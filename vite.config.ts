@@ -55,8 +55,25 @@ export default defineConfig(({mode}) => {
         },
         workbox: {
           maximumFileSizeToCacheInBytes: 10 * 1024 * 1024, // 10 MiB
-          globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,webmanifest}'],
+          // index.html is deliberately NOT precached: the app shell is fetched
+          // network-first (see runtimeCaching below) so a new deploy can never
+          // hide behind an offline copy. Hashed assets below stay precached.
+          globPatterns: ['**/*.{js,css,ico,png,svg,woff2,webmanifest}'],
+          cleanupOutdatedCaches: true,
+          // No precache fallback for navigations: the shell itself is network-first.
+          navigateFallback: undefined,
           runtimeCaching: [
+            {
+              // App shell: network first, cached copy only when offline.
+              urlPattern: /^\/(?:$|\?)/,
+              handler: 'NetworkFirst',
+              options: {
+                cacheName: 'app-shell',
+                networkTimeoutSeconds: 4,
+                expiration: { maxEntries: 1, purgeOnQuotaError: true },
+                cacheableResponse: { statuses: [0, 200] },
+              },
+            },
             {
               urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
               handler: 'CacheFirst',
