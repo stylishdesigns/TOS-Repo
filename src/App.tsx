@@ -26,6 +26,7 @@ import { StudentDetailModal } from './components/modals/StudentDetailModal';
 import { OfflineIndicator } from './components/pwa/OfflineIndicator';
 import { AuthPortal } from './components/auth/AuthPortal';
 import { WelcomeScreen } from './components/auth/WelcomeScreen';
+import { TosAdminLogin } from './components/auth/TosAdminLogin';
 import { EnterAccessCodeScreen } from './components/auth/EnterAccessCodeScreen';
 import { JoinCentreScreen } from './components/auth/JoinCentreScreen';
 
@@ -49,6 +50,13 @@ const MainLayout: React.FC = () => {
   } = useApp();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [showWelcome, setShowWelcome] = useState(true);
+  // Platform (TOS) staff sign-in lives on its own door: #tos-admin in the URL.
+  const [tosLoginRequested, setTosLoginRequested] = useState(() => window.location.hash.toLowerCase().includes('tos-admin'));
+  useEffect(() => {
+    const onHashChange = () => setTosLoginRequested(window.location.hash.toLowerCase().includes('tos-admin'));
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
   const [showPortals, setShowPortals] = useState(false);
   const [accessCodeFlow, setAccessCodeFlow] = useState<'enter' | 'join'>('enter');
 
@@ -99,6 +107,13 @@ const MainLayout: React.FC = () => {
 
   // Landing page flow: the Tutorial OS product landing is the first screen,
   // and the existing role picker stays one click away from it.
+  if (!currentUser && tosLoginRequested) {
+    return <TosAdminLogin onBack={() => {
+      history.replaceState(null, '', window.location.pathname + window.location.search);
+      setTosLoginRequested(false);
+    }} />;
+  }
+
   if (!currentUser && showWelcome) {
     if (!showPortals) {
       return (
