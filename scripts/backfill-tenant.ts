@@ -58,7 +58,6 @@ async function main() {
   const centreDoc: Centre = {
     id: EXCELLENCE_CENTRE_ID,
     name: globalData.centreName || 'Excellence Tutorial Centre',
-    type: 'centre',
     status: 'active',
     ownerUid: 'stylishdesigns484@gmail.com', // Will be linked to owner UID
     branding: {

@@ -1,5 +1,165 @@
 {
   "entities": {
+    "Settings": {
+      "title": "Tenant Settings",
+      "description": "Global configuration for the tutorial centre",
+      "type": "object",
+      "properties": {
+        "centreName": { "type": "string" },
+        "tagline": { "type": "string" },
+        "logoText": { "type": "string" },
+        "primaryColor": { "type": "string" },
+        "secondaryColor": { "type": "string" },
+        "address": { "type": "string" },
+        "state": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "whatsapp": { "type": "string" },
+        "currencySymbol": { "type": "string" },
+        "academicSession": { "type": "string" },
+        "activeBranchId": { "type": "string" },
+        "websiteDomain": { "type": "string" },
+        "maintenanceMode": { "type": "boolean" },
+        "allowPublicAdmissions": { "type": "boolean" },
+        "smsNotifications": { "type": "boolean" },
+        "emailNotifications": { "type": "boolean" }
+      }
+    },
+    "Branch": {
+      "title": "Branch",
+      "description": "Physical branch of the tutorial centre",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "state": { "type": "string" },
+        "address": { "type": "string" },
+        "phone": { "type": "string" },
+        "coordinator": { "type": "string" },
+        "studentCount": { "type": "number" }
+      }
+    },
+    "Student": {
+      "title": "Student",
+      "description": "Enrolled student record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "regNumber": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "gender": { "type": "string", "enum": ["Male", "Female"] },
+        "status": { "type": "string", "enum": ["Active", "Idle", "Suspended", "Completed"] },
+        "programmeId": { "type": "string" },
+        "branchId": { "type": "string" },
+        "totalFee": { "type": "number" },
+        "paidAmount": { "type": "number" },
+        "outstandingBalance": { "type": "number" },
+        "totalAttendanceCount": { "type": "number" }
+      }
+    },
+    "Admission": {
+      "title": "Admission Application",
+      "description": "Public admission request",
+      "type": "object",
+      "properties": {
+        "applicantName": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "status": { "type": "string", "enum": ["Pending", "Approved", "Rejected"] }
+      }
+    },
+    "Tutor": {
+      "title": "Tutor",
+      "description": "Academic faculty member",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "subjects": { "type": "array" },
+        "status": { "type": "string", "enum": ["Active", "Suspended", "Invited"] }
+      }
+    },
+    "Programme": {
+      "title": "Academic Programme",
+      "description": "Tutorial programme definition",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "code": { "type": "string" },
+        "fee": { "type": "number" },
+        "category": { "type": "string" }
+      }
+    },
+    "Payment": {
+      "title": "Payment Record",
+      "description": "Financial transaction record",
+      "type": "object",
+      "properties": {
+        "receiptNumber": { "type": "string" },
+        "studentId": { "type": "string" },
+        "amountPaid": { "type": "number" },
+        "date": { "type": "string" }
+      }
+    },
+    "CBTExam": {
+      "title": "CBT Exam",
+      "description": "Automated assessment or mock simulation",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "subjects": { "type": "array" },
+        "questionCount": { "type": "number" },
+        "durationMinutes": { "type": "number" },
+        "targetExam": { "type": "string" },
+        "attemptsCount": { "type": "number" },
+        "averageScore": { "type": "number" },
+        "status": { "type": "string", "enum": ["Live", "Scheduled", "Draft"] },
+        "questions": { "type": "array" },
+        "frequency": { "type": "string", "enum": ["Daily", "Weekly", "Mock"] },
+        "department": { "type": "string" },
+        "mode": { "type": "string", "enum": ["MCQ", "Essay"] },
+        "startTime": { "type": "string" },
+        "endTime": { "type": "string" },
+        "tutorId": { "type": "string" },
+        "scorePerQuestion": { "type": "number" }
+      }
+    },
+    "MockGrading": {
+      "title": "Mock Grading Setting",
+      "description": "Grading configuration for specific mock programmes",
+      "type": "object",
+      "properties": {
+        "programmeId": { "type": "string" },
+        "mcqScore": { "type": "number" },
+        "essayScore": { "type": "number" }
+      }
+    },
+    "AttendanceLog": {
+      "title": "Daily Attendance Log",
+      "description": "Record of student clock-in and clock-out for a specific day",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "studentId": { "type": "string" },
+        "date": { "type": "string" },
+        "clockInAt": { "type": "string" },
+        "clockOutAt": { "type": "string" },
+        "status": { "type": "string", "enum": ["Present", "Late", "Absent", "No clock out"] }
+      }
+    },
+    "AttendanceSettings": {
+      "title": "Attendance Settings",
+      "description": "Configuration for daily attendance timings",
+      "type": "object",
+      "properties": {
+        "resumptionTime": { "type": "string" },
+        "closingTime": { "type": "string" },
+        "lateArrivalTime": { "type": "string" }
+      }
+    },
     "Centre": {
       "title": "Centre",
       "description": "Tenant organization (a tutorial centre)",
@@ -7,6 +167,7 @@
       "properties": {
         "id": { "type": "string" },
         "name": { "type": "string" },
+        "type": { "type": "string", "enum": ["centre"] },
         "status": { "type": "string", "enum": ["trial", "active", "overdue", "suspended", "closed"] },
         "ownerUid": { "type": "string" },
         "audienceTypes": { "type": "array" },
@@ -84,6 +245,17 @@
     }
   },
   "firestore": {
+    "/settings/global": { "schema": "Settings", "description": "Global centre settings" },
+    "/settings/attendance": { "schema": "AttendanceSettings", "description": "Daily attendance timings" },
+    "/branches/{branchId}": { "schema": "Branch", "description": "Branches of the centre" },
+    "/students/{studentId}": { "schema": "Student", "description": "Enrolled students" },
+    "/admissions/{admissionId}": { "schema": "Admission", "description": "Public admission applications" },
+    "/tutors/{tutorId}": { "schema": "Tutor", "description": "Tutors and faculty" },
+    "/programmes/{programmeId}": { "schema": "Programme", "description": "Available tutorial programmes" },
+    "/payments/{paymentId}": { "schema": "Payment", "description": "Payment records" },
+    "/cbt_exams/{examId}": { "schema": "CBTExam", "description": "CBT assessments" },
+    "/mock_grading/{settingId}": { "schema": "MockGrading", "description": "Mock grading configurations" },
+    "/attendance_logs/{logId}": { "schema": "AttendanceLog", "description": "Daily attendance records" },
     "/centres/{centreId}": { "schema": "Centre", "description": "Tutorial centres" },
     "/centreBilling/{centreId}": { "schema": "CentreBilling", "description": "Tenant subscription and billing metadata" },
     "/accessCodes/{code}": { "schema": "AccessCode", "description": "Routing access code index" },
