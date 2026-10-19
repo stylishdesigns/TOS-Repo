@@ -21,6 +21,7 @@ import { CmsManager } from './components/cms/CmsManager';
 import { StaffRolesManager } from './components/staff/StaffRolesManager';
 import { SettingsView } from './components/settings/SettingsView';
 import { PublicWebsite } from './components/public/PublicWebsite';
+import { TutorialOsLanding } from './components/public/TutorialOsLanding';
 import { StudentDetailModal } from './components/modals/StudentDetailModal';
 import { OfflineIndicator } from './components/pwa/OfflineIndicator';
 import { AuthPortal } from './components/auth/AuthPortal';
@@ -48,6 +49,7 @@ const MainLayout: React.FC = () => {
   } = useApp();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [showWelcome, setShowWelcome] = useState(true);
+  const [showPortals, setShowPortals] = useState(false);
   const [accessCodeFlow, setAccessCodeFlow] = useState<'enter' | 'join'>('enter');
 
 
@@ -95,8 +97,24 @@ const MainLayout: React.FC = () => {
     );
   }
 
-  // Welcome Screen Flow
+  // Landing page flow: the Tutorial OS product landing is the first screen,
+  // and the existing role picker stays one click away from it.
   if (!currentUser && showWelcome) {
+    if (!showPortals) {
+      return (
+        <TutorialOsLanding
+          onAdminSignIn={() => {
+            setViewMode('portal');
+            setShowWelcome(false);
+          }}
+          onStudentAccess={() => {
+            setViewMode('student');
+            setShowWelcome(false);
+          }}
+          onExplorePortals={() => setShowPortals(true)}
+        />
+      );
+    }
     return <WelcomeScreen onSelectRole={(role) => {
       setViewMode(role === 'admin' ? 'portal' : role);
       setShowWelcome(false);
@@ -149,7 +167,7 @@ const MainLayout: React.FC = () => {
         title="Excellence Tutorial Centre"
         subtitle=""
         onSuccess={() => {}}
-        onBack={() => setShowWelcome(true)}
+        onBack={() => { setShowPortals(false); setShowWelcome(true); }}
       />
     );
   }
@@ -161,7 +179,7 @@ const MainLayout: React.FC = () => {
         title="Excellence Tutorial Centre"
         subtitle=""
         onSuccess={() => {}}
-        onBack={() => setShowWelcome(true)}
+        onBack={() => { setShowPortals(false); setShowWelcome(true); }}
       />
     );
   }
