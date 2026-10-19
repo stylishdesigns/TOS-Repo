@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { getAuth } from 'firebase/auth';
 import {
   LayoutDashboard, Users, Building2, Wallet, ScrollText, UserPlus, Loader2,
   RefreshCw, KeyRound, Send, Ban, X, ChevronLeft, AlertTriangle, CheckCircle2,
@@ -16,9 +17,18 @@ import {
 type Json = any;
 
 async function api(path: string, opts: { method?: string; body?: any } = {}): Promise<Json> {
+  // Every /api/tos route is authenticated server-side: attach the caller's
+  // verified Firebase ID token. A fresh token (force refresh) also picks up a
+  // `tos` claim minted moments ago during session sync.
+  const user = getAuth().currentUser;
+  if (!user) throw new Error('You are signed out. Sign in again to continue.');
+  const token = await user.getIdToken(true);
   const res = await fetch(path, {
     method: opts.method || 'GET',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
     ...(opts.body !== undefined ? { body: JSON.stringify(opts.body) } : {}),
   });
   const data = await res.json().catch(() => ({}));
@@ -93,8 +103,10 @@ const btnPrimary =
 const btnGhost =
   'inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-white/10 hover:border-white/25 bg-slate-950/40 disabled:opacity-50 text-slate-200 font-semibold text-sm transition-all';
 
+// ---------------------------------------------------------------------------
 // Credentials modal: a temporary password is shown exactly once, here, and
-// never stored. There is no way to see it a second time.
+// never stored. Closing it is the only way to see it again... there isn't one.
+// ---------------------------------------------------------------------------
 const CredentialsModal: React.FC<{ details: { email: string; password?: string; accessCode?: string; centreName: string }; onClose: () => void }> = ({ details, onClose }) => {
   const [copied, setCopied] = useState<string>('');
   const copy = async (label: string, value: string) => {
@@ -161,21 +173,25 @@ const CredentialsModal: React.FC<{ details: { email: string; password?: string; 
   );
 };
 
-const OverviewTab: React.FC<{ onOpenCentre: (id: string) => void; refreshKey: number }> = ({ onOpenCentre, refreshKey }) => {
+// ---------------------------------------------------------------------------
+// OVERVIEW
+// ---------------------------------------------------------------------------
+const OverviewTab: React.FC<{ onOpenCentre: (id: string) => void; refreshKey: number; onDataLoaded?: () => void }> = ({ onOpenCentre, refreshKey, onDataLoaded }) => {
   const [data, setData] = useState<Json | null>(null);
   const [error, setError] = useState('');
   const [sweeping, setSweeping] = useState(false);
-  const [sweepResult, setSweepResult] = useState('');
+  const [sweepResult, setSweepResult] = useState<string>('');
 
   const load = useCallback(async () => {
     setError('');
     try {
       const d = await api('/api/tos/overview');
       setData(d);
+      onDataLoaded?.();
     } catch (e: any) {
       setError(e.message);
     }
-  }, []);
+  }, [onDataLoaded]);
 
   useEffect(() => { load(); }, [load, refreshKey]);
 
@@ -262,6 +278,9 @@ const OverviewTab: React.FC<{ onOpenCentre: (id: string) => void; refreshKey: nu
   );
 };
 
+// ---------------------------------------------------------------------------
+// LEADS
+// ---------------------------------------------------------------------------
 const LeadsTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
   const [leads, setLeads] = useState<any[]>([]);
   const [filter, setFilter] = useState('');
@@ -298,6 +317,7 @@ const LeadsTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
           email: lead.email,
           password: r.tempPassword,
           accessCode: r.accessCode,
+          delivered: r.welcomeDelivered,
         });
       }
       await load();
@@ -356,9 +376,9 @@ const LeadsTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
                     </>
                   )}
                   {l.status === 'provisioned' && l.centreId && (
-                    <button onClick={() => window.dispatchEvent(new CustomEvent('tos-open-centre', { detail: l.centreId }))} className={btnGhost}>
+                    <a href={`#/tos`} onClick={() => window.dispatchEvent(new CustomEvent('tos-open-centre', { detail: l.centreId }))} className={btnGhost}>
                       <ArrowUpRight className="w-4 h-4" /> Open centre
-                    </button>
+                    </a>
                   )}
                 </div>
               </div>
@@ -368,7 +388,12 @@ const LeadsTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
         </div>
       )}
 
-      {credentials && <CredentialsModal details={credentials} onClose={() => setCredentials(null)} />}
+      {credentials && (
+        <CredentialsModal
+          details={credentials}
+          onClose={() => setCredentials(null)}
+        />
+      )}
 
       {rejecting && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setRejecting(null)}>
@@ -394,6 +419,9 @@ const LeadsTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
   );
 };
 
+// ---------------------------------------------------------------------------
+// CENTRES
+// ---------------------------------------------------------------------------
 const CentreDetail: React.FC<{ centreId: string; onBack: () => void; onDataChanged: () => void }> = ({ centreId, onBack, onDataChanged }) => {
   const [data, setData] = useState<Json | null>(null);
   const [plans, setPlans] = useState<any[]>([]);
@@ -653,7 +681,7 @@ const ConfirmModal: React.FC<{
   <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={onCancel}>
     <div className="bg-slate-900 border border-white/10 rounded-3xl p-6 max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
       <div className="flex items-start gap-3 mb-3">
-        <div className="w-9 h-9 rounded-xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center shrink-0"><AlertTriangle className="w-5 h-5 text-rose-400" /></div>
+        <div className="w-9 h-9 rounded-xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center shrink-0"><AlertTriangle className="w-4.5 h-4.5 text-rose-400" /></div>
         <h3 className="text-white font-bold pt-1">{title}</h3>
       </div>
       <p className="text-slate-400 text-xs leading-relaxed">{body}</p>
@@ -748,6 +776,9 @@ const CentresTab: React.FC<{ refreshKey: number; openCentreId: string; onClearOp
   );
 };
 
+// ---------------------------------------------------------------------------
+// PLANS
+// ---------------------------------------------------------------------------
 const PlansTab: React.FC = () => {
   const [plans, setPlans] = useState<any[]>([]);
   const [config, setConfig] = useState<any>({});
@@ -852,6 +883,9 @@ const PlansTab: React.FC = () => {
   );
 };
 
+// ---------------------------------------------------------------------------
+// AUDIT
+// ---------------------------------------------------------------------------
 const AuditTab: React.FC = () => {
   const [entries, setEntries] = useState<any[]>([]);
   const [query, setQuery] = useState('');
@@ -909,6 +943,9 @@ const AuditTab: React.FC = () => {
   );
 };
 
+// ---------------------------------------------------------------------------
+// TEAM
+// ---------------------------------------------------------------------------
 const TeamTab: React.FC = () => {
   const [staff, setStaff] = useState<any[]>([]);
   const [email, setEmail] = useState('');
@@ -990,6 +1027,9 @@ const TeamTab: React.FC = () => {
   );
 };
 
+// ---------------------------------------------------------------------------
+// SHELL
+// ---------------------------------------------------------------------------
 const TABS = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
   { id: 'leads', label: 'Leads', icon: UserPlus },
@@ -1067,7 +1107,7 @@ export const TosPortal: React.FC = () => {
           </p>
         </header>
 
-        {tab === 'overview' && <OverviewTab onOpenCentre={(id) => { setOpenCentreId(id); setTab('centres'); }} refreshKey={refreshKey} />}
+        {tab === 'overview' && <OverviewTab onOpenCentre={(id) => { setOpenCentreId(id); setTab('centres'); }} refreshKey={refreshKey} onDataLoaded={() => setRefreshKey((k) => k)} />}
         {tab === 'leads' && <LeadsTab refreshKey={refreshKey} />}
         {tab === 'centres' && <CentresTab refreshKey={refreshKey} openCentreId={openCentreId} onClearOpenCentre={() => setOpenCentreId('')} onDataChanged={() => setRefreshKey((k) => k + 1)} />}
         {tab === 'plans' && <PlansTab />}
