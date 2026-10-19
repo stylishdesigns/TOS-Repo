@@ -26,12 +26,27 @@ const projectId = process.env.VITE_FIREBASE_PROJECT_ID || firebaseConfig.project
 const databaseId = process.env.VITE_FIRESTORE_DATABASE_ID || firebaseConfig.firestoreDatabaseId || '(default)';
 
 const apps = getApps();
+// Explicit credentials when provided (e.g. Netlify Functions, where Application
+// Default Credentials are not available). On Cloud Run this stays undefined and
+// the platform's default credentials are used, exactly as before.
+let explicitCredential: any;
+try {
+  const svcJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+  if (svcJson) {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { credential } = require('firebase-admin/app');
+    explicitCredential = credential.cert(JSON.parse(svcJson));
+  }
+} catch (e) {
+  console.error('Could not build FIREBASE_SERVICE_ACCOUNT_JSON credential:', e);
+}
+
 export const adminApp: App = apps.length > 0
   ? apps[0]!
   : initializeApp({
       projectId,
+      ...(explicitCredential ? { credential: explicitCredential } : {}),
     });
 
 export const adminAuth: Auth = getAuth(adminApp);
 export const adminDb: Firestore = getFirestore(adminApp, databaseId);
-

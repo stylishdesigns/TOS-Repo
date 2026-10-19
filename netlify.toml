@@ -1,1 +1,22 @@
-IyBOZXRsaWZ5IGJ1aWxkcyB0aGUgVml0ZSBmcm9udGVuZCBvbmx5LiBUaGUgRXhwcmVzcyBzZXJ2ZXIgKHNlcnZlci50cykgcnVucyBvbgojIENsb3VkIFJ1biwgbm90IG9uIE5ldGxpZnkuIC9hcGkvKiB0cmFmZmljIGlzIHByb3hpZWQgdG8gdGhlIGJhY2tlbmQgYmVsb3cuCgpbYnVpbGRdCiAgY29tbWFuZCA9ICJucHggdml0ZSBidWlsZCIKICBwdWJsaXNoID0gImRpc3QiCgojIEFQSSBwcm94eTogcG9pbnQgdGhpcyBhdCB5b3VyIENsb3VkIFJ1biBzZXJ2aWNlIFVSTCAod2l0aCBodHRwczovLykuCiMgQSAyMDAgcmVkaXJlY3QgdG8gYW4gYWJzb2x1dGUgVVJMIGFjdHMgYXMgYSByZXZlcnNlIHByb3h5LgpbW3JlZGlyZWN0c11dCiAgZnJvbSA9ICIvYXBpLyoiCiAgdG8gPSAiaHR0cHM6Ly9SRVBMQUNFLVdJVEgtQ0xPVUQtUlVOLVVSTC86c3BsYXQiCiAgc3RhdHVzID0gMjAwCgojIFNQQSBmYWxsYmFjaywgYWx3YXlzIGxhc3QuCltbcmVkaXJlY3RzXV0KICBmcm9tID0gIi8qIgogIHRvID0gIi9pbmRleC5odG1sIgogIHN0YXR1cyA9IDIwMAo=
+# Netlify builds the Vite frontend and serves the Express backend through a
+# Netlify Function (netlify/functions/api.mts), so previews are fully usable.
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+# Backend: everything under /api is handled by the Express app in the function.
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api/:splat"
+  status = 200
+
+# SPA fallback, always last.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
