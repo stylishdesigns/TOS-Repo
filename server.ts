@@ -887,12 +887,21 @@ RULES:
     });
   }
 
+  if (process.env.NETLIFY === "true") {
+    // Running inside a Netlify Function: never bind a port, just return the app.
+    return app;
+  }
+
   app.listen(Number(PORT), "0.0.0.0", () => {
     console.log(`Server running on port ${PORT}`);
   });
 }
 
-startServer().catch(err => {
-  console.error("CRITICAL: Failed to start server:", err);
-  process.exit(1);
-});
+if (process.env.NETLIFY !== "true") {
+  startServer().catch(err => {
+    console.error("CRITICAL: Failed to start server:", err);
+    process.exit(1);
+  });
+}
+
+export { startServer };
