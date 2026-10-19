@@ -3,6 +3,53 @@
 Where each defect occurs in the code as of commit 5aeebc6 (branch netlify-preview-setup).
 Line numbers refer to that commit and will shift as fixes land.
 
+## Fix status (Prompt A landed)
+
+All eight defects are addressed on this branch (commits 146be6d, 19b8c15, a825c1a,
+dc75297, 4a43315, d19ab68, c749073). Status as of c749073:
+
+1. Auth bypass — fixed. `getCaller` no longer decodes token payloads; every `/api`
+   route except `/api/health`, `/api/public/*` and `/api/internal/*`
+   (`x-internal-secret`) requires a verified ID token.
+2. Silent fake data — fixed. `MEMORY_STORE` removed; tenantService is Firestore-only
+   and failures raise via `dbFailure` (500, no silent success). No empty catches
+   remain in `tenantService.ts` or `server.ts`.
+3. Unauthenticated endpoints — fixed. `/api/centre/entitlements` and
+   `/api/centre/seats-summary` require an active member (or admin/owner) of the
+   centre, with centreId resolved from the verified caller, not the client.
+4. Seat checks — fixed. `joinCentreService`, `activateStudentService` and
+   `toggleStudentAccessService` are transactional and maintain
+   `activeStudentCount` (409 `CENTRE_FULL` under concurrency).
+5. Hard-coded values — fixed server-side. Plan prices/caps live in `platformPlans`,
+   config in `platformConfig/global`, seeded create-if-missing by
+   `scripts/seed-platform-plans.ts`; missing docs return 500 pointing at the seed
+   script. Client-side super-admin refs in `AppContext.tsx` remain for Prompt B.
+6. Independent-tutor leftovers — fixed in `src/types.ts`, `tenantService.ts`,
+   `seed-platform-plans.ts`, `firebase-blueprint.json` and
+   `docs/tenant-migration-plan.md`. The unrelated comment at
+   `CbtTab.tsx:267` is untouched.
+7. Rate limiting — fixed. Firestore `rateLimits/{key}` (5 attempts per 15-min
+   window, growing lockout capped at 24h, `expiresAt` TTL field needs a console TTL
+   policy) plus per-user per-route `consumeAiRateLimit` from
+   `platformConfig.global.aiRouteRateLimitPerHour`.
+8. AI routes — fixed via middleware only (`aiQuestionsGate`/`aiEssayGate`), handlers
+   untouched; clients attach tokens through `src/utils/serverApi.ts` on same-origin
+   `/api` calls.
+
+Backward compatibility: centres with no billing document keep their own stored
+status verbatim (`effectiveStatus`), email-keyed legacy memberships still resolve,
+access codes stay server-generated 6-digit with the uniform error message, and
+`/api/health` stays public for Cloud Run checks.
+
+Verified on this branch: `tsc --noEmit` clean, `npm run build` passes, and
+`scripts/test-auth-401.ts` reports all token cases behaving correctly (missing,
+forged, expired -> 401; health stays public).
+
+Still manual (needs the service-account JSON in your environment):
+run `scripts/seed-platform-plans.ts` once, then `scripts/grant-tos.ts` for the
+super-admin email and clear `TOS_BOOTSTRAP_EMAILS`; set a TTL policy on
+`rateLimits/expiresAt` in the Firebase console.
+
 ## 1. Auth bypass (unsigned token decode)
 - `server.ts` `getCaller` (around line 330-351): on `verifyIdToken` failure the handler
   splits the JWT and decodes the payload with `Buffer.from(parts[1], 'base64')` without
