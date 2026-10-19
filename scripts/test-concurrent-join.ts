@@ -16,7 +16,21 @@ if (!process.env.FIRESTORE_EMULATOR_HOST) {
 }
 
 // The emulator ignores real credentials; initializeApp needs something valid-shaped.
-const cfg = JSON.parse(fs.readFileSync('firebase-applet-config.json', 'utf8'));
+const cfg = (() => {
+  if (process.env.FIREBASE_PROJECT_ID && process.env.FIRESTORE_DATABASE_ID) {
+    return {
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      firestoreDatabaseId: process.env.FIRESTORE_DATABASE_ID,
+    };
+  }
+  try {
+    return JSON.parse(fs.readFileSync('firebase-applet-config.json', 'utf8'));
+  } catch {
+    console.error('Set FIREBASE_PROJECT_ID and FIRESTORE_DATABASE_ID, or provide');
+    console.error('firebase-applet-config.json locally, and re-run.');
+    process.exit(1);
+  }
+})();
 process.env.VITE_FIREBASE_PROJECT_ID = cfg.projectId;
 process.env.VITE_FIRESTORE_DATABASE_ID = cfg.firestoreDatabaseId || '(default)';
 process.env.FIREBASE_SERVICE_ACCOUNT_JSON = JSON.stringify({

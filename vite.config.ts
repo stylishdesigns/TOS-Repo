@@ -1,11 +1,26 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
-import {defineConfig} from 'vite';
+import {defineConfig, loadEnv} from 'vite';
 import {VitePWA} from 'vite-plugin-pwa';
 
-export default defineConfig(() => {
+export default defineConfig(({mode}) => {
+  // Expose ONLY these public Firebase web identifiers to the client bundle.
+  // Everything else in the environment (service account, AI key) stays
+  // server-side and can never reach the browser bundle.
+  const env = {...loadEnv(mode, process.cwd(), ''), ...process.env} as Record<string, string | undefined>;
+  const pub = (key: string) => JSON.stringify(env[key] ?? '');
   return {
+    define: {
+      'import.meta.env.FIREBASE_API_KEY': pub('FIREBASE_API_KEY'),
+      'import.meta.env.FIREBASE_APP_ID': pub('FIREBASE_APP_ID'),
+      'import.meta.env.FIREBASE_PROJECT_ID': pub('FIREBASE_PROJECT_ID'),
+      'import.meta.env.FIREBASE_AUTH_DOMAIN': pub('FIREBASE_AUTH_DOMAIN'),
+      'import.meta.env.FIREBASE_STORAGE_BUCKET': pub('FIREBASE_STORAGE_BUCKET'),
+      'import.meta.env.FIREBASE_MESSAGING_SENDER_ID': pub('FIREBASE_MESSAGING_SENDER_ID'),
+      'import.meta.env.FIREBASE_OAUTH_CLIENT_ID': pub('FIREBASE_OAUTH_CLIENT_ID'),
+      'import.meta.env.FIRESTORE_DATABASE_ID': pub('FIRESTORE_DATABASE_ID'),
+    },
     plugins: [
       react(),
       tailwindcss(),
@@ -32,12 +47,6 @@ export default defineConfig(() => {
             },
             {
               src: '/pwa-512x512.png',
-              sizes: '512x512',
-              type: 'image/png',
-              purpose: 'any',
-            },
-            {
-              src: '/pwa-maskable-512x512.png',
               sizes: '512x512',
               type: 'image/png',
               purpose: 'maskable',
@@ -105,7 +114,7 @@ export default defineConfig(() => {
     },
     server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
-      // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
+      // Do not modify—file watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true' ? { overlay: false } : false,
       // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
       watch: process.env.DISABLE_HMR === 'true' ? null : {},

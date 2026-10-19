@@ -39,7 +39,24 @@ const TENANT_COLLECTIONS = [
 ];
 
 async function main() {
-  const cfg = JSON.parse(fs.readFileSync('firebase-applet-config.json', 'utf8'));
+  let cfg: { projectId: string; firestoreDatabaseId?: string } = {
+    projectId: process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID || '',
+    firestoreDatabaseId: process.env.FIRESTORE_DATABASE_ID || process.env.VITE_FIRESTORE_DATABASE_ID || '',
+  };
+  if (!cfg.projectId || !cfg.firestoreDatabaseId) {
+    try {
+      const local = JSON.parse(fs.readFileSync('firebase-applet-config.json', 'utf8'));
+      cfg.projectId = cfg.projectId || local.projectId;
+      cfg.firestoreDatabaseId = cfg.firestoreDatabaseId || local.firestoreDatabaseId || '(default)';
+    } catch {
+      // no local file; fall through to the check below
+    }
+  }
+  if (!cfg.projectId || !cfg.firestoreDatabaseId) {
+    console.error('Set FIREBASE_PROJECT_ID and FIRESTORE_DATABASE_ID (or provide');
+    console.error('firebase-applet-config.json locally) and re-run.');
+    process.exit(1);
+  }
   const svcJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
   const adcPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
   if (!svcJson && !adcPath) {

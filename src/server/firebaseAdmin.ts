@@ -4,26 +4,40 @@ import { getAuth, Auth } from 'firebase-admin/auth';
 import fs from 'fs';
 import path from 'path';
 
-let firebaseConfig: {
+// Config comes from environment variables. A local (git-ignored)
+// firebase-applet-config.json is honoured as a developer-machine fallback so
+// the maintenance scripts keep working without extra setup. No values are
+// committed to the repository.
+let localConfig: {
   projectId?: string;
   firestoreDatabaseId?: string;
-  [key: string]: any;
-} = {
-  projectId: 'excellence-tutorial-b20f7',
-  firestoreDatabaseId: 'ai-studio-excellencetutori-8f17639e-56a5-4f6b-8031-016b3f70cf68'
-};
-
+} = {};
 try {
   const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
   if (fs.existsSync(configPath)) {
-    firebaseConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    localConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
   }
 } catch (e) {
-  console.warn('Could not load firebase-applet-config.json:', e);
+  console.warn('Could not read local firebase-applet-config.json:', e);
 }
 
-const projectId = process.env.VITE_FIREBASE_PROJECT_ID || firebaseConfig.projectId;
-const databaseId = process.env.VITE_FIRESTORE_DATABASE_ID || firebaseConfig.firestoreDatabaseId || '(default)';
+const projectId =
+  process.env.FIREBASE_PROJECT_ID ||
+  process.env.VITE_FIREBASE_PROJECT_ID ||
+  localConfig.projectId ||
+  '';
+const databaseId =
+  process.env.FIRESTORE_DATABASE_ID ||
+  process.env.VITE_FIRESTORE_DATABASE_ID ||
+  localConfig.firestoreDatabaseId ||
+  '';
+
+if (!projectId || !databaseId) {
+  throw new Error(
+    'Firebase admin config is missing. Set FIREBASE_PROJECT_ID and FIRESTORE_DATABASE_ID ' +
+      'in the host environment (or provide firebase-applet-config.json locally for development).',
+  );
+}
 
 const apps = getApps();
 // Explicit credentials when provided (e.g. Netlify Functions, where Application
