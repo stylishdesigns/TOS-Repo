@@ -45,14 +45,15 @@ const apps = getApps();
 // the platform's default credentials are used, exactly as before.
 let explicitCredential: any;
 try {
-  const svcJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+  const svcJson =
+    process.env.FIREBASE_SERVICE_ACCOUNT_JSON || process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
   if (svcJson) {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { credential } = require('firebase-admin/app');
     explicitCredential = credential.cert(JSON.parse(svcJson));
   }
 } catch (e) {
-  console.error('Could not build FIREBASE_SERVICE_ACCOUNT_JSON credential:', e);
+  console.error('Could not build the service-account credential:', e);
 }
 
 export const adminApp: App = apps.length > 0

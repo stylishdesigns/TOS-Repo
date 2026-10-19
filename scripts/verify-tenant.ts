@@ -7,6 +7,7 @@
  *
  * Credentials (one of):
  *   FIREBASE_SERVICE_ACCOUNT_JSON   - the service-account key JSON as a string
+ *                                     (FIREBASE_SERVICE_ACCOUNT_KEY also works)
  *   GOOGLE_APPLICATION_CREDENTIALS  - path to a service-account key file
  * Run:  npx tsx scripts/verify-tenant.ts
  */
@@ -57,7 +58,8 @@ async function main() {
     console.error('firebase-applet-config.json locally) and re-run.');
     process.exit(1);
   }
-  const svcJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+  const svcJson =
+    process.env.FIREBASE_SERVICE_ACCOUNT_JSON || process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
   const adcPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
   if (!svcJson && !adcPath) {
     console.error('Set FIREBASE_SERVICE_ACCOUNT_JSON (the key JSON as a string) or');

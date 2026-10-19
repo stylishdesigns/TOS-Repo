@@ -6,7 +6,7 @@
  *
  * Requires these environment variables in Netlify (Site settings > Environment
  * variables):
- * - FIREBASE_SERVICE_ACCOUNT_JSON: a Firebase service account private key
+ * - FIREBASE_SERVICE_ACCOUNT_JSON (or FIREBASE_SERVICE_ACCOUNT_KEY): a Firebase service account private key
  *   (Firebase console > Project settings > Service accounts > Generate new private key).
  * - EXCELLENT_API_KEY: the Vertex AI key used by the AI routes (optional; only
  *   needed if you want AI routes to work on Netlify too).
