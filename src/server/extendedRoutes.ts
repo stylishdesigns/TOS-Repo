@@ -26,8 +26,9 @@ import {
 /**
  * Prompt C routes: public lead capture and verification, the TOS platform
  * console API, owner access-code management, first-login completion, and the
- * internal billing sweep. Registered from server.ts BEFORE the static/SPA
- * fallback so no GET route is ever swallowed by it.
+ * billing sweep (manual TOS trigger + secret-protected internal trigger).
+ * Registered from server.ts BEFORE the static/SPA fallback so no GET route is
+ * ever swallowed by it.
  *
  * Enforcement lives here (Express + Admin SDK) and in Firestore rules, never
  * only in the UI. The /api/public/* and /api/internal/* prefixes are
@@ -735,6 +736,18 @@ export function registerExtendedRoutes(app: express.Express): void {
       if (error?.status) return res.status(error.status).json({ error: error.message });
       console.error('[tos/team] add failed:', error?.message || error);
       res.status(500).json({ error: 'Could not add staff.' });
+    }
+  });
+
+  app.post('/api/tos/billing-sweep', async (req, res) => {
+    try {
+      const caller = requireTos(req);
+      const result = await runBillingSweep();
+      await audit({ actorUid: caller.uid, action: 'BILLING_SWEEP_RUN', after: result });
+      res.json({ success: true, ...result });
+    } catch (error: any) {
+      console.error('[billing-sweep] manual run failed:', error?.message || error);
+      res.status(500).json({ error: 'Billing sweep failed.' });
     }
   });
 
