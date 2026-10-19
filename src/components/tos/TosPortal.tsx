@@ -26,16 +26,16 @@ async function api(path: string, opts: { method?: string; body?: any } = {}): Pr
   return data;
 }
 
-const money = (n: any) => '\u20a6' + (Number(n) || 0).toLocaleString();
+const money = (n: any) => '₦' + (Number(n) || 0).toLocaleString();
 const fmtDate = (s: any) => {
-  if (!s) return '\u2014';
+  if (!s) return '—';
   const d = new Date(s);
-  return isNaN(d.getTime()) ? '\u2014' : d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+  return isNaN(d.getTime()) ? '—' : d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
 };
 const fmtDateTime = (s: any) => {
-  if (!s) return '\u2014';
+  if (!s) return '—';
   const d = new Date(s);
-  return isNaN(d.getTime()) ? '\u2014' : d.toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  return isNaN(d.getTime()) ? '—' : d.toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -194,7 +194,7 @@ const OverviewTab: React.FC<{ onOpenCentre: (id: string) => void; refreshKey: nu
   };
 
   if (error) return <p className="text-rose-300 text-sm">{error}</p>;
-  if (!data) return <div className="flex items-center gap-2 text-slate-400 text-sm py-10 justify-center"><Loader2 className="w-4 h-4 animate-spin" /> Loading\u2026</div>;
+  if (!data) return <div className="flex items-center gap-2 text-slate-400 text-sm py-10 justify-center"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</div>;
 
   const c = data.centres || {};
   const leads = data.leads || {};
@@ -204,7 +204,7 @@ const OverviewTab: React.FC<{ onOpenCentre: (id: string) => void; refreshKey: nu
         <div className="bg-slate-900/70 border border-white/10 rounded-2xl p-4">
           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Centres</p>
           <p className="text-2xl font-black text-white mt-1">{c.total ?? 0}</p>
-          <p className="text-[11px] text-slate-400 mt-1">{c.active || 0} active \u00b7 {c.trial || 0} trial</p>
+          <p className="text-[11px] text-slate-400 mt-1">{c.active || 0} active · {c.trial || 0} trial</p>
         </div>
         <div className="bg-slate-900/70 border border-white/10 rounded-2xl p-4">
           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Awaiting payment</p>
@@ -219,7 +219,7 @@ const OverviewTab: React.FC<{ onOpenCentre: (id: string) => void; refreshKey: nu
         <div className="bg-slate-900/70 border border-white/10 rounded-2xl p-4">
           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Leads</p>
           <p className="text-2xl font-black text-white mt-1">{leads.total ?? 0}</p>
-          <p className="text-[11px] text-slate-400 mt-1">{leads.unverified || 0} unverified \u00b7 {leads.verified || 0} to set up</p>
+          <p className="text-[11px] text-slate-400 mt-1">{leads.unverified || 0} unverified · {leads.verified || 0} to set up</p>
         </div>
       </div>
 
@@ -321,7 +321,7 @@ const LeadsTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
       </div>
       {error && <p className="text-rose-300 text-sm">{error}</p>}
       {loading ? (
-        <div className="flex items-center gap-2 text-slate-400 text-sm py-10 justify-center"><Loader2 className="w-4 h-4 animate-spin" /> Loading\u2026</div>
+        <div className="flex items-center gap-2 text-slate-400 text-sm py-10 justify-center"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</div>
       ) : shown.length === 0 ? (
         <Card><p className="text-slate-400 text-sm">No leads here yet. Sign-ups from the public site land in this list.</p></Card>
       ) : (
@@ -334,9 +334,9 @@ const LeadsTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
                     <p className="text-white font-bold">{l.businessName}</p>
                     <StatusPill status={l.status} labels={LEAD_STATUS_LABELS} styles={{ verified: STATUS_STYLES.trial }} />
                   </div>
-                  <p className="text-xs text-slate-400 mt-1">{l.fullName} \u00b7 {l.email} \u00b7 {l.phone}</p>
+                  <p className="text-xs text-slate-400 mt-1">{l.fullName} · {l.email} · {l.phone}</p>
                   <p className="text-[11px] text-slate-500 mt-1">
-                    {l.studentCount} students \u00b7 {l.city}, {l.state} \u00b7 {(l.examTypes || []).join(', ')} \u00b7 {l.skipTrial ? 'skipping trial' : 'wants the trial'} \u00b7 {fmtDate(l.createdAt)}
+                    {l.studentCount} students · {l.city}, {l.state} · {(l.examTypes || []).join(', ')} · {l.skipTrial ? 'skipping trial' : 'wants the trial'} · {fmtDate(l.createdAt)}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
@@ -442,7 +442,7 @@ const CentreDetail: React.FC<{ centreId: string; onBack: () => void; onDataChang
   };
 
   if (error) return <div><button onClick={onBack} className="text-orange-300 text-sm mb-3 inline-flex items-center gap-1.5"><ChevronLeft className="w-4 h-4" /> All centres</button><p className="text-rose-300 text-sm">{error}</p></div>;
-  if (!data) return <div className="flex items-center gap-2 text-slate-400 text-sm py-10 justify-center"><Loader2 className="w-4 h-4 animate-spin" /> Loading\u2026</div>;
+  if (!data) return <div className="flex items-center gap-2 text-slate-400 text-sm py-10 justify-center"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</div>;
 
   const { centre, billing, payments, audit } = data;
   const status = centre.billingStatus || centre.status;
@@ -459,12 +459,12 @@ const CentreDetail: React.FC<{ centreId: string; onBack: () => void; onDataChang
               <StatusPill status={status} />
             </div>
             <p className="text-xs text-slate-400 mt-1.5">
-              Owner: {centre.ownerName || '\u2014'} \u00b7 {centre.ownerEmail || '\u2014'} \u00b7 {centre.ownerPhone || '\u2014'}
+              Owner: {centre.ownerName || '—'} · {centre.ownerEmail || '—'} · {centre.ownerPhone || '—'}
             </p>
             <p className="text-[11px] text-slate-500 mt-1">
               Created {fmtDate(centre.createdAt)}
-              {centre.contact?.state ? ` \u00b7 ${centre.contact.city || ''}${centre.contact.city ? ', ' : ''}${centre.contact.state}` : ''}
-              {(centre.audienceTypes || []).length ? ` \u00b7 ${(centre.audienceTypes || []).join(', ')}` : ''}
+              {centre.contact?.state ? ` · ${centre.contact.city || ''}${centre.contact.city ? ', ' : ''}${centre.contact.state}` : ''}
+              {(centre.audienceTypes || []).length ? ` · ${(centre.audienceTypes || []).join(', ')}` : ''}
             </p>
           </div>
         </div>
@@ -490,7 +490,7 @@ const CentreDetail: React.FC<{ centreId: string; onBack: () => void; onDataChang
           <div className="space-y-4">
             <Field label="Plan">
               <select value={seatEdits.planId} onChange={(e) => setSeatEdits((s) => ({ ...s, planId: e.target.value }))} className={inputCls}>
-                {plans.map((p) => <option key={p.id} value={p.id}>{p.name} \u00b7 {money(p.price)}/seat/month</option>)}
+                {plans.map((p) => <option key={p.id} value={p.id}>{p.name} · {money(p.price)}/seat/month</option>)}
               </select>
             </Field>
             <div className="grid grid-cols-2 gap-3">
@@ -511,7 +511,7 @@ const CentreDetail: React.FC<{ centreId: string; onBack: () => void; onDataChang
             {billing && (
               <div className="text-xs text-slate-400 space-y-1 pt-2 border-t border-white/5">
                 <p>Seats in use: <span className="text-white font-bold">{billing.activeStudentCount ?? 0}</span> of <span className="text-white font-bold">{billing.seatCap}</span></p>
-                <p>Billable seats this month: <span className="text-white font-bold">{Math.max(billing.billedSeatsMinimum || 0, billing.activeStudentCount || 0)}</span> \u00d7 {money((plans.find((p) => p.id === billing.planId) || {}).price)}</p>
+                <p>Billable seats this month: <span className="text-white font-bold">{Math.max(billing.billedSeatsMinimum || 0, billing.activeStudentCount || 0)}</span> × {money((plans.find((p) => p.id === billing.planId) || {}).price)}</p>
               </div>
             )}
           </div>
@@ -550,7 +550,7 @@ const CentreDetail: React.FC<{ centreId: string; onBack: () => void; onDataChang
         <Card title="Access code">
           <div className="space-y-3">
             <div className="flex items-center gap-3">
-              <p className="text-2xl font-black text-white font-mono tracking-[0.2em]">{centre.accessCode || '\u2014'}</p>
+              <p className="text-2xl font-black text-white font-mono tracking-[0.2em]">{centre.accessCode || '—'}</p>
               <button onClick={() => navigator.clipboard?.writeText(centre.accessCode || '').catch(() => {})} className="text-slate-400 hover:text-orange-300" title="Copy"><Copy className="w-4 h-4" /></button>
             </div>
             <p className="text-xs text-slate-500">Staff and students join with this code. Regenerating invalidates the old code immediately; existing members stay signed in, and the owner is notified.</p>
@@ -561,7 +561,7 @@ const CentreDetail: React.FC<{ centreId: string; onBack: () => void; onDataChang
         <Card title="Record a payment">
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Amount (\u20a6)">
+              <Field label="Amount (₦)">
                 <input type="number" min="0" value={payment.amount} onChange={(e) => setPayment((p) => ({ ...p, amount: e.target.value }))} className={inputCls} placeholder="e.g. 30000" />
               </Field>
               <Field label="Paid through (date)">
@@ -570,7 +570,7 @@ const CentreDetail: React.FC<{ centreId: string; onBack: () => void; onDataChang
             </div>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Method">
-                <input value={payment.method} onChange={(e) => setPayment((p) => ({ ...p, method: e.target.value }))} className={inputCls} placeholder="Transfer, cash, POS\u2026" />
+                <input value={payment.method} onChange={(e) => setPayment((p) => ({ ...p, method: e.target.value }))} className={inputCls} placeholder="Transfer, cash, POS…" />
               </Field>
               <Field label="Reference">
                 <input value={payment.reference} onChange={(e) => setPayment((p) => ({ ...p, reference: e.target.value }))} className={inputCls} placeholder="Bank reference" />
@@ -591,7 +591,7 @@ const CentreDetail: React.FC<{ centreId: string; onBack: () => void; onDataChang
                 {payments.map((p: any) => (
                   <div key={p.id} className="flex items-center justify-between text-xs">
                     <span className="text-white font-bold">{money(p.amount)}</span>
-                    <span className="text-slate-400">covers to {fmtDate(p.periodCoveredUntil)} \u00b7 {p.method || '\u2014'} \u00b7 {fmtDateTime(p.at)}</span>
+                    <span className="text-slate-400">covers to {fmtDate(p.periodCoveredUntil)} · {p.method || '—'} · {fmtDateTime(p.at)}</span>
                   </div>
                 ))}
               </div>
@@ -605,7 +605,7 @@ const CentreDetail: React.FC<{ centreId: string; onBack: () => void; onDataChang
           {(audit || []).map((e: any) => (
             <div key={e.id} className="flex flex-wrap items-center justify-between gap-2 text-xs bg-slate-950/50 border border-white/5 rounded-xl px-3.5 py-2">
               <span className="font-bold text-white">{String(e.action || '').replace(/_/g, ' ')}</span>
-              <span className="text-slate-500">{fmtDateTime(e.at)} \u00b7 {e.actorUid || ''}</span>
+              <span className="text-slate-500">{fmtDateTime(e.at)} · {e.actorUid || ''}</span>
             </div>
           ))}
           {!(audit || []).length && <p className="text-slate-500 text-xs">Nothing recorded for this centre yet.</p>}
@@ -710,7 +710,7 @@ const CentresTab: React.FC<{ refreshKey: number; openCentreId: string; onClearOp
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
-        <input value={query} onChange={(e) => setQuery(e.target.value)} className={`${inputCls} max-w-xs`} placeholder="Search name or owner email\u2026" />
+        <input value={query} onChange={(e) => setQuery(e.target.value)} className={`${inputCls} max-w-xs`} placeholder="Search name or owner email…" />
         <select value={status} onChange={(e) => setStatus(e.target.value)} className={`${inputCls} max-w-52`}>
           <option value="">All statuses</option>
           {Object.entries(STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
@@ -719,7 +719,7 @@ const CentresTab: React.FC<{ refreshKey: number; openCentreId: string; onClearOp
       </div>
       {error && <p className="text-rose-300 text-sm">{error}</p>}
       {loading ? (
-        <div className="flex items-center gap-2 text-slate-400 text-sm py-10 justify-center"><Loader2 className="w-4 h-4 animate-spin" /> Loading\u2026</div>
+        <div className="flex items-center gap-2 text-slate-400 text-sm py-10 justify-center"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</div>
       ) : shown.length === 0 ? (
         <Card><p className="text-slate-400 text-sm">No centres match. New centres appear here the moment they are provisioned.</p></Card>
       ) : (
@@ -736,8 +736,8 @@ const CentresTab: React.FC<{ refreshKey: number; openCentreId: string; onClearOp
                   <p className="text-xs text-slate-400 mt-1">{c.ownerEmail || 'no owner email'}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-xs text-slate-300 font-semibold">{c.seatsUsed ?? 0} / {c.seatCap ?? '\u2014'} seats</p>
-                  <p className="text-[11px] text-slate-500">{c.planId ? c.planId.replace('centre_', 'Centre ').replace('_', ' ') : 'no plan'}{c.trialEndsAt && c.billingStatus === 'trial' ? ` \u00b7 trial ends ${fmtDate(c.trialEndsAt)}` : ''}</p>
+                  <p className="text-xs text-slate-300 font-semibold">{c.seatsUsed ?? 0} / {c.seatCap ?? '—'} seats</p>
+                  <p className="text-[11px] text-slate-500">{c.planId ? c.planId.replace('centre_', 'Centre ').replace('_', ' ') : 'no plan'}{c.trialEndsAt && c.billingStatus === 'trial' ? ` · trial ends ${fmtDate(c.trialEndsAt)}` : ''}</p>
                 </div>
               </div>
             </button>
@@ -790,7 +790,7 @@ const PlansTab: React.FC = () => {
   const setPlan = (id: string, key: string, value: any) =>
     setPlans((ps) => ps.map((p) => (p.id === id ? { ...p, [key]: value } : p)));
 
-  if (loading) return <div className="flex items-center gap-2 text-slate-400 text-sm py-10 justify-center"><Loader2 className="w-4 h-4 animate-spin" /> Loading\u2026</div>;
+  if (loading) return <div className="flex items-center gap-2 text-slate-400 text-sm py-10 justify-center"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</div>;
 
   const configFields: [string, string][] = [
     ['trialDays', 'Trial length (days)'],
@@ -806,7 +806,7 @@ const PlansTab: React.FC = () => {
       {plans.map((p) => (
         <Card key={p.id} title={p.name}>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <Field label="Price (\u20a6/seat/month)">
+            <Field label="Price (₦/seat/month)">
               <input type="number" min="0" value={p.price ?? ''} onChange={(e) => setPlan(p.id, 'price', e.target.value)} className={inputCls} />
             </Field>
             <Field label="Full seat cap">
@@ -881,13 +881,13 @@ const AuditTab: React.FC = () => {
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') load(); }}
           className={`${inputCls} max-w-xs`}
-          placeholder="Search the audit log\u2026"
+          placeholder="Search the audit log…"
         />
         <button onClick={load} className={btnGhost}><RefreshCw className="w-4 h-4" /> Search</button>
       </div>
       {error && <p className="text-rose-300 text-sm">{error}</p>}
       {loading ? (
-        <div className="flex items-center gap-2 text-slate-400 text-sm py-10 justify-center"><Loader2 className="w-4 h-4 animate-spin" /> Loading\u2026</div>
+        <div className="flex items-center gap-2 text-slate-400 text-sm py-10 justify-center"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</div>
       ) : entries.length === 0 ? (
         <Card><p className="text-slate-400 text-sm">Nothing matches that search.</p></Card>
       ) : (
@@ -896,7 +896,7 @@ const AuditTab: React.FC = () => {
             <div key={e.id} className="bg-slate-900/70 border border-white/10 rounded-xl px-4 py-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-xs font-bold text-white">{String(e.action || '').replace(/_/g, ' ')}</span>
-                <span className="text-[11px] text-slate-500">{fmtDateTime(e.at)} \u00b7 {e.actorUid || '\u2014'}{e.centreId ? ` \u00b7 ${e.centreId}` : ''}</span>
+                <span className="text-[11px] text-slate-500">{fmtDateTime(e.at)} · {e.actorUid || '—'}{e.centreId ? ` · ${e.centreId}` : ''}</span>
               </div>
               {(e.before || e.after) && (
                 <pre className="text-[10px] text-slate-400 mt-1.5 whitespace-pre-wrap break-all">{JSON.stringify({ ...(e.before ? { before: e.before } : {}), ...(e.after ? { after: e.after } : {}) }, null, 1)}</pre>
@@ -973,7 +973,7 @@ const TeamTab: React.FC = () => {
 
       <Card title={`Platform staff (${staff.length})`}>
         {loading ? (
-          <div className="flex items-center gap-2 text-slate-400 text-sm py-6 justify-center"><Loader2 className="w-4 h-4 animate-spin" /> Loading\u2026</div>
+          <div className="flex items-center gap-2 text-slate-400 text-sm py-6 justify-center"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</div>
         ) : (
           <div className="space-y-1.5">
             {staff.map((s) => (
