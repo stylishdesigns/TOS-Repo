@@ -11,7 +11,13 @@ import {
   activateStudentService,
   toggleStudentAccessService,
   getCentreEntitlements,
-  getSeatsSummaryService
+  getSeatsSummaryService,
+  isTosUser,
+  requireMembership,
+  getPlatformConfig,
+  getCentreSubscriptionStatus,
+  consumeAiRateLimit,
+  httpError
 } from "./src/server/tenantService";
 
 
@@ -239,6 +245,46 @@ function validateEssayBlock(rawBlock: string): { valid: boolean; reason?: string
 async function startServer() {
   const app = express();
   app.use(express.json());
+
+  // ---------------------------------------------------------------------------
+  // Global authentication for the API (Prompt A step 1): every /api route
+  // requires a verified Firebase ID token, except:
+  //   - /api/health (Cloud Run health check)
+  //   - /api/public/* (public endpoints, e.g. the lead form in Prompt C)
+  //   - /api/internal/* (protected by the INTERNAL_API_SECRET header instead)
+  // The verified caller is attached to the request for every handler below.
+  // ---------------------------------------------------------------------------
+  app.use("/api", (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const path = req.path; // relative to the /api mount
+    if (path === "/health") return next();
+    if (path.startsWith("/public/")) return next();
+    if (path.startsWith("/internal/")) {
+      const secret = req.headers["x-internal-secret"];
+      if (!process.env.INTERNAL_API_SECRET || secret !== process.env.INTERNAL_API_SECRET) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      return next();
+    }
+    const authHeader = req.headers.authorization || "";
+    if (!authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    adminAuth
+      .verifyIdToken(authHeader.slice("Bearer ".length).trim())
+      .then((decoded) => {
+        (req as any).caller = {
+          uid: decoded.uid,
+          email: decoded.email || "",
+          tos: isTosUser(decoded as any),
+          claims: decoded,
+        };
+        next();
+      })
+      .catch(() => {
+        res.status(401).json({ error: "Unauthorized" });
+      });
+  });
+
   const PORT = process.env.PORT || 3000;
   const isProd = process.env.NODE_ENV === "production";
   const distPath = getDistPath(isProd);
@@ -269,14 +315,10 @@ async function startServer() {
   // Tenant Session Claims Sync Endpoint
   app.post("/api/session/sync", async (req, res) => {
     try {
-      const authHeader = req.headers.authorization || "";
-      if (!authHeader.startsWith("Bearer ")) {
-        return res.status(401).json({ error: "Unauthorized", detail: "Missing Bearer token in Authorization header" });
-      }
-
-      const idToken = authHeader.split("Bearer ")[1].trim();
-      const decoded = await adminAuth.verifyIdToken(idToken);
-      const uid = decoded.uid;
+      // The token was already verified by the global /api middleware.
+      const caller = (req as any).caller;
+      const decoded = caller.claims;
+      const uid = caller.uid;
 
       // Query active memberships for this user
       const snap = await adminDb.collection("memberships")
@@ -302,9 +344,9 @@ async function startServer() {
         }
       });
 
-      // Preserve existing `tos` claim if already present or if the email matches bootstrap admin
-      const isTosEmail = decoded.email && decoded.email.toLowerCase() === "stylishdesigns484@gmail.com";
-      const hasTos = Boolean(decoded.tos || isTosEmail);
+      // The tos claim is granted only by scripts/grant-tos.ts. Session sync
+      // preserves an existing claim and never grants one itself.
+      const hasTos = decoded.tos === true;
 
       const claims: { m: Record<string, string>; tos?: boolean } = { m };
       if (hasTos) {
@@ -326,31 +368,17 @@ async function startServer() {
     }
   });
 
-  // Helper to extract authenticated user from Bearer token
-  const getCaller = async (req: express.Request): Promise<{ uid: string; email: string }> => {
-    const authHeader = req.headers.authorization || "";
-    if (!authHeader.startsWith("Bearer ")) {
-      const err: any = new Error("Missing Bearer token");
+  // Helper to extract the authenticated caller attached by the global /api
+  // middleware. Real authentication only: a request without a verified token
+  // never reaches a route, so there is no fallback decoding of any kind.
+  const getCaller = async (req: express.Request): Promise<{ uid: string; email: string; tos: boolean; claims: any }> => {
+    const caller = (req as any).caller;
+    if (!caller) {
+      const err: any = new Error("Unauthorized");
       err.status = 401;
       throw err;
     }
-    const token = authHeader.split("Bearer ")[1].trim();
-    try {
-      const decoded = await adminAuth.verifyIdToken(token);
-      return { uid: decoded.uid, email: decoded.email || "" };
-    } catch (err) {
-      // In development or when ADC is not attached, extract from JWT payload
-      try {
-        const parts = token.split(".");
-        if (parts.length === 3) {
-          const payload = JSON.parse(Buffer.from(parts[1], "base64").toString("utf8"));
-          return { uid: payload.user_id || payload.sub, email: payload.email || "" };
-        }
-      } catch {}
-      const authErr: any = new Error("Invalid Authorization token");
-      authErr.status = 401;
-      throw authErr;
-    }
+    return caller;
   };
 
   // 1. Enter Centre with 6-digit access code (Part A, point 3)
@@ -369,6 +397,7 @@ async function startServer() {
         userEmail: caller.email,
         code: code.trim(),
         ip,
+        tos: caller.tos,
       });
 
       res.json({ success: true, ...result });
@@ -392,6 +421,7 @@ async function startServer() {
         uid: caller.uid,
         userEmail: caller.email,
         centreId,
+        tos: caller.tos,
       });
 
       res.json({ success: true, ...result, centreId });
@@ -407,6 +437,7 @@ async function startServer() {
       const centres = await listUserCentresService({
         uid: caller.uid,
         userEmail: caller.email,
+        tos: caller.tos,
       });
       res.json({ success: true, centres });
     } catch (error: any) {
@@ -430,6 +461,7 @@ async function startServer() {
         userEmail: caller.email,
         code: code.trim(),
         ip,
+        tos: caller.tos,
       });
 
       res.json({ success: true, ...result });
@@ -461,6 +493,7 @@ async function startServer() {
         actorEmail: caller.email,
         studentUid,
         centreId,
+        tos: caller.tos,
       });
 
       res.json(result);
@@ -485,6 +518,7 @@ async function startServer() {
         studentUid,
         centreId,
         active,
+        tos: caller.tos,
       });
 
       res.json(result);
@@ -497,30 +531,40 @@ async function startServer() {
   // 7. Get feature entitlements for centre (Part E)
   app.get("/api/centre/entitlements", async (req, res) => {
     try {
+      const caller = await getCaller(req);
       const centreId = (req.query.centreId as string) || (req.headers["x-centre-id"] as string);
       if (!centreId) {
         return res.status(400).json({ error: "Missing centreId" });
       }
 
+      // Step 6: any active member of the centre may read entitlements, but the
+      // membership is verified on the server; the client-supplied id is only
+      // ever validated, never trusted.
+      await requireMembership(caller, centreId);
+
       const entitlements = await getCentreEntitlements(centreId);
       res.json({ success: true, centreId, entitlements });
     } catch (error: any) {
-      res.status(500).json({ error: error.message || "Failed to get entitlements" });
+      res.status(error.status || 500).json({ error: error.message || "Failed to get entitlements" });
     }
   });
 
   // 8. Get seats summary for centre (Part D)
   app.get("/api/centre/seats-summary", async (req, res) => {
     try {
+      const caller = await getCaller(req);
       const centreId = (req.query.centreId as string) || (req.headers["x-centre-id"] as string);
       if (!centreId) {
         return res.status(400).json({ error: "Missing centreId" });
       }
 
+      // Step 6: seats summary is owner/admin (or TOS) of that centre only.
+      await requireMembership(caller, centreId, ["owner", "admin"]);
+
       const summary = await getSeatsSummaryService(centreId);
       res.json({ success: true, centreId, summary });
     } catch (error: any) {
-      res.status(500).json({ error: error.message || "Failed to get seats summary" });
+      res.status(error.status || 500).json({ error: error.message || "Failed to get seats summary" });
     }
   });
 
@@ -534,8 +578,98 @@ async function startServer() {
     });
   });
 
+  // ---------------------------------------------------------------------------
+  // AI route gating (Prompt A step 10). Middleware only: the handlers below are
+  // untouched. generate-questions requires a signed-in active owner, admin or
+  // tutor of a centre whose subscription is active; grade-essay any signed-in
+  // active member. Both are per-user rate limited in Firestore.
+  // ---------------------------------------------------------------------------
+  const ROLE_CODES: Record<string, string> = {
+    own: "owner",
+    adm: "admin",
+    sec: "secretary",
+    fin: "finance",
+    tut: "tutor",
+    stu: "student",
+  };
+
+  const aiQuestionsGate = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    try {
+      const caller = await getCaller(req);
+      const bodyCentre = (req.body && req.body.centreId) || (req.headers["x-centre-id"] as string) || "";
+      let centreId = "";
+      if (bodyCentre) {
+        const m = await requireMembership(caller, bodyCentre, ["owner", "admin", "tutor"]);
+        centreId = m.centreId;
+      } else {
+        const m = caller.claims?.m || {};
+        const candidate = Object.keys(m).find(
+          (cid) => ["owner", "admin", "tutor"].includes(ROLE_CODES[m[cid]])
+        );
+        if (!candidate) {
+          throw httpError(403, "You do not have access to this feature.");
+        }
+        await requireMembership(caller, candidate, ["owner", "admin", "tutor"]);
+        centreId = candidate;
+      }
+      const status = await getCentreSubscriptionStatus(centreId);
+      if (status !== "trial" && status !== "active") {
+        throw httpError(
+          403,
+          "This feature is unavailable while the centre's subscription is not active."
+        );
+      }
+      const config = await getPlatformConfig();
+      await consumeAiRateLimit(caller.uid, "ai-questions", config);
+      next();
+    } catch (error: any) {
+      res.status(error.status || 500).json({ error: error.message || "Unauthorized" });
+    }
+  };
+
+  const aiEssayGate = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    try {
+      const caller = await getCaller(req);
+      let centreId = (req.body && req.body.centreId) || (req.headers["x-centre-id"] as string) || "";
+      if (centreId) {
+        await requireMembership(caller, centreId);
+      } else {
+        const m = caller.claims?.m || {};
+        const candidate = Object.keys(m)[0];
+        if (candidate) {
+          await requireMembership(caller, candidate);
+          centreId = candidate;
+        } else {
+          // No claim yet: fall back to a live membership lookup.
+          const snap = await adminDb
+            .collection("memberships")
+            .where("uid", "==", caller.uid)
+            .where("status", "==", "active")
+            .limit(1)
+            .get();
+          if (snap.empty) {
+            throw httpError(403, "You do not have access to this feature.");
+          }
+          centreId = snap.docs[0].data().centreId;
+        }
+      }
+      const status = await getCentreSubscriptionStatus(centreId);
+      if (status === "suspended" || status === "pending_payment") {
+        throw httpError(
+          403,
+          "This feature is unavailable while the centre's subscription is not active."
+        );
+      }
+      const config = await getPlatformConfig();
+      await consumeAiRateLimit(caller.uid, "ai-essay", config);
+      next();
+    } catch (error: any) {
+      res.status(error.status || 500).json({ error: error.message || "Unauthorized" });
+    }
+  };
+
   // AI Question Generation Endpoint
-  app.post("/api/generate-questions", async (req, res) => {
+  app.post("/api/generate-questions", aiQuestionsGate, async (req, res) => {
     try {
       const { subject, programme, count, type, prompt: userPrompt, topic } = req.body;
       const { Type } = await import("@google/genai");
@@ -734,7 +868,7 @@ RULES:
   });
 
   // System Essay Grading Endpoint
-  app.post("/api/grade-essay", async (req, res) => {
+  app.post("/api/grade-essay", aiEssayGate, async (req, res) => {
     try {
       const { items } = req.body;
       const { Type } = await import("@google/genai");
