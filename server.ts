@@ -20,6 +20,7 @@ import {
   httpError
 } from "./src/server/tenantService";
 import { ensureBootstrapSuperAdmin } from "./src/server/platformDefaults";
+import { registerExtendedRoutes } from "./src/server/extendedRoutes";
 
 
 // Source file is ESM, but compiled to CJS for production.
@@ -1000,6 +1001,10 @@ RULES:
       res.status(500).json({ error: "Failed to grade essays", detail: String(error) });
     }
   });
+
+  // Prompt C routes (leads, TOS console, access codes, billing sweep) must be
+  // registered before the static/SPA fallback so no GET route is swallowed.
+  registerExtendedRoutes(app);
 
   if (!isProd) {
     const { createServer: createViteServer } = await import("vite");
