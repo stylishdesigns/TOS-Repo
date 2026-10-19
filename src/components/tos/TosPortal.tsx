@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { getAuth } from 'firebase/auth';
+import { getAuth, signOut } from 'firebase/auth';
 import {
   LayoutDashboard, Users, Building2, Wallet, ScrollText, UserPlus, Loader2,
   RefreshCw, KeyRound, Send, Ban, X, ChevronLeft, AlertTriangle, CheckCircle2,
@@ -1053,7 +1053,12 @@ export const TosPortal: React.FC = () => {
     return () => window.removeEventListener('tos-open-centre', handler);
   }, []);
 
-  const signOutToLanding = () => { window.location.hash = ''; };
+  // With the console as the default screen for platform staff, this button
+  // means it: end the session, then land on the public site signed out.
+  const signOutToLanding = async () => {
+    window.location.hash = '';
+    try { await signOut(getAuth()); } catch (e) { console.error(e); }
+  };
 
   return (
     <div className="min-h-screen w-full bg-slate-950 flex">
@@ -1079,6 +1084,9 @@ export const TosPortal: React.FC = () => {
             </button>
           ))}
         </nav>
+        <a href="#centre" className="text-slate-500 hover:text-slate-300 text-xs font-medium px-3.5 py-2 text-left flex items-center gap-2">
+          <Building2 className="w-3.5 h-3.5" /> Centre dashboard
+        </a>
         <button onClick={signOutToLanding} className="text-slate-500 hover:text-slate-300 text-xs font-medium px-3.5 py-2 text-left flex items-center gap-2">
           <Lock className="w-3.5 h-3.5" /> Back to the public site
         </button>
