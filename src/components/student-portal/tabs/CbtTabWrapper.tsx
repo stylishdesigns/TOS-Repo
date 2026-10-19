@@ -69,7 +69,11 @@ export const CbtTabWrapper: React.FC<CbtTabWrapperProps> = ({
             student={student}
             lockedFrequency="Mock"
             hideFrequencyToggle={true}
-            onHideBottomNav={onHideBottomNav}
+            onHideBottomNav={(hide) => {
+              // Tell the PWA updater to hold its auto-reload while an exam screen is up.
+              try { sessionStorage.setItem('tos:defer-pwa-reload', hide ? '1' : '0'); } catch {}
+              onHideBottomNav?.(hide);
+            }}
             initialSubjectFilter={cbtSubjectFilter}
             directReviewResult={cbtReviewTarget?.result}
             directReviewExamId={cbtReviewTarget?.result?.examId}
