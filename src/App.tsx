@@ -31,6 +31,7 @@ import { EnterAccessCodeScreen } from './components/auth/EnterAccessCodeScreen';
 import { JoinCentreScreen } from './components/auth/JoinCentreScreen';
 
 import { PasswordChangeOverlay } from './components/auth/PasswordChangeOverlay';
+import { getAuth } from 'firebase/auth';
 
 const MainLayout: React.FC = () => {
   const { 
@@ -59,6 +60,25 @@ const MainLayout: React.FC = () => {
   }, []);
   const [showPortals, setShowPortals] = useState(false);
   const [accessCodeFlow, setAccessCodeFlow] = useState<'enter' | 'join'>('enter');
+
+  // Platform (TOS) admins are exempt from the centre access-code gate below.
+  // The `tos` custom claim is minted server-side on first verified sign-in;
+  // the bootstrap email is a routing fallback while the claim propagates into
+  // a freshly issued token. Enforcement itself stays server-side.
+  const [hasTosClaim, setHasTosClaim] = useState(false);
+  useEffect(() => {
+    const u = getAuth().currentUser;
+    if (!u) {
+      setHasTosClaim(false);
+      return;
+    }
+    let cancelled = false;
+    u.getIdTokenResult()
+      .then((r) => { if (!cancelled) setHasTosClaim(r.claims?.tos === true); })
+      .catch(() => { if (!cancelled) setHasTosClaim(false); });
+    return () => { cancelled = true; };
+  }, [currentUser?.uid]);
+  const isTosAdmin = hasTosClaim || currentUser?.email === 'stylishdesigns484@gmail.com';
 
 
   // If user is already logged in, don't show welcome screen
@@ -150,7 +170,7 @@ const MainLayout: React.FC = () => {
   }
 
   // Multi-Tenant Access Code Screen Guard (Part A, point 2 & Part B)
-  if (currentUser && !activeCentreId && hasCheckedActiveCentre) {
+  if (currentUser && !activeCentreId && hasCheckedActiveCentre && !isTosAdmin) {
     if (accessCodeFlow === 'join') {
       return (
         <JoinCentreScreen
