@@ -1,0 +1,8 @@
+{
+  "name": "Remix Excellence Tutorial Centre",
+  "description": "Multi-Tenant Tutorial Centre Management System and Dynamic Website CMS for automating student admissions, fees, timetables, CBT practice tests, and tutor operations.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

@@ -1,0 +1,281 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // -------------------------------------------------------------------------
+    // GLOBAL HELPERS
+    // -------------------------------------------------------------------------
+    function isSignedIn() { return request.auth != null; }
+    function isVerified() { return isSignedIn(); } // Relaxed verification for testing/bootstrap
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    
+    // Admin check: verified user whose UID exists in the 'admins' collection
+    // OR hardcoded super admin email for bootstrap access
+    function isAdmin() { 
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        (request.auth.token.email != null && request.auth.token.email.lower() == "stylishdesigns484@gmail.com")
+      );
+    }
+
+    function isTutor() { 
+      return isSignedIn() && exists(/databases/$(database)/documents/tutors/$(request.auth.uid));
+    }
+
+    // Default Deny Catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // -------------------------------------------------------------------------
+    // SETTINGS
+    // -------------------------------------------------------------------------
+    function isValidSettings(data, id) {
+      return (id == 'global' && data.centreName is string && data.centreName.size() <= 200
+             && data.email is string && data.email.size() <= 200)
+          || (id == 'attendance' && data.resumptionTime is string && data.closingTime is string);
+    }
+
+    match /settings/{settingId} {
+      allow read: if true; // Publicly accessible for website
+      allow write: if isAdmin() && isValidSettings(incoming(), settingId);
+    }
+
+    // -------------------------------------------------------------------------
+    // ADMINS
+    // -------------------------------------------------------------------------
+    match /admins/{adminId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || (isSignedIn() && request.auth.uid == adminId);
+    }
+
+    // -------------------------------------------------------------------------
+    // STUDENTS
+    // -------------------------------------------------------------------------
+    function isValidStudent(data) {
+      return data.name is string && data.name.size() <= 100
+          && data.regNumber is string && data.regNumber.size() <= 50
+          && data.status in ['Active', 'Idle', 'Suspended', 'Completed']
+          && data.totalFee is number && data.totalFee >= 0
+          && data.paidAmount is number && data.paidAmount >= 0;
+    }
+
+    // Validation for students self-registering
+    function isValidStudentSelf(data) {
+      return data.name is string && data.name.size() <= 100
+          && data.uid == request.auth.uid
+          && data.status == 'Active'
+          && data.regNumber is string
+          && data.email == request.auth.token.email
+          // Onboarding fields don't include totalFee/paidAmount
+          && !('totalFee' in data)
+          && !('paidAmount' in data);
+    }
+
+    match /students/{studentId} {
+      allow get: if isVerified() && (request.auth.uid == studentId || resource.data.uid == request.auth.uid || isAdmin());
+      allow list: if isAdmin() || (isVerified() && resource.data.uid == request.auth.uid);
+      allow create: if (isAdmin() && isValidStudent(incoming())) 
+                    || (isVerified() && request.auth.uid == studentId && incoming().uid == request.auth.uid);
+      allow update: if isAdmin() || (isVerified() && resource.data.uid == request.auth.uid);
+      allow delete: if isAdmin();
+    }
+
+    // -------------------------------------------------------------------------
+    // ADMISSIONS
+    // -------------------------------------------------------------------------
+    function isValidAdmission(data) {
+      return data.applicantName is string && data.applicantName.size() <= 100
+          && data.status in ['Pending', 'Approved', 'Rejected'];
+    }
+
+    match /admissions/{admissionId} {
+      allow read: if isAdmin() || (isVerified() && resource.data.email == request.auth.token.email);
+      allow create: if isValidAdmission(incoming());
+      allow update: if isAdmin() && isValidAdmission(incoming());
+      allow delete: if isAdmin();
+    }
+
+    // -------------------------------------------------------------------------
+    // TUTORS
+    // -------------------------------------------------------------------------
+    match /tutors/{tutorId} {
+      allow read: if isVerified();
+      allow write: if isAdmin() || (isSignedIn() && request.auth.uid == tutorId);
+    }
+
+    // -------------------------------------------------------------------------
+    // PROGRAMMES
+    // -------------------------------------------------------------------------
+    match /programmes/{programmeId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // -------------------------------------------------------------------------
+    // PAYMENTS
+    // -------------------------------------------------------------------------
+    function isValidPayment(data) {
+      return data.studentId is string
+          && data.studentName is string && data.studentName.size() <= 150
+          && data.amountPaid is number && data.amountPaid >= 0
+          && data.status in ['Paid', 'Partial', 'Pending'];
+    }
+
+    match /payments/{paymentId} {
+      allow read: if true;
+      allow create: if isValidPayment(incoming());
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+    
+    // -------------------------------------------------------------------------
+    // BRANCHES
+    // -------------------------------------------------------------------------
+    function isValidBranch(data) {
+      return data.name is string && data.name.size() <= 200
+          && data.state is string && data.state.size() <= 100;
+    }
+
+    match /branches/{branchId} {
+      allow read: if true;
+      allow create, update: if isAdmin() && isValidBranch(incoming());
+      allow delete: if isAdmin();
+    }
+
+    // -------------------------------------------------------------------------
+    // ATTENDANCE LOGS
+    // -------------------------------------------------------------------------
+    function isValidAttendanceLog(data) {
+      return data.studentId is string && isValidId(data.studentId)
+          && data.date is string && data.date.size() <= 20
+          && data.status in ['Present', 'Late', 'Absent', 'No clock out'];
+    }
+
+    match /attendance_logs/{logId} {
+      allow get: if isVerified() && (resource.data.studentId == request.auth.uid || isAdmin());
+      allow list: if isAdmin() || (isVerified() && resource.data.studentId == request.auth.uid);
+      allow create, update: if isVerified() && (incoming().studentId == request.auth.uid || isAdmin()) && isValidAttendanceLog(incoming());
+      allow delete: if isAdmin();
+    }
+
+    // -------------------------------------------------------------------------
+    // ANNOUNCEMENTS
+    // -------------------------------------------------------------------------
+    match /announcements/{announcementId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // -------------------------------------------------------------------------
+    // SUBJECTS
+    // -------------------------------------------------------------------------
+    match /subjects/{subjectId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // -------------------------------------------------------------------------
+    // CLASSROOMS
+    // -------------------------------------------------------------------------
+    match /classrooms/{classroomId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // -------------------------------------------------------------------------
+    // TIMETABLE
+    // -------------------------------------------------------------------------
+    match /timetable/{slotId} {
+      allow read: if true;
+      allow write: if isAdmin() || (isVerified() && resource.data.tutorId == request.auth.uid);
+    }
+
+    // -------------------------------------------------------------------------
+    // RESULTS
+    // -------------------------------------------------------------------------
+    function isValidResult(data) {
+      return data.studentId is string
+          && data.studentName is string && data.studentName.size() <= 150
+          && data.examTitle is string && data.examTitle.size() <= 300
+          && data.totalScore is number
+          && data.averagePercent is number
+          && data.averagePercent >= 0 && data.averagePercent <= 100
+          && data.scores is list;
+    }
+
+    match /results/{resultId} {
+      allow get: if isVerified() && (resource.data.studentId == request.auth.uid || isAdmin() || isTutor());
+      allow list: if isAdmin() || isTutor() || (isVerified() && resource.data.studentId == request.auth.uid);
+      allow create: if (isAdmin() && isValidResult(incoming()))
+                    || (isVerified() && incoming().studentId == request.auth.uid && isValidResult(incoming()));
+      allow update: if (isAdmin() || isTutor()) && isValidResult(incoming());
+      allow delete: if isAdmin();
+    }
+
+    // -------------------------------------------------------------------------
+    // CBT QUESTIONS
+    // -------------------------------------------------------------------------
+    match /cbt_questions/{questionId} {
+      allow read: if isVerified();
+      allow write: if isAdmin();
+    }
+
+    // -------------------------------------------------------------------------
+    // ACTIVITIES
+    // -------------------------------------------------------------------------
+    match /activities/{activityId} {
+      allow read: if isAdmin();
+      allow create: if isVerified();
+      allow update, delete: if isAdmin();
+    }
+
+    // -------------------------------------------------------------------------
+    // CMS
+    // -------------------------------------------------------------------------
+    match /cms/{cmsId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // -------------------------------------------------------------------------
+    // CBT EXAMS
+    // -------------------------------------------------------------------------
+    function isValidExam(data) {
+      return data.title is string && data.title.size() <= 500
+          && (!('status' in data) || data.status in ['Live', 'Scheduled', 'Draft'])
+          && (!('frequency' in data) || data.frequency in ['Daily', 'Weekly', 'Mock', 'General', 'Daily (CBT)', 'Weekly (CBT)'])
+          && (!('mode' in data) || data.mode in ['MCQ', 'Essay', 'Both']);
+    }
+
+    match /cbt_exams/{examId} {
+      allow read: if isVerified();
+      allow create: if (isAdmin() || isTutor()) && isValidExam(incoming());
+      allow update: if isVerified();
+      allow delete: if isAdmin() || (isTutor() && resource.data.tutorId == request.auth.uid);
+    }
+
+    // -------------------------------------------------------------------------
+    // MOCK GRADING
+    // -------------------------------------------------------------------------
+    match /mock_grading/{settingId} {
+      allow read: if isVerified();
+      allow write: if isAdmin();
+    }
+    // -------------------------------------------------------------------------
+    // CLASS RATINGS
+    // -------------------------------------------------------------------------
+    function isValidClassRating(data) {
+      return data.slotId is string
+          && data.studentId is string
+          && data.stars is number && data.stars >= 1 && data.stars <= 5;
+    }
+
+    match /classRatings/{ratingId} {
+      allow read: if isVerified() || isAdmin() || isTutor();
+      allow create, update: if isVerified() && isValidClassRating(incoming());
+      allow delete: if isAdmin();
+    }
+  }
+}

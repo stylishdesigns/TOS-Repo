@@ -1,0 +1,6 @@
+{
+  "summary":  "Comprehensive plan to integrate a dynamic AI prompt generator into both Admin CBT Manager and Tutor Assessment Portal, featuring an Auto-Fill Prompt button, real-time prompt generation from form parameters, editable instruction textarea, and validation alerting when the prompt field is left empty.",
+  "updatedAt":  "2026-10-10T08:50:51.660860483Z",
+  "requestFeedback":  true,
+  "userFacing":  true
+}

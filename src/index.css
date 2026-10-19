@@ -1,0 +1,144 @@
+@import "tailwindcss";
+
+@layer base {
+  html {
+    font-size: 16.5px; /* Scales base font size up across the entire website */
+  }
+
+  body {
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    background-color: #F8F9FA;
+    color: #0F172A;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* All clickable buttons, links, controls, and interactive triggers display the hand cursor */
+  button,
+  a,
+  [role="button"],
+  input[type="button"],
+  input[type="submit"],
+  input[type="reset"],
+  select,
+  summary {
+    cursor: pointer !important;
+  }
+
+  button:disabled,
+  [role="button"][aria-disabled="true"],
+  button[disabled] {
+    cursor: not-allowed !important;
+  }
+
+  /* Deepen and bold paragraph and span text across the application */
+  p {
+    color: #334155;
+    font-weight: 500;
+  }
+
+  span:not([class*="text-"]):not([class*="bg-"]) {
+    color: inherit;
+    font-weight: 500;
+  }
+}
+
+/* Micro-typography scaling: increase font sizes of small and compact texts across the app */
+.text-\[10px\] {
+  font-size: 0.75rem !important; /* ~12.4px instead of 10px */
+  line-height: 1.1rem !important;
+  font-weight: 600 !important;
+}
+
+.text-\[11px\] {
+  font-size: 0.8rem !important; /* ~13.2px instead of 11px */
+  line-height: 1.2rem !important;
+  font-weight: 600 !important;
+}
+
+.text-xs {
+  font-size: 0.84rem !important; /* ~13.8px instead of 12px */
+  line-height: 1.3rem !important;
+}
+
+.text-sm {
+  font-size: 0.94rem !important; /* ~15.5px instead of 14px */
+  line-height: 1.45rem !important;
+}
+
+/* Strengthen muted slate colors on paragraphs and spans */
+.bg-white p.text-slate-500,
+.bg-white span.text-slate-500,
+.bg-white p.text-slate-400,
+.bg-white span.text-slate-400,
+p.text-slate-500:not(.dark-bg-mode *),
+span.text-slate-500:not(.dark-bg-mode *) {
+  color: #475569 !important;
+  font-weight: 500 !important;
+}
+
+.bg-white p.text-slate-600,
+.bg-white span.text-slate-600,
+p.text-slate-600:not(.dark-bg-mode *),
+span.text-slate-600:not(.dark-bg-mode *) {
+  color: #1E293B !important;
+  font-weight: 600 !important;
+}
+
+/* Background-only Dark Mode: Modifies the application canvas background alone while keeping cards, sidebar, and navbars unchanged */
+.dark-bg-mode {
+  background-color: #0B1120 !important;
+}
+
+/* Headings and subtext sitting directly on the canvas background adapt for legibility without touching white cards */
+.dark-bg-mode h1.text-slate-900:not(.bg-white *):not([class*="bg-white"] *),
+.dark-bg-mode h2.text-slate-900:not(.bg-white *):not([class*="bg-white"] *),
+.dark-bg-mode h3.text-slate-900:not(.bg-white *):not([class*="bg-white"] *) {
+  color: #F8FAFC !important;
+}
+
+.dark-bg-mode p.text-slate-500:not(.bg-white *):not([class*="bg-white"] *) {
+  color: #94A3B8 !important;
+}
+
+.dark-bg-mode span.text-slate-900:not(.bg-white *):not([class*="bg-white"] *) {
+  color: #F8FAFC !important;
+}
+
+/* Modern App Bottom Sheet Splash Up Animation */
+@keyframes splashUp {
+  0% {
+    transform: translateY(100%) scale(0.98);
+    opacity: 0.6;
+  }
+  60% {
+    transform: translateY(-3px) scale(1.004);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes splashFadeIn {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.animate-splash-up {
+  animation: splashUp 0.34s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+
+.animate-splash-backdrop {
+  animation: splashFadeIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+

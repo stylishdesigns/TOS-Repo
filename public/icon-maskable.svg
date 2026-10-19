@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="brandGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#EA580C" />
+      <stop offset="100%" stop-color="#D97706" />
+    </linearGradient>
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FDE047" />
+      <stop offset="100%" stop-color="#F59E0B" />
+    </linearGradient>
+  </defs>
+
+  <!-- Full bleed background for Android maskable adaptive icon (NO rx) -->
+  <rect width="512" height="512" fill="url(#brandGrad)" />
+
+  <!-- Scaled group centered in the 80% safe zone -->
+  <g transform="translate(51.2, 51.2) scale(0.8)">
+    <!-- Graduation Cap Top Diamond -->
+    <polygon points="256,118 410,192 256,266 102,192" fill="#FFFFFF" />
+
+    <!-- Cap Diamond Accent Layer -->
+    <polygon points="256,134 388,192 256,250 124,192" fill="#FFF7ED" opacity="0.9" />
+
+    <!-- Skull Cap Underneath -->
+    <path d="M168,228 L168,280 C168,324 344,324 344,280 L344,228 L256,270 Z" fill="#FFFFFF" />
+
+    <!-- Tassel String and Pendant -->
+    <path d="M400,200 L418,270 L412,330" fill="none" stroke="url(#goldGrad)" stroke-width="8" stroke-linecap="round" />
+    <circle cx="412" cy="340" r="14" fill="url(#goldGrad)" />
+
+    <!-- Open Book Pages Below -->
+    <path d="M256,330 C220,310 160,310 120,324 L120,384 C160,370 220,370 256,390 C292,370 352,370 392,384 L392,324 C352,310 292,310 256,330 Z" fill="#FFFFFF" opacity="0.95" />
+    <line x1="256" y1="330" x2="256" y2="390" stroke="#EA580C" stroke-width="6" stroke-linecap="round" />
+
+    <!-- Excellence Star Accent -->
+    <polygon points="256,218 262,234 278,234 265,244 270,260 256,250 242,260 247,244 234,234 250,234" fill="url(#goldGrad)" />
+  </g>
+</svg>
