@@ -19,6 +19,7 @@ import {
   consumeAiRateLimit,
   httpError
 } from "./src/server/tenantService";
+import { ensureBootstrapSuperAdmin } from "./src/server/platformDefaults";
 
 
 // Source file is ESM, but compiled to CJS for production.
@@ -344,9 +345,17 @@ async function startServer() {
         }
       });
 
-      // The tos claim is granted only by scripts/grant-tos.ts. Session sync
-      // preserves an existing claim and never grants one itself.
-      const hasTos = decoded.tos === true;
+      // One-time bootstrap: the first verified sign-in from an address in
+      // TOS_BOOTSTRAP_EMAILS seeds the platform defaults and stamps the tos
+      // claim permanently (platformDefaults.ensureBootstrapSuperAdmin). Session
+      // sync preserves existing claims and never invents one on its own.
+      let bootstrapGranted = false;
+      try {
+        bootstrapGranted = await ensureBootstrapSuperAdmin(uid, decoded.email || null);
+      } catch (e) {
+        console.error("[TOS bootstrap] unexpected failure:", (e as any)?.message || e);
+      }
+      const hasTos = decoded.tos === true || bootstrapGranted;
 
       const claims: { m: Record<string, string>; tos?: boolean } = { m };
       if (hasTos) {
