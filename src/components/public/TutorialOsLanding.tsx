@@ -126,6 +126,15 @@ export const TutorialOsLanding: React.FC<{
               I have an access code
             </button>
           </div>
+          <div className="mt-3 flex justify-center">
+            <button
+              onClick={() => { window.location.hash = '#tos-admin'; }}
+              className="px-5 py-2.5 rounded-xl bg-indigo-600/90 hover:bg-indigo-500 font-semibold text-xs text-white shadow-md shadow-indigo-600/20 transition-colors flex items-center justify-center gap-2"
+            >
+              <ShieldCheck className="w-4 h-4 text-indigo-200" />
+              TOS platform admin
+            </button>
+          </div>
           <p className="text-slate-500 text-xs mt-4">
             Preparing for JAMB, WAEC, NECO or A-Levels? Your centre runs it all here.
           </p>
