@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { KeyRound, Loader2, RefreshCw, Copy, Check, AlertCircle } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { getAuth } from 'firebase/auth';
 
 /**
  * Owner-facing access-code settings (Prompt C Part C). The code is shown
@@ -23,7 +24,9 @@ export const AccessCodeSettings: React.FC = () => {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch(`/api/centre/access-code?centreId=${encodeURIComponent(activeCentreId)}`);
+      // Server-side enforcement: the call carries the caller's verified ID token.
+      const token = (await getAuth().currentUser?.getIdToken()) || '';
+      const res = await fetch(`/api/centre/access-code?centreId=${encodeURIComponent(activeCentreId)}`, { headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Could not load the access code.');
       setCode(data.accessCode || '');
@@ -40,9 +43,10 @@ export const AccessCodeSettings: React.FC = () => {
     setRegenerating(true);
     setError('');
     try {
+      const token = (await getAuth().currentUser?.getIdToken()) || '';
       const res = await fetch('/api/centre/access-code/regenerate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ centreId: activeCentreId }),
       });
       const data = await res.json().catch(() => ({}));

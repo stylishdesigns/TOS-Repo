@@ -58,7 +58,9 @@ export const FirstLoginPasswordChange: React.FC<{ onDone: () => void }> = ({ onD
     try {
       const user = auth.currentUser!;
       await updatePassword(user, password);
-      const res = await fetch('/api/auth/complete-first-login', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+      // Server-side enforcement: the call carries the caller's verified ID token.
+      const token = await user.getIdToken();
+      const res = await fetch('/api/auth/complete-first-login', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` } });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || 'Could not finish setting up your account.');
