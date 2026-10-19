@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { AccessCodeSettings } from './AccessCodeSettings';
 import { ModernSelect } from '../ui/ModernSelect';
 import {
   User,
@@ -492,7 +493,10 @@ export const SettingsView: React.FC = () => {
 
       {/* Tab: Centre & System Parameters */}
       {activeTab === 'centre' && (
-        <div className="bg-white p-5 sm:p-6 rounded-xl border border-slate-200/90 shadow-xs space-y-5">
+        <div className="space-y-6">
+          {/* Access code (Prompt C Part C): owner-managed, server-verified. */}
+          <AccessCodeSettings />
+          <div className="bg-white p-5 sm:p-6 rounded-xl border border-slate-200/90 shadow-xs space-y-5">
           <div className="border-b border-slate-100 pb-3">
             <h3 className="text-base font-bold text-slate-900">Centre Identity & Academic Parameters</h3>
             <p className="text-xs text-slate-500">
@@ -625,6 +629,7 @@ export const SettingsView: React.FC = () => {
               </button>
             </div>
           </form>
+          </div>
         </div>
       )}
 
