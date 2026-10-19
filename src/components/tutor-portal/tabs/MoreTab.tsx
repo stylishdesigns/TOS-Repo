@@ -96,7 +96,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ tutor, onExit }) => {
                     </div>
                     <div>
                       <p className="text-xs font-black text-slate-900">{centre.centreName}</p>
-                      <p className="text-[10px] text-slate-400 capitalize">{centre.role} • {centre.type}</p>
+                      <p className="text-[10px] text-slate-400 capitalize">{centre.role}</p>
                     </div>
                   </div>
                   {isActive ? (
