@@ -31,7 +31,17 @@ import { EnterAccessCodeScreen } from './components/auth/EnterAccessCodeScreen';
 import { JoinCentreScreen } from './components/auth/JoinCentreScreen';
 
 import { PasswordChangeOverlay } from './components/auth/PasswordChangeOverlay';
+import { TosPortal } from './components/tos/TosPortal';
+import { FirstLoginPasswordChange } from './components/auth/FirstLoginPasswordChange';
 import { getAuth } from 'firebase/auth';
+
+// The #tos door shows nothing to anyone who is not platform staff.
+const TosNotFound: React.FC = () => (
+  <div className="min-h-screen w-full bg-slate-950 flex flex-col items-center justify-center text-center p-6">
+    <p className="text-6xl font-black text-slate-800 mb-3">404</p>
+    <p className="text-slate-400 text-sm">There is nothing here.</p>
+  </div>
+);
 
 const MainLayout: React.FC = () => {
   const { 
@@ -51,10 +61,10 @@ const MainLayout: React.FC = () => {
   } = useApp();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [showWelcome, setShowWelcome] = useState(true);
-  // Platform (TOS) staff sign-in lives on its own door: #tos-admin in the URL.
-  const [tosLoginRequested, setTosLoginRequested] = useState(() => window.location.hash.toLowerCase().includes('tos-admin'));
+  // Platform (TOS) staff doors: #tos (console) and #tos-admin (sign-in).
+  const [tosLoginRequested, setTosLoginRequested] = useState(() => /^#tos(-admin)?$/.test(window.location.hash.toLowerCase()));
   useEffect(() => {
-    const onHashChange = () => setTosLoginRequested(window.location.hash.toLowerCase().includes('tos-admin'));
+    const onHashChange = () => setTosLoginRequested(/^#tos(-admin)?$/.test(window.location.hash.toLowerCase()));
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
@@ -66,16 +76,25 @@ const MainLayout: React.FC = () => {
   // the bootstrap email is a routing fallback while the claim propagates into
   // a freshly issued token. Enforcement itself stays server-side.
   const [hasTosClaim, setHasTosClaim] = useState(false);
+  // First-login guard (Prompt C Part C): a provisioned owner must set their
+  // own password before the app opens. Read from the token claims, enforced
+  // again on the server when the flag is cleared.
+  const [mustChangePassword, setMustChangePassword] = useState<boolean | null>(null);
   useEffect(() => {
     const u = getAuth().currentUser;
     if (!u) {
       setHasTosClaim(false);
+      setMustChangePassword(null);
       return;
     }
     let cancelled = false;
     u.getIdTokenResult()
-      .then((r) => { if (!cancelled) setHasTosClaim(r.claims?.tos === true); })
-      .catch(() => { if (!cancelled) setHasTosClaim(false); });
+      .then((r) => {
+        if (cancelled) return;
+        setHasTosClaim(r.claims?.tos === true);
+        setMustChangePassword(r.claims?.mustChangePassword === true);
+      })
+      .catch(() => { if (!cancelled) { setHasTosClaim(false); setMustChangePassword(null); } });
     return () => { cancelled = true; };
   }, [currentUser?.uid]);
   const isTosAdmin = hasTosClaim || currentUser?.email === 'stylishdesigns484@gmail.com';
@@ -125,13 +144,20 @@ const MainLayout: React.FC = () => {
     );
   }
 
-  // Landing page flow: the Tutorial OS product landing is the first screen,
-  // and the existing role picker stays one click away from it.
-  if (!currentUser && tosLoginRequested) {
+  if (tosLoginRequested) {
+    // Signed-in platform staff land in the TOS console; anyone else signed in
+    // sees a plain not-found; signed-out visitors get the staff sign-in.
+    if (currentUser && isTosAdmin) return <TosPortal />;
+    if (currentUser && !isTosAdmin) return <TosNotFound />;
     return <TosAdminLogin onBack={() => {
       history.replaceState(null, '', window.location.pathname + window.location.search);
       setTosLoginRequested(false);
     }} />;
+  }
+
+  // Forced first-password change for provisioned owners (Prompt C Part C).
+  if (currentUser && mustChangePassword === true) {
+    return <FirstLoginPasswordChange onDone={() => setMustChangePassword(false)} />;
   }
 
   if (!currentUser && showWelcome) {
@@ -287,89 +313,69 @@ const MainLayout: React.FC = () => {
             {adminSection === 'attendance' && <AttendanceTracker />}
             {adminSection === 'results' && <PerformanceManager />}
             {adminSection === 'announcements' && <AnnouncementsManager />}
-            {adminSection === 'student-portal' && <StudentPortal />}
-            {adminSection === 'tutor-portal' && <TutorPortal />}
-            {(adminSection === 'finance' || adminSection === 'payments') && <FinanceManager />}
-            {(adminSection === 'account' || adminSection === 'staff-roles') && <StaffRolesManager />}
+            {adminSection === 'finance' && <FinanceManager />}
+            {adminSection === 'cms' && <CmsManager />}
+            {adminSection === 'staff' && <StaffRolesManager />}
             {adminSection === 'settings' && <SettingsView />}
-            {(adminSection === 'cms' || adminSection === 'cms-editor') && <CmsManager />}
           </div>
         </main>
       </div>
 
-      {/* Global Modals & Notifications */}
+      {/* Student Detail Modal */}
       {selectedStudent && <StudentDetailModal />}
-      <OfflineIndicator />
-      <ToastContainer />
     </div>
   );
 };
 
-import { FirebaseProvider } from './context/FirebaseContext';
+// Error Boundary Component
+class ErrorBoundary extends Component<
+  { children: ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  state = { hasError: false, error: null as Error | null };
 
-interface ErrorBoundaryProps {
-  children: ReactNode;
-}
-
-interface ErrorBoundaryState {
-  hasError: boolean;
-  error: Error | null;
-}
-
-class ErrorBoundary extends React.Component<any, any> {
-  public state: any = {
-    hasError: false,
-    error: null
-  };
-
-  static getDerivedStateFromError(error: any): any {
+  static getDerivedStateFromError(error: Error) {
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: any, errorInfo: any) {
-    console.error("Uncaught error:", error, errorInfo);
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('App Error Boundary:', error, errorInfo);
   }
 
   render() {
     if (this.state.hasError) {
       return (
-        <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-50 p-6 text-center">
-          <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-2xl flex items-center justify-center mb-4">
-            <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
+        <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white p-4">
+          <div className="text-center max-w-md">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center">
+              <svg className="w-8 h-8 text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <h1 className="text-xl font-bold mb-2">Something went wrong</h1>
+            <p className="text-slate-400 text-sm mb-6">{this.state.error?.message || 'An unexpected error occurred.'}</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-5 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 font-bold text-sm transition-colors"
+            >
+              Reload the app
+            </button>
           </div>
-          <h2 className="text-xl font-bold text-slate-900 mb-2">Something went wrong</h2>
-          <p className="text-slate-500 text-sm max-w-md mb-6">
-            The application encountered an unexpected error. This has been logged for our engineers.
-          </p>
-          <button
-            onClick={() => window.location.reload()}
-            className="px-6 py-2 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-slate-800 transition-all"
-          >
-            Reload Application
-          </button>
-          {import.meta.env.DEV && (
-            <pre className="mt-8 p-4 bg-slate-100 rounded-lg text-left text-[10px] text-rose-600 overflow-auto max-w-full">
-              {this.state.error?.toString()}
-            </pre>
-          )}
         </div>
       );
     }
-
-    return (this as any).props.children;
+    return this.props.children;
   }
 }
 
-export default function App() {
+const App: React.FC = () => {
   return (
     <ErrorBoundary>
-      <FirebaseProvider>
-        <AppProvider>
-          <MainLayout />
-        </AppProvider>
-      </FirebaseProvider>
+      <AppProvider>
+        <MainLayout />
+      </AppProvider>
     </ErrorBoundary>
   );
-}
+};
+
+export default App;
