@@ -62,9 +62,14 @@ const MainLayout: React.FC = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [showWelcome, setShowWelcome] = useState(true);
   // Platform (TOS) staff sign-in lives on its own door: #tos-admin in the URL.
+  // #centre is the matching door back into the tenant (centre) app.
   const [tosLoginRequested, setTosLoginRequested] = useState(() => /^#tos(-admin)?$/.test(window.location.hash.toLowerCase()));
+  const [centreAppRequested, setCentreAppRequested] = useState(() => /^#centre(-admin)?$/.test(window.location.hash.toLowerCase()));
   useEffect(() => {
-    const onHashChange = () => setTosLoginRequested(/^#tos(-admin)?$/.test(window.location.hash.toLowerCase()));
+    const onHashChange = () => {
+      setTosLoginRequested(/^#tos(-admin)?$/.test(window.location.hash.toLowerCase()));
+      setCentreAppRequested(/^#centre(-admin)?$/.test(window.location.hash.toLowerCase()));
+    };
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
@@ -76,6 +81,9 @@ const MainLayout: React.FC = () => {
   // the bootstrap email is a routing fallback while the claim propagates into
   // a freshly issued token. Enforcement itself stays server-side.
   const [hasTosClaim, setHasTosClaim] = useState(false);
+  // Resolves one beat after sign-in so a claim-only staff account never
+  // flashes the tenant dashboard before the console opens.
+  const [tosClaimsSettled, setTosClaimsSettled] = useState(false);
   // First-login guard (Prompt C Part C): a provisioned owner must set their
   // own password before the app opens. Read from the token claims, enforced
   // again on the server when the flag is cleared.
@@ -85,6 +93,7 @@ const MainLayout: React.FC = () => {
     if (!u) {
       setHasTosClaim(false);
       setMustChangePassword(null);
+      setTosClaimsSettled(true);
       return;
     }
     let cancelled = false;
@@ -93,8 +102,9 @@ const MainLayout: React.FC = () => {
         if (cancelled) return;
         setHasTosClaim(r.claims?.tos === true);
         setMustChangePassword(r.claims?.mustChangePassword === true);
+        setTosClaimsSettled(true);
       })
-      .catch(() => { if (!cancelled) { setHasTosClaim(false); setMustChangePassword(null); } });
+      .catch(() => { if (!cancelled) { setHasTosClaim(false); setMustChangePassword(null); setTosClaimsSettled(true); } });
     return () => { cancelled = true; };
   }, [currentUser?.uid]);
   const isTosAdmin = hasTosClaim || currentUser?.email === 'stylishdesigns484@gmail.com';
@@ -125,8 +135,11 @@ const MainLayout: React.FC = () => {
     }
   };
 
-  // Global loading state to prevent auth "flashes"
-  if (isAuthLoading) {
+  // Global loading state to prevent auth "flashes". Signed-in users also hold
+  // one beat while token claims are read, so a `tos`-claim staff account never
+  // flashes the tenant dashboard before the console opens.
+  const claimsPending = !!currentUser && !tosClaimsSettled;
+  if (isAuthLoading || claimsPending) {
     return (
       <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-900 text-white">
         <div className="relative w-24 h-24 mb-8">
@@ -144,10 +157,21 @@ const MainLayout: React.FC = () => {
     );
   }
 
+  // Forced first-password change for provisioned owners (Prompt C Part C).
+  if (currentUser && mustChangePassword === true) {
+    return <FirstLoginPasswordChange onDone={() => setMustChangePassword(false)} />;
+  }
+
+  // Signed-in platform staff open the TOS console by default, TOS door or
+  // not; #centre in the URL is the way back into the tenant (centre) app.
+  // The #tos door still signs visitors in and shows non-staff a not-found.
+  if (currentUser && isTosAdmin && !centreAppRequested) return <TosPortal />;
+
+  // Landing page flow: the Tutorial OS product landing is the first screen,
+  // and the existing role picker stays one click away from it.
   if (tosLoginRequested) {
-    // Signed-in platform staff land in the TOS console; anyone else signed in
-    // sees a plain not-found; signed-out visitors get the staff sign-in.
-    if (currentUser && isTosAdmin) return <TosPortal />;
+    // Anyone signed in without platform access sees a plain not-found;
+    // signed-out visitors get the staff sign-in.
     if (currentUser && !isTosAdmin) return <TosNotFound />;
     return <TosAdminLogin onBack={() => {
       history.replaceState(null, '', window.location.pathname + window.location.search);
@@ -155,13 +179,6 @@ const MainLayout: React.FC = () => {
     }} />;
   }
 
-  // Forced first-password change for provisioned owners (Prompt C Part C).
-  if (currentUser && mustChangePassword === true) {
-    return <FirstLoginPasswordChange onDone={() => setMustChangePassword(false)} />;
-  }
-
-  // Landing page flow: the Tutorial OS product landing is the first screen,
-  // and the existing role picker stays one click away from it.
   if (!currentUser && showWelcome) {
     if (!showPortals) {
       return (
