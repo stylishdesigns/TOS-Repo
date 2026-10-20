@@ -16,6 +16,10 @@
 # AI key) are server-only and stay out of the client bundle entirely.
 [build.environment]
   # firebase-admin 14 needs Node >= 22 to load (jwks-rsa requires ESM-only jose).
+  # The functions runtime is pinned via AWS_LAMBDA_JS_RUNTIME=nodejs22.x, which
+  # Netlify only reads from the UI/API (not netlify.toml), so it is set in the
+  # Netlify UI as a site environment variable. NODE_VERSION keeps the build on
+  # Node 22 so the runtime default matches too.
   NODE_VERSION = "22"
   SECRETS_SCAN_OMIT_KEYS = "FIREBASE_API_KEY,FIREBASE_APP_ID,FIREBASE_PROJECT_ID,FIREBASE_AUTH_DOMAIN,FIREBASE_STORAGE_BUCKET,FIREBASE_MESSAGING_SENDER_ID,FIRESTORE_DATABASE_ID"
 
