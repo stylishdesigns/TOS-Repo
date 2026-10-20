@@ -1,1 +1,299 @@
-aW1wb3J0IHsgYWRtaW5EYiB9IGZyb20gJy4uL3NyYy9zZXJ2ZXIvZmlyZWJhc2VBZG1pbic7CmltcG9ydCB7CiAgQ2VudHJlLAogIENlbnRyZUJpbGxpbmcsCiAgQ2VudHJlTWVtYmVyc2hpcCwKICBNZW1iZXJzaGlwUm9sZSwKfSBmcm9tICcuLi9zcmMvdHlwZXMnOwoKY29uc3QgRVhDRUxMRU5DRV9DRU5UUkVfSUQgPSAnY2VudHJlLWV4Y2VsbGVuY2UnOwoKY29uc3QgVEVOQU5UX0NPTExFQ1RJT05TID0gWwogICdzdHVkZW50cycsCiAgJ2FkbWlzc2lvbnMnLAogICd0dXRvcnMnLAogICdwcm9ncmFtbWVzJywKICAncGF5bWVudHMnLAogICdicmFuY2hlcycsCiAgJ2F0dGVuZGFuY2VfbG9ncycsCiAgJ2Fubm91bmNlbWVudHMnLAogICdzdWJqZWN0cycsCiAgJ2NsYXNzcm9vbXMnLAogICd0aW1ldGFibGUnLAogICdyZXN1bHRzJywKICAnY2J0X3F1ZXN0aW9ucycsCiAgJ2NidF9leGFtcycsCiAgJ2FjdGl2aXRpZXMnLAogICdjbGFzc1JhdGluZ3MnLAogICdzdHVkeU1hdGVyaWFscycsCiAgJ21vY2tfZ3JhZGluZycsCiAgJ2FkbWlucycsCl07CgpmdW5jdGlvbiBnZW5lcmF0ZTZEaWdpdENvZGUoKTogc3RyaW5nIHsKICByZXR1cm4gTWF0aC5mbG9vcigxMDAwMDAgKyBNYXRoLnJhbmRvbSgpICogOTAwMDAwKS50b1N0cmluZygpOwp9CgovLyBUaGUgb3duZXIgVUlEIGlzIGEgcmVhbCBGaXJlYmFzZSBBdXRoIFVJRCwgcGFzc2VkIHBlciBydW4gKFByb21wdCBEKTogdGhlcmUKLy8gaXMgbm8gaGFyZC1jb2RlZCBhY2NvdW50IGFueXdoZXJlIGluIHRoZSBzY3JpcHQuCmZ1bmN0aW9uIHJlc29sdmVPd25lclVpZCgpOiBzdHJpbmcgewogIGNvbnN0IGkgPSBwcm9jZXNzLmFyZ3YuaW5kZXhPZignLS1vd25lci11aWQnKTsKICBpZiAoaSA+IC0xICYmIHByb2Nlc3MuYXJndltpICsgMV0pIHJldHVybiBTdHJpbmcocHJvY2Vzcy5hcmd2W2kgKyAxXSk7CiAgcmV0dXJuIHByb2Nlc3MuZW52LkVYQ0VMTEVOQ0VfT1dORVJfVUlEIHx8ICcnOwp9Cgpjb25zdCBPV05FUl9VSUQgPSByZXNvbHZlT3duZXJVaWQoKTsKCmFzeW5jIGZ1bmN0aW9uIG1haW4oKSB7CiAgY29uc3QgaXNBcHBseSA9IHByb2Nlc3MuYXJndi5pbmNsdWRlcygnLS1hcHBseScpOwogIGlmIChpc0FwcGx5ICYmICFPV05FUl9VSUQpIHsKICAgIGNvbnNvbGUuZXJyb3IoJ0FQUExZIG1vZGUgcmVxdWlyZXMgdGhlIHJlYWwgb3duZXIgVUlEOiBwYXNzIC0tb3duZXItdWlkIDx1aWQ+IG9yIHNldCBFWENFTExFTkNFX09XTkVSX1VJRC4nKTsKICAgIGNvbnNvbGUuZXJyb3IoJ1JlZnVzaW5nIHRvIHdyaXRlIGEgY2VudHJlIHdob3NlIG93bmVyVWlkIGlzIG5vdCBhIHJlYWwgRmlyZWJhc2UgQXV0aCBVSUQuJyk7CiAgICBwcm9jZXNzLmV4aXQoMSk7CiAgfQogIGNvbnNvbGUubG9nKGA9PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PWApOwogIGNvbnNvbGUubG9nKGAgIFR1dG9yaWFsIE9TIE11bHRpLVRlbmFudCBCYWNrZmlsbCBTY3JpcHQgKFByb21wdCAxKWApOwogIGNvbnNvbGUubG9nKGAgIE1vZGU6ICR7aXNBcHBseSA/ICdBUFBMWSAoV3JpdGluZyBjaGFuZ2VzIHRvIEZpcmVzdG9yZSknIDogJ0RSWSBSVU4gKFByZXZpZXcgb25seSwgdXNlIC0tYXBwbHkgdG8gY29tbWl0KSd9YCk7CiAgY29uc29sZS5sb2coYCAgVGFyZ2V0IENlbnRyZSBJRDogJHtFWENFTExFTkNFX0NFTlRSRV9JRH1gKTsKICBjb25zb2xlLmxvZyhgPT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT1cbmApOwoKICAvLyBTdGVwIDE6IFJlYWQgZXhpc3Rpbmcgc2V0dGluZ3MvZ2xvYmFsIHRvIGRlcml2ZSBDZW50cmUgIzEKICBjb25zdCBnbG9iYWxTZXR0aW5nc1JlZiA9IGFkbWluRGIuY29sbGVjdGlvbignc2V0dGluZ3MnKS5kb2MoJ2dsb2JhbCcpOwogIGNvbnN0IGdsb2JhbFNldHRpbmdzU25hcCA9IGF3YWl0IGdsb2JhbFNldHRpbmdzUmVmLmdldCgpOwogIGNvbnN0IGdsb2JhbERhdGEgPSBnbG9iYWxTZXR0aW5nc1NuYXAuZXhpc3RzID8gZ2xvYmFsU2V0dGluZ3NTbmFwLmRhdGEoKSB8fCB7fSA6IHt9OwoKICBjb25zdCBjZW50cmVSZWYgPSBhZG1pbkRiLmNvbGxlY3Rpb24oJ2NlbnRyZXMnKS5kb2MoRVhDRUxMRU5DRV9DRU5UUkVfSUQpOwogIGNvbnN0IGV4aXN0aW5nQ2VudHJlU25hcCA9IGF3YWl0IGNlbnRyZVJlZi5nZXQoKTsKCiAgbGV0IGFjY2Vzc0NvZGUgPSBnZW5lcmF0ZTZEaWdpdENvZGUoKTsKICBpZiAoZXhpc3RpbmdDZW50cmVTbmFwLmV4aXN0cyAmJiBleGlzdGluZ0NlbnRyZVNuYXAuZGF0YSgpPy5hY2Nlc3NDb2RlKSB7CiAgICBhY2Nlc3NDb2RlID0gZXhpc3RpbmdDZW50cmVTbmFwLmRhdGEoKSEuYWNjZXNzQ29kZTsKICB9CgogIGNvbnN0IGNlbnRyZURvYzogQ2VudHJlID0gewogICAgaWQ6IEVYQ0VMTEVOQ0VfQ0VOVFJFX0lELAogICAgbmFtZTogZ2xvYmFsRGF0YS5jZW50cmVOYW1lIHx8ICdFeGNlbGxlbmNlIFR1dG9yaWFsIENlbnRyZScsCiAgICBzdGF0dXM6ICdhY3RpdmUnLAogICAgb3duZXJVaWQ6IE9XTkVSX1VJRCwgLy8gcGFzc2VkIHdpdGggLS1vd25lci11aWQgb3IgRVhDRUxMRU5DRV9PV05FUl9VSUQKICAgIGJyYW5kaW5nOiB7CiAgICAgIGxvZ286IGdsb2JhbERhdGEubG9nb1RleHQgfHwgJ0V4Y2VsbGVuY2UnLAogICAgICBwcmltYXJ5Q29sb3I6IGdsb2JhbERhdGEucHJpbWFyeUNvbG9yIHx8ICcjRUE1ODBDJywKICAgICAgc2Vjb25kYXJ5Q29sb3I6IGdsb2JhbERhdGEuc2Vjb25kYXJ5Q29sb3IgfHwgJyMwRjE3MkEnLAogICAgICBjb2xvdXJzOiB7CiAgICAgICAgcHJpbWFyeTogZ2xvYmFsRGF0YS5wcmltYXJ5Q29sb3IgfHwgJyNFQTU4MEMnLAogICAgICAgIHNlY29uZGFyeTogZ2xvYmFsRGF0YS5zZWNvbmRhcnlDb2xvciB8fCAnIzBGMTcyQScsCiAgICAgIH0sCiAgICB9LAogICAgYXVkaWVuY2VUeXBlczogWydKQU1CJywgJ1dBRUMnLCAnTkVDTycsICdBLUxldmVscyddLAogICAgYXV0b0FwcHJvdmVTdHVkZW50czogZmFsc2UsCiAgICBjcmVhdGVkQXQ6IG5ldyBEYXRlKCkudG9JU09TdHJpbmcoKSwKICAgIGFjY2Vzc0NvZGUsCiAgfTsKCiAgY29uc3QgYmlsbGluZ0RvYzogQ2VudHJlQmlsbGluZyA9IHsKICAgIGNlbnRyZUlkOiBFWENFTExFTkNFX0NFTlRSRV9JRCwKICAgIHBsYW5JZDogJ2NlbnRyZV9wbHVzJywKICAgIHNlYXRDYXA6IDUwMCwKICAgIGJpbGxlZFNlYXRzTWluaW11bTogMTAsCiAgICB0cmlhbFN0YXJ0c0F0OiBudWxsLAogICAgdHJpYWxFbmRzQXQ6IG51bGwsCiAgICBza2lwcGVkVHJpYWw6IHRydWUsCiAgICBkaXNjb3VudFBjdDogMCwKICAgIHBhaWRUaHJvdWdoOiBudWxsLAogICAgbm90ZXM6ICdFeGNlbGxlbmNlIFR1dG9yaWFsIENlbnRyZSAoRm91bmRpbmcgQ3VzdG9tZXIpJywKICB9OwoKICBjb25zb2xlLmxvZyhgMS4gQ2VudHJlICMxICgiRXhjZWxsZW5jZSBUdXRvcmlhbCBDZW50cmUiKTpgKTsKICBjb25zb2xlLmxvZyhgICAgLSBJRDogJHtFWENFTExFTkNFX0NFTlRSRV9JRH1gKTsKICBjb25zb2xlLmxvZyhgICAgLSBOYW1lOiAke2NlbnRyZURvYy5uYW1lfWApOwogIGNvbnNvbGUubG9nKGAgICAtIFN0YXR1czogJHtjZW50cmVEb2Muc3RhdHVzfWApOwogIGNvbnNvbGUubG9nKGAgICAtIEFjY2VzcyBDb2RlOiAke2FjY2Vzc0NvZGV9YCk7CiAgY29uc29sZS5sb2coYCAgIC0gUGxhbjogJHtiaWxsaW5nRG9jLnBsYW5JZH0gKENhcDogJHtiaWxsaW5nRG9jLnNlYXRDYXB9KWApOwoKICBpZiAoaXNBcHBseSkgewogICAgYXdhaXQgY2VudHJlUmVmLnNldChjZW50cmVEb2MsIHsgbWVyZ2U6IHRydWUgfSk7CiAgICBhd2FpdCBhZG1pbkRiLmNvbGxlY3Rpb24oJ2NlbnRyZUJpbGxpbmcnKS5kb2MoRVhDRUxMRU5DRV9DRU5UUkVfSUQpLnNldChiaWxsaW5nRG9jLCB7IG1lcmdlOiB0cnVlIH0pOwogICAgYXdhaXQgYWRtaW5EYi5jb2xsZWN0aW9uKCdhY2Nlc3NDb2RlcycpLmRvYyhhY2Nlc3NDb2RlKS5zZXQoeyBjZW50cmVJZDogRVhDRUxMRU5DRV9DRU5UUkVfSUQgfSwgeyBtZXJnZTogdHJ1ZSB9KTsKICAgIGNvbnNvbGUubG9nKGAgICAtPiBXcml0dGVuIGNlbnRyZXMsIGNlbnRyZUJpbGxpbmcsIGFuZCBhY2Nlc3NDb2RlcyByZWNvcmRzLmApOwogIH0KCiAgLy8gU3RlcCAyOiBDb3B5IHNldHRpbmdzL2dsb2JhbCBhbmQgc2V0dGluZ3MvYXR0ZW5kYW5jZSB0byBzY29wZWQgZG9jcwogIGNvbnNvbGUubG9nKGBcbjIuIFNldHRpbmdzIERvY3VtZW50czpgKTsKICBjb25zdCBzY29wZWRHbG9iYWxSZWYgPSBhZG1pbkRiLmNvbGxlY3Rpb24oJ3NldHRpbmdzJykuZG9jKGAke0VYQ0VMTEVOQ0VfQ0VOVFJFX0lEfV9fZ2xvYmFsYCk7CiAgY29uc3Qgc2NvcGVkQXR0ZW5kYW5jZVJlZiA9IGFkbWluRGIuY29sbGVjdGlvbignc2V0dGluZ3MnKS5kb2MoYCR7RVhDRUxMRU5DRV9DRU5UUkVfSUR9X19hdHRlbmRhbmNlYCk7CgogIGNvbnN0IGF0dGVuZGFuY2VTZXR0aW5nc1NuYXAgPSBhd2FpdCBhZG1pbkRiLmNvbGxlY3Rpb24oJ3NldHRpbmdzJykuZG9jKCdhdHRlbmRhbmNlJykuZ2V0KCk7CiAgY29uc3QgYXR0ZW5kYW5jZURhdGEgPSBhdHRlbmRhbmNlU2V0dGluZ3NTbmFwLmV4aXN0cyA/IGF0dGVuZGFuY2VTZXR0aW5nc1NuYXAuZGF0YSgpIHx8IHt9IDoge307CgogIGNvbnNvbGUubG9nKGAgICAtIHNldHRpbmdzL2dsb2JhbCAtPiBzZXR0aW5ncy8ke0VYQ0VMTEVOQ0VfQ0VOVFJFX0lEfV9fZ2xvYmFsYCk7CiAgY29uc29sZS5sb2coYCAgIC0gc2V0dGluZ3MvYXR0ZW5kYW5jZSAtPiBzZXR0aW5ncy8ke0VYQ0VMTEVOQ0VfQ0VOVFJFX0lEfV9fYXR0ZW5kYW5jZWApOwogIGlmIChpc0FwcGx5KSB7CiAgICBhd2FpdCBzY29wZWRHbG9iYWxSZWYuc2V0KHsgLi4uZ2xvYmFsRGF0YSwgY2VudHJlSWQ6IEVYQ0VMTEVOQ0VfQ0VOVFJFX0lEIH0sIHsgbWVyZ2U6IHRydWUgfSk7CiAgICBhd2FpdCBzY29wZWRBdHRlbmRhbmNlUmVmLnNldCh7IC4uLmF0dGVuZGFuY2VEYXRhLCBjZW50cmVJZDogRVhDRUxMRU5DRV9DRU5UUkVfSUQgfSwgeyBtZXJnZTogdHJ1ZSB9KTsKICAgIGNvbnNvbGUubG9nKGAgICAtPiBTY29wZWQgc2V0dGluZ3MgY3JlYXRlZCAobGVnYWN5IGRvY3VtZW50cyBsZWZ0IGluIHBsYWNlKS5gKTsKICB9CgogIC8vIFN0ZXAgMzogQmFja2ZpbGwgY2VudHJlSWQgb24gYWxsIHRlbmFudCBjb2xsZWN0aW9ucwogIGNvbnNvbGUubG9nKGBcbjMuIEJhY2tmaWxsaW5nIGNlbnRyZUlkIGFjcm9zcyBjb2xsZWN0aW9uczpgKTsKICBjb25zdCByZXBvcnQ6IFJlY29yZDxzdHJpbmcsIHsgdG90YWw6IG51bWJlcjsgYWxyZWFkeVRhZ2dlZDogbnVtYmVyOyBuZXdseVRhZ2dlZDogbnVtYmVyIH0+ID0ge307CgogIGZvciAoY29uc3QgY29sbE5hbWUgb2YgVEVOQU5UX0NPTExFQ1RJT05TKSB7CiAgICBjb25zdCBzbmFwID0gYXdhaXQgYWRtaW5EYi5jb2xsZWN0aW9uKGNvbGxOYW1lKS5nZXQoKTsKICAgIGxldCBhbHJlYWR5VGFnZ2VkID0gMDsKICAgIGxldCBuZXdseVRhZ2dlZCA9IDA7CgogICAgY29uc3QgZG9jc1RvVXBkYXRlOiBBcnJheTx7IGlkOiBzdHJpbmc7IHJlZjogRmlyZWJhc2VGaXJlc3RvcmUuRG9jdW1lbnRSZWZlcmVuY2UgfT4gPSBbXTsKICAgIHNuYXAuZm9yRWFjaCgoZG9jU25hcCkgPT4gewogICAgICBjb25zdCBkYXRhID0gZG9jU25hcC5kYXRhKCk7CiAgICAgIGlmIChkYXRhLmNlbnRyZUlkID09PSBFWENFTExFTkNFX0NFTlRSRV9JRCkgewogICAgICAgIGFscmVhZHlUYWdnZWQrKzsKICAgICAgfSBlbHNlIHsKICAgICAgICBuZXdseVRhZ2dlZCsrOwogICAgICAgIGRvY3NUb1VwZGF0ZS5wdXNoKHsgaWQ6IGRvY1NuYXAuaWQsIHJlZjogZG9jU25hcC5yZWYgfSk7CiAgICAgIH0KICAgIH0pOwoKICAgIHJlcG9ydFtjb2xsTmFtZV0gPSB7CiAgICAgIHRvdGFsOiBzbmFwLnNpemUsCiAgICAgIGFscmVhZHlUYWdnZWQsCiAgICAgIG5ld2x5VGFnZ2VkLAogICAgfTsKCiAgICBpZiAoaXNBcHBseSAmJiBkb2NzVG9VcGRhdGUubGVuZ3RoID4gMCkgewogICAgICAvLyBCYXRjaCBpbiBjaHVua3Mgb2YgNDAwCiAgICAgIGNvbnN0IENIVU5LX1NJWkUgPSA0MDA7CiAgICAgIGZvciAobGV0IGkgPSAwOyBpIDwgZG9jc1RvVXBkYXRlLmxlbmd0aDsgaSArPSBDSFVOS19TSVpFKSB7CiAgICAgICAgY29uc3QgY2h1bmsgPSBkb2NzVG9VcGRhdGUuc2xpY2UoaSwgaSArIENIVU5LX1NJWkUpOwogICAgICAgIGNvbnN0IGJhdGNoID0gYWRtaW5EYi5iYXRjaCgpOwogICAgICAgIGZvciAoY29uc3QgaXRlbSBvZiBjaHVuaykgewogICAgICAgICAgYmF0Y2guc2V0KGl0ZW0ucmVmLCB7IGNlbnRyZUlkOiBFWENFTExFTkNFX0NFTlRSRV9JRCB9LCB7IG1lcmdlOiB0cnVlIH0pOwogICAgICAgIH0KICAgICAgICBhd2FpdCBiYXRjaC5jb21taXQoKTsKICAgICAgfQogICAgfQogIH0KCiAgLy8gU3RlcCA0OiBDcmVhdGUgbWVtYmVyc2hpcHMgZm9yIGFkbWlucywgdHV0b3JzLCBhbmQgc3R1ZGVudHMKICBjb25zb2xlLmxvZyhgXG40LiBDcmVhdGluZyBjZW50cmUgbWVtYmVyc2hpcHM6YCk7CiAgbGV0IGFkbWluTWVtYmVyc2hpcHMgPSAwOwogIGxldCB0dXRvck1lbWJlcnNoaXBzID0gMDsKICBsZXQgc3R1ZGVudE1lbWJlcnNoaXBzID0gMDsKCiAgLy8gQWRtaW5zCiAgY29uc3QgYWRtaW5zU25hcCA9IGF3YWl0IGFkbWluRGIuY29sbGVjdGlvbignYWRtaW5zJykuZ2V0KCk7CiAgZm9yIChjb25zdCBkb2NTbmFwIG9mIGFkbWluc1NuYXAuZG9jcykgewogICAgY29uc3QgZGF0YSA9IGRvY1NuYXAuZGF0YSgpOwogICAgY29uc3QgdWlkID0gZGF0YS51aWQgfHwgZG9jU25hcC5pZDsKICAgIGlmICh1aWQpIHsKICAgICAgbGV0IHJvbGU6IE1lbWJlcnNoaXBSb2xlID0gJ2FkbWluJzsKICAgICAgaWYgKGRhdGEucm9sZSA9PT0gJ1N1cGVyIEFkbWluJykgewogICAgICAgIHJvbGUgPSAnb3duZXInOwogICAgICB9IGVsc2UgaWYgKGRhdGEucm9sZSA9PT0gJ0NlbnRlciBBZG1pbicpIHsKICAgICAgICByb2xlID0gJ2FkbWluJzsKICAgICAgfSBlbHNlIGlmIChkYXRhLnJvbGUgPT09ICdBZG1pbiBTZWNyZXRhcnknKSB7CiAgICAgICAgcm9sZSA9ICdzZWNyZXRhcnknOwogICAgICB9IGVsc2UgaWYgKGRhdGEucm9sZSA9PT0gJ0ZpbmFuY2UgQWRtaW4nKSB7CiAgICAgICAgcm9sZSA9ICdmaW5hbmNlJzsKICAgICAgfSBlbHNlIGlmIChkYXRhLnJvbGUgPT09ICdUdXRvcicpIHsKICAgICAgICByb2xlID0gJ3R1dG9yJzsKICAgICAgfQoKICAgICAgY29uc3QgbWVtYmVyc2hpcElkID0gYCR7dWlkfV9fJHtFWENFTExFTkNFX0NFTlRSRV9JRH1gOwogICAgICBjb25zdCBtZW1Eb2M6IENlbnRyZU1lbWJlcnNoaXAgPSB7CiAgICAgICAgaWQ6IG1lbWJlcnNoaXBJZCwKICAgICAgICB1aWQsCiAgICAgICAgY2VudHJlSWQ6IEVYQ0VMTEVOQ0VfQ0VOVFJFX0lELAogICAgICAgIHJvbGUsCiAgICAgICAgc3RhdHVzOiBkYXRhLnN0YXR1cyA9PT0gJ1N1c3BlbmRlZCcgPyAnZGlzYWJsZWQnIDogJ2FjdGl2ZScsCiAgICAgICAgY3JlYXRlZEF0OiBkYXRhLmNyZWF0ZWRBdCB8fCBuZXcgRGF0ZSgpLnRvSVNPU3RyaW5nKCksCiAgICAgICAgdXBkYXRlZEF0OiBuZXcgRGF0ZSgpLnRvSVNPU3RyaW5nKCksCiAgICAgIH07CgogICAgICBhZG1pbk1lbWJlcnNoaXBzKys7CiAgICAgIGlmIChpc0FwcGx5KSB7CiAgICAgICAgYXdhaXQgYWRtaW5EYi5jb2xsZWN0aW9uKCdtZW1iZXJzaGlwcycpLmRvYyhtZW1iZXJzaGlwSWQpLnNldChtZW1Eb2MsIHsgbWVyZ2U6IHRydWUgfSk7CiAgICAgIH0KICAgIH0KICB9CgogIC8vIFR1dG9ycwogIGNvbnN0IHR1dG9yc1NuYXAgPSBhd2FpdCBhZG1pbkRiLmNvbGxlY3Rpb24oJ3R1dG9ycycpLmdldCgpOwogIGZvciAoY29uc3QgZG9jU25hcCBvZiB0dXRvcnNTbmFwLmRvY3MpIHsKICAgIGNvbnN0IGRhdGEgPSBkb2NTbmFwLmRhdGEoKTsKICAgIGNvbnN0IHVpZCA9IGRhdGEudWlkIHx8IGRvY1NuYXAuaWQ7CiAgICBpZiAodWlkKSB7CiAgICAgIGNvbnN0IG1lbWJlcnNoaXBJZCA9IGAke3VpZH1fXyR7RVhDRUxMRU5DRV9DRU5UUkVfSUR9YDsKICAgICAgY29uc3QgbWVtRG9jOiBDZW50cmVNZW1iZXJzaGlwID0gewogICAgICAgIGlkOiBtZW1iZXJzaGlwSWQsCiAgICAgICAgdWlkLAogICAgICAgIGNlbnRyZUlkOiBFWENFTExFTkNFX0NFTlRSRV9JRCwKICAgICAgICByb2xlOiAndHV0b3InLAogICAgICAgIHN0YXR1czogZGF0YS5zdGF0dXMgPT09ICdTdXNwZW5kZWQnID8gJ2Rpc2FibGVkJyA6ICdhY3RpdmUnLAogICAgICAgIGNyZWF0ZWRBdDogZGF0YS5jcmVhdGVkQXQgfHwgbmV3IERhdGUoKS50b0lTT1N0cmluZygpLAogICAgICAgIHVwZGF0ZWRBdDogbmV3IERhdGUoKS50b0lTT1N0cmluZygpLAogICAgICB9OwoKICAgICAgdHV0b3JNZW1iZXJzaGlwcysrOwogICAgICBpZiAoaXNBcHBseSkgewogICAgICAgIGF3YWl0IGFkbWluRGIuY29sbGVjdGlvbignbWVtYmVyc2hpcHMnKS5kb2MobWVtYmVyc2hpcElkKS5zZXQobWVtRG9jLCB7IG1lcmdlOiB0cnVlIH0pOwogICAgICB9CiAgICB9CiAgfQoKICAvLyBTdHVkZW50cwogIGNvbnN0IHN0dWRlbnRzU25hcCA9IGF3YWl0IGFkbWluRGIuY29sbGVjdGlvbignc3R1ZGVudHMnKS5nZXQoKTsKICBmb3IgKGNvbnN0IGRvY1NuYXAgb2Ygc3R1ZGVudHNTbmFwLmRvY3MpIHsKICAgIGNvbnN0IGRhdGEgPSBkb2NTbmFwLmRhdGEoKTsKICAgIGNvbnN0IHVpZCA9IGRhdGEudWlkIHx8IGRvY1NuYXAuaWQ7CiAgICBpZiAodWlkKSB7CiAgICAgIGNvbnN0IG1lbWJlcnNoaXBJZCA9IGAke3VpZH1fXyR7RVhDRUxMRU5DRV9DRU5UUkVfSUR9YDsKICAgICAgY29uc3QgbWVtRG9jOiBDZW50cmVNZW1iZXJzaGlwID0gewogICAgICAgIGlkOiBtZW1iZXJzaGlwSWQsCiAgICAgICAgdWlkLAogICAgICAgIGNlbnRyZUlkOiBFWENFTExFTkNFX0NFTlRSRV9JRCwKICAgICAgICByb2xlOiAnc3R1ZGVudCcsCiAgICAgICAgc3RhdHVzOiBkYXRhLnN0YXR1cyA9PT0gJ1N1c3BlbmRlZCcgPyAnZGlzYWJsZWQnIDogJ2FjdGl2ZScsCiAgICAgICAgY3JlYXRlZEF0OiBkYXRhLnJlZ2lzdHJhdGlvbkRhdGUgfHwgbmV3IERhdGUoKS50b0lTT1N0cmluZygpLAogICAgICAgIHVwZGF0ZWRBdDogbmV3IERhdGUoKS50b0lTT1N0cmluZygpLAogICAgICB9OwoKICAgICAgc3R1ZGVudE1lbWJlcnNoaXBzKys7CiAgICAgIGlmIChpc0FwcGx5KSB7CiAgICAgICAgYXdhaXQgYWRtaW5EYi5jb2xsZWN0aW9uKCdtZW1iZXJzaGlwcycpLmRvYyhtZW1iZXJzaGlwSWQpLnNldChtZW1Eb2MsIHsgbWVyZ2U6IHRydWUgfSk7CiAgICAgIH0KICAgIH0KICB9CgogIGNvbnNvbGUubG9nKGAgICAtIEFkbWluIG1lbWJlcnNoaXBzOiAke2FkbWluTWVtYmVyc2hpcHN9YCk7CiAgY29uc29sZS5sb2coYCAgIC0gVHV0b3IgbWVtYmVyc2hpcHM6ICR7dHV0b3JNZW1iZXJzaGlwc31gKTsKICBjb25zb2xlLmxvZyhgICAgLSBTdHVkZW50IG1lbWJlcnNoaXBzOiAke3N0dWRlbnRNZW1iZXJzaGlwc31gKTsKCiAgLy8gU3RlcCA1OiBWZXJpZmljYXRpb24gUmVwb3J0CiAgY29uc29sZS5sb2coYFxuPT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT1gKTsKICBjb25zb2xlLmxvZyhgICAgICAgICAgICAgICAgQkFDS0ZJTEwgVkVSSUZJQ0FUSU9OIFJFUE9SVGApOwogIGNvbnNvbGUubG9nKGA9PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PWApOwogIGNvbnNvbGUubG9nKAogICAgYENvbGxlY3Rpb25gLnBhZEVuZCgyMCkgKwogICAgYFRvdGFsIERvY3NgLnBhZEVuZCgxNCkgKwogICAgYFRhZ2dlZCBjZW50cmVJZGAucGFkRW5kKDE4KSArCiAgICBgVW50YWdnZWQgKFBlbmRpbmcpYAogICk7CiAgY29uc29sZS5sb2coJy0nLnJlcGVhdCg2NSkpOwoKICBmb3IgKGNvbnN0IFtjb2xsLCBzdGF0c10gb2YgT2JqZWN0LmVudHJpZXMocmVwb3J0KSkgewogICAgY29uc3QgdGFnZ2VkID0gaXNBcHBseSA/IHN0YXRzLnRvdGFsIDogc3RhdHMuYWxyZWFkeVRhZ2dlZDsKICAgIGNvbnN0IHBlbmRpbmcgPSBpc0FwcGx5ID8gMCA6IHN0YXRzLm5ld2x5VGFnZ2VkOwogICAgY29uc29sZS5sb2coCiAgICAgIGAke2NvbGwucGFkRW5kKDIwKX0ke1N0cmluZyhzdGF0cy50b3RhbCkucGFkRW5kKDE0KX0ke1N0cmluZyh0YWdnZWQpLnBhZEVuZCgxOCl9JHtTdHJpbmcocGVuZGluZyl9YAogICAgKTsKICB9CgogIGNvbnNvbGUubG9nKCctJy5yZXBlYXQoNjUpKTsKICBjb25zb2xlLmxvZyhgTW9kZTogJHtpc0FwcGx5ID8gJ0FQUExJRUQgU1VDQ0VTU0ZVTExZJyA6ICdEUlkgUlVOIEZJTklTSEVEIC0gTm8gd3JpdGVzIHBlcmZvcm1lZCd9YCk7CiAgcHJvY2Vzcy5leGl0KDApOwp9CgptYWluKCkuY2F0Y2goKGVycikgPT4gewogIGNvbnNvbGUuZXJyb3IoJ0ZhdGFsIGJhY2tmaWxsIGVycm9yOicsIGVycik7CiAgcHJvY2Vzcy5leGl0KDEpOwp9KTsK
+import { adminDb } from '../src/server/firebaseAdmin';
+import {
+  Centre,
+  CentreBilling,
+  CentreMembership,
+  MembershipRole,
+} from '../src/types';
+
+const EXCELLENCE_CENTRE_ID = 'centre-excellence';
+
+const TENANT_COLLECTIONS = [
+  'students',
+  'admissions',
+  'tutors',
+  'programmes',
+  'payments',
+  'branches',
+  'attendance_logs',
+  'announcements',
+  'subjects',
+  'classrooms',
+  'timetable',
+  'results',
+  'cbt_questions',
+  'cbt_exams',
+  'activities',
+  'classRatings',
+  'studyMaterials',
+  'mock_grading',
+  'admins',
+];
+
+function generate6DigitCode(): string {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+// The owner UID is a real Firebase Auth UID, passed per run (Prompt D): there
+// is no hard-coded account anywhere in the script.
+function resolveOwnerUid(): string {
+  const i = process.argv.indexOf('--owner-uid');
+  if (i > -1 && process.argv[i + 1]) return String(process.argv[i + 1]);
+  return process.env.EXCELLENCE_OWNER_UID || '';
+}
+
+const OWNER_UID = resolveOwnerUid();
+
+async function main() {
+  const isApply = process.argv.includes('--apply');
+  if (isApply && !OWNER_UID) {
+    console.error('APPLY mode requires the real owner UID: pass --owner-uid <uid> or set EXCELLENCE_OWNER_UID.');
+    console.error('Refusing to write a centre whose ownerUid is not a real Firebase Auth UID.');
+    process.exit(1);
+  }
+  console.log(`========================================================`);
+  console.log(`  Tutorial OS Multi-Tenant Backfill Script (Prompt 1)`);
+  console.log(`  Mode: ${isApply ? 'APPLY (Writing changes to Firestore)' : 'DRY RUN (Preview only, use --apply to commit)'}`);
+  console.log(`  Target Centre ID: ${EXCELLENCE_CENTRE_ID}`);
+  console.log(`========================================================\n`);
+
+  // Step 1: Read existing settings/global to derive Centre #1
+  const globalSettingsRef = adminDb.collection('settings').doc('global');
+  const globalSettingsSnap = await globalSettingsRef.get();
+  const globalData = globalSettingsSnap.exists ? globalSettingsSnap.data() || {} : {};
+
+  const centreRef = adminDb.collection('centres').doc(EXCELLENCE_CENTRE_ID);
+  const existingCentreSnap = await centreRef.get();
+
+  let accessCode = generate6DigitCode();
+  if (existingCentreSnap.exists && existingCentreSnap.data()?.accessCode) {
+    accessCode = existingCentreSnap.data()!.accessCode;
+  }
+
+  const centreDoc: Centre = {
+    id: EXCELLENCE_CENTRE_ID,
+    name: globalData.centreName || 'Excellence Tutorial Centre',
+    status: 'active',
+    ownerUid: OWNER_UID, // passed with --owner-uid or EXCELLENCE_OWNER_UID
+    branding: {
+      logo: globalData.logoText || 'Excellence',
+      primaryColor: globalData.primaryColor || '#EA580C',
+      secondaryColor: globalData.secondaryColor || '#0F172A',
+      colours: {
+        primary: globalData.primaryColor || '#EA580C',
+        secondary: globalData.secondaryColor || '#0F172A',
+      },
+    },
+    audienceTypes: ['JAMB', 'WAEC', 'NECO', 'A-Levels'],
+    autoApproveStudents: false,
+    createdAt: new Date().toISOString(),
+    accessCode,
+  };
+
+  const billingDoc: CentreBilling = {
+    centreId: EXCELLENCE_CENTRE_ID,
+    planId: 'centre_plus',
+    seatCap: 500,
+    billedSeatsMinimum: 10,
+    trialStartsAt: null,
+    trialEndsAt: null,
+    skippedTrial: true,
+    discountPct: 0,
+    paidThrough: null,
+    notes: 'Excellence Tutorial Centre (Founding Customer)',
+  };
+
+  console.log(`1. Centre #1 ("Excellence Tutorial Centre"):`);
+  console.log(`   - ID: ${EXCELLENCE_CENTRE_ID}`);
+  console.log(`   - Name: ${centreDoc.name}`);
+  console.log(`   - Status: ${centreDoc.status}`);
+  console.log(`   - Access Code: ${accessCode}`);
+  console.log(`   - Plan: ${billingDoc.planId} (Cap: ${billingDoc.seatCap})`);
+
+  if (isApply) {
+    await centreRef.set(centreDoc, { merge: true });
+    await adminDb.collection('centreBilling').doc(EXCELLENCE_CENTRE_ID).set(billingDoc, { merge: true });
+    await adminDb.collection('accessCodes').doc(accessCode).set({ centreId: EXCELLENCE_CENTRE_ID }, { merge: true });
+    console.log(`   -> Written centres, centreBilling, and accessCodes records.`);
+  }
+
+  // Step 2: Copy settings/global and settings/attendance to scoped docs
+  console.log(`\n2. Settings Documents:`);
+  const scopedGlobalRef = adminDb.collection('settings').doc(`${EXCELLENCE_CENTRE_ID}__global`);
+  const scopedAttendanceRef = adminDb.collection('settings').doc(`${EXCELLENCE_CENTRE_ID}__attendance`);
+
+  const attendanceSettingsSnap = await adminDb.collection('settings').doc('attendance').get();
+  const attendanceData = attendanceSettingsSnap.exists ? attendanceSettingsSnap.data() || {} : {};
+
+  console.log(`   - settings/global -> settings/${EXCELLENCE_CENTRE_ID}__global`);
+  console.log(`   - settings/attendance -> settings/${EXCELLENCE_CENTRE_ID}__attendance`);
+  if (isApply) {
+    await scopedGlobalRef.set({ ...globalData, centreId: EXCELLENCE_CENTRE_ID }, { merge: true });
+    await scopedAttendanceRef.set({ ...attendanceData, centreId: EXCELLENCE_CENTRE_ID }, { merge: true });
+    console.log(`   -> Scoped settings created (legacy documents left in place).`);
+  }
+
+  // Step 3: Backfill centreId on all tenant collections
+  console.log(`\n3. Backfilling centreId across collections:`);
+  const report: Record<string, { total: number; alreadyTagged: number; newlyTagged: number }> = {};
+
+  for (const collName of TENANT_COLLECTIONS) {
+    const snap = await adminDb.collection(collName).get();
+    let alreadyTagged = 0;
+    let newlyTagged = 0;
+
+    const docsToUpdate: Array<{ id: string; ref: FirebaseFirestore.DocumentReference }> = [];
+    snap.forEach((docSnap) => {
+      const data = docSnap.data();
+      if (data.centreId === EXCELLENCE_CENTRE_ID) {
+        alreadyTagged++;
+      } else {
+        newlyTagged++;
+        docsToUpdate.push({ id: docSnap.id, ref: docSnap.ref });
+      }
+    });
+
+    report[collName] = {
+      total: snap.size,
+      alreadyTagged,
+      newlyTagged,
+    };
+
+    if (isApply && docsToUpdate.length > 0) {
+      // Batch in chunks of 400
+      const CHUNK_SIZE = 400;
+      for (let i = 0; i < docsToUpdate.length; i += CHUNK_SIZE) {
+        const chunk = docsToUpdate.slice(i, i + CHUNK_SIZE);
+        const batch = adminDb.batch();
+        for (const item of chunk) {
+          batch.set(item.ref, { centreId: EXCELLENCE_CENTRE_ID }, { merge: true });
+        }
+        await batch.commit();
+      }
+    }
+  }
+
+  // Step 4: Create memberships for admins, tutors, and students
+  console.log(`\n4. Creating centre memberships:`);
+  let adminMemberships = 0;
+  let tutorMemberships = 0;
+  let studentMemberships = 0;
+
+  // Admins
+  const adminsSnap = await adminDb.collection('admins').get();
+  for (const docSnap of adminsSnap.docs) {
+    const data = docSnap.data();
+    const uid = data.uid || docSnap.id;
+    if (uid) {
+      let role: MembershipRole = 'admin';
+      if (data.role === 'Super Admin') {
+        role = 'owner';
+      } else if (data.role === 'Center Admin') {
+        role = 'admin';
+      } else if (data.role === 'Admin Secretary') {
+        role = 'secretary';
+      } else if (data.role === 'Finance Admin') {
+        role = 'finance';
+      } else if (data.role === 'Tutor') {
+        role = 'tutor';
+      }
+
+      const membershipId = `${uid}__${EXCELLENCE_CENTRE_ID}`;
+      const memDoc: CentreMembership = {
+        id: membershipId,
+        uid,
+        centreId: EXCELLENCE_CENTRE_ID,
+        role,
+        status: data.status === 'Suspended' ? 'disabled' : 'active',
+        createdAt: data.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      adminMemberships++;
+      if (isApply) {
+        await adminDb.collection('memberships').doc(membershipId).set(memDoc, { merge: true });
+      }
+    }
+  }
+
+  // Tutors
+  const tutorsSnap = await adminDb.collection('tutors').get();
+  for (const docSnap of tutorsSnap.docs) {
+    const data = docSnap.data();
+    const uid = data.uid || docSnap.id;
+    if (uid) {
+      const membershipId = `${uid}__${EXCELLENCE_CENTRE_ID}`;
+      const memDoc: CentreMembership = {
+        id: membershipId,
+        uid,
+        centreId: EXCELLENCE_CENTRE_ID,
+        role: 'tutor',
+        status: data.status === 'Suspended' ? 'disabled' : 'active',
+        createdAt: data.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      tutorMemberships++;
+      if (isApply) {
+        await adminDb.collection('memberships').doc(membershipId).set(memDoc, { merge: true });
+      }
+    }
+  }
+
+  // Students
+  const studentsSnap = await adminDb.collection('students').get();
+  for (const docSnap of studentsSnap.docs) {
+    const data = docSnap.data();
+    const uid = data.uid || docSnap.id;
+    if (uid) {
+      const membershipId = `${uid}__${EXCELLENCE_CENTRE_ID}`;
+      const memDoc: CentreMembership = {
+        id: membershipId,
+        uid,
+        centreId: EXCELLENCE_CENTRE_ID,
+        role: 'student',
+        status: data.status === 'Suspended' ? 'disabled' : 'active',
+        createdAt: data.registrationDate || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      studentMemberships++;
+      if (isApply) {
+        await adminDb.collection('memberships').doc(membershipId).set(memDoc, { merge: true });
+      }
+    }
+  }
+
+  console.log(`   - Admin memberships: ${adminMemberships}`);
+  console.log(`   - Tutor memberships: ${tutorMemberships}`);
+  console.log(`   - Student memberships: ${studentMemberships}`);
+
+  // Step 5: Verification Report
+  console.log(`\n========================================================`);
+  console.log(`               BACKFILL VERIFICATION REPORT`);
+  console.log(`========================================================`);
+  console.log(
+    `Collection`.padEnd(20) +
+    `Total Docs`.padEnd(14) +
+    `Tagged centreId`.padEnd(18) +
+    `Untagged (Pending)`
+  );
+  console.log('-'.repeat(65));
+
+  for (const [coll, stats] of Object.entries(report)) {
+    const tagged = isApply ? stats.total : stats.alreadyTagged;
+    const pending = isApply ? 0 : stats.newlyTagged;
+    console.log(
+      `${coll.padEnd(20)}${String(stats.total).padEnd(14)}${String(tagged).padEnd(18)}${String(pending)}`
+    );
+  }
+
+  console.log('-'.repeat(65));
+  console.log(`Mode: ${isApply ? 'APPLIED SUCCESSFULLY' : 'DRY RUN FINISHED - No writes performed'}`);
+  process.exit(0);
+}
+
+main().catch((err) => {
+  console.error('Fatal backfill error:', err);
+  process.exit(1);
+});
