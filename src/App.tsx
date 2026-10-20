@@ -185,7 +185,7 @@ const MainLayout: React.FC = () => {
         </div>
         <div className="space-y-2 text-center">
           <h2 className="text-xl font-black tracking-widest uppercase text-orange-500">Excellence</h2>
-          <p className="text-xs text-slate-400 font-medium animate-pulse">Synchronizing academic records...</</p>
+          <p className="text-xs text-slate-400 font-medium animate-pulse">Synchronizing academic records...</p>
         </div>
       </div>
     );
