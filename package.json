@@ -40,5 +40,8 @@
     "tailwindcss": "^4.1.14",
     "typescript": "~5.8.2",
     "vite-plugin-pwa": "^0.21.1"
+  },
+  "overrides": {
+    "jwks-rsa": "^3.1.0"
   }
 }
