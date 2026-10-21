@@ -124,7 +124,7 @@ service cloud.firestore {
     }
 
     match /payments/{paymentId} {
-      allow read: if true;
+      allow read: if isVerified();
       allow create: if isValidPayment(incoming());
       allow update: if isAdmin();
       allow delete: if isAdmin();
