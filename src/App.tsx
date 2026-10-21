@@ -61,6 +61,7 @@ const MainLayout: React.FC = () => {
     hasCheckedActiveCentre,
     enterCentreByCode,
     enterSoleCentre,
+    addToast,
     updateAdmin,
     logout 
   } = useApp();
@@ -114,7 +115,17 @@ const MainLayout: React.FC = () => {
         const ok = pendingCentre ? !!(r && r.success) : !!(r && r.entered);
         if (!ok) setCentreEntryFailed(true);
       })
-      .catch(() => setCentreEntryFailed(true))
+      .catch((err: any) => {
+        // A failed automatic entry is never silent: the server's reason (a
+        // temporary lockout, a membership mismatch) shows as a message, so the
+        // join screen never appears without an explanation.
+        setCentreEntryFailed(true);
+        addToast({
+          type: 'error',
+          title: 'Centre entry failed',
+          description: err?.message || 'Your centre could not be opened automatically.',
+        });
+      })
       .finally(() => setCentreEntryBusy(false));
   }, [currentUser, hasCheckedActiveCentre, activeCentreId, pendingCentre, enterCentreByCode, enterSoleCentre]);
 
