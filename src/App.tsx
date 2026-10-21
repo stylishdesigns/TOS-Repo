@@ -91,19 +91,31 @@ const MainLayout: React.FC = () => {
   // centre enters it the same way. Only a user with no centre sees the join
   // screen, and only while nothing can be resolved.
   const [centreEntryBusy, setCentreEntryBusy] = useState(false);
+  // The join/enter screens render only after a resolution attempt has
+  // demonstrably failed. Until then the resolving screen holds, so no code
+  // prompt can flash or stand between the login page and the dashboard.
+  const [centreEntryFailed, setCentreEntryFailed] = useState(false);
   const centreEntryKeyRef = useRef<string | null>(null);
   useEffect(() => {
     if (!currentUser || !hasCheckedActiveCentre) return;
     if (activeCentreId) {
       setCentreEntryBusy(false);
+      setCentreEntryFailed(false);
       return;
     }
     const key = pendingCentre ? `code:${pendingCentre.code}` : 'auto';
     if (centreEntryKeyRef.current === key) return;
     centreEntryKeyRef.current = key;
+    setCentreEntryFailed(false);
     setCentreEntryBusy(true);
     const work = pendingCentre ? enterCentreByCode(pendingCentre.code) : enterSoleCentre();
-    work.catch(() => {}).finally(() => setCentreEntryBusy(false));
+    work
+      .then((r: any) => {
+        const ok = pendingCentre ? !!(r && r.success) : !!(r && r.entered);
+        if (!ok) setCentreEntryFailed(true);
+      })
+      .catch(() => setCentreEntryFailed(true))
+      .finally(() => setCentreEntryBusy(false));
   }, [currentUser, hasCheckedActiveCentre, activeCentreId, pendingCentre, enterCentreByCode, enterSoleCentre]);
 
   // The centre code gate appears only after a login button on the landing
@@ -197,6 +209,8 @@ const MainLayout: React.FC = () => {
   const handleLogout = async () => {
     setPendingCentre(null);
     centreEntryKeyRef.current = null;
+    setCentreEntryBusy(false);
+    setCentreEntryFailed(false);
     setCentreGateRequested(false);
     setShowWelcome(true);
     setShowPortals(false);
@@ -367,7 +381,7 @@ const MainLayout: React.FC = () => {
   // centre resolution in flight this is a branded loading screen, never a
   // code prompt: the dashboard must be reachable without re-entering a code.
   if (currentUser && !activeCentreId && hasCheckedActiveCentre && !isTosAdmin) {
-    if (centreEntryBusy) {
+    if (centreEntryBusy || !centreEntryFailed) {
       return (
             <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-900 text-white">
               <div className="relative w-24 h-24 mb-8">
