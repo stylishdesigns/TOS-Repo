@@ -34,7 +34,7 @@ import { JoinCentreScreen } from './components/auth/JoinCentreScreen';
 
 import { PasswordChangeOverlay } from './components/auth/PasswordChangeOverlay';
 import { getAuth } from 'firebase/auth';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, ShieldCheck } from 'lucide-react';
 
 // The #tos door shows nothing to anyone who is not platform staff.
 const TosNotFound: React.FC = () => (
@@ -119,9 +119,9 @@ const MainLayout: React.FC = () => {
         // that can mint it (first verified sign-in from TOS_BOOTSTRAP_EMAILS,
         // or a grant written by scripts/grant-tos.ts), so ask it once and read
         // the answer back from a freshly forced token; the claim is never
-        // decoded or inferred client-side. Users heading for a centre app
-        // through #centre skip the wait, they need no TOS claim.
-        if (centreAppRequested) { settle(r.claims); return; }
+        // decoded or inferred client-side. Every sign-in runs this sync, so a
+        // platform staff member can never end up on the centre access-code
+        // screen (Prompt E) no matter which door they arrive through.
         const token = await u.getIdToken(true);
         const res = await fetch('/api/session/sync', {
           method: 'POST',
@@ -185,7 +185,7 @@ const MainLayout: React.FC = () => {
         </div>
         <div className="space-y-2 text-center">
           <h2 className="text-xl font-black tracking-widest uppercase text-orange-500">Excellence</h2>
-          <p className="text-xs text-slate-400 font-medium animate-pulse">Synchronizing academic records...</p>
+          <p className="text-xs text-slate-400 font-medium animate-pulse">Synchronizing academic records...</</p>
         </div>
       </div>
     );
@@ -200,6 +200,38 @@ const MainLayout: React.FC = () => {
   // not; #centre in the URL is the way back into the tenant (centre) app.
   // The #tos door still signs visitors in and shows non-staff a not-found.
   if (currentUser && isTosAdmin && !centreAppRequested) return <TosPortal />;
+
+  // Platform staff never see the centre access-code screen (Prompt E). When a
+  // staff member opens a centre door without an active centre membership,
+  // explain the way to test a centre instead of showing code entry.
+  if (currentUser && isTosAdmin && !activeCentreId) {
+    return (
+      <div className="min-h-screen w-full bg-slate-950 flex flex-col items-center justify-center text-center p-6">
+        <div className="w-14 h-14 rounded-2xl bg-orange-500/10 border border-orange-500/30 flex items-center justify-center mb-5">
+          <ShieldCheck className="w-7 h-7 text-orange-400" />
+        </div>
+        <h1 className="text-xl font-bold text-white mb-2">You are signed in as platform staff</h1>
+        <p className="text-slate-400 text-sm mb-6 max-w-sm">
+          Centre access codes are for centre accounts, not platform staff. To look around a centre,
+          sign out and sign in with that centre&apos;s own admin, tutor or student account.
+        </p>
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          <button
+            onClick={() => { window.location.hash = ''; }}
+            className="px-4 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-sm font-bold transition-colors"
+          >
+            Open the platform console
+          </button>
+          <button
+            onClick={handleLogout}
+            className="px-4 py-2.5 rounded-xl border border-white/10 hover:border-white/20 text-slate-300 text-sm font-semibold transition-colors"
+          >
+            Sign out
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // Landing page flow: the Tutorial OS product landing is the first screen,
   // and the existing role picker stays one click away from it.
