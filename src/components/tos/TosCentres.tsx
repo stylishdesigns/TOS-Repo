@@ -179,13 +179,15 @@ const CentreDetail: React.FC<{ centreId: string; onBack: () => void; onDataChang
               {billing?.discountPct ? <p>Skip-trial discount: <span className="text-white font-bold">{billing.discountPct}%</span></p> : null}
               {billing?.skippedTrial && <p className="text-rose-300">Trial skipped; first payment records the start of billing.</p>}
             </div>
-            {!billing?.skippedTrial && (
+            {!billing?.skippedTrial ? (
               <div className="flex items-end gap-2">
                 <Field label="Extend trial (days)">
                   <input type="number" min="1" max="365" value={seatEdits.extendDays} onChange={(e) => setSeatEdits((s) => ({ ...s, extendDays: e.target.value }))} className={`${inputCls} w-28`} />
                 </Field>
                 <button onClick={() => doAction('extend-trial', { days: Number(seatEdits.extendDays) })} disabled={busy !== ''} className={btnGhost}>Extend</button>
               </div>
+            ) : (
+              <button onClick={() => doAction('start-trial')} disabled={busy !== ''} className={btnPrimary}>Start trial</button>
             )}
             <div className="pt-2 border-t border-white/5 flex flex-wrap gap-2">
               {status === 'suspended' ? (

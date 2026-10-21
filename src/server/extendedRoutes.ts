@@ -1,5 +1,6 @@
 import express from 'express';
 import * as crypto from 'crypto';
+import { STARTING_CONFIG } from './platformDefaults';
 import { adminAuth, adminDb } from './firebaseAdmin';
 import {
   Caller,
@@ -545,6 +546,15 @@ export function registerExtendedRoutes(app: express.Express): void {
         const trialEndsAt = new Date(base + days * DAY_MS).toISOString();
         await bRef.update({ trialEndsAt });
         await auditChange('TRIAL_EXTENDED', { trialEndsAt, days });
+        return res.json({ success: true, trialEndsAt });
+      }
+      if (type === 'start-trial') {
+        const config = await getPlatformConfig();
+        const days = Math.floor(Number((config as any)?.trialDays ?? STARTING_CONFIG.trialDays));
+        if (!Number.isInteger(days) || days < 1) return res.status(400).json({ error: 'The trial length is not configured; set it under platform settings first.' });
+        const trialEndsAt = new Date(Date.now() + days * DAY_MS).toISOString();
+        await bRef.set({ trialEndsAt, skippedTrial: false }, { merge: true });
+        await auditChange('TRIAL_STARTED', { trialEndsAt, days });
         return res.json({ success: true, trialEndsAt });
       }
       if (type === 'regenerate-access-code') {

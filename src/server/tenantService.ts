@@ -422,16 +422,53 @@ export async function enterCentreService(params: {
     dbFailure('enterCentreService(code lookup)', err);
   }
 
+  // Codes set by hand on the centre document may never have a canonical
+  // accessCodes entry. Accept them and materialize the entry so claims and
+  // limits keep one source of truth. A conflicting holder still fails.
   if (!centreId) {
+    try {
+      const byCentre = await adminDb.collection('centres').where('accessCode', '==', cleanCode).limit(2).get();
+      const matches = byCentre.docs.filter((d) => d.data()?.accessCode === cleanCode);
+      if (matches.length === 1) {
+        const fallbackCentreId = matches[0].id;
+        const holder = await adminDb.runTransaction(async (tx) => {
+          const ref = adminDb.collection('accessCodes').doc(cleanCode);
+          const existing = await tx.get(ref);
+          if (existing.exists && existing.data()?.centreId !== fallbackCentreId) return false;
+          if (!existing.exists) {
+            tx.set(ref, { centreId: fallbackCentreId, createdAt: new Date().toISOString(), active: true, setBy: 'centre-doc-fallback' });
+          }
+          return true;
+        });
+        if (holder) centreId = fallbackCentreId;
+      }
+    } catch (err) {
+      dbFailure('enterCentreService(centre-doc fallback)', err);
+    }
+  }
+
+  const failWith = async (reason: string) => {
+    try {
+      await adminDb.collection('auditLogs').add({
+        actorUid: uid,
+        centreId: centreId || null,
+        action: 'ACCESS_CODE_FAIL',
+        reason,
+        at: new Date().toISOString(),
+      });
+    } catch { /* audit is best-effort */ }
     await recordFailedAttempt(rateLimitKey);
     throw httpError(400, UNIFORM_MISMATCH_ERROR);
+  };
+
+  if (!centreId) {
+    await failWith('code-not-found');
   }
 
   // 2. Fetch the centre.
   const centre = await getCentreDoc(centreId);
   if (!centre) {
-    await recordFailedAttempt(rateLimitKey);
-    throw httpError(400, UNIFORM_MISMATCH_ERROR);
+    await failWith('centre-missing');
   }
 
   // 3. Verify membership. A platform-staff `tos` claim grants no centre
@@ -454,8 +491,7 @@ export async function enterCentreService(params: {
     }
   }
   if (!membership || membership.status !== 'active') {
-    await recordFailedAttempt(rateLimitKey);
-    throw httpError(400, UNIFORM_MISMATCH_ERROR);
+    await failWith('membership-missing');
   }
 
   // 4. Subscription status: suspended centres are owner/TOS only.
