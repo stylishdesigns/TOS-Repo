@@ -53,7 +53,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
   onBack
 }) => {
   const { loginWithEmail, loginWithGoogle, signUpWithEmail, resetPassword, updatePassword, logout } = useFirebase();
-  const { addToast, activeCentreId } = useApp();
+  const { addToast, activeCentreId, centreName } = useApp();
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -246,7 +246,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
       addToast({
         type: 'success',
         title: `Welcome Back, ${displayRole}!`,
-        description: `We're glad to have you back at Excellence Tutorials.`
+        description: `We're glad to have you back at ${centreName}.`
       });
       onSuccess();
     } catch (err: any) {
@@ -458,7 +458,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
       addToast({
         type: 'success',
         title: `Welcome, ${displayRole}!`,
-        description: `You're now signed in to Excellence Tutorials.`
+        description: `You're now signed in to ${centreName}.`
       });
       onSuccess();
     } catch (err: any) {

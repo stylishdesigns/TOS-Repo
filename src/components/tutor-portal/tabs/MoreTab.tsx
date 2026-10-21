@@ -22,7 +22,7 @@ interface MoreTabProps {
 }
 
 export const MoreTab: React.FC<MoreTabProps> = ({ tutor, onExit }) => {
-  const { students, addToast, activeCentreId, userCentres, switchCentre } = useApp();
+  const { students, addToast, activeCentreId, userCentres, switchCentre, centreName } = useApp();
   const [showTopicModal, setShowTopicModal] = useState(false);
 
 
@@ -158,7 +158,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ tutor, onExit }) => {
           <Smartphone className="w-3 h-3" />
           <span>Portal Version 4.2.0 (Mobile Ready)</span>
         </p>
-        <p className="text-[9px] text-slate-300 font-medium">© Excellence Tutorial Centre • 2026</p>
+        <p className="text-[9px] text-slate-300 font-medium">© {centreName} • 2026</p>
       </div>
 
       {/* Propose Topic Modal */}

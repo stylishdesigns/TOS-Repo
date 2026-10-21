@@ -74,6 +74,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
     setBgTheme,
     isAdmin,
     logout,
+    centreName,
   } = useApp();
 
   // Active bottom splash-up modal
@@ -584,7 +585,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
 
       {/* 5. Version Footer (Exact look from video) */}
       <div className="text-center pt-6 pb-4 text-slate-400 text-xs font-medium">
-        {settings.centreName || 'Excellence Tutorial Centre'} • Version 1.0.0 (2026)
+        {centreName} • Version 1.0.0 (2026)
       </div>
 
       {/* =========================================================================
@@ -840,7 +841,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                       </div>
                       <div>
                         <span className="text-xs font-black tracking-wider uppercase block leading-none">
-                          {settings.centreName || 'Excellence Tutorial Centre'}
+                          {centreName}
                         </span>
                         <span className="text-[9px] text-orange-400 font-semibold tracking-wider uppercase">
                           Official Student Identity Card
@@ -1086,7 +1087,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                             <div className="flex justify-between items-center text-xs">
                               <span className="text-slate-500 font-medium">Account Name:</span>
                               <span className="font-bold text-slate-900 truncate max-w-[180px]">
-                                {settings.bankAccountName || 'Excellence Tutorial Centre Ltd'}
+                                {settings.bankAccountName || centreName}
                               </span>
                             </div>
                           </div>

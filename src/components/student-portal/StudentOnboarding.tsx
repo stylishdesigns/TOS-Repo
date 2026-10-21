@@ -11,7 +11,7 @@ interface StudentOnboardingProps {
 }
 
 export const StudentOnboarding: React.FC<StudentOnboardingProps> = ({ onComplete }) => {
-  const { addToast, activeCentreId } = useApp();
+  const { addToast, activeCentreId, centreName } = useApp();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     firstName: '',
@@ -65,7 +65,7 @@ export const StudentOnboarding: React.FC<StudentOnboardingProps> = ({ onComplete
       addToast({
         type: 'success',
         title: 'Profile Created!',
-        description: 'Welcome to Excellence Tutorial Centre.',
+        description: `Welcome to ${centreName}.`,
       });
       // Small delay to ensure Firestore propagation before parent re-renders
       setTimeout(() => {

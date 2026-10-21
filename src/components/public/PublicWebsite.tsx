@@ -685,7 +685,7 @@ export const PublicWebsite: React.FC = () => {
           <div className="text-center sm:text-right text-[11px] space-y-1">
             <p>© {new Date().getFullYear()} {settings.centreName}. All rights reserved.</p>
             <p className="text-slate-500">
-              Powered by Excellence Tutorial Management System & Dynamic CMS Software.
+              Powered by Tutorial OS Management System & Dynamic CMS Software.
             </p>
           </div>
         </div>

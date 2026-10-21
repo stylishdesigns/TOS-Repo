@@ -51,7 +51,7 @@ interface AssessmentTabProps {
 }
 
 export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
-  const { programmes, subjects: allSubjects, addToast, exams, results, students, activeCentreId } = useApp();
+  const { programmes, subjects: allSubjects, addToast, exams, results, students, activeCentreId, centreName } = useApp();
   const [activeFrequency] = useState<'General'>('General');
   const [activeTab, setActiveTab] = useState<'Assessment' | 'Performance'>('Assessment');
   const [expandedExamId, setExpandedExamId] = useState<string | null>(null);
@@ -2134,7 +2134,7 @@ Number of Questions: ${setupData.questionCount}`;
                   EX
                 </div>
                 <h2 className="text-lg font-black tracking-tight uppercase text-slate-900">
-                  Excellence Tutorial Centre
+                  {centreName}
                 </h2>
                 <div className="inline-block px-4 py-1 bg-slate-100 text-slate-800 rounded-full text-[10px] font-black uppercase tracking-[0.2em]">
                   Student Assessment Certificate

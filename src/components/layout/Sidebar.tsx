@@ -83,13 +83,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
       ],
     },
     {
-      title: 'PORTALS',
-      items: [
-        { id: 'student-portal', label: 'Student Portal', icon: Laptop },
-        { id: 'tutor-portal', label: 'Tutor Portal', icon: GraduationCap },
-      ],
-    },
-    {
       title: 'SETTINGS',
       items: [
         { id: 'staff-roles', label: 'Staff & Roles', icon: Shield },

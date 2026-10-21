@@ -1369,7 +1369,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // The dashboard brand follows the active centre, never a shared default.
-  const centreName = activeCentre?.name || settings.centreName || 'Excellence Tutorial Centre';
+  const centreName = activeCentre?.name || settings.centreName || 'Tutorial Centre';
 
   // Sync state to localStorage
   useEffect(() => {
@@ -2454,6 +2454,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const recordPayment = async (paymentData: Omit<PaymentRecord, 'id' | 'receiptNumber' | 'date'>) => {
     try {
+      if (!activeCentreId) {
+        addToast({ type: 'error', title: 'Payment Failed', description: 'No centre is active in this session, so the payment cannot be tagged to a centre. Sign in and enter your centre again.' });
+        return;
+      }
       const receiptNumber = `REC-2026-${Math.floor(1000 + Math.random() * 9000)}`;
       const id = `pay-${Date.now()}`;
       const newPayment: PaymentRecord = {

@@ -40,6 +40,7 @@ export const DashboardOverview: React.FC = () => {
     approveAdmission,
     rejectAdmission,
     seatsSummary,
+    centreName,
   } = useApp();
 
 
@@ -90,7 +91,7 @@ export const DashboardOverview: React.FC = () => {
             <div className="flex flex-wrap items-center gap-2.5">
               <span className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-bold bg-orange-100 text-[#EA580C] border border-orange-200/80">
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>Excellence Admin Hub</span>
+                <span>{centreName} Admin Hub</span>
               </span>
               <span className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
