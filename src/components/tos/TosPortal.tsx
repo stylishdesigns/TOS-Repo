@@ -425,6 +425,9 @@ const AuditTab: React.FC = () => {
                 <span className="text-xs font-bold text-white">{String(e.action || '').replace(/_/g, ' ')}</span>
                 <span className="text-[11px] text-slate-500">{fmtDateTime(e.at)} · {e.actorUid || '—'}{e.centreId ? ` · ${e.centreId}` : ''}</span>
               </div>
+              {e.reason && (
+                <p className="text-[11px] text-amber-300 mt-1">Reason: {String(e.reason)}</p>
+              )}
               {(e.before || e.after) && (
                 <pre className="text-[10px] text-slate-400 mt-1.5 whitespace-pre-wrap break-all">{JSON.stringify({ ...(e.before ? { before: e.before } : {}), ...(e.after ? { after: e.after } : {}) }, null, 1)}</pre>
               )}

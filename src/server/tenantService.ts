@@ -427,8 +427,12 @@ export async function enterCentreService(params: {
   // limits keep one source of truth. A conflicting holder still fails.
   if (!centreId) {
     try {
-      const byCentre = await adminDb.collection('centres').where('accessCode', '==', cleanCode).limit(2).get();
-      const matches = byCentre.docs.filter((d) => d.data()?.accessCode === cleanCode);
+      let byCentre = await adminDb.collection('centres').where('accessCode', '==', cleanCode).limit(2).get();
+      if (byCentre.empty && /^\d+$/.test(cleanCode)) {
+        // A code set by hand in the console may be stored as a number.
+        byCentre = await adminDb.collection('centres').where('accessCode', '==', Number(cleanCode)).limit(2).get();
+      }
+      const matches = byCentre.docs.filter((d) => String(d.data()?.accessCode) === cleanCode);
       if (matches.length === 1) {
         const fallbackCentreId = matches[0].id;
         const holder = await adminDb.runTransaction(async (tx) => {
