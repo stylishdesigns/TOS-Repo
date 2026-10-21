@@ -53,7 +53,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
   onBack
 }) => {
   const { loginWithEmail, loginWithGoogle, signUpWithEmail, resetPassword, updatePassword, logout } = useFirebase();
-  const { addToast } = useApp();
+  const { addToast, activeCentreId } = useApp();
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -296,7 +296,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
           programmeName: 'General Student',
           courses: []
         };
-        await setDoc(doc(db, 'students', uid), newStudent);
+        await setDoc(doc(db, 'students', uid), { ...newStudent, ...(activeCentreId ? { centreId: activeCentreId } : {}) });
       }
 
       addToast({
@@ -446,7 +446,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
           programmeName: 'General Student',
           courses: []
         };
-        await setDoc(doc(db, 'students', uid), newStudent);
+        await setDoc(doc(db, 'students', uid), { ...newStudent, ...(activeCentreId ? { centreId: activeCentreId } : {}) });
         displayRole = 'Student';
       } else {
         // If in admin/tutor portal and user doesn't exist, this might be an error or they need to be invited
