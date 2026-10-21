@@ -393,8 +393,15 @@ async function startServer() {
       }
       const hasTos = decoded.tos === true || bootstrapGranted;
 
-      const claims: { m: Record<string, string>; tos?: boolean } = { m };
-      if (hasTos) {
+      // Merge, never replace: a provisioned owner's mustChangePassword claim
+      // must survive the sync so the forced first-password change still
+      // happens. Session sync still never invents a claim of its own.
+      const syncUserRecord = await adminAuth.getUser(uid);
+      const preserved: Record<string, any> = { ...((syncUserRecord.customClaims || {}) as Record<string, any>) };
+      delete preserved.m;
+      delete preserved.tos;
+      const claims: { m: Record<string, string>; tos?: boolean } = { ...preserved, m };
+      if (hasTos || preserved.tos === true) {
         claims.tos = true;
       }
 
