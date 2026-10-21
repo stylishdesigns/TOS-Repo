@@ -434,44 +434,35 @@ export async function enterCentreService(params: {
     throw httpError(400, UNIFORM_MISMATCH_ERROR);
   }
 
-  // 3. Verify membership (TOS staff bypass with the claim, not an email).
+  // 3. Verify membership. A platform-staff `tos` claim grants no centre
+  // access here (Prompt E): staff test a centre by signing in with one of
+  // that centre's own accounts, never by entering its access code.
   let membership: CentreMembership | null = null;
-  if (caller.tos) {
-    membership = {
-      uid,
-      centreId,
-      role: 'owner',
-      status: 'active',
-      createdAt: '',
-      updatedAt: '',
-    };
-  } else {
-    membership = await getMembership(uid, centreId, userEmail);
-    if (!membership) {
-      // Legacy documents keyed by email in the uid field.
-      try {
-        const snap = await adminDb
-          .collection('memberships')
-          .where('centreId', '==', centreId)
-          .where('uid', '==', userEmail)
-          .limit(1)
-          .get();
-        if (!snap.empty) membership = snap.docs[0].data() as CentreMembership;
-      } catch (err) {
-        dbFailure('enterCentreService(legacy membership lookup)', err);
-      }
+  membership = await getMembership(uid, centreId, userEmail);
+  if (!membership) {
+    // Legacy documents keyed by email in the uid field.
+    try {
+      const snap = await adminDb
+        .collection('memberships')
+        .where('centreId', '==', centreId)
+        .where('uid', '==', userEmail)
+        .limit(1)
+        .get();
+      if (!snap.empty) membership = snap.docs[0].data() as CentreMembership;
+    } catch (err) {
+      dbFailure('enterCentreService(legacy membership lookup)', err);
     }
-    if (!membership || membership.status !== 'active') {
-      await recordFailedAttempt(rateLimitKey);
-      throw httpError(400, UNIFORM_MISMATCH_ERROR);
-    }
+  }
+  if (!membership || membership.status !== 'active') {
+    await recordFailedAttempt(rateLimitKey);
+    throw httpError(400, UNIFORM_MISMATCH_ERROR);
   }
 
   // 4. Subscription status: suspended centres are owner/TOS only.
   const billing = await getBillingDoc(centreId);
   const config = await getPlatformConfig();
   const status = effectiveStatus(centre, billing, config);
-  if (status === 'suspended' && membership.role !== 'owner' && !caller.tos) {
+  if (status === 'suspended' && membership.role !== 'owner') {
     throw httpError(
       403,
       `This centre's access is currently inactive. Please contact the centre administration.`
@@ -505,20 +496,17 @@ export async function validateActiveCentreService(params: {
   const centre = await getCentreDoc(centreId);
   if (!centre) throw httpError(404, 'Active centre not found.');
 
-  let membership: CentreMembership | null = null;
-  if (caller.tos) {
-    membership = { uid, centreId, role: 'owner', status: 'active', createdAt: '', updatedAt: '' };
-  } else {
-    membership = await getMembership(uid, centreId, userEmail);
-    if (!membership || membership.status !== 'active') {
-      throw httpError(403, 'Your active membership for this centre is no longer active.');
-    }
+  // No platform-staff shortcut (Prompt E): a `tos` claim alone is not a
+  // membership. The session's active centre must belong to the caller.
+  const membership: CentreMembership | null = await getMembership(uid, centreId, userEmail);
+  if (!membership || membership.status !== 'active') {
+    throw httpError(403, 'Your active membership for this centre is no longer active.');
   }
 
   const billing = await getBillingDoc(centreId);
   const config = await getPlatformConfig();
   const status = effectiveStatus(centre, billing, config);
-  if (status === 'suspended' && membership.role !== 'owner' && !caller.tos) {
+  if (status === 'suspended' && membership.role !== 'owner') {
     throw httpError(
       403,
       `This centre's access is currently inactive. Please contact the centre administration.`
