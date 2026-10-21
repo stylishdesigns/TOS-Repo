@@ -60,6 +60,7 @@ const MainLayout: React.FC = () => {
     centreName,
     hasCheckedActiveCentre,
     enterCentreByCode,
+    enterSoleCentre,
     updateAdmin,
     logout 
   } = useApp();
@@ -78,22 +79,36 @@ const MainLayout: React.FC = () => {
     return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
   const [showPortals, setShowPortals] = useState(false);
-  const [accessCodeFlow, setAccessCodeFlow] = useState<'enter' | 'join'>('enter');
+  const [accessCodeFlow, setAccessCodeFlow] = useState<'enter' | 'join'>('join');
   // Centre code gate (pre-login): the access code is a centre selector, not a
   // secret. The first screen asks for the code, shows the centre's name, and
   // the selected centre's login page follows; after sign-in the app enters
   // that centre automatically.
   const [pendingCentre, setPendingCentre] = useState<{ code: string; centreName: string } | null>(null);
-  const attemptedCentreCodeRef = useRef<string | null>(null);
+  // Post-login centre resolution is silent: no code screen sits between the
+  // login page and the dashboard. The centre chosen before login is entered
+  // automatically; a user with no chosen centre who belongs to exactly one
+  // centre enters it the same way. Only a user with no centre sees the join
+  // screen, and only while nothing can be resolved.
+  const [centreEntryBusy, setCentreEntryBusy] = useState(false);
+  const centreEntryKeyRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!currentUser || !pendingCentre || !hasCheckedActiveCentre) return;
-    if (attemptedCentreCodeRef.current === pendingCentre.code) return;
-    attemptedCentreCodeRef.current = pendingCentre.code;
-    enterCentreByCode(pendingCentre.code).catch(() => {
-      // Not a member of the selected centre (or the centre rejected the code):
-      // the existing access-code screen below takes over.
-    });
-  }, [currentUser, pendingCentre, hasCheckedActiveCentre, enterCentreByCode]);
+    if (!currentUser || !hasCheckedActiveCentre) return;
+    if (activeCentreId) {
+      setCentreEntryBusy(false);
+      return;
+    }
+    const key = pendingCentre ? `code:${pendingCentre.code}` : 'auto';
+    if (centreEntryKeyRef.current === key) return;
+    centreEntryKeyRef.current = key;
+    setCentreEntryBusy(true);
+    const work = pendingCentre ? enterCentreByCode(pendingCentre.code) : enterSoleCentre();
+    work.catch(() => {}).finally(() => setCentreEntryBusy(false));
+  }, [currentUser, hasCheckedActiveCentre, activeCentreId, pendingCentre, enterCentreByCode, enterSoleCentre]);
+
+  // The centre code gate appears only after a login button on the landing
+  // page is clicked; the platform-staff door (#tos-admin) never shows it.
+  const [centreGateRequested, setCentreGateRequested] = useState(false);
 
   // Platform (TOS) admins are exempt from the centre access-code gate below.
   // TOS access is the server-stamped `tos` custom claim, verified in a fresh
@@ -181,7 +196,10 @@ const MainLayout: React.FC = () => {
 
   const handleLogout = async () => {
     setPendingCentre(null);
-    attemptedCentreCodeRef.current = null;
+    centreEntryKeyRef.current = null;
+    setCentreGateRequested(false);
+    setShowWelcome(true);
+    setShowPortals(false);
     try {
       await logout();
     } catch (e) {
@@ -292,10 +310,10 @@ const MainLayout: React.FC = () => {
     }} />;
   }
 
-  // The centre code gate is the first screen for every signed-out visitor
-  // (the platform-staff door above is exempt). It only selects and names the
-  // centre; the landing and role picker follow it.
-  if (!currentUser && !tosLoginRequested && !pendingCentre) {
+  // The centre code gate shows after a login button on the landing page is
+  // clicked (the platform-staff door above is exempt). It only selects and
+  // names the centre; the centre's login page follows it.
+  if (!currentUser && !tosLoginRequested && !pendingCentre && centreGateRequested) {
     return (
       <CentreCodeGate
         onProceed={(code, centreName) => setPendingCentre({ code, centreName })}
@@ -314,10 +332,12 @@ const MainLayout: React.FC = () => {
           onAdminSignIn={() => {
             setViewMode('portal');
             setShowWelcome(false);
+            setCentreGateRequested(true);
           }}
           onStudentAccess={() => {
             setViewMode('student');
             setShowWelcome(false);
+            setCentreGateRequested(true);
           }}
           onExplorePortals={() => setShowPortals(true)}
         />
@@ -326,6 +346,7 @@ const MainLayout: React.FC = () => {
     return <WelcomeScreen onSelectRole={(role) => {
       setViewMode(role === 'admin' ? 'portal' : role);
       setShowWelcome(false);
+      setCentreGateRequested(true);
     }} />;
   }
 
@@ -342,8 +363,28 @@ const MainLayout: React.FC = () => {
     );
   }
 
-  // Multi-Tenant Access Code Screen Guard (Part A, point 2 & Part B)
+  // Multi-Tenant Access Code Screen Guard (Part A, point 2 & Part B). With
+  // centre resolution in flight this is a branded loading screen, never a
+  // code prompt: the dashboard must be reachable without re-entering a code.
   if (currentUser && !activeCentreId && hasCheckedActiveCentre && !isTosAdmin) {
+    if (centreEntryBusy) {
+      return (
+            <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-900 text-white">
+              <div className="relative w-24 h-24 mb-8">
+                <div className="absolute inset-0 border-4 border-orange-500/20 rounded-full" />
+                <div className="absolute inset-0 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
+                <div className="absolute inset-4 bg-orange-500/10 rounded-full flex items-center justify-center">
+                   <span className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" />
+                </div>
+              </div>
+              <div className="space-y-2 text-center">
+                <h2 className="text-xl font-black tracking-widest uppercase text-orange-500">{pendingCentre?.centreName || centreName}</h2>
+                <p className="text-xs text-slate-400 font-medium animate-pulse">Taking you to your dashboard...</p>
+              </div>
+            </div>
+    
+      );
+    }
     if (accessCodeFlow === 'join') {
       return (
         <JoinCentreScreen
@@ -375,7 +416,7 @@ const MainLayout: React.FC = () => {
         title={pendingCentre?.centreName || centreName}
         subtitle=""
         onSuccess={() => {}}
-        onBack={() => { setShowPortals(false); setShowWelcome(true); }}
+        onBack={() => { setShowPortals(false); setShowWelcome(true); setCentreGateRequested(false); }}
       />
     );
   }
@@ -387,7 +428,7 @@ const MainLayout: React.FC = () => {
         title={pendingCentre?.centreName || centreName}
         subtitle=""
         onSuccess={() => {}}
-        onBack={() => { setShowPortals(false); setShowWelcome(true); }}
+        onBack={() => { setShowPortals(false); setShowWelcome(true); setCentreGateRequested(false); }}
       />
     );
   }

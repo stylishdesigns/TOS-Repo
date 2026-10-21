@@ -296,6 +296,7 @@ interface AppContextType {
   seatsSummary: CentreSeatsSummary | null;
   hasCheckedActiveCentre: boolean;
   enterCentreByCode: (code: string) => Promise<{ success: boolean; centreId?: string; error?: string }>;
+  enterSoleCentre: () => Promise<{ entered: boolean; count: number }>;
   joinCentreByCode: (code: string) => Promise<{ status: 'active' | 'pending'; centreName: string; centreId: string }>;
   switchCentre: (centreId: string) => Promise<void>;
   refreshSeatsSummary: () => Promise<void>;
@@ -1272,6 +1273,45 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (data.role === 'student') setViewMode('student');
       else if (data.role === 'tutor') setViewMode('tutor');
       else setViewMode('portal');
+    }
+  };
+
+  // Silent post-login entry: a signed-in user who belongs to exactly one
+  // centre enters it with no code screen. Returns how many centres the user
+  // belongs to so the caller can decide what to show when entry did not run.
+  const enterSoleCentre = async (): Promise<{ entered: boolean; count: number }> => {
+    if (!user) return { entered: false, count: 0 };
+    const token = await user.getIdToken();
+    try {
+      const res = await fetch('/api/auth/my-centres', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      const centres: CentreUserRole[] = (data && data.success && Array.isArray(data.centres)) ? data.centres : [];
+      if (centres.length !== 1) return { entered: false, count: centres.length };
+      const target: any = centres[0];
+      if (!target || !target.centreId) return { entered: false, count: 1 };
+      const valRes = await fetch('/api/auth/validate-active-centre', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ centreId: target.centreId }),
+      });
+      const valData = await valRes.json();
+      if (!valRes.ok || !valData.success) return { entered: false, count: 1 };
+      setActiveCentreId(target.centreId);
+      setActiveCentre(valData.centre);
+      if (valData.entitlements) setEntitlements(valData.entitlements);
+      sessionStorage.setItem('tos_activeCentreId', target.centreId);
+      refreshSeatsSummary(target.centreId);
+      if (valData.role === 'student') setViewMode('student');
+      else if (valData.role === 'tutor') setViewMode('tutor');
+      else setViewMode('portal');
+      return { entered: true, count: 1 };
+    } catch (e) {
+      return { entered: false, count: 0 };
     }
   };
 
@@ -2840,6 +2880,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         seatsSummary,
         hasCheckedActiveCentre,
         enterCentreByCode,
+        enterSoleCentre,
         joinCentreByCode,
         switchCentre,
         refreshSeatsSummary,
