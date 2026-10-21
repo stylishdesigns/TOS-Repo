@@ -588,6 +588,7 @@ export function registerExtendedRoutes(app: express.Express): void {
       }
       if (type === 'reactivate') {
         const reason = String(req.body?.reason || '').trim().slice(0, 300);
+        if (!reason) return res.status(400).json({ error: 'A reason is required.' });
         await cRef.update({ status: 'active', suspendedReason: null });
         await audit({ actorUid: caller.uid, centreId: req.params.id, action: 'CENTRE_REACTIVATED', after: { reason } });
         return res.json({ success: true });
