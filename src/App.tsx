@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Component, ErrorInfo, ReactNode } from 'react';
+import React, { useRef,  useState, useEffect, Component, ErrorInfo, ReactNode } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { Sidebar } from './components/layout/Sidebar';
 import { TopNav } from './components/layout/TopNav';
@@ -30,6 +30,7 @@ import { TosAdminLogin } from './components/auth/TosAdminLogin';
 import { TosPortal } from './components/tos/TosPortal';
 import { FirstLoginPasswordChange } from './components/auth/FirstLoginPasswordChange';
 import { EnterAccessCodeScreen } from './components/auth/EnterAccessCodeScreen';
+import { CentreCodeGate } from './components/auth/CentreCodeGate';
 import { JoinCentreScreen } from './components/auth/JoinCentreScreen';
 
 import { PasswordChangeOverlay } from './components/auth/PasswordChangeOverlay';
@@ -58,6 +59,7 @@ const MainLayout: React.FC = () => {
     activeCentreId,
     centreName,
     hasCheckedActiveCentre,
+    enterCentreByCode,
     updateAdmin,
     logout 
   } = useApp();
@@ -77,6 +79,21 @@ const MainLayout: React.FC = () => {
   }, []);
   const [showPortals, setShowPortals] = useState(false);
   const [accessCodeFlow, setAccessCodeFlow] = useState<'enter' | 'join'>('enter');
+  // Centre code gate (pre-login): the access code is a centre selector, not a
+  // secret. The first screen asks for the code, shows the centre's name, and
+  // the selected centre's login page follows; after sign-in the app enters
+  // that centre automatically.
+  const [pendingCentre, setPendingCentre] = useState<{ code: string; centreName: string } | null>(null);
+  const attemptedCentreCodeRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!currentUser || !pendingCentre || !hasCheckedActiveCentre) return;
+    if (attemptedCentreCodeRef.current === pendingCentre.code) return;
+    attemptedCentreCodeRef.current = pendingCentre.code;
+    enterCentreByCode(pendingCentre.code).catch(() => {
+      // Not a member of the selected centre (or the centre rejected the code):
+      // the existing access-code screen below takes over.
+    });
+  }, [currentUser, pendingCentre, hasCheckedActiveCentre, enterCentreByCode]);
 
   // Platform (TOS) admins are exempt from the centre access-code gate below.
   // TOS access is the server-stamped `tos` custom claim, verified in a fresh
@@ -163,6 +180,8 @@ const MainLayout: React.FC = () => {
   };
 
   const handleLogout = async () => {
+    setPendingCentre(null);
+    attemptedCentreCodeRef.current = null;
     try {
       await logout();
     } catch (e) {
@@ -273,6 +292,21 @@ const MainLayout: React.FC = () => {
     }} />;
   }
 
+  // The centre code gate is the first screen for every signed-out visitor
+  // (the platform-staff door above is exempt). It only selects and names the
+  // centre; the landing and role picker follow it.
+  if (!currentUser && !tosLoginRequested && !pendingCentre) {
+    return (
+      <CentreCodeGate
+        onProceed={(code, centreName) => setPendingCentre({ code, centreName })}
+        onPlatformSignIn={() => {
+          window.location.hash = '#tos-admin';
+          setTosLoginRequested(true);
+        }}
+      />
+    );
+  }
+
   if (!currentUser && showWelcome) {
     if (!showPortals) {
       return (
@@ -338,7 +372,7 @@ const MainLayout: React.FC = () => {
     return (
       <AuthPortal 
         portalType="student"
-        title={centreName}
+        title={pendingCentre?.centreName || centreName}
         subtitle=""
         onSuccess={() => {}}
         onBack={() => { setShowPortals(false); setShowWelcome(true); }}
@@ -350,7 +384,7 @@ const MainLayout: React.FC = () => {
     return (
       <AuthPortal 
         portalType={viewMode === 'tutor' ? 'tutor' : 'admin'}
-        title={centreName}
+        title={pendingCentre?.centreName || centreName}
         subtitle=""
         onSuccess={() => {}}
         onBack={() => { setShowPortals(false); setShowWelcome(true); }}

@@ -184,6 +184,52 @@ export function registerExtendedRoutes(app: express.Express): void {
     }
   });
 
+  // ==========================================================================
+  // PUBLIC: centre lookup by access code. The code is a centre selector, not
+  // a secret: it reveals only the centre's own name before sign-in, and
+  // sign-in plus membership still gate every piece of centre data.
+  // ==========================================================================
+  app.get('/api/public/centre-by-code', async (req, res) => {
+    try {
+      const code = String(req.query.code || '').trim();
+      if (!/^\d{6}$/.test(code)) {
+        return res.status(400).json({ error: 'Enter the 6-digit centre code.' });
+      }
+      const ip = clientIp(req);
+      if (!(await countRateLimit(`code-lookup-${ip.replace(/\W/g, '')}`, 60, 15 * 60 * 1000))) {
+        return res.status(429).json({ error: 'Too many lookups. Please try again shortly.' });
+      }
+      let centreId: string | null = null;
+      const codeDoc = await adminDb.collection('accessCodes').doc(code).get();
+      if (codeDoc.exists) centreId = codeDoc.data()?.centreId || null;
+      if (!centreId) {
+        // Codes set by hand on the centre document (as text or as a number).
+        let snap = await adminDb.collection('centres').where('accessCode', '==', code).limit(2).get();
+        if (snap.empty) {
+          snap = await adminDb.collection('centres').where('accessCode', '==', Number(code)).limit(2).get();
+        }
+        const matches = snap.docs.filter((d) => String((d.data() as any)?.accessCode) === code);
+        if (matches.length === 1) centreId = matches[0].id;
+      }
+      if (!centreId) {
+        return res.status(404).json({ error: 'That code did not match any centre. Check it and try again.' });
+      }
+      const cDoc = await adminDb.collection('centres').doc(centreId).get();
+      if (!cDoc.exists) {
+        return res.status(404).json({ error: 'That code did not match any centre. Check it and try again.' });
+      }
+      const c = cDoc.data() as any;
+      res.json({
+        centreId,
+        centreName: c.name || 'Tutorial Centre',
+        suspended: c.status === 'suspended' || c.status === 'closed',
+      });
+    } catch (error: any) {
+      console.error('[centre-by-code] lookup failed:', error?.message || error);
+      res.status(500).json({ error: 'Could not look up that code. Please try again.' });
+    }
+  });
+
   app.get('/api/public/leads/verify', async (req, res) => {
     const token = String(req.query.token || '');
     const fail = (hash: string) => res.redirect(302, `${baseUrl(req)}/#${hash}`);
