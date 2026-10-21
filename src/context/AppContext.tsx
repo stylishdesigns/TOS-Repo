@@ -1562,10 +1562,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const scopedDocs = (docs: any[]): any[] =>
       activeCentreId ? docs.filter((d: any) => d.centreId === activeCentreId) : [];
 
+    // Centre-scoped reads: with the active centre known, the query itself asks
+    // Firestore only for this centre's documents, so other centres' records
+    // never leave the database. Without a centre the wide query stays, and
+    // scopedDocs keeps filtering client-side.
+    const centreQuery = (coll: string) =>
+      activeCentreId
+        ? query(collection(db, coll), where('centreId', '==', activeCentreId))
+        : query(collection(db, coll));
+
     // Students listener
     let qStudents = query(collection(db, 'students'));
     if (!isAdmin) {
       qStudents = query(collection(db, 'students'), where('uid', '==', user.uid));
+    } else if (activeCentreId) {
+      qStudents = centreQuery('students');
     }
     const unsubStudents = onSnapshot(qStudents, (snapshot) => {
       const data = scopedDocs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Student)));
@@ -1581,6 +1592,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } else {
         skipAdmissions = true;
       }
+    } else if (activeCentreId) {
+      qAdmissions = centreQuery('admissions');
     }
     const unsubAdmissions = !skipAdmissions ? onSnapshot(qAdmissions, (snapshot) => {
       const data = scopedDocs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as AdmissionApplication)));
@@ -1588,7 +1601,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }, (error) => handleFirestoreError(error, OperationType.GET, 'admissions')) : () => {};
 
     // Tutors listener
-    const unsubTutors = onSnapshot(collection(db, 'tutors'), (snapshot) => {
+    const unsubTutors = onSnapshot(centreQuery('tutors'), (snapshot) => {
       const data = scopedDocs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Tutor)));
       setTutors(data);
       
@@ -1602,7 +1615,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }, (error) => handleFirestoreError(error, OperationType.GET, 'tutors'));
 
     // Admins listener
-    const unsubAdmins = onSnapshot(collection(db, 'admins'), (snapshot) => {
+    const unsubAdmins = onSnapshot(centreQuery('admins'), (snapshot) => {
       const data = snapshot.docs.map(doc => {
         const raw = doc.data();
         return {
@@ -1636,20 +1649,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }, (error) => handleFirestoreError(error, OperationType.GET, 'settings/attendance'));
 
     // Payments listener
-    const qPayments = query(collection(db, 'payments'));
+    const qPayments = centreQuery('payments');
     const unsubPayments = onSnapshot(qPayments, (snapshot) => {
       const data = scopedDocs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as PaymentRecord)));
       setPayments(data);
     }, (error) => handleFirestoreError(error, OperationType.GET, 'payments'));
 
     // Programmes listener
-    const unsubProgrammes = onSnapshot(collection(db, 'programmes'), (snapshot) => {
+    const unsubProgrammes = onSnapshot(centreQuery('programmes'), (snapshot) => {
       const data = scopedDocs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Programme)));
       setProgrammes(data);
     }, (error) => handleFirestoreError(error, OperationType.GET, 'programmes'));
 
     // Branches listener
-    const unsubBranches = onSnapshot(collection(db, 'branches'), (snapshot) => {
+    const unsubBranches = onSnapshot(centreQuery('branches'), (snapshot) => {
       const data = scopedDocs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Branch)));
       setBranches(data);
     }, (error) => handleFirestoreError(error, OperationType.GET, 'branches'));
@@ -1663,6 +1676,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     let qAttendance = query(collection(db, 'attendance_logs'));
     if (!isAdmin) {
       qAttendance = query(collection(db, 'attendance_logs'), where('studentId', '==', user.uid));
+    } else if (activeCentreId) {
+      qAttendance = centreQuery('attendance_logs');
     }
     const unsubAttendance = onSnapshot(qAttendance, (snapshot) => {
       const data = scopedDocs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as AttendanceLog)));
@@ -1670,25 +1685,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }, (error) => handleFirestoreError(error, OperationType.GET, 'attendance_logs'));
 
     // Announcements listener
-    const unsubAnnouncements = onSnapshot(collection(db, 'announcements'), (snapshot) => {
+    const unsubAnnouncements = onSnapshot(centreQuery('announcements'), (snapshot) => {
       const data = scopedDocs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Announcement)));
       setAnnouncements(data);
     }, (error) => handleFirestoreError(error, OperationType.GET, 'announcements'));
 
     // Subjects listener
-    const unsubSubjects = onSnapshot(collection(db, 'subjects'), (snapshot) => {
+    const unsubSubjects = onSnapshot(centreQuery('subjects'), (snapshot) => {
       const data = scopedDocs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as SubjectEntry)));
       setSubjects(data);
     }, (error) => handleFirestoreError(error, OperationType.GET, 'subjects'));
 
     // Classrooms listener
-    const unsubClassrooms = onSnapshot(collection(db, 'classrooms'), (snapshot) => {
+    const unsubClassrooms = onSnapshot(centreQuery('classrooms'), (snapshot) => {
       const data = scopedDocs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Classroom)));
       setClassrooms(data);
     }, (error) => handleFirestoreError(error, OperationType.GET, 'classrooms'));
 
     // Timetable listener
-    const unsubTimetable = onSnapshot(collection(db, 'timetable'), (snapshot) => {
+    const unsubTimetable = onSnapshot(centreQuery('timetable'), (snapshot) => {
       const data = scopedDocs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as TimetableSlot)));
       setTimetable(data);
     }, (error) => handleFirestoreError(error, OperationType.GET, 'timetable'));
@@ -1700,6 +1715,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const isStaff = isAdmin || !!activeTutor || tutors.some(t => t.id === user?.uid || t.email === user?.email);
     if (!isStaff && user) {
       qResults = query(collection(db, 'results'), where('studentId', '==', user.uid));
+    } else if (activeCentreId) {
+      qResults = centreQuery('results');
     }
     const unsubResults = onSnapshot(qResults, (snapshot) => {
       const data = scopedDocs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as StudentResult)));
@@ -1707,32 +1724,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }, (error) => handleFirestoreError(error, OperationType.GET, 'results'));
 
     // CBT Questions listener
-    const unsubCBT = onSnapshot(collection(db, 'cbt_questions'), (snapshot) => {
+    const unsubCBT = onSnapshot(centreQuery('cbt_questions'), (snapshot) => {
       const data = scopedDocs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as CBTQuestion)));
       setCbtQuestions(data);
     }, (error) => handleFirestoreError(error, OperationType.GET, 'cbt_questions'));
 
     // CBT Exams listener
-    const unsubCBTExams = onSnapshot(collection(db, 'cbt_exams'), (snapshot) => {
+    const unsubCBTExams = onSnapshot(centreQuery('cbt_exams'), (snapshot) => {
       const data = scopedDocs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as CBTExam)));
       setExams(data);
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'cbt_exams'));
 
     // Activities listener
-    let qActivities = query(collection(db, 'activities'));
+    let qActivities = centreQuery('activities');
     const unsubActivities = isAdmin ? onSnapshot(qActivities, (snapshot) => {
       const data = scopedDocs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as ActivityLog)));
       setActivities(data);
     }, (error) => handleFirestoreError(error, OperationType.GET, 'activities')) : () => {};
 
     // Class Ratings listener
-    const unsubClassRatings = onSnapshot(collection(db, 'classRatings'), (snapshot) => {
+    const unsubClassRatings = onSnapshot(centreQuery('classRatings'), (snapshot) => {
       const data = scopedDocs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as ClassRating)));
       setClassRatings(data);
     }, (error) => console.warn('classRatings snapshot error:', error));
 
     // Study Materials listener
-    const unsubStudyMaterials = onSnapshot(collection(db, 'studyMaterials'), (snapshot) => {
+    const unsubStudyMaterials = onSnapshot(centreQuery('studyMaterials'), (snapshot) => {
       if (!snapshot.empty) {
         const data = scopedDocs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as StudyMaterial)));
         setStudyMaterials(data);

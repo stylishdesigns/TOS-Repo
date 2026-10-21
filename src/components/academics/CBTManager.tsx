@@ -109,12 +109,12 @@ export const CBTManager: React.FC = () => {
 
   // Firestore Sync for Global Grading
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'mock_grading'), (snapshot) => {
+    const unsub = onSnapshot(activeCentreId ? query(collection(db, 'mock_grading'), where('centreId', '==', activeCentreId)) : collection(db, 'mock_grading'), (snapshot) => {
       const data = snapshot.docs.map(doc => doc.data() as MockGradingSettings);
       setGlobalMockGrading(data);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'mock_grading'));
     return () => unsub();
-  }, []);
+  }, [activeCentreId]);
 
   React.useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 60000); // Update every minute for timers
