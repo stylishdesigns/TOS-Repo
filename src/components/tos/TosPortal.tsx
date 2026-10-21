@@ -30,7 +30,7 @@ const OverviewTab: React.FC<{ onOpenCentre: (id: string) => void; refreshKey: nu
   const [data, setData] = useState<Json | null>(null);
   const [error, setError] = useState('');
   const [sweeping, setSweeping] = useState(false);
-  const [sweepResult, setSweepResult] = useState('');
+  const [sweepResult, setSweepResult] = useState<string>('');
 
   const load = useCallback(async () => {
     setError('');
