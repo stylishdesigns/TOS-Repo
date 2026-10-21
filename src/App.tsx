@@ -58,9 +58,11 @@ const MainLayout: React.FC = () => {
     activeUser,
     activeCentreId,
     centreName,
+    activeCentre,
     hasCheckedActiveCentre,
     enterCentreByCode,
     enterSoleCentre,
+    fetchMyCentreIds,
     addToast,
     updateAdmin,
     logout 
@@ -85,7 +87,8 @@ const MainLayout: React.FC = () => {
   // secret. The first screen asks for the code, shows the centre's name, and
   // the selected centre's login page follows; after sign-in the app enters
   // that centre automatically.
-  const [pendingCentre, setPendingCentre] = useState<{ code: string; centreName: string } | null>(null);
+  const [pendingCentre, setPendingCentre] = useState<{ code: string; centreName: string; centreId?: string } | null>(null);
+  const [loginCentreError, setLoginCentreError] = useState<string | null>(null);
   // Post-login centre resolution is silent: no code screen sits between the
   // login page and the dashboard. The centre chosen before login is entered
   // automatically; a user with no chosen centre who belongs to exactly one
@@ -115,10 +118,32 @@ const MainLayout: React.FC = () => {
         const ok = pendingCentre ? !!(r && r.success) : !!(r && r.entered);
         if (!ok) setCentreEntryFailed(true);
       })
-      .catch((err: any) => {
+      .catch(async (err: any) => {
         // A failed automatic entry is never silent: the server's reason (a
         // temporary lockout, a membership mismatch) shows as a message, so the
         // join screen never appears without an explanation.
+        //
+        // Strict centre login: when the signed-in account does not belong to
+        // the centre chosen before login, sign the user back out and say so on
+        // the login page, with the student sign-up route. Only students
+        // self-register; centre staff are provisioned by each centre's super
+        // admin, so there is no staff sign-up.
+        if (pendingCentre?.centreId) {
+          try {
+            const myIds = await fetchMyCentreIds();
+            if (!myIds.includes(pendingCentre.centreId)) {
+              centreEntryKeyRef.current = null;
+              await logout();
+              setShowWelcome(false);
+              setLoginCentreError(
+                `No account can be found with these login details for ${pendingCentre.centreName}. If you are a student, sign up below.`
+              );
+              return;
+            }
+          } catch {
+            /* The membership check could not run: keep the generic path. */
+          }
+        }
         setCentreEntryFailed(true);
         addToast({
           type: 'error',
@@ -223,6 +248,7 @@ const MainLayout: React.FC = () => {
     setCentreEntryBusy(false);
     setCentreEntryFailed(false);
     setCentreGateRequested(false);
+    setLoginCentreError(null);
     setShowWelcome(true);
     setShowPortals(false);
     try {
@@ -247,7 +273,7 @@ const MainLayout: React.FC = () => {
           </div>
         </div>
         <div className="space-y-2 text-center">
-          <h2 className="text-xl font-black tracking-widest uppercase text-orange-500">{centreName}</h2>
+          <h2 className="text-xl font-black tracking-widest uppercase text-orange-500">{activeCentre?.name || ''}</h2>
           <p className="text-xs text-slate-400 font-medium animate-pulse">Synchronizing academic records...</p>
         </div>
       </div>
@@ -341,7 +367,7 @@ const MainLayout: React.FC = () => {
   if (!currentUser && !tosLoginRequested && !pendingCentre && centreGateRequested) {
     return (
       <CentreCodeGate
-        onProceed={(code, centreName) => setPendingCentre({ code, centreName })}
+        onProceed={(code, centreName, centreId) => setPendingCentre({ code, centreName, centreId })}
         onPlatformSignIn={() => {
           window.location.hash = '#tos-admin';
           setTosLoginRequested(true);
@@ -442,6 +468,8 @@ const MainLayout: React.FC = () => {
         subtitle=""
         onSuccess={() => {}}
         onBack={() => { setShowPortals(false); setShowWelcome(true); setCentreGateRequested(false); }}
+        notice={loginCentreError || undefined}
+        onNoticeSignUp={() => { setLoginCentreError(null); setViewMode('student'); }}
       />
     );
   }
@@ -454,6 +482,7 @@ const MainLayout: React.FC = () => {
         subtitle=""
         onSuccess={() => {}}
         onBack={() => { setShowPortals(false); setShowWelcome(true); setCentreGateRequested(false); }}
+        notice={loginCentreError || undefined}
       />
     );
   }

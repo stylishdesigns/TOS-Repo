@@ -43,6 +43,8 @@ interface AuthPortalProps {
   subtitle: string;
   onSuccess: () => void;
   onBack?: () => void;
+  notice?: string;
+  onNoticeSignUp?: () => void;
 }
 
 export const AuthPortal: React.FC<AuthPortalProps> = ({ 
@@ -50,7 +52,9 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
   title, 
   subtitle,
   onSuccess,
-  onBack
+  onBack,
+  notice,
+  onNoticeSignUp
 }) => {
   const { loginWithEmail, loginWithGoogle, signUpWithEmail, resetPassword, updatePassword, logout } = useFirebase();
   const { addToast, activeCentreId, centreName } = useApp();
@@ -496,6 +500,20 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
               <div className="mb-6 p-4 bg-rose-50 border border-rose-200 rounded-xl flex items-start space-x-3 text-rose-600 animate-in slide-in-from-top-2">
                 <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
                 <p className="text-sm font-bold">{error}</p>
+              </div>
+          )}
+
+          {notice && (
+              <div className="mb-6 p-4 bg-orange-50 border border-orange-200 rounded-xl text-orange-700">
+                <p className="text-sm font-bold">{notice}</p>
+                {onNoticeSignUp && (
+                  <button
+                    onClick={onNoticeSignUp}
+                    className="mt-3 w-full py-3 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-sm font-bold transition-colors"
+                  >
+                    Sign up as a student
+                  </button>
+                )}
               </div>
           )}
 

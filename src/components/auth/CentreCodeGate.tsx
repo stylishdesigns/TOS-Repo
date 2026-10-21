@@ -8,7 +8,7 @@ import { Building2, ArrowRight, Loader2, AlertCircle, RefreshCw, ShieldCheck } f
  * centre's login page follows. The code never reveals any centre data.
  */
 interface CentreCodeGateProps {
-  onProceed: (code: string, centreName: string) => void;
+  onProceed: (code: string, centreName: string, centreId?: string) => void;
   onPlatformSignIn: () => void;
 }
 
@@ -16,7 +16,7 @@ export const CentreCodeGate: React.FC<CentreCodeGateProps> = ({ onProceed, onPla
   const [digits, setDigits] = useState<string[]>(['', '', '', '', '', '']);
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [centre, setCentre] = useState<{ centreName: string; suspended?: boolean } | null>(null);
+  const [centre, setCentre] = useState<{ centreId?: string; centreName: string; suspended?: boolean } | null>(null);
   const [pendingCode, setPendingCode] = useState('');
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -185,7 +185,7 @@ export const CentreCodeGate: React.FC<CentreCodeGateProps> = ({ onProceed, onPla
             <button
               type="button"
               disabled={!!centre.suspended}
-              onClick={() => onProceed(pendingCode, centre.centreName)}
+              onClick={() => onProceed(pendingCode, centre.centreName, centre.centreId)}
               className={`w-full py-4 rounded-2xl font-bold text-sm tracking-wide transition-all duration-200 flex items-center justify-center gap-2 shadow-lg
                 ${
                   centre.suspended

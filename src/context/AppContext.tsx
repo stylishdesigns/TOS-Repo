@@ -297,6 +297,7 @@ interface AppContextType {
   hasCheckedActiveCentre: boolean;
   enterCentreByCode: (code: string) => Promise<{ success: boolean; centreId?: string; error?: string }>;
   enterSoleCentre: () => Promise<{ entered: boolean; count: number }>;
+  fetchMyCentreIds: () => Promise<string[]>;
   joinCentreByCode: (code: string) => Promise<{ status: 'active' | 'pending'; centreName: string; centreId: string }>;
   switchCentre: (centreId: string) => Promise<void>;
   refreshSeatsSummary: () => Promise<void>;
@@ -1279,6 +1280,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Silent post-login entry: a signed-in user who belongs to exactly one
   // centre enters it with no code screen. Returns how many centres the user
   // belongs to so the caller can decide what to show when entry did not run.
+  // Centre ids the signed-in user holds a membership in, for strict
+  // centre-scoped login checks. Throws on network or server failure so a
+  // caller never mistakes a failed lookup for "no memberships".
+  const fetchMyCentreIds = async (): Promise<string[]> => {
+    if (!user) return [];
+    const token = await user.getIdToken();
+    const res = await fetch('/api/auth/my-centres', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error('Could not verify your centre memberships.');
+    const data = await res.json().catch(() => ({}));
+    const centres: any[] = (data && data.success && Array.isArray(data.centres)) ? data.centres : [];
+    return centres.map((c: any) => String(c.centreId || '')).filter(Boolean);
+  };
+
   const enterSoleCentre = async (): Promise<{ entered: boolean; count: number }> => {
     if (!user) return { entered: false, count: 0 };
     const token = await user.getIdToken();
@@ -2881,6 +2897,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         hasCheckedActiveCentre,
         enterCentreByCode,
         enterSoleCentre,
+        fetchMyCentreIds,
         joinCentreByCode,
         switchCentre,
         refreshSeatsSummary,
