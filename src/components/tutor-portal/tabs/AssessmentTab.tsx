@@ -51,7 +51,7 @@ interface AssessmentTabProps {
 }
 
 export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
-  const { programmes, subjects: allSubjects, addToast, exams, results, students } = useApp();
+  const { programmes, subjects: allSubjects, addToast, exams, results, students, activeCentreId } = useApp();
   const [activeFrequency] = useState<'General'>('General');
   const [activeTab, setActiveTab] = useState<'Assessment' | 'Performance'>('Assessment');
   const [expandedExamId, setExpandedExamId] = useState<string | null>(null);
@@ -631,7 +631,9 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
     };
 
     try {
-      await setDoc(doc(db, 'cbt_exams', examId), JSON.parse(JSON.stringify(examData)));
+      const examPayload = JSON.parse(JSON.stringify(examData)) as Record<string, any>;
+      if (activeCentreId) examPayload.centreId = activeCentreId;
+      await setDoc(doc(db, 'cbt_exams', examId), examPayload);
       addToast({ type: 'success', title: editingExamId ? 'Assessment Updated' : 'Assessment Published' });
       setShowSetupModal(false);
     } catch (err) {
@@ -681,6 +683,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
       ];
 
       await setDoc(doc(db, 'results', resultId), {
+        ...(activeCentreId ? { centreId: activeCentreId } : {}),
         ...showOverrideModal,
         essayScores: overridingScores,
         totalScore: newTotalScore,

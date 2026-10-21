@@ -19,7 +19,7 @@ interface HomeTabProps {
 }
 
 export const HomeTab: React.FC<HomeTabProps> = ({ tutor, onNavigateTab }) => {
-  const { students, settings, timetable } = useApp();
+  const { students, settings, timetable, centreName } = useApp();
 
   // Filter classes for this tutor
   const myClasses = timetable.filter(slot => 
@@ -57,7 +57,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({ tutor, onNavigateTab }) => {
       {/* Tutorial Name on Top */}
       <div className="text-center pb-1">
         <h1 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">
-          {settings.centreName || 'Excellence Tutorial Centre'}
+          {centreName}
         </h1>
       </div>
 

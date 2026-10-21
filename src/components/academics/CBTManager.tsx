@@ -63,7 +63,7 @@ interface MockGradingSettings {
 }
 
 export const CBTManager: React.FC = () => {
-  const { programmes, subjects: allSubjects, tutors, settings, addToast, exams, results, students } = useApp();
+  const { programmes, subjects: allSubjects, tutors, settings, addToast, exams, results, students, activeCentreId } = useApp();
 
   const [activeFrequency, setActiveFrequency] = useState<'General' | 'Mock'>('General');
   const [activeTimeFilter, setActiveTimeFilter] = useState<'Current' | 'Upcoming'>('Current');
@@ -721,7 +721,9 @@ export const CBTManager: React.FC = () => {
         essayTotalMarks: (setupData.mode === 'Essay' || setupData.mode === 'Both') ? totalEssayMarks : 0,
       };
 
-      await setDoc(doc(db, 'cbt_exams', examId), JSON.parse(JSON.stringify(examData)));
+      const examPayload = JSON.parse(JSON.stringify(examData)) as Record<string, any>;
+      if (activeCentreId) examPayload.centreId = activeCentreId;
+      await setDoc(doc(db, 'cbt_exams', examId), examPayload);
       addToast({ 
         type: 'success', 
         title: editingExamId ? 'Assessment Updated' : 'Assessment Published', 

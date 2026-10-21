@@ -56,6 +56,7 @@ const MainLayout: React.FC = () => {
     isAuthLoading, 
     activeUser,
     activeCentreId,
+    centreName,
     hasCheckedActiveCentre,
     updateAdmin,
     logout 
@@ -184,7 +185,7 @@ const MainLayout: React.FC = () => {
           </div>
         </div>
         <div className="space-y-2 text-center">
-          <h2 className="text-xl font-black tracking-widest uppercase text-orange-500">Excellence</h2>
+          <h2 className="text-xl font-black tracking-widest uppercase text-orange-500">{centreName}</h2>
           <p className="text-xs text-slate-400 font-medium animate-pulse">Synchronizing academic records...</p>
         </div>
       </div>
@@ -337,7 +338,7 @@ const MainLayout: React.FC = () => {
     return (
       <AuthPortal 
         portalType="student"
-        title="Excellence Tutorial Centre"
+        title={centreName}
         subtitle=""
         onSuccess={() => {}}
         onBack={() => { setShowPortals(false); setShowWelcome(true); }}
@@ -349,7 +350,7 @@ const MainLayout: React.FC = () => {
     return (
       <AuthPortal 
         portalType={viewMode === 'tutor' ? 'tutor' : 'admin'}
-        title="Excellence Tutorial Centre"
+        title={centreName}
         subtitle=""
         onSuccess={() => {}}
         onBack={() => { setShowPortals(false); setShowWelcome(true); }}
