@@ -77,8 +77,23 @@ async function createAccessCode(centreId: string): Promise<string> {
   throw httpError(500, 'Could not generate a unique access code. Please try again.');
 }
 
+/** Claim one specific 6-digit code for a brand-new centre: it must be free. */
+async function claimPreferredAccessCode(centreId: string, requested: string): Promise<string> {
+  const code = (requested || '').trim();
+  if (!/^\d{6}$/.test(code)) throw httpError(400, 'The access code must be exactly 6 digits.');
+  const claimed = await adminDb.runTransaction(async (tx) => {
+    const ref = adminDb.collection('accessCodes').doc(code);
+    const existing = await tx.get(ref);
+    if (existing.exists) return false;
+    tx.set(ref, { centreId, createdAt: new Date().toISOString(), active: true, setBy: 'tos' });
+    return true;
+  });
+  if (!claimed) throw httpError(409, 'That access code is already in use. Pick a different one.');
+  return code;
+}
+
 export async function provisionCentre(
-  params: ProvisionLead & { source: 'lead' | 'tos'; actorUid: string; planId?: string }
+  params: ProvisionLead & { source: 'lead' | 'tos'; actorUid: string; planId?: string; tempPassword?: string; preferredAccessCode?: string }
 ): Promise<ProvisionResult> {
   const email = normalizeEmail(params.email);
   const phone = normalizePhone(params.phone);
@@ -86,6 +101,14 @@ export async function provisionCentre(
   const businessName = (params.businessName || '').trim();
   if (!fullName || !businessName || !email || !phone) {
     throw httpError(400, 'Name, business name, email and phone are required.');
+  }
+  // A hand-set temporary password (the portal's Generate button) must still
+  // meet the same policy a generated one does.
+  if (params.tempPassword) {
+    const pw = params.tempPassword;
+    if (pw.length < 10 || pw.length > 72 || !/[A-Za-z]/.test(pw) || !/[0-9]/.test(pw)) {
+      throw httpError(400, 'The temporary password must be 10 to 72 characters with at least one letter and one number.');
+    }
   }
 
   // One trial per person: the normalised email or phone may already own a
@@ -113,7 +136,7 @@ export async function provisionCentre(
       console.error('[provisioning] auth lookup failed:', err?.code || err);
       throw httpError(500, 'Could not look up the account. Please try again.');
     }
-    tempPassword = crypto.randomBytes(12).toString('base64url'); // 16 chars
+    tempPassword = params.tempPassword || crypto.randomBytes(12).toString('base64url'); // provided or generated
     const created = await adminAuth.createUser({
       email,
       password: tempPassword,
@@ -186,7 +209,9 @@ export async function provisionCentre(
     updatedAt: now.toISOString(),
   });
 
-  const accessCode = await createAccessCode(centreId);
+  const accessCode = params.preferredAccessCode
+    ? await claimPreferredAccessCode(centreId, params.preferredAccessCode)
+    : await createAccessCode(centreId);
   await centreRef.update({ accessCode });
 
   const appUrl = (process.env.APP_URL || '').replace(/\/+$/, '');
@@ -317,6 +342,61 @@ export async function regenerateAccessCode(
     );
   }
   return { accessCode, previousCode };
+}
+
+/**
+ * TOS sets a specific access code for an existing centre (Prompt F item 3).
+ * The code is claimed transactionally so two centres can never share one; the
+ * previous mapping is removed so the old code stops working immediately.
+ */
+export async function setAccessCode(
+  centreId: string,
+  requestedCode: string,
+  actorUid: string,
+  source: 'tos' | 'owner'
+): Promise<{ accessCode: string; previousCode: string | null }> {
+  const code = (requestedCode || '').trim();
+  if (!/^\d{6}$/.test(code)) throw httpError(400, 'The access code must be exactly 6 digits.');
+  const cRef = adminDb.collection('centres').doc(centreId);
+  const cDoc = await cRef.get();
+  if (!cDoc.exists) throw httpError(404, 'Centre not found.');
+  const centre = cDoc.data() as any;
+  const previousCode: string | null = centre?.accessCode || null;
+  if (previousCode === code) return { accessCode: code, previousCode };
+
+  const claimed = await adminDb.runTransaction(async (tx) => {
+    const ref = adminDb.collection('accessCodes').doc(code);
+    const existing = await tx.get(ref);
+    if (existing.exists) {
+      const holder = existing.data()?.centreId;
+      if (holder && holder !== centreId) return false;
+    }
+    tx.set(ref, { centreId, createdAt: new Date().toISOString(), active: true, setBy: source });
+    return true;
+  });
+  if (!claimed) throw httpError(409, 'That access code is already used by another centre. Choose a different one.');
+
+  await cRef.update({ accessCode: code });
+  if (previousCode) {
+    await adminDb.collection('accessCodes').doc(previousCode).delete().catch(() => {});
+  }
+  await adminDb.collection('auditLogs').add({
+    actorUid,
+    centreId,
+    action: 'ACCESS_CODE_SET',
+    at: new Date().toISOString(),
+    before: { accessCode: previousCode },
+    after: { accessCode: code, source },
+  });
+
+  const ownerEmail = normalizeEmail(centre?.ownerEmail || '');
+  if (ownerEmail) {
+    const appUrl = (process.env.APP_URL || '').replace(/\/+$/, '');
+    await sendEmail(
+      buildAccessCodeChangedEmail({ to: ownerEmail, centreName: centre?.name || centreId, accessCode: code, appUrl })
+    );
+  }
+  return { accessCode: code, previousCode };
 }
 
 /** Clear the first-login flags after the owner set their own password. */
