@@ -62,7 +62,7 @@ export interface ProvisionResult {
 }
 
 /** Claim a 6-digit code transactionally: retry until a free code is created. */
-async function createAccessCode(centreId: string): Promise<string> {
+export async function createAccessCode(centreId: string): Promise<string> {
   for (let attempt = 0; attempt < 5; attempt++) {
     const code = crypto.randomInt(100000, 1000000).toString();
     const created = await adminDb.runTransaction(async (tx) => {

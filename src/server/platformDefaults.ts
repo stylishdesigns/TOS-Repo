@@ -1,5 +1,6 @@
 import { Firestore } from 'firebase-admin/firestore';
 import { adminDb, adminAuth } from './firebaseAdmin';
+import { reconcileFirstTenant } from './firstTenant';
 
 /**
  * The starting platform values from the product rules. These are the single
@@ -109,6 +110,10 @@ export async function ensureBootstrapSuperAdmin(
         `(${seeded.createdPlans.length} plan(s) created${seeded.createdConfig ? ', platformConfig/global created' : ''}); ` +
         `tos claim granted permanently. TOS_BOOTSTRAP_EMAILS can now be cleared.`
     );
+    // One-time first-tenant reconciliation (user-requested 2026-10-21):
+    // provisions the first centre automatically. Runs after the platform
+    // defaults so the centre_plus plan it bills against always exists.
+    await reconcileFirstTenant();
     return true;
   } catch (err) {
     console.error('[TOS bootstrap] failed:', (err as any)?.message || err);
