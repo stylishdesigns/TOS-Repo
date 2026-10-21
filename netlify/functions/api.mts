@@ -40,15 +40,41 @@ function normalizePath(pathname: string): string {
   return '/api' + (pathname.startsWith('/') ? pathname : '/' + pathname);
 }
 
+/**
+ * Split a raw query string into name/value pairs WITHOUT decoding, so
+ * serverless-http (which URL-decodes queryStringParameters itself) decodes
+ * each value exactly once.
+ */
+function parseRawQuery(search: string): Record<string, string> {
+  let q = search.startsWith('?') ? search.slice(1) : search;
+  const out: Record<string, string> = {};
+  if (!q) return out;
+  for (const pair of q.split('&')) {
+    if (!pair) continue;
+    const eq = pair.indexOf('=');
+    out[eq === -1 ? pair : pair.slice(0, eq)] = eq === -1 ? '' : pair.slice(eq + 1);
+  }
+  return out;
+}
+
 export default async function handler(req: Request, context: any): Promise<Response> {
   const h = await getHandler();
   const url = new URL(req.url);
   const hasBody = !['GET', 'HEAD'].includes(req.method);
+  // serverless-http builds the request URL from `rawQueryString` (payload v2)
+  // or from `queryStringParameters` (payload v1); the old `rawQuery` key is
+  // read by neither, so query strings were silently dropped and every
+  // GET-with-parameters route (centre-code lookup, audit filters, lead
+  // verification links) saw empty params on Netlify. Pass the query in all
+  // three shapes so any bundler version picks it up.
+  const rawQuery = url.search.startsWith('?') ? url.search.slice(1) : '';
   const event: any = {
     httpMethod: req.method,
     path: normalizePath(url.pathname),
     headers: Object.fromEntries(req.headers.entries()),
-    rawQuery: url.search.startsWith('?') ? url.search.slice(1) : '',
+    rawQuery,
+    rawQueryString: rawQuery,
+    queryStringParameters: parseRawQuery(url.search),
     body: hasBody ? await req.text() : null,
     isBase64Encoded: false,
   };
