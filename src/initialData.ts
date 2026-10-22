@@ -35,35 +35,30 @@ export const INITIAL_CLASSROOMS: Classroom[] = [
 ];
 
 export const INITIAL_SETTINGS: TenantSettings = {
-  centreName: 'Excellence Tutorial Centre',
-  tagline: 'Premier Examination Preparation & Tutorial Academy',
-  logoText: 'EXCELLENCE',
+  centreName: '',
+  tagline: '',
+  logoText: 'TC',
   primaryColor: '#f97316', // Vibrant Amber/Orange like the video design
   secondaryColor: '#0f172a', // Deep slate navy
-  address: '14 Allen Avenue, Ikeja, Lagos State, Nigeria',
-  state: 'Lagos',
-  phone: '+234 805 676 5455',
-  email: 'info@excellencetutorials.ng',
-  whatsapp: '+234 805 676 5455',
-  whatsappNumber: '+234 805 676 5455',
+  address: '',
+  state: '',
+  phone: '',
+  email: '',
+  whatsapp: '',
+  whatsappNumber: '',
   currencySymbol: '₦',
-  academicSession: '2026/2027 Session',
-  activeBranchId: 'branch-1',
-  websiteDomain: 'excellencetutorials.ng',
+  academicSession: '',
+  activeBranchId: '',
+  websiteDomain: '',
   maintenanceMode: false,
   allowPublicAdmissions: true,
   smsNotifications: true,
   emailNotifications: true,
-  bankName: 'Access Bank Plc',
-  bankAccountNumber: '0123456789',
-  bankAccountName: 'Excellence Tutorial Centre Ltd',
-  cashPaymentGuide: 'Please proceed in person to the Centre Accounts Bursar, Mr. Adeleke, at the Admin Office (Reception Block A, 1st Floor). Always collect an official stamped paper receipt upon payment.',
-  academicSessions: [
-    '2025/2026 (Current Active Session)',
-    '2024/2025 (Harmattan & Rain)',
-    '2023/2024 (Full Academic Year)',
-    '2022/2023 (Historical Archives)',
-  ],
+  bankName: '',
+  bankAccountNumber: '',
+  bankAccountName: '',
+  cashPaymentGuide: '',
+  academicSessions: [],
 };
 
 export const INITIAL_BRANCHES: Branch[] = [
@@ -123,9 +118,9 @@ export const INITIAL_CMS: CMSContent = {
     ],
   },
   about: {
-    title: 'Excellence Tutorial Centre — Dedicated to Academic Distinction',
+    title: 'Dedicated to Academic Distinction',
     description:
-      'Founded with the single mission of dismantling exam anxiety and unlocking student potential, Excellence Tutorial Centre delivers structured tutoring, rigorous mock tests, CBT simulations, and holistic mentorship for secondary and post-secondary candidates.',
+      'Founded with the single mission of dismantling exam anxiety and unlocking student potential, we deliver structured tutoring, rigorous mock tests, CBT simulations, and holistic mentorship for secondary and post-secondary candidates.',
     highlights: [
       'Comprehensive syllabus coverage mapped to latest JAMB/WAEC brochures',
       'Fully equipped computer-based testing (CBT) lab with 50+ terminals',
@@ -165,38 +160,7 @@ export const INITIAL_CMS: CMSContent = {
       category: 'Parent Portal',
     },
   ],
-  testimonials: [
-    {
-      id: 't-1',
-      studentName: 'Chiamaka Okafor',
-      programme: 'JAMB Intensive & Post-UTME',
-      achievement: 'Scored 348 in JAMB — Admitted into UNILAG Medicine',
-      quote:
-        'The tutors at Excellence didn’t just teach formulas; they taught examination time management. The weekly CBT drills made the real JAMB feel like just another practice test!',
-      score: '348 / 400',
-      avatar: '',
-    },
-    {
-      id: 't-2',
-      studentName: 'Tunde Adeleke',
-      programme: 'WAEC Special Coaching',
-      achievement: '8 A1s and 1 B2 in May/June WASSCE',
-      quote:
-        'Physics and Further Mathematics were nightmares for me before enrolling at Excellence. Mr. Babatunde broke down electrodynamics and calculus so effortlessly.',
-      score: '8 A1s',
-      avatar: '',
-    },
-    {
-      id: 't-3',
-      studentName: 'Fatima Sanusi',
-      programme: 'Cambridge A-Levels',
-      achievement: 'Straight A*A*A — Admitted to University of Manchester',
-      quote:
-        'The lab facilities and personalized tutor feedback gave me the exact competitive edge needed for high-stakes international qualifications.',
-      score: 'A* A* A',
-      avatar: '',
-    },
-  ],
+  testimonials: [],
   gallery: [
     {
       id: 'g-1',

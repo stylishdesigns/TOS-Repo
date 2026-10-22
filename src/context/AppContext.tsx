@@ -324,7 +324,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Load from localStorage or defaults
   const [settings, setSettingsState] = useState<TenantSettings>(() => {
     try {
-      const saved = localStorage.getItem(`${STORAGE_KEY}_settings`);
+      const saved = localStorage.getItem(scopedKey('settings'));
       if (saved) {
         const parsed = JSON.parse(saved);
         const resolvedWhatsapp = parsed.whatsappNumber || parsed.whatsapp || INITIAL_SETTINGS.whatsapp;
@@ -352,7 +352,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [cms, setCmsState] = useState<CMSContent>(() => {
     try {
-      const saved = localStorage.getItem(`${STORAGE_KEY}_cms`);
+      const saved = localStorage.getItem(scopedKey('cms'));
       return saved ? JSON.parse(saved) : INITIAL_CMS;
     } catch {
       return INITIAL_CMS;
@@ -424,7 +424,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [attendanceSettings, setAttendanceSettings] = useState<AttendanceSettings>(() => {
     try {
-      const saved = localStorage.getItem(`${STORAGE_KEY}_attendanceSettings`);
+      const saved = localStorage.getItem(scopedKey('attendanceSettings'));
       return saved ? JSON.parse(saved) : INITIAL_ATTENDANCE_SETTINGS;
     } catch {
       return INITIAL_ATTENDANCE_SETTINGS;
@@ -496,7 +496,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [testimonials, setTestimonials] = useState<CMSContent['testimonials']>(() => {
     try {
-      const saved = localStorage.getItem(`${STORAGE_KEY}_testimonials`);
+      const saved = localStorage.getItem(scopedKey('testimonials'));
       return saved ? JSON.parse(saved) : INITIAL_CMS.testimonials;
     } catch {
       return INITIAL_CMS.testimonials;
@@ -1351,7 +1351,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const toggleStudentAccess = async (studentUid: string, active: boolean) => {
     if (!user) throw new Error('You must be signed in.');
     const token = await user.getIdToken();
-    const cId = activeCentreId || 'centre-excellence';
+    if (!activeCentreId) throw new Error('Select your centre first.');
+    const cId = activeCentreId;
     const res = await fetch('/api/centre/students/toggle-access', {
       method: 'POST',
       headers: {
@@ -1381,7 +1382,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const activateStudentMembership = async (studentUid: string) => {
     if (!user) throw new Error('You must be signed in.');
     const token = await user.getIdToken();
-    const cId = activeCentreId || 'centre-excellence';
+    if (!activeCentreId) throw new Error('Select your centre first.');
+    const cId = activeCentreId;
     const res = await fetch('/api/centre/students/activate', {
       method: 'POST',
       headers: {
@@ -1425,7 +1427,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // The dashboard brand follows the active centre, never a shared default.
-  const centreName = activeCentre?.name || settings.centreName || 'Tutorial Centre';
+  const centreName = activeCentre?.name || '';
 
   // Sync state to localStorage
   useEffect(() => {
@@ -1491,7 +1493,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (newSettings.whatsapp && !newSettings.whatsappNumber) {
         updated.whatsappNumber = newSettings.whatsapp;
       }
-      await setDoc(doc(db, 'settings', 'global'), updated);
+      if (!activeCentreId) throw new Error('Select your centre before saving settings.');
+      await setDoc(doc(db, 'centreSettings', `${activeCentreId}__global`), updated);
       setSettingsState(updated);
       addToast({
         type: 'success',
@@ -1505,7 +1508,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         type: 'info',
       });
     } catch (e) {
-      handleFirestoreError(e, OperationType.UPDATE, 'settings/global');
+      handleFirestoreError(e, OperationType.UPDATE, 'your centre settings');
     }
   };
 
@@ -1538,7 +1541,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateCMS = async (newCms: Partial<CMSContent>) => {
     try {
       const updated = { ...cms, ...newCms };
-      await setDoc(doc(db, 'cms', 'main'), updated);
+      if (!activeCentreId) throw new Error('Select your centre before saving website content.');
+      await setDoc(doc(db, 'centreSettings', `${activeCentreId}__cms`), updated);
       setCmsState(updated);
       addToast({
         type: 'success',
@@ -1552,7 +1556,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         type: 'success',
       });
     } catch (e) {
-      handleFirestoreError(e, OperationType.UPDATE, 'cms/main');
+      handleFirestoreError(e, OperationType.UPDATE, 'your website content');
     }
   };
 
@@ -1609,8 +1613,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Firestore Real-time Sync (Gated and Scoped)
+  // Centre change: while the next centre's records load, per-centre screens
+  // never show another centre's settings, website content or attendance times.
   useEffect(() => {
-    if (!user) return;
+    setSettingsState(INITIAL_SETTINGS);
+    setAttendanceSettings(INITIAL_ATTENDANCE_SETTINGS);
+    setCmsState(INITIAL_CMS);
+    setTestimonials(INITIAL_CMS.testimonials);
+  }, [activeCentreId]);
+
+  useEffect(() => {
+    if (!user) {
+      // Signed out: nothing centre-specific may linger on screen or in cache.
+      setSettingsState(INITIAL_SETTINGS);
+      setAttendanceSettings(INITIAL_ATTENDANCE_SETTINGS);
+      setCmsState(INITIAL_CMS);
+      setTestimonials(INITIAL_CMS.testimonials);
+      try {
+        ['settings', 'cms', 'testimonials', 'attendanceSettings'].forEach((name) => {
+          localStorage.removeItem(`${STORAGE_KEY}_${name}`);
+          const suffix = centreScopeSuffix();
+          if (suffix !== 'none') localStorage.removeItem(`${STORAGE_KEY}_${suffix}_${name}`);
+        });
+      } catch { /* cache clearing is best-effort */ }
+      return;
+    }
 
     // Tenant scope: only the active centre's records render. Documents the
     // one-time import has not tagged with centreId yet stay hidden until the
@@ -1695,14 +1722,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }, (error) => handleFirestoreError(error, OperationType.GET, 'admins'));
 
-    // Settings listener
-    const unsubSettings = onSnapshot(doc(db, 'settings', 'global'), (snapshot) => {
-      if (snapshot.exists()) setSettingsState(snapshot.data() as TenantSettings);
-    }, (error) => handleFirestoreError(error, OperationType.GET, 'settings/global'));
+    // Settings listener — per centre: each centre owns its own record
+    // (centreSettings/{centreId}__global). The shared settings/global doc is
+    // no longer read for a centre; it remains only as a migration source.
+    const settingsRef = activeCentreId ? doc(db, 'centreSettings', `${activeCentreId}__global`) : null;
+    const unsubSettings = settingsRef ? onSnapshot(settingsRef, (snapshot) => {
+      if (snapshot.exists()) {
+        setSettingsState(snapshot.data() as TenantSettings);
+      } else {
+        // A centre with no settings yet starts from neutral defaults.
+        setSettingsState(INITIAL_SETTINGS);
+      }
+    }, (error) => handleFirestoreError(error, OperationType.GET, 'centre settings')) : () => {};
 
-    const unsubAttendanceSettings = onSnapshot(doc(db, 'settings', 'attendance'), (snapshot) => {
-      if (snapshot.exists()) setAttendanceSettings(snapshot.data() as AttendanceSettings);
-    }, (error) => handleFirestoreError(error, OperationType.GET, 'settings/attendance'));
+    const attendanceRef = activeCentreId ? doc(db, 'centreSettings', `${activeCentreId}__attendance`) : null;
+    const unsubAttendanceSettings = attendanceRef ? onSnapshot(attendanceRef, (snapshot) => {
+      if (snapshot.exists()) {
+        setAttendanceSettings(snapshot.data() as AttendanceSettings);
+      } else {
+        setAttendanceSettings(INITIAL_ATTENDANCE_SETTINGS);
+      }
+    }, (error) => handleFirestoreError(error, OperationType.GET, 'centre attendance settings')) : () => {};
 
     // Payments listener
     const qPayments = centreQuery('payments');
@@ -1723,10 +1763,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setBranches(data);
     }, (error) => handleFirestoreError(error, OperationType.GET, 'branches'));
 
-    // CMS listener
-    const unsubCMS = onSnapshot(doc(db, 'cms', 'main'), (snapshot) => {
-      if (snapshot.exists()) setCmsState(snapshot.data() as CMSContent);
-    }, (error) => handleFirestoreError(error, OperationType.GET, 'cms/main'));
+    // CMS listener — per centre website content (centreSettings/{centreId}__cms)
+    const cmsRef = activeCentreId ? doc(db, 'centreSettings', `${activeCentreId}__cms`) : null;
+    const unsubCMS = cmsRef ? onSnapshot(cmsRef, (snapshot) => {
+      if (snapshot.exists()) {
+        setCmsState(snapshot.data() as CMSContent);
+      } else {
+        // A centre with no website content yet starts from neutral defaults.
+        setCmsState(INITIAL_CMS);
+      }
+    }, (error) => handleFirestoreError(error, OperationType.GET, 'centre website content')) : () => {};
 
     // Attendance Logs listener
     let qAttendance = query(collection(db, 'attendance_logs'));
@@ -1840,7 +1886,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const addStudent = async (studentData: Omit<Student, 'id' | 'registrationDate'>) => {
     try {
       const id = `stu-${Date.now()}`;
-      const cId = activeCentreId || 'centre-excellence';
+      if (!activeCentreId) throw new Error('Select your centre first.');
+      const cId = activeCentreId;
 
       // SERVER SEAT ENFORCEMENT: Verify cap in transaction and activate membership
       await activateStudentMembership(id);
@@ -1942,7 +1989,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (!app) return;
 
       const studentId = `stu-${Date.now()}`;
-      const cId = activeCentreId || 'centre-excellence';
+      if (!activeCentreId) throw new Error('Select your centre first.');
+      const cId = activeCentreId;
 
       // SERVER SEAT ENFORCEMENT: Verify cap in transaction and activate membership
       await activateStudentMembership(studentId);
@@ -2479,10 +2527,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateAttendanceSettings = async (timing: Partial<AttendanceSettings>) => {
     try {
-      await setDoc(doc(db, 'settings', 'attendance'), timing, { merge: true });
+      if (!activeCentreId) throw new Error('Select your centre before saving attendance times.');
+      await setDoc(doc(db, 'centreSettings', `${activeCentreId}__attendance`), timing, { merge: true });
       setAttendanceSettings((prev) => ({ ...prev, ...timing }));
     } catch (e) {
-      handleFirestoreError(e, OperationType.WRITE, 'settings/attendance');
+      handleFirestoreError(e, OperationType.WRITE, 'your attendance settings');
     }
   };
 
@@ -2590,66 +2639,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     await signOut(firebaseAuth);
   };
 
-  // Seed initial data if Firestore is empty (Admin check)
-  useEffect(() => {
-    if (!isAdmin) return; // Only admins can seed
-
-    const seedData = async () => {
-      try {
-        // Use a slight delay to ensure network is initialized
-        const settingsDoc = await getDoc(doc(db, 'settings', 'global'));
-        if (!settingsDoc.exists()) {
-          console.log('Seeding initial data to Firestore...');
-          await setDoc(doc(db, 'settings', 'global'), INITIAL_SETTINGS);
-          
-          // Helper to create demo auth users
-          const createDemoAuth = async (email: string, pass: string, label: string) => {
-            const secondaryApp = initializeApp(firebaseConfigValues, `demo-creation-${label}`);
-            const secondaryAuth = getAuth(secondaryApp);
-            try {
-              await createUserWithEmailAndPassword(secondaryAuth, email, pass);
-              console.log(`Demo Auth account created: ${email}`);
-            } catch (err: any) {
-              if (err.code !== 'auth/email-already-in-use') {
-                console.error(`Demo Auth failed for ${email}:`, err);
-              }
-            } finally {
-              await deleteApp(secondaryApp);
-            }
-          };
-
-          // Create standard demo accounts
-          await createDemoAuth('admin@excellencetutorials.ng', 'Admin@123', 'admin');
-          await createDemoAuth('tutor@excellencetutorials.ng', 'Tutor@123', 'tutor');
-          await createDemoAuth('student@excellencetutorials.ng', 'Student@123', 'student');
-
-          // Seed students
-          for (const s of INITIAL_STUDENTS) {
-            await setDoc(doc(db, 'students', s.id), tenantWrite(s));
-          }
-          // Seed tutors
-          for (const t of INITIAL_TUTORS) {
-            await setDoc(doc(db, 'tutors', t.id), tenantWrite({ ...t, temporaryPassword: 'Tutor@123', hasChangedPassword: false }));
-          }
-          // Seed admins
-          for (const a of INITIAL_ADMINS) {
-            await setDoc(doc(db, 'admins', a.id), tenantWrite({ ...a, temporaryPassword: 'Admin@123', hasChangedPassword: false }));
-          }
-          // Seed programmes
-          for (const p of INITIAL_PROGRAMMES) {
-            await setDoc(doc(db, 'programmes', p.id), tenantWrite(p));
-          }
-          console.log('Seeding complete.');
-        }
-      } catch (e: any) {
-        // Suppress noisy offline logs during seeding
-        if (e.code !== 'unavailable' && !e.message?.includes('offline')) {
-          console.error('Error seeding data:', e);
-        }
-      }
-    };
-    seedData();
-  }, [isAdmin]);
 
   const addAnnouncement = async (annData: Omit<Announcement, 'id' | 'date'>) => {
     try {

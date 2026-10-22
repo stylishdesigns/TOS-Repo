@@ -24,7 +24,7 @@ interface ProfileTabProps {
 }
 
 export const ProfileTab: React.FC<ProfileTabProps> = ({ student, onSelectStudent }) => {
-  const { students, settings, payments, addPayment, addToast } = useApp();
+  const { students, settings, payments, addPayment, addToast, centreName } = useApp();
 
   const [showPayModal, setShowPayModal] = useState(false);
   const [payAmount, setPayAmount] = useState<number>(
@@ -120,7 +120,7 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({ student, onSelectStudent
             </div>
             <div>
               <span className="text-xs font-black tracking-wider uppercase block leading-none">
-                {settings.centreName}
+                {centreName}
               </span>
               <span className="text-[9px] text-orange-400 font-semibold tracking-wider uppercase">
                 Official Student Identity Card
