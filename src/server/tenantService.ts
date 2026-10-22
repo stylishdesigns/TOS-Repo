@@ -296,6 +296,71 @@ export async function getMembership(
   }
 }
 
+/**
+ * One shared membership lookup for the login path (Login hotfix). Resolves a
+ * caller's membership in one centre across every documented shape:
+ *  - doc id `${uid}__${centreId}` (canonical, set by provisioning and import)
+ *  - doc id `${email}__${centreId}` (legacy: email keyed before uid backfill)
+ *  - `uid` field holding the caller uid or their email (legacy field shape)
+ * enterCentreService and listUserCentresService must never disagree again:
+ * listUserCentresService used to match only uid == caller uid, so a member
+ * enter-centre accepted could vanish from my-centres and the client would be
+ * told "no account" for an account the server itself recognises.
+ */
+export async function findCentreMembership(
+  uid: string,
+  centreId: string,
+  userEmail?: string
+): Promise<CentreMembership | null> {
+  // Document-id shapes first: canonical and legacy email-keyed ids.
+  const viaDocId = await getMembership(uid, centreId, userEmail);
+  if (viaDocId) return viaDocId;
+  // Field shapes: the uid field holding either the caller uid or their email.
+  const legacyKeys = userEmail && userEmail !== uid ? [uid, userEmail] : [uid];
+  for (const key of legacyKeys) {
+    try {
+      const snap = await adminDb
+        .collection('memberships')
+        .where('uid', '==', key)
+        .where('centreId', '==', centreId)
+        .limit(2)
+        .get();
+      if (!snap.empty) return snap.docs[0].data() as CentreMembership;
+    } catch (err) {
+      dbFailure('findCentreMembership', err);
+    }
+  }
+  return null;
+}
+
+/**
+ * Active memberships for a caller across the same field shapes as
+ * findCentreMembership (doc-id-keyed legacy rows without a usable uid field
+ * are not enumerable by query; enter-centre still resolves those directly).
+ */
+export async function listActiveMembershipsForUser(
+  uid: string,
+  userEmail?: string
+): Promise<CentreMembership[]> {
+  const byId = new Map<string, CentreMembership>();
+  const legacyKeys = userEmail && userEmail !== uid ? [uid, userEmail] : [uid];
+  for (const key of legacyKeys) {
+    try {
+      const snap = await adminDb
+        .collection('memberships')
+        .where('uid', '==', key)
+        .where('status', '==', 'active')
+        .get();
+      snap.forEach((docSnap) => {
+        if (!byId.has(docSnap.id)) byId.set(docSnap.id, docSnap.data() as CentreMembership);
+      });
+    } catch (err) {
+      dbFailure('listActiveMembershipsForUser', err);
+    }
+  }
+  return [...byId.values()];
+}
+
 /** Authorise a caller against a centre. Firestore is the only source of truth. */
 export async function requireMembership(
   caller: Caller,
@@ -478,24 +543,28 @@ export async function enterCentreService(params: {
   // 3. Verify membership. A platform-staff `tos` claim grants no centre
   // access here (Prompt E): staff test a centre by signing in with one of
   // that centre's own accounts, never by entering its access code.
-  let membership: CentreMembership | null = null;
-  membership = await getMembership(uid, centreId, userEmail);
+  // One shared membership lookup (Login hotfix): the same legacy shapes
+  // enter-centre always accepted are now exactly what my-centres reports.
+  const membership: CentreMembership | null = await findCentreMembership(uid, centreId, userEmail);
   if (!membership) {
-    // Legacy documents keyed by email in the uid field.
-    try {
-      const snap = await adminDb
-        .collection('memberships')
-        .where('centreId', '==', centreId)
-        .where('uid', '==', userEmail)
-        .limit(1)
-        .get();
-      if (!snap.empty) membership = snap.docs[0].data() as CentreMembership;
-    } catch (err) {
-      dbFailure('enterCentreService(legacy membership lookup)', err);
-    }
-  }
-  if (!membership || membership.status !== 'active') {
     await failWith('membership-missing');
+  }
+  // A membership that exists but is not active yet is a different, sayable
+  // failure from "no account": the account does belong to this centre.
+  if (membership.status !== 'active') {
+    try {
+      await adminDb.collection('auditLogs').add({
+        actorUid: uid,
+        centreId,
+        action: 'CENTRE_ENTRY_BLOCKED',
+        reason: `membership-${membership.status}`,
+        at: new Date().toISOString(),
+      });
+    } catch { /* audit is best-effort */ }
+    throw httpError(
+      403,
+      'Your access to this centre is not active yet. Please contact the centre administration.'
+    );
   }
 
   // 4. Subscription status: suspended centres are owner/TOS only.
@@ -601,14 +670,11 @@ export async function listUserCentresService(params: {
   }
 
   try {
-    const snap = await adminDb
-      .collection('memberships')
-      .where('uid', '==', uid)
-      .where('status', '==', 'active')
-      .get();
-
-    for (const docSnap of snap.docs) {
-      const m = docSnap.data() as CentreMembership;
+    // One shared membership lookup (Login hotfix): active memberships for the
+    // caller uid AND their email, so a member enter-centre accepts can no
+    // longer vanish from this list and be reported as "no account".
+    const memberships = await listActiveMembershipsForUser(uid, userEmail);
+    for (const m of memberships) {
       const centre = await getCentreDoc(m.centreId);
       results.push({
         centreId: m.centreId,

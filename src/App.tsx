@@ -128,7 +128,12 @@ const MainLayout: React.FC = () => {
         // the login page, with the student sign-up route. Only students
         // self-register; centre staff are provisioned by each centre's super
         // admin, so there is no staff sign-up.
-        if (pendingCentre?.centreId) {
+        // The "no account" message shows only when the server itself confirms
+        // the signed-in account holds no active membership in the chosen
+        // centre. Other failures (too many attempts, centre suspended or the
+        // membership not active yet, a server error) keep the session and show
+        // the server's own reason in the toast below, never "no account".
+        if (pendingCentre?.centreId && (!err?.status || err.status === 400)) {
           try {
             const myIds = await fetchMyCentreIds();
             if (!myIds.includes(pendingCentre.centreId)) {

@@ -1161,7 +1161,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const data = await res.json();
     if (!res.ok) {
-      throw new Error(data.error || 'That code did not match. Check it and try again.');
+      // The HTTP status rides along so callers can tell a real "no account"
+      // mismatch (400) from a lockout, suspension or server error.
+      const e: any = new Error(data.error || 'That code did not match. Check it and try again.');
+      e.status = res.status;
+      throw e;
     }
 
     setActiveCentreId(data.centreId);
