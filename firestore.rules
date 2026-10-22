@@ -43,6 +43,27 @@ service cloud.firestore {
     }
 
     // -------------------------------------------------------------------------
+    // CENTRE SETTINGS (per centre: {centreId}__global | {centreId}__attendance | {centreId}__cms)
+    // The part of the document id before '__' is the centre id. Members are read
+    // from the m claim (centreId -> role), set by the app's session sync.
+    // NOTE: assumes centre ids never contain '__' (they are centre-<slug>).
+    // -------------------------------------------------------------------------
+    match /centreSettings/{settingId} {
+      function memberCentreRole(id) {
+        return request.auth.token.get('m', {}).get(id.split('__')[0], '');
+      }
+      function isCentreSettingId(id) {
+        return id is string && id.matches('^[a-zA-Z0-9_\\-]+__(global|attendance|cms)$');
+      }
+      allow read: if isSignedIn()
+          && isCentreSettingId(settingId)
+          && memberCentreRole(settingId) != '';
+      allow write: if isSignedIn()
+          && isCentreSettingId(settingId)
+          && memberCentreRole(settingId) in ['owner', 'admin'];
+    }
+
+    // -------------------------------------------------------------------------
     // ADMINS
     // -------------------------------------------------------------------------
     match /admins/{adminId} {
