@@ -60,7 +60,7 @@ service cloud.firestore {
           && memberCentreRole(settingId) != '';
       allow write: if isSignedIn()
           && isCentreSettingId(settingId)
-          && memberCentreRole(settingId) in ['owner', 'admin'];
+          && memberCentreRole(settingId) in ['own', 'adm'];
     }
 
     // -------------------------------------------------------------------------
