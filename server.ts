@@ -23,6 +23,7 @@ import {
 import { ensureBootstrapSuperAdmin } from "./src/server/platformDefaults";
 import { registerExtendedRoutes } from "./src/server/extendedRoutes";
 import { registerFoDbProxy } from "./src/server/foDbProxy";
+import { registerFoAccessDoors } from "./src/server/foAccessDoors";
 
 
 // Source file is ESM, but compiled to CJS for production.
@@ -1068,6 +1069,10 @@ RULES:
   // Fo database proxy (read-only): Firestore diagnostics through the server's
   // own admin connection, gated by FO_DB_PROXY_KEY_SHA256 (see foDbProxy.ts).
   registerFoDbProxy(app);
+
+  // Fo Firebase access doors (rules read, backups, auth, storage, push),
+  // same x-fo-key gate as the data proxy (see foAccessDoors.ts).
+  registerFoAccessDoors(app);
 
   if (!isProd) {
     const { createServer: createViteServer } = await import("vite");
