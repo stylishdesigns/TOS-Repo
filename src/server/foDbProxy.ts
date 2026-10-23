@@ -207,6 +207,57 @@ export function registerFoDbProxy(app: express.Express): void {
     }
   });
 
+  // 6. One-time repair (user-approved flows only): create the owner's admins
+  //    record for a centre whose provisioning predated the auto-superadmin
+  //    rule. Fields come from the centre doc's owner fields only. Refuses when
+  //    the record already exists and never touches memberships or anything else.
+  app.post("/api/internal/fs/create-owner-admin-record", async (req, res) => {
+    const body = (req.body || {}) as Record<string, unknown>;
+    const centreId = typeof body.centreId === "string" ? body.centreId : "";
+    if (!centreId || centreId.length > 128 || !ID_RE.test(centreId)) {
+      return reject(res, 400, "A valid centreId is required.");
+    }
+    try {
+      const centreDoc = await adminDb.collection("centres").doc(centreId).get();
+      if (!centreDoc.exists) {
+        return reject(res, 404, "That centre does not exist.");
+      }
+      const centre = (centreDoc.data() || {}) as Record<string, unknown>;
+      const uid = typeof centre.ownerUid === "string" ? centre.ownerUid : "";
+      const name = typeof centre.ownerName === "string" ? centre.ownerName : "";
+      const email = typeof centre.ownerEmail === "string" ? centre.ownerEmail : "";
+      const phone = typeof centre.ownerPhone === "string" ? centre.ownerPhone : "";
+      if (!uid || !ID_RE.test(uid) || !name || !email) {
+        return reject(res, 409, "The centre doc is missing its owner details; refusing to create people.");
+      }
+      const ref = adminDb.collection("admins").doc(uid);
+      if ((await ref.get()).exists) {
+        return reject(res, 409, `The admins record for ${uid} already exists; nothing was written.`);
+      }
+      const now = new Date().toISOString();
+      await ref.set({
+        id: uid,
+        name,
+        email,
+        phone,
+        role: "Super Administrator",
+        department: "General",
+        jobTitle: "Super Admin",
+        status: "Active",
+        hasChangedPassword: false,
+        temporaryPassword: null,
+        centreId,
+        createdAt: now,
+        updatedAt: now,
+      });
+      console.log(`[fo-db-proxy] create-owner-admin-record ${uid} ${centreId}`);
+      res.json({ ok: true, created: uid, centreId });
+    } catch (err: any) {
+      console.error(`[fo-db-proxy] create-owner-admin-record failed:`, err?.message || err);
+      reject(res, 500, "The write failed on the server.");
+    }
+  });
+
   // 4. Query a collection (equality/range filters, one order, capped limit).
   app.post("/api/internal/fs/query", async (req, res) => {
     const body = (req.body || {}) as Record<string, unknown>;

@@ -161,24 +161,24 @@ export const SettingsView: React.FC = () => {
           <div>
             <div className="flex items-center space-x-2.5">
               <h2 className="text-xl font-bold text-slate-900">
-                {activeUser.name}
+                {activeUser?.name || 'Admin'}
               </h2>
               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200">
-                {activeUser.role}
+                {activeUser?.role || 'Administrator'}
               </span>
             </div>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 mt-1">
               <span className="flex items-center space-x-1">
                 <Mail className="w-3.5 h-3.5 text-slate-400" />
-                <span>{activeUser.email}</span>
+                <span>{activeUser?.email || ''}</span>
               </span>
               <span>•</span>
               <span className="flex items-center space-x-1">
                 <Phone className="w-3.5 h-3.5 text-slate-400" />
-                <span>{activeUser.phone || 'No phone set'}</span>
+                <span>{activeUser?.phone || 'No phone set'}</span>
               </span>
               <span>•</span>
-              <span className="text-slate-600 font-medium">{activeUser.department}</span>
+              <span className="text-slate-600 font-medium">{activeUser?.department || 'General'}</span>
             </div>
           </div>
         </div>

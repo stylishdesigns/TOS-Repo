@@ -209,6 +209,28 @@ export async function provisionCentre(
     updatedAt: now.toISOString(),
   });
 
+  // The centre's creator is automatically its Super Administrator: every
+  // provisioned centre (landing page or TOS console) gets the owner's staff
+  // record. Idempotent by uid; an existing admins doc is left untouched.
+  const ownerAdminRef = adminDb.collection('admins').doc(uid);
+  if (!(await ownerAdminRef.get()).exists) {
+    await ownerAdminRef.set({
+      id: uid,
+      name: fullName,
+      email,
+      phone,
+      role: 'Super Administrator',
+      department: 'General',
+      jobTitle: 'Super Admin',
+      status: 'Active',
+      hasChangedPassword: false,
+      temporaryPassword: null,
+      centreId,
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+    });
+  }
+
   const accessCode = params.preferredAccessCode
     ? await claimPreferredAccessCode(centreId, params.preferredAccessCode)
     : await createAccessCode(centreId);

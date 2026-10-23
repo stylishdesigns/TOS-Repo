@@ -99,6 +99,10 @@ const MainLayout: React.FC = () => {
   // demonstrably failed. Until then the resolving screen holds, so no code
   // prompt can flash or stand between the login page and the dashboard.
   const [centreEntryFailed, setCentreEntryFailed] = useState(false);
+  // Whitelabel splash: after the account is confirmed to belong to the chosen
+  // centre, the centre's own loading screen plays briefly before the
+  // dashboard opens.
+  const [centreSplash, setCentreSplash] = useState(false);
   const centreEntryKeyRef = useRef<string | null>(null);
   useEffect(() => {
     if (!currentUser || !hasCheckedActiveCentre) return;
@@ -116,7 +120,14 @@ const MainLayout: React.FC = () => {
     work
       .then((r: any) => {
         const ok = pendingCentre ? !!(r && r.success) : !!(r && r.entered);
-        if (!ok) setCentreEntryFailed(true);
+        if (!ok) {
+          setCentreEntryFailed(true);
+          return;
+        }
+        // Belonging is confirmed: play the centre's own loading screen
+        // briefly before the dashboard opens.
+        setCentreSplash(true);
+        window.setTimeout(() => setCentreSplash(false), 1200);
       })
       .catch(async (err: any) => {
         // A failed automatic entry is never silent: the server's reason (a
@@ -366,6 +377,16 @@ const MainLayout: React.FC = () => {
     }} />;
   }
 
+  // "Enter another access code": leave the current centre selection and show
+  // the access-code gate again, without going back to the landing page.
+  const handleEnterAnotherCode = () => {
+    setLoginCentreError(null);
+    setPendingCentre(null);
+    setShowPortals(false);
+    setShowWelcome(false);
+    setCentreGateRequested(true);
+  };
+
   // The centre code gate shows after a login button on the landing page is
   // clicked (the platform-staff door above is exempt). It only selects and
   // names the centre; the centre's login page follows it.
@@ -406,6 +427,25 @@ const MainLayout: React.FC = () => {
     }} />;
   }
 
+  // The whitelabel loading screen: the centre's own name on the orange spin.
+  // Shown after belonging is confirmed (centreSplash) and while an automatic
+  // centre entry runs for a restored session.
+  const centreSpinnerScreen = (
+    <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-900 text-white">
+      <div className="relative w-24 h-24 mb-8">
+        <div className="absolute inset-0 border-4 border-orange-500/20 rounded-full" />
+        <div className="absolute inset-0 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
+        <div className="absolute inset-4 bg-orange-500/10 rounded-full flex items-center justify-center">
+           <span className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" />
+        </div>
+      </div>
+      <div className="space-y-2 text-center">
+        <h2 className="text-xl font-black tracking-widest uppercase text-orange-500">{pendingCentre?.centreName || centreName}</h2>
+        <p className="text-xs text-slate-400 font-medium animate-pulse">Taking you to your dashboard...</p>
+      </div>
+    </div>
+  );
+
   // Admin Password Change Guard
   if (isAdmin && activeUser && activeUser.status === 'Invited' && !activeUser.hasChangedPassword) {
     return (
@@ -419,27 +459,33 @@ const MainLayout: React.FC = () => {
     );
   }
 
+  // Whitelabel splash: belonging was confirmed, the centre's own loading
+  // screen plays before the dashboard opens.
+  if (currentUser && activeCentreId && centreSplash && !isTosAdmin) {
+    return centreSpinnerScreen;
+  }
+
   // Multi-Tenant Access Code Screen Guard (Part A, point 2 & Part B). With
   // centre resolution in flight this is a branded loading screen, never a
   // code prompt: the dashboard must be reachable without re-entering a code.
+  // When a centre was chosen before login, the confirmation itself happens ON
+  // the login page: the login page stays up (inputs kept, the button shows a
+  // verifying state) until the account is confirmed to belong; only then does
+  // the centre's own loading screen play.
   if (currentUser && !activeCentreId && hasCheckedActiveCentre && !isTosAdmin) {
     if (centreEntryBusy || !centreEntryFailed) {
-      return (
-            <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-900 text-white">
-              <div className="relative w-24 h-24 mb-8">
-                <div className="absolute inset-0 border-4 border-orange-500/20 rounded-full" />
-                <div className="absolute inset-0 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
-                <div className="absolute inset-4 bg-orange-500/10 rounded-full flex items-center justify-center">
-                   <span className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" />
-                </div>
-              </div>
-              <div className="space-y-2 text-center">
-                <h2 className="text-xl font-black tracking-widest uppercase text-orange-500">{pendingCentre?.centreName || centreName}</h2>
-                <p className="text-xs text-slate-400 font-medium animate-pulse">Taking you to your dashboard...</p>
-              </div>
-            </div>
-    
-      );
+      if (pendingCentre) {
+        return (
+          <AuthPortal
+            portalType={viewMode === 'student' ? 'student' : viewMode === 'tutor' ? 'tutor' : 'admin'}
+            title={pendingCentre.centreName}
+            subtitle=""
+            onSuccess={() => {}}
+            verifying
+          />
+        );
+      }
+      return centreSpinnerScreen;
     }
     if (accessCodeFlow === 'join') {
       return (
@@ -475,6 +521,9 @@ const MainLayout: React.FC = () => {
         onBack={() => { setShowPortals(false); setShowWelcome(true); setCentreGateRequested(false); }}
         notice={loginCentreError || undefined}
         onNoticeSignUp={() => { setLoginCentreError(null); setViewMode('student'); }}
+        onNoticeCancel={() => setLoginCentreError(null)}
+        noticeModal
+        onChangeAccessCode={handleEnterAnotherCode}
       />
     );
   }
@@ -488,6 +537,10 @@ const MainLayout: React.FC = () => {
         onSuccess={() => {}}
         onBack={() => { setShowPortals(false); setShowWelcome(true); setCentreGateRequested(false); }}
         notice={loginCentreError || undefined}
+        onNoticeSignUp={() => { setLoginCentreError(null); setViewMode('student'); }}
+        onNoticeCancel={() => setLoginCentreError(null)}
+        noticeModal
+        onChangeAccessCode={handleEnterAnotherCode}
       />
     );
   }
