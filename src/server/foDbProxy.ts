@@ -1,0 +1,134 @@
+import express from "express";
+import { createHash, timingSafeEqual } from "crypto";
+import { adminDb } from "./firebaseAdmin";
+
+/**
+ * Fo database proxy (read-only, phase 1).
+ *
+ * Purpose: let the user's assistant (Fo) run read-only Firestore diagnostics
+ * through this server's own admin connection, because the client is correctly
+ * blocked by security rules and no service-account key is ever handed out.
+ *
+ * Access model:
+ *  - The route path /api/internal/fs/* is gated by the global /api middleware
+ *    in server.ts, which compares the x-fo-key header against the SHA-256 hash
+ *    in FO_DB_PROXY_KEY_SHA256. The plaintext key never exists in this repo,
+ *    in Netlify, or in chat; the operator keeps it locally.
+ *  - Deny-closed: when the hash is unset, every call fails.
+ *  - Read-only: no create/update/delete endpoint exists in this module. A
+ *    later phase may add gated writes behind the user's per-action approval.
+ *  - Every call is logged (action, collection or path, document count) so the
+ *    server's own logs are an audit trail of what was read.
+ */
+
+const ID_RE = /^[a-zA-Z0-9_\-]+$/;
+const FIELD_RE = /^[a-zA-Z0-9_\-\.]+$/;
+const MAX_DOCS = 200;
+
+function reject(res: express.Response, status: number, message: string) {
+  res.status(status).json({ error: message });
+}
+
+function validCollectionId(id: unknown): id is string {
+  return typeof id === "string" && id.length <= 150 && ID_RE.test(id);
+}
+
+/** A document path like "memberships/uid__centre-x": even number of segments. */
+function validDocPath(path: unknown): path is string {
+  if (typeof path !== "string") return false;
+  const parts = path.split("/").filter((s) => s.length > 0);
+  if (parts.length < 2 || parts.length > 60 || parts.length % 2 !== 0) return false;
+  return parts.every((p) => p.length <= 150 && ID_RE.test(p));
+}
+
+type WhereClause = { field: string; op: string; value: string | number | boolean };
+
+function validWhere(w: unknown): w is WhereClause {
+  if (!w || typeof w !== "object") return false;
+  const c = w as Record<string, unknown>;
+  return (
+    typeof c.field === "string" && c.field.length <= 150 && FIELD_RE.test(c.field) &&
+    typeof c.op === "string" && ["==", "!=", ">", ">=", "<", "<="].includes(c.op) &&
+    ["string", "number", "boolean"].includes(typeof c.value)
+  );
+}
+
+/** JSON-safe copy: Firestore Timestamps carry toJSON, everything else passes through. */
+function jsonSafe(value: unknown): unknown {
+  try {
+    const text = JSON.stringify(value);
+    if (typeof text === "string") return value;
+  } catch { /* fall through */ }
+  return String(value);
+}
+
+export function registerFoDbProxy(app: express.Express): void {
+  if (!process.env.FO_DB_PROXY_KEY_SHA256) {
+    // Fail closed: with no hash configured the routes register but every
+    // request is refused, and nothing logs a confusing half-state.
+    app.post("/api/internal/fs/*", (_req, res) => reject(res, 403, "Proxy not configured."));
+    return;
+  }
+
+  // 1. List top-level collections.
+  app.post("/api/internal/fs/collections", async (_req, res) => {
+    try {
+      const collections = await adminDb.listCollections();
+      const names = collections.map((c) => c.id);
+      console.log(`[fo-db-proxy] collections: ${names.length} listed`);
+      res.json({ ok: true, collections: names });
+    } catch (err: any) {
+      console.error("[fo-db-proxy] collections failed:", err?.message || err);
+      reject(res, 500, "The collection listing failed on the server.");
+    }
+  });
+
+  // 2. Read one document by path.
+  app.post("/api/internal/fs/doc", async (req, res) => {
+    const path = (req.body || {}).path;
+    if (!validDocPath(path)) return reject(res, 400, "A valid document path is required.");
+    try {
+      const snap = await adminDb.doc(path).get();
+      console.log(`[fo-db-proxy] doc ${path}: ${snap.exists ? "found" : "missing"}`);
+      if (!snap.exists) return res.json({ ok: true, found: false });
+      res.json({ ok: true, found: true, id: snap.id, data: jsonSafe(snap.data()) });
+    } catch (err: any) {
+      console.error(`[fo-db-proxy] doc ${path} failed:`, err?.message || err);
+      reject(res, 500, "The document read failed on the server.");
+    }
+  });
+
+  // 3. Query a collection (equality/range filters, one order, capped limit).
+  app.post("/api/internal/fs/query", async (req, res) => {
+    const body = (req.body || {}) as Record<string, unknown>;
+    if (!validCollectionId(body.collection)) {
+      return reject(res, 400, "A valid collection name is required.");
+    }
+    const where: WhereClause[] = Array.isArray(body.where) ? (body.where as unknown[]).filter(validWhere) : [];
+    if (Array.isArray(body.where) && where.length !== body.where.length) {
+      return reject(res, 400, "One or more filters are invalid.");
+    }
+    const order = body.orderBy as { field?: unknown; direction?: unknown } | undefined;
+    if (order && (typeof order.field !== "string" || !FIELD_RE.test(order.field) ||
+        (order.direction !== "asc" && order.direction !== "desc"))) {
+      return reject(res, 400, "The orderBy clause is invalid.");
+    }
+    let limit = typeof body.limit === "number" ? Math.floor(body.limit) : 50;
+    if (!Number.isFinite(limit) || limit < 1) limit = 50;
+    if (limit > MAX_DOCS) limit = MAX_DOCS;
+
+    try {
+      let q: any = adminDb.collection(body.collection);
+      for (const w of where) q = q.where(w.field, w.op, w.value);
+      if (order) q = q.orderBy(String(order.field), order.direction as "asc" | "desc");
+      q = q.limit(limit);
+      const snap = await q.get();
+      const documents = snap.docs.map((d: any) => ({ id: d.id, data: jsonSafe(d.data()) }));
+      console.log(`[fo-db-proxy] query ${body.collection}: ${documents.length} document(s)`);
+      res.json({ ok: true, count: documents.length, documents });
+    } catch (err: any) {
+      console.error(`[fo-db-proxy] query ${body.collection} failed:`, err?.message || err);
+      reject(res, 500, "The query failed on the server.");
+    }
+  });
+}

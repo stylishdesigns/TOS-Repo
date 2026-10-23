@@ -2,6 +2,7 @@ import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
 import { parseEssayBlock } from "./src/utils/essay";
+import { createHash, timingSafeEqual } from "crypto";
 import { adminAuth, adminDb, adminCredentialSource, projectId, databaseId } from "./src/server/firebaseAdmin";
 import {
   enterCentreService,
@@ -21,6 +22,7 @@ import {
 } from "./src/server/tenantService";
 import { ensureBootstrapSuperAdmin } from "./src/server/platformDefaults";
 import { registerExtendedRoutes } from "./src/server/extendedRoutes";
+import { registerFoDbProxy } from "./src/server/foDbProxy";
 
 
 // Source file is ESM, but compiled to CJS for production.
@@ -261,6 +263,21 @@ async function startServer() {
     if (path === "/health") return next();
     if (path === "/health/deep") return next(); // public diagnostic, returns no secrets
     if (path.startsWith("/public/")) return next();
+    if (path.startsWith("/internal/fs/")) {
+      // Fo database proxy (read-only): its own secret, stored in Netlify only
+      // as a SHA-256 hash (FO_DB_PROXY_KEY_SHA256), separate from
+      // INTERNAL_API_SECRET. Deny-closed when the hash is not configured.
+      const key = req.headers["x-fo-key"];
+      const hash = process.env.FO_DB_PROXY_KEY_SHA256 || "";
+      if (!hash || typeof key !== "string" || key.length === 0 || key.length > 256) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const got = createHash("sha256").update(key).digest();
+      const want = Buffer.from(hash, "hex");
+      const keyOk = want.length === got.length && timingSafeEqual(got, want);
+      if (!keyOk) return res.status(401).json({ error: "Unauthorized" });
+      return next();
+    }
     if (path.startsWith("/internal/")) {
       const secret = req.headers["x-internal-secret"];
       if (!process.env.INTERNAL_API_SECRET || secret !== process.env.INTERNAL_API_SECRET) {
@@ -1047,6 +1064,10 @@ RULES:
   // Prompt C routes (leads, TOS console, access codes, billing sweep) must be
   // registered before the static/SPA fallback so no GET route is swallowed.
   registerExtendedRoutes(app);
+
+  // Fo database proxy (read-only): Firestore diagnostics through the server's
+  // own admin connection, gated by FO_DB_PROXY_KEY_SHA256 (see foDbProxy.ts).
+  registerFoDbProxy(app);
 
   if (!isProd) {
     const { createServer: createViteServer } = await import("vite");
