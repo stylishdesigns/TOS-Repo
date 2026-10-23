@@ -357,8 +357,14 @@ export function registerExtendedRoutes(app: express.Express): void {
 
   app.get('/api/tos/overview', async (req, res) => {
     try {
-      const config = await getPlatformConfig();
-      const centresSnap = await adminDb.collection('centres').limit(200).get();
+      // One round-trip batch: config, centres, leads and the audit page all
+      // load together; only the billing map needs the centre ids first.
+      const [config, centresSnap, leadsSnap, auditSnap] = await Promise.all([
+        getPlatformConfig(),
+        adminDb.collection('centres').limit(200).get(),
+        adminDb.collection('leads').limit(200).get(),
+        adminDb.collection('auditLogs').orderBy('at', 'desc').limit(10).get(),
+      ]);
       const billingMap = await loadBillingMap(centresSnap.docs.map((d) => d.id));
       const counts: Record<string, number> = { trial: 0, pending_payment: 0, active: 0, overdue: 0, suspended: 0 };
       let seatsUsed = 0;
@@ -379,13 +385,11 @@ export function registerExtendedRoutes(app: express.Express): void {
           }
         }
       });
-      const leadsSnap = await adminDb.collection('leads').limit(200).get();
       const leadCounts: Record<string, number> = {};
       leadsSnap.docs.forEach((d) => {
         const s = (d.data() as any).status || 'unknown';
         leadCounts[s] = (leadCounts[s] || 0) + 1;
       });
-      const auditSnap = await adminDb.collection('auditLogs').orderBy('at', 'desc').limit(10).get();
       res.json({
         centres: { ...counts, total: centresSnap.size },
         seats: { used: seatsUsed, cap: seatsCap },

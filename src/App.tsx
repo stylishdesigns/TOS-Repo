@@ -103,6 +103,17 @@ const MainLayout: React.FC = () => {
   // centre, the centre's own loading screen plays briefly before the
   // dashboard opens.
   const [centreSplash, setCentreSplash] = useState(false);
+  // The login page's email/password live here so they survive every screen
+  // swap on the way to a verdict (verification, the no-account popup, the
+  // centre loading screen). They clear once the account is inside a centre.
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  useEffect(() => {
+    if (activeCentreId) {
+      setLoginEmail('');
+      setLoginPassword('');
+    }
+  }, [activeCentreId]);
   const centreEntryKeyRef = useRef<string | null>(null);
   useEffect(() => {
     if (!currentUser || !hasCheckedActiveCentre) return;
@@ -394,10 +405,7 @@ const MainLayout: React.FC = () => {
     return (
       <CentreCodeGate
         onProceed={(code, centreName, centreId) => setPendingCentre({ code, centreName, centreId })}
-        onPlatformSignIn={() => {
-          window.location.hash = '#tos-admin';
-          setTosLoginRequested(true);
-        }}
+        onBack={() => { setShowPortals(false); setShowWelcome(true); setCentreGateRequested(false); }}
       />
     );
   }
@@ -472,7 +480,7 @@ const MainLayout: React.FC = () => {
   // the login page: the login page stays up (inputs kept, the button shows a
   // verifying state) until the account is confirmed to belong; only then does
   // the centre's own loading screen play.
-  if (currentUser && !activeCentreId && hasCheckedActiveCentre && !isTosAdmin) {
+  if (currentUser && !activeCentreId && !isTosAdmin) {
     if (centreEntryBusy || !centreEntryFailed) {
       if (pendingCentre) {
         return (
@@ -482,6 +490,10 @@ const MainLayout: React.FC = () => {
             subtitle=""
             onSuccess={() => {}}
             verifying
+            email={loginEmail}
+            onEmailChange={setLoginEmail}
+            password={loginPassword}
+            onPasswordChange={setLoginPassword}
           />
         );
       }
@@ -524,6 +536,10 @@ const MainLayout: React.FC = () => {
         onNoticeCancel={() => setLoginCentreError(null)}
         noticeModal
         onChangeAccessCode={handleEnterAnotherCode}
+        email={loginEmail}
+        onEmailChange={setLoginEmail}
+        password={loginPassword}
+        onPasswordChange={setLoginPassword}
       />
     );
   }
@@ -541,6 +557,10 @@ const MainLayout: React.FC = () => {
         onNoticeCancel={() => setLoginCentreError(null)}
         noticeModal
         onChangeAccessCode={handleEnterAnotherCode}
+        email={loginEmail}
+        onEmailChange={setLoginEmail}
+        password={loginPassword}
+        onPasswordChange={setLoginPassword}
       />
     );
   }

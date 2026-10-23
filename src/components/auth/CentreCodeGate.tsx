@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Building2, ArrowRight, Loader2, AlertCircle, RefreshCw, ShieldCheck } from 'lucide-react';
+import { Building2, ArrowRight, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 
 /**
  * Centre code gate: the FIRST screen before any sign-in. The access code is a
@@ -9,10 +9,10 @@ import { Building2, ArrowRight, Loader2, AlertCircle, RefreshCw, ShieldCheck } f
  */
 interface CentreCodeGateProps {
   onProceed: (code: string, centreName: string, centreId?: string) => void;
-  onPlatformSignIn: () => void;
+  onBack: () => void;
 }
 
-export const CentreCodeGate: React.FC<CentreCodeGateProps> = ({ onProceed, onPlatformSignIn }) => {
+export const CentreCodeGate: React.FC<CentreCodeGateProps> = ({ onProceed, onBack }) => {
   const [digits, setDigits] = useState<string[]>(['', '', '', '', '', '']);
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -211,11 +211,11 @@ export const CentreCodeGate: React.FC<CentreCodeGateProps> = ({ onProceed, onPla
         <div className="mt-8 pt-6 border-t border-slate-800/80 flex flex-col items-center gap-2">
           <button
             type="button"
-            onClick={onPlatformSignIn}
+            onClick={onBack}
             className="text-[11px] text-slate-600 hover:text-slate-400 font-medium transition-colors flex items-center gap-1.5 cursor-pointer"
           >
-            <ShieldCheck className="w-3.5 h-3.5" />
-            <span>Platform staff sign in</span>
+            <ArrowRight className="w-3.5 h-3.5 rotate-180" />
+            <span>Back to landing page</span>
           </button>
         </div>
       </div>

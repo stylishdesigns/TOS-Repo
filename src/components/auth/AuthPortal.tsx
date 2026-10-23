@@ -51,6 +51,10 @@ interface AuthPortalProps {
   noticeModal?: boolean;
   onChangeAccessCode?: () => void;
   verifying?: boolean;
+  email: string;
+  onEmailChange: (v: string) => void;
+  password: string;
+  onPasswordChange: (v: string) => void;
 }
 
 export const AuthPortal: React.FC<AuthPortalProps> = ({ 
@@ -64,13 +68,15 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
   onNoticeCancel,
   noticeModal,
   onChangeAccessCode,
-  verifying
+  verifying,
+  email,
+  onEmailChange,
+  password,
+  onPasswordChange
 }) => {
   const { loginWithEmail, loginWithGoogle, signUpWithEmail, resetPassword, updatePassword, logout } = useFirebase();
   const { addToast, activeCentreId, centreName } = useApp();
   
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [currentPassword, setCurrentPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -489,13 +495,13 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
       student: { e: 'student@excellencetutorials.ng', p: 'Student@123' }
     };
     const cred = (demoCreds as any)[portalType];
-    setEmail(cred.e);
-    setPassword(cred.p);
+    onEmailChange(cred.e);
+    onPasswordChange(cred.p);
   };
 
   return (
     <div className={`min-h-screen ${pageBackground} overflow-y-auto overflow-x-hidden selection:bg-orange-500 selection:text-white`}>
-      <div className="min-h-full w-full flex flex-col items-center justify-center py-8 md:py-20 px-4">
+      <div className="min-h-screen w-full flex flex-col items-center justify-center py-8 md:py-12 px-4">
         <div className="w-full max-w-md bg-white rounded-[2.5rem] shadow-2xl shadow-black/50 border border-white/10 overflow-hidden animate-in fade-in zoom-in-95 duration-500 relative">
           <div className={`p-8 ${style.bg} border-b ${style.border} text-center relative`}>
           <div className={`w-12 h-12 rounded-xl ${style.accent} flex items-center justify-center mx-auto mb-4 shadow-lg shadow-black/5`}>
@@ -706,7 +712,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
                       type="email"
                       required
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      onChange={(e) => onEmailChange(e.target.value)}
                       placeholder="e.g. name@excellencetutorials.ng"
                       className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-4 focus:ring-slate-100 focus:border-slate-900 outline-none transition-all font-medium"
                     />
@@ -735,7 +741,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
                         type={showPassword ? 'text' : 'password'}
                         required
                         value={password}
-                        onChange={(e) => setPassword(e.target.value)}
+                        onChange={(e) => onPasswordChange(e.target.value)}
                         placeholder="••••••••"
                         className="w-full pl-10 pr-12 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-4 focus:ring-slate-100 focus:border-slate-900 outline-none transition-all font-medium"
                       />

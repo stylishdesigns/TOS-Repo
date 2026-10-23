@@ -39,6 +39,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
     branches,
     activeUser,
     setViewMode,
+    centreName,
   } = useApp();
 
   const pendingAdmissionsCount = admissions.filter((a) => a.status === 'Pending').length;
@@ -119,10 +120,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
             </div>
             <div>
               <div className="flex items-baseline space-x-1 leading-none">
-                <span className="text-white font-black text-sm tracking-tight">EXCELLENCE</span>
+                <span className="text-white font-black text-sm tracking-tight truncate max-w-[9.5rem]">{(centreName.split(/\s+/)[0] || 'TUTORIAL').toUpperCase()}</span>
               </div>
-              <span className="text-[#EA580C] font-black text-[10px] tracking-wider leading-none block mt-0.5 uppercase">
-                TUTORIAL CENTRE
+              <span className="text-[#EA580C] font-black text-[10px] tracking-wider leading-none block mt-0.5 uppercase truncate max-w-[9.5rem]">
+                {centreName.split(/\s+/).slice(1).join(' ') || 'TUTORIAL CENTRE'}
               </span>
             </div>
           </div>
