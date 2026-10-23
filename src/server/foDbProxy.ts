@@ -15,7 +15,8 @@ import { adminDb } from "./firebaseAdmin";
  *    in FO_DB_PROXY_KEY_SHA256. The plaintext key never exists in this repo,
  *    in Netlify, or in chat; the operator keeps it locally.
  *  - Deny-closed: when the hash is unset, every call fails.
- *  - Read-only: no create/update/delete endpoint exists in this module. A
+ *  - Writes: only the one narrowly-scoped, user-approved repair endpoint.
+ *    A
  *    later phase may add gated writes behind the user's per-action approval.
  *  - Every call is logged (action, collection or path, document count) so the
  *    server's own logs are an audit trail of what was read.
@@ -98,7 +99,53 @@ export function registerFoDbProxy(app: express.Express): void {
     }
   });
 
-  // 3. Query a collection (equality/range filters, one order, capped limit).
+  // 3. Owner-membership repair (user-approved, 2026-10-23): writes EXACTLY
+  //    two records for one uid+centre pair, mirroring what applyImport writes.
+  //    (1) memberships/{uid}__{centreId} = owner/active (idempotent by doc id,
+  //    preserving an existing createdAt). (2) admins/{uid} gains centreId and
+  //    nothing else. It refuses when the admins record is missing and never
+  //    creates people, centres, codes, or anything else.
+  app.post("/api/internal/fs/fix-owner-membership", async (req, res) => {
+    const body = (req.body || {}) as Record<string, unknown>;
+    const uid = typeof body.uid === "string" ? body.uid : "";
+    const centreId = typeof body.centreId === "string" ? body.centreId : "";
+    if (!uid || uid.length > 128 || !ID_RE.test(uid) || !centreId || centreId.length > 128 || !ID_RE.test(centreId)) {
+      return reject(res, 400, "A valid uid and centreId are required.");
+    }
+    const now = new Date().toISOString();
+    try {
+      const adminDoc = await adminDb.collection("admins").doc(uid).get();
+      if (!adminDoc.exists) {
+        return reject(res, 409, "The admins record is missing; refusing to create people.");
+      }
+      const beforeAdmin = adminDoc.data() as Record<string, unknown>;
+      const membershipRef = adminDb.collection("memberships").doc(`${uid}__${centreId}`);
+      const membershipDoc = await membershipRef.get();
+      const before = membershipDoc.exists ? membershipDoc.data() : null;
+      await membershipRef.set({
+        uid,
+        centreId,
+        role: "owner",
+        status: "active",
+        createdAt: (before as Record<string, unknown> | null)?.createdAt || now,
+        updatedAt: now,
+      });
+      await adminDb.collection("admins").doc(uid).update({ centreId, updatedAt: now });
+      const after = (await membershipRef.get()).data();
+      const afterAdmin = (await adminDb.collection("admins").doc(uid).get()).data() as Record<string, unknown>;
+      console.log(`[fo-db-proxy] fix-owner-membership ${uid} ${centreId}: before=${JSON.stringify(before || null)} after=${JSON.stringify(after)}`);
+      res.json({
+        ok: true,
+        membership: { id: `${uid}__${centreId}`, before: jsonSafe(before), after: jsonSafe(after) },
+        adminsRecord: { centreIdBefore: beforeAdmin.centreId ?? null, centreIdAfter: afterAdmin.centreId ?? null },
+      });
+    } catch (err: any) {
+      console.error(`[fo-db-proxy] fix-owner-membership failed:`, err?.message || err);
+      reject(res, 500, "The repair write failed on the server.");
+    }
+  });
+
+  // 4. Query a collection (equality/range filters, one order, capped limit).
   app.post("/api/internal/fs/query", async (req, res) => {
     const body = (req.body || {}) as Record<string, unknown>;
     if (!validCollectionId(body.collection)) {
