@@ -1,16 +1,15 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Loader2, RefreshCw } from 'lucide-react';
+import { Loader2, Ban, Trash2, RotateCcw, X } from 'lucide-react';
 import {
-  api, fmtDate, fmtDateTime, STATUS_LABELS, STATUS_STYLES,
-  StatusPill, Card, inputCls, btnGhost,
+  api, fmtDate, fmtDateTime,
+  StatusPill, btnGhost,
 } from './tosShared';
 
-// NOTE: this module was split out of TosPortal.tsx mechanically; code is
-// moved verbatim with no behavior change. TosPortal.tsx imports it back.
+// NOTE: the platform-wide Owners/Students/Tutors directory tabs were removed:
+// every centre's people now live in a table inside that centre's own record
+// in the TOS console, with the same member powers a TC admin has (suspend,
+// restore, remove, delete). This module keeps only that per-centre table.
 
-// ---------------------------------------------------------------------------
-// PLATFORM DIRECTORY (Prompt D, read only)
-// ---------------------------------------------------------------------------
 const SEAT_STATUS_LABELS: Record<string, string> = {
   active: 'Active',
   disabled: 'Disabled',
@@ -30,271 +29,22 @@ const LoadingRow: React.FC = () => (
   </div>
 );
 
-const LoadMore: React.FC<{ onClick: () => void; busy: boolean; hidden?: boolean }> = ({ onClick, busy, hidden }) => {
-  if (hidden) return null;
-  return (
-    <div className="flex justify-center pt-2">
-      <button onClick={onClick} disabled={busy} className={btnGhost}>
-        {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Load more
-      </button>
-    </div>
-  );
-};
-
-const DirectorySearchBar: React.FC<{
-  value: string; onChange: (v: string) => void; onSearch: () => void;
-  placeholder: string; children?: React.ReactNode;
-}> = ({ value, onChange, onSearch, placeholder, children }) => (
-  <div className="flex flex-wrap items-center gap-3">
-    <input
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      onKeyDown={(e) => { if (e.key === 'Enter') onSearch(); }}
-      placeholder={placeholder}
-      className={`${inputCls} max-w-72`}
-    />
-    <button onClick={onSearch} className={btnGhost}><RefreshCw className="w-4 h-4" /> Search</button>
-    {children}
-  </div>
-);
-
-export const OwnersTab: React.FC = () => {
-  const [rows, setRows] = useState<any[]>([]);
-  const [search, setSearch] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  const load = useCallback(async (q: string) => {
-    setLoading(true); setError('');
-    try {
-      const d = await api(`/api/tos/owners${q ? `?search=${encodeURIComponent(q)}` : ''}`);
-      setRows(d.owners || []);
-    } catch (e: any) { setError(e.message); } finally { setLoading(false); }
-  }, []);
-
-  useEffect(() => { load(''); }, [load]);
-
-  return (
-    <div className="space-y-4">
-      <DirectorySearchBar
-        value={search}
-        onChange={setSearch}
-        onSearch={() => load(search)}
-        placeholder="Search by centre, owner name or email"
-      />
-      {error && <p className="text-rose-300 text-sm">{error}</p>}
-      {loading ? <LoadingRow /> : rows.length === 0 ? (
-        <Card><p className="text-slate-400 text-sm">No centre owners found.</p></Card>
-      ) : (
-        <div className="space-y-2">
-          {rows.map((o) => (
-            <div key={o.centreId} className="bg-slate-900/70 border border-white/10 rounded-2xl p-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2.5 flex-wrap">
-                    <p className="text-white font-bold">{o.centreName}</p>
-                    <StatusPill status={o.status} labels={STATUS_LABELS} styles={STATUS_STYLES} />
-                  </div>
-                  <p className="text-xs text-slate-400 mt-1">
-                    {o.name || 'Name not on record'} · {o.email || 'No email on record'}{o.phone ? ` · ${o.phone}` : ''}
-                  </p>
-                  <p className="text-[11px] text-slate-500 mt-1">
-                    Last sign-in {o.lastSignInTime ? fmtDateTime(o.lastSignInTime) : 'never'}
-                  </p>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
-
-export const StudentsTab: React.FC = () => {
-  const [rows, setRows] = useState<any[]>([]);
-  const [nextCursor, setNextCursor] = useState('');
-  const [search, setSearch] = useState('');
-  const [centreId, setCentreId] = useState('');
-  const [status, setStatus] = useState('');
-  const [centres, setCentres] = useState<any[]>([]);
-  const [counts, setCounts] = useState<Record<string, number>>({});
-  const [loading, setLoading] = useState(true);
-  const [moreBusy, setMoreBusy] = useState(false);
-  const [error, setError] = useState('');
-
-  const buildQuery = (centre: string, cursorValue: string) => {
-    const p = new URLSearchParams();
-    if (centre) p.set('centreId', centre);
-    if (status) p.set('status', status);
-    if (search) p.set('search', search);
-    if (cursorValue) p.set('cursor', cursorValue);
-    const qs = p.toString();
-    return `/api/tos/students${qs ? `?${qs}` : ''}`;
-  };
-
-  const load = useCallback(async () => {
-    setLoading(true); setError('');
-    try {
-      const d = await api(buildQuery(centreId, ''));
-      setRows(d.students || []);
-      setNextCursor(d.nextCursor || '');
-      setCounts(d.counts || {});
-    } catch (e: any) { setError(e.message); } finally { setLoading(false); }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [centreId, status, search]);
-
-  useEffect(() => { load(); }, [centreId, status]);
-
-  useEffect(() => {
-    api('/api/tos/centres').then((d: any) => setCentres(d.centres || [])).catch(() => {});
-  }, []);
-
-  const more = async () => {
-    if (!nextCursor) return;
-    setMoreBusy(true); setError('');
-    try {
-      const d = await api(buildQuery(centreId, nextCursor));
-      setRows((prev) => [...prev, ...(d.students || [])]);
-      setNextCursor(d.nextCursor || '');
-    } catch (e: any) { setError(e.message); } finally { setMoreBusy(false); }
-  };
-
-  const centreName = (id: string) => centres.find((c) => c.id === id)?.name || id;
-
-  return (
-    <div className="space-y-4">
-      <DirectorySearchBar
-        value={search}
-        onChange={setSearch}
-        onSearch={load}
-        placeholder="Search by name, email or phone"
-      >
-        <select value={centreId} onChange={(e) => setCentreId(e.target.value)} className={`${inputCls} max-w-56`}>
-          <option value="">All centres</option>
-          {centres.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
-        <select value={status} onChange={(e) => setStatus(e.target.value)} className={`${inputCls} max-w-44`}>
-          <option value="">Any seat status</option>
-          <option value="active">Active</option>
-          <option value="disabled">Disabled</option>
-        </select>
-      </DirectorySearchBar>
-      {error && <p className="text-rose-300 text-sm">{error}</p>}
-      {!loading && Object.keys(counts).length > 0 && (
-        <p className="text-[11px] text-slate-500">
-          Students per centre: {Object.entries(counts).map(([id, n]) => `${centreName(id)}: ${n}`).join(' · ')}
-        </p>
-      )}
-      {loading ? <LoadingRow /> : rows.length === 0 ? (
-        <Card><p className="text-slate-400 text-sm">No students match this view.</p></Card>
-      ) : (
-        <>
-          <div className="space-y-2">
-            {rows.map((s) => (
-              <div key={s.id} className="bg-slate-900/70 border border-white/10 rounded-2xl p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2.5 flex-wrap">
-                      <p className="text-white font-bold">{s.name || 'Unnamed student'}</p>
-                      <StatusPill status={s.seatStatus} labels={SEAT_STATUS_LABELS} styles={SEAT_STATUS_STYLES} />
-                    </div>
-                    <p className="text-xs text-slate-400 mt-1">
-                      {s.email || 'No email on record'}{s.phone ? ` · ${s.phone}` : ''}
-                    </p>
-                    <p className="text-[11px] text-slate-500 mt-1">
-                      {s.centreName}{s.registrationDate ? ` · enrolled ${fmtDate(s.registrationDate)}` : ''}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-          <LoadMore onClick={more} busy={moreBusy} hidden={!nextCursor} />
-        </>
-      )}
-    </div>
-  );
-};
-
-export const TutorsTab: React.FC = () => {
-  const [rows, setRows] = useState<any[]>([]);
-  const [nextCursor, setNextCursor] = useState('');
-  const [search, setSearch] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [moreBusy, setMoreBusy] = useState(false);
-  const [error, setError] = useState('');
-
-  const buildQuery = (cursorValue: string) =>
-    `/api/tos/tutors${search ? `?search=${encodeURIComponent(search)}${cursorValue ? `&cursor=${encodeURIComponent(cursorValue)}` : ''}` : (cursorValue ? `?cursor=${encodeURIComponent(cursorValue)}` : '')}`;
-
-  const load = useCallback(async () => {
-    setLoading(true); setError('');
-    try {
-      const d = await api(buildQuery(''));
-      setRows(d.tutors || []);
-      setNextCursor(d.nextCursor || '');
-    } catch (e: any) { setError(e.message); } finally { setLoading(false); }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search]);
-
-  useEffect(() => { load(); }, []);
-
-  const more = async () => {
-    if (!nextCursor) return;
-    setMoreBusy(true); setError('');
-    try {
-      const d = await api(buildQuery(nextCursor));
-      setRows((prev) => [...prev, ...(d.tutors || [])]);
-      setNextCursor(d.nextCursor || '');
-    } catch (e: any) { setError(e.message); } finally { setMoreBusy(false); }
-  };
-
-  return (
-    <div className="space-y-4">
-      <DirectorySearchBar
-        value={search}
-        onChange={setSearch}
-        onSearch={load}
-        placeholder="Search by name, email or phone"
-      />
-      {error && <p className="text-rose-300 text-sm">{error}</p>}
-      {loading ? <LoadingRow /> : rows.length === 0 ? (
-        <Card><p className="text-slate-400 text-sm">No tutors found across the platform yet.</p></Card>
-      ) : (
-        <>
-          <div className="space-y-2">
-            {rows.map((t) => (
-              <div key={t.key} className="bg-slate-900/70 border border-white/10 rounded-2xl p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-white font-bold">{t.name || 'Unnamed tutor'}</p>
-                    <p className="text-xs text-slate-400 mt-1">
-                      {t.email || 'No email on record'}{t.phone ? ` · ${t.phone}` : ''}
-                    </p>
-                    <p className="text-[11px] text-slate-500 mt-1">
-                      Works for {(t.centres || []).length
-                        ? t.centres.map((c: any) => `${c.name}${c.status && c.status !== 'Active' ? ` (${String(c.status).toLowerCase()})` : ''}`).join(', ')
-                        : 'no centre on record'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-          <LoadMore onClick={more} busy={moreBusy} hidden={!nextCursor} />
-        </>
-      )}
-    </div>
-  );
-};
-
 const PEOPLE_TYPES = [
   { id: 'students', label: 'Students' },
   { id: 'tutors', label: 'Tutors' },
   { id: 'admins', label: 'Admins' },
   { id: 'owners', label: 'Owners' },
 ] as const;
+
+const VISIBLE_ROWS = 8;
+const MAX_MEMBERS = 500;
+
+const ACTION_COPY: Record<string, string> = {
+  suspend: 'loses access until restored.',
+  restore: 'gets their access back.',
+  remove: 'loses access to this centre. Their record stays on file.',
+  delete: 'is removed from this centre completely. This cannot be undone.',
+};
 
 export const CentrePeople: React.FC<{ centreId: string }> = ({ centreId }) => {
   const [type, setType] = useState<string>('students');
@@ -304,59 +54,149 @@ export const CentrePeople: React.FC<{ centreId: string }> = ({ centreId }) => {
   const [nextCursor, setNextCursor] = useState('');
   const [loading, setLoading] = useState(true);
   const [moreBusy, setMoreBusy] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [error, setError] = useState('');
+  const [busyKey, setBusyKey] = useState('');
+  const [pending, setPending] = useState<{ role: string; item: any; action: string } | null>(null);
 
-  const load = useCallback(async (t: string, cursorValue: string, append: boolean) => {
-    if (append) setMoreBusy(true); else setLoading(true);
-    setError('');
-    try {
-      const d = await api(`/api/tos/centres/${centreId}/people?type=${t}${cursorValue ? `&cursor=${encodeURIComponent(cursorValue)}` : ''}`);
-      setItems((prev) => (append ? [...prev, ...(d.items || [])] : (d.items || [])));
-      setNextCursor(d.nextCursor || '');
-      if (!append) { setCounts(d.counts || null); setSeats(d.seats || null); }
-    } catch (e: any) { setError(e.message); } finally { setLoading(false); setMoreBusy(false); }
+  const fetchPage = useCallback(async (t: string, cursorValue: string, append: boolean) => {
+    const d = await api(`/api/tos/centres/${centreId}/people?type=${t}&pageSize=100${cursorValue ? `&cursor=${encodeURIComponent(cursorValue)}` : ''}`);
+    if (!append) {
+      setItems((d.items || []).slice(0, MAX_MEMBERS));
+      setCounts(d.counts || null);
+      setSeats(d.seats || null);
+    } else {
+      setItems((prev) => [...prev, ...(d.items || [])].slice(0, MAX_MEMBERS));
+    }
+    setNextCursor(d.nextCursor || '');
   }, [centreId]);
 
-  useEffect(() => { load(type, '', false); }, [type, load]);
+  const load = useCallback(async (t: string) => {
+    setLoading(true); setError('');
+    try { await fetchPage(t, '', false); }
+    catch (e: any) { setError(e.message); }
+    finally { setLoading(false); }
+  }, [fetchPage]);
 
+  useEffect(() => { load(type); }, [type, load]);
+
+  const switchType = (t: string) => { setType(t); setExpanded(false); setPending(null); };
+
+  // "See the rest": pull every remaining page of this people type at once.
+  const seeAll = async () => {
+    setExpanded(true);
+    setMoreBusy(true); setError('');
+    try {
+      let cursor = nextCursor;
+      let guard = 0;
+      while (cursor && guard < 10) {
+        const d = await api(`/api/tos/centres/${centreId}/people?type=${type}&pageSize=100&cursor=${encodeURIComponent(cursor)}`);
+        setItems((prev) => [...prev, ...(d.items || [])].slice(0, MAX_MEMBERS));
+        cursor = d.nextCursor || '';
+        setNextCursor(cursor);
+        guard += 1;
+      }
+    } catch (e: any) { setError(e.message); }
+    finally { setMoreBusy(false); }
+  };
+
+  const runAction = async (role: string, item: any, action: string) => {
+    setBusyKey(`${item.uid || item.id}:${action}`);
+    setError('');
+    try {
+      await api(`/api/tos/centres/${centreId}/members/action`, {
+        method: 'POST',
+        body: { role, uid: item.uid || '', docId: item.id || '', action },
+      });
+      setPending(null);
+      await load(type);
+    } catch (e: any) { setError(e.message); }
+    finally { setBusyKey(''); }
+  };
+
+  const memberName = (item: any) => item.name || (type === 'students' ? 'Unnamed student' : 'Name not on record');
   const renderRow = (item: any) => {
+    const uid = item.uid || '';
+    const docId = item.id || '';
+    const busy = busyKey !== '';
     if (type === 'students') {
       return (
-        <>
-          <div className="flex items-center gap-2.5 flex-wrap">
-            <p className="text-white font-bold">{item.name || 'Unnamed student'}</p>
-            <StatusPill status={item.seatStatus} labels={SEAT_STATUS_LABELS} styles={SEAT_STATUS_STYLES} />
-          </div>
-          <p className="text-xs text-slate-400 mt-1">
-            {item.email || 'No email on record'}{item.phone ? ` · ${item.phone}` : ''}
-            {item.registrationDate ? ` · enrolled ${fmtDate(item.registrationDate)}` : ''}
-          </p>
-        </>
+        <tr key={uid || docId} className="border-t border-white/5">
+          <td className="py-2.5 pr-3"><span className="text-white font-semibold">{memberName(item)}</span></td>
+          <td className="py-2.5 pr-3 text-xs text-slate-400">{item.email || '—'}{item.phone ? ` · ${item.phone}` : ''}</td>
+          <td className="py-2.5 pr-3"><StatusPill status={item.seatStatus} labels={SEAT_STATUS_LABELS} styles={SEAT_STATUS_STYLES} /></td>
+          <td className="py-2.5 pr-3 text-xs text-slate-400">{item.registrationDate ? fmtDate(item.registrationDate) : '—'}</td>
+          <td className="py-2.5 text-right">
+            {uid ? (
+              <div className="flex items-center justify-end gap-1.5">
+                {item.seatStatus === 'active' ? (
+                  <button onClick={() => setPending({ role: 'student', item, action: 'suspend' })} disabled={busy} className="px-2.5 py-1.5 rounded-lg border border-white/10 text-[11px] font-bold text-slate-300 hover:border-amber-500/40 hover:text-amber-300 disabled:opacity-40" title="Suspend access">Suspend</button>
+                ) : (
+                  <button onClick={() => setPending({ role: 'student', item, action: 'restore' })} disabled={busy} className="px-2.5 py-1.5 rounded-lg border border-white/10 text-[11px] font-bold text-slate-300 hover:border-emerald-500/40 hover:text-emerald-300 disabled:opacity-40" title="Restore access">Restore</button>
+                )}
+                <button onClick={() => setPending({ role: 'student', item, action: 'remove' })} disabled={busy} className="px-2.5 py-1.5 rounded-lg border border-white/10 text-[11px] font-bold text-slate-300 hover:border-orange-500/40 hover:text-orange-300 disabled:opacity-40" title="Revoke access, keep the record">Remove</button>
+                <button onClick={() => setPending({ role: 'student', item, action: 'delete' })} disabled={busy} className="px-2.5 py-1.5 rounded-lg border border-white/10 text-[11px] font-bold text-rose-300 hover:border-rose-500/40 disabled:opacity-40" title="Delete completely">Delete</button>
+              </div>
+            ) : <span className="text-slate-600 text-xs">—</span>}
+          </td>
+        </tr>
       );
     }
     if (type === 'tutors') {
       return (
-        <>
-          <p className="text-white font-bold">{item.name || 'Unnamed tutor'}</p>
-          <p className="text-xs text-slate-400 mt-1">
-            {item.email || 'No email on record'}{item.phone ? ` · ${item.phone}` : ''}
-          </p>
-        </>
+        <tr key={docId} className="border-t border-white/5">
+          <td className="py-2.5 pr-3"><span className="text-white font-semibold">{memberName(item)}</span></td>
+          <td className="py-2.5 pr-3 text-xs text-slate-400">{item.email || '—'}{item.phone ? ` · ${item.phone}` : ''}</td>
+          <td className="py-2.5 pr-3"><span className={`text-[11px] font-bold ${item.status === 'Suspended' ? 'text-rose-300' : 'text-emerald-300'}`}>{item.status || '—'}</span></td>
+          <td className="py-2.5 text-right">
+            {docId ? (
+              <div className="flex items-center justify-end gap-1.5">
+                {item.status === 'Suspended' ? (
+                  <button onClick={() => setPending({ role: 'tutor', item, action: 'restore' })} disabled={busy} className="px-2.5 py-1.5 rounded-lg border border-white/10 text-[11px] font-bold text-slate-300 hover:border-emerald-500/40 hover:text-emerald-300 disabled:opacity-40">Restore</button>
+                ) : (
+                  <button onClick={() => setPending({ role: 'tutor', item, action: 'suspend' })} disabled={busy} className="px-2.5 py-1.5 rounded-lg border border-white/10 text-[11px] font-bold text-slate-300 hover:border-amber-500/40 hover:text-amber-300 disabled:opacity-40">Suspend</button>
+                )}
+                <button onClick={() => setPending({ role: 'tutor', item, action: 'delete' })} disabled={busy} className="px-2.5 py-1.5 rounded-lg border border-white/10 text-[11px] font-bold text-rose-300 hover:border-rose-500/40 disabled:opacity-40" title="Remove from the centre">Delete</button>
+              </div>
+            ) : <span className="text-slate-600 text-xs">—</span>}
+          </td>
+        </tr>
       );
     }
+    const isOwner = item.status === 'owner of record';
     return (
-      <>
-        <div className="flex items-center gap-2.5 flex-wrap">
-          <p className="text-white font-bold">{item.name || 'Name not on record'}</p>
-          {item.status && <StatusPill status={item.status === 'owner of record' ? 'unknown' : item.status} labels={item.status === 'owner of record' ? { unknown: 'Owner of record' } : SEAT_STATUS_LABELS} styles={SEAT_STATUS_STYLES} />}
-        </div>
-        <p className="text-xs text-slate-400 mt-1">
-          {item.email || 'No email on record'}{item.phone ? ` · ${item.phone}` : ''}
-          {item.lastSignInTime ? ` · last sign-in ${fmtDateTime(item.lastSignInTime)}` : ''}
-        </p>
-      </>
+      <tr key={uid || docId} className="border-t border-white/5">
+        <td className="py-2.5 pr-3"><span className="text-white font-semibold">{memberName(item)}</span></td>
+        <td className="py-2.5 pr-3 text-xs text-slate-400">{item.email || '—'}{item.phone ? ` · ${item.phone}` : ''}</td>
+        <td className="py-2.5 pr-3">
+          {isOwner
+            ? <StatusPill status="unknown" labels={{ unknown: 'Owner of record' }} styles={SEAT_STATUS_STYLES} />
+            : <span className={`text-[11px] font-bold ${item.status === 'Suspended' ? 'text-rose-300' : 'text-emerald-300'}`}>{item.status || '—'}</span>}
+        </td>
+        <td className="py-2.5 pr-3 text-xs text-slate-400">{item.lastSignInTime ? fmtDateTime(item.lastSignInTime) : 'never'}</td>
+        <td className="py-2.5 text-right">
+          {!isOwner && uid ? (
+            <div className="flex items-center justify-end gap-1.5">
+              {item.status === 'Suspended' ? (
+                <button onClick={() => setPending({ role: 'admin', item, action: 'restore' })} disabled={busy} className="px-2.5 py-1.5 rounded-lg border border-white/10 text-[11px] font-bold text-slate-300 hover:border-emerald-500/40 hover:text-emerald-300 disabled:opacity-40">Restore</button>
+              ) : (
+                <button onClick={() => setPending({ role: 'admin', item, action: 'suspend' })} disabled={busy} className="px-2.5 py-1.5 rounded-lg border border-white/10 text-[11px] font-bold text-slate-300 hover:border-amber-500/40 hover:text-amber-300 disabled:opacity-40">Suspend</button>
+              )}
+              <button onClick={() => setPending({ role: 'admin', item, action: 'delete' })} disabled={busy} className="px-2.5 py-1.5 rounded-lg border border-white/10 text-[11px] font-bold text-rose-300 hover:border-rose-500/40 disabled:opacity-40" title="Remove this admin from the centre">Delete</button>
+            </div>
+          ) : <span className="text-slate-600 text-xs">—</span>}
+        </td>
+      </tr>
     );
   };
+
+  const shown = expanded ? items : items.slice(0, VISIBLE_ROWS);
+  const canSeeAll = !expanded && (items.length > VISIBLE_ROWS || nextCursor !== '');
+  const columns = type === 'students'
+    ? ['Name', 'Contact', 'Seat', 'Enrolled', '']
+    : type === 'tutors'
+      ? ['Name', 'Contact', 'Status', '']
+      : ['Name', 'Contact', 'Status', 'Last sign-in', ''];
 
   return (
     <div className="space-y-3">
@@ -377,7 +217,7 @@ export const CentrePeople: React.FC<{ centreId: string }> = ({ centreId }) => {
         {PEOPLE_TYPES.map((t) => (
           <button
             key={t.id}
-            onClick={() => setType(t.id)}
+            onClick={() => switchType(t.id)}
             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors ${type === t.id ? 'bg-orange-500/15 text-orange-300 border border-orange-500/30' : 'text-slate-400 hover:text-white border border-transparent'}`}
           >
             {t.label}
@@ -388,16 +228,50 @@ export const CentrePeople: React.FC<{ centreId: string }> = ({ centreId }) => {
       {loading ? <LoadingRow /> : items.length === 0 ? (
         <p className="text-slate-500 text-sm">Nothing recorded here yet.</p>
       ) : (
-        <>
-          <div className="space-y-2">
-            {items.map((item: any, i: number) => (
-              <div key={item.id || item.uid || i} className="bg-slate-950/50 border border-white/5 rounded-xl px-3.5 py-2.5">
-                {renderRow(item)}
-              </div>
-            ))}
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-[10px] uppercase tracking-wider text-slate-500">
+                {columns.map((c, i) => <th key={i} className={`py-2 pr-3 font-bold ${i === columns.length - 1 ? 'text-right' : ''}`}>{c}</th>)}
+              </tr>
+            </thead>
+            <tbody>{shown.map(renderRow)}</tbody>
+          </table>
+          <div className="flex justify-center pt-3">
+            {canSeeAll && (
+              <button onClick={seeAll} disabled={moreBusy} className={btnGhost}>
+                {moreBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                See the rest ({(counts?.[type] ?? items.length) > items.length ? `${counts?.[type]} ` : ''}members)
+              </button>
+            )}
           </div>
-          <LoadMore onClick={() => load(type, nextCursor, true)} busy={moreBusy} hidden={!nextCursor} />
-        </>
+        </div>
+      )}
+
+      {pending && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setPending(null)}>
+          <div className="bg-slate-900 border border-white/10 rounded-3xl p-6 max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between gap-3 mb-2">
+              <h3 className="text-white font-bold capitalize">
+                {pending.action} {memberName(pending.item)}?
+              </h3>
+              <button onClick={() => setPending(null)} className="text-slate-500 hover:text-white"><X className="w-4 h-4" /></button>
+            </div>
+            <p className="text-slate-400 text-xs leading-relaxed">
+              {memberName(pending.item)} {ACTION_COPY[pending.action] || ''}
+            </p>
+            <div className="flex gap-2 mt-5">
+              <button onClick={() => setPending(null)} className={`${btnGhost} flex-1`}>Cancel</button>
+              <button
+                onClick={() => runAction(pending.role, pending.item, pending.action)}
+                disabled={busyKey !== ''}
+                className={`flex-1 inline-flex items-center justify-center px-4 py-2.5 rounded-xl ${pending.action === 'delete' ? 'bg-rose-600 hover:bg-rose-500' : 'bg-orange-600 hover:bg-orange-500'} disabled:opacity-50 text-white font-bold text-sm`}
+              >
+                {busyKey !== '' ? <Loader2 className="w-4 h-4 animate-spin" /> : `${pending.action.charAt(0).toUpperCase()}${pending.action.slice(1)}`}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

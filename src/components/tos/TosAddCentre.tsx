@@ -21,7 +21,7 @@ export const AddCentreModal: React.FC<{ onClose: () => void; onCreated: (centreI
   const [plans, setPlans] = useState<any[]>([]);
   const [form, setForm] = useState({
     businessName: '', fullName: '', email: '', phone: '', state: '', city: '',
-    planId: '', skipTrial: false, accessCode: '', tempPassword: '',
+    planId: '', skipTrial: false, tempPassword: '',
   });
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -55,8 +55,7 @@ export const AddCentreModal: React.FC<{ onClose: () => void; onCreated: (centreI
     form.fullName.trim().length >= 2 &&
     /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(form.email.trim()) &&
     form.phone.replace(/\D/g, '').length >= 7 &&
-    form.tempPassword.length >= 10 &&
-    (form.accessCode === '' || /^\d{6}$/.test(form.accessCode));
+    form.tempPassword.length >= 10;
 
   const submit = async () => {
     setBusy(true);
@@ -148,9 +147,7 @@ export const AddCentreModal: React.FC<{ onClose: () => void; onCreated: (centreI
                 <input type="checkbox" checked={form.skipTrial} onChange={(e) => set('skipTrial', e.target.checked)} className="accent-orange-500 w-4 h-4" />
                 Skip the trial (students wait for the first payment)
               </label>
-              <Field label="Access code (leave blank to generate one)">
-                <input value={form.accessCode} onChange={(e) => set('accessCode', e.target.value.replace(/\D/g, '').slice(0, 6))} className={inputCls} inputMode="numeric" placeholder="6 digits" />
-              </Field>
+              <p className="text-[11px] text-slate-500">The access code is generated automatically, so there is never a mix-up between centres.</p>
               <Field label="Temporary password">
                 <div className="flex items-center gap-2">
                   <input value={form.tempPassword} onChange={(e) => set('tempPassword', e.target.value)} className={`${inputCls} font-mono`} autoComplete="off" />

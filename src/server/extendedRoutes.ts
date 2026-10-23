@@ -23,7 +23,7 @@ import {
   resendCredentials,
   runBillingSweep,
 } from './provisioning';
-import { loadBillingMap, registerTosRoutes2 } from './tosRoutes2';
+import { deleteCentreCascade, loadBillingMap, registerTosRoutes2 } from './tosRoutes2';
 
 /**
  * Prompt C routes: public lead capture and verification, the TOS platform
@@ -644,6 +644,12 @@ export function registerExtendedRoutes(app: express.Express): void {
         if (!reason) return res.status(400).json({ error: 'A reason is required.' });
         await cRef.update({ status: 'suspended', suspendedReason: reason });
         await audit({ actorUid: caller.uid, centreId: req.params.id, action: 'CENTRE_SUSPENDED', after: { reason } });
+        return res.json({ success: true });
+      }
+      if (type === 'delete-centre') {
+        const reason = String(req.body?.reason || '').trim().slice(0, 300);
+        if (!reason) return res.status(400).json({ error: 'A reason is required to delete a centre.' });
+        await deleteCentreCascade(req.params.id, caller.uid, reason);
         return res.json({ success: true });
       }
       if (type === 'reactivate') {

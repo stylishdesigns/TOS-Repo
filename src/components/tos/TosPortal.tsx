@@ -3,13 +3,13 @@ import { getAuth, signOut, updateProfile, updatePassword, reauthenticateWithCred
 import {
   LayoutDashboard, Users, Building2, Wallet, ScrollText, UserPlus, Loader2,
   RefreshCw, Send, Ban, CheckCircle2, PlayCircle, Check, Plus, ShieldCheck,
-  Clock, ArrowUpRight, Lock, UserRound, GraduationCap,
+  Clock, ArrowUpRight, Lock, UserRound,
 } from 'lucide-react';
 import {
   api, fmtDate, fmtDateTime, LEAD_STATUS_LABELS, STATUS_STYLES, Json,
   StatusPill, Card, Field, inputCls, btnPrimary, btnGhost, CredentialsModal,
 } from './tosShared';
-import { OwnersTab, StudentsTab, TutorsTab } from './TosDirectory';
+import { CentrePeople } from './TosDirectory';
 import { CentresTab } from './TosCentres';
 
 /**
@@ -656,9 +656,6 @@ const TABS = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
   { id: 'leads', label: 'Leads', icon: UserPlus },
   { id: 'centres', label: 'Centres', icon: Building2 },
-  { id: 'owners', label: 'Owners', icon: UserRound },
-  { id: 'students', label: 'Students', icon: GraduationCap },
-  { id: 'tutors', label: 'Tutors', icon: Users },
   { id: 'plans', label: 'Plans', icon: Wallet },
   { id: 'audit', label: 'Audit log', icon: ScrollText },
   { id: 'team', label: 'Team', icon: Users },
@@ -677,6 +674,16 @@ export const TosPortal: React.FC = () => {
     };
     window.addEventListener('tos-open-centre', handler);
     return () => window.removeEventListener('tos-open-centre', handler);
+  }, []);
+
+  // The TC dashboards stream live through Firestore listeners; the console's
+  // data goes through the server for security, so it refreshes itself on a
+  // short cadence instead. Only while the tab is actually visible.
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') setRefreshKey((k) => k + 1);
+    }, 15000);
+    return () => window.clearInterval(timer);
   }, []);
 
   // With the console as the default screen for platform staff, this button
@@ -732,9 +739,6 @@ export const TosPortal: React.FC = () => {
             {tab === 'overview' && 'Everything happening across the platform right now.'}
             {tab === 'leads' && 'Sign-ups from the public site. Verify, provision, or decline.'}
             {tab === 'centres' && 'Every centre, its plan, seats, billing and access code.'}
-            {tab === 'owners' && 'Every centre owner across the platform, with their last sign-in.'}
-            {tab === 'students' && 'Every enrolled student across all centres. Filter by centre or seat status.'}
-            {tab === 'tutors' && 'Every tutor across all centres, and the centres they work for.'}
             {tab === 'plans' && 'Pricing, caps and feature flags. All stored as data.'}
             {tab === 'audit' && 'Every privileged action, recorded.'}
             {tab === 'team' && 'The people who run the platform.'}
@@ -745,9 +749,6 @@ export const TosPortal: React.FC = () => {
         {tab === 'overview' && <OverviewTab onOpenCentre={(id) => { setOpenCentreId(id); setTab('centres'); }} refreshKey={refreshKey} onDataLoaded={() => setRefreshKey((k) => k)} />}
         {tab === 'leads' && <LeadsTab refreshKey={refreshKey} />}
         {tab === 'centres' && <CentresTab refreshKey={refreshKey} openCentreId={openCentreId} onClearOpenCentre={() => setOpenCentreId('')} onDataChanged={() => setRefreshKey((k) => k + 1)} />}
-        {tab === 'owners' && <OwnersTab />}
-        {tab === 'students' && <StudentsTab />}
-        {tab === 'tutors' && <TutorsTab />}
         {tab === 'plans' && <PlansTab />}
         {tab === 'audit' && <AuditTab />}
         {tab === 'team' && <TeamTab />}

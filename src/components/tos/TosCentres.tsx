@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   Loader2, ChevronLeft, AlertTriangle, Send, Ban, RefreshCw,
-  Copy, Wallet, CheckCircle2, Plus,
+  Copy, Wallet, CheckCircle2, Plus, Trash2,
 } from 'lucide-react';
 import {
   api, money, fmtDate, fmtDateTime, STATUS_LABELS, Json,
@@ -24,8 +24,10 @@ const CentreDetail: React.FC<{ centreId: string; onBack: () => void; onDataChang
   const [actionError, setActionError] = useState('');
   const [credentials, setCredentials] = useState<any | null>(null);
   const [ownerNote, setOwnerNote] = useState('');
-  const [newCode, setNewCode] = useState('');
   const [confirmCode, setConfirmCode] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleteName, setDeleteName] = useState('');
+  const [deleteReason, setDeleteReason] = useState('');
   const [confirmStatus, setConfirmStatus] = useState<'' | 'suspend' | 'reactivate'>('');
   const [reason, setReason] = useState('');
   const [payment, setPayment] = useState({ amount: '', periodEnd: '', method: '', reference: '', note: '' });
@@ -65,18 +67,18 @@ const CentreDetail: React.FC<{ centreId: string; onBack: () => void; onDataChang
     }
   };
 
-  // Prompt F item 3: set a specific access code for this centre (separate
-  // endpoint; the old code stops working and the owner is notified).
-  const setAccessCodeNow = async () => {
-    setBusy('set-access-code');
+  // Centre deletion: platform-only action, confirmed by typing the centre
+  // name and giving a reason. The whole centre leaves the platform.
+  const deleteCentreNow = async () => {
+    setBusy('delete-centre');
     setActionError('');
     try {
-      await api(`/api/tos/centres/${centreId}/access-code`, { method: 'POST', body: { code: newCode } });
-      setNewCode('');
-      await load();
+      await api(`/api/tos/centres/${centreId}/action`, { method: 'POST', body: { type: 'delete-centre', reason: deleteReason } });
+      setConfirmDelete(false);
       onDataChanged();
+      onBack();
     } catch (e: any) {
-      setActionError(e.message || 'Could not set the access code.');
+      setActionError(e.message || 'Could not delete the centre.');
     } finally {
       setBusy('');
     }
@@ -85,7 +87,7 @@ const CentreDetail: React.FC<{ centreId: string; onBack: () => void; onDataChang
   if (error) return <div><button onClick={onBack} className="text-orange-300 text-sm mb-3 inline-flex items-center gap-1.5"><ChevronLeft className="w-4 h-4" /> All centres</button><p className="text-rose-300 text-sm">{error}</p></div>;
   if (!data) return <div className="flex items-center gap-2 text-slate-400 text-sm py-10 justify-center"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</div>;
 
-  const { centre, billing, payments, audit } = data;
+  const { centre, billing, payments } = data;
   const status = centre.billingStatus || centre.status;
 
   return (
@@ -200,6 +202,9 @@ const CentreDetail: React.FC<{ centreId: string; onBack: () => void; onDataChang
                 </button>
               )}
             </div>
+              <button onClick={() => { setConfirmDelete(true); setDeleteName(''); setDeleteReason(''); }} disabled={busy !== ''} className={btnGhost}>
+                <Trash2 className="w-4 h-4 text-rose-400" /> Delete centre
+              </button>
           </div>
         </Card>
 
@@ -211,16 +216,7 @@ const CentreDetail: React.FC<{ centreId: string; onBack: () => void; onDataChang
             </div>
             <p className="text-xs text-slate-500">Staff and students join with this code. Regenerating invalidates the old code immediately; existing members stay signed in, and the owner is notified.</p>
             <button onClick={() => setConfirmCode(true)} disabled={busy !== ''} className={btnGhost}><RefreshCw className="w-4 h-4" /> Generate a new code</button>
-            <div className="flex items-end gap-2 pt-1">
-              <div className="flex-1 min-w-0">
-                <Field label="Set a specific code (6 digits)">
-                  <input value={newCode} onChange={(e) => setNewCode(e.target.value.replace(/\D/g, '').slice(0, 6))} className={inputCls} inputMode="numeric" placeholder="e.g. 123456" />
-                </Field>
-              </div>
-              <button onClick={setAccessCodeNow} disabled={busy !== '' || !/^\d{6}$/.test(newCode)} className={btnPrimary}>
-                {busy === 'set-access-code' ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Set code'}
-              </button>
-            </div>
+            <p className="text-[11px] text-slate-500">Codes are system-generated only, so there is never a mix-up between centres.</p>
           </div>
         </Card>
 
@@ -270,18 +266,6 @@ const CentreDetail: React.FC<{ centreId: string; onBack: () => void; onDataChang
         <CentrePeople centreId={centreId} />
       </Card>
 
-      <Card title="Centre audit trail">
-        <div className="space-y-1.5">
-          {(audit || []).map((e: any) => (
-            <div key={e.id} className="flex flex-wrap items-center justify-between gap-2 text-xs bg-slate-950/50 border border-white/5 rounded-xl px-3.5 py-2">
-              <span className="font-bold text-white">{String(e.action || '').replace(/_/g, ' ')}</span>
-              <span className="text-slate-500">{fmtDateTime(e.at)} · {e.actorUid || ''}</span>
-            </div>
-          ))}
-          {!(audit || []).length && <p className="text-slate-500 text-xs">Nothing recorded for this centre yet.</p>}
-        </div>
-      </Card>
-
       {credentials && <CredentialsModal details={credentials} onClose={() => setCredentials(null)} />}
 
       {confirmCode && (
@@ -311,6 +295,38 @@ const CentreDetail: React.FC<{ centreId: string; onBack: () => void; onDataChang
             setConfirmStatus('');
           }}
         />
+      )}
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setConfirmDelete(false)}>
+          <div className="bg-slate-900 border border-rose-500/30 rounded-3xl p-6 max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start gap-3 mb-3">
+              <div className="w-9 h-9 rounded-xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center shrink-0"><AlertTriangle className="w-4.5 h-4.5 text-rose-400" /></div>
+              <h3 className="text-white font-bold pt-1">Delete {centre.name}?</h3>
+            </div>
+            <p className="text-slate-400 text-xs leading-relaxed">
+              The centre, its people records, exams, timetable, results, attendance, ratings, programmes, subjects, billing, payments, settings and access codes are all removed. This cannot be undone. Type the centre name to confirm, and add a reason for the record.
+            </p>
+            <div className="mt-3 space-y-2">
+              <Field label="Type the centre name to confirm">
+                <input value={deleteName} onChange={(e) => setDeleteName(e.target.value)} className={inputCls} placeholder={centre.name} />
+              </Field>
+              <Field label="Reason">
+                <input value={deleteReason} onChange={(e) => setDeleteReason(e.target.value)} className={inputCls} />
+              </Field>
+            </div>
+            {actionError && <p className="text-rose-300 text-xs mt-2">{actionError}</p>}
+            <div className="flex gap-2 mt-5">
+              <button onClick={() => setConfirmDelete(false)} className={`${btnGhost} flex-1`}>Cancel</button>
+              <button
+                onClick={deleteCentreNow}
+                disabled={busy !== '' || deleteName !== centre.name || !deleteReason.trim()}
+                className="flex-1 inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white font-bold text-sm"
+              >
+                {busy === 'delete-centre' ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Delete permanently'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -401,25 +417,35 @@ export const CentresTab: React.FC<{ refreshKey: number; openCentreId: string; on
       ) : shown.length === 0 ? (
         <Card><p className="text-slate-400 text-sm">No centres match. New centres appear here the moment they are provisioned.</p></Card>
       ) : (
-        <div className="space-y-2">
-          {shown.map((c) => (
-            <button key={c.id} onClick={() => setSelected(c.id)} className="w-full text-left bg-slate-900/70 border border-white/10 rounded-2xl p-4 hover:border-orange-500/40 transition-colors">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2.5 flex-wrap">
+        <div className="bg-slate-900/70 border border-white/10 rounded-2xl overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-[10px] uppercase tracking-wider text-slate-500">
+                <th className="px-4 py-3 font-bold">Centre</th>
+                <th className="px-4 py-3 font-bold">Status</th>
+                <th className="px-4 py-3 font-bold">Plan</th>
+                <th className="px-4 py-3 font-bold">Seats</th>
+                <th className="px-4 py-3 font-bold">Created</th>
+                <th className="px-4 py-3"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {shown.map((c) => (
+                <tr key={c.id} onClick={() => setSelected(c.id)} className="border-t border-white/5 hover:bg-white/[0.03] cursor-pointer transition-colors">
+                  <td className="px-4 py-3">
                     <p className="text-white font-bold">{c.name}</p>
-                    <StatusPill status={c.billingStatus} />
-                    {c.credentialsNotDelivered && <span className="inline-flex items-center gap-1 text-[11px] text-amber-300"><AlertTriangle className="w-3 h-3" /> credentials undelivered</span>}
-                  </div>
-                  <p className="text-xs text-slate-400 mt-1">{c.ownerEmail || 'no owner email'}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-xs text-slate-300 font-semibold">{c.seatsUsed ?? 0} / {c.seatCap ?? '—'} seats</p>
-                  <p className="text-[11px] text-slate-500">{c.planId ? c.planId.replace('centre_', 'Centre ').replace('_', ' ') : 'no plan'}{c.trialEndsAt && c.billingStatus === 'trial' ? ` · trial ends ${fmtDate(c.trialEndsAt)}` : ''}</p>
-                </div>
-              </div>
-            </button>
-          ))}
+                    <p className="text-xs text-slate-500">{c.ownerEmail || 'no owner email'}</p>
+                    {c.credentialsNotDelivered && <span className="inline-flex items-center gap-1 text-[11px] text-amber-300 mt-0.5"><AlertTriangle className="w-3 h-3" /> credentials undelivered</span>}
+                  </td>
+                  <td className="px-4 py-3"><StatusPill status={c.billingStatus} /></td>
+                  <td className="px-4 py-3 text-xs text-slate-300">{c.planId ? c.planId.replace('centre_', 'Centre ').replace('_', ' ') : 'no plan'}{c.trialEndsAt && c.billingStatus === 'trial' ? <span className="block text-slate-500">trial ends {fmtDate(c.trialEndsAt)}</span> : null}</td>
+                  <td className="px-4 py-3 text-xs text-slate-300">{c.seatsUsed ?? 0} / {c.seatCap ?? '—'}</td>
+                  <td className="px-4 py-3 text-xs text-slate-500">{c.createdAt ? fmtDate(c.createdAt) : '—'}</td>
+                  <td className="px-4 py-3 text-right"><span className="text-[11px] font-bold text-orange-300">Open →</span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>

@@ -2,8 +2,8 @@ import express from 'express';
 import { adminAuth, adminDb } from './firebaseAdmin';
 import { FieldPath } from 'firebase-admin/firestore';
 import type { CollectionReference, Query, QueryDocumentSnapshot } from 'firebase-admin/firestore';
-import { Caller, effectiveStatus, getPlatformConfig, httpError } from './tenantService';
-import { normalizeEmail, provisionCentre, setAccessCode } from './provisioning';
+import { Caller, effectiveStatus, getPlatformConfig, httpError, toggleStudentAccessService } from './tenantService';
+import { normalizeEmail, provisionCentre } from './provisioning';
 
 /**
  * TOS console routes split out of extendedRoutes.ts: manual centre creation
@@ -165,12 +165,10 @@ export function registerTosRoutes2(app: express.Express): void {
       const planId = String(body.planId || '').trim() || undefined;
       const skipTrial = body.skipTrial === true;
       const tempPassword = String(body.tempPassword || '');
-      const accessCode = String(body.accessCode || '').trim();
       if (fullName.length < 2 || fullName.length > 100) return res.status(400).json({ error: 'Please give the owner full name.' });
       if (businessName.length < 2 || businessName.length > 120) return res.status(400).json({ error: 'Please give the centre name.' });
       if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return res.status(400).json({ error: 'That email address does not look right.' });
       if (phoneDigits.length < 7 || phoneDigits.length > 15) return res.status(400).json({ error: 'That phone number does not look right.' });
-      if (accessCode && !/^\d{6}$/.test(accessCode)) return res.status(400).json({ error: 'The access code must be exactly 6 digits, or left blank to generate one.' });
       // A manual centre starts from a fresh account so the temporary password
       // and the first-login lock apply. An email that already has an account
       // keeps that account's password, which would defeat the flow.
@@ -197,7 +195,6 @@ export function registerTosRoutes2(app: express.Express): void {
         actorUid: caller.uid,
         ...(planId ? { planId } : {}),
         ...(tempPassword ? { tempPassword } : {}),
-        ...(accessCode ? { preferredAccessCode: accessCode } : {}),
       });
       await audit({
         actorUid: caller.uid,
@@ -218,18 +215,6 @@ export function registerTosRoutes2(app: express.Express): void {
       if (error?.status) return res.status(error.status).json({ error: error.message });
       console.error('[tos/centres] create failed:', error?.message || error);
       res.status(500).json({ error: 'Could not create the centre. Please try again.' });
-    }
-  });
-
-  app.post('/api/tos/centres/:id/access-code', async (req, res) => {
-    try {
-      const caller = requireTos(req);
-      const result = await setAccessCode(req.params.id, String(req.body?.code || ''), caller.uid, 'tos');
-      return res.json({ success: true, accessCode: result.accessCode });
-    } catch (error: any) {
-      if (error?.status) return res.status(error.status).json({ error: error.message });
-      console.error('[tos/centres] access-code set failed:', error?.message || error);
-      res.status(500).json({ error: 'Could not set the access code.' });
     }
   });
 
@@ -550,5 +535,146 @@ export function registerTosRoutes2(app: express.Express): void {
       console.error('[tos/centre-people] failed:', error?.message || error);
       res.status(500).json({ error: 'Could not load the centre people.' });
     }
+  });
+
+  // ==========================================================================
+  // Centre member actions: the same powers a TC admin has over their people
+  // (suspend/restore, remove, delete), exercised by platform staff. The owner
+  // of record is always protected.
+  // ==========================================================================
+  app.post('/api/tos/centres/:id/members/action', async (req, res) => {
+    try {
+      const caller = requireTos(req);
+      const centreId = String(req.params.id || '');
+      const role = String(req.body?.role || '');
+      const action = String(req.body?.action || '');
+      const uid = String(req.body?.uid || '');
+      const docId = String(req.body?.docId || '') || uid;
+      if (!centreId) throw httpError(400, 'Centre is required.');
+      if (!['student', 'tutor', 'admin'].includes(role)) throw httpError(400, 'Unknown member type.');
+      if (!['suspend', 'restore', 'remove', 'delete'].includes(action)) throw httpError(400, 'Unknown action.');
+      const cDoc = await adminDb.collection('centres').doc(centreId).get();
+      if (!cDoc.exists) throw httpError(404, 'Centre not found.');
+
+      if (role === 'student') {
+        if (!uid) throw httpError(400, 'The member id is missing.');
+        if (action === 'suspend' || action === 'restore') {
+          const r = await toggleStudentAccessService({
+            actorUid: caller.uid,
+            actorEmail: caller.email,
+            studentUid: uid,
+            centreId,
+            active: action === 'restore',
+            tos: true,
+          });
+          return res.json({ success: true, ...(r || {}) });
+        }
+        const memRef = adminDb.collection('memberships').doc(`${uid}__${centreId}`);
+        const memDoc = await memRef.get();
+        if (!memDoc.exists) throw httpError(404, 'No membership found for that student in this centre.');
+        const wasActive = (memDoc.data() as any)?.status === 'active';
+        await adminDb.runTransaction(async (tx) => {
+          tx.delete(memRef);
+          if (wasActive) {
+            const bRef = adminDb.collection('centreBilling').doc(centreId);
+            const bDoc = await tx.get(bRef);
+            const used = Number((bDoc.data() as any)?.activeStudentCount ?? 0);
+            tx.set(bRef, { activeStudentCount: Math.max(0, used - 1) }, { merge: true });
+          }
+        });
+        if (action === 'delete' && docId) {
+          await adminDb.collection('students').doc(docId).delete()
+            .catch((e: any) => console.error('[tos members] student doc delete failed:', e?.message || e));
+        }
+        await audit({ actorUid: caller.uid, centreId, action: action === 'delete' ? 'STUDENT_DELETED' : 'STUDENT_MEMBERSHIP_REMOVED', after: { studentUid: uid, docId } });
+        return res.json({ success: true });
+      }
+
+      if (role === 'tutor') {
+        if (!docId) throw httpError(400, 'The member id is missing.');
+        const tRef = adminDb.collection('tutors').doc(docId);
+        const tDoc = await tRef.get();
+        if (!tDoc.exists) throw httpError(404, 'Tutor not found in this centre.');
+        if (action === 'suspend' || action === 'restore') {
+          await tRef.update({ status: action === 'suspend' ? 'Suspended' : 'Active', updatedAt: new Date().toISOString() });
+          await audit({ actorUid: caller.uid, centreId, action: action === 'suspend' ? 'TUTOR_SUSPENDED' : 'TUTOR_RESTORED', after: { tutorId: docId } });
+          return res.json({ success: true });
+        }
+        await tRef.delete();
+        await audit({ actorUid: caller.uid, centreId, action: 'TUTOR_REMOVED', after: { tutorId: docId } });
+        return res.json({ success: true });
+      }
+
+      // admins: the centre's owner of record cannot be touched here.
+      if (!uid) throw httpError(400, 'The member id is missing.');
+      const aRef = adminDb.collection('admins').doc(uid);
+      const aDoc = await aRef.get();
+      if (!aDoc.exists) throw httpError(404, 'Admin record not found in this centre.');
+      const aData = (aDoc.data() || {}) as any;
+      const roleText = `${String(aData?.role || '')} ${String(aData?.jobTitle || '')}`.toLowerCase();
+      if (roleText.includes('super administrator') || roleText.includes('super admin') || roleText.includes('owner')) {
+        throw httpError(403, 'The centre owner cannot be suspended or removed here.');
+      }
+      if (action === 'suspend' || action === 'restore') {
+        await aRef.update({ status: action === 'suspend' ? 'Suspended' : 'Active', updatedAt: new Date().toISOString() });
+        await audit({ actorUid: caller.uid, centreId, action: action === 'suspend' ? 'ADMIN_SUSPENDED' : 'ADMIN_RESTORED', after: { uid } });
+        return res.json({ success: true });
+      }
+      const memRef = adminDb.collection('memberships').doc(`${uid}__${centreId}`);
+      const memDoc = await memRef.get();
+      await aRef.delete();
+      if (memDoc.exists) await memRef.delete();
+      await audit({ actorUid: caller.uid, centreId, action: 'ADMIN_REMOVED', after: { uid } });
+      return res.json({ success: true });
+    } catch (error: any) {
+      if (error?.status) return res.status(error.status).json({ error: error.message });
+      console.error('[tos members] action failed:', error?.message || error);
+      res.status(500).json({ error: 'Action failed.' });
+    }
+  });
+}
+
+// ============================================================================
+// Centre deletion: removes the centre and everything that belongs to it (its
+// tagged data, memberships, billing, payments, settings and access codes).
+// Member sign-in accounts are kept; without a membership they can simply no
+// longer enter any centre. Every deletion is audited with its reason.
+// ============================================================================
+const CENTRE_DATA_COLLECTIONS = [
+  'students', 'tutors', 'cbt_exams', 'timetable', 'results',
+  'attendance_logs', 'classRatings', 'programmes', 'subjects',
+];
+
+export async function deleteCentreCascade(centreId: string, actorUid: string, reason: string): Promise<void> {
+  const cRef = adminDb.collection('centres').doc(centreId);
+  const cDoc = await cRef.get();
+  if (!cDoc.exists) throw httpError(404, 'Centre not found.');
+
+  const writer = adminDb.bulkWriter();
+  const wipeQuery = async (col: string): Promise<void> => {
+    for (;;) {
+      const snap = await adminDb.collection(col).where('centreId', '==', centreId).limit(400).get();
+      if (snap.empty) break;
+      snap.docs.forEach((d) => writer.delete(d.ref));
+      if (snap.size < 400) break;
+    }
+  };
+  for (const col of CENTRE_DATA_COLLECTIONS) await wipeQuery(col);
+  await wipeQuery('memberships');
+  await wipeQuery('billingPayments');
+  const codesSnap = await adminDb.collection('accessCodes').where('centreId', '==', centreId).get();
+  codesSnap.docs.forEach((d) => writer.delete(d.ref));
+  for (const suffix of ['global', 'attendance', 'cms']) {
+    writer.delete(adminDb.collection('centreSettings').doc(`${centreId}__${suffix}`));
+  }
+  writer.delete(adminDb.collection('centreBilling').doc(centreId));
+  await writer.close();
+  await cRef.delete();
+
+  await audit({
+    actorUid,
+    centreId,
+    action: 'CENTRE_DELETED',
+    after: { reason, name: String((cDoc.data() as any)?.name || '') },
   });
 }
