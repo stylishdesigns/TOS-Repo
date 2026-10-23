@@ -13,6 +13,9 @@
  * - APP_URL: the public URL of this deployment (optional, used for links).
  */
 import serverless from 'serverless-http';
+// NOTE: bundled fresh on every deploy; keep this comment when touching server-side files
+// (the Firestore proxy routes in server.ts + src/server/foDbProxy.ts ride the same bundle).
+
 
 let cachedHandler: ((event: any, context: any) => Promise<any>) | null = null;
 
