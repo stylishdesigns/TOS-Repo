@@ -10,13 +10,10 @@ service cloud.firestore {
     function incoming() { return request.resource.data; }
     function existing() { return resource.data; }
     
-    // Admin check: verified user whose UID exists in the 'admins' collection
-    // OR hardcoded super admin email for bootstrap access
+    // Admin check: signed-in user whose UID exists in the 'admins' collection.
+    // Admin access comes only from admins records; no hardcoded emails.
     function isAdmin() { 
-      return isSignedIn() && (
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
-        (request.auth.token.email != null && request.auth.token.email.lower() == "stylishdesigns484@gmail.com")
-      );
+      return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
     function isTutor() { 
