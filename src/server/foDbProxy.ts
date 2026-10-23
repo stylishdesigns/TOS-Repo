@@ -145,6 +145,68 @@ export function registerFoDbProxy(app: express.Express): void {
     }
   });
 
+  // 4. One-time centre tagging backfill (user-approved in chat Oct 23): adds
+  //    centreId ONLY to docs in a fixed allowlist of content collections whose
+  //    centreId field is entirely missing. Docs that already carry a centreId are
+  //    counted and skipped. Nothing is created, deleted, or renamed.
+  const TAGGABLE = ["students", "tutors", "cbt_exams", "timetable", "results", "attendance_logs", "classRatings", "programmes", "subjects"];
+  app.post("/api/internal/fs/tag-missing-centreid", async (req, res) => {
+    const body = (req.body || {}) as Record<string, unknown>;
+    const centreId = typeof body.centreId === "string" ? body.centreId : "";
+    if (!centreId || centreId.length > 128 || !ID_RE.test(centreId)) {
+      return reject(res, 400, "A valid centreId is required.");
+    }
+    try {
+      const perCollection: Record<string, unknown> = {};
+      for (const name of TAGGABLE) {
+        const snap = await adminDb.collection(name).limit(200).get();
+        let tagged = 0, already = 0;
+        const batch = adminDb.batch();
+        snap.forEach((d) => {
+          const data = (d.data() || {}) as Record<string, unknown>;
+          if (typeof data.centreId === "string" && data.centreId) { already++; return; }
+          batch.set(d.ref, { centreId }, { merge: true });
+          tagged++;
+        });
+        if (tagged > 0) await batch.commit();
+        perCollection[name] = { tagged, alreadyTagged: already, scanned: snap.size };
+      }
+      console.log(`[fo-db-proxy] tag-missing-centreid centre=${centreId} ${JSON.stringify(perCollection)}`);
+      res.json({ ok: true, centreId, perCollection });
+    } catch (err: any) {
+      console.error(`[fo-db-proxy] tag-missing-centreid failed:`, err?.message || err);
+      reject(res, 500, "The tagging backfill failed on the server.");
+    }
+  });
+
+  // 5. Remove exactly one membership, by the doc id {uid}__{centreId}. Refuses a
+  //    missing doc and refuses to delete an owner membership.
+  app.post("/api/internal/fs/remove-membership", async (req, res) => {
+    const body = (req.body || {}) as Record<string, unknown>;
+    const uid = typeof body.uid === "string" ? body.uid : "";
+    const centreId = typeof body.centreId === "string" ? body.centreId : "";
+    if (!uid || uid.length > 128 || !ID_RE.test(uid) || !centreId || centreId.length > 128 || !ID_RE.test(centreId)) {
+      return reject(res, 400, "A valid uid and centreId are required.");
+    }
+    try {
+      const ref = adminDb.collection("memberships").doc(`${uid}__${centreId}`);
+      const snap = await ref.get();
+      if (!snap.exists) {
+        return reject(res, 404, "That membership does not exist.");
+      }
+      const role = snap.get("role") ?? null;
+      if (role === "owner") {
+        return reject(res, 409, "Refusing to delete an owner membership.");
+      }
+      await ref.delete();
+      console.log(`[fo-db-proxy] remove-membership ${uid}__${centreId} role=${String(role)}`);
+      res.json({ ok: true, deleted: `${uid}__${centreId}`, role });
+    } catch (err: any) {
+      console.error(`[fo-db-proxy] remove-membership failed:`, err?.message || err);
+      reject(res, 500, "The removal failed on the server.");
+    }
+  });
+
   // 4. Query a collection (equality/range filters, one order, capped limit).
   app.post("/api/internal/fs/query", async (req, res) => {
     const body = (req.body || {}) as Record<string, unknown>;
