@@ -204,6 +204,20 @@ export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => 
     [matchedSubjects]
   );
 
+  // Registered subjects the bank does not have yet (spelling differences, new subjects).
+  const unmatchedRegistered = useMemo(() => {
+    const bankLower = new Set(bankSubjects.map((sub) => sub.trim().toLowerCase()));
+    return (student?.subjects || [])
+      .map((sub) => String(sub).trim())
+      .filter((sub) => Boolean(sub) && !bankLower.has(sub.toLowerCase()));
+  }, [bankSubjects, student]);
+
+  // Opens the profile tab with the subjects editor ready.
+  const openProfileSubjects = () => {
+    try { sessionStorage.setItem('EXCELLENCE_open_subject_editor', '1'); } catch {}
+    try { window.location.hash = 'student/more'; } catch {}
+  };
+
   const yearOptions = useMemo(() => {
     const set = new Set<number>();
     questions.forEach((q) => { if (q.year) set.add(q.year); });
@@ -368,6 +382,19 @@ export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => 
             Ask your centre to register your subjects.
           </p>
         </div>
+        <p className="text-[11px] text-slate-500 font-medium leading-relaxed max-w-xs mx-auto">
+          {registeredSubjects.length > 0
+            ? `These are the ${registeredSubjects.length} subjects you registered for. Missing one?`
+            : 'You have not registered any subjects yet.'}{' '}
+          Update your subjects in Profile.
+        </p>
+        <button
+          type="button"
+          onClick={openProfileSubjects}
+          className="w-full max-w-xs mx-auto h-11 rounded-2xl bg-[#EA580C] text-white text-xs font-extrabold hover:bg-[#C2410C] transition-colors cursor-pointer"
+        >
+          Update your subjects in Profile
+        </button>
       </div>
     );
   }
@@ -645,12 +672,32 @@ export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => 
           </div>
         </div>
 
+        <div className="rounded-2xl bg-slate-50 border border-slate-100 p-3 flex items-start gap-2.5">
+          <Sparkles className="w-4 h-4 text-[#EA580C] shrink-0 mt-0.5" />
+          <p className="text-[11px] text-slate-600 font-medium leading-relaxed">
+            These are the {registeredSubjects.length} subjects you registered for. Missing one?{' '}
+            <button
+              type="button"
+              onClick={openProfileSubjects}
+              className="text-[#C2410C] font-extrabold underline underline-offset-2 cursor-pointer"
+            >
+              Update your subjects in Profile
+            </button>
+          </p>
+        </div>
+
         <div className="grid grid-cols-2 gap-3">
           <Select label="Subject" value={subject} options={subjectOptions} onChange={(v) => { setSubject(v); setTopic('all'); }} />
           <Select label="Year" value={year} options={yearOptions} onChange={setYear} />
           <Select label="Topic" value={topic} options={topicOptions} onChange={setTopic} />
           <Select label="Difficulty" value={difficulty} options={difficultyOptions} onChange={setDifficulty} />
         </div>
+
+        {unmatchedRegistered.length > 0 ? (
+          <p className="text-[11px] text-amber-700 font-semibold leading-relaxed">
+            Not in the practice bank yet: {unmatchedRegistered.join(', ')}
+          </p>
+        ) : null}
 
         <div className="space-y-2">
           <span className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Answer feedback</span>
