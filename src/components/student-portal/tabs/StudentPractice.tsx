@@ -4,11 +4,11 @@ import {
   BookOpen,
   CheckCircle2,
   ChevronRight,
-  ImageIcon,
   RefreshCw,
   Sparkles,
   XCircle,
 } from 'lucide-react';
+import type { Student } from '../../../types';
 
 interface BankQuestion {
   id: string;
@@ -45,7 +45,9 @@ interface Pointer {
 
 type Screen = 'loading' | 'noBank' | 'error' | 'home' | 'session' | 'done';
 
-const CACHE_KEY = 'EXCELLENCE_practice_bank_cache';
+const CACHE_KEY = 'TOS_practice_bank_cache';
+/** Centre-named key from the first build; cleaned up on the next load. */
+const LEGACY_CACHE_KEY = 'EXCELLENCE_practice_bank_cache';
 
 /** Display name for the two exam pipelines; anything unknown falls back to caps. */
 function pipelineLabel(examType: string): string {
@@ -115,7 +117,11 @@ const Select: React.FC<{ label: string; value: string; options: { value: string;
   </label>
 );
 
-export const StudentPractice: React.FC = () => {
+interface StudentPracticeProps {
+  student: Student;
+}
+
+export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => {
   const [screen, setScreen] = useState<Screen>('loading');
   const [bank, setBank] = useState<BankPayload | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
@@ -128,6 +134,8 @@ export const StudentPractice: React.FC = () => {
   const [topic, setTopic] = useState<string>('all');
   const [difficulty, setDifficulty] = useState<string>('all');
   const [length, setLength] = useState<string>('10');
+  const [feedbackMode, setFeedbackMode] = useState<'instant' | 'end'>('instant');
+  const [wrongOnly, setWrongOnly] = useState(false);
 
   // Session state
   const [session, setSession] = useState<BankQuestion[]>([]);
@@ -138,6 +146,7 @@ export const StudentPractice: React.FC = () => {
   const load = useCallback(async () => {
     setScreen('loading');
     setErrorMsg('');
+    try { localStorage.removeItem(LEGACY_CACHE_KEY); } catch { /* ignore */ }
     try {
       const resp = await fetch('/api/public/questionbank/current?kind=practice');
       if (!resp.ok) throw new Error(`pointer ${resp.status}`);
@@ -174,11 +183,26 @@ export const StudentPractice: React.FC = () => {
 
   const questions = bank?.questions ?? [];
 
-  const subjectOptions = useMemo(() => {
+  // Registered subjects, normalised so matching ignores case and extra spaces.
+  const registeredSubjects = useMemo(
+    () => (student?.subjects || []).map((sub) => String(sub).trim().toLowerCase()).filter(Boolean),
+    [student]
+  );
+  const bankSubjects = useMemo(() => {
     const set = new Set<string>();
     questions.forEach((q) => { if (q.subject) set.add(q.subject); });
-    return [{ value: 'all', label: 'All subjects' }, ...Array.from(set).sort((a, b) => a.localeCompare(b)).map((s) => ({ value: s, label: s }))];
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [questions]);
+  const matchedSubjects = useMemo(
+    () => bankSubjects.filter((sub) => registeredSubjects.includes(sub.trim().toLowerCase())),
+    [bankSubjects, registeredSubjects]
+  );
+  const subjectsBlocked = registeredSubjects.length === 0 || matchedSubjects.length === 0;
+
+  const subjectOptions = useMemo(
+    () => [{ value: 'all', label: 'All my subjects' }, ...matchedSubjects.map((sub) => ({ value: sub, label: sub }))],
+    [matchedSubjects]
+  );
 
   const yearOptions = useMemo(() => {
     const set = new Set<number>();
@@ -203,6 +227,7 @@ export const StudentPractice: React.FC = () => {
   }, [questions]);
 
   const filtered = useMemo(() => questions.filter((q) => {
+    if (registeredSubjects.length > 0 && !registeredSubjects.includes(String(q.subject).trim().toLowerCase())) return false;
     if (pipeline !== 'all' && q.examType !== pipeline) return false;
     if (subject !== 'all' && q.subject !== subject) return false;
     if (year !== 'all' && String(q.year) !== year) return false;
@@ -225,20 +250,31 @@ export const StudentPractice: React.FC = () => {
 
   const startSession = () => {
     if (filtered.length === 0) return;
-    const picked = length === 'all' ? filtered : filtered.slice(0, Math.min(Number(length), filtered.length));
-    setSession(shuffle(picked));
+    const shuffled = shuffle(filtered);
+    const picked = length === 'all' ? shuffled : shuffled.slice(0, Math.min(Number(length), shuffled.length));
+    setSession(picked);
     setQIndex(0);
     setPicked(null);
     setAnswers({});
+    setWrongOnly(false);
     setScreen('session');
   };
 
   const q = session[qIndex];
 
   const choose = (key: string) => {
-    if (picked || !q) return;
-    setPicked(key);
+    if (!q) return;
+    if (feedbackMode === 'instant') {
+      if (picked) return;
+      setPicked(key);
+    }
     setAnswers((prev) => ({ ...prev, [q.id]: key }));
+  };
+
+  const back = () => {
+    if (qIndex === 0) return;
+    setQIndex((i) => i - 1);
+    setPicked(null);
   };
 
   const next = () => {
@@ -312,7 +348,24 @@ export const StudentPractice: React.FC = () => {
           </div>
           <h3 className="text-lg font-black text-slate-900 tracking-tight">CBT Practice</h3>
           <p className="text-xs text-slate-500 leading-relaxed font-medium">
-            The practice bank has not been published yet. Once your centre's questions go live, practice appears here.
+            Practice questions are not available yet. Check back soon.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // ------------------------------------------------------- no matching subjects
+  if (screen === 'home' && subjectsBlocked) {
+    return (
+      <div className="bg-white rounded-3xl p-8 border border-slate-200/90 shadow-sm text-center space-y-4">
+        <div className="w-16 h-16 rounded-2xl bg-orange-50 border border-orange-100 text-[#EA580C] flex items-center justify-center mx-auto shadow-sm">
+          <BookOpen className="w-8 h-8" />
+        </div>
+        <div className="space-y-1.5 max-w-xs mx-auto">
+          <h3 className="text-lg font-black text-slate-900 tracking-tight">CBT Practice</h3>
+          <p className="text-xs text-slate-500 leading-relaxed font-medium">
+            Ask your centre to register your subjects.
           </p>
         </div>
       </div>
@@ -321,8 +374,11 @@ export const StudentPractice: React.FC = () => {
 
   // ------------------------------------------------------------------ session
   if (screen === 'session' && q) {
-    const isCorrect = picked !== null && picked === q.correct;
+    const endMode = feedbackMode === 'end';
+    const selected = endMode ? (answers[q.id] || null) : picked;
+    const isCorrect = !endMode && picked !== null && picked === q.correct;
     const optionKeys = Object.keys(q.options).sort();
+    const isLast = qIndex + 1 >= session.length;
     return (
       <div className="space-y-4">
         {/* Progress */}
@@ -336,7 +392,7 @@ export const StudentPractice: React.FC = () => {
           <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
             <div
               className="h-full rounded-full bg-[#EA580C] transition-all duration-300"
-              style={{ width: `${((qIndex + (picked ? 1 : 0)) / session.length) * 100}%` }}
+              style={{ width: `${((qIndex + (selected ? 1 : 0)) / session.length) * 100}%` }}
             />
           </div>
         </div>
@@ -358,36 +414,41 @@ export const StudentPractice: React.FC = () => {
         {/* Options */}
         <div className="space-y-2.5">
           {optionKeys.map((key) => {
-            const chosen = picked === key;
+            const chosen = selected === key;
             const isAnswer = key === q.correct;
-            const showState = picked !== null;
             let cls = 'bg-white border-[#E2E8F0] text-[#0F172A]';
-            if (showState && isAnswer) cls = 'bg-emerald-50 border-emerald-300 text-emerald-900';
-            else if (showState && chosen && !isAnswer) cls = 'bg-red-50 border-red-300 text-red-900';
-            else if (showState) cls = 'bg-white border-[#E2E8F0] text-slate-400';
+            if (endMode) {
+              if (chosen) cls = 'bg-orange-50/70 border-[#EA580C] text-[#0F172A]';
+            } else {
+              const showState = picked !== null;
+              if (showState && isAnswer) cls = 'bg-emerald-50 border-emerald-300 text-emerald-900';
+              else if (showState && chosen && !isAnswer) cls = 'bg-red-50 border-red-300 text-red-900';
+              else if (showState) cls = 'bg-white border-[#E2E8F0] text-slate-400';
+            }
+            const keyCls = endMode
+              ? (chosen ? 'bg-[#EA580C] text-white' : 'bg-slate-100 text-slate-600')
+              : ((picked !== null && isAnswer) ? 'bg-emerald-500 text-white' : (picked !== null && chosen) ? 'bg-red-500 text-white' : 'bg-slate-100 text-slate-600');
             return (
               <button
                 key={key}
                 type="button"
-                disabled={picked !== null}
+                disabled={!endMode && picked !== null}
                 onClick={() => choose(key)}
                 className={`w-full min-h-[44px] rounded-2xl border p-3.5 text-left flex items-start gap-3 transition-all cursor-pointer disabled:cursor-default ${cls}`}
               >
-                <span className={`shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black ${
-                  showState && isAnswer ? 'bg-emerald-500 text-white' : showState && chosen ? 'bg-red-500 text-white' : 'bg-slate-100 text-slate-600'
-                }`}>
+                <span className={`shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black ${keyCls}`}>
                   {key}
                 </span>
                 <span className="text-sm font-semibold leading-snug pt-0.5">{q.options[key]}</span>
-                {showState && isAnswer ? <CheckCircle2 className="w-5 h-5 ml-auto shrink-0 text-emerald-500" /> : null}
-                {showState && chosen && !isAnswer ? <XCircle className="w-5 h-5 ml-auto shrink-0 text-red-500" /> : null}
+                {!endMode && picked !== null && isAnswer ? <CheckCircle2 className="w-5 h-5 ml-auto shrink-0 text-emerald-500" /> : null}
+                {!endMode && picked !== null && chosen && !isAnswer ? <XCircle className="w-5 h-5 ml-auto shrink-0 text-red-500" /> : null}
               </button>
             );
           })}
         </div>
 
-        {/* Feedback */}
-        {picked !== null ? (
+        {/* Feedback (instant mode only) */}
+        {!endMode && picked !== null ? (
           <div className={`rounded-2xl border p-4 space-y-2 ${isCorrect ? 'bg-emerald-50/70 border-emerald-200' : 'bg-red-50/70 border-red-200'}`}>
             <div className={`flex items-center gap-2 text-xs font-extrabold ${isCorrect ? 'text-emerald-700' : 'text-red-700'}`}>
               {isCorrect ? <CheckCircle2 className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
@@ -399,20 +460,34 @@ export const StudentPractice: React.FC = () => {
           </div>
         ) : null}
 
-        {/* Next */}
-        <button
-          type="button"
-          disabled={picked === null}
-          onClick={next}
-          className={`w-full h-12 rounded-2xl flex items-center justify-center gap-2 text-sm font-extrabold transition-all ${
-            picked === null
-              ? 'bg-slate-100 text-slate-300 cursor-not-allowed'
-              : 'bg-[#EA580C] text-white shadow-sm hover:bg-[#C2410C] cursor-pointer'
-          }`}
-        >
-          {qIndex + 1 >= session.length ? 'See results' : 'Next question'}
-          <ChevronRight className="w-4 h-4" />
-        </button>
+        {/* Navigation */}
+        <div className={`flex gap-2.5 ${endMode ? '' : 'flex-col'}`}>
+          {endMode ? (
+            <button
+              type="button"
+              disabled={qIndex === 0}
+              onClick={back}
+              className={`flex-1 h-12 rounded-2xl flex items-center justify-center text-sm font-extrabold transition-all ${
+                qIndex === 0 ? 'bg-slate-100 text-slate-300 cursor-not-allowed' : 'bg-white border border-[#E2E8F0] text-[#0F172A] hover:border-[#CBD5E1] cursor-pointer'
+              }`}
+            >
+              Back
+            </button>
+          ) : null}
+          <button
+            type="button"
+            disabled={endMode ? selected === null : picked === null}
+            onClick={next}
+            className={`flex-1 h-12 rounded-2xl flex items-center justify-center gap-2 text-sm font-extrabold transition-all ${
+              (endMode ? selected === null : picked === null)
+                ? 'bg-slate-100 text-slate-300 cursor-not-allowed'
+                : 'bg-[#EA580C] text-white shadow-sm hover:bg-[#C2410C] cursor-pointer'
+            }`}
+          >
+            {isLast ? 'Finish' : 'Next question'}
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
 
         <button
           type="button"
@@ -428,26 +503,104 @@ export const StudentPractice: React.FC = () => {
   // -------------------------------------------------------------------- done
   if (screen === 'done') {
     const pct = score.total ? Math.round((score.correct / score.total) * 100) : 0;
+    const reviewRows = session
+      .map((sq, i) => ({
+        q: sq,
+        i,
+        given: answers[sq.id] || '',
+        ok: Boolean(answers[sq.id]) && answers[sq.id] === sq.correct,
+      }))
+      .sort((a, b) => Number(a.ok) - Number(b.ok) || a.i - b.i);
+    const visibleRows = wrongOnly ? reviewRows.filter((r) => !r.ok) : reviewRows;
     return (
-      <div className="bg-white rounded-3xl p-8 border border-slate-200/90 shadow-sm text-center space-y-5">
-        <div className={`w-20 h-20 rounded-3xl flex items-center justify-center mx-auto shadow-sm ${
-          pct >= 70 ? 'bg-emerald-50 border border-emerald-100 text-emerald-600' : pct >= 50 ? 'bg-orange-50 border border-orange-100 text-[#EA580C]' : 'bg-red-50 border border-red-100 text-red-600'
-        }`}>
-          <span className="text-2xl font-black">{pct}%</span>
+      <div className="space-y-4">
+        <div className="bg-white rounded-3xl p-8 border border-slate-200/90 shadow-sm text-center space-y-3">
+          <div className={`w-20 h-20 rounded-3xl flex items-center justify-center mx-auto shadow-sm ${
+            pct >= 70 ? 'bg-emerald-50 border border-emerald-100 text-emerald-600' : pct >= 50 ? 'bg-orange-50 border border-orange-100 text-[#EA580C]' : 'bg-red-50 border border-red-100 text-red-600'
+          }`}>
+            <span className="text-2xl font-black">{pct}%</span>
+          </div>
+          <div className="space-y-1.5">
+            <h3 className="text-lg font-black text-slate-900 tracking-tight">Practice complete</h3>
+            <p className="text-xs text-slate-500 font-medium">
+              You answered {score.correct} of {score.total} questions correctly.
+            </p>
+          </div>
         </div>
-        <div className="space-y-1.5">
-          <h3 className="text-lg font-black text-slate-900 tracking-tight">Practice complete</h3>
-          <p className="text-xs text-slate-500 font-medium">
-            You answered {score.correct} of {score.total} questions correctly.
-          </p>
-        </div>
-        <div className="flex flex-col gap-2.5 max-w-xs mx-auto">
+
+        {/* Review header + filter */}
+        <div className="flex items-center justify-between gap-3">
+          <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-400">Review your answers</h4>
           <button
             type="button"
-            onClick={() => { setScreen('home'); }}
-            className="h-12 rounded-2xl bg-white border border-[#E2E8F0] text-[#0F172A] text-sm font-extrabold hover:border-[#CBD5E1] cursor-pointer"
+            onClick={() => setWrongOnly((v) => !v)}
+            className={`h-9 px-3.5 rounded-full text-xs font-extrabold border transition-all cursor-pointer ${
+              wrongOnly ? 'bg-red-500 text-white border-red-500' : 'bg-white text-[#475569] border-[#E2E8F0] hover:border-[#CBD5E1]'
+            }`}
           >
-            Practice again
+            Wrong only
+          </button>
+        </div>
+
+        {/* Review rows: wrong first */}
+        <div className="space-y-2.5">
+          {visibleRows.map(({ q: sq, i, given, ok }) => (
+            <div key={sq.id} className="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-4 space-y-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+                  #{i + 1} · {pipelineLabel(sq.examType)} · {sq.subject}{sq.year ? ` · ${sq.year}` : ''}
+                </span>
+                <span className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+                  ok ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
+                }`}>
+                  {ok ? 'Correct' : given ? 'Wrong' : 'Not answered'}
+                </span>
+              </div>
+              <p className="text-sm font-bold text-slate-900 leading-snug whitespace-pre-wrap">{sq.text}</p>
+              {sq.imageLink ? (
+                <img
+                  src={sq.imageLink}
+                  alt="Question illustration"
+                  loading="lazy"
+                  className="w-full max-h-48 object-contain rounded-xl border border-slate-100 bg-slate-50"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                />
+              ) : null}
+              <div className="space-y-1 text-xs font-semibold">
+                <p className={ok ? 'text-slate-600' : 'text-red-700'}>
+                  Your answer: {given ? `${given}. ${sq.options[given] || ''}` : 'Not answered'}
+                </p>
+                {!ok ? (
+                  <p className="text-emerald-700">Correct answer: {sq.correct}. {sq.options[sq.correct] || ''}</p>
+                ) : null}
+              </div>
+              {sq.explanation ? (
+                <p className="text-xs text-slate-500 leading-relaxed font-medium whitespace-pre-wrap">{sq.explanation}</p>
+              ) : null}
+            </div>
+          ))}
+          {visibleRows.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-slate-200/90 p-6 text-center">
+              <p className="text-xs font-bold text-emerald-700">Nothing wrong in this session. Well done!</p>
+            </div>
+          ) : null}
+        </div>
+
+        {/* Actions */}
+        <div className="flex flex-col gap-2.5">
+          <button
+            type="button"
+            onClick={startSession}
+            className="w-full h-12 rounded-2xl bg-[#EA580C] text-white text-sm font-extrabold shadow-sm hover:bg-[#C2410C] cursor-pointer"
+          >
+            Practise again
+          </button>
+          <button
+            type="button"
+            onClick={() => setScreen('home')}
+            className="w-full h-12 rounded-2xl bg-white border border-[#E2E8F0] text-[#0F172A] text-sm font-extrabold hover:border-[#CBD5E1] cursor-pointer"
+          >
+            Back to setup
           </button>
         </div>
       </div>
@@ -497,6 +650,32 @@ export const StudentPractice: React.FC = () => {
           <Select label="Year" value={year} options={yearOptions} onChange={setYear} />
           <Select label="Topic" value={topic} options={topicOptions} onChange={setTopic} />
           <Select label="Difficulty" value={difficulty} options={difficultyOptions} onChange={setDifficulty} />
+        </div>
+
+        <div className="space-y-2">
+          <span className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Answer feedback</span>
+          <div className="grid grid-cols-1 gap-2">
+            <button
+              type="button"
+              onClick={() => setFeedbackMode('instant')}
+              className={`min-h-[52px] rounded-2xl border p-3 text-left transition-all cursor-pointer ${
+                feedbackMode === 'instant' ? 'bg-slate-50 border-[#0F172A]' : 'bg-white border-[#E2E8F0] hover:border-[#CBD5E1]'
+              }`}
+            >
+              <span className="block text-xs font-extrabold text-[#0F172A]">Show answers after each question</span>
+              <span className="block text-[10px] text-slate-500 font-medium">The correct answer and explanation appear right away.</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setFeedbackMode('end')}
+              className={`min-h-[52px] rounded-2xl border p-3 text-left transition-all cursor-pointer ${
+                feedbackMode === 'end' ? 'bg-slate-50 border-[#0F172A]' : 'bg-white border-[#E2E8F0] hover:border-[#CBD5E1]'
+              }`}
+            >
+              <span className="block text-xs font-extrabold text-[#0F172A]">Show answers at the end</span>
+              <span className="block text-[10px] text-slate-500 font-medium">Answer everything, change your mind any time, results after Finish.</span>
+            </button>
+          </div>
         </div>
 
         <div className="space-y-2">
