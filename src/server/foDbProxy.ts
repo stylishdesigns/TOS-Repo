@@ -145,6 +145,52 @@ export function registerFoDbProxy(app: express.Express): void {
     }
   });
 
+  // 3b. Membership backfill for legacy people (user-approved in chat Oct 24):
+  //     writes EXACTLY one record, memberships/{uid}__{centreId}, with the
+  //     role the caller names, for people whose record predates the
+  //     membership system. Refuses unless the matching people document
+  //     (students/{uid} or tutors/{uid}) exists, refuses owner/admin roles
+  //     (those have their own doors), refuses to overwrite an existing
+  //     membership, and requires confirm:"ADD-MEMBERSHIP".
+  const MEMBER_ROLE_OK = new Set(["student", "tutor"]);
+  const MEMBER_PEOPLE: Record<string, string> = { student: "students", tutor: "tutors" };
+  app.post("/api/internal/fs/add-membership", async (req, res) => {
+    const body = (req.body || {}) as Record<string, unknown>;
+    const uid = typeof body.uid === "string" ? body.uid : "";
+    const centreId = typeof body.centreId === "string" ? body.centreId : "";
+    const role = typeof body.role === "string" ? body.role : "";
+    if (body.confirm !== "ADD-MEMBERSHIP") return reject(res, 400, "Confirm with confirm:\"ADD-MEMBERSHIP\".");
+    if (!uid || uid.length > 128 || !ID_RE.test(uid) || !centreId || centreId.length > 128 || !ID_RE.test(centreId)) {
+      return reject(res, 400, "A valid uid and centreId are required.");
+    }
+    if (!MEMBER_ROLE_OK.has(role)) {
+      return reject(res, 400, "Only student or tutor memberships can be backfilled here.");
+    }
+    try {
+      const peopleDoc = await adminDb.collection(MEMBER_PEOPLE[role]).doc(uid).get();
+      if (!peopleDoc.exists) {
+        return reject(res, 409, `The ${role} record for this uid does not exist; refusing to create people.`);
+      }
+      const membershipRef = adminDb.collection("memberships").doc(`${uid}__${centreId}`);
+      const existing = await membershipRef.get();
+      if (existing.exists) {
+        const before = existing.data() as Record<string, unknown>;
+        if (before.role === role && before.status === "active") {
+          return res.json({ ok: true, already: true, membership: { id: `${uid}__${centreId}`, before: jsonSafe(before) } });
+        }
+        return reject(res, 409, `A membership already exists for this uid and centre (role ${String(before.role)}, status ${String(before.status)}); refusing to overwrite it.`);
+      }
+      const now = new Date().toISOString();
+      const payload = { uid, centreId, role, status: "active", createdAt: now, updatedAt: now };
+      await membershipRef.set(payload);
+      console.log(`[fo-db-proxy] add-membership ${uid} ${centreId} ${role}`);
+      res.json({ ok: true, created: `${uid}__${centreId}`, membership: jsonSafe(payload) });
+    } catch (err: any) {
+      console.error(`[fo-db-proxy] add-membership failed:`, err?.message || err);
+      reject(res, 500, "The write failed on the server.");
+    }
+  });
+
   // 4. One-time centre tagging backfill (user-approved in chat Oct 23): adds
   //    centreId ONLY to docs in a fixed allowlist of content collections whose
   //    centreId field is entirely missing. Docs that already carry a centreId are
