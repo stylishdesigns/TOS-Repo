@@ -446,6 +446,10 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
           )}
         </div>
 
+        {importNotice && (
+          <p className="text-xs font-bold text-amber-300 mt-2">{importNotice}</p>
+        )}
+
         {parsed && (
           <div className="mt-4 space-y-3">
             <div className="flex flex-wrap items-center gap-2">
@@ -484,7 +488,6 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
           </div>
         )}
 
-        {importNotice && <p className="text-xs text-slate-300 mt-3">{importNotice}</p>}
       </Card>
 
       {/* Summary cards */}
