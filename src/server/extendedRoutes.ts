@@ -43,6 +43,10 @@ import { registerQuestionBankRoutes } from './questionBankRoutes';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+/** Short-lived in-memory cache for the public question-bank pointer. */
+const qbPointerCache = new Map<string, { at: number; value: unknown }>();
+const QB_POINTER_TTL_MS = 60 * 1000;
+
 function getCaller(req: express.Request): Caller {
   const caller = (req as any).caller as Caller | undefined;
   if (!caller) throw httpError(401, 'Unauthorized');
@@ -228,6 +232,43 @@ export function registerExtendedRoutes(app: express.Express): void {
     } catch (error: any) {
       console.error('[centre-by-code] lookup failed:', error?.message || error);
       res.status(500).json({ error: 'Could not look up that code. Please try again.' });
+    }
+  });
+
+  // ==========================================================================
+  // PUBLIC: current published question-bank pointer for the student practice
+  // screen. Returns only where the public Cloudinary file lives; the bank
+  // file itself is fetched straight from the CDN, so student practice costs
+  // zero Firestore reads. The pointer read is cached server-side for the
+  // same reason. No centre, student or result data is exposed here.
+  // ==========================================================================
+  app.get('/api/public/questionbank/current', async (req, res) => {
+    const kindRaw = String(req.query.kind || 'practice').trim().toLowerCase();
+    if (kindRaw !== 'practice' && kindRaw !== 'mock') {
+      return res.status(400).json({ error: 'Kind must be practice or mock.' });
+    }
+    const cached = qbPointerCache.get(kindRaw);
+    if (cached && Date.now() - cached.at < QB_POINTER_TTL_MS) {
+      return res.json(cached.value);
+    }
+    try {
+      const doc = await adminDb.collection('qbMeta').doc(kindRaw).get();
+      const d = (doc.data() || {}) as any;
+      const value = doc.exists && d.currentFileUrl
+        ? {
+            version: Number(d.currentVersion) || 0,
+            fileUrl: String(d.currentFileUrl),
+            publishedAt: String(d.currentPublishedAt || ''),
+            liveCount: Number(d.liveCount) || 0,
+            subjects: d.bySubject && typeof d.bySubject === 'object' ? d.bySubject : {},
+          }
+        : { version: 0 };
+      qbPointerCache.set(kindRaw, { at: Date.now(), value });
+      res.json(value);
+    } catch (error: any) {
+      console.error('[public/questionbank/current] failed:', error?.message || error);
+      if (cached) return res.json(cached.value);
+      res.status(500).json({ error: 'Could not load the question bank pointer. Please try again.' });
     }
   });
 

@@ -1,7 +1,8 @@
 import React from 'react';
 import { Student, StudentResult } from '../../../types';
 import { CbtTab } from './CbtTab';
-import { Trophy, BookOpen, TrendingUp, Sparkles } from 'lucide-react';
+import { StudentPractice } from './StudentPractice';
+import { Trophy, TrendingUp, Sparkles } from 'lucide-react';
 
 interface CbtTabWrapperProps {
   student: Student;
@@ -138,24 +139,7 @@ export const CbtTabWrapper: React.FC<CbtTabWrapperProps> = ({
 
       <div className="p-4 sm:p-5 max-w-lg mx-auto space-y-4 animate-in fade-in duration-300 pb-20">
         {practiceView === 'practice' ? (
-          <div className="bg-white rounded-3xl p-8 border border-slate-200/90 shadow-sm text-center space-y-4">
-            <div className="w-16 h-16 rounded-2xl bg-orange-50 border border-orange-100 text-[#EA580C] flex items-center justify-center mx-auto shadow-sm">
-              <BookOpen className="w-8 h-8" />
-            </div>
-
-            <div className="space-y-1.5 max-w-xs mx-auto">
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-orange-100/60 text-[#C2410C] text-[10px] font-extrabold uppercase tracking-wider mb-1">
-                <Sparkles className="w-3 h-3" />
-                <span>Question Bank</span>
-              </div>
-              <h3 className="text-lg font-black text-slate-900 tracking-tight">
-                CBT Practice
-              </h3>
-              <p className="text-xs text-slate-500 leading-relaxed font-medium">
-                Practice is coming soon. Untimed CBT practice from the Tutorial OS question bank.
-              </p>
-            </div>
-          </div>
+          <StudentPractice />
         ) : (
           <div className="bg-white rounded-3xl p-8 border border-slate-200/90 shadow-sm text-center space-y-4">
             <div className="w-16 h-16 rounded-2xl bg-orange-50 border border-orange-100 text-[#EA580C] flex items-center justify-center mx-auto shadow-sm">

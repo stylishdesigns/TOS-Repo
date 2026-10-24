@@ -13,7 +13,7 @@
  * - APP_URL: the public URL of this deployment (optional, used for links).
  */
 import serverless from 'serverless-http';
-// NOTE: bundled fresh on every deploy; bump this comment when server-side files change (v25: adds the confirm-gated add-membership door that backfills legacy student/tutor memberships)
+// NOTE: bundled fresh on every deploy; bump this comment when server-side files change (v26: adds the confirm-gated add-membership door that backfills legacy student/tutor memberships)
 // so the function bundler cache cannot serve a stale bundle.
 // (the Firestore proxy routes in server.ts + src/server/foDbProxy.ts ride the same bundle).
 
