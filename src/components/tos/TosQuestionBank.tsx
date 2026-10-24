@@ -83,6 +83,7 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
   const [fSubject, setFSubject] = useState('');
   const [fClass, setFClass] = useState('');
   const [fPipeline, setFPipeline] = useState('');
+  const [fYear, setFYear] = useState('');
   const [fDifficulty, setFDifficulty] = useState('');
   const [fSearch, setFSearch] = useState('');
 
@@ -134,9 +135,33 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
     if (fClass && q.klass !== fClass) return false;
     if (fPipeline && (q.examType || 'jamb') !== fPipeline) return false;
     if (fDifficulty && q.difficulty !== fDifficulty) return false;
+    if (fYear && String(q.year ?? '') !== fYear) return false;
     if (fSearch && !q.text.toLowerCase().includes(fSearch.toLowerCase())) return false;
     return true;
-  }), [questions, fSubject, fClass, fPipeline, fDifficulty, fSearch]);
+  }), [questions, fSubject, fClass, fPipeline, fDifficulty, fYear, fSearch]);
+
+  const bankYears: number[] = useMemo(
+    () => Array.from(
+      new Set(questions.filter((q: any) => q.status !== 'removed' && q.year != null).map((q: any) => Number(q.year))),
+    ).sort((a, b) => b - a),
+    [questions],
+  );
+  // Year-grouped library: each year is presented as its own bank section,
+  // newest first, with the subjects and topics it covers.
+  const yearRows = useMemo(() => {
+    const sorted = [...filtered].sort((a: any, b: any) => (b.year ?? 0) - (a.year ?? 0));
+    return sorted.slice(0, 100);
+  }, [filtered]);
+  const yearGroups = useMemo(() => {
+    const groups: { label: string; rows: any[] }[] = [];
+    yearRows.forEach((q: any) => {
+      const label = q.year != null ? String(q.year) : 'No year set';
+      const last = groups[groups.length - 1];
+      if (last && last.label === label) last.rows.push(q);
+      else groups.push({ label, rows: [q] });
+    });
+    return groups;
+  }, [yearRows]);
 
   const openEditor = (q: any | null) => {
     setEditorError('');
@@ -353,7 +378,6 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
           <Field label="Difficulty">
             <select value={importDefaults.difficulty} onChange={(e) => setImportDefaults({ ...importDefaults, difficulty: e.target.value })} className={inputCls}>
               <option value="easy">Easy</option>
-              <option value="medium">Medium</option>
               <option value="hard">Hard</option>
             </select>
           </Field>
@@ -429,7 +453,7 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
       </Card>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="bg-slate-900/70 border border-white/10 rounded-2xl p-4">
           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total questions</p>
           <p className="text-2xl font-black text-white mt-1">{kindCounts.total ?? 0}</p>
@@ -439,6 +463,11 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Subjects</p>
           <p className="text-2xl font-black text-white mt-1">{subjects.length}</p>
           <p className="text-[11px] text-slate-400 mt-1 truncate">{subjects.slice(0, 4).join(', ') || '—'}</p>
+        </div>
+        <div className="bg-slate-900/70 border border-white/10 rounded-2xl p-4">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Years</p>
+          <p className="text-2xl font-black text-white mt-1">{bankYears.length}</p>
+          <p className="text-[11px] text-slate-400 mt-1 truncate">Each year is its own bank: {bankYears.slice(0, 4).join(', ') || '—'}</p>
         </div>
         <div className="bg-slate-900/70 border border-orange-500/30 rounded-2xl p-4">
           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Last published</p>
@@ -451,6 +480,12 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
 
       {/* Filters */}
       <div className="flex flex-wrap gap-2">
+        <select value={fYear} onChange={(e) => setFYear(e.target.value)} className={`${inputCls} max-w-32`}>
+          <option value="">All years</option>
+          {bankYears.map((y) => (
+            <option key={y} value={String(y)}>{y}</option>
+          ))}
+        </select>
         <select value={fSubject} onChange={(e) => setFSubject(e.target.value)} className={`${inputCls} max-w-44`}>
           <option value="">All subjects</option>
           {subjects.map((s) => <option key={s} value={s}>{s}</option>)}
@@ -467,7 +502,6 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
         <select value={fDifficulty} onChange={(e) => setFDifficulty(e.target.value)} className={`${inputCls} max-w-36`}>
           <option value="">All difficulties</option>
           <option value="easy">Easy</option>
-          <option value="medium">Medium</option>
           <option value="hard">Hard</option>
         </select>
         <input value={fSearch} onChange={(e) => setFSearch(e.target.value)} placeholder="Search question text" className={`${inputCls} max-w-64`} />
@@ -495,7 +529,20 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
                 </tr>
               </thead>
               <tbody>
-                {filtered.slice(0, 100).map((q) => (
+                {yearGroups.map((g) => (
+              <React.Fragment key={g.label}>
+                <tr className="bg-white/[0.04] border-b border-white/5">
+                  <td colSpan={7} className="py-2 px-2">
+                    <span className="text-[11px] font-black uppercase tracking-wider text-orange-300">{g.label}</span>
+                    <span className="text-[11px] text-slate-400 font-bold ml-2">{g.rows.length} question{g.rows.length === 1 ? '' : 's'}</span>
+                    <span className="text-[10px] text-slate-500 ml-2">
+                      {Array.from(new Set(g.rows.map((q: any) => q.subject).filter(Boolean))).join(', ') || 'no subjects yet'}
+                      {' · topics: '}
+                      {Array.from(new Set(g.rows.map((q: any) => q.topic).filter(Boolean))).slice(0, 6).join(', ') || 'none yet'}
+                    </span>
+                  </td>
+                </tr>
+                {g.rows.map((q) => (
                   <tr key={q.id} className="border-b border-white/5 hover:bg-white/[0.02]">
                     <td className="py-2.5 pr-3 max-w-md">
                       <p className="text-white truncate" title={q.text}>{q.text}</p>
@@ -514,6 +561,8 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
                     </td>
                   </tr>
                 ))}
+              </React.Fragment>
+              ))}
               </tbody>
             </table>
             {filtered.length > 100 && <p className="text-[11px] text-slate-500 mt-2">Showing the first 100 of {filtered.length} matches. Use the filters to narrow.</p>}
@@ -547,7 +596,6 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
               <Field label="Difficulty">
                 <select value={editor.difficulty} onChange={(e) => setEditor({ ...editor, difficulty: e.target.value })} className={inputCls}>
                   <option value="easy">Easy</option>
-                  <option value="medium">Medium</option>
                   <option value="hard">Hard</option>
                 </select>
               </Field>
