@@ -84,6 +84,7 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
   const [fClass, setFClass] = useState('');
   const [fPipeline, setFPipeline] = useState('');
   const [fYear, setFYear] = useState('');
+  const [fTopic, setFTopic] = useState('');
   const [fDifficulty, setFDifficulty] = useState('');
   const [fSearch, setFSearch] = useState('');
 
@@ -136,9 +137,10 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
     if (fPipeline && (q.examType || 'jamb') !== fPipeline) return false;
     if (fDifficulty && q.difficulty !== fDifficulty) return false;
     if (fYear && String(q.year ?? '') !== fYear) return false;
+    if (fTopic && q.topic !== fTopic) return false;
     if (fSearch && !q.text.toLowerCase().includes(fSearch.toLowerCase())) return false;
     return true;
-  }), [questions, fSubject, fClass, fPipeline, fDifficulty, fYear, fSearch]);
+  }), [questions, fSubject, fClass, fPipeline, fDifficulty, fYear, fTopic, fSearch]);
 
   const bankYears: number[] = useMemo(
     () => Array.from(
@@ -162,6 +164,39 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
     });
     return groups;
   }, [yearRows]);
+
+  // Documented inventory: what each year's bank holds, per subject and
+  // topic, so the contents are visible without opening each question.
+  const contentsByYear = useMemo(() => {
+    const map = new Map<string, { total: number; subjects: [string, number][]; topics: [string, number][]; hasYear: boolean }>();
+    questions.forEach((q: any) => {
+      if (q.status === 'removed') return;
+      const hasYear = q.year != null;
+      const label = hasYear ? String(q.year) : 'No year set';
+      if (!map.has(label)) map.set(label, { total: 0, subjects: [], topics: [], hasYear });
+      const g = map.get(label)!;
+      g.total += 1;
+      const sub = q.subject || 'No subject';
+      const subMap = new Map(g.subjects);
+      subMap.set(sub, (subMap.get(sub) || 0) + 1);
+      g.subjects = Array.from(subMap.entries());
+      const top = q.topic || 'No topic';
+      const topMap = new Map(g.topics);
+      topMap.set(top, (topMap.get(top) || 0) + 1);
+      g.topics = Array.from(topMap.entries());
+    });
+    return Array.from(map.entries()).map(([label, v]) => ({
+      label,
+      total: v.total,
+      hasYear: v.hasYear,
+      filterYear: v.hasYear ? label : '',
+      subjects: v.subjects.sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])),
+      topics: v.topics.sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])),
+    })).sort((a, b) => {
+      if (a.hasYear !== b.hasYear) return a.hasYear ? -1 : 1;
+      return a.hasYear ? Number(b.label) - Number(a.label) : 0;
+    });
+  }, [questions]);
 
   const openEditor = (q: any | null) => {
     setEditorError('');
@@ -490,6 +525,10 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
           <option value="">All subjects</option>
           {subjects.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
+        <select value={fTopic} onChange={(e) => setFTopic(e.target.value)} className={`${inputCls} max-w-44`}>
+          <option value="">All topics</option>
+          {topics.map((t) => <option key={t} value={t}>{t}</option>)}
+        </select>
         <select value={fPipeline} onChange={(e) => setFPipeline(e.target.value)} className={`${inputCls} max-w-36`}>
           <option value="">All pipelines</option>
           <option value="jamb">JAMB</option>
@@ -506,6 +545,50 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
         </select>
         <input value={fSearch} onChange={(e) => setFSearch(e.target.value)} placeholder="Search question text" className={`${inputCls} max-w-64`} />
       </div>
+
+      {/* Bank contents: documented inventory, one section per year */}
+      <Card title="Bank contents">
+        <p className="text-[11px] text-slate-500 -mt-1 mb-3">Each year is its own bank. Tap a year or a subject to filter the library below.</p>
+        {contentsByYear.length === 0 ? (
+          <p className="text-sm text-slate-400 py-4 text-center">Nothing in this bank yet. Paste a batch below or add the first question.</p>
+        ) : (
+          <div className="space-y-2.5">
+            {contentsByYear.map((g) => (
+              <div key={g.label} className="border border-white/10 rounded-xl p-3 bg-white/[0.02]">
+                <button
+                  type="button"
+                  onClick={() => g.filterYear && setFYear(g.filterYear)}
+                  title={g.filterYear ? 'Filter the library to this year' : undefined}
+                  className="text-left"
+                >
+                  <span className="text-white font-bold">{g.label}</span>
+                  <span className="text-[11px] text-slate-400 font-bold ml-2">{g.total} question{g.total === 1 ? '' : 's'}</span>
+                </button>
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {g.subjects.map(([name, count]) => (
+                    <button
+                      key={name}
+                      type="button"
+                      onClick={() => setFSubject(name)}
+                      title="Filter the library to this subject"
+                      className="text-[10px] px-2 py-0.5 rounded-full border border-white/10 text-slate-300 hover:border-orange-400/60 hover:text-orange-200"
+                    >
+                      {name} · {count}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                  {g.topics.map(([name, count]) => (
+                    <span key={name} className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.04] text-slate-400">
+                      {name} · {count}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
 
       {/* Library table */}
       <Card title="Question library">
