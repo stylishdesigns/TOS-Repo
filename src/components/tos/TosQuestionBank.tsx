@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { api, Json, Card, Field, inputCls, btnPrimary, btnGhost } from './tosShared';
 import { parseBankPaste, BANK_FORMAT_GUIDE, ParsedBankQuestion } from '../../utils/questionParsing';
+import { SENIOR_SUBJECTS, SUBJECT_NAMES, BANK_YEARS } from '../../data/seniorSubjects';
 
 /**
  * Platform Question Bank (publish pipeline, TOS console).
@@ -48,7 +49,7 @@ interface QuestionForm {
 }
 
 interface ImportDefaults {
-  examType: ExamType; subject: string; klass: string; year: string; topic: string; difficulty: string;
+  examType: ExamType; subject: string; year: string; topic: string; difficulty: string;
 }
 
 const emptyForm = (): QuestionForm => ({
@@ -57,7 +58,7 @@ const emptyForm = (): QuestionForm => ({
 });
 
 const emptyImports = (): ImportDefaults => ({
-  examType: 'jamb', subject: '', klass: '', year: '', topic: '', difficulty: 'easy',
+  examType: 'jamb', subject: '', year: '', topic: '', difficulty: 'easy',
 });
 
 const diffPill = (d: string) => (
@@ -202,12 +203,15 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
   const runImport = async () => {
     if (!parsed) return;
     setImportNotice('');
+    if (!importDefaults.subject) { setImportNotice('Choose a subject for this batch first.'); return; }
+    if (!importDefaults.topic) { setImportNotice('Choose a topic for this batch first.'); return; }
+    if (kind === 'practice' && !importDefaults.year) { setImportNotice('Practice questions need a year. Pick one above the paste box.'); return; }
     setImporting(true);
     try {
       const r = await api('/api/tos/questionbank/import', {
         method: 'POST',
         body: {
-          kind, examType: importDefaults.examType, subject: importDefaults.subject, klass: importDefaults.klass,
+          kind, examType: importDefaults.examType, subject: importDefaults.subject,
           year: importDefaults.year === '' ? null : Number(importDefaults.year),
           topic: importDefaults.topic, difficulty: importDefaults.difficulty,
           questions: parsed.questions,
@@ -259,12 +263,18 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
   if (error) return <p className="text-rose-300 text-sm">{error}</p>;
   if (!data) return <div className="flex items-center gap-2 text-slate-400 text-sm py-10 justify-center"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</div>;
 
+  // Dropdown options for the editor's subject: the catalogue plus, when the
+  // question carries a subject outside it, that subject itself so legacy
+  // rows stay editable.
+  const subjectOptions = (current: string): string[] => {
+    if (current && !SUBJECT_NAMES.includes(current)) return [...SUBJECT_NAMES, current].sort((a, b) => a.localeCompare(b));
+    return SUBJECT_NAMES;
+  };
+
   const switchBtn = (k: Kind, label: string) => (
     <button
-      onClick={() => k === 'practice' && setKind(k)}
-      disabled={k === 'mock'}
-      title={k === 'mock' ? 'Mock authoring ships after practice is done' : undefined}
-      className={`px-5 py-2 rounded-xl text-sm font-bold border transition-all ${kind === k ? 'bg-orange-500/15 text-orange-300 border-orange-500/30' : 'text-slate-400 border-white/10'} ${k === 'mock' ? 'opacity-40 cursor-not-allowed' : 'hover:text-white'}`}
+      onClick={() => setKind(k)}
+      className={`px-5 py-2 rounded-xl text-sm font-bold border transition-all ${kind === k ? 'bg-orange-500/15 text-orange-300 border-orange-500/30' : 'text-slate-400 border-white/10 hover:text-white'}`}
     >
       {label}
     </button>
@@ -282,7 +292,6 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
       {/* Header actions */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <button onClick={() => openEditor(null)} className={btnPrimary}><Plus className="w-4 h-4" /> Add question</button>
           <button onClick={openPublish} className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-orange-500/50 bg-orange-500/10 hover:bg-orange-500/20 disabled:opacity-50 text-orange-300 font-bold text-sm transition-all">
             <Send className="w-4 h-4" /> Publish changes
           </button>
@@ -290,6 +299,116 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
         </div>
         {notice && <p className="text-xs text-rose-300">{notice}</p>}
       </div>
+
+      {/* Paste import (parsing engine) */}
+      <Card title="Add questions">
+        <p className="text-xs text-slate-400 mb-3">Paste a whole past-paper section. It runs through the same parsing engine the centres use: numbered questions, A to D options, an Answer line and an Explanation line. Check the preview, then import everything as drafts.</p>
+
+        {/* Shared defaults for the batch. Class is intentionally not part of
+            the paste flow: questions carry pipeline, subject, year, topic and
+            difficulty, and class stayed optional data. */}
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+          <Field label="Exam pipeline">
+            <select value={importDefaults.examType} onChange={(e) => setImportDefaults({ ...importDefaults, examType: e.target.value as ExamType })} className={inputCls}>
+              <option value="jamb">JAMB</option>
+              <option value="waec_neco">WAEC/NECO</option>
+            </select>
+          </Field>
+          <Field label="Subject">
+            <select value={importDefaults.subject} onChange={(e) => setImportDefaults({ ...importDefaults, subject: e.target.value, topic: '' })} className={inputCls}>
+              <option value="">Select subject</option>
+              {SUBJECT_NAMES.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </Field>
+          <Field label="Topic">
+            <select value={importDefaults.topic} onChange={(e) => setImportDefaults({ ...importDefaults, topic: e.target.value })} disabled={!importDefaults.subject} className={`${inputCls} disabled:opacity-50`}>
+              <option value="">{importDefaults.subject ? 'Select topic' : 'Pick a subject first'}</option>
+              {(SENIOR_SUBJECTS[importDefaults.subject] || []).map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </Field>
+          <Field label={kind === 'practice' ? 'Year' : 'Year (optional)'}>
+            <select value={importDefaults.year} onChange={(e) => setImportDefaults({ ...importDefaults, year: e.target.value })} className={inputCls}>
+              <option value="">Select year</option>
+              {BANK_YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
+            </select>
+          </Field>
+          <Field label="Difficulty">
+            <select value={importDefaults.difficulty} onChange={(e) => setImportDefaults({ ...importDefaults, difficulty: e.target.value })} className={inputCls}>
+              <option value="easy">Easy</option>
+              <option value="medium">Medium</option>
+              <option value="hard">Hard</option>
+            </select>
+          </Field>
+        </div>
+
+        <div className="flex items-center justify-between mb-2">
+          <button onClick={() => setShowGuide(!showGuide)} className="text-[11px] font-bold text-orange-300 hover:text-orange-200 flex items-center gap-1.5">
+            <FileText className="w-3.5 h-3.5" /> {showGuide ? 'Hide format guide' : 'Show format guide'}
+          </button>
+          <button onClick={copyGuide} className="text-[11px] text-slate-400 hover:text-orange-300 flex items-center gap-1.5"><Copy className="w-3.5 h-3.5" /> Copy guide</button>
+        </div>
+        {showGuide && (
+          <pre className="bg-slate-950/80 border border-white/10 rounded-xl p-4 text-[11px] text-slate-300 leading-relaxed overflow-x-auto whitespace-pre-wrap mb-3">{BANK_FORMAT_GUIDE}</pre>
+        )}
+
+        <textarea
+          value={pasteText}
+          onChange={(e) => setPasteText(e.target.value)}
+          rows={8}
+          placeholder={'1. What is the capital of Nigeria?\nA: Lagos\nB: Abuja\nC: Kano\nD: Ibadan\nAnswer: B\nExplanation: Abuja became the capital of Nigeria in 1991.'}
+          className={`${inputCls} font-mono text-xs`}
+        />
+
+        <div className="flex flex-wrap items-center gap-2 mt-3">
+          <button onClick={runParse} disabled={!pasteText.trim()} className={btnGhost}><Eye className="w-4 h-4" /> Parse & preview</button>
+          {parsed && (
+            <button onClick={runImport} disabled={importing} className={btnPrimary}>
+              {importing ? <Loader2 className="w-4 h-4 animate-spin" /> : <ClipboardPaste className="w-4 h-4" />}
+              Import all {parsed.questions.length}
+            </button>
+          )}
+        </div>
+
+        {parsed && (
+          <div className="mt-4 space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-300 text-xs font-bold">{parsed.questions.length} parsed</span>
+              {parsed.skippedEssay > 0 && (
+                <span className="px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-300 text-xs font-bold">{parsed.skippedEssay} essay-style block{parsed.skippedEssay === 1 ? '' : 's'} skipped (objective only for now)</span>
+              )}
+              {parsed.skippedEmpty > 0 && (
+                <span className="px-2.5 py-1 rounded-full bg-slate-700/40 text-slate-400 text-xs font-bold">{parsed.skippedEmpty} unreadable block{parsed.skippedEmpty === 1 ? '' : 's'} skipped</span>
+              )}
+            </div>
+            {parsed.questions.every((q) => !q.correct) && (
+              <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-3 flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-rose-400 mt-0.5 shrink-0" />
+                <p className="text-rose-200 text-xs">No question has an "Answer:" line. Without a correct answer none of these will import.</p>
+              </div>
+            )}
+            <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
+              {parsed.questions.map((q, i) => (
+                <div key={i} className="bg-slate-950/50 border border-white/10 rounded-xl p-3.5">
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="text-sm text-white font-semibold">Q{i + 1}. {q.text}</p>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${q.correct ? 'bg-emerald-500/15 text-emerald-300' : 'bg-rose-500/15 text-rose-300'}`}>
+                      {q.correct ? `Answer ${q.correct}` : 'No answer'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 mt-2">
+                    {q.options.map((o) => (
+                      <p key={o.key} className={`text-xs ${o.key === q.correct ? 'text-emerald-300 font-bold' : 'text-slate-400'}`}>{o.key}. {o.text || '(empty)'}</p>
+                    ))}
+                  </div>
+                  {q.explanation && <p className="text-[11px] text-slate-500 mt-1.5">Explanation: {q.explanation}</p>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {importNotice && <p className="text-xs text-slate-300 mt-3">{importNotice}</p>}
+      </Card>
 
       {/* Summary cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -384,115 +503,11 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
         )}
       </Card>
 
-      {/* Paste import (parsing engine) */}
-      <Card title="Paste questions in bulk">
-        <p className="text-xs text-slate-400 mb-3">Paste a whole past-paper section. It runs through the same parsing engine the centres use: numbered questions, A to D options, an Answer line and an Explanation line. Check the preview, then import everything as drafts.</p>
-
-        {/* Shared defaults for the batch */}
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
-          <Field label="Exam pipeline">
-            <select value={importDefaults.examType} onChange={(e) => setImportDefaults({ ...importDefaults, examType: e.target.value as ExamType })} className={inputCls}>
-              <option value="jamb">JAMB</option>
-              <option value="waec_neco">WAEC/NECO</option>
-            </select>
-          </Field>
-          <Field label="Subject">
-            <input list="qb-import-subjects" value={importDefaults.subject} onChange={(e) => setImportDefaults({ ...importDefaults, subject: e.target.value })} placeholder="e.g. Mathematics" className={inputCls} />
-            <datalist id="qb-import-subjects">{subjects.map((s) => <option key={s} value={s} />)}</datalist>
-          </Field>
-          <Field label="Topic">
-            <input list="qb-import-topics" value={importDefaults.topic} onChange={(e) => setImportDefaults({ ...importDefaults, topic: e.target.value })} placeholder="e.g. Quadratic equations" className={inputCls} />
-            <datalist id="qb-import-topics">{topics.map((s) => <option key={s} value={s} />)}</datalist>
-          </Field>
-          <Field label="Year">
-            <input type="number" min={1978} max={2099} value={importDefaults.year} onChange={(e) => setImportDefaults({ ...importDefaults, year: e.target.value })} placeholder="e.g. 2024" className={inputCls} />
-          </Field>
-          <Field label="Class (optional)">
-            <input list="qb-import-klasses" value={importDefaults.klass} onChange={(e) => setImportDefaults({ ...importDefaults, klass: e.target.value })} placeholder="e.g. SS2" className={inputCls} />
-            <datalist id="qb-import-klasses">{klasses.map((s) => <option key={s} value={s} />)}</datalist>
-          </Field>
-          <Field label="Difficulty">
-            <select value={importDefaults.difficulty} onChange={(e) => setImportDefaults({ ...importDefaults, difficulty: e.target.value })} className={inputCls}>
-              <option value="easy">Easy</option>
-              <option value="medium">Medium</option>
-              <option value="hard">Hard</option>
-            </select>
-          </Field>
-        </div>
-
-        <div className="flex items-center justify-between mb-2">
-          <button onClick={() => setShowGuide(!showGuide)} className="text-[11px] font-bold text-orange-300 hover:text-orange-200 flex items-center gap-1.5">
-            <FileText className="w-3.5 h-3.5" /> {showGuide ? 'Hide format guide' : 'Show format guide'}
-          </button>
-          <button onClick={copyGuide} className="text-[11px] text-slate-400 hover:text-orange-300 flex items-center gap-1.5"><Copy className="w-3.5 h-3.5" /> Copy guide</button>
-        </div>
-        {showGuide && (
-          <pre className="bg-slate-950/80 border border-white/10 rounded-xl p-4 text-[11px] text-slate-300 leading-relaxed overflow-x-auto whitespace-pre-wrap mb-3">{BANK_FORMAT_GUIDE}</pre>
-        )}
-
-        <textarea
-          value={pasteText}
-          onChange={(e) => setPasteText(e.target.value)}
-          rows={8}
-          placeholder={'1. What is the capital of Nigeria?\nA: Lagos\nB: Abuja\nC: Kano\nD: Ibadan\nAnswer: B\nExplanation: Abuja became the capital of Nigeria in 1991.'}
-          className={`${inputCls} font-mono text-xs`}
-        />
-
-        <div className="flex flex-wrap items-center gap-2 mt-3">
-          <button onClick={runParse} disabled={!pasteText.trim()} className={btnGhost}><Eye className="w-4 h-4" /> Parse & preview</button>
-          {parsed && (
-            <button onClick={runImport} disabled={importing} className={btnPrimary}>
-              {importing ? <Loader2 className="w-4 h-4 animate-spin" /> : <ClipboardPaste className="w-4 h-4" />}
-              Import all {parsed.questions.length}
-            </button>
-          )}
-        </div>
-
-        {parsed && (
-          <div className="mt-4 space-y-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-300 text-xs font-bold">{parsed.questions.length} parsed</span>
-              {parsed.skippedEssay > 0 && (
-                <span className="px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-300 text-xs font-bold">{parsed.skippedEssay} essay-style block{parsed.skippedEssay === 1 ? '' : 's'} skipped (objective only for now)</span>
-              )}
-              {parsed.skippedEmpty > 0 && (
-                <span className="px-2.5 py-1 rounded-full bg-slate-700/40 text-slate-400 text-xs font-bold">{parsed.skippedEmpty} unreadable block{parsed.skippedEmpty === 1 ? '' : 's'} skipped</span>
-              )}
-            </div>
-            {parsed.questions.every((q) => !q.correct) && (
-              <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-3 flex items-start gap-2">
-                <AlertTriangle className="w-4 h-4 text-rose-400 mt-0.5 shrink-0" />
-                <p className="text-rose-200 text-xs">No question has an "Answer:" line. Without a correct answer none of these will import.</p>
-              </div>
-            )}
-            <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
-              {parsed.questions.map((q, i) => (
-                <div key={i} className="bg-slate-950/50 border border-white/10 rounded-xl p-3.5">
-                  <div className="flex items-start justify-between gap-3">
-                    <p className="text-sm text-white font-semibold">Q{i + 1}. {q.text}</p>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${q.correct ? 'bg-emerald-500/15 text-emerald-300' : 'bg-rose-500/15 text-rose-300'}`}>
-                      {q.correct ? `Answer ${q.correct}` : 'No answer'}
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 mt-2">
-                    {q.options.map((o) => (
-                      <p key={o.key} className={`text-xs ${o.key === q.correct ? 'text-emerald-300 font-bold' : 'text-slate-400'}`}>{o.key}. {o.text || '(empty)'}</p>
-                    ))}
-                  </div>
-                  {q.explanation && <p className="text-[11px] text-slate-500 mt-1.5">Explanation: {q.explanation}</p>}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {importNotice && <p className="text-xs text-slate-300 mt-3">{importNotice}</p>}
-      </Card>
-
       {/* Add / edit question modal */}
       {editor && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto" onClick={() => setEditor(null)}>
-          <div className="bg-slate-900 border border-white/10 rounded-3xl p-7 max-w-2xl w-full shadow-2xl my-8" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm overflow-y-auto" onClick={() => setEditor(null)}>
+          <div className="min-h-full flex items-center justify-center p-4">
+            <div className="bg-slate-900 border border-white/10 rounded-3xl p-7 max-w-2xl w-full shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between mb-5">
               <h3 className="text-white font-bold text-lg">{editor.id ? 'Edit question' : 'Add question'}</h3>
               <button onClick={() => setEditor(null)} className="text-slate-500 hover:text-slate-300"><X className="w-5 h-5" /></button>
@@ -505,8 +520,11 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
                   <option value="waec_neco">WAEC/NECO</option>
                 </select>
               </Field>
-              <Field label="Year">
-                <input type="number" min={1978} max={2099} value={editor.year} onChange={(e) => setEditor({ ...editor, year: e.target.value })} placeholder="e.g. 2024" className={inputCls} />
+              <Field label={kind === 'practice' ? 'Year' : 'Year (optional)'}>
+                <select value={editor.year} onChange={(e) => setEditor({ ...editor, year: e.target.value })} className={inputCls}>
+                  <option value="">Select year</option>
+                  {BANK_YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
+                </select>
               </Field>
               <Field label="Difficulty">
                 <select value={editor.difficulty} onChange={(e) => setEditor({ ...editor, difficulty: e.target.value })} className={inputCls}>
@@ -519,12 +537,16 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
               <Field label="Subject">
-                <input list="qb-subjects" value={editor.subject} onChange={(e) => setEditor({ ...editor, subject: e.target.value })} placeholder="e.g. Mathematics" className={inputCls} />
-                <datalist id="qb-subjects">{subjects.map((s) => <option key={s} value={s} />)}</datalist>
+                <select value={editor.subject} onChange={(e) => setEditor({ ...editor, subject: e.target.value, topic: '' })} className={inputCls}>
+                  <option value="">Select subject</option>
+                  {subjectOptions(editor.subject).map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
               </Field>
               <Field label="Topic">
-                <input list="qb-editor-topics" value={editor.topic} onChange={(e) => setEditor({ ...editor, topic: e.target.value })} placeholder="e.g. Quadratic equations" className={inputCls} />
-                <datalist id="qb-editor-topics">{topics.map((s) => <option key={s} value={s} />)}</datalist>
+                <select value={editor.topic} onChange={(e) => setEditor({ ...editor, topic: e.target.value })} disabled={!editor.subject} className={`${inputCls} disabled:opacity-50`}>
+                  <option value="">{editor.subject ? 'Select topic' : 'Pick a subject first'}</option>
+                  {(SENIOR_SUBJECTS[editor.subject] || []).map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
               </Field>
               <Field label="Class (optional)">
                 <input list="qb-klasses" value={editor.klass} onChange={(e) => setEditor({ ...editor, klass: e.target.value })} placeholder="e.g. SS2" className={inputCls} />
@@ -575,7 +597,8 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
 
             <div className="flex justify-end gap-2 mt-6">
               <button onClick={() => setEditor(null)} className={btnGhost}>Cancel</button>
-              <button onClick={saveQuestion} disabled={saving} className={btnPrimary}>{saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />} {editor.id ? 'Save changes' : 'Add question'}</button>
+              <button onClick={saveQuestion} disabled={saving} className={btnPrimary}>{saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />} {editor.id ? 'Save changes' : 'Save question'}</button>
+            </div>
             </div>
           </div>
         </div>
@@ -588,8 +611,9 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
         </div>
       )}
       {preview && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto" onClick={() => setPreview(null)}>
-          <div className="bg-slate-900 border border-white/10 rounded-3xl p-7 max-w-3xl w-full shadow-2xl my-8" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm overflow-y-auto" onClick={() => setPreview(null)}>
+          <div className="min-h-full flex items-center justify-center p-4">
+            <div className="bg-slate-900 border border-white/10 rounded-3xl p-7 max-w-3xl w-full shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between mb-5">
               <h3 className="text-white font-bold text-lg capitalize">Review before publishing {preview.kind === 'practice' ? 'practice' : 'mock'}</h3>
               <button onClick={() => setPreview(null)} className="text-slate-500 hover:text-slate-300"><X className="w-5 h-5" /></button>
@@ -643,6 +667,7 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
             <div className="flex justify-end gap-2 mt-6">
               <button onClick={() => setPreview(null)} className={btnGhost}>Cancel</button>
               <button onClick={runPublish} disabled={publishing} className={btnPrimary}>{publishing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} Publish v{preview.nextVersion}</button>
+            </div>
             </div>
           </div>
         </div>

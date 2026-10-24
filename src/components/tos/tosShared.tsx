@@ -11,20 +11,41 @@ export type Json = any;
 
 export async function api(path: string, opts: { method?: string; body?: any } = {}): Promise<Json> {
   // Every /api/tos route is authenticated server-side: attach the caller's
-  // verified Firebase ID token. A fresh token (force refresh) also picks up a
-  // `tos` claim minted moments ago during session sync.
+  // verified Firebase ID token. The cached token goes first (no network round
+  // trip, valid for about an hour); if the server rejects it the call retries
+  // once with a force-refreshed token, which also picks up a `tos` claim
+  // minted moments ago during session sync. A token refresh that fails in the
+  // browser (a brief network hiccup, a stale session) is surfaced as a plain
+  // instruction instead of a raw Firebase error.
   const user = getAuth().currentUser;
   if (!user) throw new Error('You are signed out. Sign in again to continue.');
-  const token = await user.getIdToken(true);
-  const res = await fetch(path, {
-    method: opts.method || 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    ...(opts.body !== undefined ? { body: JSON.stringify(opts.body) } : {}),
-  });
-  const data: any = await res.json().catch(() => null);
+
+  const call = async (token: string) => {
+    const res = await fetch(path, {
+      method: opts.method || 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      ...(opts.body !== undefined ? { body: JSON.stringify(opts.body) } : {}),
+    });
+    const data: any = await res.json().catch(() => null);
+    return { res, data };
+  };
+
+  let res: Response, data: any;
+  try {
+    ({ res, data } = await call(await user.getIdToken()));
+  } catch (e: any) {
+    throw new Error('Your sign-in session could not be refreshed. Reload the page and try again' + (e?.code ? ` (${e.code}).` : '.'));
+  }
+  if ((res.status === 401 || res.status === 403) && data && typeof data === 'object' && /session|token|expired/i.test(String(data.error || ''))) {
+    try {
+      ({ res, data } = await call(await user.getIdToken(true)));
+    } catch (e: any) {
+      throw new Error('Your sign-in session could not be refreshed. Reload the page and try again' + (e?.code ? ` (${e.code}).` : '.'));
+    }
+  }
   if (!res.ok) {
     // Server error messages are safe to surface. When the body is not JSON at
     // all (a platform 502, a timeout, an HTML error page) say so with the

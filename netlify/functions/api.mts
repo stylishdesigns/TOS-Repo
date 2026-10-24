@@ -13,7 +13,7 @@
  * - APP_URL: the public URL of this deployment (optional, used for links).
  */
 import serverless from 'serverless-http';
-// NOTE: bundled fresh on every deploy; bump this comment when server-side files change (v23: question bank split into practice/mock streams with JAMB and WAEC/NECO pipelines, year and topic fields, bulk paste import through the parsing engine, per-stream publish)
+// NOTE: bundled fresh on every deploy; bump this comment when server-side files change (v24: question bank authoring reworked: parse-first add form at the top with year dropdown and Nigerian senior-subject catalogue, scrollable popups, mock switch enabled, friendlier sign-in refresh errors)
 // so the function bundler cache cannot serve a stale bundle.
 // (the Firestore proxy routes in server.ts + src/server/foDbProxy.ts ride the same bundle).
 
