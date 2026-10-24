@@ -207,6 +207,41 @@ export function registerFoDbProxy(app: express.Express): void {
     }
   });
 
+  // 7. Remove a platform-level admins record (user-approved flows only).
+  //    Deletes admins/{uid} ONLY when the record carries no centreId, i.e. it
+  //    is the platform Super Admin record and not a centre's staff entry.
+  //    Centre-bound admin records are managed through the TOS console member
+  //    actions instead. Requires confirm === "REMOVE" and never touches
+  //    Auth accounts, memberships, or anything else.
+  app.post("/api/internal/fs/remove-admin-record", async (req, res) => {
+    const body = (req.body || {}) as Record<string, unknown>;
+    const uid = typeof body.uid === "string" ? body.uid : "";
+    const confirm = typeof body.confirm === "string" ? body.confirm : "";
+    if (!uid || uid.length > 128 || !ID_RE.test(uid)) {
+      return reject(res, 400, "A valid uid is required.");
+    }
+    if (confirm !== "REMOVE") {
+      return reject(res, 400, 'Send confirm: "REMOVE" to delete this record.');
+    }
+    try {
+      const ref = adminDb.collection("admins").doc(uid);
+      const snap = await ref.get();
+      if (!snap.exists) {
+        return reject(res, 404, "That admins record does not exist.");
+      }
+      if (snap.get("centreId")) {
+        return reject(res, 409, "That admins record belongs to a centre; use the TOS console member actions instead.");
+      }
+      const role = snap.get("role") ?? null;
+      await ref.delete();
+      console.log(`[fo-db-proxy] remove-admin-record ${uid} role=${String(role)}`);
+      res.json({ ok: true, deleted: uid, role });
+    } catch (err: any) {
+      console.error(`[fo-db-proxy] remove-admin-record failed:`, err?.message || err);
+      reject(res, 500, "The removal failed on the server.");
+    }
+  });
+
   // 6. One-time repair (user-approved flows only): create the owner's admins
   //    record for a centre whose provisioning predated the auto-superadmin
   //    rule. Fields come from the centre doc's owner fields only. Refuses when
