@@ -38,6 +38,17 @@ const DIFFICULTIES = ['easy', 'medium', 'hard'] as const;
 type Difficulty = (typeof DIFFICULTIES)[number];
 const OPTION_KEYS = ['A', 'B', 'C', 'D'] as const;
 type OptionKey = (typeof OPTION_KEYS)[number];
+// The bank is split into two independent streams, each with its own version
+// history and its own published file: practice (global, browser-cached until
+// the next publish) and mock (daily CBT mock; built after practice ships).
+const KINDS = ['practice', 'mock'] as const;
+type Kind = (typeof KINDS)[number];
+// Two exam pipelines. Both carry objective (MCQ) questions; essay authoring
+// rides with the mock piece.
+const EXAM_TYPES = ['jamb', 'waec_neco'] as const;
+type ExamType = (typeof EXAM_TYPES)[number];
+const EARLIEST_YEAR = 1978;
+const IMPORT_MAX = 400;
 
 function getCaller(req: express.Request): Caller {
   const caller = (req as any).caller as Caller | undefined;
@@ -65,6 +76,10 @@ const TEXT_MAX = 4000;
 const OPTION_TEXT_MAX = 800;
 
 interface ValidatedQuestion {
+  kind: Kind;
+  examType: ExamType;
+  year: number | null;
+  topic: string;
   subject: string;
   klass: string;
   difficulty: Difficulty;
@@ -75,11 +90,31 @@ interface ValidatedQuestion {
   imageLink: string;
 }
 
+function parseYear(raw: any, required: boolean): number | null {
+  if (raw === undefined || raw === null || raw === '') {
+    if (required) throw httpError(400, 'Year is required.');
+    return null;
+  }
+  const y = Number(raw);
+  if (!Number.isInteger(y) || y < EARLIEST_YEAR || y > 2099) {
+    throw httpError(400, `Year must be a whole number between ${EARLIEST_YEAR} and 2099.`);
+  }
+  return y;
+}
+
 function validateQuestion(body: any): ValidatedQuestion {
   if (!body || typeof body !== 'object') throw httpError(400, 'Invalid request body.');
 
+  const kindRaw = String(body.kind ?? 'practice').trim().toLowerCase();
+  if (!(KINDS as readonly string[]).includes(kindRaw)) throw httpError(400, 'Kind must be practice or mock.');
+  const kind = kindRaw as Kind;
+  const examTypeRaw = String(body.examType ?? 'jamb').trim().toLowerCase();
+  if (!(EXAM_TYPES as readonly string[]).includes(examTypeRaw)) throw httpError(400, 'Exam pipeline must be jamb or waec_neco.');
+  const examType = examTypeRaw as ExamType;
+
   const subject = String(body.subject ?? '').trim();
   const klass = String(body.klass ?? '').trim();
+  const topic = String(body.topic ?? '').trim();
   const difficulty = String(body.difficulty ?? '').trim().toLowerCase();
   const text = String(body.text ?? '').trim();
   const explanation = String(body.explanation ?? '').trim();
@@ -87,8 +122,9 @@ function validateQuestion(body: any): ValidatedQuestion {
 
   if (!subject) throw httpError(400, 'Subject is required.');
   if (subject.length > 120) throw httpError(400, 'Subject is too long (max 120 characters).');
-  if (!klass) throw httpError(400, 'Class is required.');
   if (klass.length > 120) throw httpError(400, 'Class is too long (max 120 characters).');
+  if (!topic) throw httpError(400, 'Topic is required.');
+  if (topic.length > 160) throw httpError(400, 'Topic is too long (max 160 characters).');
   if (!(DIFFICULTIES as readonly string[]).includes(difficulty)) {
     throw httpError(400, 'Difficulty must be easy, medium or hard.');
   }
@@ -101,6 +137,7 @@ function validateQuestion(body: any): ValidatedQuestion {
     }
     if (imageLink.length > 2048) throw httpError(400, 'Image link is too long.');
   }
+  const year = parseYear(body.year, kind === 'practice');
 
   const rawOptions: any[] = Array.isArray(body.options) ? body.options : [];
   if (rawOptions.length !== 4) throw httpError(400, 'Exactly four options (A to D) are required.');
@@ -116,7 +153,7 @@ function validateQuestion(body: any): ValidatedQuestion {
     throw httpError(400, 'The correct answer must be one of A, B, C or D.');
   }
 
-  return { subject, klass, difficulty: difficulty as Difficulty, text, options, correct: correct as OptionKey, explanation, imageLink };
+  return { kind, examType, year, topic, subject, klass, difficulty: difficulty as Difficulty, text, options, correct: correct as OptionKey, explanation, imageLink };
 }
 
 // ---------------------------------------------------------------------------
@@ -136,19 +173,31 @@ async function readAllQuestions(): Promise<QueryDocumentSnapshot[]> {
   return out;
 }
 
-async function readMeta(): Promise<{ currentVersion: number; currentFileUrl: string; currentPublishedAt: string | null }> {
-  const doc = await adminDb.collection(QB_META).doc('current').get();
-  const d = (doc.exists ? doc.data() : {}) as any;
-  return {
-    currentVersion: Number(d?.currentVersion) || 0,
-    currentFileUrl: String(d?.currentFileUrl || ''),
-    currentPublishedAt: d?.currentPublishedAt ? String(d.currentPublishedAt) : null,
+async function readAllMeta(): Promise<Record<Kind, { currentVersion: number; currentFileUrl: string; currentPublishedAt: string | null }>> {
+  const [practice, mock] = await Promise.all([
+    adminDb.collection(QB_META).doc('practice').get(),
+    adminDb.collection(QB_META).doc('mock').get(),
+  ]);
+  const shape = (doc: FirebaseFirestoreLikeDocument) => {
+    const d = (doc.exists ? doc.data() : {}) as any;
+    return {
+      currentVersion: Number(d?.currentVersion) || 0,
+      currentFileUrl: String(d?.currentFileUrl || ''),
+      currentPublishedAt: d?.currentPublishedAt ? String(d.currentPublishedAt) : null,
+    };
   };
+  return { practice: shape(practice), mock: shape(mock) };
 }
+// Local type so the helper above reads naturally without pulling the SDK type.
+type FirebaseFirestoreLikeDocument = { exists: boolean; data(): any };
 
 function publicQuestion(d: DocumentData, id: string) {
   return {
     id,
+    kind: String(d.kind || 'practice'),
+    examType: String(d.examType || 'jamb'),
+    year: d.year ?? null,
+    topic: String(d.topic || ''),
     subject: String(d.subject || ''),
     klass: String(d.klass || ''),
     difficulty: String(d.difficulty || ''),
@@ -169,12 +218,15 @@ function computeChanges(
   snaps: QueryDocumentSnapshot[],
   currentPublishedAt: string | null,
   currentVersion: number,
+  kind: Kind,
 ): { added: QueryDocumentSnapshot[]; edited: QueryDocumentSnapshot[]; removed: QueryDocumentSnapshot[] } {
   const added: QueryDocumentSnapshot[] = [];
   const edited: QueryDocumentSnapshot[] = [];
   const removed: QueryDocumentSnapshot[] = [];
   snaps.forEach((s) => {
     const d = s.data() as any;
+    // Questions belong to one stream only; each publishes separately.
+    if (String(d.kind || 'practice') !== kind) return;
     const status = String(d.status || 'draft');
     const after = !currentPublishedAt || String(d.updatedAt || '') > currentPublishedAt;
     if (status === 'draft') {
@@ -198,16 +250,17 @@ export function registerQuestionBankRoutes(app: express.Express): void {
   app.get('/api/tos/questionbank', async (req, res) => {
     try {
       requireTos(req);
-      const [snaps, meta] = await Promise.all([readAllQuestions(), readMeta()]);
+      const [snaps, meta] = await Promise.all([readAllQuestions(), readAllMeta()]);
       const questions = snaps.map((s) => publicQuestion(s.data() as any, s.id));
       const subjects = Array.from(new Set(questions.map((q) => q.subject).filter(Boolean))).sort((a, b) => a.localeCompare(b));
-      const counts = {
-        total: questions.length,
-        drafts: questions.filter((q) => q.status === 'draft').length,
-        published: questions.filter((q) => q.status === 'published').length,
-        removed: questions.filter((q) => q.status === 'removed').length,
-      };
-      res.json({ questions, subjects, counts, meta, scanCapReached: snaps.length >= QB_SCAN_CAP });
+      const ktopics = Array.from(new Set(questions.map((q) => q.topic).filter(Boolean))).sort((a, b) => a.localeCompare(b));
+      const counts = (k: Kind) => ({
+        total: questions.filter((q) => (q as any).kind === k).length,
+        drafts: questions.filter((q) => (q as any).kind === k && q.status === 'draft').length,
+        published: questions.filter((q) => (q as any).kind === k && q.status === 'published').length,
+        removed: questions.filter((q) => (q as any).kind === k && q.status === 'removed').length,
+      });
+      res.json({ questions, subjects, topics: ktopics, counts: { practice: counts('practice'), mock: counts('mock') }, meta, scanCapReached: snaps.length >= QB_SCAN_CAP });
     } catch (error: any) {
       console.error('[tos/questionbank] failed:', error?.message || error);
       res.status(error?.status || 500).json({ error: error?.message || 'Failed to load the question bank.' });
@@ -215,31 +268,38 @@ export function registerQuestionBankRoutes(app: express.Express): void {
   });
 
   // Publish preview: the exact summary the confirm screen shows. Reads only.
+  // One preview per stream: practice and mock publish independently.
   app.get('/api/tos/questionbank/publish-preview', async (req, res) => {
     try {
       requireTos(req);
-      const [snaps, meta] = await Promise.all([readAllQuestions(), readMeta()]);
-      const { added, edited, removed } = computeChanges(snaps, meta.currentPublishedAt, meta.currentVersion);
+      const kindRaw = String(req.query.kind ?? 'practice').trim().toLowerCase();
+      if (!(KINDS as readonly string[]).includes(kindRaw)) throw httpError(400, 'Kind must be practice or mock.');
+      const kind = kindRaw as Kind;
+      const [snaps, meta] = await Promise.all([readAllQuestions(), readAllMeta()]);
+      const m = meta[kind];
+      const { added, edited, removed } = computeChanges(snaps, m.currentPublishedAt, m.currentVersion, kind);
       const changes = [
         ...added.map((s) => ({ subject: String((s.data() as any).subject || ''), action: 'added', title: String((s.data() as any).text || '').slice(0, 120) })),
         ...edited.map((s) => ({ subject: String((s.data() as any).subject || ''), action: 'edited', title: String((s.data() as any).text || '').slice(0, 120) })),
         ...removed.map((s) => ({ subject: String((s.data() as any).subject || ''), action: 'removed', title: String((s.data() as any).text || '').slice(0, 120) })),
       ];
-      const liveCount = snaps.filter((s) => ['published', 'draft'].includes(String((s.data() as any).status || 'draft'))).length;
+      const liveSnaps = snaps.filter((s) => String((s.data() as any).kind || 'practice') === kind
+        && ['published', 'draft'].includes(String((s.data() as any).status || 'draft')));
+      const liveCount = liveSnaps.length;
       const subjectSet = Array.from(new Set(
-        snaps.filter((s) => ['published', 'draft'].includes(String((s.data() as any).status || 'draft')))
-          .map((s) => String((s.data() as any).subject || '').trim()).filter(Boolean),
+        liveSnaps.map((s) => String((s.data() as any).subject || '').trim()).filter(Boolean),
       )).sort((a, b) => a.localeCompare(b));
       res.json({
-        currentVersion: meta.currentVersion,
-        nextVersion: meta.currentVersion + 1,
+        kind,
+        currentVersion: m.currentVersion,
+        nextVersion: m.currentVersion + 1,
         added: added.length,
         edited: edited.length,
         removed: removed.length,
         changes,
         liveCount,
         subjects: subjectSet,
-        fileName: `questionbank_v${meta.currentVersion + 1}.json`,
+        fileName: `questionbank_${kind}_v${m.currentVersion + 1}.json`,
       });
     } catch (error: any) {
       console.error('[tos/questionbank/preview] failed:', error?.message || error);
@@ -302,6 +362,77 @@ export function registerQuestionBankRoutes(app: express.Express): void {
     }
   });
 
+  // Bulk import from the paste box: the client runs the same parsing engine
+  // the centres' publisher uses, then posts the parsed questions here with
+  // the shared defaults (pipeline, subject, class, year, topic, difficulty).
+  // Every item is re-validated server-side; the UI's parse is a preview, not
+  // a trust boundary. One call, capped, all-or-nothing per item.
+  app.post('/api/tos/questionbank/import', async (req, res) => {
+    try {
+      const caller = requireTos(req);
+      const body = req.body || {};
+      const kindRaw = String(body.kind ?? 'practice').trim().toLowerCase();
+      if (!(KINDS as readonly string[]).includes(kindRaw)) throw httpError(400, 'Kind must be practice or mock.');
+      const kind = kindRaw as Kind;
+      const examTypeRaw = String(body.examType ?? 'jamb').trim().toLowerCase();
+      if (!(EXAM_TYPES as readonly string[]).includes(examTypeRaw)) throw httpError(400, 'Exam pipeline must be jamb or waec_neco.');
+      const examType = examTypeRaw as ExamType;
+      const subject = String(body.subject ?? '').trim();
+      const klass = String(body.klass ?? '').trim();
+      const topic = String(body.topic ?? '').trim();
+      const difficultyRaw = String(body.difficulty ?? 'easy').trim().toLowerCase();
+      if (!(DIFFICULTIES as readonly string[]).includes(difficultyRaw)) throw httpError(400, 'Difficulty must be easy, medium or hard.');
+      if (!subject) throw httpError(400, 'Subject is required for an import.');
+      if (subject.length > 120) throw httpError(400, 'Subject is too long (max 120 characters).');
+      if (klass.length > 120) throw httpError(400, 'Class is too long (max 120 characters).');
+      if (!topic) throw httpError(400, 'Topic is required for an import.');
+      if (topic.length > 160) throw httpError(400, 'Topic is too long (max 160 characters).');
+      const year = parseYear(body.year, kind === 'practice');
+
+      const items: any[] = Array.isArray(body.questions) ? body.questions : [];
+      if (items.length === 0) throw httpError(400, 'No parsed questions arrived. Parse the paste again and try once more.');
+      if (items.length > IMPORT_MAX) throw httpError(400, `Too many questions in one import (${items.length}). The cap is ${IMPORT_MAX} per import; split the paste.`);
+
+      const now = new Date().toISOString();
+      const batch = adminDb.batch();
+      let count = 0;
+      items.forEach((item) => {
+        const text = String(item?.text ?? '').trim();
+        const explanation = String(item?.explanation ?? '').trim();
+        const rawOptions: any[] = Array.isArray(item?.options) ? item.options : [];
+        if (!text || text.length > TEXT_MAX) return;
+        if (rawOptions.length !== 4) return;
+        if (explanation.length > TEXT_MAX) return;
+        const options = OPTION_KEYS.map((key, i) => {
+          const t = String(rawOptions[i]?.text ?? '').trim();
+          if (!t || t.length > OPTION_TEXT_MAX) return null;
+          return { key, text: t };
+        });
+        if (options.some((o) => o === null)) return;
+        const correct = String(item?.correct ?? '').trim().toUpperCase();
+        if (!(OPTION_KEYS as readonly string[]).includes(correct)) return;
+        batch.create(adminDb.collection(QB_QUESTIONS).doc(), {
+          kind, examType, subject, klass, topic, year, difficulty: difficultyRaw,
+          text, options, correct: correct as OptionKey, explanation, imageLink: '',
+          status: 'draft', createdAt: now, updatedAt: now, publishedVersion: null,
+          createdByUid: caller.uid, createdByEmail: caller.email || '',
+        });
+        count += 1;
+      });
+      if (count === 0) throw httpError(400, 'None of the parsed questions passed validation. Check the paste format and try again.');
+      await batch.commit();
+      await audit({
+        actorUid: caller.uid,
+        action: 'QUESTIONBANK_IMPORTED',
+        after: { kind, examType, subject, topic, year, count },
+      });
+      res.json({ ok: true, imported: count, skipped: items.length - count });
+    } catch (error: any) {
+      console.error('[tos/questionbank/import] failed:', error?.message || error);
+      res.status(error?.status || 500).json({ error: error?.message || 'Import failed.' });
+    }
+  });
+
   // Remove a question. Drafts are deleted outright; published questions are
   // soft-removed so the next publish records the removal in the version
   // history instead of leaving the live file silently out of date.
@@ -347,18 +478,23 @@ export function registerQuestionBankRoutes(app: express.Express): void {
         throw httpError(500, 'Cloudinary is not configured on this deployment (missing cloud name or upload preset).');
       }
 
-      const [snaps, meta] = await Promise.all([readAllQuestions(), readMeta()]);
-      const { added, edited, removed } = computeChanges(snaps, meta.currentPublishedAt, meta.currentVersion);
+      const kindRaw = String(req.body?.kind ?? 'practice').trim().toLowerCase();
+      if (!(KINDS as readonly string[]).includes(kindRaw)) throw httpError(400, 'Kind must be practice or mock.');
+      const kind = kindRaw as Kind;
+      const [snaps, meta] = await Promise.all([readAllQuestions(), readAllMeta()]);
+      const m = meta[kind];
+      const { added, edited, removed } = computeChanges(snaps, m.currentPublishedAt, m.currentVersion, kind);
       if (added.length + edited.length + removed.length === 0) {
-        throw httpError(400, `Nothing to publish: no question was added, edited or removed since version ${meta.currentVersion}.`);
+        throw httpError(400, `Nothing to publish: no question was added, edited or removed since version ${m.currentVersion}.`);
       }
 
-      const version = meta.currentVersion + 1;
+      const version = m.currentVersion + 1;
       const publishedAt = new Date().toISOString();
 
       // The live set: everything currently published plus the new drafts;
       // soft-removed questions drop out.
-      const live = snaps.filter((s) => ['published', 'draft'].includes(String((s.data() as any).status || '')));
+      const live = snaps.filter((s) => String((s.data() as any).kind || 'practice') === kind
+        && ['published', 'draft'].includes(String((s.data() as any).status || '')));
       const questionsOut = live.map((s) => {
         const d = s.data() as any;
         const opts: Record<string, string> = {};
@@ -367,8 +503,11 @@ export function registerQuestionBankRoutes(app: express.Express): void {
         });
         return {
           id: s.id,
+          examType: String(d.examType || 'jamb'),
           subject: String(d.subject || ''),
           klass: String(d.klass || ''),
+          topic: String(d.topic || ''),
+          year: Number(d.year) || null,
           difficulty: String(d.difficulty || 'medium'),
           text: String(d.text || ''),
           options: opts,
@@ -382,6 +521,7 @@ export function registerQuestionBankRoutes(app: express.Express): void {
 
       const payload = {
         format: 'tos-questionbank',
+        kind,
         version,
         publishedAt,
         count: questionsOut.length,
@@ -400,7 +540,7 @@ export function registerQuestionBankRoutes(app: express.Express): void {
       // publish attempt died between upload and verification, the target
       // file already exists and is an orphan of exactly this version, so the
       // retry lands on a "-r" suffixed name for the same version instead.
-      let publicId = `questionbank_v${version}`;
+      let publicId = `questionbank_${kind}_v${version}`;
       const targetUrl = `https://res.cloudinary.com/${cloud}/raw/upload/tos/${publicId}.json`;
       const preexisting = await fetch(targetUrl, { method: 'HEAD' }).then((r) => r.ok).catch(() => false);
 
@@ -420,7 +560,7 @@ export function registerQuestionBankRoutes(app: express.Express): void {
         return data;
       };
 
-      if (preexisting) publicId = `questionbank_v${version}r`;
+      if (preexisting) publicId = `questionbank_${kind}_v${version}r`;
       const upload = await uploadOnce(publicId, false);
       const fileUrl = String(upload.secure_url || '');
 
@@ -431,7 +571,7 @@ export function registerQuestionBankRoutes(app: express.Express): void {
       }
       const verifyBody: any = await verify.json().catch(() => null);
       if (!verifyBody || verifyBody.version !== version || verifyBody.count !== questionsOut.length) {
-        throw httpError(502, 'The uploaded file did not round-trip with the expected contents. Nothing was recorded; try publishing again.');
+        throw httpError(502, `The uploaded ${kind} file did not round-trip with the expected contents. Nothing was recorded; try publishing again.`);
       }
 
       // File verified. Record the version, refresh the meta doc, and stamp
@@ -443,6 +583,7 @@ export function registerQuestionBankRoutes(app: express.Express): void {
         const b = adminDb.batch();
         if (includeRecords) {
           b.set(adminDb.collection(QB_PUBLISHES).doc(), {
+            kind,
             version,
             publicId,
             fileUrl,
@@ -454,7 +595,7 @@ export function registerQuestionBankRoutes(app: express.Express): void {
             changes: changes.slice(0, CHANGES_LIST_CAP),
             changesTruncated: changes.length > CHANGES_LIST_CAP,
           });
-          b.set(adminDb.collection(QB_META).doc('current'), {
+          b.set(adminDb.collection(QB_META).doc(kind), {
             currentVersion: version,
             currentFileUrl: fileUrl,
             currentPublicId: publicId,

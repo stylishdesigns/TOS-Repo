@@ -1,17 +1,28 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   BookOpen, Plus, RefreshCw, Loader2, Pencil, Trash2, X, AlertTriangle,
-  CheckCircle2, Send, Image as ImageIcon,
+  CheckCircle2, Send, Image as ImageIcon, ClipboardPaste, FileText, Copy, Eye,
 } from 'lucide-react';
 import { api, Json, Card, Field, inputCls, btnPrimary, btnGhost } from './tosShared';
+import { parseBankPaste, BANK_FORMAT_GUIDE, ParsedBankQuestion } from '../../utils/questionParsing';
 
 /**
  * Platform Question Bank (publish pipeline, TOS console).
- * Library, add/edit editor and the publish review screen, per the approved
- * design mockups. All data comes from /api/tos/questionbank; every mutation
- * is server-validated and the publish only runs after the staff member
- * reviews the change list in the review modal and clicks its confirm button.
+ *
+ * The bank is split into two independent streams with their own version
+ * history and published file: PRACTICE (global, browser-cached until the next
+ * publish) and MOCK (built after practice ships). Each carries one of two
+ * exam pipelines: JAMB or WAEC/NECO. Questions arrive either one at a time
+ * through the editor or in bulk through the paste box, which runs the same
+ * parsing engine the centres' publisher uses and shows the parsed questions
+ * for preview before anything is saved. Publishing writes ONE versioned file
+ * per stream to Cloudinary (never overwriting) and only records anything
+ * after the staff member reviews the change list and clicks its confirm
+ * button.
  */
+
+type Kind = 'practice' | 'mock';
+type ExamType = 'jamb' | 'waec_neco';
 
 const DIFF_LABELS: Record<string, string> = { easy: 'Easy', medium: 'Medium', hard: 'Hard' };
 const DIFF_STYLES: Record<string, string> = {
@@ -25,18 +36,28 @@ const STATUS_STYLES: Record<string, string> = {
   published: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
   removed: 'bg-rose-500/15 text-rose-300 border-rose-500/30',
 };
+const PIPELINE_LABELS: Record<string, string> = { jamb: 'JAMB', waec_neco: 'WAEC/NECO' };
 
 interface QuestionForm {
   id: string; // '' for a new question
+  examType: ExamType; year: string; topic: string;
   subject: string; klass: string; difficulty: string; text: string;
   options: string[]; // exactly four, index 0 = A
   correct: number; // 0-3
   explanation: string; imageLink: string;
 }
 
+interface ImportDefaults {
+  examType: ExamType; subject: string; klass: string; year: string; topic: string; difficulty: string;
+}
+
 const emptyForm = (): QuestionForm => ({
-  id: '', subject: '', klass: '', difficulty: 'easy', text: '',
+  id: '', examType: 'jamb', year: '', topic: '', subject: '', klass: '', difficulty: 'easy', text: '',
   options: ['', '', '', ''], correct: 0, explanation: '', imageLink: '',
+});
+
+const emptyImports = (): ImportDefaults => ({
+  examType: 'jamb', subject: '', klass: '', year: '', topic: '', difficulty: 'easy',
 });
 
 const diffPill = (d: string) => (
@@ -51,6 +72,7 @@ const statusPill = (s: string) => (
 );
 
 export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
+  const [kind, setKind] = useState<Kind>('practice');
   const [data, setData] = useState<Json | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -59,6 +81,7 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
   // Filters
   const [fSubject, setFSubject] = useState('');
   const [fClass, setFClass] = useState('');
+  const [fPipeline, setFPipeline] = useState('');
   const [fDifficulty, setFDifficulty] = useState('');
   const [fSearch, setFSearch] = useState('');
 
@@ -66,6 +89,14 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
   const [editor, setEditor] = useState<QuestionForm | null>(null);
   const [editorError, setEditorError] = useState('');
   const [saving, setSaving] = useState(false);
+
+  // Paste import
+  const [pasteText, setPasteText] = useState('');
+  const [importDefaults, setImportDefaults] = useState<ImportDefaults>(emptyImports());
+  const [parsed, setParsed] = useState<{ questions: ParsedBankQuestion[]; skippedEssay: number; skippedEmpty: number } | null>(null);
+  const [showGuide, setShowGuide] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importNotice, setImportNotice] = useState('');
 
   // Publish review
   const [preview, setPreview] = useState<Json | null>(null);
@@ -86,29 +117,32 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
 
   useEffect(() => { load(); }, [load, refreshKey]);
 
-  const questions: any[] = useMemo(() => (data?.questions || []) as any[], [data]);
+  const questions: any[] = useMemo(() => (data?.questions || []).filter((q: any) => (q.kind || 'practice') === kind) as any[], [data, kind]);
   const subjects: string[] = useMemo(() => (data?.subjects || []) as string[], [data]);
+  const topics: string[] = useMemo(() => (data?.topics || []) as string[], [data]);
   const klasses: string[] = useMemo(
     () => Array.from(new Set(questions.map((q) => q.klass).filter(Boolean))).sort((a: string, b: string) => a.localeCompare(b)),
     [questions],
   );
+  const kindCounts = data?.counts?.[kind] || {};
+  const kindMeta = data?.meta?.[kind] || {};
 
   const filtered = useMemo(() => questions.filter((q) => {
     if (q.status === 'removed') return false;
     if (fSubject && q.subject !== fSubject) return false;
     if (fClass && q.klass !== fClass) return false;
+    if (fPipeline && (q.examType || 'jamb') !== fPipeline) return false;
     if (fDifficulty && q.difficulty !== fDifficulty) return false;
     if (fSearch && !q.text.toLowerCase().includes(fSearch.toLowerCase())) return false;
     return true;
-  }), [questions, fSubject, fClass, fDifficulty, fSearch]);
-
-  const counts = data?.counts || {};
+  }), [questions, fSubject, fClass, fPipeline, fDifficulty, fSearch]);
 
   const openEditor = (q: any | null) => {
     setEditorError('');
     if (!q) { setEditor(emptyForm()); return; }
     setEditor({
-      id: q.id, subject: q.subject || '', klass: q.klass || '', difficulty: q.difficulty || 'easy',
+      id: q.id, examType: (q.examType || 'jamb') as ExamType, year: q.year != null ? String(q.year) : '',
+      topic: q.topic || '', subject: q.subject || '', klass: q.klass || '', difficulty: q.difficulty || 'easy',
       text: q.text || '', options: (q.options || []).map((o: any) => o.text || ''), correct: (q.options || []).findIndex((o: any) => o.key === q.correct),
       explanation: q.explanation || '', imageLink: q.imageLink || '',
     });
@@ -120,7 +154,10 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
     setSaving(true);
     try {
       const body = {
-        subject: editor.subject, klass: editor.klass, difficulty: editor.difficulty, text: editor.text,
+        kind, examType: editor.examType,
+        year: editor.year === '' ? null : Number(editor.year),
+        topic: editor.topic, subject: editor.subject, klass: editor.klass,
+        difficulty: editor.difficulty, text: editor.text,
         options: editor.options.map((t, i) => ({ key: 'ABCD'[i], text: t })),
         correct: 'ABCD'[editor.correct], explanation: editor.explanation, imageLink: editor.imageLink,
       };
@@ -151,11 +188,47 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
     }
   };
 
+  const runParse = () => {
+    setImportNotice('');
+    const r = parseBankPaste(pasteText);
+    if (r.questions.length === 0) {
+      setParsed(null);
+      setImportNotice('Nothing parsed. Check that every question is numbered and has A to D options and an "Answer:" line.');
+      return;
+    }
+    setParsed({ questions: r.questions, skippedEssay: r.skippedEssay, skippedEmpty: r.skippedEmpty });
+  };
+
+  const runImport = async () => {
+    if (!parsed) return;
+    setImportNotice('');
+    setImporting(true);
+    try {
+      const r = await api('/api/tos/questionbank/import', {
+        method: 'POST',
+        body: {
+          kind, examType: importDefaults.examType, subject: importDefaults.subject, klass: importDefaults.klass,
+          year: importDefaults.year === '' ? null : Number(importDefaults.year),
+          topic: importDefaults.topic, difficulty: importDefaults.difficulty,
+          questions: parsed.questions,
+        },
+      });
+      setParsed(null);
+      setPasteText('');
+      setImportNotice(`Imported ${r.imported} question${r.imported === 1 ? '' : 's'}${r.skipped ? `, ${r.skipped} skipped` : ''}. They are drafts until you publish.`);
+      await load();
+    } catch (e: any) {
+      setImportNotice(e.message);
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const openPublish = async () => {
     setPreview(null); setPreviewError(''); setPublishResult(null);
     setPreviewLoading(true);
     try {
-      setPreview(await api('/api/tos/questionbank/publish-preview'));
+      setPreview(await api(`/api/tos/questionbank/publish-preview?kind=${kind}`));
     } catch (e: any) {
       setPreviewError(e.message);
     } finally {
@@ -168,7 +241,7 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
     setPublishing(true);
     setPreviewError('');
     try {
-      const r = await api('/api/tos/questionbank/publish', { method: 'POST', body: { confirm: 'PUBLISH' } });
+      const r = await api('/api/tos/questionbank/publish', { method: 'POST', body: { confirm: 'PUBLISH', kind } });
       setPublishResult(r);
       setPreview(null);
       await load();
@@ -179,11 +252,33 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
     }
   };
 
+  const copyGuide = async () => {
+    try { await navigator.clipboard.writeText(BANK_FORMAT_GUIDE); setImportNotice('Format guide copied.'); } catch { /* clipboard unavailable */ }
+  };
+
   if (error) return <p className="text-rose-300 text-sm">{error}</p>;
   if (!data) return <div className="flex items-center gap-2 text-slate-400 text-sm py-10 justify-center"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</div>;
 
+  const switchBtn = (k: Kind, label: string) => (
+    <button
+      onClick={() => k === 'practice' && setKind(k)}
+      disabled={k === 'mock'}
+      title={k === 'mock' ? 'Mock authoring ships after practice is done' : undefined}
+      className={`px-5 py-2 rounded-xl text-sm font-bold border transition-all ${kind === k ? 'bg-orange-500/15 text-orange-300 border-orange-500/30' : 'text-slate-400 border-white/10'} ${k === 'mock' ? 'opacity-40 cursor-not-allowed' : 'hover:text-white'}`}
+    >
+      {label}
+    </button>
+  );
+
   return (
     <div className="space-y-5">
+      {/* Stream switch */}
+      <div className="flex items-center gap-2">
+        {switchBtn('practice', 'Practice')}
+        {switchBtn('mock', 'Mock')}
+        <span className="text-[11px] text-slate-500 ml-1">Each stream publishes and versions separately.</span>
+      </div>
+
       {/* Header actions */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
@@ -200,8 +295,8 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="bg-slate-900/70 border border-white/10 rounded-2xl p-4">
           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total questions</p>
-          <p className="text-2xl font-black text-white mt-1">{counts.total ?? 0}</p>
-          <p className="text-[11px] text-slate-400 mt-1">{counts.drafts || 0} drafts · {counts.published || 0} published</p>
+          <p className="text-2xl font-black text-white mt-1">{kindCounts.total ?? 0}</p>
+          <p className="text-[11px] text-slate-400 mt-1">{kindCounts.drafts || 0} drafts · {kindCounts.published || 0} published</p>
         </div>
         <div className="bg-slate-900/70 border border-white/10 rounded-2xl p-4">
           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Subjects</p>
@@ -210,9 +305,9 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
         </div>
         <div className="bg-slate-900/70 border border-orange-500/30 rounded-2xl p-4">
           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Last published</p>
-          <p className="text-2xl font-black text-orange-300 mt-1">{data.meta?.currentVersion ? `v${data.meta.currentVersion}` : 'Never'}</p>
+          <p className="text-2xl font-black text-orange-300 mt-1">{kindMeta.currentVersion ? `v${kindMeta.currentVersion}` : 'Never'}</p>
           <p className="text-[11px] text-slate-400 mt-1">
-            {data.meta?.currentPublishedAt ? new Date(data.meta.currentPublishedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : 'Publish to make questions live'}
+            {kindMeta.currentPublishedAt ? new Date(kindMeta.currentPublishedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : 'Publish to make questions live'}
           </p>
         </div>
       </div>
@@ -223,11 +318,16 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
           <option value="">All subjects</option>
           {subjects.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
-        <select value={fClass} onChange={(e) => setFClass(e.target.value)} className={`${inputCls} max-w-44`}>
+        <select value={fPipeline} onChange={(e) => setFPipeline(e.target.value)} className={`${inputCls} max-w-36`}>
+          <option value="">All pipelines</option>
+          <option value="jamb">JAMB</option>
+          <option value="waec_neco">WAEC/NECO</option>
+        </select>
+        <select value={fClass} onChange={(e) => setFClass(e.target.value)} className={`${inputCls} max-w-40`}>
           <option value="">All classes</option>
           {klasses.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
-        <select value={fDifficulty} onChange={(e) => setFDifficulty(e.target.value)} className={`${inputCls} max-w-40`}>
+        <select value={fDifficulty} onChange={(e) => setFDifficulty(e.target.value)} className={`${inputCls} max-w-36`}>
           <option value="">All difficulties</option>
           <option value="easy">Easy</option>
           <option value="medium">Medium</option>
@@ -241,7 +341,7 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
         {filtered.length === 0 ? (
           <div className="text-center py-10 text-slate-400 text-sm">
             <BookOpen className="w-8 h-8 mx-auto mb-3 text-slate-600" />
-            {questions.length === 0 ? 'No questions yet. Add the first question, then publish to make it live.' : 'No questions match these filters.'}
+            {questions.length === 0 ? 'No questions yet. Paste a batch below or add the first question, then publish to make it live.' : 'No questions match these filters.'}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -250,10 +350,10 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
                 <tr className="text-left text-[10px] font-bold uppercase tracking-wider text-slate-500 border-b border-white/5">
                   <th className="pb-2 pr-3">Question</th>
                   <th className="pb-2 pr-3">Subject</th>
-                  <th className="pb-2 pr-3">Class</th>
+                  <th className="pb-2 pr-3">Year</th>
+                  <th className="pb-2 pr-3">Pipeline</th>
                   <th className="pb-2 pr-3">Difficulty</th>
                   <th className="pb-2 pr-3">Status</th>
-                  <th className="pb-2 pr-3">Updated</th>
                   <th className="pb-2">Actions</th>
                 </tr>
               </thead>
@@ -262,13 +362,13 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
                   <tr key={q.id} className="border-b border-white/5 hover:bg-white/[0.02]">
                     <td className="py-2.5 pr-3 max-w-md">
                       <p className="text-white truncate" title={q.text}>{q.text}</p>
-                      {q.imageLink && <p className="text-[10px] text-slate-500 flex items-center gap-1 mt-0.5"><ImageIcon className="w-3 h-3" /> has image</p>}
+                      <p className="text-[10px] text-slate-500 truncate">{q.topic || '\u00a0'}{q.imageLink ? ' · has image' : ''}</p>
                     </td>
                     <td className="py-2.5 pr-3 text-slate-300">{q.subject}</td>
-                    <td className="py-2.5 pr-3 text-slate-300">{q.klass}</td>
+                    <td className="py-2.5 pr-3 text-slate-300">{q.year ?? '—'}</td>
+                    <td className="py-2.5 pr-3 text-slate-300">{PIPELINE_LABELS[q.examType] || q.examType}</td>
                     <td className="py-2.5 pr-3">{diffPill(q.difficulty)}</td>
                     <td className="py-2.5 pr-3">{statusPill(q.status)}</td>
-                    <td className="py-2.5 pr-3 text-slate-400 text-xs">{q.updatedAt ? new Date(q.updatedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : '—'}</td>
                     <td className="py-2.5">
                       <div className="flex items-center gap-1.5">
                         <button onClick={() => openEditor(q)} className="p-1.5 rounded-lg text-slate-400 hover:text-orange-300 hover:bg-white/5" title="Edit"><Pencil className="w-3.5 h-3.5" /></button>
@@ -284,6 +384,111 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
         )}
       </Card>
 
+      {/* Paste import (parsing engine) */}
+      <Card title="Paste questions in bulk">
+        <p className="text-xs text-slate-400 mb-3">Paste a whole past-paper section. It runs through the same parsing engine the centres use: numbered questions, A to D options, an Answer line and an Explanation line. Check the preview, then import everything as drafts.</p>
+
+        {/* Shared defaults for the batch */}
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+          <Field label="Exam pipeline">
+            <select value={importDefaults.examType} onChange={(e) => setImportDefaults({ ...importDefaults, examType: e.target.value as ExamType })} className={inputCls}>
+              <option value="jamb">JAMB</option>
+              <option value="waec_neco">WAEC/NECO</option>
+            </select>
+          </Field>
+          <Field label="Subject">
+            <input list="qb-import-subjects" value={importDefaults.subject} onChange={(e) => setImportDefaults({ ...importDefaults, subject: e.target.value })} placeholder="e.g. Mathematics" className={inputCls} />
+            <datalist id="qb-import-subjects">{subjects.map((s) => <option key={s} value={s} />)}</datalist>
+          </Field>
+          <Field label="Topic">
+            <input list="qb-import-topics" value={importDefaults.topic} onChange={(e) => setImportDefaults({ ...importDefaults, topic: e.target.value })} placeholder="e.g. Quadratic equations" className={inputCls} />
+            <datalist id="qb-import-topics">{topics.map((s) => <option key={s} value={s} />)}</datalist>
+          </Field>
+          <Field label="Year">
+            <input type="number" min={1978} max={2099} value={importDefaults.year} onChange={(e) => setImportDefaults({ ...importDefaults, year: e.target.value })} placeholder="e.g. 2024" className={inputCls} />
+          </Field>
+          <Field label="Class (optional)">
+            <input list="qb-import-klasses" value={importDefaults.klass} onChange={(e) => setImportDefaults({ ...importDefaults, klass: e.target.value })} placeholder="e.g. SS2" className={inputCls} />
+            <datalist id="qb-import-klasses">{klasses.map((s) => <option key={s} value={s} />)}</datalist>
+          </Field>
+          <Field label="Difficulty">
+            <select value={importDefaults.difficulty} onChange={(e) => setImportDefaults({ ...importDefaults, difficulty: e.target.value })} className={inputCls}>
+              <option value="easy">Easy</option>
+              <option value="medium">Medium</option>
+              <option value="hard">Hard</option>
+            </select>
+          </Field>
+        </div>
+
+        <div className="flex items-center justify-between mb-2">
+          <button onClick={() => setShowGuide(!showGuide)} className="text-[11px] font-bold text-orange-300 hover:text-orange-200 flex items-center gap-1.5">
+            <FileText className="w-3.5 h-3.5" /> {showGuide ? 'Hide format guide' : 'Show format guide'}
+          </button>
+          <button onClick={copyGuide} className="text-[11px] text-slate-400 hover:text-orange-300 flex items-center gap-1.5"><Copy className="w-3.5 h-3.5" /> Copy guide</button>
+        </div>
+        {showGuide && (
+          <pre className="bg-slate-950/80 border border-white/10 rounded-xl p-4 text-[11px] text-slate-300 leading-relaxed overflow-x-auto whitespace-pre-wrap mb-3">{BANK_FORMAT_GUIDE}</pre>
+        )}
+
+        <textarea
+          value={pasteText}
+          onChange={(e) => setPasteText(e.target.value)}
+          rows={8}
+          placeholder={'1. What is the capital of Nigeria?\nA: Lagos\nB: Abuja\nC: Kano\nD: Ibadan\nAnswer: B\nExplanation: Abuja became the capital of Nigeria in 1991.'}
+          className={`${inputCls} font-mono text-xs`}
+        />
+
+        <div className="flex flex-wrap items-center gap-2 mt-3">
+          <button onClick={runParse} disabled={!pasteText.trim()} className={btnGhost}><Eye className="w-4 h-4" /> Parse & preview</button>
+          {parsed && (
+            <button onClick={runImport} disabled={importing} className={btnPrimary}>
+              {importing ? <Loader2 className="w-4 h-4 animate-spin" /> : <ClipboardPaste className="w-4 h-4" />}
+              Import all {parsed.questions.length}
+            </button>
+          )}
+        </div>
+
+        {parsed && (
+          <div className="mt-4 space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-300 text-xs font-bold">{parsed.questions.length} parsed</span>
+              {parsed.skippedEssay > 0 && (
+                <span className="px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-300 text-xs font-bold">{parsed.skippedEssay} essay-style block{parsed.skippedEssay === 1 ? '' : 's'} skipped (objective only for now)</span>
+              )}
+              {parsed.skippedEmpty > 0 && (
+                <span className="px-2.5 py-1 rounded-full bg-slate-700/40 text-slate-400 text-xs font-bold">{parsed.skippedEmpty} unreadable block{parsed.skippedEmpty === 1 ? '' : 's'} skipped</span>
+              )}
+            </div>
+            {parsed.questions.every((q) => !q.correct) && (
+              <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-3 flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-rose-400 mt-0.5 shrink-0" />
+                <p className="text-rose-200 text-xs">No question has an "Answer:" line. Without a correct answer none of these will import.</p>
+              </div>
+            )}
+            <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
+              {parsed.questions.map((q, i) => (
+                <div key={i} className="bg-slate-950/50 border border-white/10 rounded-xl p-3.5">
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="text-sm text-white font-semibold">Q{i + 1}. {q.text}</p>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${q.correct ? 'bg-emerald-500/15 text-emerald-300' : 'bg-rose-500/15 text-rose-300'}`}>
+                      {q.correct ? `Answer ${q.correct}` : 'No answer'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 mt-2">
+                    {q.options.map((o) => (
+                      <p key={o.key} className={`text-xs ${o.key === q.correct ? 'text-emerald-300 font-bold' : 'text-slate-400'}`}>{o.key}. {o.text || '(empty)'}</p>
+                    ))}
+                  </div>
+                  {q.explanation && <p className="text-[11px] text-slate-500 mt-1.5">Explanation: {q.explanation}</p>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {importNotice && <p className="text-xs text-slate-300 mt-3">{importNotice}</p>}
+      </Card>
+
       {/* Add / edit question modal */}
       {editor && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto" onClick={() => setEditor(null)}>
@@ -293,27 +498,37 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
               <button onClick={() => setEditor(null)} className="text-slate-500 hover:text-slate-300"><X className="w-5 h-5" /></button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <Field label="Exam pipeline">
+                <select value={editor.examType} onChange={(e) => setEditor({ ...editor, examType: e.target.value as ExamType })} className={inputCls}>
+                  <option value="jamb">JAMB</option>
+                  <option value="waec_neco">WAEC/NECO</option>
+                </select>
+              </Field>
+              <Field label="Year">
+                <input type="number" min={1978} max={2099} value={editor.year} onChange={(e) => setEditor({ ...editor, year: e.target.value })} placeholder="e.g. 2024" className={inputCls} />
+              </Field>
+              <Field label="Difficulty">
+                <select value={editor.difficulty} onChange={(e) => setEditor({ ...editor, difficulty: e.target.value })} className={inputCls}>
+                  <option value="easy">Easy</option>
+                  <option value="medium">Medium</option>
+                  <option value="hard">Hard</option>
+                </select>
+              </Field>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
               <Field label="Subject">
                 <input list="qb-subjects" value={editor.subject} onChange={(e) => setEditor({ ...editor, subject: e.target.value })} placeholder="e.g. Mathematics" className={inputCls} />
                 <datalist id="qb-subjects">{subjects.map((s) => <option key={s} value={s} />)}</datalist>
               </Field>
-              <Field label="Class">
+              <Field label="Topic">
+                <input list="qb-editor-topics" value={editor.topic} onChange={(e) => setEditor({ ...editor, topic: e.target.value })} placeholder="e.g. Quadratic equations" className={inputCls} />
+                <datalist id="qb-editor-topics">{topics.map((s) => <option key={s} value={s} />)}</datalist>
+              </Field>
+              <Field label="Class (optional)">
                 <input list="qb-klasses" value={editor.klass} onChange={(e) => setEditor({ ...editor, klass: e.target.value })} placeholder="e.g. SS2" className={inputCls} />
                 <datalist id="qb-klasses">{klasses.map((s) => <option key={s} value={s} />)}</datalist>
-              </Field>
-            </div>
-
-            <div className="mt-3">
-              <Field label="Difficulty">
-                <div className="flex items-center gap-4">
-                  {['easy', 'medium', 'hard'].map((d, i) => (
-                    <label key={d} className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
-                      <input type="radio" name="qb-difficulty" checked={editor.difficulty === d} onChange={() => setEditor({ ...editor, difficulty: d })} className="accent-orange-500" />
-                      {DIFF_LABELS[d]}
-                    </label>
-                  ))}
-                </div>
               </Field>
             </div>
 
@@ -376,7 +591,7 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto" onClick={() => setPreview(null)}>
           <div className="bg-slate-900 border border-white/10 rounded-3xl p-7 max-w-3xl w-full shadow-2xl my-8" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between mb-5">
-              <h3 className="text-white font-bold text-lg">Review before publishing</h3>
+              <h3 className="text-white font-bold text-lg capitalize">Review before publishing {preview.kind === 'practice' ? 'practice' : 'mock'}</h3>
               <button onClick={() => setPreview(null)} className="text-slate-500 hover:text-slate-300"><X className="w-5 h-5" /></button>
             </div>
 
@@ -440,7 +655,7 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center"><CheckCircle2 className="w-5 h-5 text-emerald-400" /></div>
               <div>
-                <h3 className="text-white font-bold">Version v{publishResult.version} published</h3>
+                <h3 className="text-white font-bold capitalize">{publishResult.kind === 'practice' ? 'Practice' : 'Mock'} v{publishResult.version} published</h3>
                 <p className="text-slate-400 text-xs">{publishResult.counts.live} questions live</p>
               </div>
             </div>
