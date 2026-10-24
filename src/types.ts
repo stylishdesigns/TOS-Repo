@@ -436,7 +436,6 @@ export interface SubjectEntry {
 // MULTI-TENANT DATA MODELS (Step 1)
 // ---------------------------------------------------------------------------
 
-export type CentreAccountType = 'centre' | 'independent';
 export type CentreStatus = 'trial' | 'active' | 'overdue' | 'suspended' | 'closed';
 
 export interface CentreBranding {
@@ -454,7 +453,6 @@ export interface CentreBranding {
 export interface Centre {
   id: string;
   name: string;
-  type: CentreAccountType;
   status: CentreStatus;
   ownerUid: string;
   branding?: CentreBranding;
@@ -466,7 +464,9 @@ export interface Centre {
 
 export interface CentreBilling {
   centreId: string;
-  planId: 'independent' | 'centre_standard' | 'centre_plus' | string;
+  /** Transactional counter of active student seats (maintained by the server). */
+  activeStudentCount?: number;
+  planId: 'centre_standard' | 'centre_plus' | string;
   seatCap: number;
   billedSeatsMinimum: number;
   trialStartsAt?: string | null;
@@ -495,9 +495,8 @@ export interface CentreMembership {
 }
 
 export interface PlatformPlan {
-  id: string; // 'independent' | 'centre_standard' | 'centre_plus'
+  id: string; // 'centre_standard' | 'centre_plus'
   name: string;
-  accountType: CentreAccountType;
   price: number;
   priceType: 'flat' | 'per_seat';
   seatCap: number;
@@ -514,6 +513,9 @@ export interface PlatformConfigGlobal {
   trialDays: number; // 30
   skipTrialDiscountPct: number; // e.g. 10
   trialGraceDays: number; // e.g. 7
+  seatSwapLimitPerStudent?: number; // default 2
+  seatSwapWindowDays?: number; // default 30
+  aiRouteRateLimitPerHour?: number; // per-user hourly cap on the AI routes
 }
 
 export interface AuditLogEntry {
@@ -550,7 +552,5 @@ export interface CentreUserRole {
   centreId: string;
   role: MembershipRole;
   centreName: string;
-  type: CentreAccountType;
   logo?: string;
 }
-

@@ -64,7 +64,7 @@ export const CbtTab: React.FC<CbtTabProps> = ({
   hideFrequencyToggle = false,
   renderUnderHeader,
 }) => {
-  const { addToast, exams, results, addResult } = useApp();
+  const { addToast, exams, results, addResult, centreName } = useApp();
 
   const [examState, setExamState] = useState<ExamState>('select');
   const [selectedExam, setSelectedExam] = useState<CBTExam | null>(null);
@@ -578,7 +578,7 @@ export const CbtTab: React.FC<CbtTabProps> = ({
                   EX
                 </div>
                 <h2 className="text-lg font-black tracking-tight uppercase text-slate-900">
-                  Excellence Tutorial Centre
+                  {centreName}
                 </h2>
                 <div className="inline-block px-4 py-1 bg-slate-100 text-slate-800 rounded-full text-[10px] font-black uppercase tracking-[0.2em]">
                   Assessment Report

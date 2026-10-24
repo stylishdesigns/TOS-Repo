@@ -10,13 +10,10 @@ service cloud.firestore {
     function incoming() { return request.resource.data; }
     function existing() { return resource.data; }
     
-    // Admin check: verified user whose UID exists in the 'admins' collection
-    // OR hardcoded super admin email for bootstrap access
+    // Admin check: signed-in user whose UID exists in the 'admins' collection.
+    // Admin access comes only from admins records; no hardcoded emails.
     function isAdmin() { 
-      return isSignedIn() && (
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
-        (request.auth.token.email != null && request.auth.token.email.lower() == "stylishdesigns484@gmail.com")
-      );
+      return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
     function isTutor() { 
@@ -40,6 +37,27 @@ service cloud.firestore {
     match /settings/{settingId} {
       allow read: if true; // Publicly accessible for website
       allow write: if isAdmin() && isValidSettings(incoming(), settingId);
+    }
+
+    // -------------------------------------------------------------------------
+    // CENTRE SETTINGS (per centre: {centreId}__global | {centreId}__attendance | {centreId}__cms)
+    // The part of the document id before '__' is the centre id. Members are read
+    // from the m claim (centreId -> role), set by the app's session sync.
+    // NOTE: assumes centre ids never contain '__' (they are centre-<slug>).
+    // -------------------------------------------------------------------------
+    match /centreSettings/{settingId} {
+      function memberCentreRole(id) {
+        return request.auth.token.get('m', {}).get(id.split('__')[0], '');
+      }
+      function isCentreSettingId(id) {
+        return id is string && id.matches('^[a-zA-Z0-9_\\-]+__(global|attendance|cms)$');
+      }
+      allow read: if isSignedIn()
+          && isCentreSettingId(settingId)
+          && memberCentreRole(settingId) != '';
+      allow write: if isSignedIn()
+          && isCentreSettingId(settingId)
+          && memberCentreRole(settingId) in ['own', 'adm'];
     }
 
     // -------------------------------------------------------------------------
@@ -124,7 +142,7 @@ service cloud.firestore {
     }
 
     match /payments/{paymentId} {
-      allow read: if true;
+      allow read: if isVerified();
       allow create: if isValidPayment(incoming());
       allow update: if isAdmin();
       allow delete: if isAdmin();

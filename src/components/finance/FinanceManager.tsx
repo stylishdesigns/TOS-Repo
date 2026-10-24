@@ -35,6 +35,7 @@ export const FinanceManager: React.FC = () => {
     updateProgramme,
     updateSettings,
     addToast,
+    centreName,
   } = useApp();
 
   const [search, setSearch] = useState('');
@@ -55,7 +56,7 @@ export const FinanceManager: React.FC = () => {
   // Center Account & Cash Guide settings state
   const [bankName, setBankName] = useState(settings.bankName || 'Access Bank Plc');
   const [bankAccountNumber, setBankAccountNumber] = useState(settings.bankAccountNumber || '0123456789');
-  const [bankAccountName, setBankAccountName] = useState(settings.bankAccountName || 'Excellence Tutorial Centre Ltd');
+  const [bankAccountName, setBankAccountName] = useState(settings.bankAccountName || centreName);
   const [cashPaymentGuide, setCashPaymentGuide] = useState(
     settings.cashPaymentGuide ||
       'Please proceed in person to the Centre Accounts Bursar, Mr. Adeleke, at the Admin Office (Reception Block A, 1st Floor). Always collect an official stamped paper receipt upon payment.'
@@ -878,7 +879,7 @@ export const FinanceManager: React.FC = () => {
                         required
                         value={bankAccountName}
                         onChange={(e) => setBankAccountName(e.target.value)}
-                        placeholder="e.g. Excellence Tutorial Centre Ltd"
+                        placeholder="e.g. your centre's registered name"
                         className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-slate-900 font-semibold focus:border-orange-500 outline-none"
                       />
                     </div>

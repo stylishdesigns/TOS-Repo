@@ -59,7 +59,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
                 EX
               </div>
               <div>
-                <h3 className="text-sm font-black text-slate-900">Install Excellence App</h3>
+                <h3 className="text-sm font-black text-slate-900">Install the App</h3>
                 <p className="text-[10px] text-slate-500 font-semibold">Standalone PWA Mobile Experience</p>
               </div>
             </div>
@@ -135,7 +135,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
           onClick={handleInstallClick}
           disabled={installing}
           className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border border-orange-200 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-xs ${className}`}
-          title="Install Excellence PWA on your device"
+          title="Install the app on your device"
         >
           <Download className="w-3.5 h-3.5" />
           <span>Install App</span>
@@ -170,7 +170,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
           onClick={handleInstallClick}
           disabled={installing}
           className={`p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-all border border-white/10 shadow-xs ${className}`}
-          title="Install Excellence App"
+          title="Install the App"
         >
           <Download className="w-4 h-4" />
         </button>
@@ -226,7 +226,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
         className={`w-full py-3 px-4 rounded-xl bg-gradient-to-r from-[#EA580C] to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white font-bold text-xs shadow-sm transition-all flex items-center justify-center space-x-2 ${className}`}
       >
         <Download className="w-4 h-4" />
-        <span>Install Excellence Portal to Home Screen</span>
+        <span>Install the App to Home Screen</span>
       </button>
       {renderGuideModal()}
     </>

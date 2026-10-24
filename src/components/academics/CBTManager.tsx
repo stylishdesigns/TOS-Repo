@@ -63,7 +63,7 @@ interface MockGradingSettings {
 }
 
 export const CBTManager: React.FC = () => {
-  const { programmes, subjects: allSubjects, tutors, settings, addToast, exams, results, students } = useApp();
+  const { programmes, subjects: allSubjects, tutors, settings, addToast, exams, results, students, activeCentreId } = useApp();
 
   const [activeFrequency, setActiveFrequency] = useState<'General' | 'Mock'>('General');
   const [activeTimeFilter, setActiveTimeFilter] = useState<'Current' | 'Upcoming'>('Current');
@@ -109,12 +109,12 @@ export const CBTManager: React.FC = () => {
 
   // Firestore Sync for Global Grading
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'mock_grading'), (snapshot) => {
+    const unsub = onSnapshot(activeCentreId ? query(collection(db, 'mock_grading'), where('centreId', '==', activeCentreId)) : collection(db, 'mock_grading'), (snapshot) => {
       const data = snapshot.docs.map(doc => doc.data() as MockGradingSettings);
       setGlobalMockGrading(data);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'mock_grading'));
     return () => unsub();
-  }, []);
+  }, [activeCentreId]);
 
   React.useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 60000); // Update every minute for timers
@@ -721,7 +721,9 @@ export const CBTManager: React.FC = () => {
         essayTotalMarks: (setupData.mode === 'Essay' || setupData.mode === 'Both') ? totalEssayMarks : 0,
       };
 
-      await setDoc(doc(db, 'cbt_exams', examId), JSON.parse(JSON.stringify(examData)));
+      const examPayload = JSON.parse(JSON.stringify(examData)) as Record<string, any>;
+      if (activeCentreId) examPayload.centreId = activeCentreId;
+      await setDoc(doc(db, 'cbt_exams', examId), examPayload);
       addToast({ 
         type: 'success', 
         title: editingExamId ? 'Assessment Updated' : 'Assessment Published', 

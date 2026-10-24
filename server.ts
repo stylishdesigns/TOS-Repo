@@ -2,7 +2,8 @@ import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
 import { parseEssayBlock } from "./src/utils/essay";
-import { adminAuth, adminDb } from "./src/server/firebaseAdmin";
+import { createHash, timingSafeEqual } from "crypto";
+import { adminAuth, adminDb, adminCredentialSource, projectId, databaseId } from "./src/server/firebaseAdmin";
 import {
   enterCentreService,
   validateActiveCentreService,
@@ -11,8 +12,18 @@ import {
   activateStudentService,
   toggleStudentAccessService,
   getCentreEntitlements,
-  getSeatsSummaryService
+  getSeatsSummaryService,
+  isTosUser,
+  requireMembership,
+  getPlatformConfig,
+  getCentreSubscriptionStatus,
+  consumeAiRateLimit,
+  httpError
 } from "./src/server/tenantService";
+import { ensureBootstrapSuperAdmin } from "./src/server/platformDefaults";
+import { registerExtendedRoutes } from "./src/server/extendedRoutes";
+import { registerFoDbProxy } from "./src/server/foDbProxy";
+import { registerFoAccessDoors } from "./src/server/foAccessDoors";
 
 
 // Source file is ESM, but compiled to CJS for production.
@@ -239,6 +250,62 @@ function validateEssayBlock(rawBlock: string): { valid: boolean; reason?: string
 async function startServer() {
   const app = express();
   app.use(express.json());
+
+  // ---------------------------------------------------------------------------
+  // Global authentication for the API (Prompt A step 1): every /api route
+  // requires a verified Firebase ID token, except:
+  //   - /api/health (Cloud Run health check)
+  //   - /api/public/* (public endpoints, e.g. the lead form in Prompt C)
+  //   - /api/internal/* (protected by the INTERNAL_API_SECRET header instead)
+  // The verified caller is attached to the request for every handler below.
+  // ---------------------------------------------------------------------------
+  app.use("/api", (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const path = req.path; // relative to the /api mount
+    if (path === "/health") return next();
+    if (path === "/health/deep") return next(); // public diagnostic, returns no secrets
+    if (path.startsWith("/public/")) return next();
+    if (path.startsWith("/internal/fs/")) {
+      // Fo database proxy (read-only): its own secret, stored in Netlify only
+      // as a SHA-256 hash (FO_DB_PROXY_KEY_SHA256), separate from
+      // INTERNAL_API_SECRET. Deny-closed when the hash is not configured.
+      const key = req.headers["x-fo-key"];
+      const hash = process.env.FO_DB_PROXY_KEY_SHA256 || "";
+      if (!hash || typeof key !== "string" || key.length === 0 || key.length > 256) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const got = createHash("sha256").update(key).digest();
+      const want = Buffer.from(hash, "hex");
+      const keyOk = want.length === got.length && timingSafeEqual(got, want);
+      if (!keyOk) return res.status(401).json({ error: "Unauthorized" });
+      return next();
+    }
+    if (path.startsWith("/internal/")) {
+      const secret = req.headers["x-internal-secret"];
+      if (!process.env.INTERNAL_API_SECRET || secret !== process.env.INTERNAL_API_SECRET) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      return next();
+    }
+    const authHeader = req.headers.authorization || "";
+    if (!authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    adminAuth
+      .verifyIdToken(authHeader.slice("Bearer ".length).trim())
+      .then((decoded) => {
+        (req as any).caller = {
+          uid: decoded.uid,
+          email: decoded.email || "",
+          tos: isTosUser(decoded as any),
+          claims: decoded,
+        };
+        next();
+      })
+      .catch(() => {
+        res.status(401).json({ error: "Unauthorized" });
+      });
+  });
+
   const PORT = process.env.PORT || 3000;
   const isProd = process.env.NODE_ENV === "production";
   const distPath = getDistPath(isProd);
@@ -266,17 +333,47 @@ async function startServer() {
     });
   });
 
+  // Deep health check (Prompt D): verifies the Admin SDK actually works in this
+  // environment by performing one tiny Firestore read and one tiny Auth read.
+  // Public by design and returns no secrets: ids and booleans only. Results are
+  // cached briefly so uptime monitors cannot hammer the reads.
+  let deepHealthCache: { at: number; body: any } | null = null;
+  const DEEP_HEALTH_TTL_MS = 30_000;
+  app.get("/api/health/deep", async (req, res) => {
+    if (deepHealthCache && Date.now() - deepHealthCache.at < DEEP_HEALTH_TTL_MS) {
+      return res.json(deepHealthCache.body);
+    }
+    const body: any = {
+      adminCredential: adminCredentialSource,
+      projectId,
+      databaseId,
+      firestoreReadOk: false,
+      authReadOk: false,
+    };
+    try {
+      const snap = await adminDb.collection("platformConfig").doc("global").get();
+      body.firestoreReadOk = true;
+      body.platformConfigPresent = snap.exists;
+    } catch (e: any) {
+      body.firestoreErrorCode = e?.code || "unknown";
+    }
+    try {
+      await adminAuth.listUsers(1);
+      body.authReadOk = true;
+    } catch (e: any) {
+      body.authErrorCode = e?.code || "unknown";
+    }
+    deepHealthCache = { at: Date.now(), body };
+    res.json(body);
+  });
+
   // Tenant Session Claims Sync Endpoint
   app.post("/api/session/sync", async (req, res) => {
     try {
-      const authHeader = req.headers.authorization || "";
-      if (!authHeader.startsWith("Bearer ")) {
-        return res.status(401).json({ error: "Unauthorized", detail: "Missing Bearer token in Authorization header" });
-      }
-
-      const idToken = authHeader.split("Bearer ")[1].trim();
-      const decoded = await adminAuth.verifyIdToken(idToken);
-      const uid = decoded.uid;
+      // The token was already verified by the global /api middleware.
+      const caller = (req as any).caller;
+      const decoded = caller.claims;
+      const uid = caller.uid;
 
       // Query active memberships for this user
       const snap = await adminDb.collection("memberships")
@@ -302,12 +399,27 @@ async function startServer() {
         }
       });
 
-      // Preserve existing `tos` claim if already present or if the email matches bootstrap admin
-      const isTosEmail = decoded.email && decoded.email.toLowerCase() === "stylishdesigns484@gmail.com";
-      const hasTos = Boolean(decoded.tos || isTosEmail);
+      // One-time bootstrap: the first verified sign-in from an address in
+      // TOS_BOOTSTRAP_EMAILS seeds the platform defaults and stamps the tos
+      // claim permanently (platformDefaults.ensureBootstrapSuperAdmin). Session
+      // sync preserves existing claims and never invents one on its own.
+      let bootstrapGranted = false;
+      try {
+        bootstrapGranted = await ensureBootstrapSuperAdmin(uid, decoded.email || null);
+      } catch (e) {
+        console.error("[TOS bootstrap] unexpected failure:", (e as any)?.message || e);
+      }
+      const hasTos = decoded.tos === true || bootstrapGranted;
 
-      const claims: { m: Record<string, string>; tos?: boolean } = { m };
-      if (hasTos) {
+      // Merge, never replace: a provisioned owner's mustChangePassword claim
+      // must survive the sync so the forced first-password change still
+      // happens. Session sync still never invents a claim of its own.
+      const syncUserRecord = await adminAuth.getUser(uid);
+      const preserved: Record<string, any> = { ...((syncUserRecord.customClaims || {}) as Record<string, any>) };
+      delete preserved.m;
+      delete preserved.tos;
+      const claims: { m: Record<string, string>; tos?: boolean } = { ...preserved, m };
+      if (hasTos || preserved.tos === true) {
         claims.tos = true;
       }
 
@@ -326,31 +438,17 @@ async function startServer() {
     }
   });
 
-  // Helper to extract authenticated user from Bearer token
-  const getCaller = async (req: express.Request): Promise<{ uid: string; email: string }> => {
-    const authHeader = req.headers.authorization || "";
-    if (!authHeader.startsWith("Bearer ")) {
-      const err: any = new Error("Missing Bearer token");
+  // Helper to extract the authenticated caller attached by the global /api
+  // middleware. Real authentication only: a request without a verified token
+  // never reaches a route, so there is no fallback decoding of any kind.
+  const getCaller = async (req: express.Request): Promise<{ uid: string; email: string; tos: boolean; claims: any }> => {
+    const caller = (req as any).caller;
+    if (!caller) {
+      const err: any = new Error("Unauthorized");
       err.status = 401;
       throw err;
     }
-    const token = authHeader.split("Bearer ")[1].trim();
-    try {
-      const decoded = await adminAuth.verifyIdToken(token);
-      return { uid: decoded.uid, email: decoded.email || "" };
-    } catch (err) {
-      // In development or when ADC is not attached, extract from JWT payload
-      try {
-        const parts = token.split(".");
-        if (parts.length === 3) {
-          const payload = JSON.parse(Buffer.from(parts[1], "base64").toString("utf8"));
-          return { uid: payload.user_id || payload.sub, email: payload.email || "" };
-        }
-      } catch {}
-      const authErr: any = new Error("Invalid Authorization token");
-      authErr.status = 401;
-      throw authErr;
-    }
+    return caller;
   };
 
   // 1. Enter Centre with 6-digit access code (Part A, point 3)
@@ -369,6 +467,7 @@ async function startServer() {
         userEmail: caller.email,
         code: code.trim(),
         ip,
+        tos: caller.tos,
       });
 
       res.json({ success: true, ...result });
@@ -392,6 +491,7 @@ async function startServer() {
         uid: caller.uid,
         userEmail: caller.email,
         centreId,
+        tos: caller.tos,
       });
 
       res.json({ success: true, ...result, centreId });
@@ -407,6 +507,7 @@ async function startServer() {
       const centres = await listUserCentresService({
         uid: caller.uid,
         userEmail: caller.email,
+        tos: caller.tos,
       });
       res.json({ success: true, centres });
     } catch (error: any) {
@@ -430,6 +531,7 @@ async function startServer() {
         userEmail: caller.email,
         code: code.trim(),
         ip,
+        tos: caller.tos,
       });
 
       res.json({ success: true, ...result });
@@ -461,6 +563,7 @@ async function startServer() {
         actorEmail: caller.email,
         studentUid,
         centreId,
+        tos: caller.tos,
       });
 
       res.json(result);
@@ -485,6 +588,7 @@ async function startServer() {
         studentUid,
         centreId,
         active,
+        tos: caller.tos,
       });
 
       res.json(result);
@@ -497,30 +601,40 @@ async function startServer() {
   // 7. Get feature entitlements for centre (Part E)
   app.get("/api/centre/entitlements", async (req, res) => {
     try {
+      const caller = await getCaller(req);
       const centreId = (req.query.centreId as string) || (req.headers["x-centre-id"] as string);
       if (!centreId) {
         return res.status(400).json({ error: "Missing centreId" });
       }
 
+      // Step 6: any active member of the centre may read entitlements, but the
+      // membership is verified on the server; the client-supplied id is only
+      // ever validated, never trusted.
+      await requireMembership(caller, centreId);
+
       const entitlements = await getCentreEntitlements(centreId);
       res.json({ success: true, centreId, entitlements });
     } catch (error: any) {
-      res.status(500).json({ error: error.message || "Failed to get entitlements" });
+      res.status(error.status || 500).json({ error: error.message || "Failed to get entitlements" });
     }
   });
 
   // 8. Get seats summary for centre (Part D)
   app.get("/api/centre/seats-summary", async (req, res) => {
     try {
+      const caller = await getCaller(req);
       const centreId = (req.query.centreId as string) || (req.headers["x-centre-id"] as string);
       if (!centreId) {
         return res.status(400).json({ error: "Missing centreId" });
       }
 
+      // Step 6: seats summary is owner/admin (or TOS) of that centre only.
+      await requireMembership(caller, centreId, ["owner", "admin"]);
+
       const summary = await getSeatsSummaryService(centreId);
       res.json({ success: true, centreId, summary });
     } catch (error: any) {
-      res.status(500).json({ error: error.message || "Failed to get seats summary" });
+      res.status(error.status || 500).json({ error: error.message || "Failed to get seats summary" });
     }
   });
 
@@ -534,8 +648,98 @@ async function startServer() {
     });
   });
 
+  // ---------------------------------------------------------------------------
+  // AI route gating (Prompt A step 10). Middleware only: the handlers below are
+  // untouched. generate-questions requires a signed-in active owner, admin or
+  // tutor of a centre whose subscription is active; grade-essay any signed-in
+  // active member. Both are per-user rate limited in Firestore.
+  // ---------------------------------------------------------------------------
+  const ROLE_CODES: Record<string, string> = {
+    own: "owner",
+    adm: "admin",
+    sec: "secretary",
+    fin: "finance",
+    tut: "tutor",
+    stu: "student",
+  };
+
+  const aiQuestionsGate = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    try {
+      const caller = await getCaller(req);
+      const bodyCentre = (req.body && req.body.centreId) || (req.headers["x-centre-id"] as string) || "";
+      let centreId = "";
+      if (bodyCentre) {
+        const m = await requireMembership(caller, bodyCentre, ["owner", "admin", "tutor"]);
+        centreId = m.centreId;
+      } else {
+        const m = caller.claims?.m || {};
+        const candidate = Object.keys(m).find(
+          (cid) => ["owner", "admin", "tutor"].includes(ROLE_CODES[m[cid]])
+        );
+        if (!candidate) {
+          throw httpError(403, "You do not have access to this feature.");
+        }
+        await requireMembership(caller, candidate, ["owner", "admin", "tutor"]);
+        centreId = candidate;
+      }
+      const status = await getCentreSubscriptionStatus(centreId);
+      if (status !== "trial" && status !== "active") {
+        throw httpError(
+          403,
+          "This feature is unavailable while the centre's subscription is not active."
+        );
+      }
+      const config = await getPlatformConfig();
+      await consumeAiRateLimit(caller.uid, "ai-questions", config);
+      next();
+    } catch (error: any) {
+      res.status(error.status || 500).json({ error: error.message || "Unauthorized" });
+    }
+  };
+
+  const aiEssayGate = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    try {
+      const caller = await getCaller(req);
+      let centreId = (req.body && req.body.centreId) || (req.headers["x-centre-id"] as string) || "";
+      if (centreId) {
+        await requireMembership(caller, centreId);
+      } else {
+        const m = caller.claims?.m || {};
+        const candidate = Object.keys(m)[0];
+        if (candidate) {
+          await requireMembership(caller, candidate);
+          centreId = candidate;
+        } else {
+          // No claim yet: fall back to a live membership lookup.
+          const snap = await adminDb
+            .collection("memberships")
+            .where("uid", "==", caller.uid)
+            .where("status", "==", "active")
+            .limit(1)
+            .get();
+          if (snap.empty) {
+            throw httpError(403, "You do not have access to this feature.");
+          }
+          centreId = snap.docs[0].data().centreId;
+        }
+      }
+      const status = await getCentreSubscriptionStatus(centreId);
+      if (status === "suspended" || status === "pending_payment") {
+        throw httpError(
+          403,
+          "This feature is unavailable while the centre's subscription is not active."
+        );
+      }
+      const config = await getPlatformConfig();
+      await consumeAiRateLimit(caller.uid, "ai-essay", config);
+      next();
+    } catch (error: any) {
+      res.status(error.status || 500).json({ error: error.message || "Unauthorized" });
+    }
+  };
+
   // AI Question Generation Endpoint
-  app.post("/api/generate-questions", async (req, res) => {
+  app.post("/api/generate-questions", aiQuestionsGate, async (req, res) => {
     try {
       const { subject, programme, count, type, prompt: userPrompt, topic } = req.body;
       const { Type } = await import("@google/genai");
@@ -734,7 +938,7 @@ RULES:
   });
 
   // System Essay Grading Endpoint
-  app.post("/api/grade-essay", async (req, res) => {
+  app.post("/api/grade-essay", aiEssayGate, async (req, res) => {
     try {
       const { items } = req.body;
       const { Type } = await import("@google/genai");
@@ -858,6 +1062,18 @@ RULES:
     }
   });
 
+  // Prompt C routes (leads, TOS console, access codes, billing sweep) must be
+  // registered before the static/SPA fallback so no GET route is swallowed.
+  registerExtendedRoutes(app);
+
+  // Fo database proxy (read-only): Firestore diagnostics through the server's
+  // own admin connection, gated by FO_DB_PROXY_KEY_SHA256 (see foDbProxy.ts).
+  registerFoDbProxy(app);
+
+  // Fo Firebase access doors (rules read, backups, auth, storage, push),
+  // same x-fo-key gate as the data proxy (see foAccessDoors.ts).
+  registerFoAccessDoors(app);
+
   if (!isProd) {
     const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
@@ -887,12 +1103,21 @@ RULES:
     });
   }
 
+  if (process.env.NETLIFY === "true") {
+    // Running inside a Netlify Function: never bind a port, just return the app.
+    return app;
+  }
+
   app.listen(Number(PORT), "0.0.0.0", () => {
     console.log(`Server running on port ${PORT}`);
   });
 }
 
-startServer().catch(err => {
-  console.error("CRITICAL: Failed to start server:", err);
-  process.exit(1);
-});
+if (process.env.NETLIFY !== "true") {
+  startServer().catch(err => {
+    console.error("CRITICAL: Failed to start server:", err);
+    process.exit(1);
+  });
+}
+
+export { startServer };

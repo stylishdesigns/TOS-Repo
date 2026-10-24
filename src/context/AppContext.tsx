@@ -290,11 +290,14 @@ interface AppContextType {
   // Multi-Tenant Architecture (Prompt 3)
   activeCentreId: string | null;
   activeCentre: Centre | null;
+  centreName: string;
   userCentres: CentreUserRole[];
   entitlements: CentreEntitlements;
   seatsSummary: CentreSeatsSummary | null;
   hasCheckedActiveCentre: boolean;
   enterCentreByCode: (code: string) => Promise<{ success: boolean; centreId?: string; error?: string }>;
+  enterSoleCentre: () => Promise<{ entered: boolean; count: number }>;
+  fetchMyCentreIds: () => Promise<string[]>;
   joinCentreByCode: (code: string) => Promise<{ status: 'active' | 'pending'; centreName: string; centreId: string }>;
   switchCentre: (centreId: string) => Promise<void>;
   refreshSeatsSummary: () => Promise<void>;
@@ -308,10 +311,20 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 const STORAGE_KEY = 'EXCELLENCE_TUTORIAL_DATA_V1';
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // Tenant-scoped cache keys: each centre's cached records live under their
+  // own key, so one centre's dashboard never hydrates another centre's data.
+  const centreScopeSuffix = () => {
+    try {
+      return sessionStorage.getItem('tos_activeCentreId') || 'none';
+    } catch {
+      return 'none';
+    }
+  };
+  const scopedKey = (name: string) => `${STORAGE_KEY}_${centreScopeSuffix()}_${name}`;
   // Load from localStorage or defaults
   const [settings, setSettingsState] = useState<TenantSettings>(() => {
     try {
-      const saved = localStorage.getItem(`${STORAGE_KEY}_settings`);
+      const saved = localStorage.getItem(scopedKey('settings'));
       if (saved) {
         const parsed = JSON.parse(saved);
         const resolvedWhatsapp = parsed.whatsappNumber || parsed.whatsapp || INITIAL_SETTINGS.whatsapp;
@@ -330,7 +343,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [branches, setBranches] = useState<Branch[]>(() => {
     try {
-      const saved = localStorage.getItem(`${STORAGE_KEY}_branches`);
+      const saved = localStorage.getItem(scopedKey('branches'));
       return saved ? JSON.parse(saved) : INITIAL_BRANCHES;
     } catch {
       return INITIAL_BRANCHES;
@@ -339,7 +352,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [cms, setCmsState] = useState<CMSContent>(() => {
     try {
-      const saved = localStorage.getItem(`${STORAGE_KEY}_cms`);
+      const saved = localStorage.getItem(scopedKey('cms'));
       return saved ? JSON.parse(saved) : INITIAL_CMS;
     } catch {
       return INITIAL_CMS;
@@ -348,7 +361,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [students, setStudents] = useState<Student[]>(() => {
     try {
-      const saved = localStorage.getItem(`${STORAGE_KEY}_students`);
+      const saved = localStorage.getItem(scopedKey('students'));
       if (saved) {
         const parsed: Student[] = JSON.parse(saved);
         // Ensure student avatars use authentic Nigerian student pictures
@@ -371,7 +384,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [admissions, setAdmissions] = useState<AdmissionApplication[]>(() => {
     try {
-      const saved = localStorage.getItem(`${STORAGE_KEY}_admissions`);
+      const saved = localStorage.getItem(scopedKey('admissions'));
       return saved ? JSON.parse(saved) : INITIAL_ADMISSIONS;
     } catch {
       return INITIAL_ADMISSIONS;
@@ -380,7 +393,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [tutors, setTutors] = useState<Tutor[]>(() => {
     try {
-      const saved = localStorage.getItem(`${STORAGE_KEY}_tutors`);
+      const saved = localStorage.getItem(scopedKey('tutors'));
       return saved ? JSON.parse(saved) : INITIAL_TUTORS;
     } catch {
       return INITIAL_TUTORS;
@@ -389,7 +402,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [subjects, setSubjects] = useState<SubjectEntry[]>(() => {
     try {
-      const saved = localStorage.getItem(`${STORAGE_KEY}_subjects`);
+      const saved = localStorage.getItem(scopedKey('subjects'));
       return saved ? JSON.parse(saved) : INITIAL_SUBJECTS;
     } catch {
       return INITIAL_SUBJECTS;
@@ -402,7 +415,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [classrooms, setClassrooms] = useState<Classroom[]>(() => {
     try {
-      const saved = localStorage.getItem(`${STORAGE_KEY}_classrooms`);
+      const saved = localStorage.getItem(scopedKey('classrooms'));
       return saved ? JSON.parse(saved) : INITIAL_CLASSROOMS;
     } catch {
       return INITIAL_CLASSROOMS;
@@ -411,7 +424,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [attendanceSettings, setAttendanceSettings] = useState<AttendanceSettings>(() => {
     try {
-      const saved = localStorage.getItem(`${STORAGE_KEY}_attendanceSettings`);
+      const saved = localStorage.getItem(scopedKey('attendanceSettings'));
       return saved ? JSON.parse(saved) : INITIAL_ATTENDANCE_SETTINGS;
     } catch {
       return INITIAL_ATTENDANCE_SETTINGS;
@@ -420,7 +433,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [programmes, setProgrammes] = useState<Programme[]>(() => {
     try {
-      const saved = localStorage.getItem(`${STORAGE_KEY}_programmes`);
+      const saved = localStorage.getItem(scopedKey('programmes'));
       return saved ? JSON.parse(saved) : INITIAL_PROGRAMMES;
     } catch {
       return INITIAL_PROGRAMMES;
@@ -429,7 +442,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [timetable, setTimetable] = useState<TimetableSlot[]>(() => {
     try {
-      const saved = localStorage.getItem(`${STORAGE_KEY}_timetable`);
+      const saved = localStorage.getItem(scopedKey('timetable'));
       return saved ? JSON.parse(saved) : INITIAL_TIMETABLE;
     } catch {
       return INITIAL_TIMETABLE;
@@ -438,7 +451,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [results, setResults] = useState<StudentResult[]>(() => {
     try {
-      const saved = localStorage.getItem(`${STORAGE_KEY}_results`);
+      const saved = localStorage.getItem(scopedKey('results'));
       return saved ? JSON.parse(saved) : INITIAL_RESULTS;
     } catch {
       return INITIAL_RESULTS;
@@ -447,7 +460,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [cbtQuestions, setCbtQuestions] = useState<CBTQuestion[]>(() => {
     try {
-      const saved = localStorage.getItem(`${STORAGE_KEY}_cbt`);
+      const saved = localStorage.getItem(scopedKey('cbt'));
       return saved ? JSON.parse(saved) : INITIAL_CBT_QUESTIONS;
     } catch {
       return INITIAL_CBT_QUESTIONS;
@@ -456,7 +469,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [payments, setPayments] = useState<PaymentRecord[]>(() => {
     try {
-      const saved = localStorage.getItem(`${STORAGE_KEY}_payments`);
+      const saved = localStorage.getItem(scopedKey('payments'));
       return saved ? JSON.parse(saved) : INITIAL_PAYMENTS;
     } catch {
       return INITIAL_PAYMENTS;
@@ -465,7 +478,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [announcements, setAnnouncements] = useState<Announcement[]>(() => {
     try {
-      const saved = localStorage.getItem(`${STORAGE_KEY}_announcements`);
+      const saved = localStorage.getItem(scopedKey('announcements'));
       return saved ? JSON.parse(saved) : INITIAL_ANNOUNCEMENTS;
     } catch {
       return INITIAL_ANNOUNCEMENTS;
@@ -474,7 +487,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [admins, setAdmins] = useState<AdminUser[]>(() => {
     try {
-      const saved = localStorage.getItem(`${STORAGE_KEY}_admins`);
+      const saved = localStorage.getItem(scopedKey('admins'));
       return saved ? JSON.parse(saved) : INITIAL_ADMINS;
     } catch {
       return INITIAL_ADMINS;
@@ -483,7 +496,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [testimonials, setTestimonials] = useState<CMSContent['testimonials']>(() => {
     try {
-      const saved = localStorage.getItem(`${STORAGE_KEY}_testimonials`);
+      const saved = localStorage.getItem(scopedKey('testimonials'));
       return saved ? JSON.parse(saved) : INITIAL_CMS.testimonials;
     } catch {
       return INITIAL_CMS.testimonials;
@@ -492,7 +505,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [activities, setActivities] = useState<ActivityLog[]>(() => {
     try {
-      const saved = localStorage.getItem(`${STORAGE_KEY}_activities`);
+      const saved = localStorage.getItem(scopedKey('activities'));
       return saved ? JSON.parse(saved) : INITIAL_ACTIVITIES;
     } catch {
       return INITIAL_ACTIVITIES;
@@ -504,7 +517,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [classRatings, setClassRatings] = useState<ClassRating[]>([]);
   const [studyMaterials, setStudyMaterials] = useState<StudyMaterial[]>(() => {
     try {
-      const saved = localStorage.getItem(`${STORAGE_KEY}_studyMaterials`);
+      const saved = localStorage.getItem(scopedKey('studyMaterials'));
       return saved ? JSON.parse(saved) : INITIAL_STUDY_MATERIALS;
     } catch {
       return INITIAL_STUDY_MATERIALS;
@@ -513,7 +526,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   useEffect(() => {
     try {
-      localStorage.setItem(`${STORAGE_KEY}_studyMaterials`, JSON.stringify(studyMaterials));
+      localStorage.setItem(scopedKey('studyMaterials'), JSON.stringify(studyMaterials));
     } catch (e) {
       console.warn('Failed to save study materials locally:', e);
     }
@@ -531,6 +544,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const [activeCentre, setActiveCentre] = useState<Centre | null>(null);
+  // Stamp every new tenant document with the active centre so tenant-scoped
+  // reads (and later Firestore rules) can keep centres apart.
+  const tenantWrite = (data: Record<string, any>): Record<string, any> =>
+    activeCentreId ? { ...data, centreId: activeCentreId } : data;
   const [userCentres, setUserCentres] = useState<CentreUserRole[]>([]);
   const [entitlements, setEntitlements] = useState<CentreEntitlements>({
     chat: false,
@@ -553,7 +570,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setStudyMaterials((prev) => [newMaterial, ...prev]);
 
       try {
-        await setDoc(doc(db, 'studyMaterials', newId), newMaterial);
+        await setDoc(doc(db, 'studyMaterials', newId), tenantWrite(newMaterial));
       } catch (err) {
         console.warn('Firestore studyMaterial save (using local):', err);
       }
@@ -602,7 +619,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         status
       };
 
-      await setDoc(doc(db, 'attendance_logs', logId), newLog);
+      await setDoc(doc(db, 'attendance_logs', logId), tenantWrite(newLog));
       
       // Update student total count
       const student = students.find(s => s.id === studentId);
@@ -902,17 +919,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsub = onAuthStateChanged(firebaseAuth, async (u) => {
       setUser(u);
       if (u) {
-        // Recognize Super Admin
-        const isSuperAdmin = u.email === 'stylishdesigns484@gmail.com';
-        
         // Determine Auth Method
         const isGoogle = u.providerData.some(p => p.providerId === 'google.com');
         setAuthMethod(isGoogle ? 'google' : 'password');
 
         try {
-          // Admin check: verify by UID or Email
+          // Centre-admin access comes from the admins/{uid} document only
+          // (Prompt D): the old hard-coded platform-email shortcut is gone.
+          // Platform (TOS) access is the server-stamped `tos` claim instead.
           const adminDoc = await getDoc(doc(db, 'admins', u.uid));
-          let isAdminUser = adminDoc.exists() || isSuperAdmin;
+          let isAdminUser = adminDoc.exists();
           
           let adminData = adminDoc.exists() ? adminDoc.data() : null;
 
@@ -930,25 +946,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (isAdminUser) {
             const adminProfile: AdminUser = {
               id: u.uid,
-              name: isSuperAdmin ? (u.displayName || adminData?.name || 'Stylish Designs') : (u.displayName || adminData?.name || 'Administrator'),
+              name: u.displayName || adminData?.name || 'Administrator',
               email: u.email || '',
               phone: u.phoneNumber || '',
-              role: isSuperAdmin ? 'Super Admin' : (ROLE_MAP[adminData?.role] || adminData?.role || 'Center Admin'),
+              role: ROLE_MAP[adminData?.role] || adminData?.role || 'Center Admin',
               status: 'Active',
               department: 'Management',
-              jobTitle: isSuperAdmin ? 'Director of Studies' : (adminData?.jobTitle || 'Admin Staff'),
+              jobTitle: adminData?.jobTitle || 'Admin Staff',
               hasChangedPassword: true
             };
-
-            // Provision super admin if not in Firestore or if name is missing/generic/wrong
-            if (isSuperAdmin && (!adminDoc.exists() || !adminData?.name || adminData?.name.includes('(Super Admin)'))) {
-              try {
-                await setDoc(doc(db, 'admins', u.uid), adminProfile);
-                console.log('Super Admin provisioned/updated in Firestore.');
-              } catch (err) {
-                console.error('Failed to provision super admin:', err);
-              }
-            }
 
             setActiveUser(adminProfile);
             
@@ -1040,16 +1046,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (e.code !== 'unavailable' && !e.message?.includes('offline')) {
             console.error("Admin identity check failed:", e);
           }
-          setIsAdmin(isSuperAdmin);
+          // Identity check failed (offline or a Firestore error): no verified
+          // admin document, so no centre-admin access until it succeeds.
+          setIsAdmin(false);
           setActiveUser({
             id: u.uid,
             name: u.displayName || 'Administrator',
             email: u.email || '',
             phone: u.phoneNumber || '',
-            role: isSuperAdmin ? 'Super Administrator' : 'Administrator',
+            role: 'Administrator',
             status: 'Active',
             department: 'Management',
-            jobTitle: isSuperAdmin ? 'Director of Studies' : 'Admin Staff',
+            jobTitle: 'Admin Staff',
           });
         } finally {
           setIsAuthLoading(false);
@@ -1153,7 +1161,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const data = await res.json();
     if (!res.ok) {
-      throw new Error(data.error || 'That code did not match. Check it and try again.');
+      // The HTTP status rides along so callers can tell a real "no account"
+      // mismatch (400) from a lockout, suspension or server error.
+      const e: any = new Error(data.error || 'That code did not match. Check it and try again.');
+      e.status = res.status;
+      throw e;
     }
 
     setActiveCentreId(data.centreId);
@@ -1269,6 +1281,60 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  // Silent post-login entry: a signed-in user who belongs to exactly one
+  // centre enters it with no code screen. Returns how many centres the user
+  // belongs to so the caller can decide what to show when entry did not run.
+  // Centre ids the signed-in user holds a membership in, for strict
+  // centre-scoped login checks. Throws on network or server failure so a
+  // caller never mistakes a failed lookup for "no memberships".
+  const fetchMyCentreIds = async (): Promise<string[]> => {
+    if (!user) return [];
+    const token = await user.getIdToken();
+    const res = await fetch('/api/auth/my-centres', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error('Could not verify your centre memberships.');
+    const data = await res.json().catch(() => ({}));
+    const centres: any[] = (data && data.success && Array.isArray(data.centres)) ? data.centres : [];
+    return centres.map((c: any) => String(c.centreId || '')).filter(Boolean);
+  };
+
+  const enterSoleCentre = async (): Promise<{ entered: boolean; count: number }> => {
+    if (!user) return { entered: false, count: 0 };
+    const token = await user.getIdToken();
+    try {
+      const res = await fetch('/api/auth/my-centres', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      const centres: CentreUserRole[] = (data && data.success && Array.isArray(data.centres)) ? data.centres : [];
+      if (centres.length !== 1) return { entered: false, count: centres.length };
+      const target: any = centres[0];
+      if (!target || !target.centreId) return { entered: false, count: 1 };
+      const valRes = await fetch('/api/auth/validate-active-centre', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ centreId: target.centreId }),
+      });
+      const valData = await valRes.json();
+      if (!valRes.ok || !valData.success) return { entered: false, count: 1 };
+      setActiveCentreId(target.centreId);
+      setActiveCentre(valData.centre);
+      if (valData.entitlements) setEntitlements(valData.entitlements);
+      sessionStorage.setItem('tos_activeCentreId', target.centreId);
+      refreshSeatsSummary(target.centreId);
+      if (valData.role === 'student') setViewMode('student');
+      else if (valData.role === 'tutor') setViewMode('tutor');
+      else setViewMode('portal');
+      return { entered: true, count: 1 };
+    } catch (e) {
+      return { entered: false, count: 0 };
+    }
+  };
+
   const refreshSeatsSummary = async (targetId?: string) => {
     const cId = targetId || activeCentreId;
     if (!cId || !user) return;
@@ -1289,7 +1355,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const toggleStudentAccess = async (studentUid: string, active: boolean) => {
     if (!user) throw new Error('You must be signed in.');
     const token = await user.getIdToken();
-    const cId = activeCentreId || 'centre-excellence';
+    if (!activeCentreId) throw new Error('Select your centre first.');
+    const cId = activeCentreId;
     const res = await fetch('/api/centre/students/toggle-access', {
       method: 'POST',
       headers: {
@@ -1319,7 +1386,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const activateStudentMembership = async (studentUid: string) => {
     if (!user) throw new Error('You must be signed in.');
     const token = await user.getIdToken();
-    const cId = activeCentreId || 'centre-excellence';
+    if (!activeCentreId) throw new Error('Select your centre first.');
+    const cId = activeCentreId;
     const res = await fetch('/api/centre/students/activate', {
       method: 'POST',
       headers: {
@@ -1362,27 +1430,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setBgTheme(bgTheme === 'light' ? 'dark' : 'light');
   };
 
+  // The dashboard brand follows the active centre, never a shared default.
+  const centreName = activeCentre?.name || '';
+
   // Sync state to localStorage
   useEffect(() => {
     try {
       localStorage.setItem(`${STORAGE_KEY}_settings`, JSON.stringify(settings));
-      localStorage.setItem(`${STORAGE_KEY}_branches`, JSON.stringify(branches));
+      localStorage.setItem(scopedKey('branches'), JSON.stringify(branches));
       localStorage.setItem(`${STORAGE_KEY}_cms`, JSON.stringify(cms));
-      localStorage.setItem(`${STORAGE_KEY}_students`, JSON.stringify(students));
-      localStorage.setItem(`${STORAGE_KEY}_admissions`, JSON.stringify(admissions));
-      localStorage.setItem(`${STORAGE_KEY}_tutors`, JSON.stringify(tutors));
-      localStorage.setItem(`${STORAGE_KEY}_subjects`, JSON.stringify(subjects));
-      localStorage.setItem(`${STORAGE_KEY}_classrooms`, JSON.stringify(classrooms));
+      localStorage.setItem(scopedKey('students'), JSON.stringify(students));
+      localStorage.setItem(scopedKey('admissions'), JSON.stringify(admissions));
+      localStorage.setItem(scopedKey('tutors'), JSON.stringify(tutors));
+      localStorage.setItem(scopedKey('subjects'), JSON.stringify(subjects));
+      localStorage.setItem(scopedKey('classrooms'), JSON.stringify(classrooms));
       localStorage.setItem(`${STORAGE_KEY}_attendanceSettings`, JSON.stringify(attendanceSettings));
-      localStorage.setItem(`${STORAGE_KEY}_programmes`, JSON.stringify(programmes));
-      localStorage.setItem(`${STORAGE_KEY}_timetable`, JSON.stringify(timetable));
-      localStorage.setItem(`${STORAGE_KEY}_results`, JSON.stringify(results));
-      localStorage.setItem(`${STORAGE_KEY}_cbt`, JSON.stringify(cbtQuestions));
-      localStorage.setItem(`${STORAGE_KEY}_payments`, JSON.stringify(payments));
-      localStorage.setItem(`${STORAGE_KEY}_announcements`, JSON.stringify(announcements));
-      localStorage.setItem(`${STORAGE_KEY}_admins`, JSON.stringify(admins));
+      localStorage.setItem(scopedKey('programmes'), JSON.stringify(programmes));
+      localStorage.setItem(scopedKey('timetable'), JSON.stringify(timetable));
+      localStorage.setItem(scopedKey('results'), JSON.stringify(results));
+      localStorage.setItem(scopedKey('cbt'), JSON.stringify(cbtQuestions));
+      localStorage.setItem(scopedKey('payments'), JSON.stringify(payments));
+      localStorage.setItem(scopedKey('announcements'), JSON.stringify(announcements));
+      localStorage.setItem(scopedKey('admins'), JSON.stringify(admins));
       localStorage.setItem(`${STORAGE_KEY}_testimonials`, JSON.stringify(testimonials));
-      localStorage.setItem(`${STORAGE_KEY}_activities`, JSON.stringify(activities));
+      localStorage.setItem(scopedKey('activities'), JSON.stringify(activities));
     } catch {
       // ignore storage quota errors in private browsing
     }
@@ -1426,7 +1497,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (newSettings.whatsapp && !newSettings.whatsappNumber) {
         updated.whatsappNumber = newSettings.whatsapp;
       }
-      await setDoc(doc(db, 'settings', 'global'), updated);
+      if (!activeCentreId) throw new Error('Select your centre before saving settings.');
+      await setDoc(doc(db, 'centreSettings', `${activeCentreId}__global`), updated);
       setSettingsState(updated);
       addToast({
         type: 'success',
@@ -1440,7 +1512,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         type: 'info',
       });
     } catch (e) {
-      handleFirestoreError(e, OperationType.UPDATE, 'settings/global');
+      handleFirestoreError(e, OperationType.UPDATE, 'your centre settings');
     }
   };
 
@@ -1473,7 +1545,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateCMS = async (newCms: Partial<CMSContent>) => {
     try {
       const updated = { ...cms, ...newCms };
-      await setDoc(doc(db, 'cms', 'main'), updated);
+      if (!activeCentreId) throw new Error('Select your centre before saving website content.');
+      await setDoc(doc(db, 'centreSettings', `${activeCentreId}__cms`), updated);
       setCmsState(updated);
       addToast({
         type: 'success',
@@ -1487,7 +1560,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         type: 'success',
       });
     } catch (e) {
-      handleFirestoreError(e, OperationType.UPDATE, 'cms/main');
+      handleFirestoreError(e, OperationType.UPDATE, 'your website content');
     }
   };
 
@@ -1499,7 +1572,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         id,
         studentCount: 0,
       };
-      await setDoc(doc(db, 'branches', id), newBranch);
+      await setDoc(doc(db, 'branches', id), tenantWrite(newBranch));
       setBranches((prev) => [...prev, newBranch]);
       addToast({
         type: 'success',
@@ -1544,16 +1617,56 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Firestore Real-time Sync (Gated and Scoped)
+  // Centre change: while the next centre's records load, per-centre screens
+  // never show another centre's settings, website content or attendance times.
   useEffect(() => {
-    if (!user) return;
+    setSettingsState(INITIAL_SETTINGS);
+    setAttendanceSettings(INITIAL_ATTENDANCE_SETTINGS);
+    setCmsState(INITIAL_CMS);
+    setTestimonials(INITIAL_CMS.testimonials);
+  }, [activeCentreId]);
+
+  useEffect(() => {
+    if (!user) {
+      // Signed out: nothing centre-specific may linger on screen or in cache.
+      setSettingsState(INITIAL_SETTINGS);
+      setAttendanceSettings(INITIAL_ATTENDANCE_SETTINGS);
+      setCmsState(INITIAL_CMS);
+      setTestimonials(INITIAL_CMS.testimonials);
+      try {
+        ['settings', 'cms', 'testimonials', 'attendanceSettings'].forEach((name) => {
+          localStorage.removeItem(`${STORAGE_KEY}_${name}`);
+          const suffix = centreScopeSuffix();
+          if (suffix !== 'none') localStorage.removeItem(`${STORAGE_KEY}_${suffix}_${name}`);
+        });
+      } catch { /* cache clearing is best-effort */ }
+      return;
+    }
+
+    // Tenant scope: only the active centre's records render. Documents the
+    // one-time import has not tagged with centreId yet stay hidden until the
+    // backfill tags them, so one centre never sees another centre's records.
+    const scopedDocs = (docs: any[]): any[] =>
+      activeCentreId ? docs.filter((d: any) => d.centreId === activeCentreId) : [];
+
+    // Centre-scoped reads: with the active centre known, the query itself asks
+    // Firestore only for this centre's documents, so other centres' records
+    // never leave the database. Without a centre the wide query stays, and
+    // scopedDocs keeps filtering client-side.
+    const centreQuery = (coll: string) =>
+      activeCentreId
+        ? query(collection(db, coll), where('centreId', '==', activeCentreId))
+        : query(collection(db, coll));
 
     // Students listener
     let qStudents = query(collection(db, 'students'));
     if (!isAdmin) {
       qStudents = query(collection(db, 'students'), where('uid', '==', user.uid));
+    } else if (activeCentreId) {
+      qStudents = centreQuery('students');
     }
     const unsubStudents = onSnapshot(qStudents, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Student));
+      const data = scopedDocs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Student)));
       setStudents(data);
     }, (error) => handleFirestoreError(error, OperationType.GET, 'students'));
 
@@ -1566,15 +1679,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } else {
         skipAdmissions = true;
       }
+    } else if (activeCentreId) {
+      qAdmissions = centreQuery('admissions');
     }
     const unsubAdmissions = !skipAdmissions ? onSnapshot(qAdmissions, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as AdmissionApplication));
+      const data = scopedDocs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as AdmissionApplication)));
       setAdmissions(data);
     }, (error) => handleFirestoreError(error, OperationType.GET, 'admissions')) : () => {};
 
     // Tutors listener
-    const unsubTutors = onSnapshot(collection(db, 'tutors'), (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Tutor));
+    const unsubTutors = onSnapshot(centreQuery('tutors'), (snapshot) => {
+      const data = scopedDocs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Tutor)));
       setTutors(data);
       
       // Keep activeTutor in sync with real-time data
@@ -1587,7 +1702,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }, (error) => handleFirestoreError(error, OperationType.GET, 'tutors'));
 
     // Admins listener
-    const unsubAdmins = onSnapshot(collection(db, 'admins'), (snapshot) => {
+    const unsubAdmins = onSnapshot(centreQuery('admins'), (snapshot) => {
       const data = snapshot.docs.map(doc => {
         const raw = doc.data();
         return {
@@ -1596,88 +1711,106 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           role: ROLE_MAP[raw.role] || raw.role || 'Tutor'
         } as AdminUser;
       });
-      setAdmins(data);
+      // Tenant scope: only the active centre's admin records render.
+      const scopedAdmins = activeCentreId ? data.filter((a: any) => a.centreId === activeCentreId) : [];
+      setAdmins(scopedAdmins);
       
       // Update activeUser if applicable
       if (user) {
-        const isSuperAdmin = user.email === 'stylishdesigns484@gmail.com';
-        const currentAdmin = data.find(a => a.id === user.uid || a.email === user.email);
+        const currentAdmin = scopedAdmins.find(a => a.id === user.uid || a.email === user.email);
         
         if (currentAdmin) {
-          setActiveUser({
-            ...currentAdmin,
-            // Ensure super admin role is preserved if email matches
-            role: isSuperAdmin ? 'Super Admin' : currentAdmin.role
-          });
+          setActiveUser(currentAdmin);
           setIsAdmin(true);
         }
       }
     }, (error) => handleFirestoreError(error, OperationType.GET, 'admins'));
 
-    // Settings listener
-    const unsubSettings = onSnapshot(doc(db, 'settings', 'global'), (snapshot) => {
-      if (snapshot.exists()) setSettingsState(snapshot.data() as TenantSettings);
-    }, (error) => handleFirestoreError(error, OperationType.GET, 'settings/global'));
+    // Settings listener — per centre: each centre owns its own record
+    // (centreSettings/{centreId}__global). The shared settings/global doc is
+    // no longer read for a centre; it remains only as a migration source.
+    const settingsRef = activeCentreId ? doc(db, 'centreSettings', `${activeCentreId}__global`) : null;
+    const unsubSettings = settingsRef ? onSnapshot(settingsRef, (snapshot) => {
+      if (snapshot.exists()) {
+        setSettingsState(snapshot.data() as TenantSettings);
+      } else {
+        // A centre with no settings yet starts from neutral defaults.
+        setSettingsState(INITIAL_SETTINGS);
+      }
+    }, (error) => handleFirestoreError(error, OperationType.GET, 'centre settings')) : () => {};
 
-    const unsubAttendanceSettings = onSnapshot(doc(db, 'settings', 'attendance'), (snapshot) => {
-      if (snapshot.exists()) setAttendanceSettings(snapshot.data() as AttendanceSettings);
-    }, (error) => handleFirestoreError(error, OperationType.GET, 'settings/attendance'));
+    const attendanceRef = activeCentreId ? doc(db, 'centreSettings', `${activeCentreId}__attendance`) : null;
+    const unsubAttendanceSettings = attendanceRef ? onSnapshot(attendanceRef, (snapshot) => {
+      if (snapshot.exists()) {
+        setAttendanceSettings(snapshot.data() as AttendanceSettings);
+      } else {
+        setAttendanceSettings(INITIAL_ATTENDANCE_SETTINGS);
+      }
+    }, (error) => handleFirestoreError(error, OperationType.GET, 'centre attendance settings')) : () => {};
 
     // Payments listener
-    const qPayments = query(collection(db, 'payments'));
+    const qPayments = centreQuery('payments');
     const unsubPayments = onSnapshot(qPayments, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as PaymentRecord));
+      const data = scopedDocs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as PaymentRecord)));
       setPayments(data);
     }, (error) => handleFirestoreError(error, OperationType.GET, 'payments'));
 
     // Programmes listener
-    const unsubProgrammes = onSnapshot(collection(db, 'programmes'), (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Programme));
+    const unsubProgrammes = onSnapshot(centreQuery('programmes'), (snapshot) => {
+      const data = scopedDocs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Programme)));
       setProgrammes(data);
     }, (error) => handleFirestoreError(error, OperationType.GET, 'programmes'));
 
     // Branches listener
-    const unsubBranches = onSnapshot(collection(db, 'branches'), (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Branch));
+    const unsubBranches = onSnapshot(centreQuery('branches'), (snapshot) => {
+      const data = scopedDocs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Branch)));
       setBranches(data);
     }, (error) => handleFirestoreError(error, OperationType.GET, 'branches'));
 
-    // CMS listener
-    const unsubCMS = onSnapshot(doc(db, 'cms', 'main'), (snapshot) => {
-      if (snapshot.exists()) setCmsState(snapshot.data() as CMSContent);
-    }, (error) => handleFirestoreError(error, OperationType.GET, 'cms/main'));
+    // CMS listener — per centre website content (centreSettings/{centreId}__cms)
+    const cmsRef = activeCentreId ? doc(db, 'centreSettings', `${activeCentreId}__cms`) : null;
+    const unsubCMS = cmsRef ? onSnapshot(cmsRef, (snapshot) => {
+      if (snapshot.exists()) {
+        setCmsState(snapshot.data() as CMSContent);
+      } else {
+        // A centre with no website content yet starts from neutral defaults.
+        setCmsState(INITIAL_CMS);
+      }
+    }, (error) => handleFirestoreError(error, OperationType.GET, 'centre website content')) : () => {};
 
     // Attendance Logs listener
     let qAttendance = query(collection(db, 'attendance_logs'));
     if (!isAdmin) {
       qAttendance = query(collection(db, 'attendance_logs'), where('studentId', '==', user.uid));
+    } else if (activeCentreId) {
+      qAttendance = centreQuery('attendance_logs');
     }
     const unsubAttendance = onSnapshot(qAttendance, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as AttendanceLog));
+      const data = scopedDocs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as AttendanceLog)));
       setAttendanceLogs(data);
     }, (error) => handleFirestoreError(error, OperationType.GET, 'attendance_logs'));
 
     // Announcements listener
-    const unsubAnnouncements = onSnapshot(collection(db, 'announcements'), (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Announcement));
+    const unsubAnnouncements = onSnapshot(centreQuery('announcements'), (snapshot) => {
+      const data = scopedDocs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Announcement)));
       setAnnouncements(data);
     }, (error) => handleFirestoreError(error, OperationType.GET, 'announcements'));
 
     // Subjects listener
-    const unsubSubjects = onSnapshot(collection(db, 'subjects'), (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as SubjectEntry));
+    const unsubSubjects = onSnapshot(centreQuery('subjects'), (snapshot) => {
+      const data = scopedDocs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as SubjectEntry)));
       setSubjects(data);
     }, (error) => handleFirestoreError(error, OperationType.GET, 'subjects'));
 
     // Classrooms listener
-    const unsubClassrooms = onSnapshot(collection(db, 'classrooms'), (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Classroom));
+    const unsubClassrooms = onSnapshot(centreQuery('classrooms'), (snapshot) => {
+      const data = scopedDocs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Classroom)));
       setClassrooms(data);
     }, (error) => handleFirestoreError(error, OperationType.GET, 'classrooms'));
 
     // Timetable listener
-    const unsubTimetable = onSnapshot(collection(db, 'timetable'), (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as TimetableSlot));
+    const unsubTimetable = onSnapshot(centreQuery('timetable'), (snapshot) => {
+      const data = scopedDocs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as TimetableSlot)));
       setTimetable(data);
     }, (error) => handleFirestoreError(error, OperationType.GET, 'timetable'));
 
@@ -1688,41 +1821,43 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const isStaff = isAdmin || !!activeTutor || tutors.some(t => t.id === user?.uid || t.email === user?.email);
     if (!isStaff && user) {
       qResults = query(collection(db, 'results'), where('studentId', '==', user.uid));
+    } else if (activeCentreId) {
+      qResults = centreQuery('results');
     }
     const unsubResults = onSnapshot(qResults, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as StudentResult));
+      const data = scopedDocs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as StudentResult)));
       setResults(data);
     }, (error) => handleFirestoreError(error, OperationType.GET, 'results'));
 
     // CBT Questions listener
-    const unsubCBT = onSnapshot(collection(db, 'cbt_questions'), (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as CBTQuestion));
+    const unsubCBT = onSnapshot(centreQuery('cbt_questions'), (snapshot) => {
+      const data = scopedDocs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as CBTQuestion)));
       setCbtQuestions(data);
     }, (error) => handleFirestoreError(error, OperationType.GET, 'cbt_questions'));
 
     // CBT Exams listener
-    const unsubCBTExams = onSnapshot(collection(db, 'cbt_exams'), (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as CBTExam));
+    const unsubCBTExams = onSnapshot(centreQuery('cbt_exams'), (snapshot) => {
+      const data = scopedDocs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as CBTExam)));
       setExams(data);
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'cbt_exams'));
 
     // Activities listener
-    let qActivities = query(collection(db, 'activities'));
+    let qActivities = centreQuery('activities');
     const unsubActivities = isAdmin ? onSnapshot(qActivities, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as ActivityLog));
+      const data = scopedDocs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as ActivityLog)));
       setActivities(data);
     }, (error) => handleFirestoreError(error, OperationType.GET, 'activities')) : () => {};
 
     // Class Ratings listener
-    const unsubClassRatings = onSnapshot(collection(db, 'classRatings'), (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as ClassRating));
+    const unsubClassRatings = onSnapshot(centreQuery('classRatings'), (snapshot) => {
+      const data = scopedDocs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as ClassRating)));
       setClassRatings(data);
     }, (error) => console.warn('classRatings snapshot error:', error));
 
     // Study Materials listener
-    const unsubStudyMaterials = onSnapshot(collection(db, 'studyMaterials'), (snapshot) => {
+    const unsubStudyMaterials = onSnapshot(centreQuery('studyMaterials'), (snapshot) => {
       if (!snapshot.empty) {
-        const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as StudyMaterial));
+        const data = scopedDocs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as StudyMaterial)));
         setStudyMaterials(data);
       }
     }, (error) => console.warn('studyMaterials snapshot error:', error));
@@ -1750,12 +1885,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       unsubClassRatings();
       unsubStudyMaterials();
     };
-  }, [user, isAdmin, activeTutor]); // Removed 'tutors' dependency to avoid frequent resets
+  }, [user, isAdmin, activeTutor, activeCentreId]); // Re-subscribes per active centre so reads stay scoped to it
 
   const addStudent = async (studentData: Omit<Student, 'id' | 'registrationDate'>) => {
     try {
       const id = `stu-${Date.now()}`;
-      const cId = activeCentreId || 'centre-excellence';
+      if (!activeCentreId) throw new Error('Select your centre first.');
+      const cId = activeCentreId;
 
       // SERVER SEAT ENFORCEMENT: Verify cap in transaction and activate membership
       await activateStudentMembership(id);
@@ -1766,7 +1902,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         centreId: cId,
         registrationDate: new Date().toISOString().split('T')[0],
       };
-      await setDoc(doc(db, 'students', id), newStudent);
+      await setDoc(doc(db, 'students', id), tenantWrite(newStudent));
       
       addToast({
         type: 'success',
@@ -1838,7 +1974,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         status: 'Pending',
         appliedDate: new Date().toISOString().split('T')[0],
       };
-      await setDoc(doc(db, 'admissions', id), newApp);
+      await setDoc(doc(db, 'admissions', id), tenantWrite(newApp));
       
       addToast({
         type: 'success',
@@ -1857,7 +1993,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (!app) return;
 
       const studentId = `stu-${Date.now()}`;
-      const cId = activeCentreId || 'centre-excellence';
+      if (!activeCentreId) throw new Error('Select your centre first.');
+      const cId = activeCentreId;
 
       // SERVER SEAT ENFORCEMENT: Verify cap in transaction and activate membership
       await activateStudentMembership(studentId);
@@ -1906,7 +2043,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         paymentStatus: 'Pending',
       };
 
-      await setDoc(doc(db, 'students', studentId), newStudent);
+      await setDoc(doc(db, 'students', studentId), tenantWrite(newStudent));
       await updateDoc(doc(db, 'admissions', id), { status: 'Approved' });
 
       addToast({
@@ -1959,7 +2096,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         id: authUid,
       };
 
-      await setDoc(doc(db, 'tutors', authUid), newTutor);
+      await setDoc(doc(db, 'tutors', authUid), tenantWrite(newTutor));
       
       addToast({
         type: 'success',
@@ -2036,7 +2173,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ...subjectData,
         id,
       };
-      await setDoc(doc(db, 'subjects', id), newSubject);
+      await setDoc(doc(db, 'subjects', id), tenantWrite(newSubject));
       addToast({
         type: 'success',
         title: 'Subject Added',
@@ -2079,7 +2216,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ...classroomData,
         id,
       };
-      await setDoc(doc(db, 'classrooms', id), newRoom);
+      await setDoc(doc(db, 'classrooms', id), tenantWrite(newRoom));
       addToast({
         type: 'success',
         title: 'Classroom Added',
@@ -2124,7 +2261,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         id,
         enrolledStudents: 0,
       };
-      await setDoc(doc(db, 'programmes', id), newProg);
+      await setDoc(doc(db, 'programmes', id), tenantWrite(newProg));
       addToast({
         type: 'success',
         title: 'Programme Created',
@@ -2160,7 +2297,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // Remove undefined fields for Firestore
       Object.keys(newSlot).forEach(key => newSlot[key] === undefined && delete newSlot[key]);
 
-      await setDoc(doc(db, 'timetable', id), newSlot);
+      await setDoc(doc(db, 'timetable', id), tenantWrite(newSlot));
       addToast({
         type: 'success',
         title: 'Timetable Slot Added',
@@ -2183,7 +2320,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         // Remove undefined fields for Firestore
         Object.keys(newSlot).forEach(key => newSlot[key] === undefined && delete newSlot[key]);
 
-        await setDoc(doc(db, 'timetable', id), newSlot);
+        await setDoc(doc(db, 'timetable', id), tenantWrite(newSlot));
       }
       addToast({
         type: 'success',
@@ -2264,7 +2401,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updatedAt: nowIso,
       };
 
-      await setDoc(doc(db, 'classRatings', ratingDocId), record);
+      await setDoc(doc(db, 'classRatings', ratingDocId), tenantWrite(record));
       setClassRatings(prev => {
         const idx = prev.findIndex(r => r.slotId === ratingData.slotId && r.studentId === ratingData.studentId);
         if (idx >= 0) {
@@ -2394,10 +2531,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateAttendanceSettings = async (timing: Partial<AttendanceSettings>) => {
     try {
-      await setDoc(doc(db, 'settings', 'attendance'), timing, { merge: true });
+      if (!activeCentreId) throw new Error('Select your centre before saving attendance times.');
+      await setDoc(doc(db, 'centreSettings', `${activeCentreId}__attendance`), timing, { merge: true });
       setAttendanceSettings((prev) => ({ ...prev, ...timing }));
     } catch (e) {
-      handleFirestoreError(e, OperationType.WRITE, 'settings/attendance');
+      handleFirestoreError(e, OperationType.WRITE, 'your attendance settings');
     }
   };
 
@@ -2410,7 +2548,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         id,
       };
 
-      await setDoc(doc(db, 'results', id), newResult);
+      await setDoc(doc(db, 'results', id), tenantWrite(newResult));
       addToast({
         type: 'success',
         title: 'Test Score Recorded',
@@ -2429,7 +2567,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ...qData,
         id,
       };
-      await setDoc(doc(db, 'cbt_questions', id), newQ);
+      await setDoc(doc(db, 'cbt_questions', id), tenantWrite(newQ));
       addToast({
         type: 'success',
         title: 'CBT Question Added',
@@ -2442,6 +2580,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const recordPayment = async (paymentData: Omit<PaymentRecord, 'id' | 'receiptNumber' | 'date'>) => {
     try {
+      if (!activeCentreId) {
+        addToast({ type: 'error', title: 'Payment Failed', description: 'No centre is active in this session, so the payment cannot be tagged to a centre. Sign in and enter your centre again.' });
+        return;
+      }
       const receiptNumber = `REC-2026-${Math.floor(1000 + Math.random() * 9000)}`;
       const id = `pay-${Date.now()}`;
       const newPayment: PaymentRecord = {
@@ -2467,7 +2609,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return s;
       }));
 
-      await setDoc(doc(db, 'payments', id), newPayment);
+      await setDoc(doc(db, 'payments', id), tenantWrite(newPayment));
 
       // Update student record in Firestore
       const student = students.find(s => s.id === paymentData.studentId);
@@ -2501,66 +2643,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     await signOut(firebaseAuth);
   };
 
-  // Seed initial data if Firestore is empty (Admin check)
-  useEffect(() => {
-    if (!isAdmin) return; // Only admins can seed
-
-    const seedData = async () => {
-      try {
-        // Use a slight delay to ensure network is initialized
-        const settingsDoc = await getDoc(doc(db, 'settings', 'global'));
-        if (!settingsDoc.exists()) {
-          console.log('Seeding initial data to Firestore...');
-          await setDoc(doc(db, 'settings', 'global'), INITIAL_SETTINGS);
-          
-          // Helper to create demo auth users
-          const createDemoAuth = async (email: string, pass: string, label: string) => {
-            const secondaryApp = initializeApp(firebaseConfigValues, `demo-creation-${label}`);
-            const secondaryAuth = getAuth(secondaryApp);
-            try {
-              await createUserWithEmailAndPassword(secondaryAuth, email, pass);
-              console.log(`Demo Auth account created: ${email}`);
-            } catch (err: any) {
-              if (err.code !== 'auth/email-already-in-use') {
-                console.error(`Demo Auth failed for ${email}:`, err);
-              }
-            } finally {
-              await deleteApp(secondaryApp);
-            }
-          };
-
-          // Create standard demo accounts
-          await createDemoAuth('admin@excellencetutorials.ng', 'Admin@123', 'admin');
-          await createDemoAuth('tutor@excellencetutorials.ng', 'Tutor@123', 'tutor');
-          await createDemoAuth('student@excellencetutorials.ng', 'Student@123', 'student');
-
-          // Seed students
-          for (const s of INITIAL_STUDENTS) {
-            await setDoc(doc(db, 'students', s.id), s);
-          }
-          // Seed tutors
-          for (const t of INITIAL_TUTORS) {
-            await setDoc(doc(db, 'tutors', t.id), { ...t, temporaryPassword: 'Tutor@123', hasChangedPassword: false });
-          }
-          // Seed admins
-          for (const a of INITIAL_ADMINS) {
-            await setDoc(doc(db, 'admins', a.id), { ...a, temporaryPassword: 'Admin@123', hasChangedPassword: false });
-          }
-          // Seed programmes
-          for (const p of INITIAL_PROGRAMMES) {
-            await setDoc(doc(db, 'programmes', p.id), p);
-          }
-          console.log('Seeding complete.');
-        }
-      } catch (e: any) {
-        // Suppress noisy offline logs during seeding
-        if (e.code !== 'unavailable' && !e.message?.includes('offline')) {
-          console.error('Error seeding data:', e);
-        }
-      }
-    };
-    seedData();
-  }, [isAdmin]);
 
   const addAnnouncement = async (annData: Omit<Announcement, 'id' | 'date'>) => {
     try {
@@ -2570,7 +2652,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         id,
         date: new Date().toISOString().split('T')[0],
       };
-      await setDoc(doc(db, 'announcements', id), newAnn);
+      await setDoc(doc(db, 'announcements', id), tenantWrite(newAnn));
       addToast({
         type: 'success',
         title: 'Announcement Published',
@@ -2621,7 +2703,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         id: authUid,
       };
 
-      await setDoc(doc(db, 'admins', authUid), newAdmin);
+      await setDoc(doc(db, 'admins', authUid), tenantWrite(newAdmin));
       addToast({
         type: 'success',
         title: 'Staff Member Invited',
@@ -2696,7 +2778,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         id,
         timeAgo: 'Just now',
       };
-      await setDoc(doc(db, 'activities', id), newAct);
+      await setDoc(doc(db, 'activities', id), tenantWrite(newAct));
     } catch (e) {
       console.error('Failed to log activity:', e);
     }
@@ -2801,11 +2883,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isAuthLoading,
         activeCentreId,
         activeCentre,
+        centreName,
         userCentres,
         entitlements,
         seatsSummary,
         hasCheckedActiveCentre,
         enterCentreByCode,
+        enterSoleCentre,
+        fetchMyCentreIds,
         joinCentreByCode,
         switchCentre,
         refreshSeatsSummary,

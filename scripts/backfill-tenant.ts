@@ -34,8 +34,23 @@ function generate6DigitCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
+// The owner UID is a real Firebase Auth UID, passed per run (Prompt D): there
+// is no hard-coded account anywhere in the script.
+function resolveOwnerUid(): string {
+  const i = process.argv.indexOf('--owner-uid');
+  if (i > -1 && process.argv[i + 1]) return String(process.argv[i + 1]);
+  return process.env.EXCELLENCE_OWNER_UID || '';
+}
+
+const OWNER_UID = resolveOwnerUid();
+
 async function main() {
   const isApply = process.argv.includes('--apply');
+  if (isApply && !OWNER_UID) {
+    console.error('APPLY mode requires the real owner UID: pass --owner-uid <uid> or set EXCELLENCE_OWNER_UID.');
+    console.error('Refusing to write a centre whose ownerUid is not a real Firebase Auth UID.');
+    process.exit(1);
+  }
   console.log(`========================================================`);
   console.log(`  Tutorial OS Multi-Tenant Backfill Script (Prompt 1)`);
   console.log(`  Mode: ${isApply ? 'APPLY (Writing changes to Firestore)' : 'DRY RUN (Preview only, use --apply to commit)'}`);
@@ -58,9 +73,8 @@ async function main() {
   const centreDoc: Centre = {
     id: EXCELLENCE_CENTRE_ID,
     name: globalData.centreName || 'Excellence Tutorial Centre',
-    type: 'centre',
     status: 'active',
-    ownerUid: 'stylishdesigns484@gmail.com', // Will be linked to owner UID
+    ownerUid: OWNER_UID, // passed with --owner-uid or EXCELLENCE_OWNER_UID
     branding: {
       logo: globalData.logoText || 'Excellence',
       primaryColor: globalData.primaryColor || '#EA580C',
@@ -172,7 +186,7 @@ async function main() {
     const uid = data.uid || docSnap.id;
     if (uid) {
       let role: MembershipRole = 'admin';
-      if (data.role === 'Super Admin' || data.email === 'stylishdesigns484@gmail.com') {
+      if (data.role === 'Super Admin') {
         role = 'owner';
       } else if (data.role === 'Center Admin') {
         role = 'admin';
