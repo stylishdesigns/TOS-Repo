@@ -256,8 +256,26 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
     }
   };
 
+  // Copy guide: mirrors the centres' own guide style, which always opens with
+  // the batch setup (subject, topic, count and the rest) taken from the
+  // fields above the paste box, then the question format itself.
+  const pipelineLabelGuide = importDefaults.examType === 'jamb' ? 'JAMB' : 'WAEC/NECO';
+  const dynamicGuide = [
+    'SETUP FOR THIS BATCH (filled from the fields above the paste box):',
+    `Exam pipeline: ${pipelineLabelGuide}`,
+    `Subject: ${importDefaults.subject || '[pick a subject above]'}`,
+    `Topic: ${importDefaults.topic || '[pick a topic above]'}`,
+    `Year: ${importDefaults.year || (kind === 'practice' ? '[pick a year above]' : '[optional]')}`,
+    `Difficulty: ${importDefaults.difficulty.charAt(0).toUpperCase() + importDefaults.difficulty.slice(1)}`,
+    'Number of questions: as many as you paste (the preview shows the count)',
+    '',
+    'Paste only the questions into the box, not these setup lines.',
+    '',
+    BANK_FORMAT_GUIDE,
+  ].join('\n');
+
   const copyGuide = async () => {
-    try { await navigator.clipboard.writeText(BANK_FORMAT_GUIDE); setImportNotice('Format guide copied.'); } catch { /* clipboard unavailable */ }
+    try { await navigator.clipboard.writeText(dynamicGuide); setImportNotice('Format guide copied with your current setup.'); } catch { /* clipboard unavailable */ }
   };
 
   if (error) return <p className="text-rose-300 text-sm">{error}</p>;
@@ -348,7 +366,7 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
           <button onClick={copyGuide} className="text-[11px] text-slate-400 hover:text-orange-300 flex items-center gap-1.5"><Copy className="w-3.5 h-3.5" /> Copy guide</button>
         </div>
         {showGuide && (
-          <pre className="bg-slate-950/80 border border-white/10 rounded-xl p-4 text-[11px] text-slate-300 leading-relaxed overflow-x-auto whitespace-pre-wrap mb-3">{BANK_FORMAT_GUIDE}</pre>
+          <pre className="bg-slate-950/80 border border-white/10 rounded-xl p-4 text-[11px] text-slate-300 leading-relaxed overflow-x-auto whitespace-pre-wrap mb-3">{dynamicGuide}</pre>
         )}
 
         <textarea
