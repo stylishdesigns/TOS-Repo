@@ -28,17 +28,80 @@ export interface ParseResult {
   skippedEmpty: number;
 }
 
-export function parseBankPaste(text: string): ParseResult {
+// Inline question support: some publishers write a whole question on one
+// line, e.g.
+//   1. Which particle bonds atoms? A: Protons B: Neutrons C: Electrons
+//   D: Nuclei Answer: C Explanation: Bonding uses valence electrons.
+// splitInlineQuestion turns such a line into the line-per-part shape the
+// state machine below already understands. It only fires when the line is
+// unambiguous: four option markers in A-to-D order plus "Answer: <letter>".
+const INLINE_OPTION_RE = /(?:^|(?<=\s))([A-D])[:.)]\s+/g;
+
+const splitInlineQuestion = (line: string): string[] | null => {
+  if (/^[A-D][.):]\s/.test(line)) return null;
+  if (/^(?:Answer|Correct|Explanation|Solution|Model Answer)\s*:/i.test(line)) return null;
+  if (!/(?:^|(?<=\s))(?:Answer|Correct)\s*:\s*[A-D](?![a-z])/i.test(line)) return null;
+
+  const markers: { letter: string; start: number; contentStart: number }[] = [];
+  let m: RegExpExecArray | null;
+  INLINE_OPTION_RE.lastIndex = 0;
+  while ((m = INLINE_OPTION_RE.exec(line)) !== null) {
+    markers.push({ letter: m[1], start: m.index, contentStart: m.index + m[0].length });
+  }
+  const wanted = ['A', 'B', 'C', 'D'];
+  const picked: typeof markers = [];
+  let wi = 0;
+  markers.forEach((mk) => {
+    if (wi < wanted.length && mk.letter === wanted[wi] && (!picked.length || mk.start > picked[picked.length - 1].start)) {
+      picked.push(mk);
+      wi += 1;
+    }
+  });
+  if (picked.length < 4 || picked[0].start === 0) return null;
+
+  const answerMatch = /(?:^|(?<=\s))(?:Answer|Correct)\s*:\s*([A-D])(?![a-z])/i.exec(line);
+  if (!answerMatch || answerMatch.index <= picked[3].start) return null;
+  const explanationMatch = /(?:^|(?<=\s))(?:Explanation|Solution|Model Answer)\s*:/i.exec(line);
+
+  const out: string[] = [line.slice(0, picked[0].start).trim()];
+  picked.forEach((p, i) => {
+    const end = i < 3 ? picked[i + 1].start : answerMatch.index;
+    out.push(p.letter + ': ' + line.slice(p.contentStart, end).trim());
+  });
+  out.push('Answer: ' + answerMatch[1].toUpperCase());
+  if (explanationMatch) {
+    out.push('Explanation: ' + line.slice(explanationMatch.index + explanationMatch[0].length).trim());
+  }
+  return out;
+};
+
+export function parseBankPaste(input: string): ParseResult {
   const questions: ParsedBankQuestion[] = [];
+  // Pre-pass: a paste may put several whole questions on one line. Give each
+  // question its own line before blocking, but only on lines that carry an
+  // "Answer:" marker so ordinary prose is never touched. Tolerates an
+  // escaped question dot ("20\.").
+  const text = input.split('\n').map((line) => {
+    if (!/answer\s*:/i.test(line)) return line;
+    return line.split(/(?<=^|\s)(?=(?:Question\s*\d+|Q\d+|\d{1,3})(?![a-z])(?:\\)?[.):]\s)/i).join('\n');
+  }).join('\n');
+
   let skippedEssay = 0;
   let skippedEmpty = 0;
 
   // Split by main question markers: "1.", "Q1:", "Question 1:", "1)", "1:".
   // Negative lookahead (?![a-z]) avoids splitting on sub-questions like "1a."
-  const blocks = text.split(/(?:\n|^)\s*(?=(?:Question\s*\d+|Q\d+|Q:|\d+)(?![a-z])[\.\):]?\s+)/im).filter(b => b.trim());
+  const blocks = text.split(/(?:\n|^)\s*(?=(?:Question\s*\d+|Q\d+|Q:|\d+)(?![a-z])(?:\\)?[\.\):]?\s+)/im).filter(b => b.trim());
 
   blocks.forEach(block => {
-    const lines = block.split('\n').map(l => l.trim()).filter(l => l);
+    const rawLines = block.split('\n').map(l => l.trim()).filter(l => l);
+    // Expand inline one-line questions into the line-per-part shape below.
+    const lines: string[] = [];
+    rawLines.forEach((line) => {
+      const inline = splitInlineQuestion(line);
+      if (inline) lines.push(...inline);
+      else lines.push(line);
+    });
     if (lines.length < 1) return;
 
     // FIRST PASS: detect characteristics (same detection as the centre engine)
@@ -79,7 +142,7 @@ export function parseBankPaste(text: string): ParseResult {
         } else {
           let cleanLine = line;
           if (currentQuestionText === '') {
-            cleanLine = line.replace(/^(?:Question\s*\d+|Q\d+|Q:|\d+)(?![a-z])[\.\):]?\s*/i, '');
+            cleanLine = line.replace(/^(?:Question\s*\d+|Q\d+|Q:|\d+)(?![a-z])(?:\\)?[\.\):]?\s*/i, '');
           }
           if (cleanLine) {
             currentQuestionText += (currentQuestionText ? '\n' : '') + cleanLine;
@@ -130,4 +193,5 @@ RULES:
 - Use "Answer:" followed only by the correct letter.
 - Include a brief "Explanation:" line.
 - Write maths and science notation in LaTeX inside $...$.
+- Putting everything on one line per question also works: the question, then A: ... B: ... C: ... D: ..., then Answer:, then Explanation:.
 - No tables, bullets, headings or extra text.`;
