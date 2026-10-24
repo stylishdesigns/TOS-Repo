@@ -24,6 +24,7 @@ import {
   runBillingSweep,
 } from './provisioning';
 import { deleteCentreCascade, loadBillingMap, registerTosRoutes2 } from './tosRoutes2';
+import { registerQuestionBankRoutes } from './questionBankRoutes';
 
 /**
  * Prompt C routes: public lead capture and verification, the TOS platform
@@ -778,4 +779,8 @@ export function registerExtendedRoutes(app: express.Express): void {
   // setting, team, directory views) register here so they stay behind the
   // same /api/tos guard and ahead of the static/SPA fallback.
   registerTosRoutes2(app);
+
+  // Platform question bank: authoring + the versioned Cloudinary publish
+  // pipeline. Same /api/tos guard; nothing here writes without confirm.
+  registerQuestionBankRoutes(app);
 }

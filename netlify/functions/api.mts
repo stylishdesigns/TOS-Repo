@@ -13,7 +13,7 @@
  * - APP_URL: the public URL of this deployment (optional, used for links).
  */
 import serverless from 'serverless-http';
-// NOTE: bundled fresh on every deploy; bump this comment when server-side files change (v21: fo-db-proxy remove-admin-record door: platform admins records only, confirm-gated)
+// NOTE: bundled fresh on every deploy; bump this comment when server-side files change (v22: question bank publish pipeline: TOS authoring routes + versioned Cloudinary publish, confirm-gated)
 // so the function bundler cache cannot serve a stale bundle.
 // (the Firestore proxy routes in server.ts + src/server/foDbProxy.ts ride the same bundle).
 
