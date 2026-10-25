@@ -2,6 +2,7 @@ import React from 'react';
 import { Student, StudentResult } from '../../../types';
 import { CbtTab } from './CbtTab';
 import { StudentPractice } from './StudentPractice';
+import { PracticeAnalytics } from './PracticeAnalytics';
 import { Trophy, TrendingUp, Sparkles } from 'lucide-react';
 
 interface CbtTabWrapperProps {
@@ -141,24 +142,7 @@ export const CbtTabWrapper: React.FC<CbtTabWrapperProps> = ({
         {practiceView === 'practice' ? (
           <StudentPractice student={student} />
         ) : (
-          <div className="bg-white rounded-3xl p-8 border border-slate-200/90 shadow-sm text-center space-y-4">
-            <div className="w-16 h-16 rounded-2xl bg-orange-50 border border-orange-100 text-[#EA580C] flex items-center justify-center mx-auto shadow-sm">
-              <TrendingUp className="w-8 h-8" />
-            </div>
-
-            <div className="space-y-1.5 max-w-xs mx-auto">
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-orange-100/60 text-[#C2410C] text-[10px] font-extrabold uppercase tracking-wider mb-1">
-                <Sparkles className="w-3 h-3" />
-                <span>Progress Insights</span>
-              </div>
-              <h3 className="text-lg font-black text-slate-900 tracking-tight">
-                Practice Analytics
-              </h3>
-              <p className="text-xs text-slate-500 leading-relaxed font-medium">
-                Your practice progress will appear here.
-              </p>
-            </div>
-          </div>
+          <PracticeAnalytics onStartPractice={() => onPracticeViewChange('practice')} />
         )}
       </div>
     </div>

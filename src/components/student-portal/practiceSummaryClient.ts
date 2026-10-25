@@ -33,6 +33,8 @@ export interface SummaryQuestionInput {
 }
 
 const PENDING_KEY = 'TOS_practice_pending_summaries';
+// Set by Analytics "Practise this" (P5b), read once by Practice (P4 flow).
+export const PRACTISE_NOW_KEY = 'TOS_practice_practise_now';
 const MAX_PENDING = 20;
 
 function loadPending(): PracticeSummaryPayload[] {

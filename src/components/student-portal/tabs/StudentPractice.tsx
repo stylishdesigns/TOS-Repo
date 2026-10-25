@@ -15,6 +15,7 @@ import { useApp } from '../../../context/AppContext';
 import { useFirebase } from '../../../context/FirebaseContext';
 import type { Student } from '../../../types';
 import {
+  PRACTISE_NOW_KEY,
   buildSummaryPayload,
   flushPendingPracticeSummaries,
   sendPracticeSummary,
@@ -379,6 +380,34 @@ export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => 
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [screen]);
+
+  // Analytics "Practise this" handoff (P5b): when the bank is ready, jump
+  // straight to the P4 Ready screen with the chosen subject and topic.
+  const handoffDone = useRef(false);
+  useEffect(() => {
+    if (screen !== 'home' || handoffDone.current) return;
+    if (!bank) return; // wait until the bank has loaded
+    handoffDone.current = true;
+    let now: { examType?: string; subject?: string; topic?: string } | null = null;
+    try {
+      const raw = localStorage.getItem(PRACTISE_NOW_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') now = parsed;
+      }
+      localStorage.removeItem(PRACTISE_NOW_KEY);
+    } catch { /* ignore */ }
+    if (!now) return;
+    if (now.subject && matchedSubjects.includes(now.subject)) {
+      const exams = examChoices;
+      if (now.examType && exams.includes(now.examType)) setPipeline(now.examType);
+      else if (exams.length === 1) setPipeline(exams[0]);
+      setSubject(now.subject);
+      if (now.topic) setTopic(now.topic);
+      setStep(4);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screen, bank]);
 
   // In-progress session saver (P4c): every answer updates the local resume
   // record, so a closed tab or lost connection can pick up where it stopped.
