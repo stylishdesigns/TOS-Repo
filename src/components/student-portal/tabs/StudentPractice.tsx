@@ -12,7 +12,13 @@ import {
   XCircle,
 } from 'lucide-react';
 import { useApp } from '../../../context/AppContext';
+import { useFirebase } from '../../../context/FirebaseContext';
 import type { Student } from '../../../types';
+import {
+  buildSummaryPayload,
+  flushPendingPracticeSummaries,
+  sendPracticeSummary,
+} from '../practiceSummaryClient';
 
 interface BankQuestion {
   id: string;
@@ -161,6 +167,7 @@ interface StudentPracticeProps {
 
 export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => {
   const { activeCentre } = useApp();
+  const { user } = useFirebase();
   const [screen, setScreen] = useState<Screen>('loading');
   const [bank, setBank] = useState<BankPayload | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
@@ -389,6 +396,29 @@ export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => 
     });
   }, [screen, session, answers, qIndex, feedbackMode, subject, topic, pipeline]);
 
+  // Quietly send any summary that went unsent last time (P5a), once per mount.
+  useEffect(() => {
+    if (!user) return;
+    void flushPendingPracticeSummaries(() => user.getIdToken()).catch(() => { /* ignore */ });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  // Fire-and-forget summary send: the results screen never waits for it.
+  const sendSessionSummary = () => {
+    if (!user) return;
+    const payload = buildSummaryPayload({
+      centreId: activeCentre?.id || '',
+      examType: pipeline,
+      subject,
+      topic,
+      mode: feedbackMode,
+      questions: session,
+      answers,
+    });
+    if (!payload) return;
+    void sendPracticeSummary(payload, () => user.getIdToken());
+  };
+
   const startSession = () => {
     if (filtered.length === 0) return;
     clearResume();
@@ -427,6 +457,7 @@ export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => 
   const next = () => {
     if (qIndex + 1 >= session.length) {
       clearResume();
+      sendSessionSummary();
       setScreen('done');
     } else {
       setQIndex((i) => i + 1);

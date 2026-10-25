@@ -24,6 +24,7 @@ import { ensureBootstrapSuperAdmin } from "./src/server/platformDefaults";
 import { registerExtendedRoutes } from "./src/server/extendedRoutes";
 import { registerFoDbProxy } from "./src/server/foDbProxy";
 import { registerFoAccessDoors } from "./src/server/foAccessDoors";
+import { registerPracticeStatsRoutes } from "./src/server/practiceStatsRoutes";
 
 
 // Source file is ESM, but compiled to CJS for production.
@@ -1071,6 +1072,7 @@ RULES:
   // Prompt C routes (leads, TOS console, access codes, billing sweep) must be
   // registered before the static/SPA fallback so no GET route is swallowed.
   registerExtendedRoutes(app);
+  registerPracticeStatsRoutes(app);
 
   // Fo database proxy (read-only): Firestore diagnostics through the server's
   // own admin connection, gated by FO_DB_PROXY_KEY_SHA256 (see foDbProxy.ts).
