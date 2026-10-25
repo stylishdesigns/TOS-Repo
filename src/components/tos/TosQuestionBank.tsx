@@ -100,6 +100,7 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
   const [showGuide, setShowGuide] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importNotice, setImportNotice] = useState('');
+  const [dupAsk, setDupAsk] = useState<Json | null>(null); // L5: server found duplicates, waiting on skip/anyway
 
   // Publish review
   const [preview, setPreview] = useState<Json | null>(null);
@@ -321,32 +322,39 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
     setParsed({ questions: r.questions, skippedEssay: r.skippedEssay, skippedEmpty: r.skippedEmpty });
   };
 
-  const runImport = async () => {
-    if (!parsed) return;
-    setImportNotice('');
-    if (!importDefaults.subject) { setImportNotice('Choose a subject for this batch first.'); return; }
-    if (!importDefaults.topic) { setImportNotice('Choose a topic for this batch first.'); return; }
-    if (kind === 'practice' && !importDefaults.year) { setImportNotice('Practice questions need a year. Pick one above the paste box.'); return; }
+  const doImport = async (body: Json) => {
     setImporting(true);
     try {
-      const r = await api('/api/tos/questionbank/import', {
-        method: 'POST',
-        body: {
-          kind, examType: importDefaults.examType, subject: importDefaults.subject,
-          year: importDefaults.year === '' ? null : Number(importDefaults.year),
-          topic: importDefaults.topic, difficulty: importDefaults.difficulty,
-          questions: parsed.questions,
-        },
-      });
+      const r = await api('/api/tos/questionbank/import', { method: 'POST', body });
+      if (r.needsDecision) { setDupAsk({ body, info: r }); return; }
+      setDupAsk(null);
       setParsed(null);
       setPasteText('');
-      setImportNotice(`Imported ${r.imported} question${r.imported === 1 ? '' : 's'}${r.skipped ? `, ${r.skipped} skipped` : ''}. They are drafts until you publish.`);
+      setImportNotice(
+        r.imported === 0 && r.note
+          ? r.note
+          : `Imported ${r.imported} question${r.imported === 1 ? '' : 's'}${r.duplicateSkipped ? `, ${r.duplicateSkipped} duplicate${r.duplicateSkipped === 1 ? '' : 's'} skipped` : ''}${r.skipped ? `, ${r.skipped} skipped` : ''}. They are drafts until you publish.`
+      );
       await load();
     } catch (e: any) {
       setImportNotice(e.message);
     } finally {
       setImporting(false);
     }
+  };
+
+  const runImport = async () => {
+    if (!parsed) return;
+    setImportNotice('');
+    if (!importDefaults.subject) { setImportNotice('Choose a subject for this batch first.'); return; }
+    if (!importDefaults.topic) { setImportNotice('Choose a topic for this batch first.'); return; }
+    if (kind === 'practice' && !importDefaults.year) { setImportNotice('Practice questions need a year. Pick one above the paste box.'); return; }
+    await doImport({
+      kind, examType: importDefaults.examType, subject: importDefaults.subject,
+      year: importDefaults.year === '' ? null : Number(importDefaults.year),
+      topic: importDefaults.topic, difficulty: importDefaults.difficulty,
+      questions: parsed.questions,
+    });
   };
 
   const openPublish = async () => {
@@ -509,6 +517,24 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
 
         {importNotice && (
           <p className="text-xs font-bold text-amber-300 mt-2">{importNotice}</p>
+        )}
+        {dupAsk && (
+          <div className="rounded-2xl border border-amber-500/50 bg-amber-500/10 p-3.5 mt-2 space-y-2">
+            <p className="text-sm font-bold text-amber-200">{dupAsk.info.duplicateCount} of {dupAsk.info.total} questions in this paste already exist in the bank</p>
+            <p className="text-xs text-amber-200/80">{dupAsk.info.note}</p>
+            {(dupAsk.info.samples || []).length > 0 && (
+              <ul className="text-xs text-slate-400 space-y-1">
+                {(dupAsk.info.samples as string[]).map((t, i) => <li key={i} className="truncate">- {t}</li>)}
+              </ul>
+            )}
+            <div className="flex flex-wrap gap-2">
+              <button className={btnPrimary} disabled={importing} onClick={() => doImport({ ...dupAsk.body, duplicates: 'skip' })}>
+                {importing ? 'Importing...' : 'Skip duplicates, import the rest'}
+              </button>
+              <button className={btnGhost} disabled={importing} onClick={() => doImport({ ...dupAsk.body, duplicates: 'import' })}>Import all anyway</button>
+              <button className={btnGhost} disabled={importing} onClick={() => setDupAsk(null)}>Never mind</button>
+            </div>
+          </div>
         )}
 
         {parsed && (

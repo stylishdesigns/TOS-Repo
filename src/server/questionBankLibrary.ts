@@ -54,6 +54,7 @@ import { httpError } from './tenantService';
 const QB_QUESTIONS = 'qbQuestions';
 const QB_COUNTS = 'qbCounts';
 const QB_META = 'qbMeta';
+const QB_IMPORTS = 'qbImports'; // one record per bulk import, powers the Imports tab and Undo
 
 const KINDS: readonly string[] = ['practice', 'mock'];
 const QB_LIST_CAP = 100;
@@ -976,6 +977,128 @@ export function registerQuestionBankLibraryRoutes(
     } catch (error: any) {
       console.error('[tos/questionbank/topic-change] failed:', error?.message || error);
       res.status(error?.status || 500).json({ error: error?.message || 'Topic change failed.' });
+    }
+  });
+
+
+  // ---- Imports register + undo (Prompt L5) ---------------------------------
+  // One page of import batches, newest first, 20 per page. No kind filter on
+  // purpose: the list stays a plain single-field query that needs no custom
+  // index; rows carry their own stream.
+  app.get('/api/tos/questionbank/imports', async (req, res) => {
+    try {
+      requireTos(req);
+      let q = adminDb.collection(QB_IMPORTS).orderBy('importedAt', 'desc');
+      const cursorRaw = String(req.query.cursor || '').trim();
+      if (cursorRaw) {
+        const cur = await adminDb.collection(QB_IMPORTS).doc(cursorRaw).get();
+        if (cur.exists) q = q.startAfter(cur);
+      }
+      const snap = await q.limit(21).get();
+      const docs = snap.docs.slice(0, 20);
+      const rows = docs.map((d) => {
+        const x = d.data() as any;
+        return {
+          id: d.id, batchId: String(x.batchId || d.id), kind: x.kind || 'practice',
+          examType: x.examType, subject: x.subject, topic: x.topic, year: x.year,
+          difficulty: x.difficulty, count: x.count, importedAt: x.importedAt,
+          importedByEmail: x.importedByEmail || '', status: String(x.status || 'active'),
+          undoneAt: x.undoneAt || null,
+        };
+      });
+      res.json({ ok: true, items: rows, nextCursor: snap.docs.length > 20 ? rows[rows.length - 1].id : null, hasMore: snap.docs.length > 20 });
+    } catch (error: any) {
+      console.error('[tos/questionbank/imports] failed:', error?.message || error);
+      res.status(error?.status || 500).json({ error: error?.message || 'Failed to list imports.' });
+    }
+  });
+
+  // Undo preview: what an undo would delete, leave live, or leave removed.
+  // Three aggregated counts, no document reads beyond the batch record.
+  app.get('/api/tos/questionbank/undo-batch-preview', async (req, res) => {
+    try {
+      requireTos(req);
+      const batchId = String(req.query.batchId || '').trim();
+      if (!batchId) throw httpError(400, 'No batch chosen.');
+      const reg = await adminDb.collection(QB_IMPORTS).doc(batchId).get();
+      if (!reg.exists) throw httpError(404, 'That import batch is not on record.');
+      const b = reg.data() as any;
+      const base = adminDb.collection(QB_QUESTIONS).where('batchId', '==', batchId);
+      const [totalSnap, draftSnap, removedSnap] = await Promise.all([
+        base.count().get(),
+        base.where('status', '==', 'draft').count().get(),
+        base.where('status', '==', 'removed').count().get(),
+      ]);
+      const total = totalSnap.data().count || 0;
+      const drafts = draftSnap.data().count || 0;
+      const removed = removedSnap.data().count || 0;
+      const published = Math.max(0, total - drafts - removed);
+      const alreadyUndone = String(b.status || '') === 'undone';
+      res.json({
+        ok: true,
+        batch: {
+          batchId, kind: b.kind || 'practice', examType: b.examType, subject: b.subject,
+          topic: b.topic, year: b.year, difficulty: b.difficulty, count: b.count,
+          importedAt: b.importedAt, importedByEmail: b.importedByEmail || '',
+        },
+        drafts, published, removed, total, alreadyUndone,
+        note: alreadyUndone
+          ? 'This batch was already undone. Its drafts are gone; there is nothing left to undo.'
+          : `Undo deletes the ${drafts} draft question${drafts === 1 ? '' : 's'} this import added. The ${published} that were already published stay live (their copies are on the CDN), and ${removed} already removed stay removed. The counters move with every deletion.`,
+      });
+    } catch (error: any) {
+      console.error('[tos/questionbank/undo-batch-preview] failed:', error?.message || error);
+      res.status(error?.status || 500).json({ error: error?.message || 'Failed to preview the undo.' });
+    }
+  });
+
+  // Undo run: deletes up to 200 of the batch's remaining drafts per call and
+  // marks the batch undone on the last round. Counters move in the same batch.
+  app.post('/api/tos/questionbank/undo-batch', async (req, res) => {
+    try {
+      const caller = requireTos(req);
+      if (req.body?.confirm !== 'UNDO-IMPORT') {
+        throw httpError(400, 'Missing confirm. Call with confirm:"UNDO-IMPORT" from the Imports tab after the preview.');
+      }
+      const batchId = String(req.body?.batchId || '').trim();
+      if (!batchId) throw httpError(400, 'No batch chosen.');
+      const reg = await adminDb.collection(QB_IMPORTS).doc(batchId).get();
+      if (!reg.exists) throw httpError(404, 'That import batch is not on record.');
+      const b = reg.data() as any;
+      if (String(b.status || '') === 'undone') {
+        res.json({ ok: true, deleted: 0, done: true, alreadyUndone: true });
+        return;
+      }
+      const snap = await adminDb.collection(QB_QUESTIONS)
+        .where('batchId', '==', batchId).where('status', '==', 'draft')
+        .orderBy('__name__').limit(200).get();
+      if (snap.empty) {
+        await adminDb.collection(QB_IMPORTS).doc(batchId).update({
+          status: 'undone', undoneAt: new Date().toISOString(), undoneByUid: caller.uid,
+        });
+        await auditSafe(caller, 'QB_IMPORT_UNDONE', { batchId, deleted: 0, done: true });
+        res.json({ ok: true, deleted: 0, done: true });
+        return;
+      }
+      const batch = adminDb.batch();
+      const acc = createCounterAcc();
+      snap.docs.forEach((s) => {
+        acc.change(s.data() as any, null);
+        batch.delete(s.ref);
+      });
+      acc.flush(batch, (String(b.kind || 'practice') as 'practice' | 'mock'));
+      await batch.commit();
+      const done = snap.size < 200;
+      if (done) {
+        await adminDb.collection(QB_IMPORTS).doc(batchId).update({
+          status: 'undone', undoneAt: new Date().toISOString(), undoneByUid: caller.uid,
+        });
+        await auditSafe(caller, 'QB_IMPORT_UNDONE', { batchId, deleted: snap.size, done });
+      }
+      res.json({ ok: true, deleted: snap.size, done });
+    } catch (error: any) {
+      console.error('[tos/questionbank/undo-batch] failed:', error?.message || error);
+      res.status(error?.status || 500).json({ error: error?.message || 'Undo failed.' });
     }
   });
 

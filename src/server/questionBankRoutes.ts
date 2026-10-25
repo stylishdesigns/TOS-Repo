@@ -28,6 +28,7 @@ import { randomUUID } from 'crypto';
 const QB_QUESTIONS = 'qbQuestions';
 const QB_PUBLISHES = 'qbPublishes';
 const QB_META = 'qbMeta'; // doc id 'current'
+const QB_IMPORTS = 'qbImports'; // one record per bulk import, powers the Imports tab and Undo
 
 // Same windowed-read ceiling the directory views use: a scan stops here
 // rather than growing without bound.
@@ -413,8 +414,7 @@ export function registerQuestionBankRoutes(app: express.Express): void {
 
       const now = new Date().toISOString();
       const batchId = `imp-${randomUUID()}`;
-      const batch = adminDb.batch();
-      let count = 0;
+      const valid: any[] = [];
       items.forEach((item) => {
         const text = String(item?.text ?? '').trim();
         const explanation = String(item?.explanation ?? '').trim();
@@ -430,17 +430,67 @@ export function registerQuestionBankRoutes(app: express.Express): void {
         if (options.some((o) => o === null)) return;
         const correct = String(item?.correct ?? '').trim().toUpperCase();
         if (!(OPTION_KEYS as readonly string[]).includes(correct)) return;
+        valid.push({
+          enriched: enrichFields({ kind, examType, subject, topic, year, text, correct, batchId }),
+          text, options, correct: correct as OptionKey, explanation,
+        });
+      });
+      if (valid.length === 0) throw httpError(400, 'None of the parsed questions passed validation. Check the paste format and try again.');
+
+      // Duplicate check (L5): questions that share a stream, subject, wording
+      // and correct answer share a hash. Checked in chunks of 30 with `in`,
+      // so a 400-question paste costs 14 indexed queries, never a scan.
+      const dupHashes = new Set<string>();
+      const dupSamples: string[] = [];
+      for (let i = 0; i < valid.length; i += 30) {
+        const chunk = valid.slice(i, i + 30).map((v) => String(v.enriched.hash));
+        const hits = await adminDb.collection(QB_QUESTIONS).where('hash', 'in', chunk).get();
+        hits.docs.forEach((h) => dupHashes.add(String((h.data() as any).hash || '')));
+      }
+      const duplicateCount = valid.filter((v) => dupHashes.has(String(v.enriched.hash))).length;
+      if (duplicateCount > 0) {
+        valid.forEach((v) => {
+          if (dupHashes.has(String(v.enriched.hash)) && dupSamples.length < 8) dupSamples.push(String(v.text).slice(0, 120));
+        });
+        const choice = String(body.duplicates ?? '').trim().toLowerCase();
+        if (choice !== 'skip' && choice !== 'import') {
+          res.json({
+            ok: true,
+            needsDecision: true,
+            duplicateCount,
+            total: valid.length,
+            samples: dupSamples,
+            note: `${duplicateCount} of the ${valid.length} questions in this paste already exist in the bank (same subject, wording and correct answer). Nothing was written. Skip the duplicates and import the rest, or import everything anyway.`,
+          });
+          return;
+        }
+      }
+      const write = duplicateCount > 0 && String(body.duplicates).trim().toLowerCase() === 'skip'
+        ? valid.filter((v) => !dupHashes.has(String(v.enriched.hash)))
+        : valid;
+      if (write.length === 0) {
+        res.json({ ok: true, imported: 0, skipped: items.length, duplicateSkipped: valid.length, note: 'Everything in this paste already exists in the bank. Nothing was written.' });
+        return;
+      }
+      const batch = adminDb.batch();
+      const count = write.length;
+      write.forEach((v) => {
         batch.create(adminDb.collection(QB_QUESTIONS).doc(), {
           kind, examType, subject, klass, topic, year, difficulty: difficultyRaw,
-          ...enrichFields({ kind, examType, subject, topic, year, text, correct, batchId }),
+          ...v.enriched,
           batchId,
-          text, options, correct: correct as OptionKey, explanation, imageLink: '',
+          text: v.text, options: v.options, correct: v.correct, explanation: v.explanation, imageLink: '',
           status: 'draft', createdAt: now, updatedAt: now, publishedVersion: null,
           createdByUid: caller.uid, createdByEmail: caller.email || '',
         });
-        count += 1;
       });
-      if (count === 0) throw httpError(400, 'None of the parsed questions passed validation. Check the paste format and try again.');
+      // Every import gets a record in qbImports so the Library screen can
+      // list batches and undo one. Same atomic batch as the questions.
+      batch.create(adminDb.collection(QB_IMPORTS).doc(batchId), {
+        batchId, kind, examType, subject, klass, topic, year, difficulty: difficultyRaw,
+        count, importedAt: now, importedByUid: caller.uid, importedByEmail: caller.email || '',
+        status: 'active', undoneAt: null, undoneByUid: null,
+      });
       // The whole import totals into the counters in memory; each counter
       // document is written exactly once, in the same atomic batch.
       counterOpsForBatchMany(batch, kind, null, { kind, examType, subject, topic, year, status: 'draft' }, count);
@@ -448,9 +498,9 @@ export function registerQuestionBankRoutes(app: express.Express): void {
       await audit({
         actorUid: caller.uid,
         action: 'QUESTIONBANK_IMPORTED',
-        after: { kind, examType, subject, topic, year, count },
+        after: { kind, examType, subject, topic, year, count, batchId, duplicateSkipped: valid.length - count },
       });
-      res.json({ ok: true, imported: count, skipped: items.length - count });
+      res.json({ ok: true, imported: count, skipped: items.length - count, duplicateSkipped: valid.length - count, batchId });
     } catch (error: any) {
       console.error('[tos/questionbank/import] failed:', error?.message || error);
       res.status(error?.status || 500).json({ error: error?.message || 'Import failed.' });

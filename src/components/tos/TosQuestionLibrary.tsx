@@ -72,6 +72,15 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number }> = ({ refreshKe
   const [topicPreview, setTopicPreview] = useState<Json | null>(null);
   const [topicMsg, setTopicMsg] = useState('');
 
+  // Imports register (L5)
+  const [imports, setImports] = useState<Json[] | null>(null);
+  const [importsCursor, setImportsCursor] = useState<string | null>(null);
+  const [importsHasMore, setImportsHasMore] = useState(false);
+  const [importsLoading, setImportsLoading] = useState(false);
+  const [importsMsg, setImportsMsg] = useState('');
+  const [batchFilter, setBatchFilter] = useState<string | null>(null);
+  const [undoPreview, setUndoPreview] = useState<Json | null>(null);
+
   // Debounced search: 400 ms after the last keystroke.
   useEffect(() => {
     const t = setTimeout(() => setQDebounced(q.trim()), 400);
@@ -88,11 +97,13 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number }> = ({ refreshKe
   }, [kind]);
 
   const loadList = useCallback(async (mode: 'replace' | 'more') => {
+    if (tab === 'imports') return;
     if (mode === 'replace') setLoading(true); else setLoadingMore(true);
     if (mode === 'replace') setListError('');
     try {
       const p = new URLSearchParams({ kind, status: tab, sort, limit: '50' });
-      if (scope) p.set(scope.type === 'subject' ? 'subject' : scope.type === 'topic' ? 'topic' : 'year', scope.key);
+      if (batchFilter) p.set('batchId', batchFilter);
+      else if (scope) p.set(scope.type === 'subject' ? 'subject' : scope.type === 'topic' ? 'topic' : 'year', scope.key);
       if (difficulty) p.set('difficulty', difficulty);
       if (qDebounced.length >= 2) p.set('q', qDebounced);
       if (mode === 'more' && nextCursor) p.set('cursor', nextCursor);
@@ -107,7 +118,7 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number }> = ({ refreshKe
     }
     setLoading(false);
     setLoadingMore(false);
-  }, [kind, tab, scope, difficulty, qDebounced, sort, nextCursor]);
+  }, [kind, tab, scope, difficulty, qDebounced, sort, nextCursor, batchFilter]);
 
   useEffect(() => { loadTree(); }, [loadTree, refreshKey]);
   useEffect(() => { loadList('replace'); }, [loadList, refreshKey]); // loadList changes with filters
@@ -265,6 +276,52 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number }> = ({ refreshKe
     setBulkBusy(false);
   };
 
+  // ---- Imports register + undo --------------------------------------------
+
+  const loadImports = useCallback(async (mode: 'replace' | 'more') => {
+    setImportsLoading(true);
+    try {
+      const p = new URLSearchParams({ limit: '20' });
+      if (mode === 'more' && importsCursor) p.set('cursor', importsCursor);
+      const r: Json = await api(`/api/tos/questionbank/imports?${p.toString()}`);
+      setImports((prev) => (mode === 'more' ? [...(prev || []), ...(r.items || [])] : r.items || []));
+      setImportsCursor(r.nextCursor || null);
+      setImportsHasMore(Boolean(r.hasMore));
+    } catch (e: any) { setImportsMsg(e.message); }
+    setImportsLoading(false);
+  }, [importsCursor]);
+
+  useEffect(() => { if (tab === 'imports') loadImports('replace'); }, [tab, loadImports]); // fresh list on each visit
+
+  const openUndoPreview = async (batchId: string) => {
+    setBulkBusy(true); setBulkMsg('');
+    try { setUndoPreview(await api(`/api/tos/questionbank/undo-batch-preview?batchId=${encodeURIComponent(batchId)}`)); }
+    catch (e: any) { setBulkMsg(e.message); }
+    setBulkBusy(false);
+  };
+
+  const runUndo = async () => {
+    setBulkBusy(true); setBulkMsg('');
+    try {
+      let deleted = 0;
+      for (;;) {
+        const r: Json = await api('/api/tos/questionbank/undo-batch', {
+          method: 'POST',
+          body: { confirm: 'UNDO-IMPORT', batchId: undoPreview?.batch?.batchId },
+        });
+        deleted += Number(r.deleted) || 0;
+        setBulkMsg(`Undoing: ${deleted} drafts deleted so far...`);
+        if (r.done) break;
+      }
+      setBulkMsg(`Batch undone: ${deleted} drafts deleted.`);
+      setUndoPreview(null);
+      setImports(null);
+      await loadImports('replace');
+      loadList('replace');
+    } catch (e: any) { setBulkMsg(e.message); }
+    setBulkBusy(false);
+  };
+
   const setEditorField = (field: string, value: any) => {
     setEditor((prev) => (prev ? { ...prev, item: { ...prev.item, [field]: value } } : prev));
   };
@@ -334,6 +391,69 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number }> = ({ refreshKe
     </div>
   );
 
+
+  // Imports tab (L5): every recorded paste, newest first, with undo.
+  if (tab === 'imports') {
+    return (
+      <div className="space-y-4">
+        <Card title="Imports">
+          <p className="text-xs text-slate-400 mb-3">Every paste imported since this update went live, newest first. Undo a batch to delete the drafts it added; questions you already published stay live.</p>
+          <div className="flex flex-wrap gap-2 mb-3">
+            <button onClick={() => setTab('all')} className={btnGhost}>Back to the question list</button>
+            <button onClick={() => loadImports('replace')} disabled={importsLoading} className={btnGhost}>{importsLoading ? 'Refreshing...' : 'Refresh'}</button>
+          </div>
+          {importsMsg && <p className="text-sm text-orange-300 mb-2">{importsMsg}</p>}
+          {importsLoading && !imports && <p className="text-sm text-slate-400">Loading...</p>}
+          {imports && imports.length === 0 && (
+            <p className="text-sm text-slate-400">No import batches recorded yet. Batches imported before this update are not listed here.</p>
+          )}
+          <div className="space-y-2">
+            {(imports || []).map((b: any) => (
+              <div key={b.id} className="rounded-2xl border border-slate-700/50 bg-slate-900/40 p-3.5 flex flex-wrap items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-slate-200">{b.subject} · {b.topic}{b.year ? ` · ${b.year}` : ''}</p>
+                  <p className="text-xs text-slate-500">{fmtDate(b.importedAt)} · {b.count} question{b.count === 1 ? '' : 's'} · {b.examType} · {b.importedByEmail || 'TOS admin'}</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {String(b.status) === 'undone' ? (
+                    <span className="px-3 py-1.5 rounded-full text-xs font-bold border border-slate-700 text-slate-500">Undone</span>
+                  ) : (
+                    <>
+                      <button className={`${btnGhost} text-xs`} onClick={() => { setBatchFilter(b.batchId); setScope(null); setQ(''); setTab('all'); }}>See the questions</button>
+                      <button className={`${btnGhost} text-xs`} disabled={bulkBusy} onClick={() => openUndoPreview(b.batchId)}>Undo this batch</button>
+                    </>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+          {importsHasMore && (
+            <button onClick={() => loadImports('more')} disabled={importsLoading} className={`${btnGhost} mt-3`}>
+              {importsLoading ? <Loader2 className="w-4 h-4 animate-spin inline" /> : null} Load 20 more
+            </button>
+          )}
+        </Card>
+
+        {undoPreview && (
+          <div className="fixed inset-0 z-50 bg-slate-950/90 overflow-y-auto p-4" onClick={() => { if (!bulkBusy) setUndoPreview(null); }}>
+            <div className="max-w-md mx-auto mt-16 rounded-2xl border border-amber-500/40 bg-slate-900 p-4 space-y-3" onClick={(e) => e.stopPropagation()}>
+              <p className="font-bold text-white">Undo this batch</p>
+              <p className="text-sm text-slate-300">{undoPreview.note}</p>
+              <p className="text-xs text-slate-500">
+                Batch: {undoPreview.batch?.subject} · {undoPreview.batch?.topic}{undoPreview.batch?.year ? ` · ${undoPreview.batch?.year}` : ''} · {undoPreview.batch?.count} questions · imported {fmtDate(undoPreview.batch?.importedAt)}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button className={btnPrimary} disabled={bulkBusy || undoPreview.alreadyUndone} onClick={runUndo}>{bulkBusy ? 'Working...' : 'Confirm undo'}</button>
+                <button className={btnGhost} disabled={bulkBusy} onClick={() => setUndoPreview(null)}>Cancel</button>
+              </div>
+              {bulkMsg && <p className="text-sm text-orange-200">{bulkMsg}</p>}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       {tree?.setupNeeded && (
@@ -396,7 +516,16 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number }> = ({ refreshKe
               {t.id === 'removed' && ` (${Number(tabs.removed) || 0})`}
             </button>
           ))}
+          <button onClick={() => setTab('imports')}
+            className={`px-3 py-1.5 rounded-full text-xs font-bold border min-h-[36px] ${tab === 'imports' ? 'bg-orange-500 text-white border-orange-500' : 'border-slate-700/60 text-slate-400 hover:text-white'}`}>
+            Imports
+          </button>
         </div>
+        {batchFilter && (
+          <button onClick={() => { setBatchFilter(null); loadList('replace'); }} className="mt-2 px-3 py-1.5 rounded-full text-xs font-bold border border-orange-500/50 bg-orange-500/10 text-orange-200">
+            Showing one import batch · Clear
+          </button>
+        )}
         {tab === 'removed' && (Number(tabs.removed) || 0) > 0 && (
           <button onClick={openEmptyPreview} disabled={bulkBusy} className={`${btnGhost} mt-2`}>
             <Trash2 className="w-4 h-4" /> Empty removed bin
