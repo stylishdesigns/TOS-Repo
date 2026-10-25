@@ -126,6 +126,35 @@ function writeLastSetup(v: LastSetup) {
 // the student left a session unfinished on this device.
 const RESUME_KEY = 'TOS_practice_resume';
 
+interface ResumeSession {
+  questionIds: string[];
+  answers: Record<string, string>;
+  qIndex: number;
+  mode: 'instant' | 'end';
+  subject: string;
+  topic: string;
+  examType: string;
+  savedAt: number;
+}
+
+function readResume(): ResumeSession | null {
+  try {
+    const raw = localStorage.getItem(RESUME_KEY);
+    if (!raw) return null;
+    const v = JSON.parse(raw) as ResumeSession;
+    if (!v || !Array.isArray(v.questionIds)) return null;
+    return v;
+  } catch { return null; }
+}
+
+function writeResume(v: ResumeSession) {
+  try { localStorage.setItem(RESUME_KEY, JSON.stringify(v)); } catch { /* ignore */ }
+}
+
+function clearResume() {
+  try { localStorage.removeItem(RESUME_KEY); } catch { /* ignore */ }
+}
+
 interface StudentPracticeProps {
   student: Student;
 }
@@ -344,8 +373,25 @@ export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [screen]);
 
+  // In-progress session saver (P4c): every answer updates the local resume
+  // record, so a closed tab or lost connection can pick up where it stopped.
+  useEffect(() => {
+    if (screen !== 'session' || session.length === 0) return;
+    writeResume({
+      questionIds: session.map((sq) => sq.id),
+      answers,
+      qIndex,
+      mode: feedbackMode,
+      subject,
+      topic,
+      examType: pipeline,
+      savedAt: Date.now(),
+    });
+  }, [screen, session, answers, qIndex, feedbackMode, subject, topic, pipeline]);
+
   const startSession = () => {
     if (filtered.length === 0) return;
+    clearResume();
     const shuffled = shuffle(filtered);
     const picked = length === 'all' ? shuffled : shuffled.slice(0, Math.min(Number(length), shuffled.length));
     setSession(picked);
@@ -380,6 +426,7 @@ export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => 
 
   const next = () => {
     if (qIndex + 1 >= session.length) {
+      clearResume();
       setScreen('done');
     } else {
       setQIndex((i) => i + 1);
@@ -680,23 +727,31 @@ export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => 
     const visibleRows = wrongOnly ? reviewRows.filter((r) => !r.ok) : reviewRows;
     return (
       <div className="space-y-4">
-        <div className="bg-white rounded-3xl p-8 border border-slate-200/90 shadow-sm text-center space-y-3">
-          <div className={`w-20 h-20 rounded-3xl flex items-center justify-center mx-auto shadow-sm ${
-            pct >= 70 ? 'bg-emerald-50 border border-emerald-100 text-emerald-600' : pct >= 50 ? 'bg-orange-50 border border-orange-100 text-[#EA580C]' : 'bg-red-50 border border-red-100 text-red-600'
-          }`}>
-            <span className="text-2xl font-black">{pct}%</span>
-          </div>
-          <div className="space-y-1.5">
-            <h3 className="text-lg font-black text-slate-900 tracking-tight">Practice complete</h3>
-            <p className="text-xs text-slate-500 font-medium">
-              You answered {score.correct} of {score.total} questions correctly.
-            </p>
-          </div>
+        <div className="bg-white rounded-3xl p-8 border border-slate-200/90 shadow-sm text-center space-y-2">
+          <p className={`text-5xl font-black tracking-tight ${
+            pct >= 70 ? 'text-emerald-600' : pct >= 50 ? 'text-[#EA580C]' : 'text-red-600'
+          }`}>{score.correct}</p>
+          <p className="text-sm font-bold text-slate-500">{score.correct} of {score.total} correct</p>
         </div>
 
+        {/* Review wrong answers (primary) */}
+        {reviewRows.some((r) => !r.ok) ? (
+          <button
+            type="button"
+            onClick={() => {
+              setWrongOnly(true);
+              const el = document.getElementById('practice-review');
+              if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }}
+            className="w-full h-14 rounded-2xl bg-[#EA580C] text-white text-base font-extrabold shadow-sm hover:bg-[#C2410C] cursor-pointer"
+          >
+            Review wrong answers
+          </button>
+        ) : null}
+
         {/* Review header + filter */}
-        <div className="flex items-center justify-between gap-3">
-          <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-400">Review your answers</h4>
+        <div id="practice-review" className="flex items-center justify-between gap-3 scroll-mt-4">
+          <h4 className="text-xs font-extrabold text-slate-400">Review your answers</h4>
           <button
             type="button"
             onClick={() => setWrongOnly((v) => !v)}
@@ -713,10 +768,10 @@ export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => 
           {visibleRows.map(({ q: sq, i, given, ok }) => (
             <div key={sq.id} className="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-4 space-y-2.5">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+                <span className="text-xs font-bold text-slate-400">
                   #{i + 1} · {pipelineLabel(sq.examType)} · {sq.subject}{sq.year ? ` · ${sq.year}` : ''}
                 </span>
-                <span className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+                <span className={`shrink-0 px-2 py-0.5 rounded-full text-xs font-extrabold ${
                   ok ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
                 }`}>
                   {ok ? 'Correct' : given ? 'Wrong' : 'Not answered'}
@@ -757,16 +812,16 @@ export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => 
           <button
             type="button"
             onClick={startSession}
-            className="w-full h-12 rounded-2xl bg-[#EA580C] text-white text-sm font-extrabold shadow-sm hover:bg-[#C2410C] cursor-pointer"
+            className="w-full h-14 rounded-2xl bg-[#EA580C] text-white text-base font-extrabold shadow-sm hover:bg-[#C2410C] cursor-pointer"
           >
             Practise again
           </button>
           <button
             type="button"
-            onClick={() => setScreen('home')}
-            className="w-full h-12 rounded-2xl bg-white border border-[#E2E8F0] text-[#0F172A] text-sm font-extrabold hover:border-[#CBD5E1] cursor-pointer"
+            onClick={() => { setTopic('all'); setStep(3); setScreen('home'); }}
+            className="w-full h-14 rounded-2xl bg-white border border-[#E2E8F0] text-[#0F172A] text-base font-extrabold hover:border-[#CBD5E1] cursor-pointer"
           >
-            Back to setup
+            Choose another topic
           </button>
         </div>
       </div>
@@ -797,6 +852,37 @@ export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => 
     setLength(lastSetup.length || '10');
     if (lastSetup.mode === 'instant' || lastSetup.mode === 'end') setFeedbackMode(lastSetup.mode);
     setStep(4);
+  };
+
+  // Interrupted session on this device (P4c): questions must still exist in the
+  // current bank for the card to appear.
+  const resumeData = (() => {
+    const rec = readResume();
+    if (!rec || !Array.isArray(rec.questionIds) || rec.questionIds.length === 0) return null;
+    const byId = new Map<string, BankQuestion>(questions.map((qq) => [qq.id, qq]));
+    const qs = rec.questionIds.map((id) => byId.get(id)).filter((x): x is BankQuestion => Boolean(x));
+    if (qs.length === 0) return null;
+    const savedAnswers: Record<string, string> = {};
+    Object.entries(rec.answers || {}).forEach(([k, v]) => { if (typeof v === 'string') savedAnswers[k] = v; });
+    return {
+      questions: qs,
+      answers: savedAnswers,
+      qIndex: Math.max(0, Math.min(Number(rec.qIndex) || 0, qs.length - 1)),
+      mode: rec.mode === 'end' ? ('end' as const) : ('instant' as const),
+      subject: String(rec.subject || 'all'),
+      topic: String(rec.topic || 'all'),
+      examType: String(rec.examType || 'jamb'),
+    };
+  })();
+  const resumeStart = () => {
+    if (!resumeData) return;
+    setSession(resumeData.questions);
+    setAnswers(resumeData.answers);
+    setQIndex(resumeData.qIndex);
+    setPicked(null);
+    setWrongOnly(false);
+    setFeedbackMode(resumeData.mode);
+    setScreen('session');
   };
 
   const stepHeader = (title: string, sub: string, onBack: (() => void) | null) => (
@@ -846,6 +932,21 @@ export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => 
         <div className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-sm space-y-4">
           {stepHeader('Practice', 'Choose your exam to start.', null)}
           {progressBar}
+          {resumeData ? (
+            <button
+              type="button"
+              onClick={resumeStart}
+              className="w-full min-h-[60px] rounded-2xl border-2 border-[#0F172A] bg-[#0F172A] px-4 py-3.5 flex items-center justify-between gap-3 text-left cursor-pointer"
+            >
+              <span className="min-w-0">
+                <span className="block text-base font-extrabold text-white">Continue where you left off</span>
+                <span className="block text-xs text-slate-300 font-semibold mt-0.5 truncate">
+                  {resumeData.subject === 'all' ? 'All my subjects' : resumeData.subject} · {resumeData.topic === 'all' ? 'All topics' : resumeData.topic} · question {resumeData.qIndex + 1} of {resumeData.questions.length}
+                </span>
+              </span>
+              <ChevronRight className="w-5 h-5 text-white shrink-0" />
+            </button>
+          ) : null}
           {quickCard ? (
             <button
               type="button"
