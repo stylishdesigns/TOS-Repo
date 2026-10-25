@@ -561,6 +561,13 @@ export function registerQuestionBankRoutes(app: express.Express): void {
         questions: questionsOut,
       };
       const bodyText = JSON.stringify(payload);
+      // Loud failure, never silent truncation: Cloudinary's free plan caps a
+      // raw file at 10 MB. Past that the single-file format cannot carry the
+      // bank; the P3 split format takes over at that scale.
+      const bodyBytes = Buffer.byteLength(bodyText, 'utf8');
+      if (bodyBytes > 9.5 * 1024 * 1024) {
+        throw httpError(413, `The ${kind} bank file is ${(bodyBytes / 1024 / 1024).toFixed(1)} MB for ${questionsOut.length} questions. Cloudinary's free plan caps one file at 10 MB, so this publish would fail mid-upload. Nothing was uploaded. Publish in this size range needs the P3 split format.`);
+      }
 
       const changes = [
         ...added.map((s) => ({ subject: String((s.data() as any).subject || ''), action: 'added', title: String((s.data() as any).text || '').slice(0, 120) })),

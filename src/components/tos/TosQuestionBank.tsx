@@ -108,6 +108,14 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
   const [publishing, setPublishing] = useState(false);
   const [publishResult, setPublishResult] = useState<Json | null>(null);
 
+  // Library setup (Prompt L2): one-time backfill + recount for the new paged
+  // library. TOS-only routes; nothing writes until you confirm a preview.
+  const [setupTree, setSetupTree] = useState<Json | null>(null);
+  const [setupBusy, setSetupBusy] = useState(false);
+  const [setupMsg, setSetupMsg] = useState('');
+  const [setupPreview, setSetupPreview] = useState<Json | null>(null);
+  const [setupStage, setSetupStage] = useState<'backfill' | 'recount' | null>(null);
+
   const load = useCallback(async () => {
     setError('');
     try {
@@ -119,6 +127,59 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
   }, []);
 
   useEffect(() => { load(); }, [load, refreshKey]);
+
+  const loadTree = useCallback(async () => {
+    try { setSetupTree(await api(`/api/tos/questionbank/tree?kind=${kind}`)); } catch { setSetupTree(null); }
+  }, [kind]);
+  useEffect(() => { loadTree(); }, [loadTree, refreshKey]);
+
+  const setupNeeded = Boolean(setupTree && setupTree.setupNeeded);
+
+  const openSetupPreview = async (stage: 'backfill' | 'recount') => {
+    setSetupBusy(true); setSetupMsg('');
+    try {
+      const route = stage === 'backfill' ? 'backfill-preview' : 'recount-preview';
+      setSetupPreview(await api(`/api/tos/questionbank/${route}?kind=${kind}`));
+      setSetupStage(stage);
+    } catch (e: any) { setSetupMsg(e.message); }
+    setSetupBusy(false);
+  };
+
+  const runBackfill = async () => {
+    setSetupBusy(true); setSetupMsg('');
+    try {
+      let cursor: string | null = null;
+      let updated = 0;
+      let rounds = 0;
+      for (;;) {
+        const r: Json = await api('/api/tos/questionbank/backfill', {
+          method: 'POST',
+          body: { confirm: 'BACKFILL', kind, cursor, maxDocs: 400 },
+        });
+        updated += Number(r.updated) || 0;
+        rounds += 1;
+        setSetupMsg(`Backfill running: ${updated} questions keyed so far...`);
+        if (r.done || rounds > 500) break;
+        cursor = r.nextCursor || null;
+      }
+      setSetupPreview(null); setSetupStage(null);
+      setSetupMsg(`Backfill done: ${updated} questions now carry search keys. Next step: Recount.`);
+      await loadTree();
+    } catch (e: any) { setSetupMsg(e.message); }
+    setSetupBusy(false);
+  };
+
+  const runRecount = async () => {
+    setSetupBusy(true); setSetupMsg('');
+    try {
+      const r: Json = await api('/api/tos/questionbank/recount', { method: 'POST', body: { confirm: 'RECOUNT', kind } });
+      setSetupPreview(null); setSetupStage(null);
+      setSetupMsg(`Recount done: ${r.total} live questions counted across ${r.subjects} subjects.`);
+      await loadTree();
+      await load();
+    } catch (e: any) { setSetupMsg(e.message); }
+    setSetupBusy(false);
+  };
 
   const questions: any[] = useMemo(() => (data?.questions || []).filter((q: any) => (q.kind || 'practice') === kind) as any[], [data, kind]);
   const subjects: string[] = useMemo(() => (data?.subjects || []) as string[], [data]);
@@ -491,6 +552,45 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
       </Card>
 
       {/* Summary cards */}
+      {setupNeeded && (
+        <div className="rounded-2xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-200 space-y-3">
+          <p className="font-bold text-amber-100">Set up needed</p>
+          <p className="text-amber-200/90">
+            The new library needs a one-time setup for this stream before search and counts work:
+            Backfill adds search keys to existing questions, then Recount builds the counts.
+            Nothing is written until you confirm each step after its preview. Existing questions
+            only become searchable on the new screen once the backfill finishes.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button className={btnPrimary} disabled={setupBusy} onClick={() => openSetupPreview('backfill')}>Preview backfill</button>
+            <button className={btnGhost} disabled={setupBusy} onClick={() => openSetupPreview('recount')}>Preview recount</button>
+          </div>
+          {setupStage === 'backfill' && setupPreview && (
+            <div className="rounded-xl border border-amber-500/30 bg-slate-950/60 p-3 text-amber-100 space-y-2">
+              <p>Backfill will update <b>{setupPreview.needing}</b> of {setupPreview.total} questions with search keys ({setupPreview.writeOps} writes). Duplicate groups found by the new fingerprint: <b>{setupPreview.dupGroups}</b>.</p>
+              <p className="text-xs text-amber-200/80">{setupPreview.note}</p>
+              <div className="flex gap-2">
+                <button className={btnPrimary} disabled={setupBusy} onClick={runBackfill}>Confirm backfill</button>
+                <button className={btnGhost} disabled={setupBusy} onClick={() => { setSetupPreview(null); setSetupStage(null); }}>Cancel</button>
+              </div>
+            </div>
+          )}
+          {setupStage === 'recount' && setupPreview && (
+            <div className="rounded-xl border border-amber-500/30 bg-slate-950/60 p-3 text-amber-100 space-y-2">
+              <p>Recount will write {setupPreview.writeOps} counter documents for {setupPreview.computed?.total} live questions across {setupPreview.computed?.subjects?.length} subjects.</p>
+              {Array.isArray(setupPreview.diffs) && setupPreview.diffs.length > 0 && (
+                <p className="text-xs text-amber-200/80">Differences found: {setupPreview.diffs.join('; ')}</p>
+              )}
+              <p className="text-xs text-amber-200/80">{setupPreview.note}</p>
+              <div className="flex gap-2">
+                <button className={btnPrimary} disabled={setupBusy} onClick={runRecount}>Confirm recount</button>
+                <button className={btnGhost} disabled={setupBusy} onClick={() => { setSetupPreview(null); setSetupStage(null); }}>Cancel</button>
+              </div>
+            </div>
+          )}
+          {setupMsg && <p className="font-semibold text-amber-100">{setupMsg}</p>}
+        </div>
+      )}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="bg-slate-900/70 border border-white/10 rounded-2xl p-4">
           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total questions</p>
