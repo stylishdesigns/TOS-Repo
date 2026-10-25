@@ -8,6 +8,7 @@ import {
   RefreshCw,
   Search,
   Sparkles,
+  X,
   XCircle,
 } from 'lucide-react';
 import { useApp } from '../../../context/AppContext';
@@ -155,6 +156,8 @@ export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => 
   const [session, setSession] = useState<BankQuestion[]>([]);
   const [qIndex, setQIndex] = useState(0);
   const [picked, setPicked] = useState<string | null>(null);
+  // Set by the close (X) button; the dialog asks before leaving a session.
+  const [confirmLeave, setConfirmLeave] = useState(false);
   const [answers, setAnswers] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
@@ -490,11 +493,21 @@ export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => 
       <div className="space-y-4">
         {/* Progress */}
         <div className="bg-white rounded-3xl p-4 border border-slate-200/90 shadow-sm">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-extrabold text-slate-900">Question {qIndex + 1} of {session.length}</span>
-            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
-              {pipelineLabel(q.examType)} · {q.subject}{q.year ? ` · ${q.year}` : ''}
-            </span>
+          <div className="flex items-center justify-between gap-3 mb-2">
+            <span className="text-sm font-extrabold text-slate-900">Question {qIndex + 1} of {session.length}</span>
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-xs font-semibold text-slate-400 truncate">
+                {pipelineLabel(q.examType)} · {q.subject}{q.year ? ` · ${q.year}` : ''}
+              </span>
+              <button
+                type="button"
+                aria-label="Close practice"
+                onClick={() => setConfirmLeave(true)}
+                className="shrink-0 w-9 h-9 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center hover:bg-slate-200 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
           </div>
           <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
             <div
@@ -503,6 +516,34 @@ export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => 
             />
           </div>
         </div>
+
+        {/* Question strip (Test mode): jump straight to any question */}
+        {endMode && session.length > 1 ? (
+          <div className="bg-white rounded-3xl p-3 border border-slate-200/90 shadow-sm">
+            <div className="flex flex-wrap gap-1.5 justify-center">
+              {session.map((sq, i) => {
+                const answered = Boolean(answers[sq.id]);
+                const current = i === qIndex;
+                return (
+                  <button
+                    key={sq.id}
+                    type="button"
+                    onClick={() => { setPicked(null); setQIndex(i); }}
+                    className={`w-9 h-9 rounded-xl text-xs font-extrabold flex items-center justify-center transition-all cursor-pointer ${
+                      current
+                        ? 'bg-[#EA580C] text-white'
+                        : answered
+                          ? 'bg-slate-900 text-white'
+                          : 'bg-slate-100 text-slate-500'
+                    }`}
+                  >
+                    {i + 1}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
 
         {/* Question */}
         <div className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-sm space-y-4">
@@ -541,14 +582,15 @@ export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => 
                 type="button"
                 disabled={!endMode && picked !== null}
                 onClick={() => choose(key)}
-                className={`w-full min-h-[44px] rounded-2xl border p-3.5 text-left flex items-start gap-3 transition-all cursor-pointer disabled:cursor-default ${cls}`}
+                className={`w-full min-h-[56px] rounded-2xl border p-4 text-left flex items-start gap-3 transition-all cursor-pointer disabled:cursor-default ${cls}`}
               >
-                <span className={`shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black ${keyCls}`}>
+                <span className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-xs font-black ${keyCls}`}>
                   {key}
                 </span>
-                <span className="text-sm font-semibold leading-snug pt-0.5">{q.options[key]}</span>
+                <span className="text-[15px] font-semibold leading-snug pt-0.5">{q.options[key]}</span>
                 {!endMode && picked !== null && isAnswer ? <CheckCircle2 className="w-5 h-5 ml-auto shrink-0 text-emerald-500" /> : null}
                 {!endMode && picked !== null && chosen && !isAnswer ? <XCircle className="w-5 h-5 ml-auto shrink-0 text-red-500" /> : null}
+                {endMode && chosen ? <CheckCircle2 className="w-5 h-5 ml-auto shrink-0 text-[#EA580C]" /> : null}
               </button>
             );
           })}
@@ -596,13 +638,30 @@ export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => 
           </button>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setScreen('home')}
-          className="w-full h-11 rounded-2xl text-xs font-extrabold text-slate-500 hover:text-slate-800 cursor-pointer"
-        >
-          Leave practice
-        </button>
+        {confirmLeave ? (
+          <div className="fixed inset-0 z-50 bg-slate-950/50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl p-5 w-full max-w-sm space-y-4 shadow-xl">
+              <h3 className="text-lg font-black text-slate-900">Leave practice?</h3>
+              <p className="text-sm text-slate-500 font-medium">Your progress will be saved.</p>
+              <div className="flex gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => { setConfirmLeave(false); setScreen('home'); }}
+                  className="flex-1 h-12 rounded-2xl bg-[#EA580C] text-white text-sm font-extrabold hover:bg-[#C2410C] cursor-pointer"
+                >
+                  Leave
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmLeave(false)}
+                  className="flex-1 h-12 rounded-2xl bg-slate-100 text-[#0F172A] text-sm font-extrabold hover:bg-slate-200 cursor-pointer"
+                >
+                  Keep going
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
     );
   }
