@@ -213,6 +213,17 @@ class CounterAcc {
       batch.set(ref, op, { merge: true });
     }
   }
+
+/** Record one document change (prev data before, next data after; null = gone). */
+  change(prev: any, next: any) {
+    this.side(sideOf(prev), -1);
+    this.side(sideOf(next), 1);
+  }
+}
+
+/** Shared accumulator for bulk actions: totals in memory, one write per counter doc. */
+export function createCounterAcc(): CounterAcc {
+  return new CounterAcc;
 }
 
 /** prev = document data before the change, next = after (null = gone). */
@@ -746,6 +757,228 @@ export function registerQuestionBankLibraryRoutes(
       res.status(error?.status || 500).json({ error: error?.message || 'Recount failed.' });
     }
   });
+
+  // -------------------------------------------------------------------
+  // Bulk actions (Prompt L4). Every action is capped at 200 documents per
+  // call and every batch stays at or under 400 writes. Each action totals
+  // its whole counter change in memory and writes each counter document
+  // once, in the same atomic batch as the question writes.
+  // -------------------------------------------------------------------
+  const BULK_CAP = 200;
+
+  // Remove a selection made on the Library screen. Drafts are deleted
+  // outright; published questions are soft-removed. The screen shows the
+  // exact selection and an explicit confirm before calling this.
+  app.post('/api/tos/questionbank/bulk-remove', async (req, res) => {
+    try {
+      const caller = requireTos(req);
+      if (req.body?.confirm !== 'BULK-REMOVE') {
+        throw httpError(400, 'Missing confirm. Call this route with confirm:"BULK-REMOVE" from the Library screen after reviewing the selection.');
+      }
+      const kind = parseKind(req.body?.kind);
+      const ids: string[] = Array.isArray(req.body?.ids) ? req.body.ids.map(String).filter(Boolean) : [];
+      if (ids.length === 0) throw httpError(400, 'No questions selected.');
+      if (ids.length > BULK_CAP) throw httpError(400, `Too many selected (${ids.length}). The cap is ${BULK_CAP} per bulk action.`);
+      const uniq = Array.from(new Set(ids));
+      const docs = await Promise.all(uniq.map((id) => adminDb.collection(QB_QUESTIONS).doc(id).get()));
+      const batch = adminDb.batch();
+      const acc = createCounterAcc();
+      let soft = 0;
+      let hard = 0;
+      let skipped = 0;
+      const now = new Date().toISOString();
+      docs.forEach((doc) => {
+        if (!doc.exists) { skipped += 1; return; }
+        const d = doc.data() as any;
+        if (String(d.kind || 'practice') !== kind) throw httpError(409, `Question ${doc.id} belongs to a different stream. Refresh the list and try again.`);
+        if (String(d.status || '') === 'removed') { skipped += 1; return; }
+        if (String(d.status || '') === 'draft') {
+          batch.delete(doc.ref);
+          acc.change(d, null);
+          hard += 1;
+        } else {
+          batch.update(doc.ref, { status: 'removed', removedAt: now, removedByUid: caller.uid, updatedAt: now });
+          acc.change(d, { ...d, status: 'removed', removedAt: now, removedByUid: caller.uid, updatedAt: now });
+          soft += 1;
+        }
+      });
+      acc.flush(batch, kind);
+      await batch.commit();
+      await auditSafe(caller, 'QB_BULK_REMOVE', { kind, soft, hard, skipped });
+      res.json({ ok: true, softRemoved: soft, hardDeleted: hard, skipped });
+    } catch (error: any) {
+      console.error('[tos/questionbank/bulk-remove] failed:', error?.message || error);
+      res.status(error?.status || 500).json({ error: error?.message || 'Bulk remove failed.' });
+    }
+  });
+
+  // Empty the removed bin: permanently delete every soft-removed question in
+  // this stream. Preview is one aggregated count plus a few samples; the run
+  // is typed-confirm gated and processes 200 per call until done.
+  app.get('/api/tos/questionbank/empty-removed-preview', async (req, res) => {
+    try {
+      requireTos(req);
+      const kind = parseKind(req.query.kind);
+      const base = adminDb.collection(QB_QUESTIONS).where('kind', '==', kind).where('status', '==', 'removed');
+      const countSnap = await base.count().get();
+      const total = countSnap.data().count || 0;
+      const samples = await base.limit(5).get();
+      res.json({
+        ok: true,
+        kind,
+        total,
+        samples: samples.docs.map((s) => String((s.data() as any).text || '').slice(0, 120)),
+        note: 'Emptying permanently deletes these questions and their history. This cannot be undone. Type EMPTY REMOVED in the box to confirm.',
+      });
+    } catch (error: any) {
+      console.error('[tos/questionbank/empty-removed-preview] failed:', error?.message || error);
+      res.status(error?.status || 500).json({ error: error?.message || 'Failed to preview.' });
+    }
+  });
+
+  app.post('/api/tos/questionbank/empty-removed', async (req, res) => {
+    try {
+      const caller = requireTos(req);
+      if (String(req.body?.confirm || '').trim() !== 'EMPTY REMOVED') {
+        throw httpError(400, 'Missing confirm. Type EMPTY REMOVED in the box on the Removed tab; the exact words are required.');
+      }
+      const kind = parseKind(req.body?.kind);
+      const snap = await adminDb.collection(QB_QUESTIONS)
+        .where('kind', '==', kind).where('status', '==', 'removed')
+        .orderBy('__name__').limit(BULK_CAP).get();
+      if (snap.empty) { res.json({ ok: true, deleted: 0, done: true }); return; }
+      const batch = adminDb.batch();
+      const acc = createCounterAcc();
+      snap.docs.forEach((s) => {
+        acc.change(s.data() as any, null);
+        batch.delete(s.ref);
+      });
+      acc.flush(batch, kind);
+      await batch.commit();
+      const done = snap.size < BULK_CAP;
+      await auditSafe(caller, 'QB_EMPTY_REMOVED', { kind, deleted: snap.size, done });
+      res.json({ ok: true, deleted: snap.size, done });
+    } catch (error: any) {
+      console.error('[tos/questionbank/empty-removed] failed:', error?.message || error);
+      res.status(error?.status || 500).json({ error: error?.message || 'Empty removed failed.' });
+    }
+  });
+
+  // Topic rename / merge preview. Rename moves every question in one topic
+  // branch to a new spelling; merge moves them into an existing branch and
+  // keeps the target's spelling. Read-only until confirmed.
+  app.get('/api/tos/questionbank/topic-preview', async (req, res) => {
+    try {
+      requireTos(req);
+      const kind = parseKind(req.query.kind);
+      const subjectKey = mapKey(req.query.subjectKey);
+      const topicKey = mapKey(req.query.topicKey);
+      const mode = String(req.query.mode || '');
+      if (!['rename', 'merge'].includes(mode)) throw httpError(400, 'Mode must be rename or merge.');
+      if (!subjectKey || !topicKey) throw httpError(400, 'Pick a subject and a topic first.');
+      const toTopic = String(req.query.toTopic || '').trim();
+      const intoTopicKey = mapKey(req.query.intoTopicKey || '');
+      if (mode === 'rename' && !toTopic) throw httpError(400, 'Type the new topic name.');
+      if (mode === 'rename' && toTopic.length > 160) throw httpError(400, 'Topic is too long (max 160 characters).');
+      if (mode === 'merge' && !intoTopicKey) throw httpError(400, 'Pick the topic to merge into.');
+      if (mode === 'merge' && intoTopicKey === topicKey) throw httpError(400, 'Pick a different topic to merge into.');
+
+      const subjectDoc = await adminDb.collection(QB_COUNTS).doc(`${kind}__s__${subjectKey}`).get();
+      const sd = (subjectDoc.exists ? subjectDoc.data() : {}) as any;
+      const sourceLabel = String(sd.byTopic?.[topicKey]?.label || topicKey);
+      const sourceCount = Number(sd.byTopic?.[topicKey]?.total) || 0;
+      const existingTopics = Object.keys(sd.byTopic || {});
+
+      if (mode === 'rename') {
+        const newKey = mapKey(toTopic);
+        if (newKey !== topicKey && existingTopics.includes(newKey)) {
+          throw httpError(409, `"${toTopic}" already exists in this subject (as ${newKey}). Use Merge instead so the counts stay honest.`);
+        }
+        res.json({
+          ok: true, kind, mode, subjectKey, topicKey,
+          sourceLabel, sourceCount, newKey, newLabel: toTopic,
+          writeOps: sourceCount,
+          note: `Rename moves all ${sourceCount} questions from "${sourceLabel}" to "${toTopic}" and updates the counts. Nothing is written until you confirm.`,
+        });
+        return;
+      }
+      const targetLabel = String(sd.byTopic?.[intoTopicKey]?.label || intoTopicKey);
+      const targetCount = Number(sd.byTopic?.[intoTopicKey]?.total) || 0;
+      res.json({
+        ok: true, kind, mode, subjectKey, topicKey,
+        sourceLabel, sourceCount, intoTopicKey, targetLabel, targetCount,
+        writeOps: sourceCount,
+        note: `Merge moves all ${sourceCount} questions from "${sourceLabel}" into "${targetLabel}" (${targetCount} already there) and updates the counts. Nothing is written until you confirm.`,
+      });
+    } catch (error: any) {
+      console.error('[tos/questionbank/topic-preview] failed:', error?.message || error);
+      res.status(error?.status || 500).json({ error: error?.message || 'Failed to preview the topic change.' });
+    }
+  });
+
+  // Topic rename / merge run. Each call rewrites at most 200 questions of
+  // the branch; the screen keeps pressing until done:true. The counters move
+  // with every question, inside the same batch.
+  app.post('/api/tos/questionbank/topic-change', async (req, res) => {
+    try {
+      const caller = requireTos(req);
+      const confirm = String(req.body?.confirm || '');
+      if (!['TOPIC-RENAME', 'TOPIC-MERGE'].includes(confirm)) {
+        throw httpError(400, 'Missing confirm. Call with confirm:"TOPIC-RENAME" or "TOPIC-MERGE" from the Library screen after the preview.');
+      }
+      const kind = parseKind(req.body?.kind);
+      const subjectKey = mapKey(req.body?.subjectKey);
+      const topicKey = mapKey(req.body?.topicKey);
+      const mode = String(req.body?.mode || '');
+      if (!subjectKey || !topicKey) throw httpError(400, 'Pick a subject and a topic first.');
+      let nextTopic = '';
+      let nextKey = '';
+      if (mode === 'rename' && confirm === 'TOPIC-RENAME') {
+        nextTopic = String(req.body?.toTopic || '').trim();
+        nextKey = mapKey(nextTopic);
+        if (!nextTopic) throw httpError(400, 'Type the new topic name.');
+        if (nextTopic.length > 160) throw httpError(400, 'Topic is too long (max 160 characters).');
+      } else if (mode === 'merge' && confirm === 'TOPIC-MERGE') {
+        nextKey = mapKey(req.body?.intoTopicKey || '');
+        const subjectDoc = await adminDb.collection(QB_COUNTS).doc(`${kind}__s__${subjectKey}`).get();
+        nextTopic = String(((subjectDoc.data() || {}) as any).byTopic?.[nextKey]?.label || '');
+        if (!nextKey || !nextTopic) throw httpError(400, 'Pick the topic to merge into.');
+      } else {
+        throw httpError(400, 'Mode does not match the confirm string.');
+      }
+
+      const snap = await adminDb.collection(QB_QUESTIONS)
+        .where('kind', '==', kind)
+        .where('subjectKey', '==', subjectKey)
+        .where('topicKey', '==', topicKey)
+        .orderBy('__name__').limit(BULK_CAP).get();
+      if (snap.empty) { res.json({ ok: true, updated: 0, done: true }); return; }
+      const batch = adminDb.batch();
+      const acc = createCounterAcc();
+      const now = new Date().toISOString();
+      snap.docs.forEach((s) => {
+        const d = s.data() as any;
+        const nextPaths = (Array.isArray(d.paths) ? d.paths : [])
+          .filter((pv: string) => pv !== `t:${topicKey}`)
+          .concat([`t:${nextKey}`]);
+        const next = { ...d, topic: nextTopic, topicKey: nextKey, paths: nextPaths, updatedAt: now, editedByUid: caller.uid };
+        batch.update(s.ref, {
+          topic: nextTopic, topicKey: nextKey, paths: nextPaths,
+          updatedAt: now, editedByUid: caller.uid,
+        });
+        acc.change(d, next);
+      });
+      acc.flush(batch, kind);
+      await batch.commit();
+      const done = snap.size < BULK_CAP;
+      await auditSafe(caller, confirm === 'TOPIC-RENAME' ? 'QB_TOPIC_RENAMED' : 'QB_TOPIC_MERGED', { kind, subjectKey, from: topicKey, to: nextKey, updated: snap.size, done });
+      res.json({ ok: true, updated: snap.size, done });
+    } catch (error: any) {
+      console.error('[tos/questionbank/topic-change] failed:', error?.message || error);
+      res.status(error?.status || 500).json({ error: error?.message || 'Topic change failed.' });
+    }
+  });
+
 }
 
 function orderByValues(sort: string, forceUpdated: boolean, doc: QueryDocumentSnapshot | null): unknown[] {

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Loader2, Search, X, ChevronRight, SlidersHorizontal, Pencil, Trash2, FolderTree } from 'lucide-react';
+import { Loader2, Search, X, ChevronRight, Check, Pencil, Trash2, FolderTree } from 'lucide-react';
 import { api, Json, Card, inputCls, btnPrimary, btnGhost, fmtDate } from './tosShared';
 import { BANK_YEARS } from '../../data/seniorSubjects';
 
@@ -54,6 +54,23 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number }> = ({ refreshKe
   const [editorError, setEditorError] = useState('');
   const [saving, setSaving] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
+
+  // Bulk actions (L4): select, bulk remove, empty removed, manage topics.
+  const [selectMode, setSelectMode] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkMsg, setBulkMsg] = useState('');
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [confirmBulkRemove, setConfirmBulkRemove] = useState(false);
+  const [emptyPreview, setEmptyPreview] = useState<Json | null>(null);
+  const [emptyTyped, setEmptyTyped] = useState('');
+  const [topicsOpen, setTopicsOpen] = useState(false);
+  const [topicSubject, setTopicSubject] = useState('');
+  const [topicFrom, setTopicFrom] = useState('');
+  const [topicMode, setTopicMode] = useState<'rename' | 'merge'>('rename');
+  const [topicNewName, setTopicNewName] = useState('');
+  const [topicInto, setTopicInto] = useState('');
+  const [topicPreview, setTopicPreview] = useState<Json | null>(null);
+  const [topicMsg, setTopicMsg] = useState('');
 
   // Debounced search: 400 ms after the last keystroke.
   useEffect(() => {
@@ -135,6 +152,119 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number }> = ({ refreshKe
     setSaving(false);
   };
 
+  // ---- Bulk actions -------------------------------------------------------
+
+  const bulkStats = useMemo(() => {
+    const stats = { drafts: 0, published: 0, other: 0 };
+    items.forEach((it) => {
+      if (!selected.has(it.id)) return;
+      if (it.status === 'draft') stats.drafts += 1;
+      else if (it.status === 'published') stats.published += 1;
+      else stats.other += 1;
+    });
+    return stats;
+  }, [items, selected]);
+
+  const toggleSelect = (id: string) => {
+    setSelected((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  };
+
+  const runBulkRemove = async () => {
+    setBulkBusy(true); setBulkMsg('');
+    try {
+      const r: Json = await api('/api/tos/questionbank/bulk-remove', {
+        method: 'POST',
+        body: { confirm: 'BULK-REMOVE', kind, ids: Array.from(selected) },
+      });
+      setBulkMsg(`Removed ${r.softRemoved} published and deleted ${r.hardDeleted} drafts.${r.skipped ? ` Skipped ${r.skipped}.` : ''}`);
+      setConfirmBulkRemove(false);
+      setSelected(new Set());
+      setSelectMode(false);
+      loadList('replace');
+      loadTree();
+    } catch (e: any) { setBulkMsg(e.message); }
+    setBulkBusy(false);
+  };
+
+  const openEmptyPreview = async () => {
+    setBulkBusy(true); setBulkMsg(''); setEmptyTyped('');
+    try { setEmptyPreview(await api(`/api/tos/questionbank/empty-removed-preview?kind=${kind}`)); }
+    catch (e: any) { setBulkMsg(e.message); }
+    setBulkBusy(false);
+  };
+
+  const runEmpty = async () => {
+    setBulkBusy(true); setBulkMsg('');
+    try {
+      let deleted = 0;
+      for (;;) {
+        const r: Json = await api('/api/tos/questionbank/empty-removed', {
+          method: 'POST',
+          body: { confirm: emptyTyped.trim(), kind },
+        });
+        deleted += Number(r.deleted) || 0;
+        setBulkMsg(`Emptying: ${deleted} deleted so far...`);
+        if (r.done) break;
+      }
+      setBulkMsg(`Removed bin emptied: ${deleted} permanently deleted.`);
+      setEmptyPreview(null);
+      setEmptyTyped('');
+      loadList('replace');
+      loadTree();
+    } catch (e: any) { setBulkMsg(e.message); }
+    setBulkBusy(false);
+  };
+
+  const openTopics = () => {
+    setTopicsOpen(true);
+    setTopicMsg('');
+    setTopicPreview(null);
+    setTopicNewName('');
+    setTopicInto('');
+    setTopicFrom('');
+    setTopicSubject((tree?.subjects || [])[0]?.key || '');
+  };
+
+  const runTopicPreview = async () => {
+    setBulkBusy(true); setTopicMsg(''); setTopicPreview(null);
+    try {
+      const p = new URLSearchParams({ kind, subjectKey: topicSubject, topicKey: topicFrom, mode: topicMode });
+      if (topicMode === 'rename') p.set('toTopic', topicNewName); else p.set('intoTopicKey', topicInto);
+      setTopicPreview(await api(`/api/tos/questionbank/topic-preview?${p.toString()}`));
+    } catch (e: any) { setTopicMsg(e.message); }
+    setBulkBusy(false);
+  };
+
+  const runTopicChange = async () => {
+    setBulkBusy(true); setTopicMsg('');
+    try {
+      let updated = 0;
+      for (;;) {
+        const r: Json = await api('/api/tos/questionbank/topic-change', {
+          method: 'POST',
+          body: {
+            confirm: topicMode === 'rename' ? 'TOPIC-RENAME' : 'TOPIC-MERGE',
+            kind, subjectKey: topicSubject, topicKey: topicFrom, mode: topicMode,
+            toTopic: topicNewName, intoTopicKey: topicInto,
+          },
+        });
+        updated += Number(r.updated) || 0;
+        setTopicMsg(`Working: ${updated} questions moved so far...`);
+        if (r.done) break;
+      }
+      setTopicPreview(null);
+      setTopicsOpen(false);
+      setBulkMsg(`Done: ${updated} questions updated.`);
+      loadList('replace');
+      loadTree();
+    } catch (e: any) { setTopicMsg(e.message); }
+    setBulkBusy(false);
+  };
+
   const setEditorField = (field: string, value: any) => {
     setEditor((prev) => (prev ? { ...prev, item: { ...prev.item, [field]: value } } : prev));
   };
@@ -198,6 +328,9 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number }> = ({ refreshKe
       {tree && (tree.subjects || []).length === 0 && (
         <p className="text-xs text-slate-500 px-3 py-4">No counted subjects yet. Run Recount on the Authoring tab to build the tree.</p>
       )}
+      <button onClick={openTopics} className="w-full mt-2 px-3 py-2.5 rounded-xl border border-slate-700/60 text-xs font-bold text-slate-300 hover:text-white min-h-[44px]">
+        Manage topics (rename or merge)
+      </button>
     </div>
   );
 
@@ -247,6 +380,10 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number }> = ({ refreshKe
             <option value="year">Year</option>
             <option value="subject">Subject A to Z</option>
           </select>
+          <button onClick={() => { setSelectMode((v) => !v); setSelected(new Set()); setConfirmBulkRemove(false); }}
+            className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-sm font-semibold min-h-[44px] ${selectMode ? 'border-orange-500/50 bg-orange-500/15 text-orange-200' : 'border-slate-700/60 text-slate-300'}`}>
+            <Check className="w-4 h-4" /> {selectMode ? 'Selecting' : 'Select'}
+          </button>
         </div>
         <div className="flex flex-wrap gap-1.5 mt-3">
           {STATUS_TABS.map((t) => (
@@ -260,6 +397,11 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number }> = ({ refreshKe
             </button>
           ))}
         </div>
+        {tab === 'removed' && (Number(tabs.removed) || 0) > 0 && (
+          <button onClick={openEmptyPreview} disabled={bulkBusy} className={`${btnGhost} mt-2`}>
+            <Trash2 className="w-4 h-4" /> Empty removed bin
+          </button>
+        )}
         <p className="text-[11px] text-slate-500 mt-2">
           {qDebounced.length >= 2
             ? 'Search covers every question in this stream, including ones outside the tree.'
@@ -267,6 +409,26 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number }> = ({ refreshKe
         </p>
       </Card>
 
+      {selected.size > 0 && (
+        <div className="rounded-2xl border border-orange-500/40 bg-orange-500/10 p-3.5 text-sm text-orange-100 space-y-2">
+          <p>{selected.size} selected: {bulkStats.drafts} drafts, {bulkStats.published} published, {bulkStats.other} other.</p>
+          {confirmBulkRemove ? (
+            <div className="space-y-2">
+              <p className="text-orange-200/90">Drafts are deleted outright; published ones are marked removed and stay in the Removed tab until you empty it. Up to 200 per action.</p>
+              <div className="flex flex-wrap gap-2">
+                <button className={btnPrimary} disabled={bulkBusy || selected.size > 200} onClick={runBulkRemove}>{bulkBusy ? 'Working...' : 'Confirm remove'}</button>
+                <button className={btnGhost} disabled={bulkBusy} onClick={() => setConfirmBulkRemove(false)}>Back</button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              <button className={btnPrimary} disabled={bulkBusy || selected.size > 200} onClick={() => setConfirmBulkRemove(true)}>{selected.size > 200 ? 'Over the 200 cap' : 'Remove selected'}</button>
+              <button className={btnGhost} disabled={bulkBusy} onClick={() => { setSelected(new Set()); setSelectMode(false); setConfirmBulkRemove(false); }}>Clear</button>
+            </div>
+          )}
+          {bulkMsg && <p className="font-semibold">{bulkMsg}</p>}
+        </div>
+      )}
       {listError && (
         <div className="rounded-2xl border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-200">{listError}</div>
       )}
@@ -279,9 +441,14 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number }> = ({ refreshKe
         <div className="space-y-2">
           <p className="text-xs text-slate-500 px-1">{loading ? 'Loading...' : showingLine}</p>
           {items.map((it) => (
-            <button key={it.id} onClick={() => openEditor(it.id)}
-              className="w-full text-left rounded-2xl border border-slate-700/50 bg-slate-900/40 p-3.5 hover:border-orange-500/40 transition-colors">
+            <button key={it.id} onClick={() => (selectMode ? toggleSelect(it.id) : openEditor(it.id))}
+              className={`w-full text-left rounded-2xl border p-3.5 transition-colors ${selected.has(it.id) ? 'border-orange-500/60 bg-orange-500/10' : 'border-slate-700/50 bg-slate-900/40 hover:border-orange-500/40'}`}>
               <div className="flex items-start justify-between gap-3">
+                {selectMode && (
+                  <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${selected.has(it.id) ? 'border-orange-400 bg-orange-500 text-white' : 'border-slate-600'}`}>
+                    {selected.has(it.id) ? <Check className="w-3.5 h-3.5" /> : null}
+                  </span>
+                )}
                 <p className="text-sm text-slate-200 line-clamp-2">{it.textPreview}</p>
                 <Pencil className="w-4 h-4 text-slate-600 shrink-0 mt-0.5" />
               </div>
@@ -379,6 +546,77 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number }> = ({ refreshKe
                 <p className="text-[11px] text-slate-500">Saving a published question marks it as a change the next publish picks up.</p>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {emptyPreview && (
+        <div className="fixed inset-0 z-50 bg-slate-950/90 overflow-y-auto p-4" onClick={() => { if (!bulkBusy) setEmptyPreview(null); }}>
+          <div className="max-w-md mx-auto mt-16 rounded-2xl border border-red-500/40 bg-slate-900 p-4 space-y-3" onClick={(e) => e.stopPropagation()}>
+            <p className="font-bold text-white">Empty the removed bin</p>
+            <p className="text-sm text-red-200">{emptyPreview.note}</p>
+            <p className="text-sm text-slate-300">{emptyPreview.total} questions will be permanently deleted.</p>
+            {(emptyPreview.samples || []).length > 0 && (
+              <ul className="text-xs text-slate-500 space-y-1">
+                {(emptyPreview.samples as string[]).map((t, i) => <li key={i} className="truncate">- {t}</li>)}
+              </ul>
+            )}
+            <input value={emptyTyped} onChange={(e) => setEmptyTyped(e.target.value)} placeholder="Type EMPTY REMOVED" className={inputCls} />
+            <div className="flex flex-wrap gap-2">
+              <button className="px-4 py-2.5 rounded-xl bg-red-600 text-white text-sm font-bold min-h-[44px] disabled:opacity-50"
+                disabled={bulkBusy || emptyTyped.trim() !== 'EMPTY REMOVED'} onClick={runEmpty}>
+                {bulkBusy ? 'Deleting...' : 'Permanently delete'}
+              </button>
+              <button className={btnGhost} disabled={bulkBusy} onClick={() => setEmptyPreview(null)}>Cancel</button>
+            </div>
+            {bulkMsg && <p className="text-sm text-orange-200">{bulkMsg}</p>}
+          </div>
+        </div>
+      )}
+
+      {topicsOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/90 overflow-y-auto p-4" onClick={() => { if (!bulkBusy) setTopicsOpen(false); }}>
+          <div className="max-w-md mx-auto mt-16 rounded-2xl border border-slate-700 bg-slate-900 p-4 space-y-3" onClick={(e) => e.stopPropagation()}>
+            <p className="font-bold text-white">Manage topics</p>
+            <select value={topicSubject} onChange={(e) => { setTopicSubject(e.target.value); setTopicFrom(''); setTopicPreview(null); }} className={inputCls}>
+              {(tree?.subjects || []).map((s: any) => <option key={s.key} value={s.key}>{s.label} ({s.total})</option>)}
+            </select>
+            <select value={topicFrom} onChange={(e) => { setTopicFrom(e.target.value); setTopicPreview(null); }} className={inputCls}>
+              <option value="">Choose the topic to change</option>
+              {(((tree?.subjects || []).find((s: any) => s.key === topicSubject)?.topics) || []).map((t: any) => (
+                <option key={t.key} value={t.key}>{t.label} ({t.total})</option>
+              ))}
+            </select>
+            <div className="flex gap-2 text-sm">
+              <button onClick={() => { setTopicMode('rename'); setTopicPreview(null); }}
+                className={`flex-1 px-3 py-2 rounded-xl border font-semibold ${topicMode === 'rename' ? 'border-orange-500/50 bg-orange-500/15 text-orange-200' : 'border-slate-700 text-slate-400'}`}>Rename</button>
+              <button onClick={() => { setTopicMode('merge'); setTopicPreview(null); }}
+                className={`flex-1 px-3 py-2 rounded-xl border font-semibold ${topicMode === 'merge' ? 'border-orange-500/50 bg-orange-500/15 text-orange-200' : 'border-slate-700 text-slate-400'}`}>Merge into another</button>
+            </div>
+            {topicMode === 'rename' ? (
+              <input value={topicNewName} onChange={(e) => setTopicNewName(e.target.value)} placeholder="New topic name" className={inputCls} />
+            ) : (
+              <select value={topicInto} onChange={(e) => { setTopicInto(e.target.value); setTopicPreview(null); }} className={inputCls}>
+                <option value="">Merge into</option>
+                {(((tree?.subjects || []).find((s: any) => s.key === topicSubject)?.topics) || []).filter((t: any) => t.key !== topicFrom).map((t: any) => (
+                  <option key={t.key} value={t.key}>{t.label} ({t.total})</option>
+                ))}
+              </select>
+            )}
+            <div className="flex flex-wrap gap-2">
+              <button className={btnGhost} disabled={bulkBusy || !topicFrom || (topicMode === 'rename' ? !topicNewName.trim() : !topicInto)} onClick={runTopicPreview}>Preview</button>
+              {topicPreview && (
+                <button className={btnPrimary} disabled={bulkBusy} onClick={runTopicChange}>{bulkBusy ? 'Working...' : 'Confirm'}</button>
+              )}
+              <button className={btnGhost} disabled={bulkBusy} onClick={() => setTopicsOpen(false)}>Close</button>
+            </div>
+            {topicPreview && (
+              <div className="rounded-xl border border-slate-700 bg-slate-950/60 p-3 text-sm text-slate-300 space-y-1">
+                <p>{topicPreview.note}</p>
+                <p className="text-xs text-slate-500">Runs in chunks of 200 so big topics cannot hit a time limit.</p>
+              </div>
+            )}
+            {topicMsg && <p className="text-sm text-orange-200">{topicMsg}</p>}
           </div>
         </div>
       )}
