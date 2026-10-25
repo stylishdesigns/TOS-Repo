@@ -1,13 +1,16 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
+  ArrowLeft,
   BookOpen,
   CheckCircle2,
   ChevronRight,
   RefreshCw,
+  Search,
   Sparkles,
   XCircle,
 } from 'lucide-react';
+import { useApp } from '../../../context/AppContext';
 import type { Student } from '../../../types';
 
 interface BankQuestion {
@@ -87,41 +90,47 @@ function writeCache(bank: BankPayload) {
   }
 }
 
-const Chip: React.FC<{ active: boolean; onClick: () => void; children: React.ReactNode }> = ({ active, onClick, children }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    className={`h-9 px-3.5 rounded-full text-xs font-extrabold transition-all cursor-pointer border ${
-      active
-        ? 'bg-[#0F172A] text-white border-[#0F172A] shadow-xs'
-        : 'bg-white text-[#475569] border-[#E2E8F0] hover:border-[#CBD5E1]'
-    }`}
-  >
-    {children}
-  </button>
-);
+// Last setup (Prompt P4a): the student's choices from their last visit on
+// this device, so the next visit is one tap. Wrapped in try/catch because
+// storage can be unavailable in private modes.
+const LAST_SETUP_KEY = 'TOS_practice_last_setup';
+interface LastSetup {
+  examType: string;
+  subject: string;
+  topic: string;
+  year: string;
+  difficulty: string;
+  length: string;
+  mode: 'instant' | 'end';
+  lastSubject?: string;
+  lastTopic?: string;
+  practisedAt?: number;
+}
 
-const Select: React.FC<{ label: string; value: string; options: { value: string; label: string }[]; onChange: (v: string) => void; disabled?: boolean }> = ({ label, value, options, onChange, disabled }) => (
-  <label className="block">
-    <span className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-1.5">{label}</span>
-    <select
-      value={value}
-      disabled={disabled}
-      onChange={(e) => onChange(e.target.value)}
-      className="w-full h-11 rounded-xl border border-[#E2E8F0] bg-white px-3 text-sm font-bold text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#EA580C]/30 focus:border-[#EA580C] disabled:opacity-50 disabled:bg-slate-50"
-    >
-      {options.map((o) => (
-        <option key={o.value} value={o.value}>{o.label}</option>
-      ))}
-    </select>
-  </label>
-);
+function readLastSetup(): LastSetup | null {
+  try {
+    const raw = localStorage.getItem(LAST_SETUP_KEY);
+    if (!raw) return null;
+    const v = JSON.parse(raw);
+    if (!v || typeof v !== 'object') return null;
+    return v as LastSetup;
+  } catch { return null; }
+}
+
+function writeLastSetup(v: LastSetup) {
+  try { localStorage.setItem(LAST_SETUP_KEY, JSON.stringify(v)); } catch { /* ignore */ }
+}
+
+// Written by the in-progress session saver (Prompt P4c). A record here means
+// the student left a session unfinished on this device.
+const RESUME_KEY = 'TOS_practice_resume';
 
 interface StudentPracticeProps {
   student: Student;
 }
 
 export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => {
+  const { activeCentre } = useApp();
   const [screen, setScreen] = useState<Screen>('loading');
   const [bank, setBank] = useState<BankPayload | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
@@ -136,6 +145,11 @@ export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => 
   const [length, setLength] = useState<string>('10');
   const [feedbackMode, setFeedbackMode] = useState<'instant' | 'end'>('instant');
   const [wrongOnly, setWrongOnly] = useState(false);
+
+  // Guided setup state (Prompt P4a): which step of the flow is on screen.
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+  const [topicSearch, setTopicSearch] = useState('');
+  const [showMore, setShowMore] = useState(false);
 
   // Session state
   const [session, setSession] = useState<BankQuestion[]>([]);
@@ -199,10 +213,25 @@ export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => 
   );
   const subjectsBlocked = registeredSubjects.length === 0 || matchedSubjects.length === 0;
 
-  const subjectOptions = useMemo(
-    () => [{ value: 'all', label: 'All my subjects' }, ...matchedSubjects.map((sub) => ({ value: sub, label: sub }))],
-    [matchedSubjects]
-  );
+  // Guided flow (P4a): subjects the bank carries, most recently practised first.
+  const subjectChoices = useMemo(() => {
+    const lastSub = readLastSetup()?.lastSubject || '';
+    return [...matchedSubjects].sort((a, b) =>
+      a === lastSub ? -1 : b === lastSub ? 1 : a.localeCompare(b));
+  }, [matchedSubjects]);
+
+  // Exam types the centre enables (audience types) that also exist in the
+  // bank. A centre with none recorded, older setups included, gets whatever
+  // the bank carries rather than an empty step.
+  const centreExamTypes = useMemo(() => {
+    const list = ((activeCentre?.audienceTypes || []) as string[]).map((t) => String(t).trim().toLowerCase()).filter(Boolean);
+    return list.length > 0 ? list : null;
+  }, [activeCentre]);
+  const examChoices = useMemo(() => {
+    const inBank = Array.from(new Set<string>(questions.map((q) => String(q.examType || 'jamb')))).sort((a, b) => a.localeCompare(b));
+    const matched = centreExamTypes ? inBank.filter((et) => centreExamTypes.includes(et)) : inBank;
+    return matched.length > 0 ? matched : inBank;
+  }, [questions, centreExamTypes]);
 
   // Registered subjects the bank does not have yet (spelling differences, new subjects).
   const unmatchedRegistered = useMemo(() => {
@@ -224,15 +253,16 @@ export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => 
     return [{ value: 'all', label: 'All years' }, ...Array.from(set).sort((a, b) => b - a).map((y) => ({ value: String(y), label: String(y) }))];
   }, [questions]);
 
-  const topicOptions = useMemo(() => {
+  const topicChoices = useMemo(() => {
     const set = new Set<string>();
     questions.forEach((q) => {
       if (!q.topic) return;
-      if (subject !== 'all' && q.subject !== subject) return;
+      if (q.subject !== subject) return;
+      if (pipeline !== 'all' && q.examType !== pipeline) return;
       set.add(q.topic);
     });
-    return [{ value: 'all', label: 'All topics' }, ...Array.from(set).sort((a, b) => a.localeCompare(b)).map((t) => ({ value: t, label: t }))];
-  }, [questions, subject]);
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [questions, subject, pipeline]);
 
   const difficultyOptions = useMemo(() => {
     const set = new Set<string>();
@@ -250,17 +280,66 @@ export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => 
     return true;
   }), [questions, pipeline, subject, year, topic, difficulty]);
 
-  const lengthOptions = useMemo(() => {
-    const opts: { value: string; label: string; disabled: boolean }[] = [];
-    [10, 25, 50].forEach((n) => opts.push({ value: String(n), label: `${n} questions`, disabled: filtered.length < n }));
-    opts.push({ value: 'all', label: `All ${filtered.length}`, disabled: filtered.length === 0 });
-    return opts;
-  }, [filtered.length]);
-
+  // Session length chips (P4a): 10, 20, 40 or all. No counts shown to
+  // students; a chip the current choices cannot fill is simply disabled.
   useEffect(() => {
-    const current = lengthOptions.find((o) => o.value === length);
-    if (current?.disabled) setLength('10');
-  }, [lengthOptions, length]);
+    if (length !== 'all' && filtered.length < Number(length)) setLength('10');
+  }, [length, filtered.length]);
+
+  // Quiet refresh (P4a): while the student sits on the setup screen, re-check
+  // the published pointer every few minutes and on returning to the tab. The
+  // cache logic is unchanged and nothing appears on screen; an active session
+  // is never disturbed.
+  useEffect(() => {
+    if (screen !== 'home') return;
+    let alive = true;
+    const check = async () => {
+      try {
+        const resp = await fetch('/api/public/questionbank/current?kind=practice');
+        if (!resp.ok) return;
+        const pointer = (await resp.json()) as Pointer;
+        if (!pointer.version || !pointer.fileUrl || pointer.version === bank?.version) return;
+        const bankResp = await fetch(pointer.fileUrl);
+        if (!bankResp.ok) return;
+        const payload = await bankResp.json();
+        if (payload?.format !== 'tos-questionbank' || payload?.kind !== 'practice' || !Array.isArray(payload?.questions)) return;
+        const clean = payload as BankPayload;
+        writeCache(clean);
+        if (!alive) return;
+        setBank(clean);
+        setPointerInfo(pointer);
+      } catch { /* silent: never disturb the student */ }
+    };
+    const t = window.setInterval(check, 4 * 60 * 1000);
+    const onVis = () => { if (document.visibilityState === 'visible') check(); };
+    document.addEventListener('visibilitychange', onVis);
+    return () => { alive = false; window.clearInterval(t); document.removeEventListener('visibilitychange', onVis); };
+  }, [screen, bank?.version]);
+
+  // Pre-fill from the student's last choices (P4a): runs once per entry to
+  // the setup screen. With a single exam available the exam step is skipped.
+  const prefillDone = useRef(false);
+  useEffect(() => {
+    if (screen !== 'home' || prefillDone.current) return;
+    prefillDone.current = true;
+    const last = readLastSetup();
+    const exams = examChoices;
+    if (last) {
+      if (last.examType && exams.includes(last.examType)) setPipeline(last.examType);
+      else if (exams.length === 1) setPipeline(exams[0]);
+      if (last.subject && matchedSubjects.includes(last.subject)) setSubject(last.subject);
+      if (last.topic) setTopic(last.topic);
+      if (last.year) setYear(last.year);
+      if (last.difficulty) setDifficulty(last.difficulty);
+      if (last.length) setLength(last.length);
+      if (last.mode === 'instant' || last.mode === 'end') setFeedbackMode(last.mode);
+      setStep(exams.length === 1 ? 2 : 1);
+    } else if (exams.length === 1) {
+      setPipeline(exams[0]);
+      setStep(2);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screen]);
 
   const startSession = () => {
     if (filtered.length === 0) return;
@@ -271,6 +350,11 @@ export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => 
     setPicked(null);
     setAnswers({});
     setWrongOnly(false);
+    // Remember the choices on this device (P4a) so the next visit is one tap.
+    writeLastSetup({
+      examType: pipeline, subject, topic, year, difficulty, length, mode: feedbackMode,
+      lastSubject: subject, lastTopic: topic, practisedAt: Date.now(),
+    });
     setScreen('session');
   };
 
@@ -356,10 +440,6 @@ export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => 
           <BookOpen className="w-8 h-8" />
         </div>
         <div className="space-y-1.5 max-w-xs mx-auto">
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-orange-100/60 text-[#C2410C] text-[10px] font-extrabold uppercase tracking-wider mb-1">
-            <Sparkles className="w-3 h-3" />
-            <span>Question Bank</span>
-          </div>
           <h3 className="text-lg font-black text-slate-900 tracking-tight">CBT Practice</h3>
           <p className="text-xs text-slate-500 leading-relaxed font-medium">
             Practice questions are not available yet. Check back soon.
@@ -635,149 +715,326 @@ export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => 
   }
 
   // -------------------------------------------------------------------- home
-  const bankPill = pointerInfo?.publishedAt
-    ? `Updated ${new Date(pointerInfo.publishedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`
+  // Guided setup (Prompt P4a): one choice per step, back arrow, thin progress
+  // bar. Student language only, main text 14px+, helpers 12px, no bank jargon.
+  const examSkipped = examChoices.length <= 1;
+  const stepTotal = examSkipped ? 3 : 4;
+  const stepPos = examSkipped ? step - 1 : step;
+  const progressPct = Math.max(8, Math.min(100, Math.round((stepPos / stepTotal) * 100)));
+  const lastSetup = readLastSetup();
+  const quickCard = lastSetup?.lastSubject
+    ? {
+        subject: lastSetup.lastSubject,
+        topic: lastSetup.lastTopic && lastSetup.lastTopic !== 'all' ? lastSetup.lastTopic : 'All topics',
+      }
     : null;
-  return (
-    <div className="space-y-4">
-      {/* Header card */}
-      <div className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-sm">
-        <div className="flex items-start justify-between gap-3">
-          <div className="space-y-1">
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-orange-100/60 text-[#C2410C] text-[10px] font-extrabold uppercase tracking-wider">
-              <Sparkles className="w-3 h-3" />
-              <span>Question Bank</span>
-            </div>
-            <h3 className="text-lg font-black text-slate-900 tracking-tight">CBT Practice</h3>
-            <p className="text-xs text-slate-500 font-medium">
-              Untimed practice from the live question bank. Answers are marked as you go.
-            </p>
-          </div>
-          <div className="text-right shrink-0 space-y-1">
-            <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Bank v{pointerInfo?.version ?? bank?.version}</div>
-            {bankPill ? <div className="text-[10px] font-bold text-slate-400">{bankPill}</div> : null}
-          </div>
-        </div>
-      </div>
+  const quickStart = () => {
+    if (!lastSetup) return;
+    if (lastSetup.examType && examChoices.includes(lastSetup.examType)) setPipeline(lastSetup.examType);
+    if (lastSetup.subject && matchedSubjects.includes(lastSetup.subject)) setSubject(lastSetup.subject);
+    setTopic(lastSetup.topic || 'all');
+    setYear(lastSetup.year || 'all');
+    setDifficulty(lastSetup.difficulty || 'all');
+    setLength(lastSetup.length || '10');
+    if (lastSetup.mode === 'instant' || lastSetup.mode === 'end') setFeedbackMode(lastSetup.mode);
+    setStep(4);
+  };
 
-      {/* Filters */}
-      <div className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-sm space-y-4">
-        <div className="space-y-2">
-          <span className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Exam pipeline</span>
-          <div className="flex flex-wrap gap-2">
-            <Chip active={pipeline === 'all'} onClick={() => setPipeline('all')}>All</Chip>
-            {Array.from(new Set<string>(questions.map((q2) => q2.examType))).sort().map((et) => (
-              <Chip key={et} active={pipeline === et} onClick={() => setPipeline(et)}>{pipelineLabel(et)}</Chip>
-            ))}
-          </div>
-        </div>
-
-        <div className="rounded-2xl bg-slate-50 border border-slate-100 p-3 flex items-start gap-2.5">
-          <Sparkles className="w-4 h-4 text-[#EA580C] shrink-0 mt-0.5" />
-          <p className="text-[11px] text-slate-600 font-medium leading-relaxed">
-            These are the {registeredSubjects.length} subjects you registered for. Missing one?{' '}
-            <button
-              type="button"
-              onClick={openProfileSubjects}
-              className="text-[#C2410C] font-extrabold underline underline-offset-2 cursor-pointer"
-            >
-              Update your subjects in Profile
-            </button>
-          </p>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <Select label="Subject" value={subject} options={subjectOptions} onChange={(v) => { setSubject(v); setTopic('all'); }} />
-          <Select label="Year" value={year} options={yearOptions} onChange={setYear} />
-          <Select label="Topic" value={topic} options={topicOptions} onChange={setTopic} />
-          <Select label="Difficulty" value={difficulty} options={difficultyOptions} onChange={setDifficulty} />
-        </div>
-
-        {unmatchedRegistered.length > 0 ? (
-          <p className="text-[11px] text-amber-700 font-semibold leading-relaxed">
-            Not in the practice bank yet: {unmatchedRegistered.join(', ')}
-          </p>
-        ) : null}
-
-        <div className="space-y-2">
-          <span className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Answer feedback</span>
-          <div className="grid grid-cols-1 gap-2">
-            <button
-              type="button"
-              onClick={() => setFeedbackMode('instant')}
-              className={`min-h-[52px] rounded-2xl border p-3 text-left transition-all cursor-pointer ${
-                feedbackMode === 'instant' ? 'bg-slate-50 border-[#0F172A]' : 'bg-white border-[#E2E8F0] hover:border-[#CBD5E1]'
-              }`}
-            >
-              <span className="block text-xs font-extrabold text-[#0F172A]">Show answers after each question</span>
-              <span className="block text-[10px] text-slate-500 font-medium">The correct answer and explanation appear right away.</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setFeedbackMode('end')}
-              className={`min-h-[52px] rounded-2xl border p-3 text-left transition-all cursor-pointer ${
-                feedbackMode === 'end' ? 'bg-slate-50 border-[#0F172A]' : 'bg-white border-[#E2E8F0] hover:border-[#CBD5E1]'
-              }`}
-            >
-              <span className="block text-xs font-extrabold text-[#0F172A]">Show answers at the end</span>
-              <span className="block text-[10px] text-slate-500 font-medium">Answer everything, change your mind any time, results after Finish.</span>
-            </button>
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <span className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Session length</span>
-          <div className="flex flex-wrap gap-2">
-            {lengthOptions.map((o) => (
-              <button
-                key={o.value}
-                type="button"
-                disabled={o.disabled}
-                onClick={() => setLength(o.value)}
-                className={`h-9 px-3.5 rounded-full text-xs font-extrabold border transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
-                  length === o.value
-                    ? 'bg-[#0F172A] text-white border-[#0F172A]'
-                    : 'bg-white text-[#475569] border-[#E2E8F0] hover:border-[#CBD5E1]'
-                }`}
-              >
-                {o.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Start */}
-      <div className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-sm flex items-center justify-between gap-4">
-        <div>
-          <div className="text-sm font-black text-slate-900">
-            {filtered.length === 0 ? 'No questions match' : `${filtered.length} question${filtered.length === 1 ? '' : 's'} ready`}
-          </div>
-          <p className="text-xs text-slate-500 font-medium">
-            {filtered.length === 0 ? 'Loosen a filter or two to get some practice questions.' : 'Untimed. Feedback and explanations after each answer.'}
-          </p>
-        </div>
+  const stepHeader = (title: string, sub: string, onBack: (() => void) | null) => (
+    <div className="flex items-start gap-3">
+      {onBack ? (
         <button
           type="button"
-          disabled={filtered.length === 0}
-          onClick={startSession}
-          className={`shrink-0 h-11 px-5 rounded-full text-xs font-extrabold ${
-            filtered.length === 0
-              ? 'bg-slate-100 text-slate-300 cursor-not-allowed'
-              : 'bg-[#EA580C] text-white shadow-sm hover:bg-[#C2410C] cursor-pointer'
-          }`}
+          onClick={onBack}
+          aria-label="Go back a step"
+          className="shrink-0 w-11 h-11 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-600 hover:text-slate-900 cursor-pointer"
         >
-          Start
+          <ArrowLeft className="w-5 h-5" />
         </button>
+      ) : null}
+      <div className="min-w-0 pt-0.5">
+        <h3 className="text-lg font-black text-slate-900 tracking-tight">{title}</h3>
+        <p className="text-sm text-slate-500 font-medium mt-0.5">{sub}</p>
       </div>
+    </div>
+  );
 
-      <button
-        type="button"
-        onClick={load}
-        className="w-full flex items-center justify-center gap-2 text-[11px] font-bold text-slate-400 hover:text-slate-600 cursor-pointer"
-      >
-        <RefreshCw className="w-3.5 h-3.5" /> Check for a newer bank
-      </button>
+  const progressBar = (
+    <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
+      <div className="h-full rounded-full bg-[#EA580C] transition-all duration-300" style={{ width: `${progressPct}%` }} />
+    </div>
+  );
+
+  // Empty bank: a friendly state, no bank jargon.
+  if (questions.length === 0) {
+    return (
+      <div className="bg-white rounded-3xl p-8 border border-slate-200/90 shadow-sm text-center space-y-4">
+        <div className="w-16 h-16 rounded-2xl bg-orange-50 border border-orange-100 text-[#EA580C] flex items-center justify-center mx-auto shadow-sm">
+          <BookOpen className="w-8 h-8" />
+        </div>
+        <h3 className="text-lg font-black text-slate-900 tracking-tight">CBT Practice</h3>
+        <p className="text-sm text-slate-500 leading-relaxed font-medium max-w-xs mx-auto">
+          No practice questions are available yet. Check back soon.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4 pb-2">
+      {/* Step 1: choose your exam */}
+      {step === 1 ? (
+        <div className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-sm space-y-4">
+          {stepHeader('Practice', 'Choose your exam to start.', null)}
+          {progressBar}
+          {quickCard ? (
+            <button
+              type="button"
+              onClick={quickStart}
+              className="w-full min-h-[56px] rounded-2xl border-2 border-[#EA580C]/40 bg-orange-50/60 px-4 py-3.5 flex items-center justify-between gap-3 text-left hover:border-[#EA580C] transition-all cursor-pointer"
+            >
+              <span className="min-w-0">
+                <span className="block text-base font-extrabold text-[#0F172A]">Practise again</span>
+                <span className="block text-xs text-slate-500 font-semibold mt-0.5 truncate">{quickCard.subject} · {quickCard.topic}</span>
+              </span>
+              <ChevronRight className="w-5 h-5 text-[#EA580C] shrink-0" />
+            </button>
+          ) : null}
+          <div className="space-y-2.5">
+            {examChoices.map((et) => (
+              <button
+                key={et}
+                type="button"
+                onClick={() => { setPipeline(et); setTopic('all'); setStep(2); }}
+                className="w-full min-h-[60px] rounded-2xl border-2 border-[#E2E8F0] bg-white px-4 py-4 flex items-center justify-between text-left hover:border-[#EA580C] transition-all cursor-pointer"
+              >
+                <span className="text-base font-extrabold text-[#0F172A]">{pipelineLabel(et)}</span>
+                <ChevronRight className="w-5 h-5 text-slate-400 shrink-0" />
+              </button>
+            ))}
+            {examChoices.length === 0 ? (
+              <p className="text-sm text-slate-500 font-medium">No practice questions are available for your centre's exams yet. Check back soon.</p>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
+      {/* Step 2: choose a subject */}
+      {step === 2 ? (
+        <div className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-sm space-y-4">
+          {stepHeader('Choose a subject', 'Pick what you want to practise today.', examChoices.length > 1 ? () => setStep(1) : null)}
+          {progressBar}
+          {examSkipped && pipeline !== 'all' ? (
+            <p className="text-xs font-bold text-slate-400">{pipelineLabel(pipeline)}</p>
+          ) : null}
+          <div className="space-y-2.5">
+            {subjectChoices.map((sub) => (
+              <button
+                key={sub}
+                type="button"
+                onClick={() => { setSubject(sub); setTopic('all'); setStep(3); }}
+                className="w-full min-h-[60px] rounded-2xl border-2 border-[#E2E8F0] bg-white px-4 py-4 flex items-center justify-between text-left hover:border-[#EA580C] transition-all cursor-pointer"
+              >
+                <span className="text-base font-extrabold text-[#0F172A]">{sub}</span>
+                <ChevronRight className="w-5 h-5 text-slate-400 shrink-0" />
+              </button>
+            ))}
+            {unmatchedRegistered.map((sub) => (
+              <div key={sub} className="w-full min-h-[56px] rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/60 px-4 py-4 flex items-center justify-between">
+                <span className="text-base font-bold text-slate-400">{sub}</span>
+                <span className="text-xs font-bold text-slate-400">Coming soon</span>
+              </div>
+            ))}
+            {subjectChoices.length === 0 && unmatchedRegistered.length === 0 ? (
+              <p className="text-sm text-slate-500 font-medium">No subjects to practise yet.</p>
+            ) : null}
+          </div>
+          <button
+            type="button"
+            onClick={openProfileSubjects}
+            className="w-full text-left px-1 h-11 flex items-center text-sm font-bold text-[#C2410C] underline underline-offset-2 cursor-pointer"
+          >
+            Missing a subject? Update it in Profile
+          </button>
+        </div>
+      ) : null}
+
+      {/* Step 3: choose a topic */}
+      {step === 3 ? (
+        <div className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-sm space-y-4">
+          {stepHeader('Choose a topic', subject === 'all' ? 'What do you want to practise?' : subject, () => setStep(2))}
+          {progressBar}
+          <div className="relative">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={topicSearch}
+              onChange={(e) => setTopicSearch(e.target.value)}
+              placeholder="Search topics"
+              className="w-full h-12 rounded-2xl border border-[#E2E8F0] bg-white pl-10 pr-3 text-[15px] font-semibold text-[#0F172A] placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#EA580C]/30 focus:border-[#EA580C]"
+            />
+          </div>
+          <div className="space-y-2.5">
+            <button
+              type="button"
+              onClick={() => { setTopic('all'); setStep(4); }}
+              className="w-full min-h-[56px] rounded-2xl border-2 border-[#EA580C] bg-orange-50/60 px-4 py-4 flex items-center justify-between text-left cursor-pointer"
+            >
+              <span className="text-base font-extrabold text-[#0F172A]">All topics (mixed)</span>
+              <ChevronRight className="w-5 h-5 text-[#EA580C] shrink-0" />
+            </button>
+            {topicChoices
+              .filter((t) => t.toLowerCase().includes(topicSearch.trim().toLowerCase()))
+              .map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => { setTopic(t); setStep(4); }}
+                  className="w-full min-h-[56px] rounded-2xl border-2 border-[#E2E8F0] bg-white px-4 py-4 flex items-center justify-between text-left hover:border-[#EA580C] transition-all cursor-pointer"
+                >
+                  <span className="text-base font-extrabold text-[#0F172A]">{t}</span>
+                  <ChevronRight className="w-5 h-5 text-slate-400 shrink-0" />
+                </button>
+              ))}
+            {topicChoices.length === 0 ? (
+              <p className="text-sm text-slate-500 font-medium">No topics here yet. Try another subject.</p>
+            ) : topicSearch.trim() && topicChoices.every((t) => !t.toLowerCase().includes(topicSearch.trim().toLowerCase())) ? (
+              <p className="text-sm text-slate-500 font-medium">No topic matches that search. Try All topics instead.</p>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
+      {/* Step 4: ready */}
+      {step === 4 ? (
+        <>
+          <div className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-sm space-y-4">
+            {stepHeader('Ready to practise', 'Two quick choices and you are off.', () => setStep(3))}
+            {progressBar}
+            <div className="rounded-2xl bg-slate-50 border border-slate-100 p-4">
+              <p className="text-base font-extrabold text-[#0F172A]">
+                {subject === 'all' ? 'All my subjects' : subject} · {topic === 'all' ? 'All topics' : topic} · {pipelineLabel(pipeline)}
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-sm font-extrabold text-[#0F172A]">How many questions?</p>
+              <div className="flex flex-wrap gap-2">
+                {['10', '20', '40', 'all'].map((v) => {
+                  const disabled = v === 'all' ? filtered.length === 0 : filtered.length < Number(v);
+                  return (
+                    <button
+                      key={v}
+                      type="button"
+                      disabled={disabled}
+                      onClick={() => setLength(v)}
+                      className={`h-11 px-4 rounded-full text-sm font-extrabold border transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
+                        length === v ? 'bg-[#0F172A] text-white border-[#0F172A]' : 'bg-white text-[#475569] border-[#E2E8F0] hover:border-[#CBD5E1]'
+                      }`}
+                    >
+                      {v === 'all' ? 'All questions' : v}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-sm font-extrabold text-[#0F172A]">How do you want to practise?</p>
+              <div className="space-y-2.5">
+                <button
+                  type="button"
+                  onClick={() => setFeedbackMode('instant')}
+                  className={`w-full min-h-[64px] rounded-2xl border-2 p-3.5 text-left transition-all cursor-pointer ${
+                    feedbackMode === 'instant' ? 'bg-orange-50/60 border-[#EA580C]' : 'bg-white border-[#E2E8F0] hover:border-[#CBD5E1]'
+                  }`}
+                >
+                  <span className="block text-base font-extrabold text-[#0F172A]">Learn</span>
+                  <span className="block text-xs text-slate-500 font-semibold mt-0.5">See the answer after each question</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFeedbackMode('end')}
+                  className={`w-full min-h-[64px] rounded-2xl border-2 p-3.5 text-left transition-all cursor-pointer ${
+                    feedbackMode === 'end' ? 'bg-orange-50/60 border-[#EA580C]' : 'bg-white border-[#E2E8F0] hover:border-[#CBD5E1]'
+                  }`}
+                >
+                  <span className="block text-base font-extrabold text-[#0F172A]">Test</span>
+                  <span className="block text-xs text-slate-500 font-semibold mt-0.5">See all answers at the end</span>
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <button
+                type="button"
+                onClick={() => setShowMore((v) => !v)}
+                className="text-sm font-bold text-[#C2410C] underline underline-offset-2 cursor-pointer"
+              >
+                {showMore ? 'Hide more options' : 'More options'}
+              </button>
+              {showMore ? (
+                <div className="grid grid-cols-2 gap-3 mt-3">
+                  <label className="block">
+                    <span className="block text-xs font-bold text-slate-500 mb-1.5">Year</span>
+                    <select
+                      value={year}
+                      onChange={(e) => setYear(e.target.value)}
+                      className="w-full h-11 rounded-xl border border-[#E2E8F0] bg-white px-3 text-sm font-bold text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#EA580C]/30 focus:border-[#EA580C]"
+                    >
+                      {yearOptions.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
+                    </select>
+                  </label>
+                  <label className="block">
+                    <span className="block text-xs font-bold text-slate-500 mb-1.5">Difficulty</span>
+                    <select
+                      value={difficulty}
+                      onChange={(e) => setDifficulty(e.target.value)}
+                      className="w-full h-11 rounded-xl border border-[#E2E8F0] bg-white px-3 text-sm font-bold text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#EA580C]/30 focus:border-[#EA580C]"
+                    >
+                      {difficultyOptions.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
+                    </select>
+                  </label>
+                </div>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="sticky bottom-3 z-10">
+            <div className="bg-white/95 backdrop-blur rounded-2xl border border-slate-200/90 shadow-lg p-3">
+              {filtered.length === 0 ? (
+                <div className="text-center space-y-2.5 py-1">
+                  <p className="text-sm text-slate-500 font-medium px-2">No questions match these choices yet. Try All topics or any year.</p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setTopic('all')}
+                      className="flex-1 h-11 rounded-xl bg-slate-100 text-sm font-extrabold text-[#0F172A] cursor-pointer"
+                    >
+                      Use All topics
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setYear('all')}
+                      className="flex-1 h-11 rounded-xl bg-slate-100 text-sm font-extrabold text-[#0F172A] cursor-pointer"
+                    >
+                      Use any year
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={startSession}
+                  className="w-full h-14 rounded-2xl bg-[#EA580C] text-white text-base font-extrabold shadow-sm hover:bg-[#C2410C] cursor-pointer"
+                >
+                  Start practice
+                </button>
+              )}
+            </div>
+          </div>
+        </>
+      ) : null}
     </div>
   );
 };
