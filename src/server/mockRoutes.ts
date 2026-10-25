@@ -376,6 +376,92 @@ export async function bumpMockTally(mockId: string, score: number, shards: numbe
 }
 
 // ---------------------------------------------------------------------------
+// Series builder (M4): a WAEC/NECO series is a calendar of single-subject
+// papers, twice a month, cycling through the subjects with every compulsory
+// subject from settings included. Nothing hard-coded: the compulsory list
+// comes from mockSettings, and the cadence days and subject rotation are
+// chosen by TOS staff for each series.
+// ---------------------------------------------------------------------------
+const pad2 = (n: number) => String(n).padStart(2, '0');
+
+function shiftMonthStr(ym: string, delta: number): string {
+  const [y, m] = ym.split('-').map(Number);
+  const d = new Date(Date.UTC(y, m - 1 + delta, 1));
+  return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}`;
+}
+
+interface SeriesRequest {
+  start: string;
+  days: number[];
+  months: number;
+  subjects: string[];
+  count: number;
+  titlePrefix: string;
+}
+
+function parseSeriesRequest(body: any, settings: MockSettings): SeriesRequest {
+  const start = parseDate(body?.start);
+  const rawDays = Array.isArray(body?.cadenceDays) ? body.cadenceDays : [];
+  if (rawDays.length !== 2) throw httpError(400, 'Pick exactly two days of the month for the papers.');
+  const days = [...new Set(rawDays.map((d: unknown) => Number(d)))] as number[];
+  if (days.length !== 2 || days.some((d) => !Number.isInteger(d) || d < 1 || d > 28)) {
+    throw httpError(400, 'The two cadence days must be different days between the 1st and the 28th.');
+  }
+  days.sort((x, y) => x - y);
+  const months = body?.months;
+  if (!Number.isInteger(months) || months < 1 || months > 12) throw httpError(400, 'Series length must be 1 to 12 months.');
+  const subjects = Array.isArray(body?.subjects) ? body.subjects.map((x: unknown) => String(x ?? '').trim()) : [];
+  if (subjects.length < 1 || subjects.length > SUBJECTS_MAX) throw httpError(400, 'List 1 to 12 subjects for the series rotation.');
+  if (subjects.some((x: string) => x.length < 1 || x.length > SUBJECT_MAX)) throw httpError(400, 'Each subject name must be 1 to 80 characters.');
+  if (new Set(subjects.map((x: string) => x.toLowerCase())).size !== subjects.length) throw httpError(400, 'Subjects must not repeat in the rotation.');
+  const have = new Set(subjects.map((x: string) => x.toLowerCase()));
+  const missing = settings.compulsorySubjects.filter((c) => !have.has(c.toLowerCase()));
+  if (missing.length > 0) throw httpError(400, `The series must cover every compulsory subject. Missing: ${missing.join(', ')}.`);
+  const count = body?.count;
+  if (!Number.isInteger(count) || count < 1 || count > COUNT_MAX) throw httpError(400, 'Questions per paper must be a whole number from 1 to 500.');
+  const titlePrefix = body?.titlePrefix ? String(body.titlePrefix).trim().slice(0, 80) : '';
+  return { start, days, months, subjects, count, titlePrefix };
+}
+
+function buildSeriesPlan(req: SeriesRequest): Array<{ date: string; subject: string; title: string }> {
+  const papers: Array<{ date: string; subject: string; title: string }> = [];
+  let idx = 0;
+  for (let i = 0; i < req.months; i += 1) {
+    const ym = shiftMonthStr(req.start.slice(0, 7), i);
+    for (const d of req.days) {
+      const date = `${ym}-${pad2(d)}`;
+      if (date < req.start) continue;
+      const subject = req.subjects[idx % req.subjects.length];
+      idx += 1;
+      papers.push({ date, subject, title: req.titlePrefix ? `${req.titlePrefix} · ${subject}` : subject });
+    }
+  }
+  if (papers.length < req.subjects.length) {
+    throw httpError(400, `The series has only ${papers.length} papers but ${req.subjects.length} subjects to cover. Add a month or fewer subjects.`);
+  }
+  return papers;
+}
+
+// Which dates in the plan already hold a mock: one month query per affected
+// month, at most twelve. Returns status per date ('' when free).
+async function existingStatuses(papers: Array<{ date: string }>): Promise<Record<string, string>> {
+  const months = new Set(papers.map((p) => p.date.slice(0, 7)));
+  const out: Record<string, string> = {};
+  for (const ym of months) {
+    const snap = await adminDb
+      .collection(MOCKS)
+      .where('date', '>=', `${ym}-01`)
+      .where('date', '<=', `${ym}-31`)
+      .get();
+    for (const doc of snap.docs) {
+      const d = doc.data() as any;
+      out[String(d.date)] = String(d.status || '');
+    }
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
 // Routes. TOS staff only, on the server.
 // ---------------------------------------------------------------------------
 export function registerMockRoutes(app: express.Express): void {
@@ -750,6 +836,101 @@ export function registerMockRoutes(app: express.Express): void {
       if (error?.status) return res.status(error.status).json({ error: error.message });
       console.error('[mocks] settings write failed:', error?.message || error);
       res.status(500).json({ error: 'Could not save mock settings.' });
+    }
+  });
+
+  // Series preview: the planned papers with what each date already holds.
+  // A preview reads only; nothing is written.
+  app.post('/api/tos/mocks/series/preview', async (req, res) => {
+    try {
+      requireTos(req);
+      const { settings } = await readSettings();
+      const parsed = parseSeriesRequest(req.body || {}, settings);
+      const papers = buildSeriesPlan(parsed);
+      const statuses = await existingStatuses(papers);
+      const plan = papers.map((p) => ({ ...p, existing: statuses[p.date] || null }));
+      res.json({
+        ok: true,
+        plan,
+        firstDate: papers[0]?.date ?? null,
+        lastDate: papers[papers.length - 1]?.date ?? null,
+        total: papers.length,
+        compulsorySubjects: settings.compulsorySubjects,
+      });
+    } catch (error: any) {
+      if (error?.status) return res.status(error.status).json({ error: error.message });
+      console.error('[mocks] series preview failed:', error?.message || error);
+      res.status(500).json({ error: 'Could not build the series preview.' });
+    }
+  });
+
+  // Series creation: one draft per paper date. Requires the typed confirm
+  // word after the preview, per the platform confirm-gate rule. Safe to
+  // re-run: dates that already hold a live mock are skipped and reported,
+  // and a cancelled slot is rewritten as a fresh draft. Every created draft
+  // carries the same seriesId plus the series' first and last dates.
+  app.post('/api/tos/mocks/series', async (req, res) => {
+    try {
+      const caller = requireTos(req);
+      const body = req.body || {};
+      if (String(body.confirm || '').trim() !== 'CREATE SERIES') {
+        throw httpError(400, 'Type CREATE SERIES to confirm creating the drafts.');
+      }
+      const { settings } = await readSettings();
+      const parsed = parseSeriesRequest(body, settings);
+      if (parsed.start < lagosToday()) throw httpError(400, 'The series start date is in the past.');
+      const papers = buildSeriesPlan(parsed);
+      const statuses = await existingStatuses(papers);
+      const seriesId = `series-${parsed.start}-${Date.now().toString(36)}`;
+      const now = new Date().toISOString();
+      const created: string[] = [];
+      const skipped: Array<{ date: string; reason: string }> = [];
+      const failed: Array<{ date: string; error: string }> = [];
+      for (const p of papers) {
+        const existing = statuses[p.date];
+        if (existing && existing !== 'cancelled') {
+          skipped.push({ date: p.date, reason: `A ${existing} mock is already on this date.` });
+          continue;
+        }
+        try {
+          await adminDb.runTransaction(async (tx) => {
+            const ref = adminDb.collection(MOCKS).doc(`mock-${p.date}`);
+            const snap = await tx.get(ref);
+            if (snap.exists) {
+              const st = String((snap.data() as any)?.status || '');
+              if (st !== 'cancelled') {
+                skipped.push({ date: p.date, reason: `A ${st} mock was created for this date moments ago.` });
+                return;
+              }
+            }
+            tx.set(ref, {
+              id: `mock-${p.date}`,
+              examType: 'waec_neco',
+              title: p.title,
+              date: p.date,
+              status: 'draft' as MockStatus,
+              questionSource: 'random',
+              subjects: [{ subject: p.subject, count: parsed.count }],
+              seriesId,
+              seriesFirst: papers[0].date,
+              seriesLast: papers[papers.length - 1].date,
+              createdAt: now,
+              createdBy: caller.uid,
+              updatedAt: now,
+              updatedBy: caller.uid,
+            });
+          });
+          created.push(p.date);
+        } catch (e: any) {
+          failed.push({ date: p.date, error: e?.message || 'write failed' });
+        }
+      }
+      void audit({ area: 'mocks', action: 'series-create', seriesId, by: caller.uid, total: papers.length, created: created.length, skipped: skipped.length, failed: failed.length });
+      res.json({ ok: true, seriesId, total: papers.length, created, skipped, failed });
+    } catch (error: any) {
+      if (error?.status) return res.status(error.status).json({ error: error.message });
+      console.error('[mocks] series create failed:', error?.message || error);
+      res.status(500).json({ error: 'Could not create the series.' });
     }
   });
 }

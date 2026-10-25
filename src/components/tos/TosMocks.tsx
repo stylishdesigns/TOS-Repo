@@ -422,6 +422,157 @@ const MockDetail: React.FC<{ mockId: string; onChanged: () => void; onClose: () 
 };
 
 // ---------------------------------------------------------------------------
+// Series builder: plan a WAEC/NECO series (one single-subject paper per date,
+// twice a month, every compulsory subject covered), preview it, then create
+// the drafts with a typed confirm. The compulsory subjects come from the
+// server's settings; extra subjects are typed here.
+// ---------------------------------------------------------------------------
+const SeriesPanel: React.FC<{ onCreated: () => void }> = ({ onCreated }) => {
+  const [compulsory, setCompulsory] = useState<string[]>([]);
+  const [start, setStart] = useState('');
+  const [day1, setDay1] = useState('');
+  const [day2, setDay2] = useState('');
+  const [months, setMonths] = useState('');
+  const [count, setCount] = useState('');
+  const [titlePrefix, setTitlePrefix] = useState('');
+  const [extras, setExtras] = useState<string[]>([]);
+  const [preview, setPreview] = useState<Json | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [result, setResult] = useState<Json | null>(null);
+
+  useEffect(() => {
+    api('/api/tos/mocks/settings')
+      .then((r) => setCompulsory(r.settings.compulsorySubjects || []))
+      .catch(() => setCompulsory([]));
+  }, []);
+
+  const body = () => ({
+    start,
+    cadenceDays: [Number(day1), Number(day2)],
+    months: Number(months),
+    count: Number(count),
+    subjects: [...compulsory, ...extras],
+    titlePrefix,
+  });
+
+  const formReady = () =>
+    /^\d{4}-\d{2}-\d{2}$/.test(start) && Number(day1) >= 1 && Number(day1) <= 28
+    && Number(day2) >= 1 && Number(day2) <= 28 && Number(day1) !== Number(day2)
+    && Number(months) >= 1 && Number(months) <= 12
+    && Number.isInteger(Number(count)) && Number(count) >= 1;
+
+  const runPreview = async () => {
+    setBusy(true); setError(''); setPreview(null); setResult(null);
+    try { setPreview(await api('/api/tos/mocks/series/preview', { method: 'POST', body: body() })); }
+    catch (e: any) { setError(e.message); }
+    finally { setBusy(false); }
+  };
+
+  const runCreate = async () => {
+    setBusy(true); setError('');
+    try {
+      const r = await api('/api/tos/mocks/series', { method: 'POST', body: { ...body(), confirm: 'CREATE SERIES' } });
+      setResult(r); setPreview(null); onCreated();
+    } catch (e: any) { setError(e.message); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <div className="space-y-4">
+      {!result && (
+        <>
+          <p className="text-xs text-slate-400">
+            One paper per date, two dates a month, cycling through subjects. Compulsory subjects
+            {' '}({compulsory.join(', ') || 'from settings'}) are included automatically; add any others below.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="First paper date">
+              <input type="date" className={inputCls} value={start} min={todayStr()} onChange={(e) => setStart(e.target.value)} />
+            </Field>
+            <Field label="Months">
+              <input className={inputCls} value={months} inputMode="numeric" onChange={(e) => setMonths(e.target.value.replace(/[^0-9]/g, ''))} placeholder="1-12" />
+            </Field>
+            <Field label="Papers on day of month">
+              <div className="flex gap-2">
+                <input className={inputCls} value={day1} inputMode="numeric" onChange={(e) => setDay1(e.target.value.replace(/[^0-9]/g, ''))} placeholder="e.g. 7" />
+                <input className={inputCls} value={day2} inputMode="numeric" onChange={(e) => setDay2(e.target.value.replace(/[^0-9]/g, ''))} placeholder="e.g. 21" />
+              </div>
+            </Field>
+            <Field label="Questions per paper">
+              <input className={inputCls} value={count} inputMode="numeric" onChange={(e) => setCount(e.target.value.replace(/[^0-9]/g, ''))} placeholder="e.g. 40" />
+            </Field>
+          </div>
+          <Field label="Title (optional prefix; the subject name is added)">
+            <input className={inputCls} value={titlePrefix} onChange={(e) => setTitlePrefix(e.target.value)} placeholder="e.g. WAEC series" maxLength={80} />
+          </Field>
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Extra subjects beyond the compulsory ones</span>
+              <button type="button" onClick={() => setExtras([...extras, ''])} className="text-xs font-bold text-orange-300 hover:text-orange-200 inline-flex items-center gap-1">
+                <Plus className="w-3.5 h-3.5" /> Add
+              </button>
+            </div>
+            <div className="space-y-2">
+              {extras.map((x, i) => (
+                <div key={i} className="flex gap-2">
+                  <input className={inputCls} value={x} onChange={(e) => setExtras(extras.map((v, j) => (j === i ? e.target.value : v)))} placeholder="Subject name" maxLength={80} />
+                  <button type="button" onClick={() => setExtras(extras.filter((_, j) => j !== i))} className="shrink-0 px-2 text-slate-500 hover:text-rose-300" aria-label="Remove subject"><Trash2 className="w-4 h-4" /></button>
+                </div>
+              ))}
+              {extras.length === 0 && <p className="text-xs text-slate-500">None added; the series cycles the compulsory subjects only.</p>}
+            </div>
+          </div>
+          <button onClick={runPreview} disabled={busy || !formReady()} className={btnPrimary}>
+            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <CalendarDays className="w-4 h-4" />} Preview the series
+          </button>
+
+          {error && <p className="text-rose-300 text-sm">{error}</p>}
+
+          {preview && (
+            <Card title={`Review · ${preview.total} papers · ${preview.firstDate} to ${preview.lastDate}`}>
+              <div className="space-y-1.5 max-h-[320px] overflow-y-auto pr-1">
+                {preview.plan.map((p: Json) => (
+                  <div key={p.date} className="flex items-center justify-between gap-2 bg-slate-950/40 border border-white/5 rounded-xl px-3 py-2">
+                    <span className="text-sm text-white">{p.date} · {p.subject}</span>
+                    <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-lg border ${p.existing && p.existing !== 'cancelled' ? 'bg-amber-500/15 text-amber-300 border-amber-400/30' : 'bg-emerald-500/15 text-emerald-300 border-emerald-400/30'}`}>
+                      {p.existing === 'cancelled' ? 'Reuse cancelled slot' : p.existing ? `Skip: ${p.existing} mock there` : 'Will create'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-slate-500 mt-3">Dates with a live mock are skipped and reported; a cancelled slot is reused. Nothing is written until you confirm.</p>
+              <div className="mt-3">
+                <TypedConfirm word="CREATE SERIES" label="Create drafts" busy={busy} onConfirm={runCreate} onCancel={() => setPreview(null)} />
+              </div>
+            </Card>
+          )}
+        </>
+      )}
+      {result && (
+        <div className="space-y-3">
+          <p className="text-sm text-emerald-300 inline-flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4" /> {result.created.length} of {result.total} drafts created.</p>
+          {(result.skipped || []).length > 0 && (
+            <div className="space-y-1">
+              <p className="text-xs font-bold uppercase tracking-wider text-amber-300">Skipped</p>
+              {result.skipped.map((s: Json) => <p key={s.date} className="text-xs text-slate-400">{s.date}: {s.reason}</p>)}
+            </div>
+          )}
+          {(result.failed || []).length > 0 && (
+            <div className="space-y-1">
+              <p className="text-xs font-bold uppercase tracking-wider text-rose-300">Failed</p>
+              {result.failed.map((f: Json) => <p key={f.date} className="text-xs text-slate-400">{f.date}: {f.error}</p>)}
+            </div>
+          )}
+          <p className="text-xs text-slate-500">Run the builder again with the same dates to fill in any skipped or failed ones; nothing is written twice.</p>
+          <button onClick={() => { setResult(null); }} className={btnGhost}>Build another series</button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
 // The tab: month calendar with a side panel for create and detail.
 // ---------------------------------------------------------------------------
 export const MocksTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
@@ -429,7 +580,7 @@ export const MocksTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
   const [byDate, setByDate] = useState<Record<string, Json>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [panel, setPanel] = useState<Json>(null); // {mode:'create', date} | {mode:'detail', id}
+  const [panel, setPanel] = useState<Json>(null); // {mode:'create', date} | {mode:'detail', id} | {mode:'series'}
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState('');
 
@@ -497,9 +648,10 @@ export const MocksTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
           ))}
         </div>
         <p className="text-xs text-slate-500 mt-3">Tap a free day to create a mock for that date, or a filled day to open it. One mock per day.</p>
+        <button onClick={() => setPanel({ mode: 'series' })} className={`${btnGhost} mt-3`}><CalendarDays className="w-4 h-4" /> Build a WAEC/NECO series</button>
       </Card>
 
-      <Card title={panel?.mode === 'create' ? `New mock · ${panel.date}` : panel?.mode === 'detail' ? 'Mock' : 'Mocks'}>
+      <Card title={panel?.mode === 'create' ? `New mock · ${panel.date}` : panel?.mode === 'series' ? 'WAEC/NECO series builder' : panel?.mode === 'detail' ? 'Mock' : 'Mocks'}>
         {!panel && (
           <p className="text-sm text-slate-400">Pick a day on the calendar to create a mock, or open an existing one. Scheduling freezes the paper: questions are drawn from the mock bank and the marking key stays on the server.</p>
         )}
@@ -521,6 +673,7 @@ export const MocksTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
             {createError && <p className="text-rose-300 text-sm mt-3">{createError}</p>}
           </>
         )}
+        {panel?.mode === 'series' && <SeriesPanel onCreated={load} />}
         {panel?.mode === 'detail' && (
           <MockDetail mockId={panel.id} onChanged={load} onClose={() => setPanel(null)} />
         )}
