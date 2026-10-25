@@ -1,0 +1,387 @@
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Loader2, Search, X, ChevronRight, SlidersHorizontal, Pencil, Trash2, FolderTree } from 'lucide-react';
+import { api, Json, Card, inputCls, btnPrimary, btnGhost, fmtDate } from './tosShared';
+import { BANK_YEARS } from '../../data/seniorSubjects';
+
+/**
+ * New question bank library (Prompt L, piece L3).
+ *
+ * Built on the paged L2 backend: 50 rows per page, one read per page, tree
+ * counts from the counter documents, search across the whole stream with a
+ * 400 ms debounce, and a quick-edit panel. No screen here reads the whole
+ * collection; the old full-scan Authoring screen stays untouched.
+ *
+ * Status tabs mirror the counters. The tree scope is one branch at a time
+ * (subject, topic or year) and search runs across the whole stream, so
+ * typing a search clears the tree scope exactly as the server requires.
+ */
+
+const STATUS_TABS: { id: string; label: string }[] = [
+  { id: 'all', label: 'All' },
+  { id: 'draft', label: 'Drafts' },
+  { id: 'published', label: 'Published' },
+  { id: 'changed', label: 'Changed' },
+  { id: 'removed', label: 'Removed' },
+];
+
+const DIFF_LABELS: Record<string, string> = { easy: 'Easy', hard: 'Hard' };
+
+type Scope = { type: 'subject' | 'topic' | 'year'; key: string; label: string } | null;
+
+export const QuestionLibraryTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
+  const [kind, setKind] = useState<'practice' | 'mock'>('practice');
+  const [tree, setTree] = useState<Json | null>(null);
+  const [tab, setTab] = useState('all');
+  const [scope, setScope] = useState<Scope>(null);
+  const [difficulty, setDifficulty] = useState('');
+  const [sort, setSort] = useState('updated');
+  const [q, setQ] = useState('');
+  const [qDebounced, setQDebounced] = useState('');
+
+  const [items, setItems] = useState<any[]>([]);
+  const [tabs, setTabs] = useState<Json>({});
+  const [hasMore, setHasMore] = useState(false);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [listError, setListError] = useState('');
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  const [openSubjects, setOpenSubjects] = useState<Set<string>>(new Set());
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  const [editor, setEditor] = useState<Json | null>(null);
+  const [editorLoading, setEditorLoading] = useState(false);
+  const [editorError, setEditorError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState(false);
+
+  // Debounced search: 400 ms after the last keystroke.
+  useEffect(() => {
+    const t = setTimeout(() => setQDebounced(q.trim()), 400);
+    return () => clearTimeout(t);
+  }, [q]);
+
+  // Search covers the whole stream, so it and the tree scope never mix.
+  useEffect(() => {
+    if (qDebounced.length >= 2 && scope) setScope(null);
+  }, [qDebounced]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const loadTree = useCallback(async () => {
+    try { setTree(await api(`/api/tos/questionbank/tree?kind=${kind}`)); } catch { setTree(null); }
+  }, [kind]);
+
+  const loadList = useCallback(async (mode: 'replace' | 'more') => {
+    if (mode === 'replace') setLoading(true); else setLoadingMore(true);
+    if (mode === 'replace') setListError('');
+    try {
+      const p = new URLSearchParams({ kind, status: tab, sort, limit: '50' });
+      if (scope) p.set(scope.type === 'subject' ? 'subject' : scope.type === 'topic' ? 'topic' : 'year', scope.key);
+      if (difficulty) p.set('difficulty', difficulty);
+      if (qDebounced.length >= 2) p.set('q', qDebounced);
+      if (mode === 'more' && nextCursor) p.set('cursor', nextCursor);
+      const r = await api(`/api/tos/questionbank/list?${p.toString()}`);
+      setItems((prev) => (mode === 'more' ? [...prev, ...(r.items || [])] : r.items || []));
+      setTabs(r.tabs || {});
+      setHasMore(Boolean(r.hasMore));
+      setNextCursor(r.nextCursor || null);
+      setTree((prev) => (prev ? { ...prev, setupNeeded: r.setupNeeded } : prev));
+    } catch (e: any) {
+      setListError(e.message || 'Failed to load questions.');
+    }
+    setLoading(false);
+    setLoadingMore(false);
+  }, [kind, tab, scope, difficulty, qDebounced, sort, nextCursor]);
+
+  useEffect(() => { loadTree(); }, [loadTree, refreshKey]);
+  useEffect(() => { loadList('replace'); }, [loadList, refreshKey]); // loadList changes with filters
+
+  const openEditor = async (id: string) => {
+    setEditorLoading(true); setEditorError(''); setConfirmRemove(false);
+    try { setEditor(await api(`/api/tos/questionbank/item/${id}`)); }
+    catch (e: any) { setEditorError(e.message); }
+    setEditorLoading(false);
+  };
+
+  const saveEditor = async () => {
+    if (!editor?.item) return;
+    setSaving(true); setEditorError('');
+    try {
+      const it = editor.item;
+      await api(`/api/tos/questionbank/questions/${it.id}`, {
+        method: 'POST',
+        body: {
+          kind: it.kind, examType: it.examType, subject: it.subject, klass: it.klass,
+          topic: it.topic, year: it.year || '', difficulty: it.difficulty,
+          text: it.text, options: (it.options || []).map((o: any) => ({ key: o.key, text: o.text })),
+          correct: it.correct, explanation: it.explanation, imageLink: it.imageLink || '',
+        },
+      });
+      setEditor(null);
+      loadList('replace');
+      loadTree();
+    } catch (e: any) { setEditorError(e.message || 'Failed to save.'); }
+    setSaving(false);
+  };
+
+  const removeQuestion = async () => {
+    if (!editor?.item) return;
+    setSaving(true); setEditorError('');
+    try {
+      await api(`/api/tos/questionbank/questions/${editor.item.id}`, { method: 'DELETE' });
+      setEditor(null);
+      loadList('replace');
+      loadTree();
+    } catch (e: any) { setEditorError(e.message || 'Failed to remove.'); }
+    setSaving(false);
+  };
+
+  const setEditorField = (field: string, value: any) => {
+    setEditor((prev) => (prev ? { ...prev, item: { ...prev.item, [field]: value } } : prev));
+  };
+
+  const toggleSubject = (key: string) => {
+    setOpenSubjects((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
+
+  const pickScope = (type: 'subject' | 'topic' | 'year', key: string, label: string) => {
+    setScope({ type, key, label });
+    setQ('');
+    setQDebounced('');
+    setDrawerOpen(false);
+  };
+
+  const scopeParamActive = Boolean(scope) || qDebounced.length >= 2 || Boolean(difficulty);
+  const showingLine = scopeParamActive
+    ? `Showing ${items.length}${hasMore ? ' (more available)' : ''}`
+    : `Showing ${items.length} of ${Number(tabs.total) || 0}`;
+
+  const treePanel = (
+    <div className="space-y-1.5">
+      {scope && (
+        <button onClick={() => setScope(null)} className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-orange-500/15 border border-orange-500/30 text-orange-200 text-sm font-semibold">
+          <span className="truncate">{scope.label}</span>
+          <X className="w-4 h-4 shrink-0" />
+        </button>
+      )}
+      {(tree?.subjects || []).map((s: any) => (
+        <div key={s.key} className="rounded-xl border border-slate-700/50 bg-slate-900/40">
+          <button onClick={() => toggleSubject(s.key)} className="w-full flex items-center justify-between gap-2 px-3 py-2.5 text-left">
+            <span className="text-sm font-semibold text-slate-200 truncate">{s.label}</span>
+            <span className="flex items-center gap-1.5 shrink-0">
+              <span className="text-[11px] text-slate-500">{s.total}</span>
+              <ChevronRight className={`w-4 h-4 text-slate-500 transition-transform ${openSubjects.has(s.key) ? 'rotate-90' : ''}`} />
+            </span>
+          </button>
+          {openSubjects.has(s.key) && (
+            <div className="px-3 pb-3 space-y-1">
+              {Object.entries(s.byYear || {}).sort((a: any, b: any) => Number(b[0]) - Number(a[0])).slice(0, 12).map(([y, n]: any) => (
+                <button key={y} onClick={() => pickScope('year', String(y), `Year ${y}`)} className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs text-slate-400 hover:bg-white/5">
+                  <span>Year {y}</span><span className="text-slate-600">{n}</span>
+                </button>
+              ))}
+              {(s.topics || []).map((t: any) => (
+                <button key={t.key} onClick={() => pickScope('topic', t.key, t.label)} className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs text-slate-400 hover:bg-white/5">
+                  <span className="truncate">{t.label}</span><span className="text-slate-600 shrink-0 ml-2">{t.total}</span>
+                </button>
+              ))}
+              <button onClick={() => pickScope('subject', s.key, s.label)} className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs text-orange-300/90 hover:bg-white/5">
+                <span>All of {s.label}</span><span className="text-slate-600">{s.total}</span>
+              </button>
+            </div>
+          )}
+        </div>
+      ))}
+      {tree && (tree.subjects || []).length === 0 && (
+        <p className="text-xs text-slate-500 px-3 py-4">No counted subjects yet. Run Recount on the Authoring tab to build the tree.</p>
+      )}
+    </div>
+  );
+
+  return (
+    <div className="space-y-4">
+      {tree?.setupNeeded && (
+        <div className="rounded-2xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-200">
+          <p className="font-bold text-amber-100">Set up needed</p>
+          <p className="text-amber-200/90 mt-1">
+            This stream has not had its one-time setup yet: Backfill (adds search keys to existing
+            questions) then Recount (builds the counts). Run both from the Authoring tab; nothing is
+            written until you confirm each step. Existing questions only appear in search after the
+            backfill finishes.
+          </p>
+        </div>
+      )}
+
+      <Card>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex rounded-xl border border-slate-700/60 overflow-hidden">
+            {(['practice', 'mock'] as const).map((k) => (
+              <button key={k} onClick={() => { setKind(k); setScope(null); }}
+                className={`px-4 py-2 text-sm font-bold ${kind === k ? 'bg-orange-500 text-white' : 'text-slate-400 hover:text-white'}`}>
+                {k === 'practice' ? 'Practice' : 'Mock'}
+              </button>
+            ))}
+          </div>
+          <div className="relative flex-1 min-w-[220px]">
+            <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search the whole stream (whole words, up to 3)..."
+              className={`${inputCls} pl-9`}
+            />
+          </div>
+          <button onClick={() => setDrawerOpen(true)} className="lg:hidden flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-700/60 text-sm font-semibold text-slate-300 min-h-[44px]">
+            <FolderTree className="w-4 h-4" /> Browse
+          </button>
+          <select value={difficulty} onChange={(e) => setDifficulty(e.target.value)} className={`${inputCls} w-auto`}>
+            <option value="">Any difficulty</option>
+            <option value="easy">Easy</option>
+            <option value="hard">Hard</option>
+          </select>
+          <select value={sort} onChange={(e) => setSort(e.target.value)} className={`${inputCls} w-auto`}>
+            <option value="updated">Newest activity</option>
+            <option value="year">Year</option>
+            <option value="subject">Subject A to Z</option>
+          </select>
+        </div>
+        <div className="flex flex-wrap gap-1.5 mt-3">
+          {STATUS_TABS.map((t) => (
+            <button key={t.id} onClick={() => setTab(t.id)}
+              className={`px-3 py-1.5 rounded-full text-xs font-bold border min-h-[36px] ${tab === t.id ? 'bg-orange-500 text-white border-orange-500' : 'border-slate-700/60 text-slate-400 hover:text-white'}`}>
+              {t.label}{t.id === 'all' && ` (${Number(tabs.total) || 0})`}
+              {t.id === 'draft' && ` (${Number(tabs.draft) || 0})`}
+              {t.id === 'published' && ` (${Number(tabs.published) || 0})`}
+              {t.id === 'changed' && ` (${Number(tabs.changed) || 0})`}
+              {t.id === 'removed' && ` (${Number(tabs.removed) || 0})`}
+            </button>
+          ))}
+        </div>
+        <p className="text-[11px] text-slate-500 mt-2">
+          {qDebounced.length >= 2
+            ? 'Search covers every question in this stream, including ones outside the tree.'
+            : 'Tap a subject, topic or year in the Browse panel to narrow the list. Search covers the whole stream.'}
+        </p>
+      </Card>
+
+      {listError && (
+        <div className="rounded-2xl border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-200">{listError}</div>
+      )}
+
+      <div className="lg:grid lg:grid-cols-[280px_1fr] lg:gap-4 items-start">
+        <div className="hidden lg:block">
+          <Card title="Browse"><div className="mt-2 max-h-[70vh] overflow-y-auto pr-1">{treePanel}</div></Card>
+        </div>
+
+        <div className="space-y-2">
+          <p className="text-xs text-slate-500 px-1">{loading ? 'Loading...' : showingLine}</p>
+          {items.map((it) => (
+            <button key={it.id} onClick={() => openEditor(it.id)}
+              className="w-full text-left rounded-2xl border border-slate-700/50 bg-slate-900/40 p-3.5 hover:border-orange-500/40 transition-colors">
+              <div className="flex items-start justify-between gap-3">
+                <p className="text-sm text-slate-200 line-clamp-2">{it.textPreview}</p>
+                <Pencil className="w-4 h-4 text-slate-600 shrink-0 mt-0.5" />
+              </div>
+              <div className="flex flex-wrap gap-1.5 mt-2 items-center">
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300">{it.subject}</span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">{it.topic}</span>
+                {it.year != null && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">{it.year}</span>}
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">{DIFF_LABELS[it.difficulty] || it.difficulty}</span>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${it.status === 'published' ? 'bg-emerald-500/15 text-emerald-300' : it.status === 'removed' ? 'bg-red-500/15 text-red-300' : it.status === 'draft' ? 'bg-sky-500/15 text-sky-300' : 'bg-amber-500/15 text-amber-300'}`}>{it.status}</span>
+                <span className="text-[10px] text-slate-600 ml-auto">{fmtDate(it.updatedAt)}</span>
+              </div>
+            </button>
+          ))}
+          {!loading && items.length === 0 && !listError && (
+            <p className="text-sm text-slate-500 px-1 py-6">No questions match this view.</p>
+          )}
+          {hasMore && (
+            <button onClick={() => loadList('more')} disabled={loadingMore}
+              className={`${btnGhost} w-full justify-center`}>
+              {loadingMore ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Load 50 more'}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {drawerOpen && (
+        <div className="lg:hidden fixed inset-0 z-50 bg-slate-950/95 overflow-y-auto p-4">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-sm font-bold text-white">Browse the bank</p>
+            <button onClick={() => setDrawerOpen(false)} className="p-2 rounded-lg text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
+          </div>
+          {treePanel}
+        </div>
+      )}
+
+      {(editor || editorLoading) && (
+        <div className="fixed inset-0 z-50 bg-slate-950 lg:bg-slate-950/80 lg:flex lg:justify-end" onClick={() => { if (!saving) setEditor(null); }}>
+          <div className="w-full lg:max-w-[520px] h-full bg-slate-950 border-l border-slate-800 overflow-y-auto p-4 lg:p-6 space-y-3" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-bold text-white">Quick edit</p>
+              <button onClick={() => setEditor(null)} disabled={saving} className="p-2 rounded-lg text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
+            </div>
+            {editorLoading && <p className="text-sm text-slate-500">Loading question...</p>}
+            {editor?.item && (
+              <>
+                <div className="flex flex-wrap gap-1.5 text-[10px] text-slate-400">
+                  <span className="font-bold px-2 py-0.5 rounded-full bg-slate-800">{editor.item.subject}</span>
+                  <span className="font-bold px-2 py-0.5 rounded-full bg-slate-800">{editor.item.topic}</span>
+                  <span className="font-bold px-2 py-0.5 rounded-full bg-slate-800">{editor.item.klass}</span>
+                  <span className="font-bold px-2 py-0.5 rounded-full bg-slate-800">{editor.item.examType}</span>
+                </div>
+                <p className="text-[11px] text-slate-500">Subject, topic and class are edited on the Authoring tab, where the guides live.</p>
+                <textarea value={editor.item.text} onChange={(e) => setEditorField('text', e.target.value)} rows={4} className={inputCls} />
+                {['A', 'B', 'C', 'D'].map((k) => {
+                  const opt = (editor.item.options || []).find((o: any) => o.key === k);
+                  return (
+                    <div key={k} className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-slate-500 w-4">{k}</span>
+                      <input
+                        value={opt?.text || ''}
+                        onChange={(e) => setEditorField('options', (editor.item.options || []).map((o: any) => (o.key === k ? { ...o, text: e.target.value } : o)))}
+                        className={inputCls}
+                      />
+                    </div>
+                  );
+                })}
+                <div className="grid grid-cols-2 gap-2">
+                  <select value={editor.item.correct} onChange={(e) => setEditorField('correct', e.target.value)} className={inputCls}>
+                    {['A', 'B', 'C', 'D'].map((k) => <option key={k} value={k}>Correct: {k}</option>)}
+                  </select>
+                  <select value={String(editor.item.difficulty)} onChange={(e) => setEditorField('difficulty', e.target.value)} className={inputCls}>
+                    <option value="easy">Easy</option>
+                    <option value="hard">Hard</option>
+                  </select>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <select value={String(editor.item.year ?? '')} onChange={(e) => setEditorField('year', e.target.value === '' ? '' : Number(e.target.value))} className={inputCls}>
+                    <option value="">No year</option>
+                    {BANK_YEARS.map((y: number) => <option key={y} value={y}>{y}</option>)}
+                  </select>
+                  <p className="text-[11px] text-slate-500 self-center">Status: {editor.item.status}</p>
+                </div>
+                <textarea value={editor.item.explanation || ''} onChange={(e) => setEditorField('explanation', e.target.value)} rows={3} placeholder="Explanation (optional)" className={inputCls} />
+                {editorError && <p className="text-sm text-red-300">{editorError}</p>}
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <button onClick={saveEditor} disabled={saving} className={btnPrimary}>{saving ? 'Saving...' : 'Save changes'}</button>
+                  {confirmRemove ? (
+                    <button onClick={removeQuestion} disabled={saving} className="px-4 py-2.5 rounded-xl bg-red-600 text-white text-sm font-bold min-h-[44px]">Confirm remove</button>
+                  ) : (
+                    <button onClick={() => setConfirmRemove(true)} disabled={saving} className={btnGhost}>
+                      <Trash2 className="w-4 h-4" /> Remove
+                    </button>
+                  )}
+                </div>
+                <p className="text-[11px] text-slate-500">Saving a published question marks it as a change the next publish picks up.</p>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
