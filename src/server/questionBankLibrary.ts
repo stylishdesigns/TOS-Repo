@@ -506,6 +506,11 @@ export function registerQuestionBankLibraryRoutes(
         hasMore,
         setupNeeded,
         publishedAt: meta.currentPublishedAt,
+        meta: {
+          currentVersion: meta.currentVersion,
+          currentFileUrl: meta.currentFileUrl,
+          currentPublishedAt: meta.currentPublishedAt,
+        },
         tabs: {
           total: Number(summary?.total) || 0,
           draft: Number(summary?.byStatus?.draft) || 0,

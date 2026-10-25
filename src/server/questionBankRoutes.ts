@@ -162,20 +162,6 @@ function validateQuestion(body: any): ValidatedQuestion {
 // ---------------------------------------------------------------------------
 // Reads
 // ---------------------------------------------------------------------------
-async function readAllQuestions(cap: number | null = QB_SCAN_CAP): Promise<QueryDocumentSnapshot[]> {
-  const out: QueryDocumentSnapshot[] = [];
-  let cursor: DocumentSnapshot | undefined;
-  for (;;) {
-    let q = adminDb.collection(QB_QUESTIONS).orderBy('__name__').limit(400) as Query;
-    if (cursor) q = q.startAfter(cursor);
-    const snap = await q.get();
-    out.push(...snap.docs);
-    if (snap.empty || snap.size < 400 || (cap != null && out.length >= cap)) break;
-    cursor = snap.docs[snap.docs.length - 1];
-  }
-  return out;
-}
-
 async function readAllMeta(): Promise<Record<Kind, { currentVersion: number; currentFileUrl: string; currentPublishedAt: string | null }>> {
   const [practice, mock] = await Promise.all([
     adminDb.collection(QB_META).doc('practice').get(),
@@ -250,64 +236,77 @@ function computeChanges(
 // Routes
 // ---------------------------------------------------------------------------
 export function registerQuestionBankRoutes(app: express.Express): void {
-  // DEPRECATED (Prompt L2): this full-scan listing stops at QB_SCAN_CAP and
-  // stays only for the current console screen. The paged replacement is
-  // GET /api/tos/questionbank/list (see questionBankLibrary.ts).
-  app.get('/api/tos/questionbank', async (req, res) => {
-    try {
-      requireTos(req);
-      const [snaps, meta] = await Promise.all([readAllQuestions(), readAllMeta()]);
-      const questions = snaps.map((s) => publicQuestion(s.data() as any, s.id));
-      const subjects = Array.from(new Set(questions.map((q) => q.subject).filter(Boolean))).sort((a, b) => a.localeCompare(b));
-      const ktopics = Array.from(new Set(questions.map((q) => q.topic).filter(Boolean))).sort((a, b) => a.localeCompare(b));
-      const counts = (k: Kind) => ({
-        total: questions.filter((q) => (q as any).kind === k).length,
-        drafts: questions.filter((q) => (q as any).kind === k && q.status === 'draft').length,
-        published: questions.filter((q) => (q as any).kind === k && q.status === 'published').length,
-        removed: questions.filter((q) => (q as any).kind === k && q.status === 'removed').length,
-      });
-      res.json({ questions, subjects, topics: ktopics, counts: { practice: counts('practice'), mock: counts('mock') }, meta, scanCapReached: snaps.length >= QB_SCAN_CAP });
-    } catch (error: any) {
-      console.error('[tos/questionbank] failed:', error?.message || error);
-      res.status(error?.status || 500).json({ error: error?.message || 'Failed to load the question bank.' });
-    }
-  });
 
-  // Publish preview: the exact summary the confirm screen shows. Reads only.
-  // One preview per stream: practice and mock publish independently.
+  // Publish preview (Prompt L6): counter-based. Instead of scanning the bank,
+  // it reads the stream's meta document, runs three aggregated count queries
+  // (index entries only) and pulls at most ten sample questions per category.
+  // About 35 reads at any bank size, where the old preview read every question.
   app.get('/api/tos/questionbank/publish-preview', async (req, res) => {
     try {
       requireTos(req);
       const kindRaw = String(req.query.kind ?? 'practice').trim().toLowerCase();
       if (!(KINDS as readonly string[]).includes(kindRaw)) throw httpError(400, 'Kind must be practice or mock.');
       const kind = kindRaw as Kind;
-      // Publish-family reads take the WHOLE stream; the 2,000-document scan
-      // cap must never truncate a publish (Prompt L2 amendment 4).
-      const [snaps, meta] = await Promise.all([readAllQuestions(null), readAllMeta()]);
-      const m = meta[kind];
-      const { added, edited, removed } = computeChanges(snaps, m.currentPublishedAt, m.currentVersion, kind);
-      const changes = [
-        ...added.map((s) => ({ subject: String((s.data() as any).subject || ''), action: 'added', title: String((s.data() as any).text || '').slice(0, 120) })),
-        ...edited.map((s) => ({ subject: String((s.data() as any).subject || ''), action: 'edited', title: String((s.data() as any).text || '').slice(0, 120) })),
-        ...removed.map((s) => ({ subject: String((s.data() as any).subject || ''), action: 'removed', title: String((s.data() as any).text || '').slice(0, 120) })),
-      ];
-      const liveSnaps = snaps.filter((s) => String((s.data() as any).kind || 'practice') === kind
-        && ['published', 'draft'].includes(String((s.data() as any).status || 'draft')));
-      const liveCount = liveSnaps.length;
-      const subjectSet = Array.from(new Set(
-        liveSnaps.map((s) => String((s.data() as any).subject || '').trim()).filter(Boolean),
-      )).sort((a, b) => a.localeCompare(b));
+      const metaDoc = await adminDb.collection(QB_META).doc(kind).get();
+      const md = (metaDoc.exists ? metaDoc.data() : {}) as any;
+      const currentVersion = Number(md?.currentVersion) || 0;
+      const currentPublishedAt = md?.currentPublishedAt ? String(md.currentPublishedAt) : null;
+      const lastLive = Number(md?.liveCount) || 0;
+
+      const base = adminDb.collection(QB_QUESTIONS).where('kind', '==', kind);
+      const changes: { subject: string; action: string; title: string }[] = [];
+      let sampleDocs = 0;
+
+      // Added = every current draft. A publish stamps all drafts, so any
+      // draft that exists now was created after the last publish.
+      const draftsCount = (await base.where('status', '==', 'draft').count().get()).data().count || 0;
+      let editedCount = 0;
+      let removedCount = 0;
+      if (currentVersion > 0 && currentPublishedAt) {
+        const [eSnap, rSnap] = await Promise.all([
+          base.where('status', '==', 'published').where('updatedAt', '>', currentPublishedAt).count().get(),
+          base.where('status', '==', 'removed').where('updatedAt', '>', currentPublishedAt).count().get(),
+        ]);
+        editedCount = eSnap.data().count || 0;
+        removedCount = rSnap.data().count || 0;
+      }
+
+      // Samples: at most ten per category, newest first.
+      const draftSamples = await base.where('status', '==', 'draft').orderBy('updatedAt', 'desc').limit(10).get();
+      sampleDocs += draftSamples.size;
+      draftSamples.docs.forEach((s) => changes.push({
+        subject: String((s.data() as any).subject || ''), action: 'added', title: String((s.data() as any).text || '').slice(0, 120),
+      }));
+      if (currentVersion > 0 && currentPublishedAt) {
+        const editedSamples = await base.where('status', '==', 'published').where('updatedAt', '>', currentPublishedAt).orderBy('updatedAt', 'desc').limit(10).get();
+        sampleDocs += editedSamples.size;
+        editedSamples.docs.forEach((s) => changes.push({
+          subject: String((s.data() as any).subject || ''), action: 'edited', title: String((s.data() as any).text || '').slice(0, 120),
+        }));
+        const removedSamples = await base.where('status', '==', 'removed').where('updatedAt', '>', currentPublishedAt).orderBy('updatedAt', 'desc').limit(10).get();
+        sampleDocs += removedSamples.size;
+        removedSamples.docs.forEach((s) => changes.push({
+          subject: String((s.data() as any).subject || ''), action: 'removed', title: String((s.data() as any).text || '').slice(0, 120),
+        }));
+      }
+
+      const liveCount = currentVersion === 0 ? draftsCount : Math.max(0, lastLive + draftsCount - removedCount);
+      const subjects = Object.keys(md?.bySubject || {}).sort((a: string, b: string) => a.localeCompare(b));
+      const countQueries = currentVersion === 0 ? 1 : 3;
       res.json({
         kind,
-        currentVersion: m.currentVersion,
-        nextVersion: m.currentVersion + 1,
-        added: added.length,
-        edited: edited.length,
-        removed: removed.length,
+        currentVersion,
+        nextVersion: currentVersion + 1,
+        added: draftsCount,
+        edited: editedCount,
+        removed: removedCount,
         changes,
         liveCount,
-        subjects: subjectSet,
-        fileName: `questionbank_${kind}_v${m.currentVersion + 1}.json`,
+        subjects,
+        fileName: `questionbank_${kind}_v${currentVersion + 1}.json`,
+        counterBased: true,
+        readsReport: { metaDocs: 1, countQueries, sampleDocs, approxTotalReads: 1 + countQueries + sampleDocs },
+        note: 'This preview reads the meta document and three small count queries instead of scanning the bank, so it costs about the same at any size. The removed count is approximate: it counts questions touched since the last publish that are now removed.',
       });
     } catch (error: any) {
       console.error('[tos/questionbank/preview] failed:', error?.message || error);
@@ -561,11 +560,43 @@ export function registerQuestionBankRoutes(app: express.Express): void {
       const kindRaw = String(req.body?.kind ?? 'practice').trim().toLowerCase();
       if (!(KINDS as readonly string[]).includes(kindRaw)) throw httpError(400, 'Kind must be practice or mock.');
       const kind = kindRaw as Kind;
-      // Publish-family reads take the WHOLE stream; the 2,000-document scan
-      // cap must never truncate a publish (Prompt L2 amendment 4).
-      const [snaps, meta] = await Promise.all([readAllQuestions(null), readAllMeta()]);
-      const m = meta[kind];
-      const { added, edited, removed } = computeChanges(snaps, m.currentPublishedAt, m.currentVersion, kind);
+      // Paged read on press (Prompt L6): the scan walks the stream 500 at a
+      // time through cursors instead of loading it in one go, and reports how
+      // much it read. No cap can truncate a publish.
+      const startedAt = Date.now();
+      const metaDoc = await adminDb.collection(QB_META).doc(kind).get();
+      const md = (metaDoc.exists ? metaDoc.data() : {}) as any;
+      const m = {
+        currentVersion: Number(md?.currentVersion) || 0,
+        currentFileUrl: String(md?.currentFileUrl || ''),
+        currentPublishedAt: md?.currentPublishedAt ? String(md.currentPublishedAt) : null,
+      };
+      const added: QueryDocumentSnapshot[] = [];
+      const edited: QueryDocumentSnapshot[] = [];
+      const removed: QueryDocumentSnapshot[] = [];
+      const live: QueryDocumentSnapshot[] = [];
+      let pages = 0;
+      let docsRead = 0;
+      let cursor: QueryDocumentSnapshot | undefined;
+      for (;;) {
+        let page = adminDb.collection(QB_QUESTIONS).where('kind', '==', kind).orderBy('__name__').limit(500) as Query;
+        if (cursor) page = page.startAfter(cursor);
+        const snap = await page.get();
+        pages += 1;
+        docsRead += snap.size;
+        if (!snap.empty) {
+          const pageChanges = computeChanges(snap.docs, m.currentPublishedAt, m.currentVersion, kind);
+          added.push(...pageChanges.added);
+          edited.push(...pageChanges.edited);
+          removed.push(...pageChanges.removed);
+          snap.docs.forEach((s) => {
+            const d = s.data() as any;
+            if (['published', 'draft'].includes(String(d.status || ''))) live.push(s);
+          });
+        }
+        if (snap.empty || snap.size < 500) break;
+        cursor = snap.docs[snap.docs.length - 1];
+      }
       if (added.length + edited.length + removed.length === 0) {
         throw httpError(400, `Nothing to publish: no question was added, edited or removed since version ${m.currentVersion}.`);
       }
@@ -574,9 +605,7 @@ export function registerQuestionBankRoutes(app: express.Express): void {
       const publishedAt = new Date().toISOString();
 
       // The live set: everything currently published plus the new drafts;
-      // soft-removed questions drop out.
-      const live = snaps.filter((s) => String((s.data() as any).kind || 'practice') === kind
-        && ['published', 'draft'].includes(String((s.data() as any).status || '')));
+      // soft-removed questions drop out. Collected during the paged scan.
       const questionsOut = live.map((s) => {
         const d = s.data() as any;
         const opts: Record<string, string> = {};
@@ -732,6 +761,8 @@ export function registerQuestionBankRoutes(app: express.Express): void {
         fileUrl,
         counts: { added: added.length, edited: edited.length, removed: removed.length, live: questionsOut.length },
         subjects: bySubject,
+        reads: { pages, docsRead },
+        elapsedMs: Date.now() - startedAt,
       });
     } catch (error: any) {
       console.error('[tos/questionbank/publish] failed:', error?.message || error);

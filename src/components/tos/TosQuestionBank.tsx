@@ -117,17 +117,50 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
   const [setupPreview, setSetupPreview] = useState<Json | null>(null);
   const [setupStage, setSetupStage] = useState<'backfill' | 'recount' | null>(null);
 
+  // Authoring list (Prompt L6): the paged backend, 100 per page. The old
+  // full-scan route is gone; use the Library tab to browse everything.
+  const [listCursor, setListCursor] = useState<string | null>(null);
+  const [listHasMore, setListHasMore] = useState(false);
+  const [listLoadingMore, setListLoadingMore] = useState(false);
+
+  const applyList = (r: Json, mode: 'replace' | 'more') => {
+    const rows = ((r.items || []) as any[]).map((it) => ({ ...it, text: it.textPreview }));
+    setData((prev: Json | null) => {
+      const prevRows: any[] = mode === 'more' ? (prev?.questions || []) : [];
+      const merged = [...prevRows, ...rows];
+      return {
+        questions: merged,
+        subjects: Array.from(new Set(merged.map((q: any) => q.subject).filter(Boolean))).sort((a: string, b: string) => a.localeCompare(b)),
+        topics: Array.from(new Set(merged.map((q: any) => q.topic).filter(Boolean))).sort((a: string, b: string) => a.localeCompare(b)),
+        counts: { [r.kind]: { total: Number(r.tabs?.total) || 0, drafts: Number(r.tabs?.draft) || 0, published: Number(r.tabs?.published) || 0, removed: Number(r.tabs?.removed) || 0, changed: Number(r.tabs?.changed) || 0 } },
+        meta: { [r.kind]: r.meta || {} },
+      };
+    });
+    setListCursor(r.nextCursor || null);
+    setListHasMore(Boolean(r.hasMore));
+  };
+
   const load = useCallback(async () => {
     setError('');
     try {
-      const d = await api('/api/tos/questionbank');
-      setData(d);
+      const r = await api(`/api/tos/questionbank/list?kind=${kind}&status=all&sort=updated&limit=100`);
+      applyList(r, 'replace');
     } catch (e: any) {
       setError(e.message);
     }
-  }, []);
+  }, [kind]);
 
   useEffect(() => { load(); }, [load, refreshKey]);
+
+  const loadMoreList = async () => {
+    if (!listCursor) return;
+    setListLoadingMore(true);
+    try {
+      const r = await api(`/api/tos/questionbank/list?kind=${kind}&status=all&sort=updated&limit=100&cursor=${encodeURIComponent(listCursor)}`);
+      applyList(r, 'more');
+    } catch (e: any) { setError(e.message); }
+    setListLoadingMore(false);
+  };
 
   const loadTree = useCallback(async () => {
     try { setSetupTree(await api(`/api/tos/questionbank/tree?kind=${kind}`)); } catch { setSetupTree(null); }
@@ -260,15 +293,22 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
     });
   }, [questions]);
 
-  const openEditor = (q: any | null) => {
+  const openEditor = async (q: any | null) => {
     setEditorError('');
     if (!q) { setEditor(emptyForm()); return; }
-    setEditor({
-      id: q.id, examType: (q.examType || 'jamb') as ExamType, year: q.year != null ? String(q.year) : '',
-      topic: q.topic || '', subject: q.subject || '', klass: q.klass || '', difficulty: q.difficulty || 'easy',
-      text: q.text || '', options: (q.options || []).map((o: any) => o.text || ''), correct: (q.options || []).findIndex((o: any) => o.key === q.correct),
-      explanation: q.explanation || '', imageLink: q.imageLink || '',
-    });
+    try {
+      const r = await api(`/api/tos/questionbank/item/${q.id}`);
+      const full = r.item || {};
+      const opts: any[] = full.options || q.options || [];
+      setEditor({
+        id: full.id || q.id, examType: (full.examType || q.examType || 'jamb') as ExamType, year: full.year != null ? String(full.year) : '',
+        topic: full.topic || q.topic || '', subject: full.subject || q.subject || '', klass: full.klass || q.klass || '', difficulty: full.difficulty || q.difficulty || 'easy',
+        text: full.text || q.text || '', options: opts.map((o: any) => o.text || ''), correct: opts.findIndex((o: any) => o.key === full.correct),
+        explanation: full.explanation || '', imageLink: full.imageLink || '',
+      });
+    } catch (e: any) {
+      setEditorError(e.message || 'Could not load that question.');
+    }
   };
 
   const saveQuestion = async () => {
@@ -777,7 +817,12 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
               ))}
               </tbody>
             </table>
-            {filtered.length > 100 && <p className="text-[11px] text-slate-500 mt-2">Showing the first 100 of {filtered.length} matches. Use the filters to narrow.</p>}
+            {listHasMore && (
+              <button onClick={loadMoreList} disabled={listLoadingMore} className="mt-3 px-4 py-2.5 rounded-xl border border-white/10 text-xs font-bold text-slate-300 hover:text-white min-h-[44px]">
+                {listLoadingMore ? 'Loading...' : 'Load 100 more'}
+              </button>
+            )}
+            <p className="text-[11px] text-slate-500 mt-2">The list loads 100 at a time from the paged backend, so it stays fast at any bank size. The Library tab is home for browsing everything.</p>
           </div>
         )}
       </Card>
@@ -905,6 +950,9 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
                   <span className="px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-300 text-xs font-bold">Edited {preview.edited}</span>
                   <span className="px-2.5 py-1 rounded-full bg-rose-500/15 text-rose-300 text-xs font-bold">Removed {preview.removed}</span>
                 </div>
+                {preview.counterBased && (
+                  <p className="text-[11px] text-slate-500 mb-2">This preview read the counters and ran three small count queries (about {preview.readsReport?.approxTotalReads ?? 35} reads) instead of scanning the bank, so it costs the same at any size.</p>
+                )}
                 <div className="max-h-52 overflow-y-auto space-y-1.5">
                   {(preview.changes || []).slice(0, 50).map((c: any, i: number) => (
                     <div key={i} className="flex items-center gap-2 text-xs">
@@ -964,6 +1012,9 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
             </div>
             <div className="text-xs text-slate-300 space-y-1 bg-slate-950/60 border border-white/10 rounded-xl p-4">
               <p>Added {publishResult.counts.added} · Edited {publishResult.counts.edited} · Removed {publishResult.counts.removed}</p>
+              {publishResult.reads && (
+                <p>Paged read: {publishResult.reads.docsRead} questions in {publishResult.reads.pages} pages · {(Number(publishResult.elapsedMs) / 1000).toFixed(1)}s</p>
+              )}
               <p className="break-all text-slate-500">{publishResult.fileUrl}</p>
             </div>
             <button onClick={() => setPublishResult(null)} className={`${btnPrimary} w-full mt-5`}>Done</button>
