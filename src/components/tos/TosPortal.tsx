@@ -3,7 +3,7 @@ import { getAuth, signOut, updateProfile, updatePassword, reauthenticateWithCred
 import {
   LayoutDashboard, Users, Building2, Wallet, ScrollText, UserPlus, Loader2,
   RefreshCw, Send, Ban, CheckCircle2, PlayCircle, Check, Plus, ShieldCheck,
-  Clock, ArrowUpRight, Lock, UserRound, BookOpen, Library, CalendarDays,
+  Clock, ArrowUpRight, Lock, UserRound, BookOpen, Library, CalendarDays, Copy,
 } from 'lucide-react';
 import {
   api, fmtDate, fmtDateTime, LEAD_STATUS_LABELS, STATUS_STYLES, Json,
@@ -448,13 +448,24 @@ const AuditTab: React.FC = () => {
 // ---------------------------------------------------------------------------
 // TEAM
 // ---------------------------------------------------------------------------
+// Teammate creation (Prompt N2a): mirrors the Add-centre flow. The temporary
+// password is generated here with crypto, shown once, and a brand-new account
+// is locked into changing it at first sign-in (mustChangePassword claim set by
+// the server). The password is never stored.
+const TEAM_PW_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+function generateTeamPassword(): string {
+  const bytes = new Uint8Array(12);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => TEAM_PW_ALPHABET[b % TEAM_PW_ALPHABET.length]).join('');
+}
+
 const TeamTab: React.FC = () => {
   const [staff, setStaff] = useState<any[]>([]);
-  const [email, setEmail] = useState('');
-  const [role, setRole] = useState('support');
+  const [form, setForm] = useState({ name: '', email: '', role: 'support', tempPassword: '' });
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState('');
+  const [copied, setCopied] = useState(false);
+  const [created, setCreated] = useState<any | null>(null);
   const [error, setError] = useState('');
 
   const load = useCallback(async () => {
@@ -472,14 +483,29 @@ const TeamTab: React.FC = () => {
 
   useEffect(() => { load(); }, [load]);
 
+  const set = (key: string, value: any) => setForm((f) => ({ ...f, [key]: value }));
+  const copyPassword = async () => {
+    try {
+      await navigator.clipboard.writeText(form.tempPassword);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch { /* clipboard unavailable */ }
+  };
+
+  const canAdd =
+    /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(form.email.trim()) &&
+    form.tempPassword.length >= 10;
+
   const add = async () => {
     setBusy(true);
-    setMessage('');
     setError('');
     try {
-      await api('/api/tos/team', { method: 'POST', body: { email, role } });
-      setMessage(`${email} now has platform access.`);
-      setEmail('');
+      const d = await api('/api/tos/team', {
+        method: 'POST',
+        body: { name: form.name, email: form.email, role: form.role, password: form.tempPassword },
+      });
+      setCreated({ email: form.email.trim(), tempPassword: form.tempPassword, createdAuthUser: !!d.createdAuthUser });
+      setForm({ name: '', email: '', role: 'support', tempPassword: '' });
       await load();
     } catch (e: any) {
       setError(e.message);
@@ -491,23 +517,77 @@ const TeamTab: React.FC = () => {
   return (
     <div className="space-y-5">
       <Card title="Add a platform teammate">
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="flex-1 min-w-56">
-            <Field label="Email"><input value={email} onChange={(e) => setEmail(e.target.value)} className={inputCls} placeholder="teammate@example.com" /></Field>
+        {created ? (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 text-emerald-300">
+              <CheckCircle2 className="w-4 h-4" />
+              <p className="font-bold">
+                {created.createdAuthUser ? `${created.email} is on the team.` : `${created.email} already had an account and now has platform access.`}
+              </p>
+            </div>
+            {created.createdAuthUser ? (
+              <>
+                <p className="text-xs text-slate-400">Hand these over. They show this once only and are never stored anywhere. They will be asked to change this password at first sign-in.</p>
+                <div className="bg-slate-950/60 border border-white/10 rounded-2xl p-4 space-y-2.5 text-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-slate-400 text-xs">Login email</span>
+                    <span className="text-white font-bold truncate">{created.email}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-slate-400 text-xs">Temporary password</span>
+                    <span className="flex items-center gap-2">
+                      <span className="text-white font-mono font-bold">{created.tempPassword}</span>
+                      <button onClick={copyPassword} className="text-orange-300 hover:text-orange-200" title="Copy password">
+                        {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                      </button>
+                    </span>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <p className="text-xs text-slate-400">Their existing password was left untouched.</p>
+            )}
+            <button onClick={() => setCreated(null)} className={btnGhost}>Add another</button>
           </div>
-          <Field label="Role">
-            <select value={role} onChange={(e) => setRole(e.target.value)} className={`${inputCls} w-44`}>
-              <option value="support">Support</option>
-              <option value="owner">Owner</option>
-            </select>
-          </Field>
-          <button onClick={add} disabled={busy || !email.trim()} className={btnPrimary}>
-            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Add
-          </button>
-        </div>
-        <p className="text-[11px] text-slate-500 mt-3">They need to have signed in to Tutorial OS at least once. Access is revoked by removing them in Firebase Authentication, not here.</p>
-        {message && <p className="text-xs text-emerald-300 mt-2">{message}</p>}
-        {error && <p className="text-xs text-rose-300 mt-2">{error}</p>}
+        ) : (
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="flex-1 min-w-56">
+                <Field label="Name (optional)"><input value={form.name} onChange={(e) => set('name', e.target.value)} className={inputCls} placeholder="Their name" /></Field>
+              </div>
+              <div className="flex-1 min-w-56">
+                <Field label="Email"><input value={form.email} onChange={(e) => set('email', e.target.value)} className={inputCls} placeholder="teammate@example.com" /></Field>
+              </div>
+              <Field label="Role">
+                <select value={form.role} onChange={(e) => set('role', e.target.value)} className={`${inputCls} w-44`}>
+                  <option value="support">Support</option>
+                  <option value="owner">Owner</option>
+                </select>
+              </Field>
+            </div>
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="flex-1 min-w-56">
+                <Field label="Temporary password">
+                  <input value={form.tempPassword} onChange={(e) => set('tempPassword', e.target.value)} className={`${inputCls} font-mono`} autoComplete="off" />
+                </Field>
+              </div>
+              <button onClick={() => set('tempPassword', generateTeamPassword())} className={btnGhost}>
+                <RefreshCw className="w-4 h-4" /> Generate
+              </button>
+              <button onClick={() => set('tempPassword', '')} className={btnGhost}>Clear</button>
+            </div>
+            <div className="flex items-center gap-3">
+              <button onClick={add} disabled={busy || !canAdd} className={btnPrimary}>
+                {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Add teammate
+              </button>
+              {form.tempPassword.length > 0 && form.tempPassword.length < 10 && (
+                <span className="text-xs text-amber-300">The password must be at least 10 characters.</span>
+              )}
+            </div>
+            <p className="text-[11px] text-slate-500">A new account is created with this temporary password and the person must change it at first sign-in. Someone who already has an account keeps their password and just gains access. Access is revoked by removing them in Firebase Authentication, not here.</p>
+            {error && <p className="text-xs text-rose-300">{error}</p>}
+          </div>
+        )}
       </Card>
 
       <Card title={`Platform staff (${staff.length})`}>

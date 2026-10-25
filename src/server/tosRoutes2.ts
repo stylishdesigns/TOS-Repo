@@ -239,24 +239,46 @@ export function registerTosRoutes2(app: express.Express): void {
     }
   });
 
+  // Add a platform teammate (Prompt N2a): an email that has never signed in
+  // gets a brand-new Auth account created here with the temporary password the
+  // admin generated on screen, the tos claim, and mustChangePassword so they
+  // are locked into changing it at first sign-in. An email that already has an
+  // account is reused without touching its password. The password is never
+  // stored anywhere.
   app.post('/api/tos/team', async (req, res) => {
     try {
       const caller = requireTos(req);
       const email = normalizeEmail(String(req.body?.email || ''));
       const role = String(req.body?.role || 'support');
+      const name = String(req.body?.name || '').trim().slice(0, 120);
+      const password = String(req.body?.password || '');
       if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return res.status(400).json({ error: 'Enter a valid email.' });
       if (!['owner', 'support'].includes(role)) return res.status(400).json({ error: 'Role must be owner or support.' });
-      let user;
+      if (password && password.length < 10) return res.status(400).json({ error: 'The temporary password must be at least 10 characters.' });
+      let user: any;
       try {
         user = await adminAuth.getUserByEmail(email);
-      } catch {
-        return res.status(404).json({ error: 'No account with that email yet. They must sign in once first, then you can add them.' });
+      } catch (err: any) {
+        if (err?.code !== 'auth/user-not-found') {
+          console.error('[tos/team] auth lookup failed:', err?.code || err);
+          return res.status(500).json({ error: 'Could not look up the account. Please try again.' });
+        }
+        if (!password) return res.status(404).json({ error: 'No account with that email yet. Generate a temporary password to create one.' });
+        const created = await adminAuth.createUser({ email, password, displayName: name || undefined, emailVerified: false });
+        await adminAuth.setCustomUserClaims(created.uid, {
+          tos: true,
+          tosRole: role,
+          mustChangePassword: true,
+          tempPasswordExpiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        });
+        await audit({ actorUid: caller.uid, action: 'STAFF_ADDED', after: { email, role, createdAuthUser: true } });
+        return res.json({ success: true, createdAuthUser: true });
       }
       const claims = (user.customClaims || {}) as Record<string, any>;
       if (claims.tos === true) return res.status(400).json({ error: 'That person is already TOS staff.' });
       await adminAuth.setCustomUserClaims(user.uid, { ...claims, tos: true, tosRole: role });
-      await audit({ actorUid: caller.uid, action: 'STAFF_ADDED', after: { email, role } });
-      res.json({ success: true });
+      await audit({ actorUid: caller.uid, action: 'STAFF_ADDED', after: { email, role, createdAuthUser: false } });
+      res.json({ success: true, createdAuthUser: false });
     } catch (error: any) {
       if (error?.status) return res.status(error.status).json({ error: error.message });
       console.error('[tos/team] add failed:', error?.message || error);
