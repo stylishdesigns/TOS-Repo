@@ -3,7 +3,7 @@ import { getAuth, signOut, updateProfile, updatePassword, reauthenticateWithCred
 import {
   LayoutDashboard, Users, Building2, Wallet, ScrollText, UserPlus, Loader2,
   RefreshCw, Send, Ban, CheckCircle2, PlayCircle, Check, Plus, ShieldCheck,
-  Clock, ArrowUpRight, Lock, UserRound, BookOpen, Library,
+  Clock, ArrowUpRight, Lock, UserRound, BookOpen, Library, CalendarDays,
 } from 'lucide-react';
 import {
   api, fmtDate, fmtDateTime, LEAD_STATUS_LABELS, STATUS_STYLES, Json,
@@ -13,6 +13,7 @@ import { CentrePeople } from './TosDirectory';
 import { CentresTab } from './TosCentres';
 import { QuestionBankTab } from './TosQuestionBank';
 import { QuestionLibraryTab } from './TosQuestionLibrary';
+import { MocksTab } from './TosMocks';
 
 /**
  * TOS platform console (Prompt C Part D).
@@ -661,6 +662,7 @@ const TABS = [
   { id: 'plans', label: 'Plans', icon: Wallet },
   { id: 'questions', label: 'Question Bank', icon: BookOpen },
   { id: 'library', label: 'Library', icon: Library },
+  { id: 'mocks', label: 'Mocks', icon: CalendarDays },
   { id: 'audit', label: 'Audit log', icon: ScrollText },
   { id: 'team', label: 'Team', icon: Users },
   { id: 'account', label: 'Account', icon: UserRound },
@@ -746,6 +748,7 @@ export const TosPortal: React.FC = () => {
             {tab === 'plans' && 'Pricing, caps and feature flags. All stored as data.'}
             {tab === 'questions' && 'Author questions once, publish to the CDN, and every centre practices from the same live bank.'}
             {tab === 'library' && 'Browse, search and fix questions 50 at a time, fast at any bank size. Built for tens of thousands.'}
+            {tab === 'mocks' && "One mock a day for every centre's students. Create, freeze and manage them from here."}
             {tab === 'audit' && 'Every privileged action, recorded.'}
             {tab === 'team' && 'The people who run the platform.'}
             {tab === 'account' && 'Your platform profile, password and sign-out.'}
@@ -757,6 +760,7 @@ export const TosPortal: React.FC = () => {
         {tab === 'centres' && <CentresTab refreshKey={refreshKey} openCentreId={openCentreId} onClearOpenCentre={() => setOpenCentreId('')} onDataChanged={() => setRefreshKey((k) => k + 1)} />}
         {tab === 'questions' && <QuestionBankTab refreshKey={refreshKey} />}
         {tab === 'library' && <QuestionLibraryTab refreshKey={refreshKey} />}
+        {tab === 'mocks' && <MocksTab refreshKey={refreshKey} />}
         {tab === 'plans' && <PlansTab />}
         {tab === 'audit' && <AuditTab />}
         {tab === 'team' && <TeamTab />}
