@@ -683,13 +683,16 @@ export const TosPortal: React.FC = () => {
   }, []);
 
   // The TC dashboards stream live through Firestore listeners; the console's
-  // data goes through the server for security, so it refreshes itself on a
-  // short cadence instead. Only while the tab is actually visible.
+  // data goes through the server, so it refreshes when the admin comes back
+  // to the tab. No blind timer: a periodic refresh churned the screen every
+  // few seconds while the admin was mid-task, so it only refreshes on the
+  // moment of return now (plus every tab's own refresh after its actions).
   useEffect(() => {
-    const timer = window.setInterval(() => {
+    const onVisible = () => {
       if (document.visibilityState === 'visible') setRefreshKey((k) => k + 1);
-    }, 15000);
-    return () => window.clearInterval(timer);
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
   }, []);
 
   // With the console as the default screen for platform staff, this button

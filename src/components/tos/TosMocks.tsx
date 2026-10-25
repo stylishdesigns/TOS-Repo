@@ -637,7 +637,7 @@ export const MocksTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
     } catch (e: any) { setError(e.message); }
     finally { setLoading(false); }
   }, [month]);
-  useEffect(() => { setPanel(null); load(); }, [load, refreshKey]);
+  useEffect(() => { load(); }, [load, refreshKey]); // a refresh must not close an open panel
 
   const { y, m, days, firstWeekday } = useMemo(() => monthRange(month), [month]);
   const monthLabel = useMemo(() => {
