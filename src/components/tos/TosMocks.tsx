@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   CalendarDays, ChevronLeft, ChevronRight, Loader2, Plus, Trash2,
-  AlertTriangle, CheckCircle2, FileText, RefreshCw, X,
+  AlertTriangle, CheckCircle2, FileText, RefreshCw, Rocket, X,
 } from 'lucide-react';
 import { api, Card, Field, inputCls, btnPrimary, btnGhost, fmtDateTime } from './tosShared';
 
@@ -259,7 +259,7 @@ const MockDetail: React.FC<{ mockId: string; onChanged: () => void; onClose: () 
   const [loadError, setLoadError] = useState('');
   const [readiness, setReadiness] = useState<Json | null>(null);
   const [checking, setChecking] = useState(false);
-  const [confirming, setConfirming] = useState<'' | 'schedule' | 'cancel'>('');
+  const [confirming, setConfirming] = useState<'' | 'schedule' | 'cancel' | 'release'>('');
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
   const [showPaper, setShowPaper] = useState(false);
@@ -294,6 +294,24 @@ const MockDetail: React.FC<{ mockId: string; onChanged: () => void; onClose: () 
     try {
       await api(`/api/tos/mocks/${mockId}/cancel`, { method: 'POST' });
       setConfirming(''); await load(); onChanged();
+    } catch (e: any) { setNotice(e.message); }
+    finally { setBusy(false); }
+  };
+
+  const [monitor, setMonitor] = useState<Json | null>(null);
+
+  const loadMonitor = useCallback(async () => {
+    try { setMonitor(await api(`/api/tos/mocks/${mockId}/monitor`)); }
+    catch { setMonitor(null); }
+  }, [mockId]);
+  useEffect(() => { if (mock && mock.status !== 'draft') loadMonitor(); }, [mock, loadMonitor]);
+
+  const release = async () => {
+    setBusy(true); setNotice('');
+    try {
+      const r = await api('/api/tos/mocks/release', { method: 'POST', body: { mockId, confirm: 'RELEASE' } });
+      setNotice(r.outcome === 'already' ? 'Results were already released.' : 'Results released: the leaderboard is built.');
+      setConfirming(''); await load(); await loadMonitor(); onChanged();
     } catch (e: any) { setNotice(e.message); }
     finally { setBusy(false); }
   };
@@ -403,6 +421,31 @@ const MockDetail: React.FC<{ mockId: string; onChanged: () => void; onClose: () 
             </div>
           )}
           {isScheduled && showPaper && <Card title="Frozen paper"><PaperPreview mockId={mockId} /></Card>}
+
+          {mock.status !== 'draft' && monitor && (
+            <Card title="Monitor">
+              <div className="space-y-2">
+                <p className="text-sm text-slate-300">
+                  {monitor.started} started · {monitor.openNow} in progress · {monitor.submitted} submitted
+                </p>
+                {mock.status === 'released' ? (
+                  <p className="text-xs text-emerald-300">
+                    Results released{monitor.releasedTotal != null ? ` · ${monitor.releasedTotal} marked attempts` : ''}.
+                  </p>
+                ) : (
+                  <p className="text-xs text-slate-500">
+                    Results release automatically at 6:00 a.m. Lagos the morning after the mock; this button is the fallback.
+                  </p>
+                )}
+                {['scheduled', 'live', 'closed'].includes(mock.status) && mock.date < todayStr() && confirming !== 'release' && (
+                  <div><button onClick={() => setConfirming('release')} className={btnPrimary}><Rocket className="w-4 h-4" /> Release results now</button></div>
+                )}
+                {confirming === 'release' && (
+                  <TypedConfirm word="RELEASE" label="Release results" busy={busy} onConfirm={release} onCancel={() => setConfirming('')} />
+                )}
+              </div>
+            </Card>
+          )}
 
           {!isDraft && !isScheduled && (
             <div className="flex flex-wrap gap-2">

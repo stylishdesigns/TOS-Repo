@@ -53,7 +53,10 @@ import { Caller, httpError } from './tenantService';
  * (reads only, no writes, no storage).
  */
 
-const MOCKS = 'mocks';
+export const MOCKS = 'mocks';
+export const MOCK_ATTEMPTS = 'mockAttempts';
+export const MOCK_TALLY = 'mockScoreTally';
+export const MOCK_LEADERBOARDS = 'mockLeaderboards';
 const MOCK_PAPERS = 'mockPapers';
 const MOCK_KEYS = 'mockKeys';
 const MOCK_SETTINGS = 'mockSettings'; // doc id 'global'
@@ -97,7 +100,7 @@ function requireTos(req: express.Request): Caller {
   return caller;
 }
 
-function audit(entry: Record<string, any>): Promise<unknown> {
+export function audit(entry: Record<string, any>): Promise<unknown> {
   return adminDb
     .collection('auditLogs')
     .add({ ...entry, at: entry.at || new Date().toISOString() })
@@ -107,7 +110,7 @@ function audit(entry: Record<string, any>): Promise<unknown> {
 // ---------------------------------------------------------------------------
 // Time: everything is Africa/Lagos, on the server.
 // ---------------------------------------------------------------------------
-function lagosToday(): string {
+export function lagosToday(): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Lagos' }).format(new Date());
 }
 
@@ -465,6 +468,38 @@ async function existingStatuses(papers: Array<{ date: string }>): Promise<Record
 // Routes. TOS staff only, on the server.
 // ---------------------------------------------------------------------------
 export function registerMockRoutes(app: express.Express): void {
+  // Settings: read (defaults served when nothing is stored yet; a GET never
+  // writes) and replace with validation.
+  app.get('/api/tos/mocks/settings', async (req, res) => {
+    try {
+      requireTos(req);
+      const { settings, stored } = await readSettings();
+      res.json({ ok: true, settings, stored });
+    } catch (error: any) {
+      if (error?.status) return res.status(error.status).json({ error: error.message });
+      console.error('[mocks] settings read failed:', error?.message || error);
+      res.status(500).json({ error: 'Could not load mock settings.' });
+    }
+  });
+
+  app.post('/api/tos/mocks/settings', async (req, res) => {
+    try {
+      const caller = requireTos(req);
+      const settings = validateSettingsBody(req.body || {});
+      await adminDb.collection(MOCK_SETTINGS).doc('global').set({
+        ...settings,
+        updatedAt: new Date().toISOString(),
+        updatedBy: caller.uid,
+      });
+      void audit({ area: 'mocks', action: 'settings', by: caller.uid });
+      res.json({ ok: true, settings });
+    } catch (error: any) {
+      if (error?.status) return res.status(error.status).json({ error: error.message });
+      console.error('[mocks] settings write failed:', error?.message || error);
+      res.status(500).json({ error: 'Could not save mock settings.' });
+    }
+  });
+
   // Create a Draft. The document id is the date, so one-mock-per-day is
   // structural; a cancelled slot can be reused as a fresh draft.
   app.post('/api/tos/mocks', async (req, res) => {
@@ -807,35 +842,52 @@ export function registerMockRoutes(app: express.Express): void {
     }
   });
 
-  // Settings: read (defaults served when nothing is stored yet; a GET never
-  // writes) and replace with validation.
-  app.get('/api/tos/mocks/settings', async (req, res) => {
+  // Monitor: cheap live counts for the console. Count aggregations only,
+  // nothing written on a GET.
+  app.get('/api/tos/mocks/:id/monitor', async (req, res) => {
     try {
       requireTos(req);
-      const { settings, stored } = await readSettings();
-      res.json({ ok: true, settings, stored });
+      const id = String(req.params.id || '').trim();
+      const mockSnap = await adminDb.collection(MOCKS).doc(id).get();
+      if (!mockSnap.exists) throw httpError(404, 'Mock not found.');
+      const mock = mockSnap.data() as any;
+      const attempts = adminDb.collection(MOCK_ATTEMPTS).where('mockId', '==', id);
+      const [started, open, submitted] = await Promise.all([
+        attempts.count().get(),
+        attempts.where('status', '==', 'open').count().get(),
+        attempts.where('status', '==', 'submitted').count().get(),
+      ]);
+      res.json({
+        ok: true,
+        status: mock.status,
+        date: mock.date,
+        started: started.data().count,
+        openNow: open.data().count,
+        submitted: submitted.data().count,
+        releasedTotal: Number.isInteger(mock?.releasedTotalAttempts) ? mock.releasedTotalAttempts : null,
+      });
     } catch (error: any) {
       if (error?.status) return res.status(error.status).json({ error: error.message });
-      console.error('[mocks] settings read failed:', error?.message || error);
-      res.status(500).json({ error: 'Could not load mock settings.' });
+      console.error('[mocks] monitor read failed:', error?.message || error);
+      res.status(500).json({ error: 'Could not read the monitor counts.' });
     }
   });
 
-  app.post('/api/tos/mocks/settings', async (req, res) => {
+  // Manual release: the fallback when the overnight job could not release a
+  // mock. Typed confirm, per the platform confirm-gate rule. Release only
+  // ever runs for a mock whose day has ended.
+  app.post('/api/tos/mocks/release', async (req, res) => {
     try {
       const caller = requireTos(req);
-      const settings = validateSettingsBody(req.body || {});
-      await adminDb.collection(MOCK_SETTINGS).doc('global').set({
-        ...settings,
-        updatedAt: new Date().toISOString(),
-        updatedBy: caller.uid,
-      });
-      void audit({ area: 'mocks', action: 'settings', by: caller.uid });
-      res.json({ ok: true, settings });
+      const body = req.body || {};
+      if (String(body.confirm || '').trim() !== 'RELEASE') throw httpError(400, 'Type RELEASE to confirm releasing the results.');
+      const { releaseMock } = await import('./mockRelease');
+      const r = await releaseMock(String(body.mockId || ''), { source: 'manual', by: caller.uid });
+      res.json({ ok: true, outcome: r.outcome });
     } catch (error: any) {
       if (error?.status) return res.status(error.status).json({ error: error.message });
-      console.error('[mocks] settings write failed:', error?.message || error);
-      res.status(500).json({ error: 'Could not save mock settings.' });
+      console.error('[mocks] manual release failed:', error?.message || error);
+      res.status(500).json({ error: 'Could not release the mock.' });
     }
   });
 

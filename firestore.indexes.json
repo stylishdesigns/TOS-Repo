@@ -25,7 +25,9 @@
     { "collectionGroup": "qbQuestions", "queryScope": "COLLECTION",
       "fields": [ { "fieldPath": "kind", "order": "ASCENDING" }, { "fieldPath": "tokens", "arrayConfig": "CONTAINS_ANY" }, { "fieldPath": "updatedAt", "order": "DESCENDING" } ] },
     { "collectionGroup": "qbQuestions", "queryScope": "COLLECTION",
-      "fields": [ { "fieldPath": "kind", "order": "ASCENDING" }, { "fieldPath": "status", "order": "ASCENDING" }, { "fieldPath": "tokens", "arrayConfig": "CONTAINS_ANY" }, { "fieldPath": "updatedAt", "order": "DESCENDING" } ] }
+      "fields": [ { "fieldPath": "kind", "order": "ASCENDING" }, { "fieldPath": "status", "order": "ASCENDING" }, { "fieldPath": "tokens", "arrayConfig": "CONTAINS_ANY" }, { "fieldPath": "updatedAt", "order": "DESCENDING" } ] },
+    { "collectionGroup": "mocks", "queryScope": "COLLECTION",
+      "fields": [ { "fieldPath": "status", "order": "ASCENDING" }, { "fieldPath": "date", "order": "ASCENDING" } ] }
   ],
   "fieldOverrides": []
 }
