@@ -69,6 +69,9 @@ const OverviewTab: React.FC<{ onOpenCentre: (id: string) => void; refreshKey: nu
   const leads = data.leads || {};
   return (
     <div className="space-y-5">
+      <div className="flex justify-end">
+        <button onClick={load} className={btnGhost}><RefreshCw className="w-4 h-4" /> Refresh</button>
+      </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="bg-slate-900/70 border border-white/10 rounded-2xl p-4">
           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Centres</p>
@@ -682,18 +685,11 @@ export const TosPortal: React.FC = () => {
     return () => window.removeEventListener('tos-open-centre', handler);
   }, []);
 
-  // The TC dashboards stream live through Firestore listeners; the console's
-  // data goes through the server, so it refreshes when the admin comes back
-  // to the tab. No blind timer: a periodic refresh churned the screen every
-  // few seconds while the admin was mid-task, so it only refreshes on the
-  // moment of return now (plus every tab's own refresh after its actions).
-  useEffect(() => {
-    const onVisible = () => {
-      if (document.visibilityState === 'visible') setRefreshKey((k) => k + 1);
-    };
-    document.addEventListener('visibilitychange', onVisible);
-    return () => document.removeEventListener('visibilitychange', onVisible);
-  }, []);
+  // No automatic refresh anywhere: every tab loads when opened and when the
+  // staff member acts, and each tab header carries a visible Refresh button.
+  // Nothing reloads behind the admin's back, so an open form, a typed
+  // confirm or a scroll position can never be wiped by a timer, and idle
+  // screens cost zero reads.
 
   // With the console as the default screen for platform staff, this button
   // means it: end the session, then land on the public site signed out.

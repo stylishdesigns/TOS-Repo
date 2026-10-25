@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Loader2, Search, X, ChevronRight, Check, Pencil, Trash2, FolderTree } from 'lucide-react';
+import { Loader2, Search, X, ChevronRight, Check, Pencil, Trash2, FolderTree, RefreshCw } from 'lucide-react';
 import { api, Json, Card, inputCls, btnPrimary, btnGhost, fmtDate } from './tosShared';
 import { BANK_YEARS } from '../../data/seniorSubjects';
 
@@ -478,6 +478,7 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number }> = ({ refreshKe
               </button>
             ))}
           </div>
+          <button onClick={() => { loadTree(); loadList('replace'); }} className={btnGhost}><RefreshCw className="w-4 h-4" /> Refresh</button>
           <div className="relative flex-1 min-w-[220px]">
             <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
             <input

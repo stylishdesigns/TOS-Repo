@@ -482,7 +482,7 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
           <button onClick={openPublish} className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-orange-500/50 bg-orange-500/10 hover:bg-orange-500/20 disabled:opacity-50 text-orange-300 font-bold text-sm transition-all">
             <Send className="w-4 h-4" /> Publish changes
           </button>
-          <button onClick={load} disabled={busy} className={btnGhost}><RefreshCw className={`w-4 h-4 ${busy ? 'animate-spin' : ''}`} /> Refresh</button>
+          <button onClick={() => { load(); loadTree(); }} disabled={busy} className={btnGhost}><RefreshCw className={`w-4 h-4 ${busy ? 'animate-spin' : ''}`} /> Refresh</button>
         </div>
         {notice && <p className="text-xs text-rose-300">{notice}</p>}
       </div>
