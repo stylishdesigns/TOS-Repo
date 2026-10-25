@@ -295,5 +295,22 @@ service cloud.firestore {
       allow create, update: if isVerified() && isValidClassRating(incoming());
       allow delete: if isAdmin();
     }
+
+    // -------------------------------------------------------------------------
+    // TOS MOCKS (Prompt M). Mocks are owned entirely by Tutorial OS: centres,
+    // admins and tutors cannot create, edit, see inside or use them. Every
+    // mock collection below is read and written ONLY by the server through
+    // the Admin SDK (which bypasses these rules). Browsers get nothing. The
+    // default-deny catch-all at the top already blocks them; these explicit
+    // blocks keep that guarantee pinned for each collection by name.
+    // -------------------------------------------------------------------------
+    match /mocks/{doc}          { allow read, write: if false; }
+    match /mockPapers/{doc}     { allow read, write: if false; }
+    match /mockKeys/{doc}       { allow read, write: if false; }
+    match /mockAttempts/{doc}   { allow read, write: if false; }
+    match /mockScoreTally/{doc} { allow read, write: if false; }
+    match /mockLeaderboards/{doc} { allow read, write: if false; }
+    match /usernames/{doc}      { allow read, write: if false; }
+    match /mockSettings/{doc}   { allow read, write: if false; }
   }
 }
