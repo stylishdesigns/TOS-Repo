@@ -349,6 +349,12 @@ async function startServer() {
       databaseId,
       firestoreReadOk: false,
       authReadOk: false,
+      // Presence booleans only (no values): proves the publish route's
+      // Cloudinary configuration is visible to this deployment at runtime.
+      cloudinaryConfigured: {
+        cloudName: Boolean(process.env.CLOUDINARY_CLOUD_NAME),
+        uploadPreset: Boolean(process.env.CLOUDINARY_UPLOAD_PRESET),
+      },
     };
     try {
       const snap = await adminDb.collection("platformConfig").doc("global").get();
