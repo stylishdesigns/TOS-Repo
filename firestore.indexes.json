@@ -1,0 +1,29 @@
+{
+  "indexes": [
+    { "collectionGroup": "qbQuestions", "queryScope": "COLLECTION",
+      "fields": [ { "fieldPath": "kind", "order": "ASCENDING" }, { "fieldPath": "updatedAt", "order": "DESCENDING" } ] },
+    { "collectionGroup": "qbQuestions", "queryScope": "COLLECTION",
+      "fields": [ { "fieldPath": "kind", "order": "ASCENDING" }, { "fieldPath": "status", "order": "ASCENDING" }, { "fieldPath": "updatedAt", "order": "DESCENDING" } ] },
+    { "collectionGroup": "qbQuestions", "queryScope": "COLLECTION",
+      "fields": [ { "fieldPath": "kind", "order": "ASCENDING" }, { "fieldPath": "status", "order": "ASCENDING" }, { "fieldPath": "difficulty", "order": "ASCENDING" }, { "fieldPath": "updatedAt", "order": "DESCENDING" } ] },
+    { "collectionGroup": "qbQuestions", "queryScope": "COLLECTION",
+      "fields": [ { "fieldPath": "kind", "order": "ASCENDING" }, { "fieldPath": "status", "order": "ASCENDING" }, { "fieldPath": "klass", "order": "ASCENDING" }, { "fieldPath": "updatedAt", "order": "DESCENDING" } ] },
+    { "collectionGroup": "qbQuestions", "queryScope": "COLLECTION",
+      "fields": [ { "fieldPath": "kind", "order": "ASCENDING" }, { "fieldPath": "status", "order": "ASCENDING" }, { "fieldPath": "examType", "order": "ASCENDING" }, { "fieldPath": "updatedAt", "order": "DESCENDING" } ] },
+    { "collectionGroup": "qbQuestions", "queryScope": "COLLECTION",
+      "fields": [ { "fieldPath": "kind", "order": "ASCENDING" }, { "fieldPath": "status", "order": "ASCENDING" }, { "fieldPath": "subjectKey", "order": "ASCENDING" }, { "fieldPath": "updatedAt", "order": "DESCENDING" } ] },
+    { "collectionGroup": "qbQuestions", "queryScope": "COLLECTION",
+      "fields": [ { "fieldPath": "kind", "order": "ASCENDING" }, { "fieldPath": "status", "order": "ASCENDING" }, { "fieldPath": "topicKey", "order": "ASCENDING" }, { "fieldPath": "updatedAt", "order": "DESCENDING" } ] },
+    { "collectionGroup": "qbQuestions", "queryScope": "COLLECTION",
+      "fields": [ { "fieldPath": "kind", "order": "ASCENDING" }, { "fieldPath": "status", "order": "ASCENDING" }, { "fieldPath": "batchId", "order": "ASCENDING" }, { "fieldPath": "updatedAt", "order": "DESCENDING" } ] },
+    { "collectionGroup": "qbQuestions", "queryScope": "COLLECTION",
+      "fields": [ { "fieldPath": "kind", "order": "ASCENDING" }, { "fieldPath": "status", "order": "ASCENDING" }, { "fieldPath": "subject", "order": "ASCENDING" }, { "fieldPath": "updatedAt", "order": "DESCENDING" } ] },
+    { "collectionGroup": "qbQuestions", "queryScope": "COLLECTION",
+      "fields": [ { "fieldPath": "kind", "order": "ASCENDING" }, { "fieldPath": "status", "order": "ASCENDING" }, { "fieldPath": "year", "order": "DESCENDING" } ] },
+    { "collectionGroup": "qbQuestions", "queryScope": "COLLECTION",
+      "fields": [ { "fieldPath": "kind", "order": "ASCENDING" }, { "fieldPath": "tokens", "arrayConfig": "CONTAINS_ANY" }, { "fieldPath": "updatedAt", "order": "DESCENDING" } ] },
+    { "collectionGroup": "qbQuestions", "queryScope": "COLLECTION",
+      "fields": [ { "fieldPath": "kind", "order": "ASCENDING" }, { "fieldPath": "status", "order": "ASCENDING" }, { "fieldPath": "tokens", "arrayConfig": "CONTAINS_ANY" }, { "fieldPath": "updatedAt", "order": "DESCENDING" } ] }
+  ],
+  "fieldOverrides": []
+}

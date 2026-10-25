@@ -2,6 +2,8 @@ import express from 'express';
 import { adminDb } from './firebaseAdmin';
 import type { Query, QueryDocumentSnapshot, DocumentSnapshot, DocumentData, WriteBatch } from 'firebase-admin/firestore';
 import { Caller, httpError } from './tenantService';
+import { enrichFields, counterOpsForBatch, counterOpsForBatchMany, appendPublishCounterOps, mapKey, registerQuestionBankLibraryRoutes } from './questionBankLibrary';
+import { randomUUID } from 'crypto';
 
 /**
  * Platform Question Bank (Prompt G follow-on, publish pipeline).
@@ -34,7 +36,7 @@ const QB_SCAN_CAP = 2000;
 // exact, only the rendered list is capped.
 const CHANGES_LIST_CAP = 300;
 
-const DIFFICULTIES = ['easy', 'medium', 'hard'] as const;
+const DIFFICULTIES = ['easy', 'hard'] as const; // Prompt L2: easy and hard only
 type Difficulty = (typeof DIFFICULTIES)[number];
 const OPTION_KEYS = ['A', 'B', 'C', 'D'] as const;
 type OptionKey = (typeof OPTION_KEYS)[number];
@@ -126,7 +128,7 @@ function validateQuestion(body: any): ValidatedQuestion {
   if (!topic) throw httpError(400, 'Topic is required.');
   if (topic.length > 160) throw httpError(400, 'Topic is too long (max 160 characters).');
   if (!(DIFFICULTIES as readonly string[]).includes(difficulty)) {
-    throw httpError(400, 'Difficulty must be easy, medium or hard.');
+    throw httpError(400, 'Difficulty is easy or hard only.');
   }
   if (!text) throw httpError(400, 'Question text is required.');
   if (text.length > TEXT_MAX) throw httpError(400, `Question text is too long (max ${TEXT_MAX} characters).`);
@@ -159,7 +161,7 @@ function validateQuestion(body: any): ValidatedQuestion {
 // ---------------------------------------------------------------------------
 // Reads
 // ---------------------------------------------------------------------------
-async function readAllQuestions(): Promise<QueryDocumentSnapshot[]> {
+async function readAllQuestions(cap: number | null = QB_SCAN_CAP): Promise<QueryDocumentSnapshot[]> {
   const out: QueryDocumentSnapshot[] = [];
   let cursor: DocumentSnapshot | undefined;
   for (;;) {
@@ -167,7 +169,7 @@ async function readAllQuestions(): Promise<QueryDocumentSnapshot[]> {
     if (cursor) q = q.startAfter(cursor);
     const snap = await q.get();
     out.push(...snap.docs);
-    if (snap.empty || snap.size < 400 || out.length >= QB_SCAN_CAP) break;
+    if (snap.empty || snap.size < 400 || (cap != null && out.length >= cap)) break;
     cursor = snap.docs[snap.docs.length - 1];
   }
   return out;
@@ -247,6 +249,9 @@ function computeChanges(
 // Routes
 // ---------------------------------------------------------------------------
 export function registerQuestionBankRoutes(app: express.Express): void {
+  // DEPRECATED (Prompt L2): this full-scan listing stops at QB_SCAN_CAP and
+  // stays only for the current console screen. The paged replacement is
+  // GET /api/tos/questionbank/list (see questionBankLibrary.ts).
   app.get('/api/tos/questionbank', async (req, res) => {
     try {
       requireTos(req);
@@ -275,7 +280,9 @@ export function registerQuestionBankRoutes(app: express.Express): void {
       const kindRaw = String(req.query.kind ?? 'practice').trim().toLowerCase();
       if (!(KINDS as readonly string[]).includes(kindRaw)) throw httpError(400, 'Kind must be practice or mock.');
       const kind = kindRaw as Kind;
-      const [snaps, meta] = await Promise.all([readAllQuestions(), readAllMeta()]);
+      // Publish-family reads take the WHOLE stream; the 2,000-document scan
+      // cap must never truncate a publish (Prompt L2 amendment 4).
+      const [snaps, meta] = await Promise.all([readAllQuestions(null), readAllMeta()]);
       const m = meta[kind];
       const { added, edited, removed } = computeChanges(snaps, m.currentPublishedAt, m.currentVersion, kind);
       const changes = [
@@ -313,15 +320,21 @@ export function registerQuestionBankRoutes(app: express.Express): void {
       const caller = requireTos(req);
       const q = validateQuestion(req.body);
       const now = new Date().toISOString();
-      const ref = await adminDb.collection(QB_QUESTIONS).add({
+      const docData = {
         ...q,
+        ...enrichFields({ kind: q.kind, examType: q.examType, subject: q.subject, topic: q.topic, year: q.year, text: q.text, correct: q.correct }),
         status: 'draft',
         createdAt: now,
         updatedAt: now,
         publishedVersion: null,
         createdByUid: caller.uid,
         createdByEmail: caller.email || '',
-      });
+      };
+      const ref = adminDb.collection(QB_QUESTIONS).doc();
+      const batch = adminDb.batch();
+      batch.create(ref, docData);
+      counterOpsForBatch(batch, q.kind, null, docData);
+      await batch.commit();
       await audit({
         actorUid: caller.uid,
         action: 'QUESTION_CREATED',
@@ -347,7 +360,12 @@ export function registerQuestionBankRoutes(app: express.Express): void {
       if (!doc.exists) throw httpError(404, 'Question not found.');
       const prev = doc.data() as any;
       if (prev?.status === 'removed') throw httpError(409, 'This question was removed. Restore is not supported; add it again as a new question.');
-      await ref.update({ ...q, updatedAt: new Date().toISOString(), editedByUid: caller.uid, editedByEmail: caller.email || '' });
+      const now = new Date().toISOString();
+      const next = { ...prev, ...q, updatedAt: now, editedByUid: caller.uid, editedByEmail: caller.email || '' };
+      const batch = adminDb.batch();
+      batch.update(ref, next);
+      counterOpsForBatch(batch, (String(prev.kind || 'practice') as 'practice' | 'mock'), prev, next);
+      await batch.commit();
       await audit({
         actorUid: caller.uid,
         action: 'QUESTION_EDITED',
@@ -381,7 +399,7 @@ export function registerQuestionBankRoutes(app: express.Express): void {
       const klass = String(body.klass ?? '').trim();
       const topic = String(body.topic ?? '').trim();
       const difficultyRaw = String(body.difficulty ?? 'easy').trim().toLowerCase();
-      if (!(DIFFICULTIES as readonly string[]).includes(difficultyRaw)) throw httpError(400, 'Difficulty must be easy, medium or hard.');
+      if (!(DIFFICULTIES as readonly string[]).includes(difficultyRaw)) throw httpError(400, 'Difficulty is easy or hard only.');
       if (!subject) throw httpError(400, 'Subject is required for an import.');
       if (subject.length > 120) throw httpError(400, 'Subject is too long (max 120 characters).');
       if (klass.length > 120) throw httpError(400, 'Class is too long (max 120 characters).');
@@ -394,6 +412,7 @@ export function registerQuestionBankRoutes(app: express.Express): void {
       if (items.length > IMPORT_MAX) throw httpError(400, `Too many questions in one import (${items.length}). The cap is ${IMPORT_MAX} per import; split the paste.`);
 
       const now = new Date().toISOString();
+      const batchId = `imp-${randomUUID()}`;
       const batch = adminDb.batch();
       let count = 0;
       items.forEach((item) => {
@@ -413,6 +432,8 @@ export function registerQuestionBankRoutes(app: express.Express): void {
         if (!(OPTION_KEYS as readonly string[]).includes(correct)) return;
         batch.create(adminDb.collection(QB_QUESTIONS).doc(), {
           kind, examType, subject, klass, topic, year, difficulty: difficultyRaw,
+          ...enrichFields({ kind, examType, subject, topic, year, text, correct, batchId }),
+          batchId,
           text, options, correct: correct as OptionKey, explanation, imageLink: '',
           status: 'draft', createdAt: now, updatedAt: now, publishedVersion: null,
           createdByUid: caller.uid, createdByEmail: caller.email || '',
@@ -420,6 +441,9 @@ export function registerQuestionBankRoutes(app: express.Express): void {
         count += 1;
       });
       if (count === 0) throw httpError(400, 'None of the parsed questions passed validation. Check the paste format and try again.');
+      // The whole import totals into the counters in memory; each counter
+      // document is written exactly once, in the same atomic batch.
+      counterOpsForBatchMany(batch, kind, null, { kind, examType, subject, topic, year, status: 'draft' }, count);
       await batch.commit();
       await audit({
         actorUid: caller.uid,
@@ -444,11 +468,17 @@ export function registerQuestionBankRoutes(app: express.Express): void {
       if (!doc.exists) throw httpError(404, 'Question not found.');
       const prev = doc.data() as any;
       if (prev?.status === 'removed') throw httpError(409, 'This question is already removed.');
+      const now = new Date().toISOString();
+      const batch = adminDb.batch();
       if (prev?.status === 'draft') {
-        await ref.delete();
+        batch.delete(ref);
+        counterOpsForBatch(batch, (String(prev.kind || 'practice') as 'practice' | 'mock'), prev, null);
       } else {
-        await ref.update({ status: 'removed', removedAt: new Date().toISOString(), removedByUid: caller.uid, updatedAt: new Date().toISOString() });
+        const next = { ...prev, status: 'removed', removedAt: now, removedByUid: caller.uid, updatedAt: now };
+        batch.update(ref, next);
+        counterOpsForBatch(batch, (String(prev.kind || 'practice') as 'practice' | 'mock'), prev, next);
       }
+      await batch.commit();
       await audit({
         actorUid: caller.uid,
         action: 'QUESTION_REMOVED',
@@ -481,7 +511,9 @@ export function registerQuestionBankRoutes(app: express.Express): void {
       const kindRaw = String(req.body?.kind ?? 'practice').trim().toLowerCase();
       if (!(KINDS as readonly string[]).includes(kindRaw)) throw httpError(400, 'Kind must be practice or mock.');
       const kind = kindRaw as Kind;
-      const [snaps, meta] = await Promise.all([readAllQuestions(), readAllMeta()]);
+      // Publish-family reads take the WHOLE stream; the 2,000-document scan
+      // cap must never truncate a publish (Prompt L2 amendment 4).
+      const [snaps, meta] = await Promise.all([readAllQuestions(null), readAllMeta()]);
       const m = meta[kind];
       const { added, edited, removed } = computeChanges(snaps, m.currentPublishedAt, m.currentVersion, kind);
       if (added.length + edited.length + removed.length === 0) {
@@ -615,6 +647,22 @@ export function registerQuestionBankRoutes(app: express.Express): void {
         await stampChunk([], true).commit();
       }
 
+      // Counter books: the added drafts move draft -> published and the
+      // changed count resets. Its own batch, so the 450-op stamp chunks keep
+      // headroom; if a crash ever lands between the two, Recount repairs it.
+      const addedGroups: { sKey: string; count: number }[] = [];
+      const groupTotals = new Map<string, number>();
+      added.forEach((s) => {
+        const k = mapKey((s.data() as any).subject);
+        if (k) groupTotals.set(k, (groupTotals.get(k) || 0) + 1);
+      });
+      groupTotals.forEach((cnt, sKey) => addedGroups.push({ sKey, count: cnt }));
+      if (added.length > 0) {
+        const counterBatch = adminDb.batch();
+        appendPublishCounterOps(counterBatch, kind, addedGroups, added.length);
+        await counterBatch.commit();
+      }
+
       await audit({
         actorUid: caller.uid,
         action: 'QUESTIONBANK_PUBLISHED',
@@ -633,4 +681,6 @@ export function registerQuestionBankRoutes(app: express.Express): void {
       res.status(error?.status || 500).json({ error: error?.message || 'Publish failed.' });
     }
   });
+
+  registerQuestionBankLibraryRoutes(app, requireTos);
 }
