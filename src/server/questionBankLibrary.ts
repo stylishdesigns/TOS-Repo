@@ -405,14 +405,17 @@ export function registerQuestionBankLibraryRoutes(
       const klass = String(req.query.klass || '').trim();
 
       // Exactly one tree scope at a time, taken from the normalised key fields.
-      const scope: Array<[string, string]> = [];
+      const scope: Array<[string, string | number]> = [];
       if (String(req.query.examType || '').trim()) scope.push(['examType', normKey(req.query.examType)]);
       if (String(req.query.subject || '').trim()) scope.push(['subjectKey', mapKey(req.query.subject)]);
       if (String(req.query.topic || '').trim()) scope.push(['topicKey', mapKey(req.query.topic)]);
       if (String(req.query.year || '').trim()) {
         const y = Number(req.query.year);
         if (!Number.isInteger(y) || y < 1978 || y > 2099) throw httpError(400, 'Year must be between 1978 and 2099.');
-        scope.push(['year', String(y)]);
+        // The documents store year as a number (parseYear), so compare with
+        // the number, not the string form. The string never matched, which
+        // made every year drill-down return zero rows.
+        scope.push(['year', y]);
       }
       if (String(req.query.batchId || '').trim()) scope.push(['batchId', normKey(req.query.batchId)]);
       if (scope.length > 1) {
