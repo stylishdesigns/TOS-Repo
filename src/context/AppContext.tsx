@@ -1449,7 +1449,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       localStorage.setItem(scopedKey('timetable'), JSON.stringify(timetable));
       localStorage.setItem(scopedKey('results'), JSON.stringify(results));
       localStorage.setItem(scopedKey('cbt'), JSON.stringify(cbtQuestions));
-      localStorage.setItem(scopedKey('payments'), JSON.stringify(payments));
+      if (isAdmin) localStorage.setItem(scopedKey('payments'), JSON.stringify(payments)); // A student's device keeps no fee cache
       localStorage.setItem(scopedKey('announcements'), JSON.stringify(announcements));
       localStorage.setItem(scopedKey('admins'), JSON.stringify(admins));
       localStorage.setItem(`${STORAGE_KEY}_testimonials`, JSON.stringify(testimonials));
@@ -1748,12 +1748,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }, (error) => handleFirestoreError(error, OperationType.GET, 'centre attendance settings')) : () => {};
 
-    // Payments listener
-    const qPayments = centreQuery('payments');
-    const unsubPayments = onSnapshot(qPayments, (snapshot) => {
-      const data = scopedDocs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as PaymentRecord)));
-      setPayments(data);
-    }, (error) => handleFirestoreError(error, OperationType.GET, 'payments'));
+    // Payments listener: admins load their centre's payment records. A
+    // non-admin's own fees are loaded by the dedicated listener below once
+    // their own student record is known, so a student's session never asks
+    // the database for the centre's whole payment list.
+    let unsubPayments = () => {};
+    if (isAdmin) {
+      const qPayments = centreQuery('payments');
+      unsubPayments = onSnapshot(qPayments, (snapshot) => {
+        const data = scopedDocs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as PaymentRecord)));
+        setPayments(data);
+      }, (error) => handleFirestoreError(error, OperationType.GET, 'payments'));
+    }
 
     // Programmes listener
     const unsubProgrammes = onSnapshot(centreQuery('programmes'), (snapshot) => {
@@ -1886,6 +1892,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       unsubStudyMaterials();
     };
   }, [user, isAdmin, activeTutor, activeCentreId]); // Re-subscribes per active centre so reads stay scoped to it
+
+  // Non-admin fee records: a signed-in student loads only the payment records
+  // attached to their own student record, never the centre's list.
+  const ownStudentId = user && !isAdmin
+    ? (students.find((s) => s.uid === user.uid)?.id ?? null)
+    : null;
+
+  useEffect(() => {
+    if (!user || isAdmin) return;
+    // A cached centre list from another session must never render for a student.
+    setPayments([]);
+    if (!ownStudentId) return;
+    const qOwnPayments = query(collection(db, 'payments'), where('studentId', '==', ownStudentId));
+    const unsubOwnPayments = onSnapshot(qOwnPayments, (snapshot) => {
+      setPayments(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as PaymentRecord)));
+    }, (error) => handleFirestoreError(error, OperationType.GET, 'payments'));
+    return unsubOwnPayments;
+  }, [user, isAdmin, ownStudentId]);
 
   const addStudent = async (studentData: Omit<Student, 'id' | 'registrationDate'>) => {
     try {

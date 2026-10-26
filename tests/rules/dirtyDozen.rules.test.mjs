@@ -56,6 +56,9 @@ async function seed() {
   await admin.doc('tutors/uid-tut2').set({
     name: 'Invited', email: 'tut2@test.com', status: 'Suspended', hasChangedPassword: false,
   });
+    await admin.doc('payments/pay-b2').set({
+      studentId: 'uid-stu2', studentName: 'Student Two', amountPaid: 75, status: 'Paid',
+    });
     await admin.doc('admissions/adv-1').set({
       applicantName: 'Applicant', email: 'applicant@test.com', status: 'Pending',
     });
@@ -152,6 +155,31 @@ try {
     await assertSucceeds(admCtx().firestore().doc('payments/pay-4').set({
       studentId: 'stu-999', studentName: 'Student One', amountPaid: 10, status: 'Partial',
     }));
+  });
+
+  // 13. Payment-read scoping: only admins and the paying student can read a
+  //     payment record. A centre's students can never list another centre's,
+  //     or another student's, fees.
+  await check('13a. unauth read payment denied', async () => {
+    await assertFails(testEnv.unauthenticatedContext().firestore().doc('payments/pay-3').get());
+  });
+  await check('13b. student reads own payment (studentId = own uid) allowed', async () => {
+    await assertSucceeds(stuCtx().firestore().doc('payments/pay-3').get());
+  });
+  await check('13c. student reads own payment via own admin-created record allowed', async () => {
+    await assertSucceeds(stuCtx().firestore().doc('payments/pay-5').get());
+  });
+  await check('13d. student reads another student payment denied', async () => {
+    await assertFails(stuCtx().firestore().doc('payments/pay-b2').get());
+  });
+  await check('13e. student centre-wide payments list denied', async () => {
+    await assertFails(stuCtx().firestore().collection('payments').where('centreId', '==', 'centre-excellence').get());
+  });
+  await check('13f. student own-payments query allowed', async () => {
+    await assertSucceeds(stuCtx().firestore().collection('payments').where('studentId', '==', 'uid-stu').get());
+  });
+  await check('13g. admin reads any payment allowed', async () => {
+    await assertSucceeds(admCtx().firestore().doc('payments/pay-b2').get());
   });
 
   // 7. Role spoofing: a tutor who already completed first login cannot
