@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Loader2, Search, X, ChevronRight, Check, Pencil, Trash2, FolderTree } from 'lucide-react';
+import { Loader2, Search, X, ChevronRight, Check, Pencil, Trash2 } from 'lucide-react';
 import { api, Json, Card, inputCls, btnPrimary, btnGhost, fmtDate } from './tosShared';
 import { BANK_YEARS } from '../../data/seniorSubjects';
 
@@ -57,8 +57,11 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number; kind?: 'practice
   const [listError, setListError] = useState('');
   const [loadingMore, setLoadingMore] = useState(false);
 
-  const [openSubjects, setOpenSubjects] = useState<Set<string>>(new Set());
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  // U2 subject shelf: the shelf replaces the old Browse panel. activeSubject
+  // opens the subject screen (topics, years, breadcrumbs), built entirely from
+  // the tree counts already in memory, so opening it costs no extra reads.
+  const [activeSubject, setActiveSubject] = useState<string | null>(null);
+  const [openTopicsInScreen, setOpenTopicsInScreen] = useState<Set<string>>(new Set());
 
   const [editor, setEditor] = useState<Json | null>(null);
   const [editorLoading, setEditorLoading] = useState(false);
@@ -112,11 +115,12 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number; kind?: 'practice
   // Search covers the whole stream, so it and the tree scope never mix.
   useEffect(() => {
     if (qDebounced.length >= 2 && scope) setScope(null);
+    if (qDebounced.length >= 2 && activeSubject) setActiveSubject(null);
   }, [qDebounced]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // A stream switch from the shared header clears the tree scope, exactly as
   // the old in-tab toggle did.
-  useEffect(() => { setScope(null); }, [kind]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setScope(null); setActiveSubject(null); }, [kind]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadTree = useCallback(async () => {
     try { setTree(await api(`/api/tos/questionbank/tree?kind=${kind}`)); } catch { setTree(null); }
@@ -387,10 +391,21 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number; kind?: 'practice
     setEditor((prev) => (prev ? { ...prev, item: { ...prev.item, [field]: value } } : prev));
   };
 
-  const toggleSubject = (key: string) => {
-    setOpenSubjects((prev) => {
+  // U2 shelf helpers: no fetches here, everything reads the tree in memory.
+  const openSubjectScreen = (sKey: string) => {
+    setActiveSubject(sKey);
+    setOpenTopicsInScreen(new Set());
+  };
+
+  const pickFromScreen = (type: 'subject' | 'topic' | 'year', key: string, label: string) => {
+    setActiveSubject(null);
+    pickScope(type, key, label);
+  };
+
+  const toggleScreenTopic = (tKey: string) => {
+    setOpenTopicsInScreen((prev) => {
       const next = new Set(prev);
-      if (next.has(key)) next.delete(key); else next.add(key);
+      if (next.has(tKey)) next.delete(tKey); else next.add(tKey);
       return next;
     });
   };
@@ -399,7 +414,7 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number; kind?: 'practice
     setScope({ type, key, label });
     setQ('');
     setQDebounced('');
-    setDrawerOpen(false);
+    setActiveSubject(null);
   };
 
   const scopeParamActive = Boolean(scope) || qDebounced.length >= 2 || Boolean(difficulty);
@@ -409,54 +424,111 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number; kind?: 'practice
       ? `Showing ${items.length}`
       : `Showing ${items.length} of ${Number(tabs.total) || 0}`;
 
-  const treePanel = (
-    <div className="space-y-1.5">
-      {scope && (
-        <button onClick={() => setScope(null)} className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-orange-500/15 border border-orange-500/30 text-orange-200 text-sm font-semibold">
-          <span className="truncate">{scope.label}</span>
-          <X className="w-4 h-4 shrink-0" />
-        </button>
-      )}
-      {(tree?.subjects || []).map((s: any) => (
-        <div key={s.key} className="rounded-xl border border-slate-700/50 bg-slate-900/40">
-          <button onClick={() => toggleSubject(s.key)} className="w-full flex items-center justify-between gap-2 px-3 py-2.5 text-left">
-            <span className="text-sm font-semibold text-slate-200 truncate">{s.label}</span>
-            <span className="flex items-center gap-1.5 shrink-0">
-              <span className="text-[11px] text-slate-500">{countsHidden ? '–' : s.total}</span>
-              <ChevronRight className={`w-4 h-4 text-slate-500 transition-transform ${openSubjects.has(s.key) ? 'rotate-90' : ''}`} />
-            </span>
-          </button>
-          {openSubjects.has(s.key) && (
-            <div className="px-3 pb-3 space-y-1">
-              {Object.entries(s.byYear || {}).sort((a: any, b: any) => Number(b[0]) - Number(a[0])).slice(0, 12).map(([y, n]: any) => (
-                <button key={y} onClick={() => pickScope('year', String(y), `Year ${y}`)} className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs text-slate-400 hover:bg-white/5">
-                  <span>Year {y}</span><span className="text-slate-600">{countsHidden ? '–' : n}</span>
-                </button>
-              ))}
-              {(s.topics || []).map((t: any) => (
-                <button key={t.key} onClick={() => pickScope('topic', t.key, t.label)} className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs text-slate-400 hover:bg-white/5">
-                  <span className="truncate">{t.label}</span><span className="text-slate-600 shrink-0 ml-2">{countsHidden ? '–' : t.total}</span>
-                </button>
-              ))}
-              <button onClick={() => pickScope('subject', s.key, s.label)} className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs text-orange-300/90 hover:bg-white/5">
-                <span>All of {s.label}</span><span className="text-slate-600">{countsHidden ? '–' : s.total}</span>
-              </button>
-            </div>
-          )}
-        </div>
-      ))}
-      {tree && (tree.subjects || []).length === 0 && (
-        <p className="text-xs text-slate-500 px-3 py-4">
+  const shelfSubjects = (tree?.subjects || []) as any[];
+  const activeSubjectData = activeSubject
+    ? (shelfSubjects.find((sh: any) => sh.key === activeSubject) || null)
+    : null;
+  // The screen only renders when its subject still exists in the tree; if a
+  // refresh dropped it, the shelf shows again instead of a blank page.
+  const screenSubject = activeSubject ? activeSubjectData : null;
+
+  const subjectShelf = (
+    <Card title="Subjects">
+      <p className="text-xs text-slate-500 mb-3">Tap a subject to open it: its topics, years and questions.</p>
+      {shelfSubjects.length === 0 ? (
+        <p className="text-sm text-slate-500 py-4">
           {setupNeeded
             ? 'The counter setup has not finished for this stream yet; the banner above has the steps.'
             : 'No questions in this stream yet. Go to Import & edit to add some.'}
         </p>
+      ) : (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+          {shelfSubjects.map((s: any) => (
+            <button key={s.key} onClick={() => openSubjectScreen(s.key)}
+              className="text-left rounded-2xl border border-slate-700/50 bg-slate-900/40 hover:border-orange-500/40 p-3.5 min-h-[76px] flex flex-col justify-between gap-2">
+              <span className="text-sm font-bold text-slate-100 line-clamp-2">{s.label}</span>
+              <span className="text-xs text-slate-500">{countsHidden ? '–' : `${Number(s.total) || 0} question${Number(s.total) === 1 ? '' : 's'}`}</span>
+            </button>
+          ))}
+        </div>
       )}
-      <button onClick={openTopics} className="w-full mt-2 px-3 py-2.5 rounded-xl border border-slate-700/60 text-xs font-bold text-slate-300 hover:text-white min-h-[44px]">
+      <button onClick={openTopics} className="w-full mt-3 px-3 py-2.5 rounded-xl border border-slate-700/60 text-xs font-bold text-slate-300 hover:text-white min-h-[44px]">
         Manage topics (rename or merge)
       </button>
-    </div>
+    </Card>
   );
+
+  const subjectScreen = screenSubject ? (
+    <Card>
+      <div className="flex items-center gap-1.5 flex-wrap text-xs text-slate-500 mb-2">
+        <button onClick={() => setActiveSubject(null)} className="font-semibold hover:text-white px-1 min-h-[44px]">{kind === 'mock' ? 'Mock' : 'Practice'}</button>
+        <ChevronRight className="w-3.5 h-3.5 text-slate-600" />
+        <span className="text-orange-300 font-bold">{screenSubject.label}</span>
+      </div>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h3 className="text-lg font-extrabold text-white">{screenSubject.label}</h3>
+          <p className="text-xs text-slate-500 mt-0.5">
+            {countsHidden
+              ? '–'
+              : `${Number(screenSubject.total) || 0} question${Number(screenSubject.total) === 1 ? '' : 's'} · ${(screenSubject.topics || []).length} topic${(screenSubject.topics || []).length === 1 ? '' : 's'} · ${Object.keys(screenSubject.byYear || {}).length} year${Object.keys(screenSubject.byYear || {}).length === 1 ? '' : 's'}`}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button onClick={() => pickFromScreen('subject', screenSubject.key, screenSubject.label)}
+            disabled={countsHidden || !(Number(screenSubject.total) || 0)}
+            className={btnPrimary}>See all its questions</button>
+          <button onClick={() => { openTopics(); setTopicSubject(screenSubject.key); }} className={btnGhost}>Manage topics (rename or merge)</button>
+        </div>
+      </div>
+      {!(Number(screenSubject.total) || 0) && !countsHidden && (
+        <p className="text-sm text-slate-500 mt-3">No questions here yet. Go to Import & edit to add some.</p>
+      )}
+      {(screenSubject.topics || []).length > 0 && (
+        <div className="mt-4">
+          <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Topics</p>
+          <div className="space-y-2">
+            {(screenSubject.topics || []).map((t: any) => (
+              <div key={t.key} className="rounded-xl border border-slate-700/50 bg-slate-900/40">
+                <button onClick={() => toggleScreenTopic(t.key)} className="w-full flex items-center justify-between gap-2 px-3 py-2.5 text-left min-h-[44px]">
+                  <span className="text-sm font-semibold text-slate-200 truncate">{t.label}</span>
+                  <span className="flex items-center gap-1.5 shrink-0">
+                    <span className="text-[11px] text-slate-500">{countsHidden ? '–' : t.total}</span>
+                    <ChevronRight className={`w-4 h-4 text-slate-500 transition-transform ${openTopicsInScreen.has(t.key) ? 'rotate-90' : ''}`} />
+                  </span>
+                </button>
+                {openTopicsInScreen.has(t.key) && (
+                  <div className="px-3 pb-3 space-y-1">
+                    <button onClick={() => pickFromScreen('topic', t.key, t.label)} className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold text-orange-300/90 hover:bg-white/5 min-h-[36px]">
+                      <span>All {t.label} questions</span><span className="text-slate-600">{countsHidden ? '–' : t.total}</span>
+                    </button>
+                    {Object.entries(t.byYear || {}).sort((a: any, b: any) => Number(b[0]) - Number(a[0])).map(([y, n]: any) => (
+                      <button key={y} onClick={() => pickFromScreen('year', String(y), `Year ${y}`)} className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs text-slate-400 hover:bg-white/5 min-h-[36px]">
+                        <span>Year {y}</span><span className="text-slate-600">{countsHidden ? '–' : String(n)}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {Object.keys(screenSubject.byYear || {}).length > 0 && (
+        <div className="mt-4">
+          <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Years</p>
+          <div className="flex flex-wrap gap-2">
+            {Object.entries(screenSubject.byYear || {}).sort((a: any, b: any) => Number(b[0]) - Number(a[0])).map(([y, n]: any) => (
+              <button key={y} onClick={() => pickFromScreen('year', String(y), `Year ${y}`)}
+                className="px-3 py-2 rounded-xl border border-slate-700/60 text-sm text-slate-300 hover:text-white min-h-[44px]">
+                Year {y} <span className="text-slate-600 ml-1">{countsHidden ? '–' : String(n)}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </Card>
+  ) : null;
 
 
   // Imports tab (L5): every recorded paste, newest first, with undo.
@@ -556,9 +628,6 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number; kind?: 'practice
               className={`${inputCls} pl-9`}
             />
           </div>
-          <button onClick={() => setDrawerOpen(true)} className="lg:hidden flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-700/60 text-sm font-semibold text-slate-300 min-h-[44px]">
-            <FolderTree className="w-4 h-4" /> Browse
-          </button>
           <select value={difficulty} onChange={(e) => setDifficulty(e.target.value)} className={`${inputCls} w-auto`}>
             <option value="">Any difficulty</option>
             <option value="easy">Easy</option>
@@ -603,7 +672,7 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number; kind?: 'practice
         <p className="text-[11px] text-slate-500 mt-2">
           {qDebounced.length >= 2
             ? 'Search covers every question in this stream, including ones outside the tree.'
-            : 'Tap a subject, topic or year in the Browse panel to narrow the list. Search covers the whole stream.'}
+            : 'Tap a subject on the shelf to open its topics and years. Search covers the whole stream.'}
         </p>
       </Card>
 
@@ -631,11 +700,11 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number; kind?: 'practice
         <div className="rounded-2xl border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-200">{listError}</div>
       )}
 
-      <div className="lg:grid lg:grid-cols-[280px_1fr] lg:gap-4 items-start">
-        <div className="hidden lg:block">
-          <Card title="Browse"><div className="mt-2 max-h-[70vh] overflow-y-auto pr-1">{treePanel}</div></Card>
-        </div>
+      {screenSubject && subjectScreen}
 
+      {!screenSubject && (
+      <div className="space-y-4">
+        {subjectShelf}
         <div className="space-y-2">
           <p className="text-xs text-slate-500 px-1">{loading ? 'Loading...' : showingLine}</p>
           {items.map((it) => (
@@ -671,15 +740,6 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number; kind?: 'practice
           )}
         </div>
       </div>
-
-      {drawerOpen && (
-        <div className="lg:hidden fixed inset-0 z-50 bg-slate-950/95 overflow-y-auto p-4">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-sm font-bold text-white">Browse the bank</p>
-            <button onClick={() => setDrawerOpen(false)} className="p-2 rounded-lg text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
-          </div>
-          {treePanel}
-        </div>
       )}
 
       {(editor || editorLoading) && (
