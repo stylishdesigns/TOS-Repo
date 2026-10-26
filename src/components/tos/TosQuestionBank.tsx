@@ -401,9 +401,9 @@ export const QuestionBankTab: React.FC<{ refreshKey: number; view?: 'edit' | 'pu
   const runImport = async () => {
     if (!parsed) return;
     setImportNotice('');
-    if (!importDefaults.subject) { setImportNotice('Choose a subject for this batch first.'); return; }
-    if (!importDefaults.topic) { setImportNotice('Choose a topic for this batch first.'); return; }
-    if (kind === 'practice' && !importDefaults.year) { setImportNotice('Practice questions need a year. Pick one above the paste box.'); return; }
+    if (!importDefaults.subject) { setImportNotice('Choose a subject in Step 1 first.'); return; }
+    if (!importDefaults.topic) { setImportNotice('Choose a topic in Step 1 first.'); return; }
+    if (kind === 'practice' && !importDefaults.year) { setImportNotice('Practice questions need a year. Pick one in Step 1.'); return; }
     await doImport({
       kind, examType: importDefaults.examType, subject: importDefaults.subject,
       year: importDefaults.year === '' ? null : Number(importDefaults.year),
@@ -445,13 +445,13 @@ export const QuestionBankTab: React.FC<{ refreshKey: number; view?: 'edit' | 'pu
   // fields above the paste box, then the question format itself.
   const pipelineLabelGuide = importDefaults.examType === 'jamb' ? 'JAMB' : 'WAEC/NECO';
   const dynamicGuide = [
-    'SETUP FOR THIS BATCH (filled from the fields above the paste box):',
+    'SETUP FOR THIS BATCH (filled from Step 1):',
     `Exam pipeline: ${pipelineLabelGuide}`,
-    `Subject: ${importDefaults.subject || '[pick a subject above]'}`,
-    `Topic: ${importDefaults.topic || '[pick a topic above]'}`,
-    `Year: ${importDefaults.year || (kind === 'practice' ? '[pick a year above]' : '[optional]')}`,
+    `Subject: ${importDefaults.subject || '[pick a subject in Step 1]'}`,
+    `Topic: ${importDefaults.topic || '[pick a topic in Step 1]'}`,
+    `Year: ${importDefaults.year || (kind === 'practice' ? '[pick a year in Step 1]' : '[optional]')}`,
     `Difficulty: ${importDefaults.difficulty.charAt(0).toUpperCase() + importDefaults.difficulty.slice(1)}`,
-    'Number of questions: as many as you paste (the preview shows the count)',
+    'Number of questions: as many as you paste (Step 3 shows the count)',
     '',
     'Paste only the questions into the box, not these setup lines.',
     '',
@@ -523,114 +523,120 @@ export const QuestionBankTab: React.FC<{ refreshKey: number; view?: 'edit' | 'pu
           header now, so this tab starts straight at its content. */}
       {notice && <p className="text-xs text-rose-300">{notice}</p>}
 
-      {/* Paste import (parsing engine) */}
-      <Card title="Add questions">
-        <p className="text-xs text-slate-400 mb-3">Paste a whole past-paper section. It runs through the same parsing engine the centres use: numbered questions, A to D options, an Answer line and an Explanation line. Check the preview, then import everything as drafts.</p>
+      {/* U4: import presented as four numbered steps. The handlers are the same
+    ones this screen always had (runParse, runImport, dupAsk); only the
+    presentation is new, so the whole flow reads top to bottom on a phone. */}
+      <Card title="Import questions">
+        <p className="text-sm text-slate-400 mb-4">Four steps, top to bottom: choose where the batch goes, paste the questions, check what was parsed, then import. Everything arrives as a draft; publishing makes it live.</p>
 
-        {/* Shared defaults for the batch. Class is intentionally not part of
-            the paste flow: questions carry pipeline, subject, year, topic and
-            difficulty, and class stayed optional data. */}
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
-          <Field label="Exam pipeline">
-            <select value={importDefaults.examType} onChange={(e) => setImportDefaults({ ...importDefaults, examType: e.target.value as ExamType })} className={inputCls}>
-              <option value="jamb">JAMB</option>
-              <option value="waec_neco">WAEC/NECO</option>
-            </select>
-          </Field>
-          <Field label="Subject">
-            <select value={importDefaults.subject} onChange={(e) => setImportDefaults({ ...importDefaults, subject: e.target.value, topic: '' })} className={inputCls}>
-              <option value="">Select subject</option>
-              {SUBJECT_NAMES.map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </Field>
-          <Field label="Topic">
-            <select value={importDefaults.topic} onChange={(e) => setImportDefaults({ ...importDefaults, topic: e.target.value })} disabled={!importDefaults.subject} className={`${inputCls} disabled:opacity-50`}>
-              <option value="">{importDefaults.subject ? 'Select topic' : 'Pick a subject first'}</option>
-              {(SENIOR_SUBJECTS[importDefaults.subject] || []).map((t) => <option key={t} value={t}>{t}</option>)}
-            </select>
-          </Field>
-          <Field label={kind === 'practice' ? 'Year' : 'Year (optional)'}>
-            <select value={importDefaults.year} onChange={(e) => setImportDefaults({ ...importDefaults, year: e.target.value })} className={inputCls}>
-              <option value="">Select year</option>
-              {BANK_YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
-            </select>
-          </Field>
-          <Field label="Difficulty">
-            <select value={importDefaults.difficulty} onChange={(e) => setImportDefaults({ ...importDefaults, difficulty: e.target.value })} className={inputCls}>
-              <option value="easy">Easy</option>
-              <option value="hard">Hard</option>
-            </select>
-          </Field>
-        </div>
-
-        <div className="flex items-center justify-between mb-2">
-          <button onClick={() => setShowGuide(!showGuide)} className="text-[11px] font-bold text-orange-300 hover:text-orange-200 flex items-center gap-1.5">
-            <FileText className="w-3.5 h-3.5" /> {showGuide ? 'Hide format guide' : 'Show format guide'}
-          </button>
-          <button onClick={copyGuide} className="text-[11px] text-slate-400 hover:text-orange-300 flex items-center gap-1.5"><Copy className="w-3.5 h-3.5" /> Copy guide</button>
-        </div>
-        {showGuide && (
-          <pre className="bg-slate-950/80 border border-white/10 rounded-xl p-4 text-[11px] text-slate-300 leading-relaxed overflow-x-auto whitespace-pre-wrap mb-3">{dynamicGuide}</pre>
-        )}
-
-        <textarea
-          value={pasteText}
-          onChange={(e) => setPasteText(e.target.value)}
-          rows={8}
-          placeholder={'1. What is the capital of Nigeria?\nA: Lagos\nB: Abuja\nC: Kano\nD: Ibadan\nAnswer: B\nExplanation: Abuja became the capital of Nigeria in 1991.'}
-          className={`${inputCls} font-mono text-xs`}
-        />
-
-        <div className="flex flex-wrap items-center gap-2 mt-3">
-          <button onClick={runParse} disabled={!pasteText.trim()} className={btnGhost}><Eye className="w-4 h-4" /> Parse & preview</button>
-          {parsed && (
-            <button onClick={runImport} disabled={importing} className={btnPrimary}>
-              {importing ? <Loader2 className="w-4 h-4 animate-spin" /> : <ClipboardPaste className="w-4 h-4" />}
-              Import all {parsed.questions.length}
-            </button>
-          )}
-        </div>
-
-        {importNotice && (
-          <p className="text-xs font-bold text-amber-300 mt-2">{importNotice}</p>
-        )}
-        {dupAsk && (
-          <div className="rounded-2xl border border-amber-500/50 bg-amber-500/10 p-3.5 mt-2 space-y-2">
-            <p className="text-sm font-bold text-amber-200">{dupAsk.info.duplicateCount} of {dupAsk.info.total} questions in this paste already exist in the bank</p>
-            <p className="text-xs text-amber-200/80">{dupAsk.info.note}</p>
-            {(dupAsk.info.samples || []).length > 0 && (
-              <ul className="text-xs text-slate-400 space-y-1">
-                {(dupAsk.info.samples as string[]).map((t, i) => <li key={i} className="truncate">- {t}</li>)}
-              </ul>
-            )}
-            <div className="flex flex-wrap gap-2">
-              <button className={btnPrimary} disabled={importing} onClick={() => doImport({ ...dupAsk.body, duplicates: 'skip' })}>
-                {importing ? 'Importing...' : 'Skip duplicates, import the rest'}
-              </button>
-              <button className={btnGhost} disabled={importing} onClick={() => doImport({ ...dupAsk.body, duplicates: 'import' })}>Import all anyway</button>
-              <button className={btnGhost} disabled={importing} onClick={() => setDupAsk(null)}>Never mind</button>
+        {/* Step 1: where the batch goes */}
+        <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+          <div className="flex items-start gap-3 mb-3">
+            <span className="w-8 h-8 rounded-xl bg-orange-500/15 border border-orange-500/30 text-orange-300 text-sm font-black flex items-center justify-center shrink-0">1</span>
+            <div>
+              <p className="text-sm font-bold text-white">Where these questions go</p>
+              <p className="text-xs text-slate-400 mt-0.5">One choice for the whole batch: every question pasted below arrives with this subject, topic, year and pipeline.</p>
             </div>
           </div>
-        )}
 
-        {parsed && (
-          <div className="mt-4 space-y-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-300 text-xs font-bold">{parsed.questions.length} parsed</span>
-              {parsed.skippedEssay > 0 && (
-                <span className="px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-300 text-xs font-bold">{parsed.skippedEssay} essay-style block{parsed.skippedEssay === 1 ? '' : 's'} skipped (objective only for now)</span>
-              )}
-              {parsed.skippedEmpty > 0 && (
-                <span className="px-2.5 py-1 rounded-full bg-slate-700/40 text-slate-400 text-xs font-bold">{parsed.skippedEmpty} unreadable block{parsed.skippedEmpty === 1 ? '' : 's'} skipped</span>
-              )}
+          {/* Shared defaults for the batch. Class is intentionally not part of
+              the paste flow: questions carry pipeline, subject, year, topic and
+              difficulty, and class stayed optional data. */}
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <Field label="Exam pipeline">
+              <select value={importDefaults.examType} onChange={(e) => setImportDefaults({ ...importDefaults, examType: e.target.value as ExamType })} className={inputCls}>
+                <option value="jamb">JAMB</option>
+                <option value="waec_neco">WAEC/NECO</option>
+              </select>
+            </Field>
+            <Field label="Subject">
+              <select value={importDefaults.subject} onChange={(e) => setImportDefaults({ ...importDefaults, subject: e.target.value, topic: '' })} className={inputCls}>
+                <option value="">Select subject</option>
+                {SUBJECT_NAMES.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </Field>
+            <Field label="Topic">
+              <select value={importDefaults.topic} onChange={(e) => setImportDefaults({ ...importDefaults, topic: e.target.value })} disabled={!importDefaults.subject} className={`${inputCls} disabled:opacity-50`}>
+                <option value="">{importDefaults.subject ? 'Select topic' : 'Pick a subject first'}</option>
+                {(SENIOR_SUBJECTS[importDefaults.subject] || []).map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </Field>
+            <Field label={kind === 'practice' ? 'Year' : 'Year (optional)'}>
+              <select value={importDefaults.year} onChange={(e) => setImportDefaults({ ...importDefaults, year: e.target.value })} className={inputCls}>
+                <option value="">Select year</option>
+                {BANK_YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
+              </select>
+            </Field>
+            <Field label="Difficulty">
+              <select value={importDefaults.difficulty} onChange={(e) => setImportDefaults({ ...importDefaults, difficulty: e.target.value })} className={inputCls}>
+                <option value="easy">Easy</option>
+                <option value="hard">Hard</option>
+              </select>
+            </Field>
+          </div>
+        </div>
+
+        {/* Step 2: paste */}
+        <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4 mt-3">
+          <div className="flex items-start gap-3 mb-3">
+            <span className="w-8 h-8 rounded-xl bg-orange-500/15 border border-orange-500/30 text-orange-300 text-sm font-black flex items-center justify-center shrink-0">2</span>
+            <div>
+              <p className="text-sm font-bold text-white">Paste the questions</p>
+              <p className="text-xs text-slate-400 mt-0.5">Paste only the questions into the box, not the setup lines. Numbered questions, A to D options, an Answer line, an Explanation line.</p>
             </div>
-            {parsed.questions.every((q) => !q.correct) && (
-              <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-3 flex items-start gap-2">
-                <AlertTriangle className="w-4 h-4 text-rose-400 mt-0.5 shrink-0" />
-                <p className="text-rose-200 text-xs">No question has an "Answer:" line. Without a correct answer none of these will import.</p>
-              </div>
+          </div>
+
+          <div className="flex items-center justify-between mb-2">
+            <button onClick={() => setShowGuide(!showGuide)} className="text-[11px] font-bold text-orange-300 hover:text-orange-200 flex items-center gap-1.5">
+              <FileText className="w-3.5 h-3.5" /> {showGuide ? 'Hide format guide' : 'Show format guide'}
+            </button>
+            <button onClick={copyGuide} className="text-[11px] text-slate-400 hover:text-orange-300 flex items-center gap-1.5"><Copy className="w-3.5 h-3.5" /> Copy guide</button>
+          </div>
+          {showGuide && (
+            <pre className="bg-slate-950/80 border border-white/10 rounded-xl p-4 text-[11px] text-slate-300 leading-relaxed overflow-x-auto whitespace-pre-wrap mb-3">{dynamicGuide}</pre>
+          )}
+
+          <textarea
+            value={pasteText}
+            onChange={(e) => setPasteText(e.target.value)}
+            rows={8}
+            placeholder={'1. What is the capital of Nigeria?\nA: Lagos\nB: Abuja\nC: Kano\nD: Ibadan\nAnswer: B\nExplanation: Abuja became the capital of Nigeria in 1991.'}
+            className={`${inputCls} font-mono text-xs`}
+          />
+        </div>
+
+        {/* Step 3: preview */}
+        <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4 mt-3">
+          <div className="flex items-start gap-3 mb-3">
+            <span className="w-8 h-8 rounded-xl bg-orange-500/15 border border-orange-500/30 text-orange-300 text-sm font-black flex items-center justify-center shrink-0">3</span>
+            <div>
+              <p className="text-sm font-bold text-white">Check the preview</p>
+              <p className="text-xs text-slate-400 mt-0.5">The parsing engine reads the paste and shows every question it found. Fix anything the preview flags before importing.</p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button onClick={runParse} disabled={!pasteText.trim()} className={btnGhost}><Eye className="w-4 h-4" /> Parse & preview</button>
+            {parsed && (
+              <span className="px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-300 text-xs font-bold">{parsed.questions.length} parsed</span>
             )}
-            <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
+            {parsed && parsed.skippedEssay > 0 && (
+              <span className="px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-300 text-xs font-bold">{parsed.skippedEssay} essay-style block{parsed.skippedEssay === 1 ? '' : 's'} skipped (objective only for now)</span>
+            )}
+            {parsed && parsed.skippedEmpty > 0 && (
+              <span className="px-2.5 py-1 rounded-full bg-slate-700/40 text-slate-400 text-xs font-bold">{parsed.skippedEmpty} unreadable block{parsed.skippedEmpty === 1 ? '' : 's'} skipped</span>
+            )}
+          </div>
+
+          {parsed && parsed.questions.every((q) => !q.correct) && (
+            <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-3 flex items-start gap-2 mt-2">
+              <AlertTriangle className="w-4 h-4 text-rose-400 mt-0.5 shrink-0" />
+              <p className="text-rose-200 text-xs">No question has an "Answer:" line. Without a correct answer none of these will import.</p>
+            </div>
+          )}
+
+          {parsed && (
+            <div className="max-h-80 overflow-y-auto space-y-2 pr-1 mt-3">
               {parsed.questions.map((q, i) => (
                 <div key={i} className="bg-slate-950/50 border border-white/10 rounded-xl p-3.5">
                   <div className="flex items-start justify-between gap-3">
@@ -648,9 +654,51 @@ export const QuestionBankTab: React.FC<{ refreshKey: number; view?: 'edit' | 'pu
                 </div>
               ))}
             </div>
-          </div>
-        )}
+          )}
 
+          {!parsed && <p className="text-xs text-slate-500 mt-2">Nothing parsed yet. Paste in Step 2, then run the preview.</p>}
+        </div>
+
+        {/* Step 4: import */}
+        <div className="rounded-2xl border border-orange-500/25 bg-white/[0.02] p-4 mt-3">
+          <div className="flex items-start gap-3 mb-3">
+            <span className="w-8 h-8 rounded-xl bg-orange-500/15 border border-orange-500/30 text-orange-300 text-sm font-black flex items-center justify-center shrink-0">4</span>
+            <div>
+              <p className="text-sm font-bold text-white">Import as drafts</p>
+              <p className="text-xs text-slate-400 mt-0.5">The whole batch goes in with the Step 1 choices. Drafts are not live for students; the Publish tab makes them live.</p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button onClick={runImport} disabled={importing || !parsed} className={btnPrimary}>
+              {importing ? <Loader2 className="w-4 h-4 animate-spin" /> : <ClipboardPaste className="w-4 h-4" />}
+              {parsed ? `Import all ${parsed.questions.length}` : 'Import'}
+            </button>
+            {!parsed && <p className="text-xs text-slate-500">Run the preview in Step 3 first.</p>}
+          </div>
+
+          {importNotice && (
+            <p className="text-xs font-bold text-amber-300 mt-2">{importNotice}</p>
+          )}
+          {dupAsk && (
+            <div className="rounded-2xl border border-amber-500/50 bg-amber-500/10 p-3.5 mt-2 space-y-2">
+              <p className="text-sm font-bold text-amber-200">{dupAsk.info.duplicateCount} of {dupAsk.info.total} questions in this paste already exist in the bank</p>
+              <p className="text-xs text-amber-200/80">{dupAsk.info.note}</p>
+              {(dupAsk.info.samples || []).length > 0 && (
+                <ul className="text-xs text-slate-400 space-y-1">
+                  {(dupAsk.info.samples as string[]).map((t, i) => <li key={i} className="truncate">- {t}</li>)}
+                </ul>
+              )}
+              <div className="flex flex-wrap gap-2">
+                <button className={btnPrimary} disabled={importing} onClick={() => doImport({ ...dupAsk.body, duplicates: 'skip' })}>
+                  {importing ? 'Importing...' : 'Skip duplicates, import the rest'}
+                </button>
+                <button className={btnGhost} disabled={importing} onClick={() => doImport({ ...dupAsk.body, duplicates: 'import' })}>Import all anyway</button>
+                <button className={btnGhost} disabled={importing} onClick={() => setDupAsk(null)}>Never mind</button>
+              </div>
+            </div>
+          )}
+        </div>
       </Card>
 
       {/* Summary cards */}
