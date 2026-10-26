@@ -504,15 +504,44 @@ export const QuestionBankTab: React.FC<{ refreshKey: number; view?: 'edit' | 'pu
     <div className="space-y-5">
       {view === 'publish' && (
         <>
+          {/* U5: the Publish tab tidied into one status card: what is live now,
+              what is waiting, and the publish button, with a proper empty state
+              for a stream that has no questions yet. Same handler (openPublish)
+              and the same counters the Import tab already loaded; no new reads. */}
           <Card title="Publish">
-            <p className="text-xs text-slate-400 mb-3">Publishing writes ONE versioned file to Cloudinary and marks every change live. Preview the change list first; nothing writes until you confirm.</p>
-            <div className="flex flex-wrap items-center gap-2">
-              <button onClick={openPublish} className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-orange-500/50 bg-orange-500/10 hover:bg-orange-500/20 disabled:opacity-50 text-orange-300 font-bold text-sm transition-all">
-                <Send className="w-4 h-4" /> Publish changes
-              </button>
-            </div>
-            {notice && <p className="text-xs text-rose-300 mt-2">{notice}</p>}
-            <p className="text-xs text-slate-500 mt-3">{kindMeta.currentVersion ? `Current live version: v${kindMeta.currentVersion}${kindMeta.currentPublishedAt ? `, published ${new Date(kindMeta.currentPublishedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}.` : 'Nothing published yet for this stream.'}</p>
+            {Number(kindCounts.total) > 0 ? (
+              <>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-white">
+                      {kindMeta.currentVersion
+                        ? `Live now: v${kindMeta.currentVersion}${kindMeta.currentPublishedAt ? `, published ${new Date(kindMeta.currentPublishedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}`
+                        : 'Nothing published yet in this stream.'}
+                    </p>
+                    <p className="text-sm text-slate-400 mt-0.5">
+                      {Number(kindCounts.changed) > 0
+                        ? `${kindCounts.changed} change${Number(kindCounts.changed) === 1 ? '' : 's'} waiting to go live.`
+                        : kindMeta.currentVersion
+                          ? 'Everything in this stream is already live.'
+                          : 'Publish to make your questions live for students.'}
+                    </p>
+                  </div>
+                  <button onClick={openPublish} className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl border border-orange-500/50 bg-orange-500/10 hover:bg-orange-500/20 disabled:opacity-50 text-orange-300 font-bold text-sm transition-all shrink-0">
+                    <Send className="w-4 h-4" /> Publish changes
+                  </button>
+                </div>
+                <p className="text-sm text-slate-500">Publishing writes one versioned file to Cloudinary and marks every change live. You preview the change list first; nothing writes until you confirm.</p>
+              </>
+            ) : (
+              <div className="text-center py-10">
+                <div className="w-12 h-12 rounded-2xl bg-slate-800/60 border border-white/10 flex items-center justify-center mx-auto mb-3">
+                  <Send className="w-5 h-5 text-slate-500" />
+                </div>
+                <p className="text-sm font-bold text-white">Nothing to publish yet</p>
+                <p className="text-sm text-slate-400 mt-1 max-w-sm mx-auto">This stream has no questions. Open Import &amp; edit, paste your first batch, then come back here to publish it.</p>
+              </div>
+            )}
+            {notice && <p className="text-sm text-rose-300 mt-2">{notice}</p>}
           </Card>
           {summaryRow}
         </>
@@ -1001,7 +1030,7 @@ export const QuestionBankTab: React.FC<{ refreshKey: number; view?: 'edit' | 'pu
       {preview && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm overflow-y-auto" onClick={() => setPreview(null)}>
           <div className="min-h-full flex items-center justify-center p-4">
-            <div className="bg-slate-900 border border-white/10 rounded-3xl p-7 max-w-3xl w-full shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-slate-900 border border-white/10 rounded-3xl p-5 sm:p-7 max-w-3xl w-full shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between mb-5">
               <h3 className="text-white font-bold text-lg capitalize">Review before publishing {preview.kind === 'practice' ? 'practice' : 'mock'}</h3>
               <button onClick={() => setPreview(null)} className="text-slate-500 hover:text-slate-300"><X className="w-5 h-5" /></button>
@@ -1055,9 +1084,9 @@ export const QuestionBankTab: React.FC<{ refreshKey: number; view?: 'edit' | 'pu
               </div>
             )}
 
-            <div className="flex justify-end gap-2 mt-6">
-              <button onClick={() => setPreview(null)} className={btnGhost}>Cancel</button>
-              <button onClick={runPublish} disabled={publishing} className={btnPrimary}>{publishing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} Publish v{preview.nextVersion}</button>
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 mt-6">
+              <button onClick={() => setPreview(null)} className={`${btnGhost} w-full sm:w-auto`}>Cancel</button>
+              <button onClick={runPublish} disabled={publishing} className={`${btnPrimary} w-full sm:w-auto`}>{publishing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} Publish v{preview.nextVersion}</button>
             </div>
             </div>
           </div>
@@ -1067,7 +1096,7 @@ export const QuestionBankTab: React.FC<{ refreshKey: number; view?: 'edit' | 'pu
       {/* Publish result */}
       {publishResult && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setPublishResult(null)}>
-          <div className="bg-slate-900 border border-white/10 rounded-3xl p-7 max-w-md w-full shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-slate-900 border border-white/10 rounded-3xl p-5 sm:p-7 max-w-md w-full shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center"><CheckCircle2 className="w-5 h-5 text-emerald-400" /></div>
               <div>
