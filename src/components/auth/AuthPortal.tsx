@@ -488,17 +488,6 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
     }
   };
 
-  const fillDemoCredentials = () => {
-    const demoCreds = {
-      admin: { e: 'admin@excellencetutorials.ng', p: 'Admin@123' },
-      tutor: { e: 'tutor@excellencetutorials.ng', p: 'Tutor@123' },
-      student: { e: 'student@excellencetutorials.ng', p: 'Student@123' }
-    };
-    const cred = (demoCreds as any)[portalType];
-    onEmailChange(cred.e);
-    onPasswordChange(cred.p);
-  };
-
   return (
     <div className={`min-h-screen ${pageBackground} overflow-y-auto overflow-x-hidden selection:bg-orange-500 selection:text-white`}>
       <div className="min-h-screen w-full flex flex-col items-center justify-center py-8 md:py-12 px-4">

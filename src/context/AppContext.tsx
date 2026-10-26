@@ -2002,13 +2002,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const prog = programmes.find((p) => p.id === app.programmeId) || programmes[0];
       const branch = branches.find((b) => b.id === app.branchId) || branches[0];
 
-      // Create Firebase Auth account for the student
-      const tempPass = 'Student@123';
+      // Create Firebase Auth account for the student with a one-time random
+      // password (same alphabet as the centre and team flows). A fixed shared
+      // password would let anyone who approves an admission into any account.
+      const passAlphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+      const passBytes = new Uint8Array(12);
+      crypto.getRandomValues(passBytes);
+      const tempPass = Array.from(passBytes, (b) => passAlphabet[b % passAlphabet.length]).join('');
       const secondaryApp = initializeApp(firebaseConfigValues, `student-creation-${studentId}`);
       const secondaryAuth = getAuth(secondaryApp);
+      let authCreated = false;
       try {
         await createUserWithEmailAndPassword(secondaryAuth, app.email, tempPass);
         console.log(`Auth account created for student: ${app.email}`);
+        authCreated = true;
       } catch (authError: any) {
         console.error('Student Auth account creation failed:', authError);
       } finally {
@@ -2049,7 +2056,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       addToast({
         type: 'success',
         title: 'Applicant Approved & Enrolled!',
-        description: `${app.applicantName} is now in the Student Directory.`,
+        description: authCreated
+          ? `${app.applicantName} is now in the Student Directory. One-time password for ${app.email}: ${tempPass} (share it privately; ask them to change it after their first sign-in).`
+          : `${app.applicantName} is now in the Student Directory.`,
       });
     } catch (e) {
       console.error(e);
