@@ -20,7 +20,8 @@
  */
 import { adminDb } from './firebaseAdmin';
 import { httpError } from './tenantService';
-import { MOCKS, MOCK_ATTEMPTS, MOCK_TALLY, MOCK_LEADERBOARDS, audit, lagosToday } from './mockRoutes';
+import { MOCKS, MOCK_ATTEMPTS, MOCK_TALLY, MOCK_LEADERBOARDS, MOCK_KEYS, KeyItem, audit, lagosToday, bumpMockTally } from './mockRoutes';
+import { markWithKey } from './studentMockRoutes';
 
 const TOP_ENTRIES = 100;
 const OPEN_ATTEMPT_CAP = 25;
@@ -35,6 +36,41 @@ async function releaseOne(mockId: string, mock: any, source: string, by?: string
     .limit(OPEN_ATTEMPT_CAP)
     .get();
   const now = Date.now();
+  // 1a. Auto-submit (piece S2): an open attempt whose deadline has passed is
+  //     submitted from its last saved answers, marked with the server-only
+  //     key and counted in the tally, exactly as if the student had pressed
+  //     submit before midnight. Forgetting to press submit never costs a
+  //     student their result. These bumps land BEFORE the tally sum below.
+  const stale = openSnap.docs.filter((d) => {
+    const deadline = Date.parse(String((d.data() as any).deadline || ''));
+    return Number.isFinite(deadline) && deadline <= now;
+  });
+  if (stale.length > 0) {
+    const keySnap = await adminDb.collection(MOCK_KEYS).doc(mockId).get();
+    const keyItems = ((keySnap.data() as any)?.items || []) as KeyItem[];
+    for (const d of stale) {
+      const a = d.data() as any;
+      const deadline = Date.parse(String(a.deadline || ''));
+      const started = Date.parse(String(a.startedAt || '')) || deadline;
+      const mark = markWithKey(a.savedAnswers || {}, keyItems, Number(a.scoreScale || 100));
+      const submittedAt = new Date().toISOString();
+      await d.ref.update({
+        status: 'submitted',
+        submittedAt,
+        markedAt: submittedAt,
+        autoSubmitted: true,
+        score: { answered: mark.answered, correct: mark.correct },
+        scoreCorrect: mark.correct,
+        scoreScaled: mark.scoreScaled,
+        perSubject: mark.perSubject,
+        perTopic: mark.perTopic,
+        sortMs: Math.max(0, deadline - started),
+      });
+      await bumpMockTally(mockId, mark.correct, Number(a.tallyShards || 1));
+    }
+    void audit({ area: 'mocks', action: 'release.autosubmit', mockId, source, count: stale.length, by: by || null });
+  }
+  // 1b. An attempt still inside its deadline window defers release.
   const stillLive = openSnap.docs.some((d) => {
     const deadline = Date.parse(String((d.data() as any).deadline || ''));
     return Number.isFinite(deadline) && deadline > now;

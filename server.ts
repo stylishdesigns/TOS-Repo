@@ -26,6 +26,7 @@ import { registerFoDbProxy } from "./src/server/foDbProxy";
 import { registerFoAccessDoors } from "./src/server/foAccessDoors";
 import { registerPracticeStatsRoutes } from "./src/server/practiceStatsRoutes";
 import { registerMockRoutes } from "./src/server/mockRoutes";
+import { registerStudentMockRoutes } from "./src/server/studentMockRoutes";
 
 
 // Source file is ESM, but compiled to CJS for production.
@@ -1239,6 +1240,7 @@ RULES:
   registerExtendedRoutes(app);
   registerPracticeStatsRoutes(app);
   registerMockRoutes(app);
+  registerStudentMockRoutes(app);
 
   // Fo database proxy (read-only): Firestore diagnostics through the server's
   // own admin connection, gated by FO_DB_PROXY_KEY_SHA256 (see foDbProxy.ts).

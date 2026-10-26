@@ -1,0 +1,645 @@
+import express from 'express';
+import { FieldValue } from 'firebase-admin/firestore';
+import { adminDb } from './firebaseAdmin';
+import { Caller, httpError, listActiveMembershipsForUser } from './tenantService';
+import {
+  MOCKS,
+  MOCK_ATTEMPTS,
+  MOCK_TALLY,
+  MOCK_PAPERS,
+  MOCK_KEYS,
+  USERNAMES,
+  audit,
+  lagosToday,
+  bumpMockTally,
+  readSettings,
+  MockSettings,
+  KeyItem,
+} from './mockRoutes';
+
+/**
+ * Student Mock (Prompt S, piece S2): the student-facing half of the TOS
+ * daily mock. Every route here is for the signed-in student of an active
+ * centre; identity and centre come from the verified token plus a
+ * server-side membership lookup, never from the request body.
+ *
+ * The spine is unchanged from M1: the paper reaches the device WITHOUT its
+ * answers, the marking key is read only inside the submit path, nothing is
+ * scored or shown before release, and every time window is computed on the
+ * server in Africa/Lagos.
+ *
+ * Attempt contract (extends the shape mockRelease.ts already expects):
+ *   id `${mockId}__${uid}` (one per student per mock, structural),
+ *   mockId, uid, centreId, studentId, examType, startedAt, deadline,
+ *   status 'open' | 'submitted', submittedAt, markedAt, autoSubmitted,
+ *   savedAnswers { [questionId]: { choice, flag, ts } }, lastSavedAt,
+ *   shuffleSeed, score {answered, correct}, scoreCorrect, scoreScaled,
+ *   perSubject, perTopic, sortMs, username, keyVersion,
+ *   questionCount, tallyShards, scoreScale, resultSeenAt.
+ *
+ * savedAnswers entries keep the client timestamp (ts) of the last write so a
+ * resume can merge the device copy with the server copy by timestamp.
+ *
+ * Read/write budget per action (measured, Firestore counts):
+ *   status: 3-5 reads (username, today's attempt, week strip; yesterday's
+ *           attempt and its mock only when an unseen result is possible),
+ *           cached in instance memory for 60 s. 0 writes.
+ *   username/check: 1 read, 0 writes (a GET never writes).
+ *   username POST: 2 reads, 2-3 writes (claim, freed old claim, audit).
+ *   start: 3 reads (attempt, mock, paper), 1 write on first start + audit,
+ *          0 writes on resume. The username lookup rides the cached status
+ *          when possible; it is 1 extra read on the cold path.
+ *   save: 1 read + 2 writes (attempt update + audit) per batch.
+ *   submit: 2 reads inside the transaction (attempt + key), then 1 write to
+ *           the attempt, 1 tally shard, 1 audit. A second submit writes
+ *           nothing and returns the stored receipt.
+ */
+
+// ---------------------------------------------------------------------------
+// Small helpers
+// ---------------------------------------------------------------------------
+
+const QID_RE = /^[A-Za-z0-9_-]{1,64}$/;
+const CHOICES = ['A', 'B', 'C', 'D'] as const;
+const SAVE_BATCH_MAX = 50;
+const SAVE_PAYLOAD_MAX = 64 * 1024;
+const SAVE_PER_MINUTE = 30; // per server instance; the payload cap is the real guard
+const USERNAME_CHANGE_COOLDOWN_MS = 30 * 24 * 60 * 60 * 1000;
+const STATUS_CACHE_TTL_MS = 60 * 1000;
+const STATUS_CACHE_MAX = 500;
+
+// Starter blocklist, checked case-insensitively on the server. Deliberately
+// short: it blocks the obvious, and staff review stays the real control.
+const USERNAME_BLOCKED = [
+  'fuck', 'shit', 'bitch', 'bastard', 'asshole', 'arsehole', 'dick', 'pussy',
+  'cunt', 'nigger', 'nigga', 'faggot', 'wanker', 'slut', 'whore', 'porn',
+  'sex', 'rape', 'hitler', 'terror',
+];
+
+function getCaller(req: express.Request): Caller {
+  const caller = (req as any).caller as Caller | undefined;
+  if (!caller) throw httpError(401, 'Unauthorized');
+  return caller;
+}
+
+/** Lagos wall-clock helpers. All windows live on the server. */
+function lagosNowParts(d = new Date()): { ymd: string; hh: number; mm: number; ss: number } {
+  const fmt = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Africa/Lagos', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+  });
+  const parts = Object.fromEntries(fmt.formatToParts(d).map((p) => [p.type, p.value]));
+  const ymd = `${parts.year}-${parts.month}-${parts.day}`;
+  return { ymd, hh: Number(parts.hour) % 24, mm: Number(parts.minute), ss: Number(parts.second) };
+}
+
+/** The instant Lagos "today" flips to tomorrow, as a UTC millisecond. */
+function lagosDayEndMs(ymd: string): number {
+  // Lagos is always UTC+1 (no DST), so midnight Lagos is 23:00 UTC of the
+  // same calendar date. The timezone is fixed in settings and never changes.
+  return Date.parse(`${ymd}T23:00:00.000Z`) + 999;
+}
+
+function dateAddDays(ymd: string, days: number): string {
+  const d = new Date(`${ymd}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+// ---------------------------------------------------------------------------
+// Status cache: repeat taps cost nothing. Cleared by every mutation this
+// student makes, and small enough to stay harmless in memory.
+// ---------------------------------------------------------------------------
+const statusCache = new Map<string, { at: number; body: any }>();
+
+function cacheGet(key: string): any | null {
+  const hit = statusCache.get(key);
+  if (!hit) return null;
+  if (Date.now() - hit.at > STATUS_CACHE_TTL_MS) {
+    statusCache.delete(key);
+    return null;
+  }
+  return hit.body;
+}
+
+function cacheClearFor(uid: string): void {
+  for (const key of statusCache.keys()) {
+    if (key.startsWith(`status:${uid}:`)) statusCache.delete(key);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Student identity: token-verified caller + an active student membership in
+// an existing, enabled centre. Two centres never share data: the attempt
+// records the centre the membership points at, and nothing else reads it.
+// ---------------------------------------------------------------------------
+interface StudentContext {
+  caller: Caller;
+  centreId: string;
+  studentId: string;
+}
+
+async function requireStudent(req: express.Request): Promise<StudentContext> {
+  const caller = getCaller(req);
+  if (caller.tos) throw httpError(403, 'TOS staff do not take mocks. Use a student account.');
+  const memberships = await listActiveMembershipsForUser(caller.uid, caller.email);
+  const student = memberships.find((m) => String(m.role) === 'student' && String(m.status) === 'active');
+  if (!student) throw httpError(403, 'You are not an active student of any centre.');
+  const centreSnap = await adminDb.collection('centres').doc(student.centreId).get();
+  if (!centreSnap.exists) throw httpError(403, 'Your centre is not available.');
+  const centre = centreSnap.data() as any;
+  if (String(centre?.status || 'active') !== 'active') throw httpError(403, 'Your centre is not available.');
+  // The student record keyed by uid: the username register needs its id.
+  const stuSnap = await adminDb.collection('students').where('uid', '==', caller.uid).limit(1).get();
+  const stuDoc = stuSnap.docs[0];
+  if (!stuDoc) throw httpError(403, 'No student record found for your sign-in.');
+  return { caller, centreId: student.centreId, studentId: stuDoc.id };
+}
+
+/** One read: the student's current username claim, by uid. */
+async function findUsernameByUid(uid: string) {
+  const snap = await adminDb.collection(USERNAMES).where('uid', '==', uid).limit(1).get();
+  return snap.docs[0] || null;
+}
+
+// ---------------------------------------------------------------------------
+// Marking. A pure function over the saved answers and the server-only key.
+// The score scale comes from the mock's frozen settings, never from code.
+// ---------------------------------------------------------------------------
+export interface MarkResult {
+  answered: number;
+  correct: number;
+  scoreScaled: number;
+  perSubject: Array<{ subject: string; correct: number; total: number }>;
+  perTopic: Array<{ subject: string; topic: string; correct: number; total: number }>;
+}
+
+export function markWithKey(savedAnswers: Record<string, any>, keyItems: KeyItem[], scoreScale: number): MarkResult {
+  let answered = 0;
+  let correct = 0;
+  const subj = new Map<string, { correct: number; total: number }>();
+  const topic = new Map<string, { subject: string; topic: string; correct: number; total: number }>();
+  for (const item of keyItems || []) {
+    const pick = savedAnswers?.[item.id];
+    const choice = pick && typeof pick === 'object' ? String(pick.choice || '') : String(pick || '');
+    const isAnswered = (CHOICES as readonly string[]).includes(choice);
+    if (isAnswered) answered += 1;
+    const isCorrect = isAnswered && choice === String(item.correct || '').toUpperCase();
+    if (isCorrect) correct += 1;
+    const subject = String(item.subject || 'General');
+    const s = subj.get(subject) || { correct: 0, total: 0 };
+    s.total += 1;
+    if (isCorrect) s.correct += 1;
+    subj.set(subject, s);
+    const tKey = `${subject}||${String(item.topic || '')}`;
+    const t = topic.get(tKey) || { subject, topic: String(item.topic || ''), correct: 0, total: 0 };
+    t.total += 1;
+    if (isCorrect) t.correct += 1;
+    topic.set(tKey, t);
+  }
+  const total = (keyItems || []).length || 1;
+  const scale = Number.isFinite(scoreScale) && scoreScale > 0 ? scoreScale : 100;
+  return {
+    answered,
+    correct,
+    scoreScaled: Math.round((correct / total) * scale),
+    perSubject: [...subj.entries()].map(([subject, v]) => ({ subject, ...v })),
+    perTopic: [...topic.values()],
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Routes
+// ---------------------------------------------------------------------------
+export function registerStudentMockRoutes(app: express.Express): void {
+  // -----------------------------------------------------------------------
+  // GET status: everything the Today tab needs, in one call.
+  // -----------------------------------------------------------------------
+  app.get('/api/student/mock/status', async (req, res) => {
+    try {
+      const ctx = await requireStudent(req);
+      const today = lagosToday();
+      const cacheKey = `status:${ctx.caller.uid}:${today}`;
+      const cached = cacheGet(cacheKey);
+      if (cached) return res.json(cached);
+
+      const now = Date.now();
+      const serverNow = new Date(now).toISOString();
+      const { settings } = await readSettings();
+
+      // One week strip query covers today's mock too (date >= today).
+      const weekEnd = dateAddDays(today, 6);
+      const weekSnap = await adminDb.collection(MOCKS)
+        .where('date', '>=', today)
+        .where('date', '<=', weekEnd)
+        .get();
+      const week = weekSnap.docs
+        .map((d) => d.data() as any)
+        .filter((m) => !['cancelled', 'void', 'draft', 'archived'].includes(String(m.status)))
+        .sort((a, b) => String(a.date).localeCompare(String(b.date)))
+        .map((m) => ({
+          id: m.id, date: m.date, title: m.title, examType: m.examType, status: m.status,
+          durationMinutes: m.durationMinutes, subjects: m.subjects, questionCount: m.questionCount,
+        }));
+      const todayMock = week.find((m) => m.date === today) || null;
+      const nextMock = week.find((m) => m.date !== today && ['scheduled', 'live'].includes(String(m.status))) || null;
+
+      // The attempt for today, by id: no query.
+      const todayAttemptId = todayMock ? `${todayMock.id}__${ctx.caller.uid}` : '';
+      const attemptSnap = todayAttemptId ? await adminDb.collection(MOCK_ATTEMPTS).doc(todayAttemptId).get() : null;
+      const attempt: any = attemptSnap && attemptSnap.exists ? attemptSnap!.data() : null;
+
+      // Unseen result: yesterday's attempt only (the release lands the
+      // morning after; anything older surfaces in Past). Two direct gets,
+      // skipped when there is nothing to check.
+      let unseen: { mockId: string; date: string } | null = null;
+      const yesterday = dateAddDays(today, -1);
+      const yAttemptId = `mock-${yesterday}__${ctx.caller.uid}`;
+      const ySnap = await adminDb.collection(MOCK_ATTEMPTS).doc(yAttemptId).get();
+      if (ySnap.exists) {
+        const y = ySnap.data() as any;
+        if (String(y.status) === 'submitted' && !y.resultSeenAt) {
+          const yMockSnap = await adminDb.collection(MOCKS).doc(`mock-${yesterday}`).get();
+          if (yMockSnap.exists && String((yMockSnap.data() as any)?.status) === 'released') {
+            unseen = { mockId: `mock-${yesterday}`, date: yesterday };
+          }
+        }
+      }
+
+      const usernameDoc = await findUsernameByUid(ctx.caller.uid);
+      const username = usernameDoc
+        ? { username: String((usernameDoc.data() as any).username), lastChangedAt: String((usernameDoc.data() as any).lastChangedAt || (usernameDoc.data() as any).updatedAt || '') }
+        : null;
+
+      // State machine. Everything time-related is the server's Lagos clock.
+      const dayEnd = lagosDayEndMs(today);
+      let state = 'no_mock';
+      let canStart = false;
+      if (todayMock) {
+        const durationMs = Number(todayMock.durationMinutes || 0) * 60 * 1000;
+        const status = String(todayMock.status);
+        const openNow = ['scheduled', 'live'].includes(status) && attempt?.status !== 'submitted';
+        if (attempt?.status === 'submitted' || (attempt?.status === 'open' && now > Number(Date.parse(attempt.deadline)))) {
+          state = 'submitted';
+        } else if (attempt?.status === 'open') {
+          state = 'in_progress';
+        } else if (openNow && now < dayEnd && now + durationMs <= dayEnd) {
+          state = 'open';
+          canStart = true;
+        } else if (now + durationMs > dayEnd && now < dayEnd) {
+          // The day is not over, but a full attempt no longer fits.
+          state = 'closed';
+        } else {
+          state = 'missed';
+        }
+      }
+
+      // Lagos release time on the next day: Lagos is UTC+1, so subtract the hour.
+      const releaseTomorrow = new Date(
+        Date.parse(`${dateAddDays(today, 1)}T00:00:00.000Z`)
+        + (settings.releaseHourLagos - 1) * 3600_000 + settings.releaseMinuteLagos * 60_000
+      ).toISOString();
+
+      const body = {
+        ok: true,
+        serverNow,
+        today,
+        state,
+        canStart,
+        mock: todayMock ? {
+          id: todayMock.id,
+          title: todayMock.title,
+          examType: todayMock.examType,
+          subjects: (todayMock.subjects || []).map((s: any) => s.subject),
+          durationMinutes: todayMock.durationMinutes,
+          questionCount: todayMock.questionCount,
+          status: todayMock.status,
+        } : null,
+        attempt: attempt ? {
+          status: attempt.status,
+          startedAt: attempt.startedAt,
+          deadline: attempt.deadline,
+          submittedAt: attempt.submittedAt || null,
+          autoSubmitted: Boolean(attempt.autoSubmitted),
+        } : null,
+        cutoffAt: todayMock ? new Date(lagosDayEndMs(today) - Number(todayMock.durationMinutes || 0) * 60 * 1000).toISOString() : null,
+        releaseAt: releaseTomorrow,
+        nextMockDate: nextMock ? nextMock.date : null,
+        week,
+        username,
+        unseen,
+      };
+      if (statusCache.size >= STATUS_CACHE_MAX) statusCache.clear();
+      statusCache.set(cacheKey, { at: Date.now(), body });
+      res.json(body);
+    } catch (error: any) {
+      if (error?.status) return res.status(error.status).json({ error: error.message });
+      console.error('[student-mock] status failed:', error?.message || error);
+      res.status(500).json({ error: 'Could not load your mock status.' });
+    }
+  });
+
+  // -----------------------------------------------------------------------
+  // Username: live availability check (GET, never writes) and the claim
+  // (POST, one transaction so two students can never hold one name).
+  // -----------------------------------------------------------------------
+  app.get('/api/student/mock/username/check', async (req, res) => {
+    try {
+      await requireStudent(req);
+      const name = String(req.query.name || '').trim();
+      if (!/^[A-Za-z0-9_]{4,16}$/.test(name)) {
+        return res.json({ ok: true, name, valid: false, available: false, reason: 'Usernames are 4 to 16 letters, numbers or underscores.' });
+      }
+      const lower = name.toLowerCase();
+      if (USERNAME_BLOCKED.some((w) => lower.includes(w))) {
+        return res.json({ ok: true, name, valid: false, available: false, reason: 'That name is not allowed. Pick another.' });
+      }
+      const snap = await adminDb.collection(USERNAMES).doc(lower).get();
+      return res.json({ ok: true, name, valid: true, available: !snap.exists, reason: snap.exists ? 'That username is taken.' : null });
+    } catch (error: any) {
+      if (error?.status) return res.status(error.status).json({ error: error.message });
+      console.error('[student-mock] username check failed:', error?.message || error);
+      res.status(500).json({ error: 'Could not check that username.' });
+    }
+  });
+
+  app.post('/api/student/mock/username', async (req, res) => {
+    try {
+      const ctx = await requireStudent(req);
+      const name = String(req.body?.name || '').trim();
+      if (!/^[A-Za-z0-9_]{4,16}$/.test(name)) throw httpError(400, 'Usernames are 4 to 16 letters, numbers or underscores.');
+      const lower = name.toLowerCase();
+      if (USERNAME_BLOCKED.some((w) => lower.includes(w))) throw httpError(400, 'That name is not allowed. Pick another.');
+      const nowIso = new Date().toISOString();
+      let changed = false;
+      await adminDb.runTransaction(async (tx) => {
+        const mine = await tx.get(adminDb.collection(USERNAMES).where('studentId', '==', ctx.studentId));
+        const current = mine.docs[0] || null;
+        if (current) {
+          const lastChange = Date.parse(String((current.data() as any).lastChangedAt || (current.data() as any).updatedAt || ''));
+          if (Number.isFinite(lastChange) && Date.now() - lastChange < USERNAME_CHANGE_COOLDOWN_MS) {
+            throw httpError(409, 'You can change your username once a month.');
+          }
+          if (current.id === lower) {
+            // Same name, nothing to do; still refresh nothing.
+            return;
+          }
+        }
+        const target = await tx.get(adminDb.collection(USERNAMES).doc(lower));
+        if (target.exists && String((target.data() as any)?.studentId || '') !== ctx.studentId) {
+          throw httpError(409, 'That username is already taken.');
+        }
+        changed = true;
+        for (const d of mine.docs) if (d.id !== lower) tx.delete(d.ref);
+        tx.set(adminDb.collection(USERNAMES).doc(lower), {
+          username: name,
+          usernameLower: lower,
+          studentId: ctx.studentId,
+          uid: ctx.caller.uid,
+          studentName: '',
+          centreId: ctx.centreId,
+          setBy: ctx.caller.uid,
+          setByStudent: true,
+          lastChangedAt: nowIso,
+          updatedAt: nowIso,
+        });
+      });
+      cacheClearFor(ctx.caller.uid);
+      if (!changed) {
+        void audit({ area: 'student-mock', action: 'username.keep', studentId: ctx.studentId, username: name, by: ctx.caller.uid });
+        return res.json({ ok: true, username: name, changed: false });
+      }
+      void audit({ area: 'student-mock', action: 'username.claim', studentId: ctx.studentId, username: name, by: ctx.caller.uid });
+      res.json({ ok: true, username: name, changed: true });
+    } catch (error: any) {
+      if (error?.status) return res.status(error.status).json({ error: error.message });
+      console.error('[student-mock] username claim failed:', error?.message || error);
+      res.status(500).json({ error: 'Could not save your username.' });
+    }
+  });
+
+  // -----------------------------------------------------------------------
+  // POST start: one attempt, idempotent, the clock set on the server.
+  // -----------------------------------------------------------------------
+  app.post('/api/student/mock/start', async (req, res) => {
+    try {
+      const ctx = await requireStudent(req);
+      const today = lagosToday();
+      const mockId = `mock-${today}`;
+      const now = Date.now();
+
+      const mockSnap = await adminDb.collection(MOCKS).doc(mockId).get();
+      if (!mockSnap.exists) throw httpError(404, 'There is no mock today.');
+      const mock = mockSnap.data() as any;
+      if (!['scheduled', 'live'].includes(String(mock.status))) {
+        throw httpError(409, `Today's mock is not open (${mock.status}).`);
+      }
+      // A mockId in the body is ignored on purpose: the route can only ever
+      // open today's mock, so no future or past paper is reachable at all.
+      const durationMs = Number(mock.durationMinutes || 0) * 60 * 1000;
+      const dayEnd = lagosDayEndMs(today);
+      if (now + durationMs > dayEnd) {
+        const cutoff = new Date(dayEnd - durationMs);
+        throw httpError(409, `Too late to start today: the clock would run past 11:59 pm. Starting was possible until ${cutoff.toISOString()}.`);
+      }
+
+      const usernameDoc = await findUsernameByUid(ctx.caller.uid);
+      if (!usernameDoc) throw httpError(409, 'username_required');
+
+      const attemptRef = adminDb.collection(MOCK_ATTEMPTS).doc(`${mockId}__${ctx.caller.uid}`);
+      let created = false;
+      const attemptData = await adminDb.runTransaction(async (tx) => {
+        const snap = await tx.get(attemptRef);
+        if (snap.exists) {
+          const a = snap.data() as any;
+          if (String(a.status) === 'submitted') throw httpError(409, 'You have already submitted this mock.');
+          return a;
+        }
+        created = true;
+        const startedAt = new Date(now).toISOString();
+        const attempt = {
+          id: `${mockId}__${ctx.caller.uid}`,
+          mockId,
+          uid: ctx.caller.uid,
+          centreId: ctx.centreId,
+          studentId: ctx.studentId,
+          examType: mock.examType,
+          startedAt,
+          deadline: new Date(now + durationMs).toISOString(),
+          status: 'open' as const,
+          savedAnswers: {} as Record<string, any>,
+          lastSavedAt: null as string | null,
+          shuffleSeed: Math.floor(Math.random() * 2_147_483_647),
+          username: String((usernameDoc!.data() as any).username || ''),
+          keyVersion: 1,
+          questionCount: Number(mock.questionCount || 0),
+          tallyShards: Number(mock.tallyShards || 1),
+          scoreScale: Number(mock.scoreScale || 100),
+        };
+        tx.set(attemptRef, attempt);
+        return attempt;
+      });
+      if (created) void audit({ area: 'student-mock', action: 'start', mockId, studentId: ctx.studentId, by: ctx.caller.uid });
+      cacheClearFor(ctx.caller.uid);
+
+      // The frozen paper: questions and options only, by design.
+      const paperSnap = await adminDb.collection(MOCK_PAPERS).doc(mockId).get();
+      if (!paperSnap.exists) throw httpError(500, 'The frozen paper is missing. Contact your centre.');
+      const paper = paperSnap.data() as any;
+
+      res.json({
+        ok: true,
+        serverNow: new Date().toISOString(),
+        created,
+        attempt: {
+          status: attemptData.status,
+          startedAt: attemptData.startedAt,
+          deadline: attemptData.deadline,
+          shuffleSeed: attemptData.shuffleSeed,
+          savedAnswers: attemptData.savedAnswers || {},
+          scoreScale: attemptData.scoreScale,
+        },
+        paper: {
+          mockId,
+          examType: paper.examType,
+          durationMinutes: paper.durationMinutes,
+          questionCount: paper.questionCount,
+          questions: (paper.questions || []).map((q: any) => ({
+            id: q.id, subject: q.subject, topic: q.topic, year: q.year ?? null,
+            text: q.text, options: q.options || [], imageLink: q.imageLink || '',
+          })),
+        },
+      });
+    } catch (error: any) {
+      if (error?.status) return res.status(error.status).json({ error: error.message });
+      console.error('[student-mock] start failed:', error?.message || error);
+      res.status(500).json({ error: 'Could not start the mock.' });
+    }
+  });
+
+  // -----------------------------------------------------------------------
+  // POST save: a batch of changed answers and flags. Last write per question
+  // wins by server receipt order; every entry keeps its client timestamp for
+  // the offline merge. Ignored after the deadline.
+  // -----------------------------------------------------------------------
+  const saveHits = new Map<string, number[]>();
+  app.post('/api/student/mock/save', async (req, res) => {
+    try {
+      const ctx = await requireStudent(req);
+      const raw = JSON.stringify(req.body || {});
+      if (raw.length > SAVE_PAYLOAD_MAX) throw httpError(413, 'That batch is too large.');
+      const changes = Array.isArray(req.body?.changes) ? req.body.changes : null;
+      if (!changes || changes.length < 1) throw httpError(400, 'No changes in the batch.');
+      if (changes.length > SAVE_BATCH_MAX) throw httpError(400, `A batch holds at most ${SAVE_BATCH_MAX} answers.`);
+      for (const c of changes) {
+        if (!c || !QID_RE.test(String(c.qid || ''))) throw httpError(400, 'A question id in the batch looks wrong.');
+        if (c.choice !== undefined && c.choice !== null && !(CHOICES as readonly string[]).includes(String(c.choice))) {
+          throw httpError(400, 'An answer choice in the batch looks wrong.');
+        }
+        if (c.flag !== undefined && typeof c.flag !== 'boolean') throw httpError(400, 'A flag in the batch looks wrong.');
+      }
+      // In-instance throttle: free, and the payload cap carries the rest.
+      const nowMs = Date.now();
+      const hits = (saveHits.get(ctx.caller.uid) || []).filter((t) => nowMs - t < 60_000);
+      if (hits.length >= SAVE_PER_MINUTE) throw httpError(429, 'Slow down a moment; your answers are still saving.');
+      hits.push(nowMs);
+      saveHits.set(ctx.caller.uid, hits);
+
+      const today = lagosToday();
+      const mockId = `mock-${today}`;
+      const attemptRef = adminDb.collection(MOCK_ATTEMPTS).doc(`${mockId}__${ctx.caller.uid}`);
+      const snap = await attemptRef.get();
+      if (!snap.exists) throw httpError(404, 'Start the mock first.');
+      const attempt = snap.data() as any;
+      if (String(attempt.status) !== 'open') throw httpError(409, 'This mock is already submitted.');
+      const deadline = Date.parse(String(attempt.deadline || ''));
+      const serverNow = new Date().toISOString();
+      if (Number.isFinite(deadline) && nowMs > deadline) {
+        // Past the deadline nothing changes the paper. The release sweep
+        // submits what was last saved.
+        return res.json({ ok: true, ignored: true, reason: 'deadline', serverNow });
+      }
+      const update: Record<string, any> = { lastSavedAt: serverNow };
+      for (const c of changes) {
+        const key = `savedAnswers.${String(c.qid)}`;
+        const prev = attempt.savedAnswers?.[String(c.qid)] || {};
+        update[key] = {
+          choice: c.choice === undefined ? (prev.choice ?? null) : c.choice,
+          flag: c.flag === undefined ? Boolean(prev.flag) : Boolean(c.flag),
+          ts: Number.isFinite(Number(c.ts)) ? Number(c.ts) : nowMs,
+        };
+      }
+      await attemptRef.update(update);
+      void audit({ area: 'student-mock', action: 'save', mockId, studentId: ctx.studentId, changed: changes.length, by: ctx.caller.uid });
+      cacheClearFor(ctx.caller.uid);
+      res.json({ ok: true, saved: changes.length, serverNow });
+    } catch (error: any) {
+      if (error?.status) return res.status(error.status).json({ error: error.message });
+      console.error('[student-mock] save failed:', error?.message || error);
+      res.status(500).json({ error: 'Could not save your answers.' });
+    }
+  });
+
+  // -----------------------------------------------------------------------
+  // POST submit: mark with the server-only key, bump the tally, return
+  // nothing about the score. Idempotent; past the deadline it marks what was
+  // last saved, as an auto-submit.
+  // -----------------------------------------------------------------------
+  app.post('/api/student/mock/submit', async (req, res) => {
+    try {
+      const ctx = await requireStudent(req);
+      const today = lagosToday();
+      const mockId = `mock-${today}`;
+      const attemptRef = adminDb.collection(MOCK_ATTEMPTS).doc(`${mockId}__${ctx.caller.uid}`);
+      const nowMs = Date.now();
+
+      const keySnap = await adminDb.collection(MOCK_KEYS).doc(mockId).get();
+      if (!keySnap.exists) throw httpError(500, 'The marking key is missing. Contact your centre.');
+      const keyItems = ((keySnap.data() as any)?.items || []) as KeyItem[];
+
+      const receipt = await adminDb.runTransaction(async (tx) => {
+        const snap = await tx.get(attemptRef);
+        if (!snap.exists) throw httpError(404, 'Start the mock first.');
+        const attempt = snap.data() as any;
+        if (String(attempt.status) === 'submitted') {
+          return { already: true, submittedAt: attempt.submittedAt, autoSubmitted: Boolean(attempt.autoSubmitted) };
+        }
+        const deadline = Date.parse(String(attempt.deadline || ''));
+        const autoSubmitted = Number.isFinite(deadline) && nowMs > deadline;
+        const mark = markWithKey(attempt.savedAnswers || {}, keyItems, Number(attempt.scoreScale || 100));
+        const started = Date.parse(String(attempt.startedAt || '')) || nowMs;
+        const submittedAt = new Date(nowMs).toISOString();
+        tx.update(attemptRef, {
+          status: 'submitted',
+          submittedAt,
+          markedAt: submittedAt,
+          autoSubmitted,
+          score: { answered: mark.answered, correct: mark.correct },
+          scoreCorrect: mark.correct,
+          scoreScaled: mark.scoreScaled,
+          perSubject: mark.perSubject,
+          perTopic: mark.perTopic,
+          // Time used, capped at the deadline: a late auto-submit never shows
+          // more time spent than the student actually had.
+          sortMs: Math.max(0, Math.min(nowMs - started, Number.isFinite(deadline) ? deadline - started : nowMs - started)),
+        });
+        return { already: false, submittedAt, autoSubmitted, scoreCorrect: mark.correct, tallyShards: Number(attempt.tallyShards || 1), mockId };
+      });
+      cacheClearFor(ctx.caller.uid);
+      if (!receipt.already) {
+        await bumpMockTally(mockId, receipt.scoreCorrect, receipt.tallyShards);
+        void audit({ area: 'student-mock', action: 'submit', mockId, studentId: ctx.studentId, autoSubmitted: receipt.autoSubmitted, correct: receipt.scoreCorrect, by: ctx.caller.uid });
+      }
+      // Deliberately no score in the response: results stay hidden until release.
+      res.json({ ok: true, serverNow: new Date().toISOString(), submittedAt: receipt.submittedAt, autoSubmitted: Boolean(receipt.autoSubmitted), already: Boolean(receipt.already) });
+    } catch (error: any) {
+      if (error?.status) return res.status(error.status).json({ error: error.message });
+      console.error('[student-mock] submit failed:', error?.message || error);
+      res.status(500).json({ error: 'Could not submit the mock.' });
+    }
+  });
+
+  // The tally collection name is exported for the release sweep's use; the
+  // bump helper itself lives with the other mock code.
+  void MOCK_TALLY;
+}

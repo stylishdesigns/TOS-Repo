@@ -13,7 +13,7 @@
  * - APP_URL: the public URL of this deployment (optional, used for links).
  */
 import serverless from 'serverless-http';
-// NOTE: bundled fresh on every deploy; bump this comment when server-side files change (v29: mocks M5b+M5c, board view, username register, settings screen, correct-a-question, void)
+// NOTE: bundled fresh on every deploy; bump this comment when server-side files change (v30: student mock S2, status/username/start/save/submit, score scale, release auto-submit)
 // so the function bundler cache cannot serve a stale bundle.
 // (the Firestore proxy routes in server.ts + src/server/foDbProxy.ts ride the same bundle).
 

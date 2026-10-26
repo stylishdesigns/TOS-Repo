@@ -842,12 +842,13 @@ const SettingsPanel: React.FC = () => {
       const body = {
         jamb: {
           durationMinutes: Number(s.jamb.durationMinutes),
+          scoreScale: Number(s.jamb.scoreScale),
           compulsorySubject: s.jamb.compulsorySubject,
           compulsoryCount: Number(s.jamb.compulsoryCount),
           otherCount: Number(s.jamb.otherCount),
           subjectCount: Number(s.jamb.subjectCount),
         },
-        waecNeco: { durationMinutes: Number(s.waecNeco.durationMinutes) },
+        waecNeco: { durationMinutes: Number(s.waecNeco.durationMinutes), scoreScale: Number(s.waecNeco.scoreScale) },
         compulsorySubjects: String(s.compulsorySubjectsText || '').split(',').map((x: string) => x.trim()).filter(Boolean),
         releaseHourLagos: Number(s.releaseHourLagos),
         releaseMinuteLagos: Number(s.releaseMinuteLagos),
@@ -882,6 +883,7 @@ const SettingsPanel: React.FC = () => {
         <p className="text-xs font-bold uppercase tracking-wider text-slate-500">JAMB mock</p>
         <div className="grid grid-cols-2 gap-3">
           {num('Duration (minutes)', 'jamb.durationMinutes', 15, 360)}
+          {num('Score scale (total marks)', 'jamb.scoreScale', 20, 2000)}
           {num('Subjects per mock', 'jamb.subjectCount', 1, 12)}
           {num('Compulsory subject questions', 'jamb.compulsoryCount', 1, 500)}
           {num('Other subject questions', 'jamb.otherCount', 1, 500)}
@@ -894,6 +896,7 @@ const SettingsPanel: React.FC = () => {
       <div className="bg-slate-950/40 border border-white/5 rounded-xl p-3 space-y-3">
         <p className="text-xs font-bold uppercase tracking-wider text-slate-500">WAEC/NECO mock</p>
         {num('Duration (minutes)', 'waecNeco.durationMinutes', 15, 360)}
+        {num('Score scale (%)', 'waecNeco.scoreScale', 10, 1000)}
       </div>
       <div className="bg-slate-950/40 border border-white/5 rounded-xl p-3 space-y-3">
         <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Series and results</p>

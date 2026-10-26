@@ -58,10 +58,10 @@ export const MOCKS = 'mocks';
 export const MOCK_ATTEMPTS = 'mockAttempts';
 export const MOCK_TALLY = 'mockScoreTally';
 export const MOCK_LEADERBOARDS = 'mockLeaderboards';
-const MOCK_PAPERS = 'mockPapers';
-const MOCK_KEYS = 'mockKeys';
+export const MOCK_PAPERS = 'mockPapers';
+export const MOCK_KEYS = 'mockKeys';
 const MOCK_SETTINGS = 'mockSettings'; // doc id 'global'
-const USERNAMES = 'usernames'; // doc id = the username lowercased
+export const USERNAMES = 'usernames'; // doc id = the username lowercased
 const QB_QUESTIONS = 'qbQuestions';
 const QB_SCAN_CAP = 2000; // same windowed-read ceiling the bank uses
 
@@ -81,8 +81,8 @@ const QUESTION_IDS_MAX = 2000;
 // TOS settings screen overwrites them, and every mock copies what it needs at
 // freeze time so later setting changes never touch Scheduled mocks.
 const DEFAULT_SETTINGS = {
-  jamb: { durationMinutes: 120, compulsorySubject: 'English', compulsoryCount: 60, otherCount: 40, subjectCount: 4 },
-  waecNeco: { durationMinutes: 90 },
+  jamb: { durationMinutes: 120, compulsorySubject: 'English', compulsoryCount: 60, otherCount: 40, subjectCount: 4, scoreScale: 400 },
+  waecNeco: { durationMinutes: 90, scoreScale: 100 },
   compulsorySubjects: ['English', 'Mathematics', 'Civic Education'],
   releaseHourLagos: 6,
   releaseMinuteLagos: 0,
@@ -208,9 +208,9 @@ function rejectDuplicateIds(subjects: SubjectSpec[]) {
 // never alters a Scheduled mock: freeze copies the values it needs and
 // nothing reads settings after freeze.
 // ---------------------------------------------------------------------------
-interface MockSettings {
-  jamb: { durationMinutes: number; compulsorySubject: string; compulsoryCount: number; otherCount: number; subjectCount: number };
-  waecNeco: { durationMinutes: number };
+export interface MockSettings {
+  jamb: { durationMinutes: number; compulsorySubject: string; compulsoryCount: number; otherCount: number; subjectCount: number; scoreScale: number };
+  waecNeco: { durationMinutes: number; scoreScale: number };
   compulsorySubjects: string[];
   releaseHourLagos: number;
   releaseMinuteLagos: number;
@@ -218,7 +218,10 @@ interface MockSettings {
   tallyShards: number;
 }
 
-async function readSettings(): Promise<{ settings: MockSettings; stored: boolean }> {
+let settingsCache: { at: number; value: { settings: MockSettings; stored: boolean } } | null = null;
+
+export async function readSettings(): Promise<{ settings: MockSettings; stored: boolean }> {
+  if (settingsCache && Date.now() - settingsCache.at < 5 * 60 * 1000) return settingsCache.value;
   const snap = await adminDb.collection(MOCK_SETTINGS).doc('global').get();
   if (!snap.exists) return { settings: DEFAULT_SETTINGS, stored: false };
   const d = snap.data() as any;
@@ -231,7 +234,9 @@ async function readSettings(): Promise<{ settings: MockSettings; stored: boolean
     timezone: typeof d?.timezone === 'string' && d.timezone ? d.timezone : DEFAULT_SETTINGS.timezone,
     tallyShards: Number.isInteger(d?.tallyShards) ? d.tallyShards : DEFAULT_SETTINGS.tallyShards,
   };
-  return { settings, stored: true };
+  const value = { settings, stored: true };
+  settingsCache = { at: Date.now(), value };
+  return value;
 }
 
 function intIn(v: unknown, lo: number, hi: number, label: string): number {
@@ -256,8 +261,9 @@ function validateSettingsBody(body: any): MockSettings {
       compulsoryCount: intIn(jamb.compulsoryCount, 1, COUNT_MAX, 'JAMB compulsory count'),
       otherCount: intIn(jamb.otherCount, 1, COUNT_MAX, 'JAMB other-subject count'),
       subjectCount: intIn(jamb.subjectCount, 1, SUBJECTS_MAX, 'JAMB subject count'),
+      scoreScale: intIn(jamb.scoreScale, 20, 2000, 'JAMB score scale'),
     },
-    waecNeco: { durationMinutes: intIn(waecNeco.durationMinutes, 15, 360, 'WAEC/NECO duration') },
+    waecNeco: { durationMinutes: intIn(waecNeco.durationMinutes, 15, 360, 'WAEC/NECO duration'), scoreScale: intIn(waecNeco.scoreScale, 10, 1000, 'WAEC/NECO score scale') },
     compulsorySubjects: names,
     releaseHourLagos: intIn(body?.releaseHourLagos, 0, 23, 'Release hour'),
     releaseMinuteLagos: intIn(body?.releaseMinuteLagos, 0, 59, 'Release minute'),
@@ -281,7 +287,7 @@ interface PaperQuestion {
   imageLink: string;
 }
 
-interface KeyItem {
+export interface KeyItem {
   id: string;
   correct: string;
   explanation: string;
@@ -475,7 +481,7 @@ async function existingStatuses(papers: Array<{ date: string }>): Promise<Record
 // case-insensitive. Boards keep the username snapshot they were built with:
 // resetting a username never rewrites a past board.
 // ---------------------------------------------------------------------------
-const USERNAME_RE = /^[A-Za-z0-9_]{3,24}$/;
+const USERNAME_RE = /^[A-Za-z0-9_]{4,16}$/;
 const USERNAME_LIST_CAP = 100;
 
 function entryView(d: any): Record<string, unknown> {
@@ -513,6 +519,7 @@ export function registerMockRoutes(app: express.Express): void {
     try {
       const caller = requireTos(req);
       const settings = validateSettingsBody(req.body || {});
+      settingsCache = null;
       await adminDb.collection(MOCK_SETTINGS).doc('global').set({
         ...settings,
         updatedAt: new Date().toISOString(),
@@ -596,7 +603,7 @@ export function registerMockRoutes(app: express.Express): void {
       const studentId = String(body.studentId ?? '').trim();
       const username = String(body.username ?? '').trim();
       if (!/^[a-zA-Z0-9_-]{1,128}$/.test(studentId)) throw httpError(400, 'That student id looks wrong.');
-      if (!USERNAME_RE.test(username)) throw httpError(400, 'Usernames are 3 to 24 letters, numbers or underscores.');
+      if (!USERNAME_RE.test(username)) throw httpError(400, 'Usernames are 4 to 16 letters, numbers or underscores.');
       const lower = username.toLowerCase();
       const studentSnap = await adminDb.collection('students').doc(studentId).get();
       if (!studentSnap.exists) throw httpError(404, 'Student record not found.');
@@ -921,6 +928,7 @@ export function registerMockRoutes(app: express.Express): void {
         throw httpError(409, `Freeze built ${paper.length} questions but the mock declares ${expected}. Nothing was written.`);
       }
       const durationMinutes = mock.examType === 'jamb' ? settings.jamb.durationMinutes : settings.waecNeco.durationMinutes;
+      const scoreScale = mock.examType === 'jamb' ? settings.jamb.scoreScale : settings.waecNeco.scoreScale;
       const batch = adminDb.batch();
       batch.set(adminDb.collection(MOCK_PAPERS).doc(id), {
         mockId: id,
@@ -928,6 +936,7 @@ export function registerMockRoutes(app: express.Express): void {
         date: mock.date,
         durationMinutes,
         questionCount: paper.length,
+        scoreScale,
         questions: paper,
       });
       // Server-only marking key: correct answers and explanations. Stored in
@@ -944,6 +953,7 @@ export function registerMockRoutes(app: express.Express): void {
         frozenBy: caller.uid,
         durationMinutes,
         questionCount: paper.length,
+        scoreScale,
         tallyShards: settings.tallyShards,
         updatedAt: new Date().toISOString(),
         updatedBy: caller.uid,
