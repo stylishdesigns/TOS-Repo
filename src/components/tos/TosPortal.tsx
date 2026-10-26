@@ -3,7 +3,7 @@ import { getAuth, signOut, updateProfile, updatePassword, reauthenticateWithCred
 import {
   LayoutDashboard, Users, Building2, Wallet, ScrollText, UserPlus, Loader2,
   RefreshCw, Send, Ban, CheckCircle2, PlayCircle, Check, Plus, ShieldCheck,
-  Clock, ArrowUpRight, Lock, UserRound, BookOpen, Library, CalendarDays, Copy,
+  Clock, ArrowUpRight, Lock, UserRound, BookOpen, CalendarDays, Copy,
 } from 'lucide-react';
 import {
   api, fmtDate, fmtDateTime, LEAD_STATUS_LABELS, STATUS_STYLES, Json,
@@ -738,18 +738,56 @@ const AccountTab: React.FC = () => {
   );
 };
 
+// N2: the sidebar groups its items into Business / Content / System. One
+// nav array still drives both the desktop sidebar and the mobile bottom bar
+// (mlabel is the short label the bar shows on phones).
+const GROUPS = ['Business', 'Content', 'System'] as const;
+
 const TABS = [
-  { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-  { id: 'leads', label: 'Leads', icon: UserPlus },
-  { id: 'centres', label: 'Centres', icon: Building2 },
-  { id: 'plans', label: 'Plans', icon: Wallet },
-  { id: 'questions', label: 'Question Bank', icon: BookOpen },
-  { id: 'library', label: 'Library', icon: Library },
-  { id: 'mocks', label: 'Mocks', icon: CalendarDays },
-  { id: 'audit', label: 'Audit log', icon: ScrollText },
-  { id: 'team', label: 'Team', icon: Users },
-  { id: 'account', label: 'Account', icon: UserRound },
+  { id: 'overview', label: 'Overview', mlabel: 'Home', icon: LayoutDashboard, group: 'Business' },
+  { id: 'leads', label: 'Leads', mlabel: 'Leads', icon: UserPlus, group: 'Business' },
+  { id: 'centres', label: 'Centres', mlabel: 'Centres', icon: Building2, group: 'Business' },
+  { id: 'plans', label: 'Plans', mlabel: 'Plans', icon: Wallet, group: 'Business' },
+  { id: 'questions', label: 'Question Bank', mlabel: 'Bank', icon: BookOpen, group: 'Content' },
+  { id: 'mocks', label: 'Mocks', mlabel: 'Mocks', icon: CalendarDays, group: 'Content' },
+  { id: 'audit', label: 'Audit log', mlabel: 'Audit', icon: ScrollText, group: 'System' },
+  { id: 'team', label: 'Team', mlabel: 'Team', icon: Users, group: 'System' },
+  { id: 'account', label: 'Account', mlabel: 'Account', icon: UserRound, group: 'System' },
 ] as const;
+
+// Question Bank shell (N2): one nav item, three tabs. Library is the default
+// and the last tab is remembered on this device; the Practice/Mock stream is
+// remembered by the screens themselves.
+const QB_SUB_KEY = 'TOS_qb_subtab';
+const QB_SUBS = [
+  { id: 'library', label: 'Library' },
+  { id: 'edit', label: 'Import & edit' },
+  { id: 'publish', label: 'Publish' },
+] as const;
+
+const QuestionBankShell: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
+  const [sub, setSub] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem(QB_SUB_KEY);
+      return saved === 'edit' || saved === 'publish' ? saved : 'library';
+    } catch { return 'library'; }
+  });
+  const pick = (id: string) => {
+    setSub(id);
+    try { localStorage.setItem(QB_SUB_KEY, id); } catch { /* storage unavailable */ }
+  };
+  return (
+    <div className="space-y-5">
+      <div className="flex gap-1.5 overflow-x-auto pb-0.5">
+        {QB_SUBS.map((t) => (
+          <button key={t.id} onClick={() => pick(t.id)} className={`min-h-[44px] px-5 py-2 rounded-xl text-sm font-bold border transition-all whitespace-nowrap ${sub === t.id ? 'bg-orange-500/15 text-orange-300 border-orange-500/30' : 'text-slate-400 border-white/10 hover:text-white'}`}>{t.label}</button>
+        ))}
+      </div>
+      {sub === 'library' && <QuestionLibraryTab refreshKey={refreshKey} />}
+      {sub !== 'library' && <QuestionBankTab refreshKey={refreshKey} view={sub === 'publish' ? 'publish' : 'edit'} />}
+    </div>
+  );
+};
 
 export const TosPortal: React.FC = () => {
   const [tab, setTab] = useState<string>('overview');
@@ -791,15 +829,22 @@ export const TosPortal: React.FC = () => {
             <p className="text-sm font-black text-white">Platform</p>
           </div>
         </div>
-        <nav className="space-y-1 flex-1">
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => { setTab(t.id); }}
-              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-colors ${tab === t.id ? 'bg-orange-500/15 text-orange-300 border border-orange-500/30' : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent'}`}
-            >
-              <t.icon className="w-4 h-4" /> {t.label}
-            </button>
+        <nav className="space-y-5 flex-1">
+          {GROUPS.map((g) => (
+            <div key={g}>
+              <p className="text-[9px] font-black uppercase tracking-[0.25em] text-slate-600 px-3.5 mb-1.5">{g}</p>
+              <div className="space-y-1">
+                {TABS.filter((t) => t.group === g).map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => { setTab(t.id); }}
+                    className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-colors ${tab === t.id ? 'bg-orange-500/15 text-orange-300 border border-orange-500/30' : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent'}`}
+                  >
+                    <t.icon className="w-4 h-4" /> {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           ))}
         </nav>
         <button onClick={signOutToLanding} className="text-slate-500 hover:text-slate-300 text-xs font-medium px-3.5 py-2 text-left flex items-center gap-2">
@@ -810,8 +855,8 @@ export const TosPortal: React.FC = () => {
       {/* Mobile tab bar */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 backdrop-blur border-t border-white/10 flex overflow-x-auto">
         {TABS.map((t) => (
-          <button key={t.id} onClick={() => setTab(t.id)} className={`flex-1 flex flex-col items-center gap-1 py-2.5 text-[10px] font-bold ${tab === t.id ? 'text-orange-300' : 'text-slate-500'}`}>
-            <t.icon className="w-4 h-4" /> {t.label}
+          <button key={t.id} onClick={() => setTab(t.id)} className={`flex-1 min-w-[64px] min-h-[44px] flex flex-col items-center justify-center gap-1 py-2 text-[10px] font-bold ${tab === t.id ? 'text-orange-300' : 'text-slate-500'}`}>
+            <t.icon className="w-4 h-4" /> {t.mlabel}
           </button>
         ))}
       </div>
@@ -825,8 +870,7 @@ export const TosPortal: React.FC = () => {
             {tab === 'leads' && 'Sign-ups from the public site. Verify, provision, or decline.'}
             {tab === 'centres' && 'Every centre, its plan, seats, billing and access code.'}
             {tab === 'plans' && 'Pricing, caps and feature flags. All stored as data.'}
-            {tab === 'questions' && 'Author questions once, publish to the CDN, and every centre practices from the same live bank.'}
-            {tab === 'library' && 'Browse, search and fix questions 50 at a time, fast at any bank size. Built for tens of thousands.'}
+            {tab === 'questions' && 'Browse, search and fix the bank, import new questions, and publish versions to the CDN.'}
             {tab === 'mocks' && "One mock a day for every centre's students. Create, freeze and manage them from here."}
             {tab === 'audit' && 'Every privileged action, recorded.'}
             {tab === 'team' && 'The people who run the platform.'}
@@ -837,7 +881,7 @@ export const TosPortal: React.FC = () => {
         {tab === 'overview' && <OverviewTab onOpenCentre={(id) => { setOpenCentreId(id); setTab('centres'); }} refreshKey={refreshKey} onDataLoaded={() => setRefreshKey((k) => k)} />}
         {tab === 'leads' && <LeadsTab refreshKey={refreshKey} />}
         {tab === 'centres' && <CentresTab refreshKey={refreshKey} openCentreId={openCentreId} onClearOpenCentre={() => setOpenCentreId('')} onDataChanged={() => setRefreshKey((k) => k + 1)} />}
-        {tab === 'questions' && <QuestionBankTab refreshKey={refreshKey} />}
+        {tab === 'questions' && <QuestionBankShell refreshKey={refreshKey} />}
         {tab === 'library' && <QuestionLibraryTab refreshKey={refreshKey} />}
         {tab === 'mocks' && <MocksTab refreshKey={refreshKey} />}
         {tab === 'plans' && <PlansTab />}

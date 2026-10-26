@@ -29,7 +29,15 @@ const DIFF_LABELS: Record<string, string> = { easy: 'Easy', hard: 'Hard' };
 type Scope = { type: 'subject' | 'topic' | 'year'; key: string; label: string } | null;
 
 export const QuestionLibraryTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
-  const [kind, setKind] = useState<'practice' | 'mock'>('practice');
+  // The stream is remembered on this device and shared with the Import &
+  // edit screen, so both halves of Question Bank follow the same stream.
+  const [kind, setKindState] = useState<'practice' | 'mock'>(() => {
+    try { return localStorage.getItem('TOS_qb_stream') === 'mock' ? 'mock' : 'practice'; } catch { return 'practice'; }
+  });
+  const setKind = (k: 'practice' | 'mock') => {
+    setKindState(k);
+    try { localStorage.setItem('TOS_qb_stream', k); } catch { /* storage unavailable */ }
+  };
   const [tree, setTree] = useState<Json | null>(null);
   const [tab, setTab] = useState('all');
   const [scope, setScope] = useState<Scope>(null);
@@ -383,7 +391,7 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number }> = ({ refreshKe
         </div>
       ))}
       {tree && (tree.subjects || []).length === 0 && (
-        <p className="text-xs text-slate-500 px-3 py-4">No counted subjects yet. Run Recount on the Authoring tab to build the tree.</p>
+        <p className="text-xs text-slate-500 px-3 py-4">No counted subjects yet. Run Recount on the Import & edit tab to build the tree.</p>
       )}
       <button onClick={openTopics} className="w-full mt-2 px-3 py-2.5 rounded-xl border border-slate-700/60 text-xs font-bold text-slate-300 hover:text-white min-h-[44px]">
         Manage topics (rename or merge)
@@ -461,7 +469,7 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number }> = ({ refreshKe
           <p className="font-bold text-amber-100">Set up needed</p>
           <p className="text-amber-200/90 mt-1">
             This stream has not had its one-time setup yet: Backfill (adds search keys to existing
-            questions) then Recount (builds the counts). Run both from the Authoring tab; nothing is
+            questions) then Recount (builds the counts). Run both from the Import & edit tab; nothing is
             written until you confirm each step. Existing questions only appear in search after the
             backfill finishes.
           </p>
@@ -630,7 +638,7 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number }> = ({ refreshKe
                   <span className="font-bold px-2 py-0.5 rounded-full bg-slate-800">{editor.item.klass}</span>
                   <span className="font-bold px-2 py-0.5 rounded-full bg-slate-800">{editor.item.examType}</span>
                 </div>
-                <p className="text-[11px] text-slate-500">Subject, topic and class are edited on the Authoring tab, where the guides live.</p>
+                <p className="text-[11px] text-slate-500">Subject, topic and class are edited on the Import & edit tab, where the guides live.</p>
                 <textarea value={editor.item.text} onChange={(e) => setEditorField('text', e.target.value)} rows={4} className={inputCls} />
                 {['A', 'B', 'C', 'D'].map((k) => {
                   const opt = (editor.item.options || []).find((o: any) => o.key === k);

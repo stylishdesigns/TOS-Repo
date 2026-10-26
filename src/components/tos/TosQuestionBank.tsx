@@ -72,8 +72,18 @@ const statusPill = (s: string) => (
   </span>
 );
 
-export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
-  const [kind, setKind] = useState<Kind>('practice');
+// Stream choice is remembered on this device and shared with the Library
+// screen, so both halves of Question Bank follow the same stream.
+const QB_STREAM_KEY = 'TOS_qb_stream';
+
+export const QuestionBankTab: React.FC<{ refreshKey: number; view?: 'edit' | 'publish' }> = ({ refreshKey, view = 'edit' }) => {
+  const [kind, setKindState] = useState<Kind>(() => {
+    try { return localStorage.getItem(QB_STREAM_KEY) === 'mock' ? 'mock' : 'practice'; } catch { return 'practice'; }
+  });
+  const setKind = (k: Kind) => {
+    setKindState(k);
+    try { localStorage.setItem(QB_STREAM_KEY, k); } catch { /* storage unavailable */ }
+  };
   const [data, setData] = useState<Json | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -467,8 +477,53 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
     </button>
   );
 
+  // Summary cards (N2): shown on the Import & edit tab and, with the publish
+  // button, on the Publish tab.
+  const summaryRow = (      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="bg-slate-900/70 border border-white/10 rounded-2xl p-4">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total questions</p>
+          <p className="text-2xl font-black text-white mt-1">{kindCounts.total ?? 0}</p>
+          <p className="text-[11px] text-slate-400 mt-1">{kindCounts.drafts || 0} drafts · {kindCounts.published || 0} published</p>
+        </div>
+        <div className="bg-slate-900/70 border border-white/10 rounded-2xl p-4">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Subjects</p>
+          <p className="text-2xl font-black text-white mt-1">{subjects.length}</p>
+          <p className="text-[11px] text-slate-400 mt-1 truncate">{subjects.slice(0, 4).join(', ') || '—'}</p>
+        </div>
+        <div className="bg-slate-900/70 border border-white/10 rounded-2xl p-4">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Years</p>
+          <p className="text-2xl font-black text-white mt-1">{bankYears.length}</p>
+          <p className="text-[11px] text-slate-400 mt-1 truncate">Each year is its own bank: {bankYears.slice(0, 4).join(', ') || '—'}</p>
+        </div>
+        <div className="bg-slate-900/70 border border-orange-500/30 rounded-2xl p-4">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Last published</p>
+          <p className="text-2xl font-black text-orange-300 mt-1">{kindMeta.currentVersion ? `v${kindMeta.currentVersion}` : 'Never'}</p>
+          <p className="text-[11px] text-slate-400 mt-1">
+            {kindMeta.currentPublishedAt ? new Date(kindMeta.currentPublishedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : 'Publish to make questions live'}
+          </p>
+        </div>
+      </div>  );
+
   return (
     <div className="space-y-5">
+      {view === 'publish' && (
+        <>
+          <Card title="Publish">
+            <p className="text-xs text-slate-400 mb-3">Publishing writes ONE versioned file to Cloudinary and marks every change live. Preview the change list first; nothing writes until you confirm.</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <button onClick={openPublish} className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-orange-500/50 bg-orange-500/10 hover:bg-orange-500/20 disabled:opacity-50 text-orange-300 font-bold text-sm transition-all">
+                <Send className="w-4 h-4" /> Publish changes
+              </button>
+              <button onClick={() => { load(); loadTree(); }} disabled={busy} className={btnGhost}><RefreshCw className={`w-4 h-4 ${busy ? 'animate-spin' : ''}`} /> Refresh</button>
+            </div>
+            {notice && <p className="text-xs text-rose-300 mt-2">{notice}</p>}
+            <p className="text-xs text-slate-500 mt-3">{kindMeta.currentVersion ? `Current live version: v${kindMeta.currentVersion}${kindMeta.currentPublishedAt ? `, published ${new Date(kindMeta.currentPublishedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}.` : 'Nothing published yet for this stream.'}</p>
+          </Card>
+          {summaryRow}
+        </>
+      )}
+      {view === 'edit' && (
+        <>
       {/* Stream switch */}
       <div className="flex items-center gap-2">
         {switchBtn('practice', 'Practice')}
@@ -479,9 +534,6 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
       {/* Header actions */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <button onClick={openPublish} className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-orange-500/50 bg-orange-500/10 hover:bg-orange-500/20 disabled:opacity-50 text-orange-300 font-bold text-sm transition-all">
-            <Send className="w-4 h-4" /> Publish changes
-          </button>
           <button onClick={() => { load(); loadTree(); }} disabled={busy} className={btnGhost}><RefreshCw className={`w-4 h-4 ${busy ? 'animate-spin' : ''}`} /> Refresh</button>
         </div>
         {notice && <p className="text-xs text-rose-300">{notice}</p>}
@@ -657,30 +709,8 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
           {setupMsg && <p className="font-semibold text-amber-100">{setupMsg}</p>}
         </div>
       )}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="bg-slate-900/70 border border-white/10 rounded-2xl p-4">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total questions</p>
-          <p className="text-2xl font-black text-white mt-1">{kindCounts.total ?? 0}</p>
-          <p className="text-[11px] text-slate-400 mt-1">{kindCounts.drafts || 0} drafts · {kindCounts.published || 0} published</p>
-        </div>
-        <div className="bg-slate-900/70 border border-white/10 rounded-2xl p-4">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Subjects</p>
-          <p className="text-2xl font-black text-white mt-1">{subjects.length}</p>
-          <p className="text-[11px] text-slate-400 mt-1 truncate">{subjects.slice(0, 4).join(', ') || '—'}</p>
-        </div>
-        <div className="bg-slate-900/70 border border-white/10 rounded-2xl p-4">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Years</p>
-          <p className="text-2xl font-black text-white mt-1">{bankYears.length}</p>
-          <p className="text-[11px] text-slate-400 mt-1 truncate">Each year is its own bank: {bankYears.slice(0, 4).join(', ') || '—'}</p>
-        </div>
-        <div className="bg-slate-900/70 border border-orange-500/30 rounded-2xl p-4">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Last published</p>
-          <p className="text-2xl font-black text-orange-300 mt-1">{kindMeta.currentVersion ? `v${kindMeta.currentVersion}` : 'Never'}</p>
-          <p className="text-[11px] text-slate-400 mt-1">
-            {kindMeta.currentPublishedAt ? new Date(kindMeta.currentPublishedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : 'Publish to make questions live'}
-          </p>
-        </div>
-      </div>
+      {summaryRow}
+
 
       {/* Filters */}
       <div className="flex flex-wrap gap-2">
@@ -925,6 +955,9 @@ export const QuestionBankTab: React.FC<{ refreshKey: number }> = ({ refreshKey }
             </div>
           </div>
         </div>
+      )}
+
+        </>
       )}
 
       {/* Publish review modal */}

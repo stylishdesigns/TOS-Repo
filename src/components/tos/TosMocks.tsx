@@ -623,7 +623,16 @@ export const MocksTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
   const [byDate, setByDate] = useState<Record<string, Json>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [panel, setPanel] = useState<Json>(null); // {mode:'create', date} | {mode:'detail', id} | {mode:'series'}
+  const [panel, setPanel] = useState<Json>(null); // {mode:'create', date} | {mode:'detail', id}
+  // N2: the Mocks screen carries three tabs; the last one is remembered on
+  // this device. A refresh still never closes an open panel.
+  const [subTab, setSubTabState] = useState<string>(() => {
+    try { const v = localStorage.getItem('TOS_mocks_subtab'); return v === 'series' || v === 'settings' ? v : 'calendar'; } catch { return 'calendar'; }
+  });
+  const setSubTab = (s: string) => {
+    setSubTabState(s);
+    try { localStorage.setItem('TOS_mocks_subtab', s); } catch { /* storage unavailable */ }
+  };
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState('');
 
@@ -656,7 +665,20 @@ export const MocksTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
     setCreateError('');
   };
 
+  const MOCK_SUBS = [
+    { id: 'calendar', label: 'Calendar' },
+    { id: 'series', label: 'Series builder' },
+    { id: 'settings', label: 'Settings' },
+  ] as const;
+
   return (
+    <div className="space-y-5">
+      <div className="flex gap-1.5 overflow-x-auto pb-0.5">
+        {MOCK_SUBS.map((s) => (
+          <button key={s.id} onClick={() => setSubTab(s.id)} className={`min-h-[44px] px-5 py-2 rounded-xl text-sm font-bold border transition-all whitespace-nowrap ${subTab === s.id ? 'bg-orange-500/15 text-orange-300 border-orange-500/30' : 'text-slate-400 border-white/10 hover:text-white'}`}>{s.label}</button>
+        ))}
+      </div>
+      {subTab === 'calendar' && (
     <div className="grid lg:grid-cols-[1fr_380px] gap-5 items-start">
       <Card>
         <div className="flex items-center justify-between mb-4">
@@ -691,10 +713,9 @@ export const MocksTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
           ))}
         </div>
         <p className="text-xs text-slate-500 mt-3">Tap a free day to create a mock for that date, or a filled day to open it. One mock per day.</p>
-        <button onClick={() => setPanel({ mode: 'series' })} className={`${btnGhost} mt-3`}><CalendarDays className="w-4 h-4" /> Build a WAEC/NECO series</button>
       </Card>
 
-      <Card title={panel?.mode === 'create' ? `New mock · ${panel.date}` : panel?.mode === 'series' ? 'WAEC/NECO series builder' : panel?.mode === 'detail' ? 'Mock' : 'Mocks'}>
+      <Card title={panel?.mode === 'create' ? `New mock · ${panel.date}` : panel?.mode === 'detail' ? 'Mock' : 'Mocks'}>
         {!panel && (
           <p className="text-sm text-slate-400">Pick a day on the calendar to create a mock, or open an existing one. Scheduling freezes the paper: questions are drawn from the mock bank and the marking key stays on the server.</p>
         )}
@@ -716,11 +737,23 @@ export const MocksTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
             {createError && <p className="text-rose-300 text-sm mt-3">{createError}</p>}
           </>
         )}
-        {panel?.mode === 'series' && <SeriesPanel onCreated={load} />}
         {panel?.mode === 'detail' && (
           <MockDetail mockId={panel.id} onChanged={load} onClose={() => setPanel(null)} />
         )}
       </Card>
+    </div>
+      )}
+      {subTab === 'series' && (
+        <Card title="WAEC/NECO series builder">
+          <p className="text-xs text-slate-400 mb-3">Creates a draft WAEC/NECO paper on a repeating pair of days each month. Preview the plan first; nothing is written until you confirm.</p>
+          <SeriesPanel onCreated={load} />
+        </Card>
+      )}
+      {subTab === 'settings' && (
+        <Card title="Mock settings">
+          <p className="text-sm text-slate-400">Mock durations, compulsory subjects and the results release time live in one settings document, and changing them never alters a mock that is already scheduled. The editable settings screen ships in the next build; the server defaults apply until then.</p>
+        </Card>
+      )}
     </div>
   );
 };
