@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   CalendarDays, ChevronLeft, ChevronRight, Loader2, Plus, Trash2,
-  AlertTriangle, CheckCircle2, FileText, RefreshCw, Rocket, X,
+  AlertTriangle, CheckCircle2, FileText, RefreshCw, Rocket, Trophy, X,
 } from 'lucide-react';
 import { api, Card, Field, inputCls, btnPrimary, btnGhost, fmtDateTime } from './tosShared';
 
@@ -32,11 +32,12 @@ const STATUS_STYLES: Record<string, string> = {
   released: 'bg-orange-500/15 text-orange-300 border-orange-400/30',
   archived: 'bg-slate-500/15 text-slate-400 border-slate-400/20',
   cancelled: 'bg-rose-500/15 text-rose-300 border-rose-400/30',
+  void: 'bg-purple-500/15 text-purple-300 border-purple-400/30',
 };
 
 const STATUS_LABELS: Record<string, string> = {
   draft: 'Draft', scheduled: 'Scheduled', live: 'Live', closed: 'Closed',
-  released: 'Results out', archived: 'Archived', cancelled: 'Cancelled',
+  released: 'Results out', archived: 'Archived', cancelled: 'Cancelled', void: 'Voided',
 };
 
 const EXAM_LABELS: Record<string, string> = { jamb: 'JAMB', waec_neco: 'WAEC/NECO' };
@@ -259,10 +260,12 @@ const MockDetail: React.FC<{ mockId: string; onChanged: () => void; onClose: () 
   const [loadError, setLoadError] = useState('');
   const [readiness, setReadiness] = useState<Json | null>(null);
   const [checking, setChecking] = useState(false);
-  const [confirming, setConfirming] = useState<'' | 'schedule' | 'cancel' | 'release'>('');
+  const [confirming, setConfirming] = useState<'' | 'schedule' | 'cancel' | 'release' | 'void'>('');
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
   const [showPaper, setShowPaper] = useState(false);
+  const [showBoard, setShowBoard] = useState(false);
+  const [showCorrect, setShowCorrect] = useState(false);
   const [editing, setEditing] = useState(false);
 
   const load = useCallback(async () => {
@@ -293,6 +296,18 @@ const MockDetail: React.FC<{ mockId: string; onChanged: () => void; onClose: () 
     setBusy(true); setNotice('');
     try {
       await api(`/api/tos/mocks/${mockId}/cancel`, { method: 'POST' });
+      setConfirming(''); await load(); onChanged();
+    } catch (e: any) { setNotice(e.message); }
+    finally { setBusy(false); }
+  };
+
+  const doVoid = async () => {
+    setBusy(true); setNotice('');
+    try {
+      const r = await api(`/api/tos/mocks/${mockId}/void`, { method: 'POST', body: { confirm: 'VOID' } });
+      setNotice(r.hadBoard
+        ? 'Voided. The leaderboard is hidden and these results do not count.'
+        : 'Voided. The date can be reused for a fresh mock.');
       setConfirming(''); await load(); onChanged();
     } catch (e: any) { setNotice(e.message); }
     finally { setBusy(false); }
@@ -418,9 +433,14 @@ const MockDetail: React.FC<{ mockId: string; onChanged: () => void; onClose: () 
             <div className="flex flex-wrap gap-2">
               <button onClick={() => setShowPaper(!showPaper)} className={btnGhost}><FileText className="w-4 h-4" /> {showPaper ? 'Hide paper' : 'Preview paper'}</button>
               <button onClick={() => { setConfirming('cancel'); setShowPaper(false); }} className={btnGhost}>Cancel mock</button>
+              <button onClick={() => setShowCorrect(!showCorrect)} className={btnGhost}>Correct a question</button>
+              {confirming !== 'void' && <button onClick={() => setConfirming('void')} className={btnGhost}>Void this mock</button>}
             </div>
           )}
           {isScheduled && showPaper && <Card title="Frozen paper"><PaperPreview mockId={mockId} /></Card>}
+          {isScheduled && confirming === 'void' && (
+            <TypedConfirm word="VOID" label="Void this mock" busy={busy} onConfirm={doVoid} onCancel={() => setConfirming('')} />
+          )}
 
           {mock.status !== 'draft' && monitor && (
             <Card title="Monitor">
@@ -452,10 +472,26 @@ const MockDetail: React.FC<{ mockId: string; onChanged: () => void; onClose: () 
               {['live', 'closed', 'released', 'archived'].includes(mock.status) && (
                 <button onClick={() => setShowPaper(!showPaper)} className={btnGhost}><FileText className="w-4 h-4" /> {showPaper ? 'Hide paper' : 'Preview paper'}</button>
               )}
+              {mock.status === 'released' && (
+                <button onClick={() => setShowBoard(!showBoard)} className={btnGhost}><Trophy className="w-4 h-4" /> {showBoard ? 'Hide leaderboard' : 'View leaderboard'}</button>
+              )}
+              {['scheduled', 'released'].includes(mock.status) && (
+                <button onClick={() => setShowCorrect(!showCorrect)} className={btnGhost}>Correct a question</button>
+              )}
+              {['scheduled', 'released'].includes(mock.status) && confirming !== 'void' && (
+                <button onClick={() => setConfirming('void')} className={btnGhost}>Void this mock</button>
+              )}
               <p className="text-xs text-slate-500 self-center">A {STATUS_LABELS[mock.status] || mock.status} mock is read-only here.</p>
             </div>
           )}
           {!isDraft && !isScheduled && showPaper && <Card title="Frozen paper"><PaperPreview mockId={mockId} /></Card>}
+          {mock.status === 'released' && showBoard && <Card title="Leaderboard"><BoardView mockId={mockId} /></Card>}
+          {['scheduled', 'released'].includes(mock.status) && showCorrect && (
+            <Card title="Correct a question"><CorrectPanel mockId={mockId} released={mock.status === 'released'} /></Card>
+          )}
+          {!isDraft && !isScheduled && ['scheduled', 'released'].includes(mock.status) && confirming === 'void' && (
+            <TypedConfirm word="VOID" label="Void this mock" busy={busy} onConfirm={doVoid} onCancel={() => setConfirming('')} />
+          )}
 
           {notice && <p className="text-sm text-orange-300">{notice}</p>}
         </>
@@ -616,6 +652,405 @@ const SeriesPanel: React.FC<{ onCreated: () => void }> = ({ onCreated }) => {
 };
 
 // ---------------------------------------------------------------------------
+// M5b: the leaderboard view. The server serves the released board (top 100,
+// usernames only); this just shows it. A GET, so nothing is written.
+// ---------------------------------------------------------------------------
+const fmtMs = (ms: number) => {
+  if (!Number.isFinite(ms) || ms <= 0) return '';
+  const m = Math.floor(ms / 60000);
+  const s = Math.round((ms % 60000) / 1000);
+  return m > 0 ? `${m}m ${s}s` : `${s}s`;
+};
+
+const BoardView: React.FC<{ mockId: string }> = ({ mockId }) => {
+  const [board, setBoard] = useState<Json | null>(null);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true); setError('');
+    try { setBoard(await api(`/api/tos/mocks/${mockId}/board`)); }
+    catch (e: any) { setError(e.message); }
+    finally { setLoading(false); }
+  }, [mockId]);
+  useEffect(() => { setBoard(null); load(); }, [load]);
+
+  if (loading) return <div className="flex items-center gap-2 text-slate-400 text-sm py-4"><Loader2 className="w-4 h-4 animate-spin" /> Loading the board…</div>;
+  if (error) return (
+    <div className="space-y-2">
+      <p className="text-rose-300 text-sm">{error}</p>
+      <button onClick={load} className={btnGhost}><RefreshCw className="w-4 h-4" /> Try again</button>
+    </div>
+  );
+  const entries = board?.board?.entries || [];
+  return (
+    <div className="space-y-2">
+      <p className="text-xs text-slate-400">
+        Top {entries.length} of {board?.board?.totalAttempts ?? '…'} marked attempts · released {fmtDateTime(board?.board?.releasedAt)}. One board across all centres; usernames only.
+      </p>
+      {entries.length === 0 && <p className="text-sm text-slate-400">No entries on this board.</p>}
+      <div className="max-h-[380px] overflow-y-auto pr-1 space-y-1.5">
+        {entries.map((e: Json, i: number) => (
+          <div key={i} className="flex items-center gap-3 bg-slate-950/40 border border-white/5 rounded-xl px-3 py-2">
+            <span className="text-sm font-black text-orange-300 w-12 shrink-0">#{e.rank}</span>
+            <span className="text-sm text-white flex-1 truncate">{e.username}</span>
+            <span className="text-sm text-slate-300 shrink-0">{e.score}</span>
+            <span className="text-[11px] text-slate-500 shrink-0 w-16 text-right">{fmtMs(e.sortMs)}</span>
+          </div>
+        ))}
+      </div>
+      <p className="text-[11px] text-slate-500">Score = questions correct. Ties share a rank; the faster finish sits higher.</p>
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// M5b: the username register tools. One username per student, kept in a
+// server-side register; the boards keep the snapshot they were built with,
+// so a reset never rewrites a past board.
+// ---------------------------------------------------------------------------
+const UsernamePanel: React.FC = () => {
+  const [q, setQ] = useState('');
+  const [entries, setEntries] = useState<Json[] | null>(null);
+  const [studentId, setStudentId] = useState('');
+  const [username, setUsername] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState('');
+  const [error, setError] = useState('');
+  const [freeing, setFreeing] = useState('');
+
+  const search = useCallback(async (query: string) => {
+    setBusy(true); setError(''); setNotice('');
+    try {
+      const r = await api(`/api/tos/mock-usernames${query ? `?q=${encodeURIComponent(query)}` : ''}`);
+      setEntries(r.entries || []);
+    } catch (e: any) { setError(e.message); }
+    finally { setBusy(false); }
+  }, []);
+  useEffect(() => { search(''); }, [search]);
+
+  const lookupStudent = async () => {
+    if (!studentId.trim()) return;
+    setBusy(true); setError(''); setNotice('');
+    try {
+      const r = await api(`/api/tos/mock-usernames?studentId=${encodeURIComponent(studentId.trim())}`);
+      setEntries(r.entries || []);
+      if ((r.entries || []).length === 0) setNotice('That student has no username yet.');
+    } catch (e: any) { setError(e.message); }
+    finally { setBusy(false); }
+  };
+
+  const assign = async () => {
+    setBusy(true); setError(''); setNotice('');
+    try {
+      const r = await api('/api/tos/mock-usernames', { method: 'POST', body: { studentId: studentId.trim(), username: username.trim() } });
+      setNotice(r.freed && r.freed.length
+        ? `Saved. ${r.username} now belongs to that student; their old username ${r.freed.join(', ')} was freed.`
+        : `Saved. ${r.username} now belongs to that student.`);
+      setUsername('');
+      await search(q.trim());
+    } catch (e: any) { setError(e.message); }
+    finally { setBusy(false); }
+  };
+
+  const free = async (sid: string) => {
+    setBusy(true); setError(''); setNotice('');
+    try {
+      const r = await api(`/api/tos/mock-usernames/${encodeURIComponent(sid)}`, { method: 'DELETE' });
+      setNotice(`Freed ${(r.freed || []).join(', ')}.`);
+      setFreeing('');
+      await search(q.trim());
+    } catch (e: any) { setError(e.message); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <div className="space-y-4">
+      <p className="text-xs text-slate-400">
+        The leaderboard shows usernames only, one name per student, unique across every centre. Assign it here; a past board keeps the name it was built with.
+      </p>
+      <div className="flex gap-2">
+        <input className={inputCls} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search usernames" maxLength={64} />
+        <button onClick={() => search(q.trim())} disabled={busy} className={btnGhost}>{busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} Search</button>
+      </div>
+      <div className="bg-slate-950/40 border border-white/5 rounded-xl p-3 space-y-2">
+        <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Assign or change</p>
+        <input className={inputCls} value={studentId} onChange={(e) => setStudentId(e.target.value)} placeholder="Student ID (copy it from the Students tab)" maxLength={128} />
+        <div className="flex gap-2">
+          <input className={inputCls} value={username} onChange={(e) => setUsername(e.target.value)} placeholder="New username (3-24 letters, numbers, _)" maxLength={24} />
+          <button onClick={assign} disabled={busy || !studentId.trim() || !username.trim()} className={btnPrimary}>Save</button>
+        </div>
+        <button onClick={lookupStudent} disabled={busy || !studentId.trim()} className={btnGhost}>Look up this student's username</button>
+      </div>
+      {entries && entries.length === 0 && <p className="text-sm text-slate-400">No usernames match yet. Assign the first one above.</p>}
+      <div className="space-y-1.5">
+        {(entries || []).map((e: Json, i: number) => (
+          <div key={i} className="flex items-center gap-3 bg-slate-950/40 border border-white/5 rounded-xl px-3 py-2">
+            <span className="text-sm font-black text-orange-300 flex-1 truncate">{e.username}</span>
+            <span className="text-xs text-slate-400 flex-1 truncate">{e.studentName || e.studentId}</span>
+            <span className="text-[11px] text-slate-500 shrink-0">{e.centreId || '—'}</span>
+            {freeing === e.studentId ? (
+              <button onClick={() => free(e.studentId)} disabled={busy} className="text-xs font-bold text-rose-300 hover:text-rose-200 px-2 min-h-[44px]">Tap again to free</button>
+            ) : (
+              <button onClick={() => setFreeing(e.studentId)} className="text-xs text-slate-400 hover:text-rose-300 px-2 min-h-[44px]">Free</button>
+            )}
+          </div>
+        ))}
+      </div>
+      {notice && <p className="text-sm text-orange-300">{notice}</p>}
+      {error && <p className="text-sm text-rose-300">{error}</p>}
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// M5b: the mock settings screen. Settings are defaults for future mocks; a
+// mock that is already scheduled keeps the values it was frozen with.
+// ---------------------------------------------------------------------------
+const SettingsPanel: React.FC = () => {
+  const [s, setS] = useState<Json | null>(null);
+  const [stored, setStored] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState('');
+  const [error, setError] = useState('');
+
+  const load = useCallback(async () => {
+    setLoading(true); setError(''); setNotice('');
+    try {
+      const r = await api('/api/tos/mocks/settings');
+      setS({ ...r.settings, compulsorySubjectsText: (r.settings?.compulsorySubjects || []).join(', ') });
+      setStored(r.stored);
+    } catch (e: any) { setError(e.message); }
+    finally { setLoading(false); }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const set = (path: string, value: any) => {
+    setS((cur: Json) => {
+      const next = { ...cur };
+      const [a, b] = path.split('.');
+      if (b) next[a] = { ...next[a], [b]: value };
+      else next[a] = value;
+      return next;
+    });
+  };
+
+  const save = async () => {
+    setBusy(true); setError(''); setNotice('');
+    try {
+      const body = {
+        jamb: {
+          durationMinutes: Number(s.jamb.durationMinutes),
+          compulsorySubject: s.jamb.compulsorySubject,
+          compulsoryCount: Number(s.jamb.compulsoryCount),
+          otherCount: Number(s.jamb.otherCount),
+          subjectCount: Number(s.jamb.subjectCount),
+        },
+        waecNeco: { durationMinutes: Number(s.waecNeco.durationMinutes) },
+        compulsorySubjects: String(s.compulsorySubjectsText || '').split(',').map((x: string) => x.trim()).filter(Boolean),
+        releaseHourLagos: Number(s.releaseHourLagos),
+        releaseMinuteLagos: Number(s.releaseMinuteLagos),
+        tallyShards: Number(s.tallyShards),
+      };
+      const r = await api('/api/tos/mocks/settings', { method: 'POST', body });
+      setS({ ...r.settings, compulsorySubjectsText: (r.settings?.compulsorySubjects || []).join(', ') });
+      setStored(true);
+      setNotice('Saved. New values apply to mocks scheduled from now on; a mock that is already scheduled keeps the values it was frozen with.');
+    } catch (e: any) { setError(e.message); }
+    finally { setBusy(false); }
+  };
+
+  if (loading) return <div className="flex items-center gap-2 text-slate-400 text-sm py-4"><Loader2 className="w-4 h-4 animate-spin" /> Loading settings…</div>;
+  if (error && !s) return (
+    <div className="space-y-2">
+      <p className="text-rose-300 text-sm">{error}</p>
+      <button onClick={load} className={btnGhost}><RefreshCw className="w-4 h-4" /> Try again</button>
+    </div>
+  );
+  if (!s) return null;
+  const num = (label: string, path: string, lo: number, hi: number) => (
+    <label className="block space-y-1">
+      <span className="text-xs text-slate-400">{label}</span>
+      <input className={inputCls} type="number" min={lo} max={hi} value={path.split('.').reduce((o: Json, k: string) => o?.[k], s)} onChange={(e) => set(path, e.target.value === '' ? '' : Number(e.target.value))} />
+    </label>
+  );
+  return (
+    <div className="space-y-4">
+      {!stored && <p className="text-xs text-amber-300">Nothing stored yet: these are the platform defaults. Saving makes them yours.</p>}
+      <div className="bg-slate-950/40 border border-white/5 rounded-xl p-3 space-y-3">
+        <p className="text-xs font-bold uppercase tracking-wider text-slate-500">JAMB mock</p>
+        <div className="grid grid-cols-2 gap-3">
+          {num('Duration (minutes)', 'jamb.durationMinutes', 15, 360)}
+          {num('Subjects per mock', 'jamb.subjectCount', 1, 12)}
+          {num('Compulsory subject questions', 'jamb.compulsoryCount', 1, 500)}
+          {num('Other subject questions', 'jamb.otherCount', 1, 500)}
+        </div>
+        <label className="block space-y-1">
+          <span className="text-xs text-slate-400">Compulsory subject name</span>
+          <input className={inputCls} value={s.jamb.compulsorySubject} onChange={(e) => set('jamb.compulsorySubject', e.target.value)} maxLength={80} />
+        </label>
+      </div>
+      <div className="bg-slate-950/40 border border-white/5 rounded-xl p-3 space-y-3">
+        <p className="text-xs font-bold uppercase tracking-wider text-slate-500">WAEC/NECO mock</p>
+        {num('Duration (minutes)', 'waecNeco.durationMinutes', 15, 360)}
+      </div>
+      <div className="bg-slate-950/40 border border-white/5 rounded-xl p-3 space-y-3">
+        <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Series and results</p>
+        <label className="block space-y-1">
+          <span className="text-xs text-slate-400">Compulsory subjects for the series builder (comma-separated)</span>
+          <input className={inputCls} value={s.compulsorySubjectsText} onChange={(e) => set('compulsorySubjectsText', e.target.value)} />
+        </label>
+        <div className="grid grid-cols-2 gap-3">
+          {num('Results release hour (Lagos)', 'releaseHourLagos', 0, 23)}
+          {num('Results release minute', 'releaseMinuteLagos', 0, 59)}
+          {num('Tally shards', 'tallyShards', 1, 8)}
+        </div>
+        <p className="text-[11px] text-slate-500">Timezone stays Africa/Lagos. Every mock copies what it needs when it is scheduled, so changing these never alters a Scheduled mock.</p>
+      </div>
+      <button onClick={save} disabled={busy} className={btnPrimary}>{busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />} Save settings</button>
+      {notice && <p className="text-sm text-orange-300">{notice}</p>}
+      {error && <p className="text-sm text-rose-300">{error}</p>}
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// M5c: correct one question on a frozen or released paper. The correct
+// answer is never shown on any screen: the picker only sets which option
+// SHOULD be correct, and only the server writes it. On a released mock the
+// marks already counted stand; if the fix is material, void the mock.
+// ---------------------------------------------------------------------------
+const CorrectPanel: React.FC<{ mockId: string; released: boolean }> = ({ mockId, released }) => {
+  const [paper, setPaper] = useState<Json | null>(null);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [find, setFind] = useState('');
+  const [page, setPage] = useState(0);
+  const [pickedIdx, setPickedIdx] = useState<number | null>(null);
+  const [form, setForm] = useState<Json | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState('');
+
+  const load = useCallback(async () => {
+    setLoading(true); setError('');
+    try { setPaper(await api(`/api/tos/mocks/${mockId}/paper`)); }
+    catch (e: any) { setError(e.message); }
+    finally { setLoading(false); }
+  }, [mockId]);
+  useEffect(() => { setPaper(null); setPickedIdx(null); setForm(null); load(); }, [load]);
+
+  const questions: Json[] = paper?.paper?.questions || [];
+  const filtered = useMemo(() => {
+    const f = find.trim().toLowerCase();
+    const all = questions.map((q: Json, i: number) => ({ q, i }));
+    if (!f) return all;
+    const num = /^\d+$/.test(f) ? Number(f) : null;
+    return all.filter(({ q, i }) => (num !== null && i + 1 === num)
+      || String(q.id).toLowerCase().includes(f)
+      || String(q.text).toLowerCase().includes(f));
+  }, [questions, find]);
+  const pageSlice = filtered.slice(page * 25, page * 25 + 25);
+
+  const pick = (i: number) => {
+    const q = questions[i];
+    setPickedIdx(i);
+    setForm({ text: q.text, options: (q.options || []).slice(), correctIndex: null, explanation: '' });
+    setNotice('');
+  };
+
+  const setOpt = (j: number, v: string) => setForm((f: Json) => ({ ...f, options: f.options.map((o: string, k: number) => (k === j ? v : o)) }));
+
+  const save = async () => {
+    if (pickedIdx === null || !form) return;
+    const patch: Json = {};
+    if (form.text !== questions[pickedIdx].text) patch.question = form.text;
+    if (JSON.stringify(form.options) !== JSON.stringify(questions[pickedIdx].options)) patch.options = form.options;
+    if (form.correctIndex !== null) patch.correctIndex = form.correctIndex;
+    if (form.explanation.trim()) patch.explanation = form.explanation.trim();
+    if (patch.question === undefined && patch.options === undefined && patch.correctIndex === undefined && patch.explanation === undefined) {
+      setNotice('Change something first: edit the text, an option, the answer or the explanation.');
+      return;
+    }
+    setBusy(true); setError(''); setNotice('');
+    try {
+      await api(`/api/tos/mocks/${mockId}/correct-question`, { method: 'POST', body: { questionId: questions[pickedIdx].id, patch } });
+      setNotice(`Saved to the paper and the marking key.${released ? ' Scores already released stand.' : ''}`);
+      setPickedIdx(null); setForm(null);
+      await load();
+    } catch (e: any) { setError(e.message); }
+    finally { setBusy(false); }
+  };
+
+  if (loading) return <div className="flex items-center gap-2 text-slate-400 text-sm py-4"><Loader2 className="w-4 h-4 animate-spin" /> Loading the paper…</div>;
+  if (error) return (
+    <div className="space-y-2">
+      <p className="text-rose-300 text-sm">{error}</p>
+      <button onClick={load} className={btnGhost}><RefreshCw className="w-4 h-4" /> Try again</button>
+    </div>
+  );
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-slate-400">
+        Correct a question on the frozen paper. The current answer is never shown here; pick the option that should be correct.{released ? ' Scores already released stand; if the fix should change results, void the mock.' : ''}
+      </p>
+      {pickedIdx === null ? (
+        <>
+          <input className={inputCls} value={find} onChange={(e) => { setFind(e.target.value); setPage(0); }} placeholder="Find: question number, id or words from the text" />
+          <div className="max-h-[340px] overflow-y-auto pr-1 space-y-1.5">
+            {pageSlice.map(({ q, i }: Json) => (
+              <button key={q.id} onClick={() => pick(i)} className="w-full text-left bg-slate-950/40 border border-white/5 rounded-xl px-3 py-2 hover:border-orange-500/40">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-0.5">{i + 1} · {q.subject}{q.topic ? ` · ${q.topic}` : ''}</p>
+                <p className="text-sm text-white truncate">{q.text}</p>
+              </button>
+            ))}
+            {pageSlice.length === 0 && <p className="text-sm text-slate-400">Nothing matches that search.</p>}
+          </div>
+          {filtered.length > 25 && (
+            <div className="flex items-center gap-2">
+              <button onClick={() => setPage(Math.max(0, page - 1))} disabled={page === 0} className={btnGhost}>Back</button>
+              <span className="text-xs text-slate-500">Page {page + 1} of {Math.ceil(filtered.length / 25)}</span>
+              <button onClick={() => setPage(page + 1)} disabled={(page + 1) * 25 >= filtered.length} className={btnGhost}>Next</button>
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="space-y-3">
+          <button onClick={() => { setPickedIdx(null); setForm(null); }} className={btnGhost}>Back to the list</button>
+          <label className="block space-y-1">
+            <span className="text-xs text-slate-400">Question text</span>
+            <textarea className={inputCls} rows={4} value={form.text} onChange={(e) => setForm((f: Json) => ({ ...f, text: e.target.value }))} />
+          </label>
+          <div className="space-y-1.5">
+            <p className="text-xs text-slate-400">Options (text only; the count stays the same)</p>
+            {form.options.map((o: string, j: number) => (
+              <div key={j} className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-400 w-4">{String.fromCharCode(65 + j)}</span>
+                <input className={inputCls} value={o} onChange={(e) => setOpt(j, e.target.value)} maxLength={300} />
+              </div>
+            ))}
+          </div>
+          <label className="block space-y-1">
+            <span className="text-xs text-slate-400">The correct answer (pick the option that should be correct)</span>
+            <select className={inputCls} value={form.correctIndex ?? ''} onChange={(e) => setForm((f: Json) => ({ ...f, correctIndex: e.target.value === '' ? null : Number(e.target.value) }))}>
+              <option value="">No change</option>
+              {form.options.map((_: string, j: number) => <option key={j} value={j}>{String.fromCharCode(65 + j)}</option>)}
+            </select>
+          </label>
+          <label className="block space-y-1">
+            <span className="text-xs text-slate-400">Explanation (leave empty to keep the current one)</span>
+            <textarea className={inputCls} rows={3} value={form.explanation} onChange={(e) => setForm((f: Json) => ({ ...f, explanation: e.target.value }))} />
+          </label>
+          <button onClick={save} disabled={busy} className={btnPrimary}>{busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />} Save correction</button>
+        </div>
+      )}
+      {notice && <p className="text-sm text-orange-300">{notice}</p>}
+      {error && <p className="text-sm text-rose-300">{error}</p>}
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
 // The tab: month calendar with a side panel for create and detail.
 // ---------------------------------------------------------------------------
 export const MocksTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
@@ -627,7 +1062,7 @@ export const MocksTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
   // N2: the Mocks screen carries three tabs; the last one is remembered on
   // this device. A refresh still never closes an open panel.
   const [subTab, setSubTabState] = useState<string>(() => {
-    try { const v = localStorage.getItem('TOS_mocks_subtab'); return v === 'series' || v === 'settings' ? v : 'calendar'; } catch { return 'calendar'; }
+    try { const v = localStorage.getItem('TOS_mocks_subtab'); return v === 'series' || v === 'settings' || v === 'usernames' ? v : 'calendar'; } catch { return 'calendar'; }
   });
   const setSubTab = (s: string) => {
     setSubTabState(s);
@@ -668,6 +1103,7 @@ export const MocksTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
   const MOCK_SUBS = [
     { id: 'calendar', label: 'Calendar' },
     { id: 'series', label: 'Series builder' },
+    { id: 'usernames', label: 'Usernames' },
     { id: 'settings', label: 'Settings' },
   ] as const;
 
@@ -749,9 +1185,14 @@ export const MocksTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
           <SeriesPanel onCreated={load} />
         </Card>
       )}
+      {subTab === 'usernames' && (
+        <Card title="Leaderboard usernames">
+          <UsernamePanel />
+        </Card>
+      )}
       {subTab === 'settings' && (
         <Card title="Mock settings">
-          <p className="text-sm text-slate-400">Mock durations, compulsory subjects and the results release time live in one settings document, and changing them never alters a mock that is already scheduled. The editable settings screen ships in the next build; the server defaults apply until then.</p>
+          <SettingsPanel />
         </Card>
       )}
     </div>

@@ -26,7 +26,7 @@ import { Caller, httpError } from './tenantService';
  *   mocks           one document per mock, id = mock-<YYYY-MM-DD>: the id IS
  *                   the date, so one-mock-per-day is structural. Statuses:
  *                   draft | scheduled | live | closed | released | archived |
- *                   cancelled.
+ *                   cancelled | void.
  *   mockPapers      the frozen paper: questions and options only.
  *   mockKeys        the server-only marking key: correct + explanation.
  *   mockAttempts    one per student per mock (later student-side piece):
@@ -45,8 +45,9 @@ import { Caller, httpError } from './tenantService';
  *                   shards. Changing settings never alters a Scheduled mock:
  *                   the freeze copies the values it needs, and nothing reads
  *                   settings after freeze.
- *   usernames       the uniqueness register (later piece): one doc per
- *                   claimed username pointing to the student.
+ *   usernames       the uniqueness register (piece M5b): one doc per claimed
+ *                   username pointing to the student. Boards keep the username
+ *                   snapshot they were built with.
  *
  * There is deliberately NO per-student review collection: the post-release
  * review is built on request from the attempt plus the paper and the key
@@ -60,10 +61,11 @@ export const MOCK_LEADERBOARDS = 'mockLeaderboards';
 const MOCK_PAPERS = 'mockPapers';
 const MOCK_KEYS = 'mockKeys';
 const MOCK_SETTINGS = 'mockSettings'; // doc id 'global'
+const USERNAMES = 'usernames'; // doc id = the username lowercased
 const QB_QUESTIONS = 'qbQuestions';
 const QB_SCAN_CAP = 2000; // same windowed-read ceiling the bank uses
 
-const STATUSES = ['draft', 'scheduled', 'live', 'closed', 'released', 'archived', 'cancelled'] as const;
+const STATUSES = ['draft', 'scheduled', 'live', 'closed', 'released', 'archived', 'cancelled', 'void'] as const;
 type MockStatus = (typeof STATUSES)[number];
 const EXAM_TYPES = ['jamb', 'waec_neco'] as const;
 type ExamType = (typeof EXAM_TYPES)[number];
@@ -467,6 +469,31 @@ async function existingStatuses(papers: Array<{ date: string }>): Promise<Record
 // ---------------------------------------------------------------------------
 // Routes. TOS staff only, on the server.
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// M5b: the username register. One doc per claimed leaderboard username, the
+// doc id being the username lowercased, so uniqueness is structural and
+// case-insensitive. Boards keep the username snapshot they were built with:
+// resetting a username never rewrites a past board.
+// ---------------------------------------------------------------------------
+const USERNAME_RE = /^[A-Za-z0-9_]{3,24}$/;
+const USERNAME_LIST_CAP = 100;
+
+function entryView(d: any): Record<string, unknown> {
+  const data = d.data ? d.data() : d;
+  return {
+    username: String(data?.username || d.id),
+    studentId: String(data?.studentId || ''),
+    studentName: String(data?.studentName || ''),
+    centreId: String(data?.centreId || ''),
+    updatedAt: String(data?.updatedAt || ''),
+  };
+}
+
+async function findStudentUsernameDocs(studentId: string) {
+  const snap = await adminDb.collection(USERNAMES).where('studentId', '==', studentId).limit(5).get();
+  return snap.docs;
+}
+
 export function registerMockRoutes(app: express.Express): void {
   // Settings: read (defaults served when nothing is stored yet; a GET never
   // writes) and replace with validation.
@@ -500,6 +527,133 @@ export function registerMockRoutes(app: express.Express): void {
     }
   });
 
+  // -----------------------------------------------------------------------
+  // M5b: the leaderboard view and the username register tools.
+  // -----------------------------------------------------------------------
+
+  // Board: the released leaderboard for one mock, usernames only. A GET
+  // never writes.
+  app.get('/api/tos/mocks/:id/board', async (req, res) => {
+    try {
+      requireTos(req);
+      const id = String(req.params.id || '').trim();
+      const mockSnap = await adminDb.collection(MOCKS).doc(id).get();
+      if (!mockSnap.exists) throw httpError(404, 'Mock not found.');
+      const mock = mockSnap.data() as any;
+      if (String(mock.status) === 'void') throw httpError(409, 'This mock was voided; its board is hidden.');
+      if (String(mock.status) !== 'released') throw httpError(409, `Results are not out yet (this mock is ${mock.status}).`);
+      const boardSnap = await adminDb.collection(MOCK_LEADERBOARDS).doc(id).get();
+      if (!boardSnap.exists) throw httpError(404, 'No board has been built for this mock yet.');
+      const b = boardSnap.data() as any;
+      res.json({
+        ok: true,
+        mock: { id, title: mock.title, date: mock.date, examType: mock.examType, status: mock.status },
+        board: {
+          releasedAt: b.releasedAt || null,
+          totalAttempts: Number.isInteger(b.totalAttempts) ? b.totalAttempts : null,
+          entries: Array.isArray(b.entries) ? b.entries : [],
+          lastEntryScore: b.lastEntryScore ?? null,
+        },
+      });
+    } catch (error: any) {
+      if (error?.status) return res.status(error.status).json({ error: error.message });
+      console.error('[mocks] board read failed:', error?.message || error);
+      res.status(500).json({ error: 'Could not read the leaderboard.' });
+    }
+  });
+
+  // Search the register: ?q= matches the start of a username (case folded),
+  // ?studentId= finds one student's current claim. At most 100 rows.
+  app.get('/api/tos/mock-usernames', async (req, res) => {
+    try {
+      requireTos(req);
+      const studentId = String(req.query.studentId || '').trim();
+      if (studentId) {
+        if (!/^[a-zA-Z0-9_-]{1,128}$/.test(studentId)) throw httpError(400, 'That student id looks wrong.');
+        const docs = await findStudentUsernameDocs(studentId);
+        return res.json({ ok: true, entries: docs.map((d) => entryView(d)) });
+      }
+      const q = String(req.query.q || '').trim().toLowerCase();
+      if (q.length > 64) throw httpError(400, 'Search is at most 64 characters.');
+      let query: any = adminDb.collection(USERNAMES).orderBy('usernameLower');
+      if (q) query = query.where('usernameLower', '>=', q).where('usernameLower', '<=', `${q}\uf8ff`);
+      const snap = await query.limit(USERNAME_LIST_CAP).get();
+      res.json({ ok: true, entries: snap.docs.map((d) => entryView(d)) });
+    } catch (error: any) {
+      if (error?.status) return res.status(error.status).json({ error: error.message });
+      console.error('[mocks] username search failed:', error?.message || error);
+      res.status(500).json({ error: 'Could not search usernames.' });
+    }
+  });
+
+  // Assign (or change) one student's leaderboard username. The student's name
+  // and centre come from the student record, never from the request. One
+  // username per student: their previous claim is freed in the same batch.
+  app.post('/api/tos/mock-usernames', async (req, res) => {
+    try {
+      const caller = requireTos(req);
+      const body = req.body || {};
+      const studentId = String(body.studentId ?? '').trim();
+      const username = String(body.username ?? '').trim();
+      if (!/^[a-zA-Z0-9_-]{1,128}$/.test(studentId)) throw httpError(400, 'That student id looks wrong.');
+      if (!USERNAME_RE.test(username)) throw httpError(400, 'Usernames are 3 to 24 letters, numbers or underscores.');
+      const lower = username.toLowerCase();
+      const studentSnap = await adminDb.collection('students').doc(studentId).get();
+      if (!studentSnap.exists) throw httpError(404, 'Student record not found.');
+      const s = studentSnap.data() as any;
+      const taken = await adminDb.collection(USERNAMES).doc(lower).get();
+      if (taken.exists && String((taken.data() as any)?.studentId || '') !== studentId) {
+        throw httpError(409, 'That username is already taken.');
+      }
+      const oldDocs = await findStudentUsernameDocs(studentId);
+      const freed = oldDocs.filter((d) => d.id !== lower).map((d) => String((d.data() as any)?.username || d.id));
+      const batch = adminDb.batch();
+      for (const d of oldDocs) if (d.id !== lower) batch.delete(d.ref);
+      batch.set(adminDb.collection(USERNAMES).doc(lower), {
+        username,
+        usernameLower: lower,
+        studentId,
+        uid: String(s?.uid || studentId),
+        studentName: String(s?.name || s?.fullName || s?.fullname || ''),
+        centreId: String(s?.centreId || ''),
+        setBy: caller.uid,
+        updatedAt: new Date().toISOString(),
+      });
+      await batch.commit();
+      void audit({ area: 'mocks', action: 'username.assign', studentId, username, freed, by: caller.uid });
+      res.json({ ok: true, username, studentId, freed });
+    } catch (error: any) {
+      if (error?.status) return res.status(error.status).json({ error: error.message });
+      console.error('[mocks] username assign failed:', error?.message || error);
+      res.status(500).json({ error: 'Could not save the username.' });
+    }
+  });
+
+  // Free a student's username. Nothing is lost: past boards keep their
+  // snapshot, and the name becomes available to be claimed again.
+  app.delete('/api/tos/mock-usernames/:studentId', async (req, res) => {
+    try {
+      const caller = requireTos(req);
+      const studentId = String(req.params.studentId || '').trim();
+      if (!/^[a-zA-Z0-9_-]{1,128}$/.test(studentId)) throw httpError(400, 'That student id looks wrong.');
+      const docs = await findStudentUsernameDocs(studentId);
+      if (docs.length === 0) throw httpError(404, 'That student has no username on the register.');
+      const freed: string[] = [];
+      const batch = adminDb.batch();
+      for (const d of docs) {
+        batch.delete(d.ref);
+        freed.push(String((d.data() as any)?.username || d.id));
+      }
+      await batch.commit();
+      void audit({ area: 'mocks', action: 'username.free', studentId, freed, by: caller.uid });
+      res.json({ ok: true, freed });
+    } catch (error: any) {
+      if (error?.status) return res.status(error.status).json({ error: error.message });
+      console.error('[mocks] username free failed:', error?.message || error);
+      res.status(500).json({ error: 'Could not free the username.' });
+    }
+  });
+
   // Create a Draft. The document id is the date, so one-mock-per-day is
   // structural; a cancelled slot can be reused as a fresh draft.
   app.post('/api/tos/mocks', async (req, res) => {
@@ -520,7 +674,7 @@ export function registerMockRoutes(app: express.Express): void {
         const snap = await tx.get(ref);
         if (snap.exists) {
           const st = String((snap.data() as any)?.status || '');
-          if (st !== 'cancelled') throw httpError(409, 'A mock already exists for this date.');
+          if (st !== 'cancelled' && st !== 'void') throw httpError(409, 'A mock already exists for this date.');
         }
         tx.set(ref, {
           id,
@@ -842,6 +996,166 @@ export function registerMockRoutes(app: express.Express): void {
     }
   });
 
+  // -----------------------------------------------------------------------
+  // M5c: correct one question, and void a mock.
+  // -----------------------------------------------------------------------
+
+  // Correct one question on a frozen or released paper. Drafts use the full
+  // editor instead; live and closed mocks are blocked because an exam must
+  // not change while students sit it. Correcting never re-scores: once a
+  // mock is released its marks stand. If a correction is material, void the
+  // mock and run it again on another date. The corrected answer is written
+  // server-side only; it is never sent to a browser.
+  app.post('/api/tos/mocks/:id/correct-question', async (req, res) => {
+    try {
+      const caller = requireTos(req);
+      const id = String(req.params.id || '').trim();
+      const body = req.body || {};
+      const questionId = String(body.questionId ?? '').trim();
+      if (questionId.length < 1 || questionId.length > 128) throw httpError(400, 'A question id is required.');
+      const mockSnap = await adminDb.collection(MOCKS).doc(id).get();
+      if (!mockSnap.exists) throw httpError(404, 'Mock not found.');
+      const status = String((mockSnap.data() as any)?.status || '');
+      if (status === 'draft') throw httpError(409, 'Drafts are edited with the editor, not question corrections.');
+      if (status === 'live' || status === 'closed') throw httpError(409, `A ${status} exam cannot be corrected while students sit it.`);
+      if (status !== 'scheduled' && status !== 'released') throw httpError(409, `A ${status} mock cannot be corrected.`);
+      const patch = body.patch && typeof body.patch === 'object' ? body.patch : {};
+      const hasText = patch.question !== undefined;
+      const hasOptions = patch.options !== undefined;
+      const hasCorrect = patch.correctIndex !== undefined;
+      const hasExplanation = patch.explanation !== undefined;
+      if (!hasText && !hasOptions && !hasCorrect && !hasExplanation) {
+        throw httpError(400, 'Nothing to change: send question text, options, the correct answer or an explanation.');
+      }
+      let text: string | null = null;
+      if (hasText) {
+        text = String(patch.question ?? '').trim();
+        if (text.length < 1 || text.length > 2000) throw httpError(400, 'Question text must be 1 to 2000 characters.');
+      }
+      let options: string[] | null = null;
+      if (hasOptions) {
+        if (!Array.isArray(patch.options) || patch.options.length < 2 || patch.options.length > 4) {
+          throw httpError(400, 'Options must be 2 to 4 choices, the same count the question already has.');
+        }
+        options = patch.options.map((o: unknown) => String(o ?? '').trim());
+        if (options.some((o: string) => o.length < 1 || o.length > 300)) throw httpError(400, 'Each option must be 1 to 300 characters.');
+      }
+      let correctIndex: number | null = null;
+      if (hasCorrect) {
+        if (!Number.isInteger(patch.correctIndex) || (patch.correctIndex as number) < 0) throw httpError(400, 'The correct answer must be an option number.');
+        correctIndex = patch.correctIndex as number;
+      }
+      let explanation: string | null = null;
+      if (hasExplanation) {
+        explanation = String(patch.explanation ?? '').trim();
+        if (explanation.length > 4000) throw httpError(400, 'The explanation must be at most 4000 characters.');
+      }
+      const paperSnap = await adminDb.collection(MOCK_PAPERS).doc(id).get();
+      const keySnap = await adminDb.collection(MOCK_KEYS).doc(id).get();
+      if (!paperSnap.exists || !keySnap.exists) throw httpError(409, 'The paper and marking key are not in place for this mock.');
+      const paperDoc = paperSnap.data() as any;
+      const keyDoc = keySnap.data() as any;
+      const questions: PaperQuestion[] = Array.isArray(paperDoc.questions) ? paperDoc.questions : [];
+      const idx = questions.findIndex((q) => String(q.id) === questionId);
+      if (idx < 0) throw httpError(404, 'That question is not in this mock.');
+      const oldQ = questions[idx];
+      const newOptions = options || oldQ.options;
+      if (hasCorrect && correctIndex! >= newOptions.length) {
+        throw httpError(400, `The correct answer must be option A to ${String.fromCharCode(64 + newOptions.length)}.`);
+      }
+      const updatedQ: PaperQuestion = {
+        ...oldQ,
+        ...(text !== null ? { text } : {}),
+        ...(options !== null ? { options } : {}),
+      };
+      questions[idx] = updatedQ;
+      const items: KeyItem[] = Array.isArray(keyDoc.items) ? keyDoc.items : [];
+      const kIdx = items.findIndex((k) => String(k.id) === questionId);
+      if (kIdx < 0) throw httpError(409, 'No marking key entry exists for that question.');
+      const oldItem = items[kIdx];
+      const updatedItem: KeyItem = {
+        ...oldItem,
+        ...(correctIndex !== null ? { correct: String.fromCharCode(65 + correctIndex!) } : {}),
+        ...(explanation !== null ? { explanation } : {}),
+      };
+      items[kIdx] = updatedItem;
+      const changed: string[] = [];
+      if (text !== null && text !== oldQ.text) changed.push('text');
+      if (options !== null && JSON.stringify(options) !== JSON.stringify(oldQ.options)) changed.push('options');
+      if (correctIndex !== null) changed.push('answer');
+      if (explanation !== null) changed.push('explanation');
+      const batch = adminDb.batch();
+      batch.set(adminDb.collection(MOCK_PAPERS).doc(id), { ...paperDoc, questions }, { merge: true });
+      batch.set(adminDb.collection(MOCK_KEYS).doc(id), { ...keyDoc, items }, { merge: true });
+      await batch.commit();
+      void audit({
+        area: 'mocks', action: 'question.corrected', mockId: id, questionId, changed,
+        oldAnswer: correctIndex !== null ? String(oldItem.correct || '') : undefined,
+        newAnswer: correctIndex !== null ? String.fromCharCode(65 + correctIndex!) : undefined,
+        by: caller.uid,
+      });
+      res.json({ ok: true, questionId, changed, scoresStand: status === 'released' });
+    } catch (error: any) {
+      if (error?.status) return res.status(error.status).json({ error: error.message });
+      console.error('[mocks] question correction failed:', error?.message || error);
+      res.status(500).json({ error: 'Could not correct the question.' });
+    }
+  });
+
+  // Void a mock: Scheduled, Live, Closed or Released (a Draft is cancelled
+  // instead). A voided mock holds no results: the board, if one was built,
+  // is marked voided and hidden, and the day's date can be reused by a fresh
+  // draft, exactly like a cancelled slot. Attempt records are kept for the
+  // audit trail. Voiding a Scheduled mock deletes its frozen paper and key,
+  // so no secret lingers for a mock that never runs.
+  app.post('/api/tos/mocks/:id/void', async (req, res) => {
+    try {
+      const caller = requireTos(req);
+      const id = String(req.params.id || '').trim();
+      if (String((req.body || {}).confirm || '').trim() !== 'VOID') throw httpError(400, 'Type VOID to confirm voiding this mock.');
+      let wasScheduled = false;
+      let hadBoard = false;
+      await adminDb.runTransaction(async (tx) => {
+        const ref = adminDb.collection(MOCKS).doc(id);
+        const snap = await tx.get(ref);
+        if (!snap.exists) throw httpError(404, 'Mock not found.');
+        const status = String((snap.data() as any)?.status || '');
+        if (status === 'draft') throw httpError(409, 'A draft is cancelled, not voided. Use Cancel mock.');
+        if (!['scheduled', 'live', 'closed', 'released'].includes(status)) {
+          throw httpError(409, `A ${status} mock cannot be voided.`);
+        }
+        wasScheduled = status === 'scheduled';
+        tx.update(ref, {
+          status: 'void' as MockStatus,
+          voidedAt: new Date().toISOString(),
+          voidedBy: caller.uid,
+          voidedFrom: status,
+        });
+      });
+      const batch = adminDb.batch();
+      if (wasScheduled) {
+        batch.delete(adminDb.collection(MOCK_PAPERS).doc(id));
+        batch.delete(adminDb.collection(MOCK_KEYS).doc(id));
+      }
+      const boardSnap = await adminDb.collection(MOCK_LEADERBOARDS).doc(id).get();
+      if (boardSnap.exists) {
+        hadBoard = true;
+        batch.set(adminDb.collection(MOCK_LEADERBOARDS).doc(id), {
+          voided: true,
+          voidedAt: new Date().toISOString(),
+          voidedBy: caller.uid,
+        }, { merge: true });
+      }
+      await batch.commit();
+      void audit({ area: 'mocks', action: 'void', mockId: id, by: caller.uid, wasScheduled, hadBoard });
+      res.json({ ok: true, hadBoard });
+    } catch (error: any) {
+      if (error?.status) return res.status(error.status).json({ error: error.message });
+      console.error('[mocks] void failed:', error?.message || error);
+      res.status(500).json({ error: 'Could not void the mock.' });
+    }
+  });
+
   // Monitor: cheap live counts for the console. Count aggregations only,
   // nothing written on a GET.
   app.get('/api/tos/mocks/:id/monitor', async (req, res) => {
@@ -940,7 +1254,7 @@ export function registerMockRoutes(app: express.Express): void {
       const failed: Array<{ date: string; error: string }> = [];
       for (const p of papers) {
         const existing = statuses[p.date];
-        if (existing && existing !== 'cancelled') {
+        if (existing && existing !== 'cancelled' && existing !== 'void') {
           skipped.push({ date: p.date, reason: `A ${existing} mock is already on this date.` });
           continue;
         }
@@ -950,7 +1264,7 @@ export function registerMockRoutes(app: express.Express): void {
             const snap = await tx.get(ref);
             if (snap.exists) {
               const st = String((snap.data() as any)?.status || '');
-              if (st !== 'cancelled') {
+              if (st !== 'cancelled' && st !== 'void') {
                 skipped.push({ date: p.date, reason: `A ${st} mock was created for this date moments ago.` });
                 return;
               }
