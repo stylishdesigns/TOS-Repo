@@ -5,10 +5,11 @@
 //     "node tests/rules/dirtyDozen.rules.test.mjs"
 // Requires Java 21+. Exits 0 when every check passes.
 //
-// Known gap (documented in the phase 4 report): a student can still move their
-// own paidAmount / outstandingBalance, because the payment submission flow
-// writes them from the client. Locking those needs a server payment route.
-// totalFee, paymentStatus, status, regNumber and uid are already locked.
+// Fee fields are locked server-side now: paidAmount, outstandingBalance,
+// totalFee, paymentStatus, status, regNumber and uid all refuse a student
+// write, and payment records can only be created by a centre admin's client.
+// Student payments are recorded by the server payment route, which writes
+// with the admin SDK.
 import { readFileSync } from 'node:fs';
 import {
   initializeTestEnvironment,
@@ -58,6 +59,14 @@ async function seed() {
   });
     await admin.doc('payments/pay-b2').set({
       studentId: 'uid-stu2', studentName: 'Student Two', amountPaid: 75, status: 'Paid',
+    });
+    // Section 13 reads pay-3 and pay-5; since students can no longer create
+    // payment records, seed them from the admin context instead.
+    await admin.doc('payments/pay-3').set({
+      studentId: 'uid-stu', studentName: 'Student One', amountPaid: 50, status: 'Partial',
+    });
+    await admin.doc('payments/pay-5').set({
+      studentId: 'stu-999', studentName: 'Student One', amountPaid: 10, status: 'Partial',
     });
     await admin.doc('admissions/adv-1').set({
       applicantName: 'Applicant', email: 'applicant@test.com', status: 'Pending',
@@ -115,6 +124,12 @@ try {
   await check('4d. student edit own profile fields allowed', async () => {
     await assertSucceeds(stuCtx().firestore().doc('students/uid-stu').update({ phone: '+2348000000000' }));
   });
+  await check('4e. student change own paidAmount denied', async () => {
+    await assertFails(stuCtx().firestore().doc('students/uid-stu').update({ paidAmount: 9999 }));
+  });
+  await check('4f. student change own outstandingBalance denied', async () => {
+    await assertFails(stuCtx().firestore().doc('students/uid-stu').update({ outstandingBalance: 0 }));
+  });
 
   // 5. Orphaned student: a student record cannot reference a programme that
   //    does not exist, and the record id must be well-formed.
@@ -129,8 +144,9 @@ try {
     }));
   });
 
-  // 6. Fake payment: nobody can inject a payment unauthenticated; a student
-  //    can only record a payment against their own student record.
+  // 6. Fake payment: nobody can inject a payment unauthenticated, and a
+  //    student can never create a payment record from a client device; the
+  //    server payment route writes student payments with the admin SDK.
   await check('6a. unauth create payment denied', async () => {
     await assertFails(testEnv.unauthenticatedContext().firestore().doc('payments/pay-1').set({
       studentId: 'uid-stu', studentName: 'Student One', amountPaid: 999999, status: 'Paid',
@@ -141,13 +157,13 @@ try {
       studentId: 'uid-stu2', studentName: 'Other', amountPaid: 500, status: 'Paid',
     }));
   });
-  await check('6e. student A pay via own admin-created record allowed', async () => {
-    await assertSucceeds(stuCtx().firestore().doc('payments/pay-5').set({
+  await check('6e. student create payment via own admin-created record denied', async () => {
+    await assertFails(stuCtx().firestore().doc('payments/pay-5').set({
       studentId: 'stu-999', studentName: 'Student One', amountPaid: 20, status: 'Partial',
     }));
   });
-  await check('6c. student A pay for own record allowed', async () => {
-    await assertSucceeds(stuCtx().firestore().doc('payments/pay-3').set({
+  await check('6c. student create own payment denied (server route only)', async () => {
+    await assertFails(stuCtx().firestore().doc('payments/pay-3').set({
       studentId: 'uid-stu', studentName: 'Student One', amountPaid: 50, status: 'Partial',
     }));
   });

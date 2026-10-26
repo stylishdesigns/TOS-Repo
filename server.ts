@@ -635,6 +635,105 @@ async function startServer() {
     }
   });
 
+  // 6c. Record a payment (Part C, point 3). Fees move through this route
+  // only: the server computes paidAmount / outstandingBalance / paymentStatus
+  // from the student's stored fees inside a transaction, so no device ever
+  // sends fee numbers. A student may only pay their own record; centre admins
+  // only their own centre's students. Every payment leaves an audit record.
+  app.post("/api/centre/students/payment", async (req, res) => {
+    try {
+      const caller = await getCaller(req);
+      const { studentId, amountPaid, method, note, evidenceUrl, evidenceName } = req.body || {};
+      if (typeof studentId !== "string" || !/^[a-zA-Z0-9_\-]{1,128}$/.test(studentId)) {
+        return res.status(400).json({ error: "Invalid studentId" });
+      }
+      const amount = Number(amountPaid);
+      if (!Number.isFinite(amount) || amount <= 0 || amount > 10000000) {
+        return res.status(400).json({ error: "Invalid payment amount" });
+      }
+      const payMethod = method === "Bank Transfer" || method === "Cash" ? method : "Card";
+      if (typeof evidenceUrl === "string" && evidenceUrl.length > 900000) {
+        return res.status(400).json({ error: "Payment evidence is too large. Please attach a smaller image." });
+      }
+
+      const adminSnap = await adminDb.collection("admins").doc(caller.uid).get();
+      const isAdminCaller = adminSnap.exists || caller.tos === true;
+      const callerCentreId = adminSnap.exists
+        ? String((adminSnap.data() as Record<string, unknown>).centreId || "")
+        : "";
+
+      const result = await adminDb.runTransaction(async (tx) => {
+        const studentRef = adminDb.collection("students").doc(studentId);
+        const studentSnap = await tx.get(studentRef);
+        if (!studentSnap.exists) {
+          throw new Error("NOT_FOUND:Student record not found");
+        }
+        const s = studentSnap.data() as Record<string, any>;
+        if (isAdminCaller) {
+          if (callerCentreId && s.centreId && callerCentreId !== s.centreId) {
+            throw new Error("FORBIDDEN:That student belongs to a different centre");
+          }
+        } else if (s.uid !== caller.uid && studentId !== caller.uid) {
+          throw new Error("FORBIDDEN:You can only record payments for your own student record");
+        }
+        const totalFee = typeof s.totalFee === "number" ? s.totalFee : 0;
+        const currentPaid = typeof s.paidAmount === "number" ? s.paidAmount : 0;
+        const newPaid = currentPaid + amount;
+        const outstanding = Math.max(totalFee - newPaid, 0);
+        const paymentStatus = outstanding <= 0 ? "Paid" : "Partial";
+        const paymentId = `pay-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+        const receiptNumber = `REC-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
+        const paymentDoc: Record<string, any> = {
+          centreId: s.centreId || callerCentreId || "",
+          receiptNumber,
+          studentId,
+          studentName: typeof s.name === "string" ? s.name : "",
+          programmeName: typeof s.programmeName === "string" ? s.programmeName : "",
+          amountPaid: amount,
+          totalFee,
+          balance: outstanding,
+          status: paymentStatus,
+          method: payMethod,
+          date: new Date().toISOString().split("T")[0],
+          submittedBy: isAdminCaller ? "Admin" : "Student",
+          createdAt: Date.now(),
+        };
+        if (typeof note === "string" && note.trim()) paymentDoc.note = note.trim().slice(0, 500);
+        if (typeof evidenceUrl === "string" && evidenceUrl) paymentDoc.evidenceUrl = evidenceUrl;
+        if (typeof evidenceName === "string" && evidenceName) paymentDoc.evidenceName = evidenceName.slice(0, 200);
+        tx.set(adminDb.collection("payments").doc(paymentId), paymentDoc);
+        tx.update(studentRef, {
+          paidAmount: newPaid,
+          outstandingBalance: outstanding,
+          paymentStatus,
+        });
+        tx.set(adminDb.collection("auditLogs").doc(), {
+          action: "payment.record",
+          actorUid: caller.uid,
+          actorEmail: caller.email,
+          centreId: paymentDoc.centreId,
+          studentId,
+          paymentId,
+          receiptNumber,
+          amountPaid: amount,
+          method: payMethod,
+          at: new Date().toISOString(),
+        });
+        return {
+          payment: { id: paymentId, ...paymentDoc },
+          student: { paidAmount: newPaid, outstandingBalance: outstanding, paymentStatus },
+        };
+      });
+
+      res.json({ success: true, ...result });
+    } catch (error: any) {
+      const msg = String(error?.message || error);
+      const code = msg.startsWith("NOT_FOUND:") ? 404 : msg.startsWith("FORBIDDEN:") ? 403 : 500;
+      console.warn("record-payment error:", msg);
+      res.status(code).json({ error: msg.replace(/^(NOT_FOUND|FORBIDDEN):/, "") || "Failed to record payment" });
+    }
+  });
+
   // 7. Get feature entitlements for centre (Part E)
   app.get("/api/centre/entitlements", async (req, res) => {
     try {

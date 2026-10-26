@@ -24,7 +24,7 @@ interface ProfileTabProps {
 }
 
 export const ProfileTab: React.FC<ProfileTabProps> = ({ student, onSelectStudent }) => {
-  const { students, settings, payments, addPayment, addToast, centreName } = useApp();
+  const { students, settings, payments, recordPayment, addToast, centreName } = useApp();
 
   const [showPayModal, setShowPayModal] = useState(false);
   const [payAmount, setPayAmount] = useState<number>(
@@ -50,33 +50,22 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({ student, onSelectStudent
       : MALE_NIGERIAN_AVATAR);
 
   // Simulate payment
-  const handleCompletePayment = (e: React.FormEvent) => {
+  const handleCompletePayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (payAmount <= 0) return;
 
-    const receiptNum = `REC-2026-${Math.floor(1000 + Math.random() * 9000)}`;
-    addPayment({
-      receiptNumber: receiptNum,
+    const result = await recordPayment({
       studentId: student.id,
-      studentName: student.name,
-      programmeName: student.programmeName,
       amountPaid: payAmount,
-      totalFee: student.totalFee,
-      balance: Math.max(0, student.outstandingBalance - payAmount),
-      status: student.outstandingBalance - payAmount <= 0 ? 'Paid' : 'Partial',
       method: 'Card',
-      date: new Date().toISOString().split('T')[0],
     });
-
-    // Update student's paidAmount
-    student.paidAmount += payAmount;
-    student.outstandingBalance = Math.max(0, student.totalFee - student.paidAmount);
+    if (!result) return; // The payment helper already explained the failure.
 
     setShowPayModal(false);
     addToast({
       type: 'success',
       title: 'Payment Successful',
-      description: `Payment of ${settings.currencySymbol}${(payAmount || 0).toLocaleString()} confirmed. Receipt ${receiptNum} issued.`,
+      description: `Payment of ${settings.currencySymbol}${(payAmount || 0).toLocaleString()} confirmed. Receipt ${result.receiptNumber} issued.`,
     });
   };
 

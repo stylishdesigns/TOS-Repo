@@ -228,7 +228,7 @@ interface AppContextType {
   addCBTQuestion: (question: Omit<CBTQuestion, 'id'>) => void;
 
   payments: PaymentRecord[];
-  recordPayment: (payment: Omit<PaymentRecord, 'id' | 'receiptNumber' | 'date'>) => void;
+  recordPayment: (payment: { studentId: string; amountPaid: number; method?: 'Card' | 'Bank Transfer' | 'Cash'; note?: string; evidenceUrl?: string; evidenceName?: string }) => Promise<{ receiptNumber: string; paidAmount: number; outstandingBalance: number; paymentStatus: 'Paid' | 'Partial' } | void>;
 
   announcements: Announcement[];
   addAnnouncement: (announcement: Omit<Announcement, 'id' | 'date'>) => void;
@@ -2611,62 +2611,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const recordPayment = async (paymentData: Omit<PaymentRecord, 'id' | 'receiptNumber' | 'date'>) => {
+  const recordPayment = async (paymentData: {
+    studentId: string;
+    amountPaid: number;
+    method?: 'Card' | 'Bank Transfer' | 'Cash';
+    note?: string;
+    evidenceUrl?: string;
+    evidenceName?: string;
+  }): Promise<{ receiptNumber: string; paidAmount: number; outstandingBalance: number; paymentStatus: 'Paid' | 'Partial' } | void> => {
+    // Payments are recorded by the server payment route only. The server
+    // computes paidAmount / outstandingBalance / paymentStatus from the
+    // student's stored fees inside a transaction, so no device ever sends
+    // fee numbers or mints its own payment record.
     try {
-      if (!activeCentreId) {
-        addToast({ type: 'error', title: 'Payment Failed', description: 'No centre is active in this session, so the payment cannot be tagged to a centre. Sign in and enter your centre again.' });
-        return;
-      }
-      const receiptNumber = `REC-2026-${Math.floor(1000 + Math.random() * 9000)}`;
-      const id = `pay-${Date.now()}`;
-      const newPayment: PaymentRecord = {
-        ...paymentData,
-        id,
-        receiptNumber,
-        date: new Date().toISOString().split('T')[0],
-      };
-      
-      // Update local state immediately for snappy real-time feedback
-      setPayments(prev => [newPayment, ...prev.filter(p => p.id !== id)]);
-      setStudents(prev => prev.map(s => {
-        if (s.id === paymentData.studentId) {
-          const newPaid = (s.paidAmount || 0) + paymentData.amountPaid;
-          const newBalance = Math.max(0, (s.totalFee || 0) - newPaid);
-          return {
-            ...s,
-            paidAmount: newPaid,
-            outstandingBalance: newBalance,
-            paymentStatus: newBalance <= 0 ? 'Paid' : 'Partial',
-          };
-        }
-        return s;
-      }));
-
-      await setDoc(doc(db, 'payments', id), tenantWrite(newPayment));
-
-      // Update student record in Firestore
-      const student = students.find(s => s.id === paymentData.studentId);
-      if (student) {
-        const newPaid = (student.paidAmount || 0) + paymentData.amountPaid;
-        const newBalance = Math.max(0, (student.totalFee || 0) - newPaid);
-        await updateDoc(doc(db, 'students', student.id), {
-          paidAmount: newPaid,
-          outstandingBalance: newBalance,
-          paymentStatus: newBalance <= 0 ? 'Paid' : 'Partial',
-        });
-      }
-
-      addToast({
-        type: 'success',
-        title: 'Payment Recorded!',
-        description: `Receipt ${receiptNumber} generated for ${paymentData.studentName}.`,
+      const token = await firebaseAuth.currentUser?.getIdToken();
+      if (!token) throw new Error('You are signed out, so the payment cannot be recorded. Sign in and try again.');
+      const res = await fetch('/api/centre/students/payment', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(paymentData),
       });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || 'The payment could not be recorded. Please try again.');
+      }
+      return data;
     } catch (e) {
       console.error(e);
-      addToast({ type: 'error', title: 'Payment Failed', description: 'Could not sync payment to Firestore.' });
+      addToast({ type: 'error', title: 'Payment Failed', description: (e as Error)?.message || 'Could not record the payment.' });
+      return;
     }
   };
-
   const login = async () => {
     const provider = new GoogleAuthProvider();
     await signInWithPopup(firebaseAuth, provider);

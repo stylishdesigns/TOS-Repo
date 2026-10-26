@@ -111,15 +111,17 @@ service cloud.firestore {
     match /students/{studentId} {
       // A student's own edits may never change their uid, registration number,
       // status, fee configuration or payment status. paidAmount and
-      // outstandingBalance stay student-editable because the payment
-      // submission flow writes them from the client; a server payment route
-      // is the follow-up that locks them.
+      // outstandingBalance are locked too: fees move only through the server
+      // payment route (/api/centre/students/payment), which computes and
+      // writes them with the admin SDK after a transaction.
       function studentSelfFieldsUnchanged() {
         return incoming().get('uid', existing().get('uid', '')) == existing().get('uid', '')
             && incoming().get('regNumber', existing().get('regNumber', '')) == existing().get('regNumber', '')
             && incoming().get('status', existing().get('status', '')) == existing().get('status', '')
             && incoming().get('totalFee', existing().get('totalFee', 0)) == existing().get('totalFee', 0)
             && incoming().get('paymentStatus', existing().get('paymentStatus', '')) == existing().get('paymentStatus', '')
+            && incoming().get('paidAmount', existing().get('paidAmount', 0)) == existing().get('paidAmount', 0)
+            && incoming().get('outstandingBalance', existing().get('outstandingBalance', 0)) == existing().get('outstandingBalance', 0)
             && (incoming().get('email', existing().get('email', '')) == existing().get('email', '')
                 || incoming().get('email', '') == request.auth.token.email);
       }
@@ -204,9 +206,10 @@ service cloud.firestore {
       // Read: admins only, plus the student the payment belongs to. A centre's
       // students can never list another centre's, or another student's, fees.
       allow read: if isVerified() && (isAdmin() || paymentTouchesOwnRecord(resource.data));
-      // Create: signed-in users only, and a non-admin can only record a
-      // payment for their own student record.
-      allow create: if isSignedIn() && isValidPayment(incoming()) && (isAdmin() || paymentTouchesOwnRecord(incoming()));
+      // Create: centre admins only, from the admin client. Student payments
+      // are recorded by the server payment route, which writes with the
+      // admin SDK; no client device can inject a payment record.
+      allow create: if isAdmin() && isValidPayment(incoming());
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }

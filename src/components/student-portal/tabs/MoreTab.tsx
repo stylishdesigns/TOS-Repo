@@ -300,7 +300,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
   };
 
   // Handle Tuition Payment
-  const handleCompletePayment = (e: React.FormEvent) => {
+  const handleCompletePayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (payAmount <= 0) {
       addToast({
@@ -322,32 +322,20 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
 
     setIsSubmittingPayment(true);
     try {
-      recordPayment({
+      const result = await recordPayment({
         studentId: student.id,
-        studentName: student.name,
-        programmeName: student.programmeName,
         amountPaid: payAmount,
-        totalFee: student.totalFee,
-        balance: Math.max(0, student.outstandingBalance - payAmount),
-        status: student.outstandingBalance - payAmount <= 0 ? 'Paid' : 'Partial',
         method: paymentMode,
         evidenceUrl: evidenceDataUrl || undefined,
         evidenceName: evidenceFileName || undefined,
         note: paymentNote.trim() || undefined,
-        submittedBy: 'Student',
       });
-
-      student.paidAmount = (student.paidAmount || 0) + payAmount;
-      student.outstandingBalance = Math.max(0, student.totalFee - student.paidAmount);
-      updateStudent(student.id, {
-        paidAmount: student.paidAmount,
-        outstandingBalance: student.outstandingBalance,
-      });
+      if (!result) return; // The payment helper already explained the failure.
 
       addToast({
         type: 'success',
         title: 'Payment Submitted',
-        description: `Your payment of ${settings.currencySymbol}${(payAmount || 0).toLocaleString()} via ${paymentMode} has been recorded and synced live with the admin.`,
+        description: `Your payment of ${settings.currencySymbol}${(payAmount || 0).toLocaleString()} via ${paymentMode} has been recorded. Receipt ${result.receiptNumber}.`,
       });
 
       setEvidenceDataUrl(null);

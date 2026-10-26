@@ -150,7 +150,7 @@ export const FinanceManager: React.FC = () => {
     return matchesSearch && matchesMethod && matchesStatus && matchesExamType && matchesMonth;
   });
 
-  const handleRecordSubmit = (e: React.FormEvent) => {
+  const handleRecordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const st = students.find((s) => s.id === selectedStudentId);
     if (!st) return;
@@ -158,18 +158,19 @@ export const FinanceManager: React.FC = () => {
     const amount = Number(amountPaid);
     if (!amount || amount <= 0) return;
 
-    recordPayment({
+    const result = await recordPayment({
       studentId: st.id,
-      studentName: st.name,
-      programmeName: st.programmeName,
       amountPaid: amount,
-      totalFee: st.totalFee,
-      balance: Math.max(0, st.outstandingBalance - amount),
-      status: amount >= st.outstandingBalance ? 'Paid' : 'Partial',
       method: paymentMethod,
       note: adminNote.trim() || undefined,
-      submittedBy: 'Admin',
     });
+    if (result) {
+      addToast({
+        type: 'success',
+        title: 'Payment Recorded!',
+        description: `Receipt ${result.receiptNumber} generated for ${st.name}.`,
+      });
+    }
 
     setShowRecordModal(false);
     setAmountPaid('');
