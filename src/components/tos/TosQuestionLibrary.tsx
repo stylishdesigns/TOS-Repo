@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Loader2, Search, X, ChevronRight, Check, Pencil, Trash2, FolderTree, RefreshCw } from 'lucide-react';
+import { Loader2, Search, X, ChevronRight, Check, Pencil, Trash2, FolderTree } from 'lucide-react';
 import { api, Json, Card, inputCls, btnPrimary, btnGhost, fmtDate } from './tosShared';
 import { BANK_YEARS } from '../../data/seniorSubjects';
 
@@ -28,15 +28,18 @@ const DIFF_LABELS: Record<string, string> = { easy: 'Easy', hard: 'Hard' };
 
 type Scope = { type: 'subject' | 'topic' | 'year'; key: string; label: string } | null;
 
-export const QuestionLibraryTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
-  // The stream is remembered on this device and shared with the Import &
-  // edit screen, so both halves of Question Bank follow the same stream.
-  const [kind, setKindState] = useState<'practice' | 'mock'>(() => {
+export const QuestionLibraryTab: React.FC<{ refreshKey: number; kind?: 'practice' | 'mock'; onKindChange?: (k: 'practice' | 'mock') => void }> = ({ refreshKey, kind: kindProp, onKindChange }) => {
+  // U1: the stream is chosen once in the shared Question Bank header; the
+  // prop wins when the shell passes it, and the remembered local state only
+  // serves the rare case where no shell is above this screen.
+  const [kindState, setKindState] = useState<'practice' | 'mock'>(() => {
     try { return localStorage.getItem('TOS_qb_stream') === 'mock' ? 'mock' : 'practice'; } catch { return 'practice'; }
   });
+  const kind = kindProp ?? kindState;
   const setKind = (k: 'practice' | 'mock') => {
     setKindState(k);
     try { localStorage.setItem('TOS_qb_stream', k); } catch { /* storage unavailable */ }
+    onKindChange?.(k);
   };
   const [tree, setTree] = useState<Json | null>(null);
   const [tab, setTab] = useState('all');
@@ -89,6 +92,17 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number }> = ({ refreshKe
   const [batchFilter, setBatchFilter] = useState<string | null>(null);
   const [undoPreview, setUndoPreview] = useState<Json | null>(null);
 
+  // One-time setup + counter repair (U1): the banner carries the same
+  // preview-then-confirm buttons the Import & edit screen has, so the steps
+  // can be run from right here. While the banner is up the screens hide the
+  // numbers instead of showing zeros and partial counts.
+  const [setupBusy, setSetupBusy] = useState(false);
+  const [setupMsg, setSetupMsg] = useState('');
+  const [setupPreview, setSetupPreview] = useState<Json | null>(null);
+  const [setupStage, setSetupStage] = useState<'backfill' | 'recount' | null>(null);
+  const setupNeeded = Boolean(tree?.setupNeeded || tree?.repairNeeded);
+  const countsHidden = setupNeeded;
+
   // Debounced search: 400 ms after the last keystroke.
   useEffect(() => {
     const t = setTimeout(() => setQDebounced(q.trim()), 400);
@@ -99,6 +113,10 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number }> = ({ refreshKe
   useEffect(() => {
     if (qDebounced.length >= 2 && scope) setScope(null);
   }, [qDebounced]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // A stream switch from the shared header clears the tree scope, exactly as
+  // the old in-tab toggle did.
+  useEffect(() => { setScope(null); }, [kind]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadTree = useCallback(async () => {
     try { setTree(await api(`/api/tos/questionbank/tree?kind=${kind}`)); } catch { setTree(null); }
@@ -120,7 +138,7 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number }> = ({ refreshKe
       setTabs(r.tabs || {});
       setHasMore(Boolean(r.hasMore));
       setNextCursor(r.nextCursor || null);
-      setTree((prev) => (prev ? { ...prev, setupNeeded: r.setupNeeded } : prev));
+      setTree((prev) => (prev ? { ...prev, setupNeeded: r.setupNeeded, repairNeeded: r.repairNeeded } : prev));
     } catch (e: any) {
       setListError(e.message || 'Failed to load questions.');
     }
@@ -130,6 +148,41 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number }> = ({ refreshKe
 
   useEffect(() => { loadTree(); }, [loadTree, refreshKey]);
   useEffect(() => { loadList('replace'); }, [loadList, refreshKey]); // loadList changes with filters
+
+  const openSetupPreview = async (stage: 'backfill' | 'recount') => {
+    setSetupBusy(true); setSetupMsg('');
+    try {
+      setSetupPreview(await api(`/api/tos/questionbank/${stage === 'backfill' ? 'backfill-preview' : 'recount-preview'}?kind=${kind}`));
+      setSetupStage(stage);
+    } catch (e: any) { setSetupMsg(e.message); }
+    setSetupBusy(false);
+  };
+
+  const runSetupStage = async (stage: 'backfill' | 'recount') => {
+    setSetupBusy(true); setSetupMsg('');
+    try {
+      if (stage === 'backfill') {
+        let cursor: string | null = null;
+        let updated = 0;
+        for (;;) {
+          const r: Json = await api('/api/tos/questionbank/backfill', { method: 'POST', body: { confirm: 'BACKFILL', kind, cursor, maxDocs: 400 } });
+          updated += Number(r.updated) || 0;
+          setSetupMsg(`Backfill running: ${updated} questions keyed so far...`);
+          if (r.done) break;
+          cursor = r.nextCursor || null;
+          if (!cursor) break;
+        }
+        setSetupMsg(`Backfill done: ${updated} questions now carry search keys. Next step: Recount.`);
+      } else {
+        const r: Json = await api('/api/tos/questionbank/recount', { method: 'POST', body: { confirm: 'RECOUNT', kind } });
+        setSetupMsg(`Recount done: ${r.total} live questions counted across ${r.subjects} subjects.`);
+      }
+      setSetupPreview(null); setSetupStage(null);
+      await loadTree();
+      await loadList('replace');
+    } catch (e: any) { setSetupMsg(e.message); }
+    setSetupBusy(false);
+  };
 
   const openEditor = async (id: string) => {
     setEditorLoading(true); setEditorError(''); setConfirmRemove(false);
@@ -352,7 +405,9 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number }> = ({ refreshKe
   const scopeParamActive = Boolean(scope) || qDebounced.length >= 2 || Boolean(difficulty);
   const showingLine = scopeParamActive
     ? `Showing ${items.length}${hasMore ? ' (more available)' : ''}`
-    : `Showing ${items.length} of ${Number(tabs.total) || 0}`;
+    : countsHidden
+      ? `Showing ${items.length}`
+      : `Showing ${items.length} of ${Number(tabs.total) || 0}`;
 
   const treePanel = (
     <div className="space-y-1.5">
@@ -367,7 +422,7 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number }> = ({ refreshKe
           <button onClick={() => toggleSubject(s.key)} className="w-full flex items-center justify-between gap-2 px-3 py-2.5 text-left">
             <span className="text-sm font-semibold text-slate-200 truncate">{s.label}</span>
             <span className="flex items-center gap-1.5 shrink-0">
-              <span className="text-[11px] text-slate-500">{s.total}</span>
+              <span className="text-[11px] text-slate-500">{countsHidden ? '–' : s.total}</span>
               <ChevronRight className={`w-4 h-4 text-slate-500 transition-transform ${openSubjects.has(s.key) ? 'rotate-90' : ''}`} />
             </span>
           </button>
@@ -375,23 +430,27 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number }> = ({ refreshKe
             <div className="px-3 pb-3 space-y-1">
               {Object.entries(s.byYear || {}).sort((a: any, b: any) => Number(b[0]) - Number(a[0])).slice(0, 12).map(([y, n]: any) => (
                 <button key={y} onClick={() => pickScope('year', String(y), `Year ${y}`)} className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs text-slate-400 hover:bg-white/5">
-                  <span>Year {y}</span><span className="text-slate-600">{n}</span>
+                  <span>Year {y}</span><span className="text-slate-600">{countsHidden ? '–' : n}</span>
                 </button>
               ))}
               {(s.topics || []).map((t: any) => (
                 <button key={t.key} onClick={() => pickScope('topic', t.key, t.label)} className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs text-slate-400 hover:bg-white/5">
-                  <span className="truncate">{t.label}</span><span className="text-slate-600 shrink-0 ml-2">{t.total}</span>
+                  <span className="truncate">{t.label}</span><span className="text-slate-600 shrink-0 ml-2">{countsHidden ? '–' : t.total}</span>
                 </button>
               ))}
               <button onClick={() => pickScope('subject', s.key, s.label)} className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs text-orange-300/90 hover:bg-white/5">
-                <span>All of {s.label}</span><span className="text-slate-600">{s.total}</span>
+                <span>All of {s.label}</span><span className="text-slate-600">{countsHidden ? '–' : s.total}</span>
               </button>
             </div>
           )}
         </div>
       ))}
       {tree && (tree.subjects || []).length === 0 && (
-        <p className="text-xs text-slate-500 px-3 py-4">No counted subjects yet. Run Recount on the Import & edit tab to build the tree.</p>
+        <p className="text-xs text-slate-500 px-3 py-4">
+          {setupNeeded
+            ? 'The counter setup has not finished for this stream yet; the banner above has the steps.'
+            : 'No questions in this stream yet. Go to Import & edit to add some.'}
+        </p>
       )}
       <button onClick={openTopics} className="w-full mt-2 px-3 py-2.5 rounded-xl border border-slate-700/60 text-xs font-bold text-slate-300 hover:text-white min-h-[44px]">
         Manage topics (rename or merge)
@@ -464,29 +523,30 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number }> = ({ refreshKe
 
   return (
     <div className="space-y-4">
-      {tree?.setupNeeded && (
-        <div className="rounded-2xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-200">
-          <p className="font-bold text-amber-100">Set up needed</p>
-          <p className="text-amber-200/90 mt-1">
-            This stream has not had its one-time setup yet: Backfill (adds search keys to existing
-            questions) then Recount (builds the counts). Run both from the Import & edit tab; nothing is
-            written until you confirm each step. Existing questions only appear in search after the
-            backfill finishes.
+      {setupNeeded && (
+        <div className="rounded-2xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-200 space-y-3">
+          <p className="font-bold text-amber-100">Setup needed before the library can count your questions</p>
+          <p className="text-amber-200/90">
+            {tree?.repairNeeded
+              ? 'The counters behind the numbers on this page were saved in a form the screens cannot read, so every count here is out of date until a recount rebuilds it from the questions themselves. Your questions and published files are untouched.'
+              : 'This stream has not had its one-time setup yet: Backfill (adds search keys to existing questions) then Recount (builds the counts). Nothing is written until you confirm each step, and existing questions only appear in search after the backfill finishes.'}
           </p>
+          <div className="flex flex-wrap gap-2">
+            {!tree?.setup?.backfilled && (
+              <button onClick={() => openSetupPreview('backfill')} disabled={setupBusy} className="px-4 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white text-sm font-bold min-h-[44px]">
+                {setupBusy ? 'Working...' : 'Preview backfill'}
+              </button>
+            )}
+            <button onClick={() => openSetupPreview('recount')} disabled={setupBusy} className="px-4 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white text-sm font-bold min-h-[44px]">
+              {setupBusy ? 'Working...' : 'Preview recount'}
+            </button>
+          </div>
+          {setupMsg && <p className="text-amber-100">{setupMsg}</p>}
         </div>
       )}
 
       <Card>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex rounded-xl border border-slate-700/60 overflow-hidden">
-            {(['practice', 'mock'] as const).map((k) => (
-              <button key={k} onClick={() => { setKind(k); setScope(null); }}
-                className={`px-4 py-2 text-sm font-bold ${kind === k ? 'bg-orange-500 text-white' : 'text-slate-400 hover:text-white'}`}>
-                {k === 'practice' ? 'Practice' : 'Mock'}
-              </button>
-            ))}
-          </div>
-          <button onClick={() => { loadTree(); loadList('replace'); }} className={btnGhost}><RefreshCw className="w-4 h-4" /> Refresh</button>
           <div className="relative flex-1 min-w-[220px]">
             <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
@@ -518,11 +578,11 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number }> = ({ refreshKe
           {STATUS_TABS.map((t) => (
             <button key={t.id} onClick={() => setTab(t.id)}
               className={`px-3 py-1.5 rounded-full text-xs font-bold border min-h-[36px] ${tab === t.id ? 'bg-orange-500 text-white border-orange-500' : 'border-slate-700/60 text-slate-400 hover:text-white'}`}>
-              {t.label}{t.id === 'all' && ` (${Number(tabs.total) || 0})`}
-              {t.id === 'draft' && ` (${Number(tabs.draft) || 0})`}
-              {t.id === 'published' && ` (${Number(tabs.published) || 0})`}
-              {t.id === 'changed' && ` (${Number(tabs.changed) || 0})`}
-              {t.id === 'removed' && ` (${Number(tabs.removed) || 0})`}
+              {t.label}{!countsHidden && t.id === 'all' && ` (${Number(tabs.total) || 0})`}
+              {!countsHidden && t.id === 'draft' && ` (${Number(tabs.draft) || 0})`}
+              {!countsHidden && t.id === 'published' && ` (${Number(tabs.published) || 0})`}
+              {!countsHidden && t.id === 'changed' && ` (${Number(tabs.changed) || 0})`}
+              {!countsHidden && t.id === 'removed' && ` (${Number(tabs.removed) || 0})`}
             </button>
           ))}
           <button onClick={() => setTab('imports')}
@@ -755,6 +815,35 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number }> = ({ refreshKe
               </div>
             )}
             {topicMsg && <p className="text-sm text-orange-200">{topicMsg}</p>}
+          </div>
+        </div>
+      )}
+
+      {setupPreview && (
+        <div className="fixed inset-0 z-50 bg-slate-950/90 overflow-y-auto p-4" onClick={() => { if (!setupBusy) setSetupPreview(null); }}>
+          <div className="max-w-md mx-auto mt-16 rounded-2xl border border-amber-500/40 bg-slate-900 p-4 space-y-3" onClick={(e) => e.stopPropagation()}>
+            <p className="font-bold text-white">{setupStage === 'backfill' ? 'Backfill preview' : 'Recount preview'}</p>
+            <p className="text-sm text-slate-300">{String(setupPreview.note || '')}</p>
+            {setupStage === 'backfill' && (
+              <p className="text-sm text-slate-300">
+                {Number(setupPreview.total) || 0} questions in this stream, {Number(setupPreview.needing) || 0} need search keys.
+                {Number(setupPreview.dupGroups) || 0} duplicate group{Number(setupPreview.dupGroups) === 1 ? '' : 's'} in the whole stream.
+              </p>
+            )}
+            {setupStage === 'recount' && (
+              <div className="text-xs text-slate-400 space-y-1">
+                {((setupPreview.diffs || []) as string[]).length === 0
+                  ? <p>No differences found; the recount just rebuilds and refreshes the counters.</p>
+                  : ((setupPreview.diffs || []) as string[]).map((d, i) => <p key={i}>- {d}</p>)}
+              </div>
+            )}
+            <div className="flex flex-wrap gap-2">
+              <button className={btnPrimary} disabled={setupBusy} onClick={() => runSetupStage(setupStage || 'recount')}>
+                {setupBusy ? 'Working...' : 'Confirm'}
+              </button>
+              <button className={btnGhost} disabled={setupBusy} onClick={() => setSetupPreview(null)}>Cancel</button>
+            </div>
+            {setupMsg && <p className="text-sm text-orange-200">{setupMsg}</p>}
           </div>
         </div>
       )}

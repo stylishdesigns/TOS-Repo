@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  BookOpen, Plus, RefreshCw, Loader2, Pencil, Trash2, X, AlertTriangle,
+  BookOpen, Plus, Loader2, Pencil, Trash2, X, AlertTriangle,
   CheckCircle2, Send, Image as ImageIcon, ClipboardPaste, FileText, Copy, Eye,
 } from 'lucide-react';
 import { api, Json, Card, Field, inputCls, btnPrimary, btnGhost } from './tosShared';
@@ -76,13 +76,18 @@ const statusPill = (s: string) => (
 // screen, so both halves of Question Bank follow the same stream.
 const QB_STREAM_KEY = 'TOS_qb_stream';
 
-export const QuestionBankTab: React.FC<{ refreshKey: number; view?: 'edit' | 'publish' }> = ({ refreshKey, view = 'edit' }) => {
-  const [kind, setKindState] = useState<Kind>(() => {
+export const QuestionBankTab: React.FC<{ refreshKey: number; view?: 'edit' | 'publish'; kind?: Kind; onKindChange?: (k: Kind) => void }> = ({ refreshKey, view = 'edit', kind: kindProp, onKindChange }) => {
+  // U1: the stream is chosen once in the shared Question Bank header; the
+  // prop wins when the shell passes it, and the remembered local state only
+  // serves the rare case where no shell is above this screen.
+  const [kindState, setKindState] = useState<Kind>(() => {
     try { return localStorage.getItem(QB_STREAM_KEY) === 'mock' ? 'mock' : 'practice'; } catch { return 'practice'; }
   });
+  const kind = kindProp ?? kindState;
   const setKind = (k: Kind) => {
     setKindState(k);
     try { localStorage.setItem(QB_STREAM_KEY, k); } catch { /* storage unavailable */ }
+    onKindChange?.(k);
   };
   const [data, setData] = useState<Json | null>(null);
   const [error, setError] = useState('');
@@ -468,15 +473,6 @@ export const QuestionBankTab: React.FC<{ refreshKey: number; view?: 'edit' | 'pu
     return SUBJECT_NAMES;
   };
 
-  const switchBtn = (k: Kind, label: string) => (
-    <button
-      onClick={() => setKind(k)}
-      className={`px-5 py-2 rounded-xl text-sm font-bold border transition-all ${kind === k ? 'bg-orange-500/15 text-orange-300 border-orange-500/30' : 'text-slate-400 border-white/10 hover:text-white'}`}
-    >
-      {label}
-    </button>
-  );
-
   // Summary cards (N2): shown on the Import & edit tab and, with the publish
   // button, on the Publish tab.
   const summaryRow = (      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -514,7 +510,6 @@ export const QuestionBankTab: React.FC<{ refreshKey: number; view?: 'edit' | 'pu
               <button onClick={openPublish} className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-orange-500/50 bg-orange-500/10 hover:bg-orange-500/20 disabled:opacity-50 text-orange-300 font-bold text-sm transition-all">
                 <Send className="w-4 h-4" /> Publish changes
               </button>
-              <button onClick={() => { load(); loadTree(); }} disabled={busy} className={btnGhost}><RefreshCw className={`w-4 h-4 ${busy ? 'animate-spin' : ''}`} /> Refresh</button>
             </div>
             {notice && <p className="text-xs text-rose-300 mt-2">{notice}</p>}
             <p className="text-xs text-slate-500 mt-3">{kindMeta.currentVersion ? `Current live version: v${kindMeta.currentVersion}${kindMeta.currentPublishedAt ? `, published ${new Date(kindMeta.currentPublishedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}.` : 'Nothing published yet for this stream.'}</p>
@@ -524,20 +519,9 @@ export const QuestionBankTab: React.FC<{ refreshKey: number; view?: 'edit' | 'pu
       )}
       {view === 'edit' && (
         <>
-      {/* Stream switch */}
-      <div className="flex items-center gap-2">
-        {switchBtn('practice', 'Practice')}
-        {switchBtn('mock', 'Mock')}
-        <span className="text-[11px] text-slate-500 ml-1">Each stream publishes and versions separately.</span>
-      </div>
-
-      {/* Header actions */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <button onClick={() => { load(); loadTree(); }} disabled={busy} className={btnGhost}><RefreshCw className={`w-4 h-4 ${busy ? 'animate-spin' : ''}`} /> Refresh</button>
-        </div>
-        {notice && <p className="text-xs text-rose-300">{notice}</p>}
-      </div>
+      {/* U1: the stream toggle and Refresh live in the shared Question Bank
+          header now, so this tab starts straight at its content. */}
+      {notice && <p className="text-xs text-rose-300">{notice}</p>}
 
       {/* Paste import (parsing engine) */}
       <Card title="Add questions">

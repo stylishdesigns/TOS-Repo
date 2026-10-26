@@ -3,7 +3,8 @@ import { getAuth, signOut, updateProfile, updatePassword, reauthenticateWithCred
 import {
   LayoutDashboard, Users, Building2, Wallet, ScrollText, UserPlus, Loader2,
   RefreshCw, Send, Ban, CheckCircle2, PlayCircle, Check, Plus, ShieldCheck,
-  Clock, ArrowUpRight, UserRound, BookOpen, CalendarDays, Copy,
+  Clock, ArrowUpRight, UserRound, BookOpen, CalendarDays, Copy, HelpCircle,
+  X, ChevronRight,
 } from 'lucide-react';
 import {
   api, fmtDate, fmtDateTime, LEAD_STATUS_LABELS, STATUS_STYLES, Json,
@@ -756,14 +757,89 @@ const TABS = [
 ] as const;
 
 // Question Bank shell (N2): one nav item, three tabs. Library is the default
-// and the last tab is remembered on this device; the Practice/Mock stream is
-// remembered by the screens themselves.
+// and the last tab is remembered on this device. U1: the Practice/Mock
+// stream is chosen once here, in the shared header, and handed to both
+// screens, so no tab ever shows a second stream toggle.
 const QB_SUB_KEY = 'TOS_qb_subtab';
+const QB_STREAM_KEY = 'TOS_qb_stream';
 const QB_SUBS = [
   { id: 'library', label: 'Library' },
   { id: 'edit', label: 'Import & edit' },
   { id: 'publish', label: 'Publish' },
 ] as const;
+
+// U1: the "How this works" guide. A plain-language side panel for a new
+// staff member: what the shelf is, what the statuses mean, and the order of
+// work. Nothing in it is hard-coded to the current data. It opens by itself
+// the first time Question Bank is opened on this device (remembered in
+// localStorage, best effort); the (?) button always brings it back.
+const QB_GUIDE_SEEN_KEY = 'TOS_qb_guide_seen';
+
+const QbGuidePanel: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onClose }) => {
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 bg-slate-950 lg:bg-slate-950/80 lg:flex lg:justify-end" onClick={onClose}>
+      <div className="w-full lg:max-w-[480px] h-full bg-slate-950 border-l border-slate-800 overflow-y-auto p-5 lg:p-6 space-y-5" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <p className="text-lg font-black text-white">How this works</p>
+          <button onClick={onClose} aria-label="Close the guide" className="p-2 rounded-lg text-slate-400 hover:text-white min-h-[44px] min-w-[44px]"><X className="w-5 h-5" /></button>
+        </div>
+
+        <div>
+          <p className="text-sm font-bold text-orange-300 mb-2">The shelf, top to bottom</p>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {['Stream', 'Exam', 'Subject', 'Topic', 'Year', 'Question'].map((step, i) => (
+              <React.Fragment key={step}>
+                {i > 0 && <ChevronRight className="w-3.5 h-3.5 text-slate-600 shrink-0" />}
+                <span className="px-2.5 py-1 rounded-full bg-orange-500/15 border border-orange-500/30 text-orange-200 text-xs font-bold whitespace-nowrap">{step}</span>
+              </React.Fragment>
+            ))}
+          </div>
+          <p className="text-sm text-slate-300 mt-2">You open one level at a time: pick a stream, then an exam, a subject, a topic and a year. Questions only appear at the bottom of that path, or in search results. Search looks across the whole stream from wherever you are.</p>
+        </div>
+
+        <div>
+          <p className="text-sm font-bold text-orange-300 mb-1">Practice and Mock are two separate banks</p>
+          <p className="text-sm text-slate-300">Practice feeds student practice across every centre. Mock feeds the daily mock exam. Each keeps its own questions, its own counts and its own published file, so switching the stream at the top switches every tab below it.</p>
+        </div>
+
+        <div>
+          <p className="text-sm font-bold text-orange-300 mb-1">Every question carries an exam pipeline</p>
+          <p className="text-sm text-slate-300">JAMB or WAEC/NECO. The shelf can filter by it, and each import chooses it once for the whole batch.</p>
+        </div>
+
+        <div>
+          <p className="text-sm font-bold text-orange-300 mb-1">What the statuses mean</p>
+          <ul className="text-sm text-slate-300 space-y-1.5">
+            <li><span className="font-bold text-slate-100">Draft:</span> saved but not live for students yet.</li>
+            <li><span className="font-bold text-slate-100">Published:</span> went live with a publish.</li>
+            <li><span className="font-bold text-slate-100">Changed since publish:</span> a published question you edited; the next publish carries the change.</li>
+            <li><span className="font-bold text-slate-100">Removed:</span> taken out of the bank; it waits in the Removed list until the bin is emptied.</li>
+          </ul>
+        </div>
+
+        <div>
+          <p className="text-sm font-bold text-orange-300 mb-1">The order of work</p>
+          <p className="text-sm text-slate-300">Import & edit first: paste questions in (they arrive as drafts) and fix anything that needs it. Publish second: review the change list, then confirm. A publish writes one new versioned file and never overwrites an older one.</p>
+        </div>
+
+        <div>
+          <p className="text-sm font-bold text-orange-300 mb-1">"Setup needed"</p>
+          <p className="text-sm text-slate-300">The library counts questions from counter documents, not by scanning the bank. The first time a stream is used it needs a backfill (adds search keys to existing questions) and a recount (builds those counters). Both show a preview first and write nothing until you confirm.</p>
+        </div>
+
+        <button onClick={() => { try { localStorage.setItem(QB_GUIDE_SEEN_KEY, '1'); } catch { /* storage unavailable */ } onClose(); }} className={btnPrimary}>Got it, don't show this again</button>
+        <p className="text-[11px] text-slate-500">The (?) button at the top of Question Bank brings this back at any time.</p>
+      </div>
+    </div>
+  );
+};
 
 const QuestionBankShell: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
   const [sub, setSub] = useState<string>(() => {
@@ -776,15 +852,54 @@ const QuestionBankShell: React.FC<{ refreshKey: number }> = ({ refreshKey }) => 
     setSub(id);
     try { localStorage.setItem(QB_SUB_KEY, id); } catch { /* storage unavailable */ }
   };
+  // U1: the stream is chosen HERE only. One segmented control for all three
+  // tabs, remembered on this device exactly as before.
+  const [kind, setKindState] = useState<'practice' | 'mock'>(() => {
+    try { return localStorage.getItem(QB_STREAM_KEY) === 'mock' ? 'mock' : 'practice'; } catch { return 'practice'; }
+  });
+  const setKind = (k: 'practice' | 'mock') => {
+    setKindState(k);
+    try { localStorage.setItem(QB_STREAM_KEY, k); } catch { /* storage unavailable */ }
+  };
+  // The header's Refresh bumps a key both screens watch, so one button
+  // refreshes whichever tab is open.
+  const [localRefresh, setLocalRefresh] = useState(0);
+  const [guideOpen, setGuideOpen] = useState(false);
+  useEffect(() => {
+    try { if (!localStorage.getItem(QB_GUIDE_SEEN_KEY)) setGuideOpen(true); } catch { /* storage unavailable */ }
+  }, []);
+  const refresh = () => setLocalRefresh((n) => n + 1);
+  const fullKey = refreshKey + localRefresh;
   return (
     <div className="space-y-5">
-      <div className="flex gap-1.5 overflow-x-auto pb-0.5">
-        {QB_SUBS.map((t) => (
-          <button key={t.id} onClick={() => pick(t.id)} className={`min-h-[44px] px-5 py-2 rounded-xl text-sm font-bold border transition-all whitespace-nowrap ${sub === t.id ? 'bg-orange-500/15 text-orange-300 border-orange-500/30' : 'text-slate-400 border-white/10 hover:text-white'}`}>{t.label}</button>
-        ))}
+      <div>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex rounded-xl border border-slate-700/60 overflow-hidden" role="group" aria-label="Question stream">
+            {(['practice', 'mock'] as const).map((k) => (
+              <button key={k} onClick={() => setKind(k)} aria-pressed={kind === k}
+                className={`px-4 py-2.5 text-sm font-bold min-h-[44px] ${kind === k ? 'bg-orange-500 text-white' : 'text-slate-400 hover:text-white'}`}>
+                {k === 'practice' ? 'Practice' : 'Mock'}
+              </button>
+            ))}
+          </div>
+          <button onClick={refresh} aria-label="Refresh the question bank" title="Refresh"
+            className="p-2.5 rounded-xl border border-slate-700/60 text-slate-300 hover:text-white min-h-[44px] min-w-[44px]">
+            <RefreshCw className="w-4 h-4" />
+          </button>
+          <button onClick={() => setGuideOpen(true)} aria-label="How this works" title="How this works"
+            className="p-2.5 rounded-xl border border-slate-700/60 text-slate-300 hover:text-white min-h-[44px] min-w-[44px]">
+            <HelpCircle className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="flex gap-1.5 overflow-x-auto pb-0.5 mt-2">
+          {QB_SUBS.map((t) => (
+            <button key={t.id} onClick={() => pick(t.id)} className={`min-h-[44px] px-5 py-2 rounded-xl text-sm font-bold border transition-all whitespace-nowrap ${sub === t.id ? 'bg-orange-500/15 text-orange-300 border-orange-500/30' : 'text-slate-400 border-white/10 hover:text-white'}`}>{t.label}</button>
+          ))}
+        </div>
       </div>
-      {sub === 'library' && <QuestionLibraryTab refreshKey={refreshKey} />}
-      {sub !== 'library' && <QuestionBankTab refreshKey={refreshKey} view={sub === 'publish' ? 'publish' : 'edit'} />}
+      {sub === 'library' && <QuestionLibraryTab refreshKey={fullKey} kind={kind} onKindChange={setKind} />}
+      {sub !== 'library' && <QuestionBankTab refreshKey={fullKey} view={sub === 'publish' ? 'publish' : 'edit'} kind={kind} onKindChange={setKind} />}
+      <QbGuidePanel open={guideOpen} onClose={() => setGuideOpen(false)} />
     </div>
   );
 };

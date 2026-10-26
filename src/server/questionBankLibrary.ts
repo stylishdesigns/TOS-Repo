@@ -126,6 +126,26 @@ export function enrichFields(d: {
 // Counters
 // ---------------------------------------------------------------------------
 
+/**
+ * Write a dotted path as REAL nested objects inside the merge payload.
+ * A dotted string key in a merge-set ("byStatus.published") lands in
+ * Firestore as one literal field name containing a dot, sitting BESIDE the
+ * nested count maps the recount writes, so every reader of summary.byStatus
+ * or summary.subjects never sees it. Nesting the same path keeps each
+ * counter update inside the maps the screens read.
+ */
+function setDotted(target: Record<string, unknown>, path: string, value: unknown): void {
+  const parts = path.split('.');
+  let node = target;
+  for (let i = 0; i < parts.length - 1; i += 1) {
+    const key = parts[i];
+    const existing = node[key];
+    if (typeof existing !== 'object' || existing === null || Array.isArray(existing)) node[key] = {};
+    node = node[key] as Record<string, unknown>;
+  }
+  node[parts[parts.length - 1]] = value;
+}
+
 type CounterSide = {
   sKey: string; sLabel: string; tKey: string; tLabel: string;
   year: number | null; examType: string; status: string;
@@ -199,8 +219,8 @@ class CounterAcc {
     const batch = target as WriteBatch;
     const summaryRef = adminDb.collection(QB_COUNTS).doc(kind);
     const sOp: Record<string, unknown> = { kind, updatedAt: new Date().toISOString() };
-    for (const [p, n] of Object.entries(this.summary)) sOp[p] = FieldValue.increment(n);
-    for (const [k, label] of Object.entries(this.sLabels)) sOp[`subjects.${k}.label`] = label;
+    for (const [p, n] of Object.entries(this.summary)) setDotted(sOp, p, FieldValue.increment(n));
+    for (const [k, label] of Object.entries(this.sLabels)) setDotted(sOp, `subjects.${k}.label`, label);
     batch.set(summaryRef, sOp, { merge: true });
 
     for (const [sKey, entry] of this.subj) {
@@ -208,9 +228,9 @@ class CounterAcc {
       const op: Record<string, unknown> = {
         kind, subjectKey: sKey, label: entry.label, updatedAt: new Date().toISOString(),
       };
-      for (const [p, n] of Object.entries(entry.f)) op[p] = FieldValue.increment(n);
+      for (const [p, n] of Object.entries(entry.f)) setDotted(op, p, FieldValue.increment(n));
       const tl = this.tLabels[sKey] || {};
-      for (const [tKey, label] of Object.entries(tl)) op[`byTopic.${tKey}.label`] = label;
+      for (const [tKey, label] of Object.entries(tl)) setDotted(op, `byTopic.${tKey}.label`, label);
       batch.set(ref, op, { merge: true });
     }
   }
@@ -267,20 +287,21 @@ export function appendPublishCounterOps(
   const sOp: Record<string, unknown> = {
     updatedAt: new Date().toISOString(),
     changed: 0,
-    [`byStatus.draft`]: FieldValue.increment(-totalAdded),
-    [`byStatus.published`]: FieldValue.increment(totalAdded),
   };
+  setDotted(sOp, 'byStatus.draft', FieldValue.increment(-totalAdded));
+  setDotted(sOp, 'byStatus.published', FieldValue.increment(totalAdded));
   batch.set(summaryRef, sOp, { merge: true });
   for (const g of addedGroups) {
     if (!g.sKey || !g.count) continue;
     const ref = adminDb.collection(QB_COUNTS).doc(`${kind}__s__${g.sKey}`);
-    batch.set(ref, {
+    const op: Record<string, unknown> = {
       kind,
       subjectKey: g.sKey,
       updatedAt: new Date().toISOString(),
-      [`byStatus.draft`]: FieldValue.increment(-g.count),
-      [`byStatus.published`]: FieldValue.increment(g.count),
-    }, { merge: true });
+    };
+    setDotted(op, 'byStatus.draft', FieldValue.increment(-g.count));
+    setDotted(op, 'byStatus.published', FieldValue.increment(g.count));
+    batch.set(ref, op, { merge: true });
   }
 }
 
@@ -498,6 +519,7 @@ export function registerQuestionBankLibraryRoutes(
 
       const [summary, meta] = await Promise.all([readSummary(kind), readKindMeta(kind)]);
       const setupNeeded = !summary?.setup?.backfilled || !summary?.setup?.recounted;
+      const repairNeeded = Boolean(summary) && Object.keys(summary).some((k) => k.includes('.'));
       res.json({
         ok: true,
         kind,
@@ -505,6 +527,7 @@ export function registerQuestionBankLibraryRoutes(
         nextCursor,
         hasMore,
         setupNeeded,
+        repairNeeded,
         publishedAt: meta.currentPublishedAt,
         meta: {
           currentVersion: meta.currentVersion,
@@ -553,12 +576,19 @@ export function registerQuestionBankLibraryRoutes(
       const kind = parseKind(req.query.kind);
       const summary = await readSummary(kind);
       const setupNeeded = !summary?.setup?.backfilled || !summary?.setup?.recounted;
+      // Counter repair check, free on the reads already in hand: a field name
+      // containing a dot in a counter document means counter updates were
+      // once saved BESIDE the count maps instead of inside them, so the
+      // numbers below are stale until a recount rewrites the documents.
+      const hasDottedKeys = (d: unknown) =>
+        Boolean(d) && Object.keys(d as Record<string, unknown>).some((k) => k.includes('.'));
       if (!summary) {
-        res.json({ ok: true, kind, setupNeeded, summary: null, subjects: [] });
+        res.json({ ok: true, kind, setupNeeded, repairNeeded: false, setup: null, summary: null, subjects: [] });
         return;
       }
       const sKeys = Object.keys(summary.subjects || {}).slice(0, SUBJECT_DOC_CAP);
       const subjectDocs = await readSubjectDocs(kind, sKeys);
+      const repairNeeded = hasDottedKeys(summary) || subjectDocs.some(({ data }) => hasDottedKeys(data));
       const subjects = subjectDocs.map(({ sKey, data }) => ({
         key: sKey,
         label: String(data?.label || summary.subjects?.[sKey]?.label || sKey),
@@ -578,6 +608,8 @@ export function registerQuestionBankLibraryRoutes(
         ok: true,
         kind,
         setupNeeded,
+        repairNeeded,
+        setup: summary.setup || null,
         publishedAt: meta.currentPublishedAt,
         summary: {
           total: Number(summary.total) || 0,
