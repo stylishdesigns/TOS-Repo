@@ -26,7 +26,7 @@ const STATUS_TABS: { id: string; label: string }[] = [
 
 const DIFF_LABELS: Record<string, string> = { easy: 'Easy', hard: 'Hard' };
 
-type Scope = { type: 'subject' | 'topic' | 'year'; key: string; label: string } | null;
+type Scope = { type: 'subject' | 'topic' | 'year'; key: string; label: string; subjectKey?: string; subjectLabel?: string } | null;
 
 export const QuestionLibraryTab: React.FC<{ refreshKey: number; kind?: 'practice' | 'mock'; onKindChange?: (k: 'practice' | 'mock') => void }> = ({ refreshKey, kind: kindProp, onKindChange }) => {
   // U1: the stream is chosen once in the shared Question Bank header; the
@@ -62,6 +62,10 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number; kind?: 'practice
   // the tree counts already in memory, so opening it costs no extra reads.
   const [activeSubject, setActiveSubject] = useState<string | null>(null);
   const [openTopicsInScreen, setOpenTopicsInScreen] = useState<Set<string>>(new Set());
+  // U3: the flat question list opens only from an explicit action (a status
+  // pill, a drill-in, a search or one import batch). The shelf alone is the
+  // resting view of the Library tab.
+  const [listOpen, setListOpen] = useState(false);
 
   const [editor, setEditor] = useState<Json | null>(null);
   const [editorLoading, setEditorLoading] = useState(false);
@@ -397,9 +401,9 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number; kind?: 'practice
     setOpenTopicsInScreen(new Set());
   };
 
-  const pickFromScreen = (type: 'subject' | 'topic' | 'year', key: string, label: string) => {
+  const pickFromScreen = (type: 'subject' | 'topic' | 'year', key: string, label: string, subjectKey?: string, subjectLabel?: string) => {
     setActiveSubject(null);
-    pickScope(type, key, label);
+    pickScope(type, key, label, subjectKey, subjectLabel);
   };
 
   const toggleScreenTopic = (tKey: string) => {
@@ -410,14 +414,18 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number; kind?: 'practice
     });
   };
 
-  const pickScope = (type: 'subject' | 'topic' | 'year', key: string, label: string) => {
-    setScope({ type, key, label });
+  const pickScope = (type: 'subject' | 'topic' | 'year', key: string, label: string, subjectKey?: string, subjectLabel?: string) => {
+    setScope({ type, key, label, subjectKey, subjectLabel });
     setQ('');
     setQDebounced('');
     setActiveSubject(null);
   };
 
   const scopeParamActive = Boolean(scope) || qDebounced.length >= 2 || Boolean(difficulty);
+  // U3 level-3 view: the question table renders only once you have drilled in
+  // (a subject, topic or year, a search, one import batch, a difficulty filter
+  // or a status tab). With nothing active the shelf is the whole screen.
+  const listViewActive = listOpen || Boolean(scope) || qDebounced.length >= 2 || Boolean(batchFilter) || Boolean(difficulty) || tab !== 'all';
   const showingLine = scopeParamActive
     ? `Showing ${items.length}${hasMore ? ' (more available)' : ''}`
     : countsHidden
@@ -475,7 +483,7 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number; kind?: 'practice
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button onClick={() => pickFromScreen('subject', screenSubject.key, screenSubject.label)}
+          <button onClick={() => pickFromScreen('subject', screenSubject.key, screenSubject.label, screenSubject.key, screenSubject.label)}
             disabled={countsHidden || !(Number(screenSubject.total) || 0)}
             className={btnPrimary}>See all its questions</button>
           <button onClick={() => { openTopics(); setTopicSubject(screenSubject.key); }} className={btnGhost}>Manage topics (rename or merge)</button>
@@ -499,11 +507,11 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number; kind?: 'practice
                 </button>
                 {openTopicsInScreen.has(t.key) && (
                   <div className="px-3 pb-3 space-y-1">
-                    <button onClick={() => pickFromScreen('topic', t.key, t.label)} className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold text-orange-300/90 hover:bg-white/5 min-h-[36px]">
+                    <button onClick={() => pickFromScreen('topic', t.key, t.label, screenSubject.key, screenSubject.label)} className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold text-orange-300/90 hover:bg-white/5 min-h-[36px]">
                       <span>All {t.label} questions</span><span className="text-slate-600">{countsHidden ? '–' : t.total}</span>
                     </button>
                     {Object.entries(t.byYear || {}).sort((a: any, b: any) => Number(b[0]) - Number(a[0])).map(([y, n]: any) => (
-                      <button key={y} onClick={() => pickFromScreen('year', String(y), `Year ${y}`)} className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs text-slate-400 hover:bg-white/5 min-h-[36px]">
+                      <button key={y} onClick={() => pickFromScreen('year', String(y), `Year ${y}`, screenSubject.key, screenSubject.label)} className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs text-slate-400 hover:bg-white/5 min-h-[36px]">
                         <span>Year {y}</span><span className="text-slate-600">{countsHidden ? '–' : String(n)}</span>
                       </button>
                     ))}
@@ -519,7 +527,7 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number; kind?: 'practice
           <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Years</p>
           <div className="flex flex-wrap gap-2">
             {Object.entries(screenSubject.byYear || {}).sort((a: any, b: any) => Number(b[0]) - Number(a[0])).map(([y, n]: any) => (
-              <button key={y} onClick={() => pickFromScreen('year', String(y), `Year ${y}`)}
+              <button key={y} onClick={() => pickFromScreen('year', String(y), `Year ${y}`, screenSubject.key, screenSubject.label)}
                 className="px-3 py-2 rounded-xl border border-slate-700/60 text-sm text-slate-300 hover:text-white min-h-[44px]">
                 Year {y} <span className="text-slate-600 ml-1">{countsHidden ? '–' : String(n)}</span>
               </button>
@@ -530,6 +538,100 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number; kind?: 'practice
     </Card>
   ) : null;
 
+
+  // U3: the level-3 screen. The first crumb is always the stream and always
+  // leads back to the shelf; the rest show the drill-in path. Difficulty and
+  // sort moved here from the old top filter stack, beside the Select toggle.
+  const backToShelf = () => {
+    setScope(null); setActiveSubject(null); setDifficulty(''); setTab('all'); setListOpen(false); setQ(''); setQDebounced('');
+  };
+  const crumbs: { label: string; onClick?: () => void }[] = [
+    { label: kind === 'mock' ? 'Mock' : 'Practice', onClick: listViewActive ? backToShelf : undefined },
+  ];
+  if (scope) {
+    if (scope.type !== 'subject' && scope.subjectKey && scope.subjectLabel) {
+      crumbs.push({ label: scope.subjectLabel, onClick: () => setScope({ type: 'subject', key: scope.subjectKey!, label: scope.subjectLabel! }) });
+    }
+    crumbs.push({ label: scope.label });
+  } else if (qDebounced.length >= 2) {
+    crumbs.push({ label: `Search: "${qDebounced}"` });
+  } else if (batchFilter) {
+    crumbs.push({ label: 'One import batch' });
+  } else if (tab !== 'all') {
+    crumbs.push({ label: tab === 'imports' ? 'Imports' : (STATUS_TABS.find((t) => t.id === tab)?.label || tab) });
+  }
+
+  const level3 = (
+    <div className="space-y-3">
+      <Card>
+        <div className="flex flex-wrap items-center gap-x-1 gap-y-0.5 text-xs text-slate-500">
+          {crumbs.map((c, i) => (
+            <React.Fragment key={`${c.label}-${i}`}>
+              {i > 0 && <ChevronRight className="w-3.5 h-3.5 text-slate-600 shrink-0" />}
+              {c.onClick ? (
+                <button onClick={c.onClick} className="font-semibold hover:text-white px-1 min-h-[36px]">{c.label}</button>
+              ) : (
+                <span className={i === crumbs.length - 1 ? 'px-1 font-bold text-orange-300' : 'px-1'}>{c.label}</span>
+              )}
+            </React.Fragment>
+          ))}
+        </div>
+        <div className="flex flex-wrap items-center gap-2 mt-2">
+          <select value={difficulty} onChange={(e) => setDifficulty(e.target.value)} className={`${inputCls} w-auto`}>
+            <option value="">Any difficulty</option>
+            <option value="easy">Easy</option>
+            <option value="hard">Hard</option>
+          </select>
+          <select value={sort} onChange={(e) => setSort(e.target.value)} className={`${inputCls} w-auto`}>
+            <option value="updated">Newest activity</option>
+            <option value="year">Year</option>
+            <option value="subject">Subject A to Z</option>
+          </select>
+          <button onClick={() => { setSelectMode((v) => !v); setSelected(new Set()); setConfirmBulkRemove(false); }}
+            className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-sm font-semibold min-h-[44px] ${selectMode ? 'border-orange-500/50 bg-orange-500/15 text-orange-200' : 'border-slate-700/60 text-slate-300'}`}>
+            <Check className="w-4 h-4" /> {selectMode ? 'Selecting' : 'Select'}
+          </button>
+          {qDebounced.length >= 2 && (
+            <button onClick={() => { setQ(''); setQDebounced(''); }} className={btnGhost}>Clear search</button>
+          )}
+          <span className="text-xs text-slate-500 ml-auto">{loading ? 'Loading...' : showingLine}</span>
+        </div>
+      </Card>
+      <div className="space-y-2">
+        {items.map((it) => (
+          <button key={it.id} onClick={() => (selectMode ? toggleSelect(it.id) : openEditor(it.id))}
+            className={`w-full text-left rounded-2xl border p-3.5 transition-colors ${selected.has(it.id) ? 'border-orange-500/60 bg-orange-500/10' : 'border-slate-700/50 bg-slate-900/40 hover:border-orange-500/40'}`}>
+            <div className="flex items-start justify-between gap-3">
+              {selectMode && (
+                <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${selected.has(it.id) ? 'border-orange-400 bg-orange-500 text-white' : 'border-slate-600'}`}>
+                  {selected.has(it.id) ? <Check className="w-3.5 h-3.5" /> : null}
+                </span>
+              )}
+              <p className="text-sm text-slate-200 line-clamp-2">{it.textPreview}</p>
+              <Pencil className="w-4 h-4 text-slate-600 shrink-0 mt-0.5" />
+            </div>
+            <div className="flex flex-wrap gap-1.5 mt-2 items-center">
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300">{it.subject}</span>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">{it.topic}</span>
+              {it.year != null && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">{it.year}</span>}
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">{DIFF_LABELS[it.difficulty] || it.difficulty}</span>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${it.status === 'published' ? 'bg-emerald-500/15 text-emerald-300' : it.status === 'removed' ? 'bg-red-500/15 text-red-300' : it.status === 'draft' ? 'bg-sky-500/15 text-sky-300' : 'bg-amber-500/15 text-amber-300'}`}>{it.status}</span>
+              <span className="text-[10px] text-slate-600 ml-auto">{fmtDate(it.updatedAt)}</span>
+            </div>
+          </button>
+        ))}
+        {!loading && items.length === 0 && !listError && (
+          <p className="text-sm text-slate-500 px-1 py-6">No questions match this view.</p>
+        )}
+        {hasMore && (
+          <button onClick={() => loadList('more')} disabled={loadingMore}
+            className={`${btnGhost} w-full justify-center`}>
+            {loadingMore ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Load 50 more'}
+          </button>
+        )}
+      </div>
+    </div>
+  );
 
   // Imports tab (L5): every recorded paste, newest first, with undo.
   if (tab === 'imports') {
@@ -558,7 +660,7 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number; kind?: 'practice
                     <span className="px-3 py-1.5 rounded-full text-xs font-bold border border-slate-700 text-slate-500">Undone</span>
                   ) : (
                     <>
-                      <button className={`${btnGhost} text-xs`} onClick={() => { setBatchFilter(b.batchId); setScope(null); setQ(''); setTab('all'); }}>See the questions</button>
+                      <button className={`${btnGhost} text-xs`} onClick={() => { setBatchFilter(b.batchId); setScope(null); setQ(''); setTab('all'); setListOpen(true); }}>See the questions</button>
                       <button className={`${btnGhost} text-xs`} disabled={bulkBusy} onClick={() => openUndoPreview(b.batchId)}>Undo this batch</button>
                     </>
                   )}
@@ -628,24 +730,10 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number; kind?: 'practice
               className={`${inputCls} pl-9`}
             />
           </div>
-          <select value={difficulty} onChange={(e) => setDifficulty(e.target.value)} className={`${inputCls} w-auto`}>
-            <option value="">Any difficulty</option>
-            <option value="easy">Easy</option>
-            <option value="hard">Hard</option>
-          </select>
-          <select value={sort} onChange={(e) => setSort(e.target.value)} className={`${inputCls} w-auto`}>
-            <option value="updated">Newest activity</option>
-            <option value="year">Year</option>
-            <option value="subject">Subject A to Z</option>
-          </select>
-          <button onClick={() => { setSelectMode((v) => !v); setSelected(new Set()); setConfirmBulkRemove(false); }}
-            className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-sm font-semibold min-h-[44px] ${selectMode ? 'border-orange-500/50 bg-orange-500/15 text-orange-200' : 'border-slate-700/60 text-slate-300'}`}>
-            <Check className="w-4 h-4" /> {selectMode ? 'Selecting' : 'Select'}
-          </button>
         </div>
         <div className="flex flex-wrap gap-1.5 mt-3">
           {STATUS_TABS.map((t) => (
-            <button key={t.id} onClick={() => setTab(t.id)}
+            <button key={t.id} onClick={() => { setTab(t.id); setListOpen(true); }}
               className={`px-3 py-1.5 rounded-full text-xs font-bold border min-h-[36px] ${tab === t.id ? 'bg-orange-500 text-white border-orange-500' : 'border-slate-700/60 text-slate-400 hover:text-white'}`}>
               {t.label}{!countsHidden && t.id === 'all' && ` (${Number(tabs.total) || 0})`}
               {!countsHidden && t.id === 'draft' && ` (${Number(tabs.draft) || 0})`}
@@ -654,7 +742,7 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number; kind?: 'practice
               {!countsHidden && t.id === 'removed' && ` (${Number(tabs.removed) || 0})`}
             </button>
           ))}
-          <button onClick={() => setTab('imports')}
+          <button onClick={() => { setTab('imports'); setListOpen(true); }}
             className={`px-3 py-1.5 rounded-full text-xs font-bold border min-h-[36px] ${tab === 'imports' ? 'bg-orange-500 text-white border-orange-500' : 'border-slate-700/60 text-slate-400 hover:text-white'}`}>
             Imports
           </button>
@@ -702,45 +790,9 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number; kind?: 'practice
 
       {screenSubject && subjectScreen}
 
-      {!screenSubject && (
-      <div className="space-y-4">
-        {subjectShelf}
-        <div className="space-y-2">
-          <p className="text-xs text-slate-500 px-1">{loading ? 'Loading...' : showingLine}</p>
-          {items.map((it) => (
-            <button key={it.id} onClick={() => (selectMode ? toggleSelect(it.id) : openEditor(it.id))}
-              className={`w-full text-left rounded-2xl border p-3.5 transition-colors ${selected.has(it.id) ? 'border-orange-500/60 bg-orange-500/10' : 'border-slate-700/50 bg-slate-900/40 hover:border-orange-500/40'}`}>
-              <div className="flex items-start justify-between gap-3">
-                {selectMode && (
-                  <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${selected.has(it.id) ? 'border-orange-400 bg-orange-500 text-white' : 'border-slate-600'}`}>
-                    {selected.has(it.id) ? <Check className="w-3.5 h-3.5" /> : null}
-                  </span>
-                )}
-                <p className="text-sm text-slate-200 line-clamp-2">{it.textPreview}</p>
-                <Pencil className="w-4 h-4 text-slate-600 shrink-0 mt-0.5" />
-              </div>
-              <div className="flex flex-wrap gap-1.5 mt-2 items-center">
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300">{it.subject}</span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">{it.topic}</span>
-                {it.year != null && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">{it.year}</span>}
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">{DIFF_LABELS[it.difficulty] || it.difficulty}</span>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${it.status === 'published' ? 'bg-emerald-500/15 text-emerald-300' : it.status === 'removed' ? 'bg-red-500/15 text-red-300' : it.status === 'draft' ? 'bg-sky-500/15 text-sky-300' : 'bg-amber-500/15 text-amber-300'}`}>{it.status}</span>
-                <span className="text-[10px] text-slate-600 ml-auto">{fmtDate(it.updatedAt)}</span>
-              </div>
-            </button>
-          ))}
-          {!loading && items.length === 0 && !listError && (
-            <p className="text-sm text-slate-500 px-1 py-6">No questions match this view.</p>
-          )}
-          {hasMore && (
-            <button onClick={() => loadList('more')} disabled={loadingMore}
-              className={`${btnGhost} w-full justify-center`}>
-              {loadingMore ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Load 50 more'}
-            </button>
-          )}
-        </div>
-      </div>
-      )}
+            {!screenSubject && !listViewActive && subjectShelf}
+      {!screenSubject && listViewActive && level3}
+
 
       {(editor || editorLoading) && (
         <div className="fixed inset-0 z-50 bg-slate-950 lg:bg-slate-950/80 lg:flex lg:justify-end" onClick={() => { if (!saving) setEditor(null); }}>
