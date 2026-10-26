@@ -525,7 +525,6 @@ export function registerQuestionBankLibraryRoutes(
       const repairNeeded = Boolean(summary) && Object.keys(summary).some((k) => k.includes('.'));
       res.json({
         ok: true,
-        scopeEcho: scope,
         kind,
         items,
         nextCursor,

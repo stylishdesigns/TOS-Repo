@@ -49,6 +49,15 @@ function normalizePath(pathname: string): string {
  * serverless-http (which URL-decodes queryStringParameters itself) decodes
  * each value exactly once.
  */
+function decodeQueryPart(raw: string): string {
+  // Form-urlencoded rules: '+' means a space in a query string, and literal
+  // '+' arrives as %2B (the client encodes with URLSearchParams), so decoding
+  // once here turns both spellings into the real value.
+  let text = raw.replace(/\+/g, ' ');
+  try { text = decodeURIComponent(text); } catch { /* keep raw on bad input */ }
+  return text;
+}
+
 function parseRawQuery(search: string): Record<string, string> {
   let q = search.startsWith('?') ? search.slice(1) : search;
   const out: Record<string, string> = {};
@@ -56,7 +65,7 @@ function parseRawQuery(search: string): Record<string, string> {
   for (const pair of q.split('&')) {
     if (!pair) continue;
     const eq = pair.indexOf('=');
-    out[eq === -1 ? pair : pair.slice(0, eq)] = eq === -1 ? '' : pair.slice(eq + 1);
+    out[decodeQueryPart(eq === -1 ? pair : pair.slice(0, eq))] = eq === -1 ? '' : decodeQueryPart(pair.slice(eq + 1));
   }
   return out;
 }
