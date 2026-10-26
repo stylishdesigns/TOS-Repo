@@ -55,6 +55,7 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number; kind?: 'practice
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [listError, setListError] = useState('');
+  const listReq = useRef(0);
   const [loadingMore, setLoadingMore] = useState(false);
 
   // U2 subject shelf: the shelf replaces the old Browse panel. activeSubject
@@ -132,6 +133,7 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number; kind?: 'practice
 
   const loadList = useCallback(async (mode: 'replace' | 'more') => {
     if (tab === 'imports') return;
+    const seq = ++listReq.current;
     if (mode === 'replace') setLoading(true); else setLoadingMore(true);
     if (mode === 'replace') setListError('');
     try {
@@ -142,16 +144,19 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number; kind?: 'practice
       if (qDebounced.length >= 2) p.set('q', qDebounced);
       if (mode === 'more' && nextCursor) p.set('cursor', nextCursor);
       const r = await api(`/api/tos/questionbank/list?${p.toString()}`);
+      if (seq !== listReq.current) return;
       setItems((prev) => (mode === 'more' ? [...prev, ...(r.items || [])] : r.items || []));
       setTabs(r.tabs || {});
       setHasMore(Boolean(r.hasMore));
       setNextCursor(r.nextCursor || null);
       setTree((prev) => (prev ? { ...prev, setupNeeded: r.setupNeeded, repairNeeded: r.repairNeeded } : prev));
     } catch (e: any) {
-      setListError(e.message || 'Failed to load questions.');
+      if (seq === listReq.current) setListError(e.message || 'Failed to load questions.');
     }
-    setLoading(false);
-    setLoadingMore(false);
+    if (seq === listReq.current) {
+      setLoading(false);
+      setLoadingMore(false);
+    }
   }, [kind, tab, scope, difficulty, qDebounced, sort, nextCursor, batchFilter]);
 
   useEffect(() => { loadTree(); }, [loadTree, refreshKey]);
