@@ -20,6 +20,13 @@ service cloud.firestore {
       return isSignedIn() && exists(/databases/$(database)/documents/tutors/$(request.auth.uid));
     }
 
+    // Platform staff (Tutorial OS) carry the `tos` claim, granted only by
+    // scripts/grant-tos.ts. Writes stay server-only; staff get read access to
+    // the platform's own configuration and plan documents.
+    function isTos() {
+      return isSignedIn() && request.auth.token.get('tos', false) == true;
+    }
+
     // Default Deny Catch-all
     match /{document=**} {
       allow read, write: if false;
@@ -304,6 +311,12 @@ service cloud.firestore {
     // default-deny catch-all at the top already blocks them; these explicit
     // blocks keep that guarantee pinned for each collection by name.
     // -------------------------------------------------------------------------
+    // -------------------------------------------------------------------------
+    // PLATFORM-LEVEL COLLECTIONS (Tutorial OS staff, by the `tos` claim)
+    // -------------------------------------------------------------------------
+    match /platformConfig/{doc}  { allow read: if isTos(); }
+    match /platformPlans/{doc}   { allow read: if isTos(); }
+
     match /mocks/{doc}          { allow read, write: if false; }
     match /mockPapers/{doc}     { allow read, write: if false; }
     match /mockKeys/{doc}       { allow read, write: if false; }

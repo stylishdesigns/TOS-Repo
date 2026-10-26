@@ -52,7 +52,7 @@ export function isTosUser(decoded: {
   email_verified?: boolean;
 }): boolean {
   if (decoded.tos === true) return true;
-  const bootstrap = (process.env.TOS_BOOTSTRAP_EMAILS || '')
+  const bootstrap = (process.env.TOS_BOOTSTRAP_EMAILS || process.env.SUPER_ADMIN_EMAILS || '')
     .split(',')
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean);

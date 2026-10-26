@@ -79,7 +79,7 @@ export async function ensurePlatformDefaultsSeeded(db: Firestore): Promise<SeedR
 
 /** Emails temporarily allowed TOS access via the TOS_BOOTSTRAP_EMAILS env var. */
 export function isBootstrapEmail(email: string | null | undefined): boolean {
-  const bootstrap = (process.env.TOS_BOOTSTRAP_EMAILS || '')
+  const bootstrap = (process.env.TOS_BOOTSTRAP_EMAILS || process.env.SUPER_ADMIN_EMAILS || '')
     .split(',')
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean);

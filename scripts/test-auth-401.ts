@@ -11,6 +11,7 @@ import { adminAuth } from '../src/server/firebaseAdmin';
 process.env.NODE_ENV = 'production';
 process.env.NETLIFY = 'true';
 delete process.env.TOS_BOOTSTRAP_EMAILS;
+delete process.env.SUPER_ADMIN_EMAILS;
 
 // Stub the verifier: only a token literally named "valid" verifies, anything
 // else behaves like a forged/expired/unsigned token would in production.
