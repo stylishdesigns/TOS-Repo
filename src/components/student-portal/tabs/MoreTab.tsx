@@ -161,7 +161,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
   const [firstName, setFirstName] = useState(student.name.split(' ')[0] || 'John');
   const [lastName, setLastName] = useState(student.name.split(' ').slice(1).join(' ') || 'Ade');
   const [phone, setPhone] = useState(student.phone || '+234 812 345 6789');
-  const [email, setEmail] = useState(student.email || 'john.ade@gmail.com');
+  const [email, setEmail] = useState(student.email || '');
   const [gender, setGender] = useState(student.gender || 'Male');
   const [dob, setDob] = useState(student.dob || '2008-04-12');
   const [address, setAddress] = useState(student.address || '12 Admiralty Way, Lekki Phase 1, Lagos');

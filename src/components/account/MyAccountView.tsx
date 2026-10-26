@@ -22,7 +22,7 @@ export const MyAccountView: React.FC = () => {
   // Profile Form state
   const [firstName, setFirstName] = useState('Platform');
   const [lastName, setLastName] = useState('Admin');
-  const [email, setEmail] = useState('nativebrandsdev@gmail.com');
+  const [email, setEmail] = useState(activeUser?.email || ''); // No hardcoded demo email
   const [phone, setPhone] = useState('08056765455');
   const [jobTitle, setJobTitle] = useState('Platform Owner');
   const [department, setDepartment] = useState('Technology');
