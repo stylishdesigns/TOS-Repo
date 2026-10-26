@@ -24,6 +24,7 @@ import { ensureBootstrapSuperAdmin } from "./src/server/platformDefaults";
 import { registerExtendedRoutes } from "./src/server/extendedRoutes";
 import { registerFoDbProxy } from "./src/server/foDbProxy";
 import { registerFoAccessDoors } from "./src/server/foAccessDoors";
+import { registerFoIndexDoors } from "./src/server/foIndexDoors";
 import { registerPracticeStatsRoutes } from "./src/server/practiceStatsRoutes";
 import { registerMockRoutes } from "./src/server/mockRoutes";
 import { registerStudentMockRoutes } from "./src/server/studentMockRoutes";
@@ -1249,6 +1250,10 @@ RULES:
   // Fo Firebase access doors (rules read, backups, auth, storage, push),
   // same x-fo-key gate as the data proxy (see foAccessDoors.ts).
   registerFoAccessDoors(app);
+
+  // Fo index doors (Firestore composite index list/deploy/check), same gate
+  // (see foIndexDoors.ts).
+  registerFoIndexDoors(app);
 
   if (!isProd) {
     const { createServer: createViteServer } = await import("vite");
