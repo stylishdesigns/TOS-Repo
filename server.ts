@@ -252,6 +252,35 @@ function validateEssayBlock(rawBlock: string): { valid: boolean; reason?: string
 async function startServer() {
   const app = express();
   app.use(express.json());
+  app.disable("x-powered-by");
+
+  // ---------------------------------------------------------------------------
+  // Security headers and origin guard (Prompt A phase 2). The API is same-origin
+  // only (the SPA calls /api on its own host), so mutating requests that carry a
+  // cross-origin Origin header are refused, and standard safe headers are set on
+  // every response. Written directly instead of adding helmet/cors packages.
+  // ---------------------------------------------------------------------------
+  app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("X-Frame-Options", "DENY");
+    res.setHeader("Referrer-Policy", "no-referrer");
+    if ((req.headers["x-forwarded-proto"] || "") === "https") {
+      res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+    }
+    const method = (req.method || "").toUpperCase();
+    if (method !== "GET" && method !== "HEAD" && method !== "OPTIONS") {
+      const origin = typeof req.headers.origin === "string" ? req.headers.origin : "";
+      if (origin) {
+        const host = (req.headers["x-forwarded-host"] as string) || (req.headers.host as string) || "";
+        let originHost = "";
+        try { originHost = new URL(origin).host; } catch { originHost = ""; }
+        if (!originHost || originHost !== host) {
+          return res.status(403).json({ error: "Cross-origin requests are not allowed on the API." });
+        }
+      }
+    }
+    next();
+  });
 
   // ---------------------------------------------------------------------------
   // Global authentication for the API (Prompt A step 1): every /api route
@@ -699,6 +728,20 @@ async function startServer() {
       }
       const config = await getPlatformConfig();
       await consumeAiRateLimit(caller.uid, "ai-questions", config);
+      // Body caps (Prompt A phase 2), enforced here so the handler stays untouched:
+      // count must be a whole number 1-50, text fields capped at 2,000 characters.
+      const qBody = req.body && typeof req.body === "object" && !Array.isArray(req.body)
+        ? (req.body as Record<string, unknown>) : {};
+      const rawCount = Number(qBody.count ?? 10);
+      if (!Number.isFinite(rawCount) || Math.floor(rawCount) !== rawCount || rawCount < 1 || rawCount > 50) {
+        throw httpError(400, "Question count must be a whole number between 1 and 50.");
+      }
+      for (const field of ["subject", "programme", "type", "prompt", "topic"] as const) {
+        const value = qBody[field];
+        if (value != null && (typeof value !== "string" || value.length > 2000)) {
+          throw httpError(400, `The ${field} field must be text under 2,000 characters.`);
+        }
+      }
       next();
     } catch (error: any) {
       res.status(error.status || 500).json({ error: error.message || "Unauthorized" });
@@ -740,6 +783,28 @@ async function startServer() {
       }
       const config = await getPlatformConfig();
       await consumeAiRateLimit(caller.uid, "ai-essay", config);
+      // Body caps (Prompt A phase 2): items must be an array of 1-50 objects and
+      // every string value capped, again without touching the handler.
+      const eBody = req.body && typeof req.body === "object" && !Array.isArray(req.body)
+        ? (req.body as Record<string, unknown>) : {};
+      const items = eBody.items;
+      if (!Array.isArray(items) || items.length < 1 || items.length > 50) {
+        throw httpError(400, "Send between 1 and 50 essay items to grade.");
+      }
+      for (const item of items) {
+        if (!item || typeof item !== "object" || Array.isArray(item)) {
+          throw httpError(400, "Each essay item must be an object.");
+        }
+        for (const value of Object.values(item as Record<string, unknown>)) {
+          if (typeof value === "string" && value.length > 8000) {
+            throw httpError(400, "An essay field is too long (8,000 characters maximum).");
+          }
+        }
+      }
+      const rawMarks = Number(eBody.totalEssayMarks ?? 0);
+      if (!Number.isFinite(rawMarks) || rawMarks < 0 || rawMarks > 100000) {
+        throw httpError(400, "The total marks value is out of range.");
+      }
       next();
     } catch (error: any) {
       res.status(error.status || 500).json({ error: error.message || "Unauthorized" });
