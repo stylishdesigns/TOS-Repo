@@ -71,8 +71,13 @@ service cloud.firestore {
     // ADMINS
     // -------------------------------------------------------------------------
     match /admins/{adminId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin() || (isSignedIn() && request.auth.uid == adminId);
+      // Only existing admins may read the staff list or write staff records.
+      // A signed-in user can still read their own record (by uid or by an
+      // email-filtered lookup), which the login flow needs.
+      allow read: if isAdmin()
+          || (isSignedIn() && request.auth.uid == adminId)
+          || (isSignedIn() && resource.data.email == request.auth.token.email);
+      allow write: if isAdmin();
     }
 
     // -------------------------------------------------------------------------
@@ -83,7 +88,12 @@ service cloud.firestore {
           && data.regNumber is string && data.regNumber.size() <= 50
           && data.status in ['Active', 'Idle', 'Suspended', 'Completed']
           && data.totalFee is number && data.totalFee >= 0
-          && data.paidAmount is number && data.paidAmount >= 0;
+          && data.paidAmount is number && data.paidAmount >= 0
+          // A referenced programme must actually exist, so a fake id cannot be
+          // attached to a student record.
+          && (!('programmeId' in data)
+              || (data.programmeId is string && isValidId(data.programmeId)
+                  && exists(/databases/$(database)/documents/programmes/$(data.programmeId))));
     }
 
     // Validation for students self-registering
@@ -99,11 +109,29 @@ service cloud.firestore {
     }
 
     match /students/{studentId} {
+      // A student's own edits may never change their uid, registration number,
+      // status, fee configuration or payment status. paidAmount and
+      // outstandingBalance stay student-editable because the payment
+      // submission flow writes them from the client; a server payment route
+      // is the follow-up that locks them.
+      function studentSelfFieldsUnchanged() {
+        return incoming().get('uid', existing().get('uid', '')) == existing().get('uid', '')
+            && incoming().get('regNumber', existing().get('regNumber', '')) == existing().get('regNumber', '')
+            && incoming().get('status', existing().get('status', '')) == existing().get('status', '')
+            && incoming().get('totalFee', existing().get('totalFee', 0)) == existing().get('totalFee', 0)
+            && incoming().get('paymentStatus', existing().get('paymentStatus', '')) == existing().get('paymentStatus', '')
+            && (incoming().get('email', existing().get('email', '')) == existing().get('email', '')
+                || incoming().get('email', '') == request.auth.token.email);
+      }
       allow get: if isVerified() && (request.auth.uid == studentId || resource.data.uid == request.auth.uid || isAdmin());
       allow list: if isAdmin() || (isVerified() && resource.data.uid == request.auth.uid);
-      allow create: if (isAdmin() && isValidStudent(incoming())) 
-                    || (isVerified() && request.auth.uid == studentId && incoming().uid == request.auth.uid);
-      allow update: if isAdmin() || (isVerified() && resource.data.uid == request.auth.uid);
+      allow create: if (isAdmin() && isValidStudent(incoming()) && isValidId(studentId))
+                    || (isVerified() && request.auth.uid == studentId
+                        && incoming().uid == request.auth.uid
+                        // A future or junk timestamp cannot be planted.
+                        && (!('createdAt' in incoming())
+                            || (incoming().createdAt is number && incoming().createdAt <= request.time.toMillis())));
+      allow update: if isAdmin() || (isVerified() && resource.data.uid == request.auth.uid && studentSelfFieldsUnchanged());
       allow delete: if isAdmin();
     }
 
@@ -117,7 +145,10 @@ service cloud.firestore {
 
     match /admissions/{admissionId} {
       allow read: if isAdmin() || (isVerified() && resource.data.email == request.auth.token.email);
-      allow create: if isValidAdmission(incoming());
+      // Visitors may submit an application, but only as Pending; only admins
+      // can create pre-decided records.
+      allow create: if (isValidAdmission(incoming()) && incoming().status == 'Pending')
+                    || (isAdmin() && isValidAdmission(incoming()));
       allow update: if isAdmin() && isValidAdmission(incoming());
       allow delete: if isAdmin();
     }
@@ -126,8 +157,20 @@ service cloud.firestore {
     // TUTORS
     // -------------------------------------------------------------------------
     match /tutors/{tutorId} {
+      // A tutor may update their own profile, but the only self-service status
+      // change is the first-login acceptance (status -> Active together with
+      // hasChangedPassword). After that, status is staff-managed only.
+      function tutorSelfWriteAllowed() {
+        return incoming().get('uid', existing().get('uid', '')) == existing().get('uid', '')
+            && incoming().get('email', existing().get('email', '')) == existing().get('email', '')
+            && incoming().get('centreId', existing().get('centreId', '')) == existing().get('centreId', '')
+            && (incoming().get('status', existing().get('status', '')) == existing().get('status', '')
+                || (incoming().get('hasChangedPassword', existing().get('hasChangedPassword', false)) == true
+                    && incoming().get('status', '') == 'Active'
+                    && existing().get('hasChangedPassword', false) != true));
+      }
       allow read: if isVerified();
-      allow write: if isAdmin() || (isSignedIn() && request.auth.uid == tutorId);
+      allow write: if isAdmin() || (isSignedIn() && request.auth.uid == tutorId && tutorSelfWriteAllowed());
     }
 
     // -------------------------------------------------------------------------
@@ -149,8 +192,19 @@ service cloud.firestore {
     }
 
     match /payments/{paymentId} {
+      // Payments may be created only by a signed-in user, and a non-admin can
+      // only record a payment for their own student record (the payment's
+      // studentId must be the caller's uid, or a student record whose uid
+      // matches the caller).
+      function paymentForOwnStudent(data) {
+        return isAdmin()
+            || (isValidId(data.studentId)
+                && (data.studentId == request.auth.uid
+                    || (exists(/databases/$(database)/documents/students/$(data.studentId))
+                        && get(/databases/$(database)/documents/students/$(data.studentId)).data.get('uid', '') == request.auth.uid)));
+      }
       allow read: if isVerified();
-      allow create: if isValidPayment(incoming());
+      allow create: if isSignedIn() && isValidPayment(incoming()) && paymentForOwnStudent(incoming());
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
