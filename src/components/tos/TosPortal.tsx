@@ -3,7 +3,7 @@ import { getAuth, signOut, updateProfile, updatePassword, reauthenticateWithCred
 import {
   LayoutDashboard, Users, Building2, Wallet, ScrollText, UserPlus, Loader2,
   RefreshCw, Send, Ban, CheckCircle2, PlayCircle, Check, Plus, ShieldCheck,
-  Clock, ArrowUpRight, Lock, UserRound, BookOpen, CalendarDays, Copy,
+  Clock, ArrowUpRight, UserRound, BookOpen, CalendarDays, Copy,
 } from 'lucide-react';
 import {
   api, fmtDate, fmtDateTime, LEAD_STATUS_LABELS, STATUS_STYLES, Json,
@@ -809,17 +809,10 @@ export const TosPortal: React.FC = () => {
   // confirm or a scroll position can never be wiped by a timer, and idle
   // screens cost zero reads.
 
-  // With the console as the default screen for platform staff, this button
-  // means it: end the session, then land on the public site signed out.
-  const signOutToLanding = async () => {
-    window.location.hash = '';
-    try { await signOut(getAuth()); } catch (e) { console.error(e); }
-  };
-
   return (
     <div className="min-h-screen w-full bg-slate-950 flex">
       {/* Sidebar */}
-      <aside className="hidden md:flex flex-col w-60 shrink-0 border-r border-white/5 bg-slate-950 p-5 sticky top-0 h-screen">
+      <aside className="hidden md:flex flex-col w-60 shrink-0 border-r border-white/5 bg-slate-950 p-5 sticky top-0 h-screen overflow-hidden">
         <div className="flex items-center gap-2.5 mb-8">
           <div className="w-9 h-9 rounded-xl bg-orange-500/15 border border-orange-500/30 flex items-center justify-center">
             <ShieldCheck className="w-5 h-5 text-orange-400" />
@@ -829,7 +822,7 @@ export const TosPortal: React.FC = () => {
             <p className="text-sm font-black text-white">Platform</p>
           </div>
         </div>
-        <nav className="space-y-5 flex-1">
+        <nav className="space-y-5 flex-1 min-h-0 overflow-y-auto">
           {GROUPS.map((g) => (
             <div key={g}>
               <p className="text-[9px] font-black uppercase tracking-[0.25em] text-slate-600 px-3.5 mb-1.5">{g}</p>
@@ -847,9 +840,6 @@ export const TosPortal: React.FC = () => {
             </div>
           ))}
         </nav>
-        <button onClick={signOutToLanding} className="text-slate-500 hover:text-slate-300 text-xs font-medium px-3.5 py-2 text-left flex items-center gap-2">
-          <Lock className="w-3.5 h-3.5" /> Back to the public site
-        </button>
       </aside>
 
       {/* Mobile tab bar */}
