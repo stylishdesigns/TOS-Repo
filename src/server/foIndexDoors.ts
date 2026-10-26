@@ -88,8 +88,8 @@ export function registerFoIndexDoors(app: express.Express): void {
         return res.status(400).json({ ok: false, error: "Bad collection name." });
       }
       const url = col
-        ? `${base}/collectionGroups/${col}/indexes?pageSize=200&showMissing=false`
-        : `${base}/collectionGroups/-/indexes?pageSize=200&showMissing=false`;
+        ? `${base}/collectionGroups/${col}/indexes?pageSize=200`
+        : `${base}/collectionGroups/-/indexes?pageSize=200`;
       const r = await googleApi(url, "GET");
       if (r.status !== 200) {
         const msg = r.json?.error?.message || `HTTP ${r.status}`;
