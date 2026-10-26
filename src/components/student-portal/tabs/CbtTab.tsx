@@ -3,6 +3,7 @@ import { ModernSelect } from '../../ui/ModernSelect';
 import { useApp } from '../../../context/AppContext';
 import { Student, CBTExam, QuizQuestion, StudentResult, EssayPart, EssaySubPart } from '../../../types';
 import { CalculatorModal } from '../CalculatorModal';
+import { StudentMockTab } from './StudentMockTab';
 import { EssayQuestion } from '../../common/EssayQuestion';
 import { flattenEssayAnswers, getEssayStructure } from '../../../utils/essay';
 import { gradeAllEssays } from '../../../utils/essayGrading';
@@ -716,6 +717,16 @@ export const CbtTab: React.FC<CbtTabProps> = ({
   // ---------------- VIEW 1: Exam Selection ----------------
   if (examState === 'select') {
     const isMock = activeFrequency === 'Mock' && !showArchive;
+    // The Mock tab is the TOS mock system, whole and only: today's mock,
+    // the past list and the leaderboard. Nothing a tutor writes reaches it.
+    if (isMock) {
+      return (
+        <StudentMockTab
+          onHideBottomNav={onHideBottomNav}
+          onExitToGeneral={() => setActiveFrequency('General')}
+        />
+      );
+    }
     return (
       <div className={`space-y-4 transition-all duration-500 min-h-screen relative ${showArchive ? 'bg-slate-50' : (activeFrequency === 'Mock' ? 'bg-[#EA580C]' : 'bg-slate-50')} p-4`}>
         {renderModals()}

@@ -287,8 +287,11 @@ await check('start after submit is refused', async () => {
   assert.equal(r.status, 409);
 });
 
-await check('a 10-hour duration cannot fit before midnight (cutoff refusal)', async () => {
-  await adminDb.collection('mocks').doc(TODAY).update({ durationMinutes: 600 });
+await check('a duration that cannot fit before midnight (cutoff refusal)', async () => {
+  // Computed fresh every run so the guard is tested at any hour of the day:
+  // one hour past the minutes left in the Lagos day can never fit.
+  const tooLong = Math.max(60, Math.round((dayEnd - Date.now()) / 60000) + 60);
+  await adminDb.collection('mocks').doc(TODAY).update({ durationMinutes: tooLong });
   const r = await call('/api/student/mock/start', 'stu2', 'POST', {});
   assert.equal(r.status, 409);
   assert.ok(/Too late/i.test(r.json.error), r.json.error);
@@ -356,6 +359,58 @@ await check('disabled centre refused: an inactive centre blocks its student', as
 await check('no live listeners and no stored review docs: the review collection stays empty', async () => {
   const snap = await adminDb.collection('mockReviews').limit(1).get();
   assert.equal(snap.size, 0);
+});
+
+await check('history lists own attempts with rank and release state', async () => {
+  const r = await call('/api/student/mock/history', 'stu1');
+  assert.equal(r.status, 200);
+  assert.equal(r.json.rows.length, 2); // today + the auto-submitted BEFORE2 attempt
+  const t = r.json.rows.find((x: any) => x.mockId === TODAY);
+  assert.equal(t.scoreScaled, 300);
+  assert.equal(t.released, false); // releases the morning after
+  const old = r.json.rows.find((x: any) => x.mockId === BEFORE2);
+  assert.equal(old.rank, 1);
+  assert.equal(old.released, true);
+  const r2 = await call('/api/student/mock/history', 'stu2');
+  const t2 = r2.json.rows.find((x: any) => x.mockId === TODAY);
+  assert.equal(t2.autoSubmitted, true);
+});
+
+await check('leaderboard: today not released, released day shows usernames only', async () => {
+  const r1 = await call(`/api/student/mock/leaderboard?date=${today}`, 'stu1');
+  assert.equal(r1.json.released, false);
+  assert.equal(r1.json.entries.length, 0);
+  const r2 = await call(`/api/student/mock/leaderboard?date=${shift(-2)}`, 'stu1');
+  assert.equal(r2.json.released, true);
+  assert.equal(r2.json.entries.length, 1);
+  const e = r2.json.entries[0];
+  assert.equal(e.username, 'ada_t'); // username, never a real name
+  assert.equal(e.rank, 1);
+  assert.equal(e.score, 1);
+  assert.ok(!('uid' in e) && !('centreId' in e) && !('sortMs' in e));
+  assert.equal(r2.json.me.rank, 1);
+  assert.equal(r2.json.me.score, 1);
+  const r3 = await call(`/api/student/mock/leaderboard?date=${shift(-2)}`, 'stu2');
+  assert.equal(r3.json.me, null); // no attempt that day, still sees the board
+});
+
+await check('result: released mock gives the full review; unreleased is refused', async () => {
+  const r1 = await call(`/api/student/mock/result?mockId=${TODAY}`, 'stu1');
+  assert.equal(r1.status, 403); // today has no board yet
+  const r2 = await call(`/api/student/mock/result?mockId=${BEFORE2}`, 'stu2');
+  assert.equal(r2.status, 404); // no attempt of their own that day
+  const r3 = await call(`/api/student/mock/result?mockId=${BEFORE2}`, 'stu1');
+  assert.equal(r3.status, 200);
+  assert.equal(r3.json.review.length, 4);
+  const q1 = r3.json.review.find((x: any) => x.id === 'q1');
+  assert.equal(q1.isCorrect, true);
+  assert.equal(q1.yourChoice, 'B');
+  assert.ok(q1.explanation.length > 0); // the why, handed out only after release
+  assert.equal(r3.json.rank, 1);
+  const seen = await adminDb.collection('mockAttempts').doc(`${BEFORE2}__stu1-uid`).get();
+  assert.ok((seen.data() as any).resultSeenAt);
+  const r4 = await call(`/api/student/mock/result?mockId=${BEFORE2}`, 'stu1');
+  assert.equal(r4.status, 200); // idempotent
 });
 
 console.log(`\n${passed} passed, ${fails.length} failed`);

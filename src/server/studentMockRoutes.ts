@@ -6,6 +6,7 @@ import {
   MOCKS,
   MOCK_ATTEMPTS,
   MOCK_TALLY,
+  MOCK_LEADERBOARDS,
   MOCK_PAPERS,
   MOCK_KEYS,
   USERNAMES,
@@ -424,6 +425,7 @@ export function registerStudentMockRoutes(app: express.Express): void {
   app.post('/api/student/mock/start', async (req, res) => {
     try {
       const ctx = await requireStudent(req);
+      const { settings } = await readSettings();
       const today = lagosToday();
       const mockId = `mock-${today}`;
       const now = Date.now();
@@ -471,6 +473,11 @@ export function registerStudentMockRoutes(app: express.Express): void {
           lastSavedAt: null as string | null,
           shuffleSeed: Math.floor(Math.random() * 2_147_483_647),
           username: String((usernameDoc!.data() as any).username || ''),
+          mockTitle: String(mock.title || 'Mock'),
+          releasesAt: new Date(
+            Date.parse(`${dateAddDays(String(mock.date), 1)}T00:00:00.000Z`)
+            + (settings.releaseHourLagos - 1) * 3600_000 + settings.releaseMinuteLagos * 60_000
+          ).toISOString(),
           keyVersion: 1,
           questionCount: Number(mock.questionCount || 0),
           tallyShards: Number(mock.tallyShards || 1),
@@ -636,6 +643,179 @@ export function registerStudentMockRoutes(app: express.Express): void {
       if (error?.status) return res.status(error.status).json({ error: error.message });
       console.error('[student-mock] submit failed:', error?.message || error);
       res.status(500).json({ error: 'Could not submit the mock.' });
+    }
+  });
+
+
+  // -------------------------------------------------------------------------
+  // GET history: the student's own submitted attempts, newest first, for the
+  // Past tab. Only what the rules allow the phone to see: score, rank and
+  // the mock's public shape. Released comes from the attempt's releasesAt
+  // stamp, so no mock reads are needed here.
+  // -------------------------------------------------------------------------
+  app.get('/api/student/mock/history', async (req, res) => {
+    try {
+      const ctx = await requireStudent(req);
+      const snap = await adminDb.collection(MOCK_ATTEMPTS)
+        .where('uid', '==', ctx.caller.uid)
+        .where('status', '==', 'submitted')
+        .orderBy('startedAt', 'desc')
+        .limit(50)
+        .get();
+      const nowMs = Date.now();
+      const rows = snap.docs.map((d) => {
+        const a = d.data() as any;
+        return {
+          mockId: String(a.mockId || ''),
+          date: String(a.mockId || '').slice(5),
+          title: String(a.mockTitle || 'Mock'),
+          examType: String(a.examType || ''),
+          scoreCorrect: Number(a.scoreCorrect || 0),
+          questionCount: Number(a.questionCount || 0),
+          scoreScaled: a.scoreScaled == null ? null : Number(a.scoreScaled),
+          scoreScale: Number(a.scoreScale || 0),
+          rank: a.rankCorrect == null ? null : Number(a.rankCorrect),
+          autoSubmitted: Boolean(a.autoSubmitted),
+          // An attempt ranked at release time (rankCorrect written by the
+          // release job) is released even if it predates the releasesAt stamp.
+          released: (Boolean(a.releasesAt) && nowMs >= Date.parse(String(a.releasesAt))) || a.rankCorrect != null,
+          resultSeenAt: a.resultSeenAt ? String(a.resultSeenAt) : null,
+        };
+      });
+      res.json({ ok: true, rows });
+    } catch (error: any) {
+      if (error?.status) return res.status(error.status).json({ error: error.message });
+      console.error('[student-mock] history failed:', error?.message || error);
+      res.status(500).json({ error: 'Could not load your past mocks.' });
+    }
+  });
+
+  // -------------------------------------------------------------------------
+  // GET leaderboard: one board shared by every centre. Usernames and scores
+  // only; never uids, real names or centre names. rank = 1 + everyone who
+  // scored higher, ties share a rank (the same math the release job used).
+  // -------------------------------------------------------------------------
+  app.get('/api/student/mock/leaderboard', async (req, res) => {
+    try {
+      await requireStudent(req);
+      const date = /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.date || ''))
+        ? String(req.query.date)
+        : dateAddDays(lagosToday(), -1);
+      const mockId = `mock-${date}`;
+      const boardSnap = await adminDb.collection(MOCK_LEADERBOARDS).doc(mockId).get();
+      if (!boardSnap.exists) {
+        return res.json({ ok: true, date, released: false, entries: [], me: null, totalAttempts: 0 });
+      }
+      const board = boardSnap.data() as any;
+      const counts: Record<string, number> = board.scoreCounts || {};
+      const attemptSnap = await adminDb.collection(MOCK_ATTEMPTS).doc(`${mockId}__${(req as any).caller.uid}`).get();
+      let me: any = null;
+      if (attemptSnap.exists) {
+        const a = attemptSnap.data() as any;
+        const myScore = Number(a.scoreCorrect || 0);
+        let higher = 0;
+        for (const k of Object.keys(counts)) {
+          const v = Number(k);
+          if (v > myScore) higher += Number(counts[k] || 0);
+        }
+        me = { rank: higher + 1, score: myScore, username: String(a.username || '') };
+      }
+      const entries = ((board.entries || []) as any[]).slice(0, 100).map((e) => ({
+        rank: Number(e.rank), username: String(e.username || ''), score: Number(e.score),
+      }));
+      res.json({
+        ok: true, date, released: true,
+        mockTitle: String(board.mockTitle || 'Mock'),
+        examType: String(board.examType || ''),
+        totalAttempts: Number(board.totalAttempts || 0),
+        entries, me,
+      });
+    } catch (error: any) {
+      if (error?.status) return res.status(error.status).json({ error: error.message });
+      console.error('[student-mock] leaderboard failed:', error?.message || error);
+      res.status(500).json({ error: 'Could not load the leaderboard.' });
+    }
+  });
+
+  // -------------------------------------------------------------------------
+  // GET result: the student's own marked attempt with the full review, only
+  // after release (the board exists exactly when the mock is released).
+  // Explanations come from the server-only key and are handed out here and
+  // nowhere else. Marks the result seen so the Today card clears.
+  // -------------------------------------------------------------------------
+  app.get('/api/student/mock/result', async (req, res) => {
+    try {
+      const ctx = await requireStudent(req);
+      const mockId = String(req.query.mockId || '').trim();
+      if (!/^mock-\d{4}-\d{2}-\d{2}$/.test(mockId)) throw httpError(400, 'That mock id looks wrong.');
+      const attemptSnap = await adminDb.collection(MOCK_ATTEMPTS).doc(`${mockId}__${ctx.caller.uid}`).get();
+      if (!attemptSnap.exists || String((attemptSnap.data() as any).status) !== 'submitted') {
+        throw httpError(404, 'You have no submitted attempt for that mock.');
+      }
+      const attempt = attemptSnap.data() as any;
+      const boardSnap = await adminDb.collection(MOCK_LEADERBOARDS).doc(mockId).get();
+      if (!boardSnap.exists) {
+        throw httpError(403, 'Results are not out yet. They drop the morning after the mock.');
+      }
+      const paperSnap = await adminDb.collection(MOCK_PAPERS).doc(mockId).get();
+      const keySnap = await adminDb.collection(MOCK_KEYS).doc(mockId).get();
+      const questions = ((paperSnap.data() as any)?.questions || []) as any[];
+      const keyById = new Map<string, any>(
+        (((keySnap.data() as any)?.items || []) as any[]).map((k) => [String(k.id), k]),
+      );
+      const saved = attempt.savedAnswers || {};
+      const review = questions.map((q, i) => {
+        const k = keyById.get(String(q.id));
+        const your = saved[q.id] ? String(saved[q.id].choice || '') : null;
+        const correct = k ? String(k.correct || '') : '';
+        return {
+          n: i + 1,
+          id: String(q.id),
+          subject: String(q.subject || ''),
+          topic: String(q.topic || ''),
+          year: q.year ?? null,
+          text: String(q.text || ''),
+          options: (q.options || []).map((o: any) => String(o)),
+          imageLink: String(q.imageLink || ''),
+          yourChoice: your,
+          correctChoice: correct,
+          isCorrect: your != null && your !== '' && your === correct,
+          explanation: k ? String(k.explanation || '') : '',
+          flagged: Boolean(saved[q.id]?.flag),
+        };
+      });
+      const counts: Record<string, number> = (boardSnap.data() as any).scoreCounts || {};
+      const myScore = Number(attempt.scoreCorrect || 0);
+      let higher = 0;
+      for (const k of Object.keys(counts)) {
+        const v = Number(k);
+        if (v > myScore) higher += Number(counts[k] || 0);
+      }
+      // One small write, once per result: clears the Today reminder card.
+      if (!attempt.resultSeenAt) void attemptSnap.ref.update({ resultSeenAt: new Date().toISOString() });
+      res.json({
+        ok: true,
+        mockId,
+        date: mockId.slice(5),
+        title: String(attempt.mockTitle || 'Mock'),
+        examType: String(attempt.examType || ''),
+        score: {
+          correct: myScore,
+          questionCount: Number(attempt.questionCount || review.length),
+          scaled: attempt.scoreScaled == null ? null : Number(attempt.scoreScaled),
+          scale: Number(attempt.scoreScale || 0),
+        },
+        rank: higher + 1,
+        autoSubmitted: Boolean(attempt.autoSubmitted),
+        timeSpentMs: Number(attempt.sortMs || 0),
+        perSubject: attempt.perSubject || [],
+        perTopic: attempt.perTopic || [],
+        review,
+      });
+    } catch (error: any) {
+      if (error?.status) return res.status(error.status).json({ error: error.message });
+      console.error('[student-mock] result failed:', error?.message || error);
+      res.status(500).json({ error: 'Could not load your result.' });
     }
   });
 

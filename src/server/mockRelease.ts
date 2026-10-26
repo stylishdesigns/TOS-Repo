@@ -138,6 +138,33 @@ async function releaseOne(mockId: string, mock: any, source: string, by?: string
     releasedEntries: entries.length,
   });
   await batch.commit();
+
+  // 5. Rank every submitted attempt once, while the histogram is fresh, so
+  //    the student's Past list never has to read boards at view time. Ties
+  //    share a rank, matching the board.
+  try {
+    const allSnap = await adminDb.collection(MOCK_ATTEMPTS)
+      .where('mockId', '==', mockId)
+      .where('status', '==', 'submitted')
+      .get();
+    let rankBatch = adminDb.batch();
+    let rankN = 0;
+    for (const d of allSnap.docs) {
+      const s = Number((d.data() as any).scoreCorrect || 0);
+      let higher = 0;
+      for (const k of Object.keys(scoreCounts)) {
+        const v = Number(k);
+        if (v > s) higher += Number(scoreCounts[k] || 0);
+      }
+      rankBatch.update(d.ref, { rankCorrect: higher + 1 });
+      rankN += 1;
+      if (rankN % 400 === 0) { await rankBatch.commit(); rankBatch = adminDb.batch(); }
+    }
+    if (rankN % 400 !== 0) await rankBatch.commit();
+  } catch (e: any) {
+    console.error(`[mockRelease] rank write failed for ${mockId}:`, e?.message || e);
+  }
+
   void audit({ area: 'mocks', action: 'release', mockId, source, by: by || null, totalAttempts, entries: entries.length });
   return 'released';
 }
