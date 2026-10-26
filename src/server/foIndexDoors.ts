@@ -87,9 +87,11 @@ export function registerFoIndexDoors(app: express.Express): void {
       if (col && !/^[A-Za-z0-9_-]{1,150}$/.test(col)) {
         return res.status(400).json({ ok: false, error: "Bad collection name." });
       }
+      // This endpoint rejects a pageSize other than 0, so no size param:
+      // one full page is far more than this app ever declares.
       const url = col
-        ? `${base}/collectionGroups/${col}/indexes?pageSize=200`
-        : `${base}/collectionGroups/-/indexes?pageSize=200`;
+        ? `${base}/collectionGroups/${col}/indexes`
+        : `${base}/collectionGroups/-/indexes`;
       const r = await googleApi(url, "GET");
       if (r.status !== 200) {
         const msg = r.json?.error?.message || `HTTP ${r.status}`;
