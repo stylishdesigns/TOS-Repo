@@ -21,8 +21,6 @@ export const INDEX_SPEC: IndexSpecEntry[] = [
   {"collectionGroup":"qbQuestions","queryScope":"COLLECTION","fields":[{"fieldPath":"kind","order":"ASCENDING"},{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"batchId","order":"ASCENDING"},{"fieldPath":"updatedAt","order":"DESCENDING"}]},
   {"collectionGroup":"qbQuestions","queryScope":"COLLECTION","fields":[{"fieldPath":"kind","order":"ASCENDING"},{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"subject","order":"ASCENDING"},{"fieldPath":"updatedAt","order":"DESCENDING"}]},
   {"collectionGroup":"qbQuestions","queryScope":"COLLECTION","fields":[{"fieldPath":"kind","order":"ASCENDING"},{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"year","order":"DESCENDING"}]},
-  {"collectionGroup":"qbQuestions","queryScope":"COLLECTION","fields":[{"fieldPath":"kind","order":"ASCENDING"},{"fieldPath":"tokens","arrayConfig":"CONTAINS_ANY"},{"fieldPath":"updatedAt","order":"DESCENDING"}]},
-  {"collectionGroup":"qbQuestions","queryScope":"COLLECTION","fields":[{"fieldPath":"kind","order":"ASCENDING"},{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"tokens","arrayConfig":"CONTAINS_ANY"},{"fieldPath":"updatedAt","order":"DESCENDING"}]},
   {"collectionGroup":"mocks","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"date","order":"ASCENDING"}]},
   {"collectionGroup":"mockAttempts","queryScope":"COLLECTION","fields":[{"fieldPath":"uid","order":"ASCENDING"},{"fieldPath":"startedAt","order":"DESCENDING"}]},
 ];
