@@ -16,6 +16,12 @@
 // EXPECTED ON THE PRE-FIX RULES (66a3d21): K1, K2, K3, K5, K6, K8, K9, K11,
 // K14a, K14b and S1, S2, S3 FAIL. If they pass there, this suite is not
 // testing what it claims. All checks must pass on the fixed rules.
+//
+// The S-checks each use their own caller whose uid matches the record it
+// creates (doc id == payload uid == auth uid), so each one is a genuine
+// create and the fee guard is the only rule deciding S1-S3. S5 is the
+// deliberate exception: it creates a record for someone else, denied by the
+// uid checks.
 import { readFileSync } from 'node:fs';
 import {
   initializeTestEnvironment,
@@ -44,6 +50,12 @@ const admNoCentre = () => testEnv.authenticatedContext('uid-adm-nox', { email: '
 const tosCtx = () => testEnv.authenticatedContext('uid-tos', { email: 'tos@test.com', tos: true });
 const invitedCtx = () => testEnv.authenticatedContext('uid-invited', { email: 'invited@test.com' });
 const newStu = () => testEnv.authenticatedContext('uid-newstu', { email: 'newstu@test.com' });
+// S1-S3 each use their own caller whose uid matches the record they create, so
+// every S-check evaluates as a true create and the fee guard is the only rule
+// deciding the outcome.
+const newStu1 = () => testEnv.authenticatedContext('uid-s1', { email: 'newstu@test.com' });
+const newStu2 = () => testEnv.authenticatedContext('uid-s2', { email: 'newstu@test.com' });
+const newStu3 = () => testEnv.authenticatedContext('uid-s3', { email: 'newstu@test.com' });
 
 const studentB = {
   uid: 'uid-stu-b', email: 'stub@test.com', regNumber: 'RB-1', status: 'Active',
@@ -143,19 +155,19 @@ try {
 
   // S. Student self-registration may not plant fee or payment state.
   await check('S1. student self-creates a record with paidAmount set denied', async () => {
-    await assertFails(newStu().firestore().doc('students/uid-s1').set({
+    await assertFails(newStu1().firestore().doc('students/uid-s1').set({
       uid: 'uid-s1', email: 'newstu@test.com', status: 'Active', totalFee: 100000, paidAmount: 100000,
       outstandingBalance: 0, centreId: 'centre-a',
     }));
   });
   await check('S2. student self-creates a record with a fee set denied', async () => {
-    await assertFails(newStu().firestore().doc('students/uid-s2').set({
+    await assertFails(newStu2().firestore().doc('students/uid-s2').set({
       uid: 'uid-s2', email: 'newstu@test.com', status: 'Active', totalFee: 50000,
       paidAmount: 0, outstandingBalance: 50000, centreId: 'centre-a',
     }));
   });
   await check('S3. student self-creates a record marked Paid denied', async () => {
-    await assertFails(newStu().firestore().doc('students/uid-s3').set({
+    await assertFails(newStu3().firestore().doc('students/uid-s3').set({
       uid: 'uid-s3', email: 'newstu@test.com', status: 'Active', totalFee: 0, paidAmount: 0,
       outstandingBalance: 0, paymentStatus: 'Paid', centreId: 'centre-a',
     }));
