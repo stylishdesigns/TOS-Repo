@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   CalendarDays, ChevronLeft, ChevronRight, HelpCircle, Loader2, Plus, Trash2,
   AlertTriangle, CheckCircle2, FileText, RefreshCw, Rocket, Trophy, X,
@@ -1222,6 +1222,9 @@ const MocksGuidePanel: React.FC<{ open: boolean; onClose: () => void }> = ({ ope
   );
 };
 
+// MB2: the last create-open signal this device has handled (survives remounts).
+let mocksCreateHandled = -1;
+
 export const MocksTab: React.FC<{ refreshKey: number; openCreateSignal?: number }> = ({ refreshKey, openCreateSignal }) => {
   const [month, setMonth] = useState(() => todayStr().slice(0, 7));
   const [byDate, setByDate] = useState<Record<string, Json>>({});
@@ -1279,16 +1282,18 @@ export const MocksTab: React.FC<{ refreshKey: number; openCreateSignal?: number 
     setCreateError('');
   };
 
-  // MB2: the Overview and Mock papers screens can send the admin here with
-  // the create form already open.
-  const seenSignal = useRef(openCreateSignal);
   useEffect(() => {
-    if (openCreateSignal && openCreateSignal !== seenSignal.current) {
-      seenSignal.current = openCreateSignal;
+    if (openCreateSignal && openCreateSignal !== mocksCreateHandled) {
+      mocksCreateHandled = openCreateSignal;
       setSubTab('calendar');
       createOn(todayStr());
     }
   }, [openCreateSignal]);
+
+  // MB2: the Overview and Mock papers screens can send the admin here with
+  // the create form already open. The signal is compared against a
+  // module-level marker, because the component mounts fresh when the tab
+  // switches, after the signal has already been bumped.
 
   const MOCK_SUBS = [
     { id: 'calendar', label: 'Calendar' },
