@@ -64,8 +64,10 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({ student, onSelectStudent
     setShowPayModal(false);
     addToast({
       type: 'success',
-      title: 'Payment Successful',
-      description: `Payment of ${settings.currencySymbol}${(payAmount || 0).toLocaleString()} confirmed. Receipt ${result.receiptNumber} issued.`,
+      title: result.pending ? 'Payment Sent for Confirmation' : 'Payment Successful',
+      description: result.pending
+        ? `Your payment of ${settings.currencySymbol}${(payAmount || 0).toLocaleString()} was sent to the centre. Your balance updates once the centre confirms it.`
+        : `Payment of ${settings.currencySymbol}${(payAmount || 0).toLocaleString()} confirmed. Receipt ${result.receiptNumber} issued.`,
     });
   };
 
@@ -262,14 +264,12 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({ student, onSelectStudent
                     {(p.amountPaid || 0).toLocaleString()}
                   </div>
                   <div className="text-[10px] text-slate-400 font-mono">
-                    {p.receiptNumber} • {p.date}
+                    {p.status === 'Pending'
+                      ? 'Awaiting confirmation'
+                      : p.status === 'Rejected'
+                      ? 'Rejected'
+                      : p.receiptNumber} • {p.date}
                   </div>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <span className="text-[10px] text-slate-400 font-mono">
-                    {p.receiptNumber} • {p.date}
-                  </span>
                 </div>
               </div>
             ))}

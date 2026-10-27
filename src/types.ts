@@ -341,14 +341,30 @@ export interface PaymentRecord {
   amountPaid: number;
   totalFee: number;
   balance: number;
-  status: 'Paid' | 'Partial' | 'Pending';
+  // 'Pending' = a student's claim awaiting centre confirmation (no balance change yet).
+  // 'Rejected' = the centre declined the claim. Only Paid/Partial count as money received.
+  status: 'Paid' | 'Partial' | 'Pending' | 'Rejected';
   method: 'Card' | 'Bank Transfer' | 'Cash';
   date: string;
   evidenceUrl?: string;
   evidenceName?: string;
   note?: string;
   submittedBy?: 'Student' | 'Admin';
+  rejectionReason?: string;
 }
+
+/** What the payment route reports back to the client. */
+export interface RecordPaymentResult {
+  pending: boolean;
+  receiptNumber: string;
+  paidAmount?: number;
+  outstandingBalance?: number;
+  paymentStatus?: 'Paid' | 'Partial';
+}
+
+/** A payment counts as received money only once the centre has confirmed it. */
+export const isConfirmedPayment = (p: { status?: string }): boolean =>
+  p.status === 'Paid' || p.status === 'Partial';
 
 export interface Announcement {
   id: string;

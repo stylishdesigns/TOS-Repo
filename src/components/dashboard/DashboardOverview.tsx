@@ -49,7 +49,10 @@ export const DashboardOverview: React.FC = () => {
   const pendingAdmissions = admissions.filter((a) => a.status === 'Pending');
   const activeStudents = students.filter((s) => s.status === 'Active');
 
-  const totalRevenue = payments.reduce((sum, p) => sum + p.amountPaid, 0);
+  // Only confirmed money counts as revenue; pending or rejected claims do not.
+  const totalRevenue = payments
+    .filter((p) => p.status === 'Paid' || p.status === 'Partial')
+    .reduce((sum, p) => sum + p.amountPaid, 0);
   const totalOutstanding = students.reduce((sum, s) => sum + s.outstandingBalance, 0);
 
   const getGreeting = () => {

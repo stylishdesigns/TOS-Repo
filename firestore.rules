@@ -206,12 +206,12 @@ service cloud.firestore {
       // Read: admins only, plus the student the payment belongs to. A centre's
       // students can never list another centre's, or another student's, fees.
       allow read: if isVerified() && (isAdmin() || paymentTouchesOwnRecord(resource.data));
-      // Create: centre admins only, from the admin client. Student payments
-      // are recorded by the server payment route, which writes with the
-      // admin SDK; no client device can inject a payment record.
-      allow create: if isAdmin() && isValidPayment(incoming());
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      // No client may write a payment record, admins included. Student claims
+      // ('Pending') and admin-recorded payments are both created by the server
+      // payment routes, and confirmations/rejections by the confirm route, all
+      // with the admin SDK inside a transaction that also updates the student's
+      // balance. A client write could never keep the two in step.
+      allow create, update, delete: if false;
     }
     
     // -------------------------------------------------------------------------

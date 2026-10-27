@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { PaymentRecord } from '../../types';
+import { PaymentRecord, isConfirmedPayment } from '../../types';
 import { ModernSelect } from '../ui/ModernSelect';
 import {
   CreditCard,
@@ -32,6 +32,7 @@ export const FinanceManager: React.FC = () => {
     programmes,
     settings,
     recordPayment,
+    confirmPayment,
     updateProgramme,
     updateSettings,
     addToast,
@@ -71,7 +72,39 @@ export const FinanceManager: React.FC = () => {
   const [paymentMethod, setPaymentMethod] = useState<'Bank Transfer' | 'Card' | 'Cash'>('Bank Transfer');
   const [adminNote, setAdminNote] = useState('');
 
-  const totalCollected = payments.reduce((sum, p) => sum + (p.amountPaid || 0), 0);
+  // Only confirmed payments count as money collected.
+  const totalCollected = payments
+    .filter(isConfirmedPayment)
+    .reduce((sum, p) => sum + (p.amountPaid || 0), 0);
+  const pendingPayments = payments.filter((p) => p.status === 'Pending');
+  const [busyPaymentId, setBusyPaymentId] = useState<string | null>(null);
+
+  const handleConfirmPayment = async (pay: PaymentRecord) => {
+    const ok = window.confirm(
+      `Confirm ${settings.currencySymbol}${(pay.amountPaid || 0).toLocaleString()} from ${pay.studentName}?\n\nOnly confirm after you have checked the proof or your bank statement. This updates the student's balance.`
+    );
+    if (!ok) return;
+    setBusyPaymentId(pay.id);
+    try {
+      await confirmPayment(pay.id, 'confirm');
+    } finally {
+      setBusyPaymentId(null);
+    }
+  };
+
+  const handleRejectPayment = async (pay: PaymentRecord) => {
+    const reason = window.prompt(
+      `Reject ${settings.currencySymbol}${(pay.amountPaid || 0).toLocaleString()} from ${pay.studentName}?\nOptional reason (shown to the student):`,
+      ''
+    );
+    if (reason === null) return;
+    setBusyPaymentId(pay.id);
+    try {
+      await confirmPayment(pay.id, 'reject', reason);
+    } finally {
+      setBusyPaymentId(null);
+    }
+  };
   const totalBilled = students.reduce((sum, s) => sum + (s.totalFee || 0), 0);
   const totalOutstanding = students.reduce((sum, s) => sum + (s.outstandingBalance || 0), 0);
 
@@ -115,7 +148,7 @@ export const FinanceManager: React.FC = () => {
     const matchesSearch =
       !search ||
       p.studentName.toLowerCase().includes(search.toLowerCase()) ||
-      p.receiptNumber.toLowerCase().includes(search.toLowerCase()) ||
+      (p.receiptNumber || '').toLowerCase().includes(search.toLowerCase()) ||
       p.programmeName.toLowerCase().includes(search.toLowerCase());
 
     const matchesMethod = methodFilter === 'All' || p.method === methodFilter;
@@ -261,7 +294,9 @@ export const FinanceManager: React.FC = () => {
                 options={[
                   { value: 'All', label: 'All Statuses' },
                   { value: 'Paid', label: 'Full Payment (Paid)' },
-                  { value: 'Partial', label: 'Partial Payment' }
+                  { value: 'Partial', label: 'Partial Payment' },
+                  { value: 'Pending', label: 'Awaiting Confirmation' },
+                  { value: 'Rejected', label: 'Rejected' }
                 ]}
               />
             </div>
@@ -364,6 +399,21 @@ export const FinanceManager: React.FC = () => {
           </div>
         </div>
 
+        {pendingPayments.length > 0 && (
+          <div className="flex items-center justify-between gap-3 p-3 mt-2 rounded-lg bg-blue-50 border border-blue-200 text-xs text-blue-900">
+            <span className="font-semibold">
+              {pendingPayments.length} student payment{pendingPayments.length === 1 ? '' : 's'} awaiting your confirmation. Balances only change once you confirm.
+            </span>
+            <button
+              type="button"
+              onClick={() => setPaymentStatusFilter('Pending')}
+              className="px-2.5 py-1 font-bold rounded-md bg-white border border-blue-200 hover:bg-blue-100 cursor-pointer shrink-0"
+            >
+              Review
+            </button>
+          </div>
+        )}
+
         <div className="overflow-x-auto rounded-lg border border-slate-100 mt-2">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -411,6 +461,11 @@ export const FinanceManager: React.FC = () => {
                     <td className="py-3 px-4 text-slate-600">
                       <div className="flex items-center gap-1.5">
                         <span>{pay.method}</span>
+                        {pay.status === 'Pending' && !pay.evidenceUrl && (
+                          <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">
+                            No proof
+                          </span>
+                        )}
                         {pay.evidenceUrl && (
                           <button
                             type="button"
@@ -428,20 +483,49 @@ export const FinanceManager: React.FC = () => {
                         className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
                           pay.status === 'Paid'
                             ? 'bg-emerald-100 text-emerald-800'
+                            : pay.status === 'Pending'
+                            ? 'bg-blue-100 text-blue-800'
+                            : pay.status === 'Rejected'
+                            ? 'bg-rose-100 text-rose-800'
                             : 'bg-amber-100 text-amber-800'
                         }`}
                       >
-                        {pay.status}
+                        {pay.status === 'Pending' ? 'Awaiting' : pay.status}
                       </span>
                     </td>
                     <td className="py-3 px-4 text-right">
-                      <button
-                        onClick={() => setSelectedReceipt(pay)}
-                        className="px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 rounded-md border border-slate-200 flex items-center space-x-1 ml-auto cursor-pointer"
-                      >
-                        <Receipt className="w-3 h-3 text-[#EA580C]" />
-                        <span>View Detail</span>
-                      </button>
+                      {pay.status === 'Pending' ? (
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            disabled={busyPaymentId === pay.id}
+                            onClick={() => handleConfirmPayment(pay)}
+                            className="px-2.5 py-1 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-md cursor-pointer"
+                          >
+                            Confirm
+                          </button>
+                          <button
+                            type="button"
+                            disabled={busyPaymentId === pay.id}
+                            onClick={() => handleRejectPayment(pay)}
+                            className="px-2.5 py-1 text-xs font-bold text-rose-700 bg-white hover:bg-rose-50 disabled:opacity-50 rounded-md border border-rose-200 cursor-pointer"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      ) : pay.status === 'Rejected' ? (
+                        <span className="text-[10px] text-slate-400 italic" title={pay.rejectionReason || ''}>
+                          {pay.rejectionReason ? 'Rejected: ' + pay.rejectionReason : 'Rejected'}
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => setSelectedReceipt(pay)}
+                          className="px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 rounded-md border border-slate-200 flex items-center space-x-1 ml-auto cursor-pointer"
+                        >
+                          <Receipt className="w-3 h-3 text-[#EA580C]" />
+                          <span>View Detail</span>
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))

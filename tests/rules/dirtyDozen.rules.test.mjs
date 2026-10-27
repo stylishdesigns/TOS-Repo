@@ -7,9 +7,10 @@
 //
 // Fee fields are locked server-side now: paidAmount, outstandingBalance,
 // totalFee, paymentStatus, status, regNumber and uid all refuse a student
-// write, and payment records can only be created by a centre admin's client.
-// Student payments are recorded by the server payment route, which writes
-// with the admin SDK.
+// write, and NO client (student or admin) can create, update or delete a
+// payment record. Payments are written only by the server payment routes
+// (student claims as 'Pending', admin confirmation/rejection), which use the
+// admin SDK and move the student's balance in the same transaction.
 import { readFileSync } from 'node:fs';
 import {
   initializeTestEnvironment,
@@ -167,10 +168,30 @@ try {
       studentId: 'uid-stu', studentName: 'Student One', amountPaid: 50, status: 'Partial',
     }));
   });
-  await check('6d. admin create payment for any student allowed', async () => {
-    await assertSucceeds(admCtx().firestore().doc('payments/pay-4').set({
+  await check('6d. admin client create payment denied (server route only)', async () => {
+    await assertFails(admCtx().firestore().doc('payments/pay-4').set({
       studentId: 'stu-999', studentName: 'Student One', amountPaid: 10, status: 'Partial',
     }));
+  });
+  await check('6f. student create own Pending claim directly denied', async () => {
+    await assertFails(stuCtx().firestore().doc('payments/pay-6').set({
+      studentId: 'uid-stu', studentName: 'Student One', amountPaid: 50, status: 'Pending',
+    }));
+  });
+  await check('6g. student mark own Pending payment as Paid denied', async () => {
+    await assertFails(stuCtx().firestore().doc('payments/pay-3').update({ status: 'Paid' }));
+  });
+  await check('6h. student edit own payment amount denied', async () => {
+    await assertFails(stuCtx().firestore().doc('payments/pay-3').update({ amountPaid: 0 }));
+  });
+  await check('6i. student delete own payment denied', async () => {
+    await assertFails(stuCtx().firestore().doc('payments/pay-3').delete());
+  });
+  await check('6j. admin client update payment denied (confirm route only)', async () => {
+    await assertFails(admCtx().firestore().doc('payments/pay-3').update({ status: 'Paid' }));
+  });
+  await check('6k. admin client delete payment denied', async () => {
+    await assertFails(admCtx().firestore().doc('payments/pay-3').delete());
   });
 
   // 13. Payment-read scoping: only admins and the paying student can read a

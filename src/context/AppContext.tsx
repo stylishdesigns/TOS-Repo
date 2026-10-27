@@ -11,6 +11,7 @@ import {
   StudentResult,
   CBTQuestion,
   PaymentRecord,
+  RecordPaymentResult,
   Announcement,
   AdminUser,
   ActivityLog,
@@ -228,7 +229,8 @@ interface AppContextType {
   addCBTQuestion: (question: Omit<CBTQuestion, 'id'>) => void;
 
   payments: PaymentRecord[];
-  recordPayment: (payment: { studentId: string; amountPaid: number; method?: 'Card' | 'Bank Transfer' | 'Cash'; note?: string; evidenceUrl?: string; evidenceName?: string }) => Promise<{ receiptNumber: string; paidAmount: number; outstandingBalance: number; paymentStatus: 'Paid' | 'Partial' } | void>;
+  recordPayment: (payment: { studentId: string; amountPaid: number; method?: 'Card' | 'Bank Transfer' | 'Cash'; note?: string; evidenceUrl?: string; evidenceName?: string }) => Promise<RecordPaymentResult | void>;
+  confirmPayment: (paymentId: string, action: 'confirm' | 'reject', reason?: string) => Promise<boolean>;
 
   announcements: Announcement[];
   addAnnouncement: (announcement: Omit<Announcement, 'id' | 'date'>) => void;
@@ -2618,11 +2620,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     note?: string;
     evidenceUrl?: string;
     evidenceName?: string;
-  }): Promise<{ receiptNumber: string; paidAmount: number; outstandingBalance: number; paymentStatus: 'Paid' | 'Partial' } | void> => {
-    // Payments are recorded by the server payment route only. The server
-    // computes paidAmount / outstandingBalance / paymentStatus from the
-    // student's stored fees inside a transaction, so no device ever sends
-    // fee numbers or mints its own payment record.
+  }): Promise<RecordPaymentResult | void> => {
+    // Payments go through the server payment route only. A student's call
+    // stores a 'Pending' claim and changes no balance; an admin's call is
+    // applied immediately. The server computes every fee number, so no
+    // device ever sends fee numbers or mints its own payment record.
     try {
       const token = await firebaseAuth.currentUser?.getIdToken();
       if (!token) throw new Error('You are signed out, so the payment cannot be recorded. Sign in and try again.');
@@ -2638,13 +2640,52 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (!res.ok || !data?.success) {
         throw new Error(data?.error || 'The payment could not be recorded. Please try again.');
       }
-      return data;
+      return {
+        pending: data.pending === true,
+        receiptNumber: data.payment?.receiptNumber || '',
+        paidAmount: data.student?.paidAmount,
+        outstandingBalance: data.student?.outstandingBalance,
+        paymentStatus: data.student?.paymentStatus,
+      };
     } catch (e) {
       console.error(e);
       addToast({ type: 'error', title: 'Payment Failed', description: (e as Error)?.message || 'Could not record the payment.' });
       return;
     }
   };
+  // Admin-only: confirm or reject a student's pending payment claim. The server
+  // applies the stored amount to the student's balance; the client sends no money.
+  const confirmPayment = async (paymentId: string, action: 'confirm' | 'reject', reason?: string): Promise<boolean> => {
+    try {
+      const token = await firebaseAuth.currentUser?.getIdToken();
+      if (!token) throw new Error('You are signed out. Sign in and try again.');
+      const res = await fetch('/api/centre/payments/confirm', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ paymentId, action, reason }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || 'The payment could not be updated. Please try again.');
+      }
+      addToast({
+        type: action === 'confirm' ? 'success' : 'info',
+        title: action === 'confirm' ? 'Payment Confirmed' : 'Payment Rejected',
+        description: action === 'confirm'
+          ? `Receipt ${data.receiptNumber} issued and the student's balance updated.`
+          : 'The student has been shown the payment as rejected.',
+      });
+      return true;
+    } catch (e) {
+      console.error(e);
+      addToast({ type: 'error', title: 'Payment Not Updated', description: (e as Error)?.message || 'Could not update the payment.' });
+      return false;
+    }
+  };
+
   const login = async () => {
     const provider = new GoogleAuthProvider();
     await signInWithPopup(firebaseAuth, provider);
@@ -2854,6 +2895,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addCBTQuestion,
         payments,
         recordPayment,
+        confirmPayment,
         announcements,
         addAnnouncement,
         deleteAnnouncement,

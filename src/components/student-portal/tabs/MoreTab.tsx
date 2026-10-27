@@ -334,8 +334,10 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
 
       addToast({
         type: 'success',
-        title: 'Payment Submitted',
-        description: `Your payment of ${settings.currencySymbol}${(payAmount || 0).toLocaleString()} via ${paymentMode} has been recorded. Receipt ${result.receiptNumber}.`,
+        title: result.pending ? 'Payment Sent for Confirmation' : 'Payment Submitted',
+        description: result.pending
+          ? `Your payment of ${settings.currencySymbol}${(payAmount || 0).toLocaleString()} via ${paymentMode} was sent to the centre. Your balance updates once the centre confirms it.`
+          : `Your payment of ${settings.currencySymbol}${(payAmount || 0).toLocaleString()} via ${paymentMode} has been recorded. Receipt ${result.receiptNumber}.`,
       });
 
       setEvidenceDataUrl(null);
@@ -1471,14 +1473,21 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
                                       p.status === 'Paid'
                                         ? 'bg-emerald-100 text-emerald-800'
+                                        : p.status === 'Pending'
+                                        ? 'bg-blue-100 text-blue-800'
+                                        : p.status === 'Rejected'
+                                        ? 'bg-rose-100 text-rose-800'
                                         : 'bg-amber-100 text-amber-800'
                                     }`}>
-                                      {p.status}
+                                      {p.status === 'Pending' ? 'Awaiting confirmation' : p.status}
                                     </span>
                                   </div>
                                   <p className="text-[10px] text-slate-500 font-mono mt-0.5">
-                                    {p.receiptNumber} • {p.date} • {p.method}
+                                    {p.status === 'Pending' || p.status === 'Rejected' ? p.status === 'Pending' ? 'Not yet counted' : 'Not counted' : p.receiptNumber} • {p.date} • {p.method}
                                   </p>
+                                  {p.status === 'Rejected' && p.rejectionReason && (
+                                    <p className="text-[10px] text-rose-700 mt-0.5">Reason: {p.rejectionReason}</p>
+                                  )}
                                 </div>
 
                                 {p.evidenceUrl && (
