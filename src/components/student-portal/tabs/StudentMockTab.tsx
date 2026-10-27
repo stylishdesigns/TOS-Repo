@@ -499,10 +499,11 @@ const ReviewScreen: React.FC<{ mockId: string; onBack: () => void }> = ({ mockId
 // The tab itself.
 // ---------------------------------------------------------------------------
 export const StudentMockTab: React.FC<{
+  initialTab?: 'today' | 'past' | 'board';
   onHideBottomNav?: (hide: boolean) => void;
   onExitToGeneral?: () => void;
-}> = ({ onHideBottomNav, onExitToGeneral }) => {
-  const [tab, setTab] = useState<'today' | 'past' | 'board'>('today');
+}> = ({ initialTab, onHideBottomNav, onExitToGeneral }) => {
+  const [tab, setTab] = useState<'today' | 'past' | 'board'>(initialTab || 'today');
   const [status, setStatus] = useState<Json | null>(null);
   const [statusErr, setStatusErr] = useState('');
   const [loading, setLoading] = useState(true);

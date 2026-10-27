@@ -3,7 +3,7 @@ import { Student, StudentResult } from '../../../types';
 import { CbtTab } from './CbtTab';
 import { StudentPractice } from './StudentPractice';
 import { PracticeAnalytics } from './PracticeAnalytics';
-import { Trophy, TrendingUp, Sparkles } from 'lucide-react';
+import { StudentMockTab } from './StudentMockTab';
 
 interface CbtTabWrapperProps {
   student: Student;
@@ -82,26 +82,15 @@ export const CbtTabWrapper: React.FC<CbtTabWrapperProps> = ({
             onExitReview={onExitReview}
           />
         ) : (
-          <div className="p-4 sm:p-5 max-w-lg mx-auto space-y-4 animate-in fade-in duration-300 pb-20">
-            <div className="bg-white rounded-3xl p-8 border border-slate-200/90 shadow-sm text-center space-y-4">
-              <div className="w-16 h-16 rounded-2xl bg-orange-50 border border-orange-100 text-[#EA580C] flex items-center justify-center mx-auto shadow-sm">
-                <Trophy className="w-8 h-8" />
-              </div>
-
-              <div className="space-y-1.5 max-w-xs mx-auto">
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-orange-100/60 text-[#C2410C] text-[10px] font-extrabold uppercase tracking-wider mb-1">
-                  <Sparkles className="w-3 h-3" />
-                  <span>Rankings</span>
-                </div>
-                <h3 className="text-lg font-black text-slate-900 tracking-tight">
-                  Leaderboard
-                </h3>
-                <p className="text-xs text-slate-500 leading-relaxed font-medium">
-                  Leaderboard coming soon. Your mock scores will be ranked against students across every Tutorial OS centre.
-                </p>
-              </div>
-            </div>
-          </div>
+          <StudentMockTab
+            initialTab="board"
+            onExitToGeneral={() => onMockViewChange('mock')}
+            onHideBottomNav={(hide) => {
+              // Same PWA auto-reload deferral the mock side uses while an exam screen is up.
+              try { sessionStorage.setItem('tos:defer-pwa-reload', hide ? '1' : '0'); } catch {}
+              onHideBottomNav?.(hide);
+            }}
+          />
         )}
       </div>
     );
