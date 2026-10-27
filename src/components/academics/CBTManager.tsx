@@ -2437,7 +2437,8 @@ Number of Questions: ${setupData.questionCount}`;
                   onClick={async () => {
                     try {
                       for (const grading of globalMockGrading) {
-                        await setDoc(doc(db, 'mock_grading', grading.programmeId), grading);
+                        // Stamp the centre so the row stays visible to, and writable by, its own centre.
+                        await setDoc(doc(db, 'mock_grading', grading.programmeId), activeCentreId ? { ...grading, centreId: activeCentreId } : grading);
                       }
                       addToast({ type: 'success', title: 'Grading Saved', description: 'Global mock rules updated.' });
                       setShowGlobalGradingModal(false);

@@ -69,7 +69,10 @@ service cloud.firestore {
 
     match /settings/{settingId} {
       allow read: if true; // Publicly accessible for website
-      allow write: if isAdmin() && isValidSettings(incoming(), settingId);
+      // Legacy global settings: the app writes per-centre settings under
+      // centreSettings, so no browser code writes here. Any-admin write let one
+      // centre's admin edit what every visitor sees; only the server may now.
+      allow write: if false;
     }
 
     // -------------------------------------------------------------------------
@@ -238,7 +241,12 @@ service cloud.firestore {
     // -------------------------------------------------------------------------
     match /programmes/{programmeId} {
       allow read: if true;
-      allow write: if isAdmin();
+      // Fees live here and feed every student's totalFee, so writes are the sensitive part.
+      // Centre isolation: only an admin of the record's own centre may write it,
+      // and no write may move a record between centres.
+      allow create: if isAdminOfCentre(incoming().get('centreId', ''));
+      allow update: if isAdminOfCentre(existing().get('centreId', '')) && centreTagUnchanged();
+      allow delete: if isAdminOfCentre(existing().get('centreId', ''));
     }
 
     // -------------------------------------------------------------------------
@@ -282,8 +290,9 @@ service cloud.firestore {
 
     match /branches/{branchId} {
       allow read: if true;
-      allow create, update: if isAdmin() && isValidBranch(incoming());
-      allow delete: if isAdmin();
+      allow create: if isAdminOfCentre(incoming().get('centreId', '')) && isValidBranch(incoming());
+      allow update: if isAdminOfCentre(existing().get('centreId', '')) && centreTagUnchanged() && isValidBranch(incoming());
+      allow delete: if isAdminOfCentre(existing().get('centreId', ''));
     }
 
     // -------------------------------------------------------------------------
@@ -310,7 +319,11 @@ service cloud.firestore {
     // -------------------------------------------------------------------------
     match /announcements/{announcementId} {
       allow read: if true;
-      allow write: if isAdmin();
+      // Centre isolation: only an admin of the record's own centre may write it,
+      // and no write may move a record between centres.
+      allow create: if isAdminOfCentre(incoming().get('centreId', ''));
+      allow update: if isAdminOfCentre(existing().get('centreId', '')) && centreTagUnchanged();
+      allow delete: if isAdminOfCentre(existing().get('centreId', ''));
     }
 
     // -------------------------------------------------------------------------
@@ -318,7 +331,11 @@ service cloud.firestore {
     // -------------------------------------------------------------------------
     match /subjects/{subjectId} {
       allow read: if true;
-      allow write: if isAdmin();
+      // Centre isolation: only an admin of the record's own centre may write it,
+      // and no write may move a record between centres.
+      allow create: if isAdminOfCentre(incoming().get('centreId', ''));
+      allow update: if isAdminOfCentre(existing().get('centreId', '')) && centreTagUnchanged();
+      allow delete: if isAdminOfCentre(existing().get('centreId', ''));
     }
 
     // -------------------------------------------------------------------------
@@ -326,7 +343,11 @@ service cloud.firestore {
     // -------------------------------------------------------------------------
     match /classrooms/{classroomId} {
       allow read: if true;
-      allow write: if isAdmin();
+      // Centre isolation: only an admin of the record's own centre may write it,
+      // and no write may move a record between centres.
+      allow create: if isAdminOfCentre(incoming().get('centreId', ''));
+      allow update: if isAdminOfCentre(existing().get('centreId', '')) && centreTagUnchanged();
+      allow delete: if isAdminOfCentre(existing().get('centreId', ''));
     }
 
     // -------------------------------------------------------------------------
@@ -334,7 +355,14 @@ service cloud.firestore {
     // -------------------------------------------------------------------------
     match /timetable/{slotId} {
       allow read: if true;
-      allow write: if isAdmin() || (isVerified() && resource.data.tutorId == request.auth.uid);
+      // Slots are created by centre admins. A tutor may still update or remove a
+      // slot assigned to them, but never move it to another centre.
+      allow create: if isAdminOfCentre(incoming().get('centreId', ''));
+      allow update: if (isAdminOfCentre(existing().get('centreId', ''))
+                         || (isVerified() && existing().get('tutorId', '') == request.auth.uid))
+                       && centreTagUnchanged();
+      allow delete: if isAdminOfCentre(existing().get('centreId', ''))
+                       || (isVerified() && existing().get('tutorId', '') == request.auth.uid);
     }
 
     // -------------------------------------------------------------------------
@@ -365,7 +393,11 @@ service cloud.firestore {
     // -------------------------------------------------------------------------
     match /cbt_questions/{questionId} {
       allow read: if isVerified();
-      allow write: if isAdmin();
+      // Centre isolation: only an admin of the record's own centre may write it,
+      // and no write may move a record between centres.
+      allow create: if isAdminOfCentre(incoming().get('centreId', ''));
+      allow update: if isAdminOfCentre(existing().get('centreId', '')) && centreTagUnchanged();
+      allow delete: if isAdminOfCentre(existing().get('centreId', ''));
     }
 
     // -------------------------------------------------------------------------
@@ -382,7 +414,9 @@ service cloud.firestore {
     // -------------------------------------------------------------------------
     match /cms/{cmsId} {
       allow read: if true;
-      allow write: if isAdmin();
+      // Legacy global collection; the app keeps per-centre content under
+      // centreSettings. No browser code writes here, so only the server may.
+      allow write: if false;
     }
 
     // -------------------------------------------------------------------------
@@ -396,10 +430,23 @@ service cloud.firestore {
     }
 
     match /cbt_exams/{examId} {
+      // A student's submission bumps attemptsCount by one (CbtTab). That is the
+      // only exam change a non-staff user may make.
+      function examAttemptBump() {
+        return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['attemptsCount'])
+            && incoming().attemptsCount == existing().get('attemptsCount', 0) + 1;
+      }
       allow read: if isVerified();
-      allow create: if (isAdmin() || isTutor()) && isValidExam(incoming());
-      allow update: if isVerified();
-      allow delete: if isAdmin() || (isTutor() && resource.data.tutorId == request.auth.uid);
+      allow create: if (isAdminOfCentre(incoming().get('centreId', ''))
+                         || isTutorOfCentre(incoming().get('centreId', '')))
+                       && isValidExam(incoming());
+      allow update: if ((isAdminOfCentre(existing().get('centreId', ''))
+                          || isTutorOfCentre(existing().get('centreId', '')))
+                         && centreTagUnchanged())
+                       || (isVerified() && examAttemptBump());
+      allow delete: if isAdminOfCentre(existing().get('centreId', ''))
+                       || (isTutorOfCentre(existing().get('centreId', ''))
+                           && existing().get('tutorId', '') == request.auth.uid);
     }
 
     // -------------------------------------------------------------------------
@@ -407,7 +454,11 @@ service cloud.firestore {
     // -------------------------------------------------------------------------
     match /mock_grading/{settingId} {
       allow read: if isVerified();
-      allow write: if isAdmin();
+      // Centre isolation: only an admin of the record's own centre may write it,
+      // and no write may move a record between centres.
+      allow create: if isAdminOfCentre(incoming().get('centreId', ''));
+      allow update: if isAdminOfCentre(existing().get('centreId', '')) && centreTagUnchanged();
+      allow delete: if isAdminOfCentre(existing().get('centreId', ''));
     }
     // -------------------------------------------------------------------------
     // CLASS RATINGS
