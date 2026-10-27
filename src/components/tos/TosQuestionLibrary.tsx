@@ -125,7 +125,7 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number; kind?: 'practice
 
   // A stream switch from the shared header clears the tree scope, exactly as
   // the old in-tab toggle did.
-  useEffect(() => { setScope(null); setActiveSubject(null); }, [kind]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setScope(null); setActiveSubject(null); setDifficulty(''); if (sort === 'year') setSort('updated'); }, [kind]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadTree = useCallback(async () => {
     try { setTree(await api(`/api/tos/questionbank/tree?kind=${kind}`)); } catch { setTree(null); }
@@ -213,7 +213,9 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number; kind?: 'practice
         method: 'POST',
         body: {
           kind: it.kind, examType: it.examType, subject: it.subject, klass: it.klass,
-          topic: it.topic, year: it.year || '', difficulty: it.difficulty,
+          topic: it.topic,
+          // Mock questions carry no year and no difficulty; the server enforces it.
+          year: kind === 'mock' ? null : (it.year || ''), difficulty: kind === 'mock' ? null : it.difficulty,
           text: it.text, options: (it.options || []).map((o: any) => ({ key: o.key, text: o.text })),
           correct: it.correct, explanation: it.explanation, imageLink: it.imageLink || '',
         },
@@ -484,7 +486,7 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number; kind?: 'practice
           <p className="text-xs text-slate-500 mt-0.5">
             {countsHidden
               ? '–'
-              : `${Number(screenSubject.total) || 0} question${Number(screenSubject.total) === 1 ? '' : 's'} · ${(screenSubject.topics || []).length} topic${(screenSubject.topics || []).length === 1 ? '' : 's'} · ${Object.keys(screenSubject.byYear || {}).length} year${Object.keys(screenSubject.byYear || {}).length === 1 ? '' : 's'}`}
+              : `${Number(screenSubject.total) || 0} question${Number(screenSubject.total) === 1 ? '' : 's'} · ${(screenSubject.topics || []).length} topic${(screenSubject.topics || []).length === 1 ? '' : 's'}${kind === 'mock' ? '' : ` · ${Object.keys(screenSubject.byYear || {}).length} year${Object.keys(screenSubject.byYear || {}).length === 1 ? '' : 's'}`}`}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -515,7 +517,7 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number; kind?: 'practice
                     <button onClick={() => pickFromScreen('topic', t.key, t.label, screenSubject.key, screenSubject.label)} className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold text-orange-300/90 hover:bg-white/5 min-h-[36px]">
                       <span>All {t.label} questions</span><span className="text-slate-600">{countsHidden ? '–' : t.total}</span>
                     </button>
-                    {Object.entries(t.byYear || {}).sort((a: any, b: any) => Number(b[0]) - Number(a[0])).map(([y, n]: any) => (
+                    {kind !== 'mock' && Object.entries(t.byYear || {}).sort((a: any, b: any) => Number(b[0]) - Number(a[0])).map(([y, n]: any) => (
                       <button key={y} onClick={() => pickFromScreen('year', String(y), `Year ${y}`, screenSubject.key, screenSubject.label)} className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs text-slate-400 hover:bg-white/5 min-h-[36px]">
                         <span>Year {y}</span><span className="text-slate-600">{countsHidden ? '–' : String(n)}</span>
                       </button>
@@ -527,7 +529,7 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number; kind?: 'practice
           </div>
         </div>
       )}
-      {Object.keys(screenSubject.byYear || {}).length > 0 && (
+      {kind !== 'mock' && Object.keys(screenSubject.byYear || {}).length > 0 && (
         <div className="mt-4">
           <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Years</p>
           <div className="flex flex-wrap gap-2">
@@ -582,14 +584,16 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number; kind?: 'practice
           ))}
         </div>
         <div className="flex flex-wrap items-center gap-2 mt-2">
+          {kind !== 'mock' && (
           <select value={difficulty} onChange={(e) => setDifficulty(e.target.value)} className={`${inputCls} w-auto`}>
             <option value="">Any difficulty</option>
             <option value="easy">Easy</option>
             <option value="hard">Hard</option>
           </select>
+          )}
           <select value={sort} onChange={(e) => setSort(e.target.value)} className={`${inputCls} w-auto`}>
             <option value="updated">Newest activity</option>
-            <option value="year">Year</option>
+            {kind !== 'mock' && <option value="year">Year</option>}
             <option value="subject">Subject A to Z</option>
           </select>
           <button onClick={() => { setSelectMode((v) => !v); setSelected(new Set()); setConfirmBulkRemove(false); }}
@@ -618,8 +622,8 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number; kind?: 'practice
             <div className="flex flex-wrap gap-1.5 mt-2 items-center">
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300">{it.subject}</span>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">{it.topic}</span>
-              {it.year != null && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">{it.year}</span>}
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">{DIFF_LABELS[it.difficulty] || it.difficulty}</span>
+              {kind !== 'mock' && it.year != null && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">{it.year}</span>}
+              {kind !== 'mock' && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">{DIFF_LABELS[it.difficulty] || it.difficulty}</span>}
               <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${it.status === 'published' ? 'bg-emerald-500/15 text-emerald-300' : it.status === 'removed' ? 'bg-red-500/15 text-red-300' : it.status === 'draft' ? 'bg-sky-500/15 text-sky-300' : 'bg-amber-500/15 text-amber-300'}`}>{it.status}</span>
               <span className="text-[10px] text-slate-600 ml-auto">{fmtDate(it.updatedAt)}</span>
             </div>
@@ -834,16 +838,20 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number; kind?: 'practice
                   <select value={editor.item.correct} onChange={(e) => setEditorField('correct', e.target.value)} className={inputCls}>
                     {['A', 'B', 'C', 'D'].map((k) => <option key={k} value={k}>Correct: {k}</option>)}
                   </select>
+                  {kind !== 'mock' && (
                   <select value={String(editor.item.difficulty)} onChange={(e) => setEditorField('difficulty', e.target.value)} className={inputCls}>
                     <option value="easy">Easy</option>
                     <option value="hard">Hard</option>
                   </select>
+                  )}
                 </div>
                 <div className="grid grid-cols-2 gap-2">
+                  {kind !== 'mock' && (
                   <select value={String(editor.item.year ?? '')} onChange={(e) => setEditorField('year', e.target.value === '' ? '' : Number(e.target.value))} className={inputCls}>
                     <option value="">No year</option>
                     {BANK_YEARS.map((y: number) => <option key={y} value={y}>{y}</option>)}
                   </select>
+                  )}
                   <p className="text-[11px] text-slate-500 self-center">Status: {editor.item.status}</p>
                 </div>
                 <textarea value={editor.item.explanation || ''} onChange={(e) => setEditorField('explanation', e.target.value)} rows={3} placeholder="Explanation (optional)" className={inputCls} />

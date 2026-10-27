@@ -86,7 +86,7 @@ interface ValidatedQuestion {
   topic: string;
   subject: string;
   klass: string;
-  difficulty: Difficulty;
+  difficulty: Difficulty | null;
   text: string;
   options: { key: OptionKey; text: string }[];
   correct: OptionKey;
@@ -129,7 +129,9 @@ function validateQuestion(body: any): ValidatedQuestion {
   if (klass.length > 120) throw httpError(400, 'Class is too long (max 120 characters).');
   if (!topic) throw httpError(400, 'Topic is required.');
   if (topic.length > 160) throw httpError(400, 'Topic is too long (max 160 characters).');
-  if (!(DIFFICULTIES as readonly string[]).includes(difficulty)) {
+  // Mock questions carry no year and no difficulty (MB1 rule): both are
+  // ignored for kind=mock, whatever the client sends.
+  if (kind !== 'mock' && !(DIFFICULTIES as readonly string[]).includes(difficulty)) {
     throw httpError(400, 'Difficulty is easy or hard only.');
   }
   if (!text) throw httpError(400, 'Question text is required.');
@@ -141,7 +143,7 @@ function validateQuestion(body: any): ValidatedQuestion {
     }
     if (imageLink.length > 2048) throw httpError(400, 'Image link is too long.');
   }
-  const year = parseYear(body.year, kind === 'practice');
+  const year = kind === 'mock' ? null : parseYear(body.year, true);
 
   const rawOptions: any[] = Array.isArray(body.options) ? body.options : [];
   if (rawOptions.length !== 4) throw httpError(400, 'Exactly four options (A to D) are required.');
@@ -157,7 +159,7 @@ function validateQuestion(body: any): ValidatedQuestion {
     throw httpError(400, 'The correct answer must be one of A, B, C or D.');
   }
 
-  return { kind, examType, year, topic, subject, klass, difficulty: difficulty as Difficulty, text, options, correct: correct as OptionKey, explanation, imageLink };
+  return { kind, examType, year, topic, subject, klass, difficulty: (kind === 'mock' ? null : difficulty) as Difficulty | null, text, options, correct: correct as OptionKey, explanation, imageLink };
 }
 
 // ---------------------------------------------------------------------------
@@ -505,14 +507,16 @@ export function registerQuestionBankRoutes(app: express.Express): void {
       const subject = String(body.subject ?? '').trim();
       const klass = String(body.klass ?? '').trim();
       const topic = String(body.topic ?? '').trim();
-      const difficultyRaw = String(body.difficulty ?? 'easy').trim().toLowerCase();
-      if (!(DIFFICULTIES as readonly string[]).includes(difficultyRaw)) throw httpError(400, 'Difficulty is easy or hard only.');
+      let difficultyRaw = String(body.difficulty ?? 'easy').trim().toLowerCase();
+      // Mock questions carry no difficulty; practice stays easy or hard.
+      if (kind === 'mock') difficultyRaw = '';
+      else if (!(DIFFICULTIES as readonly string[]).includes(difficultyRaw)) throw httpError(400, 'Difficulty is easy or hard only.');
       if (!subject) throw httpError(400, 'Subject is required for an import.');
       if (subject.length > 120) throw httpError(400, 'Subject is too long (max 120 characters).');
       if (klass.length > 120) throw httpError(400, 'Class is too long (max 120 characters).');
       if (!topic) throw httpError(400, 'Topic is required for an import.');
       if (topic.length > 160) throw httpError(400, 'Topic is too long (max 160 characters).');
-      const year = parseYear(body.year, kind === 'practice');
+      const year = kind === 'mock' ? null : parseYear(body.year, true);
 
       const items: any[] = Array.isArray(body.questions) ? body.questions : [];
       if (items.length === 0) throw httpError(400, 'No parsed questions arrived. Parse the paste again and try once more.');
@@ -582,7 +586,7 @@ export function registerQuestionBankRoutes(app: express.Express): void {
       const count = write.length;
       write.forEach((v) => {
         batch.create(adminDb.collection(QB_QUESTIONS).doc(), {
-          kind, examType, subject, klass, topic, year, difficulty: difficultyRaw,
+          kind, examType, subject, klass, topic, year, difficulty: kind === 'mock' ? null : difficultyRaw,
           ...v.enriched,
           batchId,
           text: v.text, options: v.options, correct: v.correct, explanation: v.explanation, imageLink: '',
@@ -593,7 +597,7 @@ export function registerQuestionBankRoutes(app: express.Express): void {
       // Every import gets a record in qbImports so the Library screen can
       // list batches and undo one. Same atomic batch as the questions.
       batch.create(adminDb.collection(QB_IMPORTS).doc(batchId), {
-        batchId, kind, examType, subject, klass, topic, year, difficulty: difficultyRaw,
+        batchId, kind, examType, subject, klass, topic, year, difficulty: kind === 'mock' ? null : difficultyRaw,
         count, importedAt: now, importedByUid: caller.uid, importedByEmail: caller.email || '',
         status: 'active', undoneAt: null, undoneByUid: null,
       });

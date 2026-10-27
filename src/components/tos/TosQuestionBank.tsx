@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  BookOpen, Plus, Loader2, Pencil, Trash2, X, AlertTriangle,
+  Loader2, X, AlertTriangle,
   CheckCircle2, Send, Image as ImageIcon, ClipboardPaste, FileText, Copy, Eye,
 } from 'lucide-react';
 import { api, Json, Card, Field, inputCls, btnPrimary, btnGhost } from './tosShared';
@@ -25,52 +25,15 @@ import { SENIOR_SUBJECTS, SUBJECT_NAMES, BANK_YEARS } from '../../data/seniorSub
 type Kind = 'practice' | 'mock';
 type ExamType = 'jamb' | 'waec_neco';
 
-const DIFF_LABELS: Record<string, string> = { easy: 'Easy', medium: 'Medium', hard: 'Hard' };
-const DIFF_STYLES: Record<string, string> = {
-  easy: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
-  medium: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
-  hard: 'bg-rose-500/15 text-rose-300 border-rose-500/30',
-};
-const STATUS_LABELS: Record<string, string> = { draft: 'Draft', published: 'Published', removed: 'Removed' };
-const STATUS_STYLES: Record<string, string> = {
-  draft: 'bg-slate-700/40 text-slate-300 border-slate-600/40',
-  published: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
-  removed: 'bg-rose-500/15 text-rose-300 border-rose-500/30',
-};
 const PIPELINE_LABELS: Record<string, string> = { jamb: 'JAMB', waec_neco: 'WAEC/NECO' };
-
-interface QuestionForm {
-  id: string; // '' for a new question
-  examType: ExamType; year: string; topic: string;
-  subject: string; klass: string; difficulty: string; text: string;
-  options: string[]; // exactly four, index 0 = A
-  correct: number; // 0-3
-  explanation: string; imageLink: string;
-}
 
 interface ImportDefaults {
   examType: ExamType; subject: string; year: string; topic: string; difficulty: string;
 }
 
-const emptyForm = (): QuestionForm => ({
-  id: '', examType: 'jamb', year: '', topic: '', subject: '', klass: '', difficulty: 'easy', text: '',
-  options: ['', '', '', ''], correct: 0, explanation: '', imageLink: '',
-});
-
 const emptyImports = (): ImportDefaults => ({
   examType: 'jamb', subject: '', year: '', topic: '', difficulty: 'easy',
 });
-
-const diffPill = (d: string) => (
-  <span className={`inline-flex items-center px-2 py-0.5 rounded-full border text-[10px] font-bold ${DIFF_STYLES[d] || 'bg-slate-700/40 text-slate-300 border-slate-600/40'}`}>
-    {DIFF_LABELS[d] || d}
-  </span>
-);
-const statusPill = (s: string) => (
-  <span className={`inline-flex items-center px-2 py-0.5 rounded-full border text-[10px] font-bold ${STATUS_STYLES[s] || 'bg-slate-700/40 text-slate-300 border-slate-600/40'}`}>
-    {STATUS_LABELS[s] || s}
-  </span>
-);
 
 // Stream choice is remembered on this device and shared with the Library
 // screen, so both halves of Question Bank follow the same stream.
@@ -91,22 +54,7 @@ export const QuestionBankTab: React.FC<{ refreshKey: number; view?: 'edit' | 'pu
   };
   const [data, setData] = useState<Json | null>(null);
   const [error, setError] = useState('');
-  const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
-
-  // Filters
-  const [fSubject, setFSubject] = useState('');
-  const [fClass, setFClass] = useState('');
-  const [fPipeline, setFPipeline] = useState('');
-  const [fYear, setFYear] = useState('');
-  const [fTopic, setFTopic] = useState('');
-  const [fDifficulty, setFDifficulty] = useState('');
-  const [fSearch, setFSearch] = useState('');
-
-  // Editor
-  const [editor, setEditor] = useState<QuestionForm | null>(null);
-  const [editorError, setEditorError] = useState('');
-  const [saving, setSaving] = useState(false);
 
   // Paste import
   const [pasteText, setPasteText] = useState('');
@@ -132,11 +80,6 @@ export const QuestionBankTab: React.FC<{ refreshKey: number; view?: 'edit' | 'pu
   const [setupPreview, setSetupPreview] = useState<Json | null>(null);
   const [setupStage, setSetupStage] = useState<'backfill' | 'recount' | null>(null);
 
-  // Authoring list (Prompt L6): the paged backend, 100 per page. The old
-  // full-scan route is gone; use the Library tab to browse everything.
-  const [listCursor, setListCursor] = useState<string | null>(null);
-  const [listHasMore, setListHasMore] = useState(false);
-  const [listLoadingMore, setListLoadingMore] = useState(false);
 
   const applyList = (r: Json, mode: 'replace' | 'more') => {
     const rows = ((r.items || []) as any[]).map((it) => ({ ...it, text: it.textPreview }));
@@ -151,8 +94,6 @@ export const QuestionBankTab: React.FC<{ refreshKey: number; view?: 'edit' | 'pu
         meta: { [r.kind]: r.meta || {} },
       };
     });
-    setListCursor(r.nextCursor || null);
-    setListHasMore(Boolean(r.hasMore));
   };
 
   const load = useCallback(async () => {
@@ -166,16 +107,6 @@ export const QuestionBankTab: React.FC<{ refreshKey: number; view?: 'edit' | 'pu
   }, [kind]);
 
   useEffect(() => { load(); }, [load, refreshKey]);
-
-  const loadMoreList = async () => {
-    if (!listCursor) return;
-    setListLoadingMore(true);
-    try {
-      const r = await api(`/api/tos/questionbank/list?kind=${kind}&status=all&sort=updated&limit=100&cursor=${encodeURIComponent(listCursor)}`);
-      applyList(r, 'more');
-    } catch (e: any) { setError(e.message); }
-    setListLoadingMore(false);
-  };
 
   const loadTree = useCallback(async () => {
     try { setSetupTree(await api(`/api/tos/questionbank/tree?kind=${kind}`)); } catch { setSetupTree(null); }
@@ -230,141 +161,8 @@ export const QuestionBankTab: React.FC<{ refreshKey: number; view?: 'edit' | 'pu
     setSetupBusy(false);
   };
 
-  const questions: any[] = useMemo(() => (data?.questions || []).filter((q: any) => (q.kind || 'practice') === kind) as any[], [data, kind]);
-  const subjects: string[] = useMemo(() => (data?.subjects || []) as string[], [data]);
-  const topics: string[] = useMemo(() => (data?.topics || []) as string[], [data]);
-  const klasses: string[] = useMemo(
-    () => Array.from(new Set(questions.map((q) => q.klass).filter(Boolean))).sort((a: string, b: string) => a.localeCompare(b)),
-    [questions],
-  );
   const kindCounts = data?.counts?.[kind] || {};
   const kindMeta = data?.meta?.[kind] || {};
-
-  const filtered = useMemo(() => questions.filter((q) => {
-    if (q.status === 'removed') return false;
-    if (fSubject && q.subject !== fSubject) return false;
-    if (fClass && q.klass !== fClass) return false;
-    if (fPipeline && (q.examType || 'jamb') !== fPipeline) return false;
-    if (fDifficulty && q.difficulty !== fDifficulty) return false;
-    if (fYear && String(q.year ?? '') !== fYear) return false;
-    if (fTopic && q.topic !== fTopic) return false;
-    if (fSearch && !q.text.toLowerCase().includes(fSearch.toLowerCase())) return false;
-    return true;
-  }), [questions, fSubject, fClass, fPipeline, fDifficulty, fYear, fTopic, fSearch]);
-
-  const bankYears: number[] = useMemo(
-    () => Array.from(
-      new Set(questions.filter((q: any) => q.status !== 'removed' && q.year != null).map((q: any) => Number(q.year))),
-    ).sort((a, b) => b - a),
-    [questions],
-  );
-  // Year-grouped library: each year is presented as its own bank section,
-  // newest first, with the subjects and topics it covers.
-  const yearRows = useMemo(() => {
-    const sorted = [...filtered].sort((a: any, b: any) => (b.year ?? 0) - (a.year ?? 0));
-    return sorted.slice(0, 100);
-  }, [filtered]);
-  const yearGroups = useMemo(() => {
-    const groups: { label: string; rows: any[] }[] = [];
-    yearRows.forEach((q: any) => {
-      const label = q.year != null ? String(q.year) : 'No year set';
-      const last = groups[groups.length - 1];
-      if (last && last.label === label) last.rows.push(q);
-      else groups.push({ label, rows: [q] });
-    });
-    return groups;
-  }, [yearRows]);
-
-  // Documented inventory: what each year's bank holds, per subject and
-  // topic, so the contents are visible without opening each question.
-  const contentsByYear = useMemo(() => {
-    const map = new Map<string, { total: number; subjects: [string, number][]; topics: [string, number][]; hasYear: boolean }>();
-    questions.forEach((q: any) => {
-      if (q.status === 'removed') return;
-      const hasYear = q.year != null;
-      const label = hasYear ? String(q.year) : 'No year set';
-      if (!map.has(label)) map.set(label, { total: 0, subjects: [], topics: [], hasYear });
-      const g = map.get(label)!;
-      g.total += 1;
-      const sub = q.subject || 'No subject';
-      const subMap = new Map(g.subjects);
-      subMap.set(sub, (subMap.get(sub) || 0) + 1);
-      g.subjects = Array.from(subMap.entries());
-      const top = q.topic || 'No topic';
-      const topMap = new Map(g.topics);
-      topMap.set(top, (topMap.get(top) || 0) + 1);
-      g.topics = Array.from(topMap.entries());
-    });
-    return Array.from(map.entries()).map(([label, v]) => ({
-      label,
-      total: v.total,
-      hasYear: v.hasYear,
-      filterYear: v.hasYear ? label : '',
-      subjects: v.subjects.sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])),
-      topics: v.topics.sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])),
-    })).sort((a, b) => {
-      if (a.hasYear !== b.hasYear) return a.hasYear ? -1 : 1;
-      return a.hasYear ? Number(b.label) - Number(a.label) : 0;
-    });
-  }, [questions]);
-
-  const openEditor = async (q: any | null) => {
-    setEditorError('');
-    if (!q) { setEditor(emptyForm()); return; }
-    try {
-      const r = await api(`/api/tos/questionbank/item/${q.id}`);
-      const full = r.item || {};
-      const opts: any[] = full.options || q.options || [];
-      setEditor({
-        id: full.id || q.id, examType: (full.examType || q.examType || 'jamb') as ExamType, year: full.year != null ? String(full.year) : '',
-        topic: full.topic || q.topic || '', subject: full.subject || q.subject || '', klass: full.klass || q.klass || '', difficulty: full.difficulty || q.difficulty || 'easy',
-        text: full.text || q.text || '', options: opts.map((o: any) => o.text || ''), correct: opts.findIndex((o: any) => o.key === full.correct),
-        explanation: full.explanation || '', imageLink: full.imageLink || '',
-      });
-    } catch (e: any) {
-      setEditorError(e.message || 'Could not load that question.');
-    }
-  };
-
-  const saveQuestion = async () => {
-    if (!editor) return;
-    setEditorError('');
-    setSaving(true);
-    try {
-      const body = {
-        kind, examType: editor.examType,
-        year: editor.year === '' ? null : Number(editor.year),
-        topic: editor.topic, subject: editor.subject, klass: editor.klass,
-        difficulty: editor.difficulty, text: editor.text,
-        options: editor.options.map((t, i) => ({ key: 'ABCD'[i], text: t })),
-        correct: 'ABCD'[editor.correct], explanation: editor.explanation, imageLink: editor.imageLink,
-      };
-      if (editor.id) {
-        await api(`/api/tos/questionbank/questions/${editor.id}`, { method: 'POST', body });
-      } else {
-        await api('/api/tos/questionbank/questions', { method: 'POST', body });
-      }
-      setEditor(null);
-      await load();
-    } catch (e: any) {
-      setEditorError(e.message);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const removeQuestion = async (q: any) => {
-    setNotice('');
-    setBusy(true);
-    try {
-      await api(`/api/tos/questionbank/questions/${q.id}`, { method: 'DELETE' });
-      await load();
-    } catch (e: any) {
-      setNotice(e.message);
-    } finally {
-      setBusy(false);
-    }
-  };
 
   const runParse = () => {
     setImportNotice('');
@@ -406,8 +204,9 @@ export const QuestionBankTab: React.FC<{ refreshKey: number; view?: 'edit' | 'pu
     if (kind === 'practice' && !importDefaults.year) { setImportNotice('Practice questions need a year. Pick one in Step 1.'); return; }
     await doImport({
       kind, examType: importDefaults.examType, subject: importDefaults.subject,
-      year: importDefaults.year === '' ? null : Number(importDefaults.year),
-      topic: importDefaults.topic, difficulty: importDefaults.difficulty,
+      // Mock questions carry no year and no difficulty; the server enforces it.
+      year: kind === 'mock' ? null : (importDefaults.year === '' ? null : Number(importDefaults.year)),
+      topic: importDefaults.topic, difficulty: kind === 'mock' ? null : importDefaults.difficulty,
       questions: parsed.questions,
     });
   };
@@ -449,8 +248,10 @@ export const QuestionBankTab: React.FC<{ refreshKey: number; view?: 'edit' | 'pu
     `Exam pipeline: ${pipelineLabelGuide}`,
     `Subject: ${importDefaults.subject || '[pick a subject in Step 1]'}`,
     `Topic: ${importDefaults.topic || '[pick a topic in Step 1]'}`,
-    `Year: ${importDefaults.year || (kind === 'practice' ? '[pick a year in Step 1]' : '[optional]')}`,
-    `Difficulty: ${importDefaults.difficulty.charAt(0).toUpperCase() + importDefaults.difficulty.slice(1)}`,
+    ...(kind === 'mock' ? [] : [
+      `Year: ${importDefaults.year || '[pick a year in Step 1]'}`,
+      `Difficulty: ${importDefaults.difficulty.charAt(0).toUpperCase() + importDefaults.difficulty.slice(1)}`,
+    ]),
     'Number of questions: as many as you paste (Step 3 shows the count)',
     '',
     'Paste only the questions into the box, not these setup lines.',
@@ -472,33 +273,6 @@ export const QuestionBankTab: React.FC<{ refreshKey: number; view?: 'edit' | 'pu
     if (current && !SUBJECT_NAMES.includes(current)) return [...SUBJECT_NAMES, current].sort((a, b) => a.localeCompare(b));
     return SUBJECT_NAMES;
   };
-
-  // Summary cards (N2): shown on the Import & edit tab and, with the publish
-  // button, on the Publish tab.
-  const summaryRow = (      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="bg-slate-900/70 border border-white/10 rounded-2xl p-4">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total questions</p>
-          <p className="text-2xl font-black text-white mt-1">{kindCounts.total ?? 0}</p>
-          <p className="text-[11px] text-slate-400 mt-1">{kindCounts.drafts || 0} drafts · {kindCounts.published || 0} published</p>
-        </div>
-        <div className="bg-slate-900/70 border border-white/10 rounded-2xl p-4">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Subjects</p>
-          <p className="text-2xl font-black text-white mt-1">{subjects.length}</p>
-          <p className="text-[11px] text-slate-400 mt-1 truncate">{subjects.slice(0, 4).join(', ') || '—'}</p>
-        </div>
-        <div className="bg-slate-900/70 border border-white/10 rounded-2xl p-4">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Years</p>
-          <p className="text-2xl font-black text-white mt-1">{bankYears.length}</p>
-          <p className="text-[11px] text-slate-400 mt-1 truncate">Each year is its own bank: {bankYears.slice(0, 4).join(', ') || '—'}</p>
-        </div>
-        <div className="bg-slate-900/70 border border-orange-500/30 rounded-2xl p-4">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Last published</p>
-          <p className="text-2xl font-black text-orange-300 mt-1">{kindMeta.currentVersion ? `v${kindMeta.currentVersion}` : 'Never'}</p>
-          <p className="text-[11px] text-slate-400 mt-1">
-            {kindMeta.currentPublishedAt ? new Date(kindMeta.currentPublishedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : 'Publish to make questions live'}
-          </p>
-        </div>
-      </div>  );
 
   return (
     <div className="space-y-5">
@@ -543,7 +317,6 @@ export const QuestionBankTab: React.FC<{ refreshKey: number; view?: 'edit' | 'pu
             )}
             {notice && <p className="text-sm text-rose-300 mt-2">{notice}</p>}
           </Card>
-          {summaryRow}
         </>
       )}
       {view === 'edit' && (
@@ -590,18 +363,22 @@ export const QuestionBankTab: React.FC<{ refreshKey: number; view?: 'edit' | 'pu
                 {(SENIOR_SUBJECTS[importDefaults.subject] || []).map((t) => <option key={t} value={t}>{t}</option>)}
               </select>
             </Field>
-            <Field label={kind === 'practice' ? 'Year' : 'Year (optional)'}>
-              <select value={importDefaults.year} onChange={(e) => setImportDefaults({ ...importDefaults, year: e.target.value })} className={inputCls}>
-                <option value="">Select year</option>
-                {BANK_YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
-              </select>
-            </Field>
-            <Field label="Difficulty">
-              <select value={importDefaults.difficulty} onChange={(e) => setImportDefaults({ ...importDefaults, difficulty: e.target.value })} className={inputCls}>
-                <option value="easy">Easy</option>
-                <option value="hard">Hard</option>
-              </select>
-            </Field>
+            {kind !== 'mock' && (
+              <>
+                <Field label="Year">
+                  <select value={importDefaults.year} onChange={(e) => setImportDefaults({ ...importDefaults, year: e.target.value })} className={inputCls}>
+                    <option value="">Select year</option>
+                    {BANK_YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
+                  </select>
+                </Field>
+                <Field label="Difficulty">
+                  <select value={importDefaults.difficulty} onChange={(e) => setImportDefaults({ ...importDefaults, difficulty: e.target.value })} className={inputCls}>
+                    <option value="easy">Easy</option>
+                    <option value="hard">Hard</option>
+                  </select>
+                </Field>
+              </>
+            )}
           </div>
         </div>
 
@@ -770,254 +547,6 @@ export const QuestionBankTab: React.FC<{ refreshKey: number; view?: 'edit' | 'pu
           {setupMsg && <p className="font-semibold text-amber-100">{setupMsg}</p>}
         </div>
       )}
-      {summaryRow}
-
-
-      {/* Filters */}
-      <div className="flex flex-wrap gap-2">
-        <select value={fYear} onChange={(e) => setFYear(e.target.value)} className={`${inputCls} max-w-32`}>
-          <option value="">All years</option>
-          {bankYears.map((y) => (
-            <option key={y} value={String(y)}>{y}</option>
-          ))}
-        </select>
-        <select value={fSubject} onChange={(e) => setFSubject(e.target.value)} className={`${inputCls} max-w-44`}>
-          <option value="">All subjects</option>
-          {subjects.map((s) => <option key={s} value={s}>{s}</option>)}
-        </select>
-        <select value={fTopic} onChange={(e) => setFTopic(e.target.value)} className={`${inputCls} max-w-44`}>
-          <option value="">All topics</option>
-          {topics.map((t) => <option key={t} value={t}>{t}</option>)}
-        </select>
-        <select value={fPipeline} onChange={(e) => setFPipeline(e.target.value)} className={`${inputCls} max-w-36`}>
-          <option value="">All pipelines</option>
-          <option value="jamb">JAMB</option>
-          <option value="waec_neco">WAEC/NECO</option>
-        </select>
-        <select value={fClass} onChange={(e) => setFClass(e.target.value)} className={`${inputCls} max-w-40`}>
-          <option value="">All classes</option>
-          {klasses.map((s) => <option key={s} value={s}>{s}</option>)}
-        </select>
-        <select value={fDifficulty} onChange={(e) => setFDifficulty(e.target.value)} className={`${inputCls} max-w-36`}>
-          <option value="">All difficulties</option>
-          <option value="easy">Easy</option>
-          <option value="hard">Hard</option>
-        </select>
-        <input value={fSearch} onChange={(e) => setFSearch(e.target.value)} placeholder="Search question text" className={`${inputCls} max-w-64`} />
-      </div>
-
-      {/* Bank contents: documented inventory, one section per year */}
-      <Card title="Bank contents">
-        <p className="text-[11px] text-slate-500 -mt-1 mb-3">Each year is its own bank. Tap a year or a subject to filter the library below.</p>
-        {contentsByYear.length === 0 ? (
-          <p className="text-sm text-slate-400 py-4 text-center">Nothing in this bank yet. Paste a batch below or add the first question.</p>
-        ) : (
-          <div className="space-y-2.5">
-            {contentsByYear.map((g) => (
-              <div key={g.label} className="border border-white/10 rounded-xl p-3 bg-white/[0.02]">
-                <button
-                  type="button"
-                  onClick={() => g.filterYear && setFYear(g.filterYear)}
-                  title={g.filterYear ? 'Filter the library to this year' : undefined}
-                  className="text-left"
-                >
-                  <span className="text-white font-bold">{g.label}</span>
-                  <span className="text-[11px] text-slate-400 font-bold ml-2">{g.total} question{g.total === 1 ? '' : 's'}</span>
-                </button>
-                <div className="flex flex-wrap gap-1.5 mt-2">
-                  {g.subjects.map(([name, count]) => (
-                    <button
-                      key={name}
-                      type="button"
-                      onClick={() => setFSubject(name)}
-                      title="Filter the library to this subject"
-                      className="text-[10px] px-2 py-0.5 rounded-full border border-white/10 text-slate-300 hover:border-orange-400/60 hover:text-orange-200"
-                    >
-                      {name} · {count}
-                    </button>
-                  ))}
-                </div>
-                <div className="flex flex-wrap gap-1.5 mt-1.5">
-                  {g.topics.map(([name, count]) => (
-                    <span key={name} className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.04] text-slate-400">
-                      {name} · {count}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
-
-      {/* Library table */}
-      <Card title="Question library">
-        {filtered.length === 0 ? (
-          <div className="text-center py-10 text-slate-400 text-sm">
-            <BookOpen className="w-8 h-8 mx-auto mb-3 text-slate-600" />
-            {questions.length === 0 ? 'No questions yet. Paste a batch below or add the first question, then publish to make it live.' : 'No questions match these filters.'}
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-[10px] font-bold uppercase tracking-wider text-slate-500 border-b border-white/5">
-                  <th className="pb-2 pr-3">Question</th>
-                  <th className="pb-2 pr-3">Subject</th>
-                  <th className="pb-2 pr-3">Year</th>
-                  <th className="pb-2 pr-3">Pipeline</th>
-                  <th className="pb-2 pr-3">Difficulty</th>
-                  <th className="pb-2 pr-3">Status</th>
-                  <th className="pb-2">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {yearGroups.map((g) => (
-              <React.Fragment key={g.label}>
-                <tr className="bg-white/[0.04] border-b border-white/5">
-                  <td colSpan={7} className="py-2 px-2">
-                    <span className="text-[11px] font-black uppercase tracking-wider text-orange-300">{g.label}</span>
-                    <span className="text-[11px] text-slate-400 font-bold ml-2">{g.rows.length} question{g.rows.length === 1 ? '' : 's'}</span>
-                    <span className="text-[10px] text-slate-500 ml-2">
-                      {Array.from(new Set(g.rows.map((q: any) => q.subject).filter(Boolean))).join(', ') || 'no subjects yet'}
-                      {' · topics: '}
-                      {Array.from(new Set(g.rows.map((q: any) => q.topic).filter(Boolean))).slice(0, 6).join(', ') || 'none yet'}
-                    </span>
-                  </td>
-                </tr>
-                {g.rows.map((q) => (
-                  <tr key={q.id} className="border-b border-white/5 hover:bg-white/[0.02]">
-                    <td className="py-2.5 pr-3 max-w-md">
-                      <p className="text-white truncate" title={q.text}>{q.text}</p>
-                      <p className="text-[10px] text-slate-500 truncate">{q.topic || '\u00a0'}{q.imageLink ? ' · has image' : ''}</p>
-                    </td>
-                    <td className="py-2.5 pr-3 text-slate-300">{q.subject}</td>
-                    <td className="py-2.5 pr-3 text-slate-300">{q.year ?? '—'}</td>
-                    <td className="py-2.5 pr-3 text-slate-300">{PIPELINE_LABELS[q.examType] || q.examType}</td>
-                    <td className="py-2.5 pr-3">{diffPill(q.difficulty)}</td>
-                    <td className="py-2.5 pr-3">{statusPill(q.status)}</td>
-                    <td className="py-2.5">
-                      <div className="flex items-center gap-1.5">
-                        <button onClick={() => openEditor(q)} className="p-1.5 rounded-lg text-slate-400 hover:text-orange-300 hover:bg-white/5" title="Edit"><Pencil className="w-3.5 h-3.5" /></button>
-                        <button onClick={() => removeQuestion(q)} disabled={busy} className="p-1.5 rounded-lg text-slate-400 hover:text-rose-300 hover:bg-white/5" title="Remove"><Trash2 className="w-3.5 h-3.5" /></button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </React.Fragment>
-              ))}
-              </tbody>
-            </table>
-            {listHasMore && (
-              <button onClick={loadMoreList} disabled={listLoadingMore} className="mt-3 px-4 py-2.5 rounded-xl border border-white/10 text-xs font-bold text-slate-300 hover:text-white min-h-[44px]">
-                {listLoadingMore ? 'Loading...' : 'Load 100 more'}
-              </button>
-            )}
-            <p className="text-[11px] text-slate-500 mt-2">The list loads 100 at a time from the paged backend, so it stays fast at any bank size. The Library tab is home for browsing everything.</p>
-          </div>
-        )}
-      </Card>
-
-      {/* Add / edit question modal */}
-      {editor && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm overflow-y-auto" onClick={() => setEditor(null)}>
-          <div className="min-h-full flex items-center justify-center p-4">
-            <div className="bg-slate-900 border border-white/10 rounded-3xl p-7 max-w-2xl w-full shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-start justify-between mb-5">
-              <h3 className="text-white font-bold text-lg">{editor.id ? 'Edit question' : 'Add question'}</h3>
-              <button onClick={() => setEditor(null)} className="text-slate-500 hover:text-slate-300"><X className="w-5 h-5" /></button>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <Field label="Exam pipeline">
-                <select value={editor.examType} onChange={(e) => setEditor({ ...editor, examType: e.target.value as ExamType })} className={inputCls}>
-                  <option value="jamb">JAMB</option>
-                  <option value="waec_neco">WAEC/NECO</option>
-                </select>
-              </Field>
-              <Field label={kind === 'practice' ? 'Year' : 'Year (optional)'}>
-                <select value={editor.year} onChange={(e) => setEditor({ ...editor, year: e.target.value })} className={inputCls}>
-                  <option value="">Select year</option>
-                  {BANK_YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
-                </select>
-              </Field>
-              <Field label="Difficulty">
-                <select value={editor.difficulty} onChange={(e) => setEditor({ ...editor, difficulty: e.target.value })} className={inputCls}>
-                  <option value="easy">Easy</option>
-                  <option value="hard">Hard</option>
-                </select>
-              </Field>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
-              <Field label="Subject">
-                <select value={editor.subject} onChange={(e) => setEditor({ ...editor, subject: e.target.value, topic: '' })} className={inputCls}>
-                  <option value="">Select subject</option>
-                  {subjectOptions(editor.subject).map((s) => <option key={s} value={s}>{s}</option>)}
-                </select>
-              </Field>
-              <Field label="Topic">
-                <select value={editor.topic} onChange={(e) => setEditor({ ...editor, topic: e.target.value })} disabled={!editor.subject} className={`${inputCls} disabled:opacity-50`}>
-                  <option value="">{editor.subject ? 'Select topic' : 'Pick a subject first'}</option>
-                  {(SENIOR_SUBJECTS[editor.subject] || []).map((t) => <option key={t} value={t}>{t}</option>)}
-                </select>
-              </Field>
-              <Field label="Class (optional)">
-                <input list="qb-klasses" value={editor.klass} onChange={(e) => setEditor({ ...editor, klass: e.target.value })} placeholder="e.g. SS2" className={inputCls} />
-                <datalist id="qb-klasses">{klasses.map((s) => <option key={s} value={s} />)}</datalist>
-              </Field>
-            </div>
-
-            <div className="mt-3">
-              <Field label="Question text">
-                <textarea value={editor.text} onChange={(e) => setEditor({ ...editor, text: e.target.value })} rows={3} placeholder="Type the question" className={inputCls} />
-                <p className="text-[11px] text-slate-500 mt-1">LaTeX supported: wrap formulas in $...$</p>
-              </Field>
-            </div>
-
-            <div className="mt-3">
-              <Field label="Answer options">
-                <div className="space-y-2">
-                  {editor.options.map((t, i) => (
-                    <div key={i} className="flex items-center gap-2">
-                      <span className="w-6 h-6 rounded-lg bg-slate-800 text-slate-300 text-xs font-black flex items-center justify-center shrink-0">{'ABCD'[i]}</span>
-                      <input value={t} onChange={(e) => { const o = [...editor.options]; o[i] = e.target.value; setEditor({ ...editor, options: o }); }} placeholder={`Option ${'ABCD'[i]}`} className={inputCls} />
-                      <label className="flex items-center gap-1.5 text-[11px] text-slate-400 shrink-0 cursor-pointer">
-                        <input type="radio" name="qb-correct" checked={editor.correct === i} onChange={() => setEditor({ ...editor, correct: i })} className="accent-orange-500" />
-                        Correct
-                      </label>
-                    </div>
-                  ))}
-                </div>
-              </Field>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
-              <Field label="Explanation (optional)">
-                <textarea value={editor.explanation} onChange={(e) => setEditor({ ...editor, explanation: e.target.value })} rows={2} placeholder="Shown to students after answering" className={inputCls} />
-              </Field>
-              <Field label="Image link (optional)">
-                <input value={editor.imageLink} onChange={(e) => setEditor({ ...editor, imageLink: e.target.value })} placeholder="https://res.cloudinary.com/..." className={inputCls} />
-                <p className="text-[11px] text-slate-500 mt-1">Upload the image in Cloudinary and paste its https link here.</p>
-              </Field>
-            </div>
-
-            {editorError && (
-              <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-3 mt-4 flex items-start gap-2">
-                <AlertTriangle className="w-4 h-4 text-rose-400 mt-0.5 shrink-0" />
-                <p className="text-rose-200 text-xs">{editorError}</p>
-              </div>
-            )}
-
-            <div className="flex justify-end gap-2 mt-6">
-              <button onClick={() => setEditor(null)} className={btnGhost}>Cancel</button>
-              <button onClick={saveQuestion} disabled={saving} className={btnPrimary}>{saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />} {editor.id ? 'Save changes' : 'Save question'}</button>
-            </div>
-            </div>
-          </div>
-        </div>
-      )}
-
         </>
       )}
 
