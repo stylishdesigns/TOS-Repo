@@ -306,7 +306,7 @@ export function registerQuestionBankRoutes(app: express.Express): void {
         changes,
         liveCount,
         subjects,
-        fileName: `questionbank_${kind}_v${currentVersion + 1}.json`,
+        fileName: kind === 'mock' ? 'No public file (mock papers stay private)' : `questionbank_${kind}_v${currentVersion + 1}.json`,
         counterBased: true,
         readsReport: { metaDocs: 1, countQueries, sampleDocs, approxTotalReads: 1 + countQueries + sampleDocs },
         note: 'This preview reads the meta document and three small count queries instead of scanning the bank, so it costs about the same at any size. The removed count is approximate: it counts questions touched since the last publish that are now removed.',
@@ -672,11 +672,6 @@ export function registerQuestionBankRoutes(app: express.Express): void {
       const kindRaw = String(req.body?.kind ?? 'practice').trim().toLowerCase();
       if (!(KINDS as readonly string[]).includes(kindRaw)) throw httpError(400, 'Kind must be practice or mock.');
       const kind = kindRaw as Kind;
-      // MB1 decision: the Mock Bank publishes no public file at all. Mock
-      // questions stay in Firestore (the mock freeze reads them there) and a
-      // mock's paper is built as a PRIVATE Cloudinary file. Only practice
-      // publishes to the public CDN.
-      if (kind === 'mock') throw httpError(400, 'The Mock Bank does not publish a public file. Mock questions stay in Firestore, and mock papers are private files.');
       // Paged read on press (Prompt L6): the scan walks the stream 500 at a
       // time through cursors instead of loading it in one go, and reports how
       // much it read. No cap can truncate a publish.
@@ -747,66 +742,73 @@ export function registerQuestionBankRoutes(app: express.Express): void {
       const bySubject: Record<string, number> = {};
       questionsOut.forEach((q) => { bySubject[q.subject] = (bySubject[q.subject] || 0) + 1; });
 
-      const payload = {
-        format: 'tos-questionbank',
-        kind,
-        version,
-        publishedAt,
-        count: questionsOut.length,
-        subjects: bySubject,
-        questions: questionsOut,
-      };
-      const bodyText = JSON.stringify(payload);
-      // Loud failure, never silent truncation: Cloudinary's free plan caps a
-      // raw file at 10 MB. Past that the single-file format cannot carry the
-      // bank; the P3 split format takes over at that scale.
-      const bodyBytes = Buffer.byteLength(bodyText, 'utf8');
-      if (bodyBytes > 9.5 * 1024 * 1024) {
-        throw httpError(413, `The ${kind} bank file is ${(bodyBytes / 1024 / 1024).toFixed(1)} MB for ${questionsOut.length} questions. Cloudinary's free plan caps one file at 10 MB, so this publish would fail mid-upload. Nothing was uploaded. Publish in this size range needs the P3 split format.`);
-      }
-
+      // Practice publishes the public CDN file. MB1 decision: the Mock Bank
+      // publishes no public file at all (mock questions stay in Firestore,
+      // where the mock freeze reads them, and each mock's paper is built as
+      // a PRIVATE Cloudinary file at schedule time), so a mock publish only
+      // stamps the drafts and bumps the bank version.
       const changes = [
         ...added.map((s) => ({ subject: String((s.data() as any).subject || ''), action: 'added', title: String((s.data() as any).text || '').slice(0, 120) })),
         ...edited.map((s) => ({ subject: String((s.data() as any).subject || ''), action: 'edited', title: String((s.data() as any).text || '').slice(0, 120) })),
         ...removed.map((s) => ({ subject: String((s.data() as any).subject || ''), action: 'removed', title: String((s.data() as any).text || '').slice(0, 120) })),
       ];
 
-      // Upload. The preset is unsigned and never overwrites: if a previous
-      // publish attempt died between upload and verification, the target
-      // file already exists and is an orphan of exactly this version, so the
-      // retry lands on a "-r" suffixed name for the same version instead.
-      let publicId = `questionbank_${kind}_v${version}`;
-      const targetUrl = `https://res.cloudinary.com/${cloud}/raw/upload/tos/${publicId}.json`;
-      const preexisting = await fetch(targetUrl, { method: 'HEAD' }).then((r) => r.ok).catch(() => false);
-
-      const uploadOnce = async (pid: string, overwrite: boolean) => {
-        const form = new FormData();
-        form.append('upload_preset', preset);
-        form.append('public_id', pid);
-        form.append('folder', 'tos');
-        if (overwrite) form.append('overwrite', 'true');
-        form.append('file', new Blob([bodyText], { type: 'application/json' }), `${pid}.json`);
-        const resp = await fetch(`https://api.cloudinary.com/v1_1/${cloud}/raw/upload`, { method: 'POST', body: form });
-        const data: any = await resp.json().catch(() => null);
-        if (!resp.ok) {
-          const detail = data?.error?.message || `Cloudinary returned ${resp.status}`;
-          throw httpError(502, `The question bank file could not be uploaded to Cloudinary: ${detail}`);
+      let publicId = '';
+      let fileUrl = '';
+      if (kind !== 'mock') {
+        const payload = {
+          format: 'tos-questionbank',
+          kind,
+          version,
+          publishedAt,
+          count: questionsOut.length,
+          subjects: bySubject,
+          questions: questionsOut,
+        };
+        const bodyText = JSON.stringify(payload);
+        // Loud failure, never silent truncation: Cloudinary's free plan caps
+        // a raw file at 10 MB. Past that the single-file format cannot carry
+        // the bank; the P3 split format takes over at that scale.
+        const bodyBytes = Buffer.byteLength(bodyText, 'utf8');
+        if (bodyBytes > 9.5 * 1024 * 1024) {
+          throw httpError(413, `The ${kind} bank file is ${(bodyBytes / 1024 / 1024).toFixed(1)} MB for ${questionsOut.length} questions. Cloudinary's free plan caps one file at 10 MB, so this publish would fail mid-upload. Nothing was uploaded. Publish in this size range needs the P3 split format.`);
         }
-        return data;
-      };
 
-      if (preexisting) publicId = `questionbank_${kind}_v${version}r`;
-      const upload = await uploadOnce(publicId, false);
-      const fileUrl = String(upload.secure_url || '');
+        // The preset is unsigned and never overwrites: if a previous publish
+        // attempt died between upload and verification, the target file
+        // already exists and is an orphan of exactly this version, so the
+        // retry lands on a "-r" suffixed name for the same version instead.
+        publicId = `questionbank_${kind}_v${version}`;
+        const targetUrl = `https://res.cloudinary.com/${cloud}/raw/upload/tos/${publicId}.json`;
+        const preexisting = await fetch(targetUrl, { method: 'HEAD' }).then((r) => r.ok).catch(() => false);
+        const uploadOnce = async (pid: string, overwrite: boolean) => {
+          const form = new FormData();
+          form.append('upload_preset', preset);
+          form.append('public_id', pid);
+          form.append('folder', 'tos');
+          if (overwrite) form.append('overwrite', 'true');
+          form.append('file', new Blob([bodyText], { type: 'application/json' }), `${pid}.json`);
+          const resp = await fetch(`https://api.cloudinary.com/v1_1/${cloud}/raw/upload`, { method: 'POST', body: form });
+          const data: any = await resp.json().catch(() => null);
+          if (!resp.ok) {
+            const detail = data?.error?.message || `Cloudinary returned ${resp.status}`;
+            throw httpError(502, `The question bank file could not be uploaded to Cloudinary: ${detail}`);
+          }
+          return data;
+        };
+        if (preexisting) publicId = `questionbank_${kind}_v${version}r`;
+        const upload = await uploadOnce(publicId, false);
+        fileUrl = String(upload.secure_url || '');
 
-      // Verify the served file before anything is recorded.
-      const verify = await fetch(fileUrl).catch(() => null);
-      if (!verify || !verify.ok) {
-        throw httpError(502, `The published file was uploaded but the verification read failed (${verify ? verify.status : 'no response'}). Nothing was recorded; try publishing again.`);
-      }
-      const verifyBody: any = await verify.json().catch(() => null);
-      if (!verifyBody || verifyBody.version !== version || verifyBody.count !== questionsOut.length) {
-        throw httpError(502, `The uploaded ${kind} file did not round-trip with the expected contents. Nothing was recorded; try publishing again.`);
+        // Verify the served file before anything is recorded.
+        const verify = await fetch(fileUrl).catch(() => null);
+        if (!verify || !verify.ok) {
+          throw httpError(502, `The published file was uploaded but the verification read failed (${verify ? verify.status : 'no response'}). Nothing was recorded; try publishing again.`);
+        }
+        const verifyBody: any = await verify.json().catch(() => null);
+        if (!verifyBody || verifyBody.version !== version || verifyBody.count !== questionsOut.length) {
+          throw httpError(502, `The uploaded ${kind} file did not round-trip with the expected contents. Nothing was recorded; try publishing again.`);
+        }
       }
 
       // File verified. Record the version, refresh the meta doc, and stamp

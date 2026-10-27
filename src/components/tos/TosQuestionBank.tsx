@@ -638,7 +638,7 @@ export const QuestionBankTab: React.FC<{ refreshKey: number; view?: 'edit' | 'pu
               {publishResult.reads && (
                 <p>Paged read: {publishResult.reads.docsRead} questions in {publishResult.reads.pages} pages · {(Number(publishResult.elapsedMs) / 1000).toFixed(1)}s</p>
               )}
-              <p className="break-all text-slate-500">{publishResult.fileUrl}</p>
+              <p className="break-all text-slate-500">{publishResult.fileUrl || 'No public file (mock papers stay private)'}</p>
             </div>
             <button onClick={() => setPublishResult(null)} className={`${btnPrimary} w-full mt-5`}>Done</button>
           </div>

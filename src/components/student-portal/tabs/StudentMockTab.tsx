@@ -86,7 +86,7 @@ const UsernameGate: React.FC<{ onClaimed: () => void }> = ({ onClaimed }) => {
 
   const ok = check?.valid && check?.available;
   return (
-    <div className="bg-white rounded-3xl border border-slate-200 p-5 space-y-3">
+    <div className="rounded-3xl p-5 space-y-3">
       <div className="flex items-center gap-2">
         <Medal className="w-5 h-5 text-[#EA580C]" />
         <h3 className="text-base font-black text-slate-900">Pick your leaderboard name</h3>
@@ -835,10 +835,9 @@ export const StudentMockTab: React.FC<{
                   const mine = board.me && board.me.username === e.username && board.me.rank === e.rank;
                   return (
                     <div key={`${e.username}-${i}`} className={`rounded-2xl border-2 px-4 py-3 flex items-center gap-3 ${mine ? 'border-[#EA580C] bg-orange-50' : 'border-slate-200 bg-white'}`}>
-                      <span className={`w-9 h-9 shrink-0 rounded-full flex items-center justify-center font-black text-sm ${e.rank === 1 ? 'bg-amber-300 text-amber-900' : e.rank === 2 ? 'bg-slate-200 text-slate-700' : e.rank === 3 ? 'bg-orange-200 text-orange-900' : 'text-slate-400'}`}>
-                        {e.rank <= 3 ? e.rank : ''}
+                      <span className={`w-9 h-9 shrink-0 rounded-full flex items-center justify-center font-black text-sm ${e.rank === 1 ? 'bg-amber-300 text-amber-900' : e.rank === 2 ? 'bg-slate-200 text-slate-700' : e.rank === 3 ? 'bg-orange-200 text-orange-900' : 'bg-slate-100 text-slate-500'}`}>
+                        {e.rank}
                       </span>
-                      {e.rank > 3 && <span className="text-sm font-black text-slate-400 -ml-3">{e.rank}</span>}
                       <span className="flex-1 text-[15px] font-black text-slate-900 truncate">{e.username}</span>
                       <span className="text-lg font-black text-slate-900">{e.score}</span>
                     </div>
