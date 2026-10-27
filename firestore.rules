@@ -20,6 +20,32 @@ service cloud.firestore {
       return isSignedIn() && exists(/databases/$(database)/documents/tutors/$(request.auth.uid));
     }
 
+    // Centre isolation (Prompt G2). The centre an admins record belongs to
+    // comes from centreId on the admins document. A record with no centre
+    // acts for no centre (fail closed): scripts/backfill-tenant.ts stamps
+    // centreId on every admins record. Platform staff (the `tos` claim) act
+    // across centres. Every tenant record carries centreId, and a record
+    // without one is out of reach of every centre admin until it is tagged.
+    function adminCentreId() {
+      return get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.get('centreId', '');
+    }
+
+    function isAdminOfCentre(centreId) {
+      return isAdmin() && (isTos() || (adminCentreId() != '' && adminCentreId() == centreId));
+    }
+
+    // A tutor's own centre comes from centreId on their tutors record.
+    function isTutorOfCentre(centreId) {
+      return isTutor()
+          && centreId != ''
+          && get(/databases/$(database)/documents/tutors/$(request.auth.uid)).data.get('centreId', '') == centreId;
+    }
+
+    // No write may move a record into or out of a centre.
+    function centreTagUnchanged() {
+      return incoming().get('centreId', existing().get('centreId', '')) == existing().get('centreId', '');
+    }
+
     // Platform staff (Tutorial OS) carry the `tos` claim, granted only by
     // scripts/grant-tos.ts. Writes stay server-only; staff get read access to
     // the platform's own configuration and plan documents.
@@ -125,16 +151,23 @@ service cloud.firestore {
             && (incoming().get('email', existing().get('email', '')) == existing().get('email', '')
                 || incoming().get('email', '') == request.auth.token.email);
       }
-      allow get: if isVerified() && (request.auth.uid == studentId || resource.data.uid == request.auth.uid || isAdmin());
-      allow list: if isAdmin() || (isVerified() && resource.data.uid == request.auth.uid);
-      allow create: if (isAdmin() && isValidStudent(incoming()) && isValidId(studentId))
+      // Centre isolation: an admin of one centre cannot read or change
+      // another centre's student record from the browser, fee fields
+      // included. The server payment routes keep their own centre checks.
+      function adminCentreOwnsStudent(data) {
+        return isAdminOfCentre(data.get('centreId', ''));
+      }
+      allow get: if isVerified() && (request.auth.uid == studentId || resource.data.uid == request.auth.uid || adminCentreOwnsStudent(resource.data));
+      allow list: if adminCentreOwnsStudent(resource.data) || (isVerified() && resource.data.uid == request.auth.uid);
+      allow create: if (isAdmin() && adminCentreOwnsStudent(incoming()) && isValidStudent(incoming()) && isValidId(studentId))
                     || (isVerified() && request.auth.uid == studentId
                         && incoming().uid == request.auth.uid
                         // A future or junk timestamp cannot be planted.
                         && (!('createdAt' in incoming())
                             || (incoming().createdAt is number && incoming().createdAt <= request.time.toMillis())));
-      allow update: if isAdmin() || (isVerified() && resource.data.uid == request.auth.uid && studentSelfFieldsUnchanged());
-      allow delete: if isAdmin();
+      allow update: if (isAdmin() && adminCentreOwnsStudent(existing()) && centreTagUnchanged())
+                    || (isVerified() && resource.data.uid == request.auth.uid && studentSelfFieldsUnchanged());
+      allow delete: if adminCentreOwnsStudent(existing());
     }
 
     // -------------------------------------------------------------------------
@@ -146,13 +179,14 @@ service cloud.firestore {
     }
 
     match /admissions/{admissionId} {
-      allow read: if isAdmin() || (isVerified() && resource.data.email == request.auth.token.email);
+      allow read: if isAdminOfCentre(resource.data.get('centreId', ''))
+                  || (isVerified() && resource.data.email == request.auth.token.email);
       // Visitors may submit an application, but only as Pending; only admins
-      // can create pre-decided records.
+      // can create pre-decided records, and only inside their own centre.
       allow create: if (isValidAdmission(incoming()) && incoming().status == 'Pending')
-                    || (isAdmin() && isValidAdmission(incoming()));
-      allow update: if isAdmin() && isValidAdmission(incoming());
-      allow delete: if isAdmin();
+                    || (isAdmin() && isAdminOfCentre(incoming().get('centreId', '')) && isValidAdmission(incoming()));
+      allow update: if isAdminOfCentre(existing().get('centreId', '')) && centreTagUnchanged() && isValidAdmission(incoming());
+      allow delete: if isAdminOfCentre(existing().get('centreId', ''));
     }
 
     // -------------------------------------------------------------------------
@@ -172,7 +206,11 @@ service cloud.firestore {
                     && existing().get('hasChangedPassword', false) != true));
       }
       allow read: if isVerified();
-      allow write: if isAdmin() || (isSignedIn() && request.auth.uid == tutorId && tutorSelfWriteAllowed());
+      allow create: if isAdminOfCentre(incoming().get('centreId', ''))
+                    || (isSignedIn() && request.auth.uid == tutorId && tutorSelfWriteAllowed());
+      allow update: if (isAdminOfCentre(existing().get('centreId', '')) && centreTagUnchanged())
+                    || (isSignedIn() && request.auth.uid == tutorId && tutorSelfWriteAllowed());
+      allow delete: if isAdminOfCentre(existing().get('centreId', ''));
     }
 
     // -------------------------------------------------------------------------
@@ -205,7 +243,7 @@ service cloud.firestore {
       }
       // Read: admins only, plus the student the payment belongs to. A centre's
       // students can never list another centre's, or another student's, fees.
-      allow read: if isVerified() && (isAdmin() || paymentTouchesOwnRecord(resource.data));
+      allow read: if isVerified() && (isAdminOfCentre(resource.data.get('centreId', '')) || paymentTouchesOwnRecord(resource.data));
       // No client may write a payment record, admins included. Student claims
       // ('Pending') and admin-recorded payments are both created by the server
       // payment routes, and confirmations/rejections by the confirm route, all
@@ -238,10 +276,13 @@ service cloud.firestore {
     }
 
     match /attendance_logs/{logId} {
-      allow get: if isVerified() && (resource.data.studentId == request.auth.uid || isAdmin());
-      allow list: if isAdmin() || (isVerified() && resource.data.studentId == request.auth.uid);
-      allow create, update: if isVerified() && (incoming().studentId == request.auth.uid || isAdmin()) && isValidAttendanceLog(incoming());
-      allow delete: if isAdmin();
+      allow get: if isVerified() && (resource.data.studentId == request.auth.uid || isAdminOfCentre(resource.data.get('centreId', '')));
+      allow list: if isAdminOfCentre(resource.data.get('centreId', '')) || (isVerified() && resource.data.studentId == request.auth.uid);
+      allow create, update: if isVerified()
+          && (incoming().studentId == request.auth.uid
+              || (isAdmin() && isAdminOfCentre(incoming().get('centreId', ''))))
+          && isValidAttendanceLog(incoming());
+      allow delete: if isAdminOfCentre(existing().get('centreId', ''));
     }
 
     // -------------------------------------------------------------------------
@@ -290,12 +331,13 @@ service cloud.firestore {
     }
 
     match /results/{resultId} {
-      allow get: if isVerified() && (resource.data.studentId == request.auth.uid || isAdmin() || isTutor());
-      allow list: if isAdmin() || isTutor() || (isVerified() && resource.data.studentId == request.auth.uid);
-      allow create: if (isAdmin() && isValidResult(incoming()))
+      allow get: if isVerified() && (resource.data.studentId == request.auth.uid || isAdminOfCentre(resource.data.get('centreId', '')) || isTutorOfCentre(resource.data.get('centreId', '')));
+      allow list: if isAdminOfCentre(resource.data.get('centreId', '')) || isTutorOfCentre(resource.data.get('centreId', '')) || (isVerified() && resource.data.studentId == request.auth.uid);
+      allow create: if ((isAdminOfCentre(incoming().get('centreId', '')) || isTutorOfCentre(incoming().get('centreId', ''))) && isValidResult(incoming()))
                     || (isVerified() && incoming().studentId == request.auth.uid && isValidResult(incoming()));
-      allow update: if (isAdmin() || isTutor()) && isValidResult(incoming());
-      allow delete: if isAdmin();
+      allow update: if (isAdminOfCentre(existing().get('centreId', '')) || isTutorOfCentre(existing().get('centreId', '')))
+                    && centreTagUnchanged() && isValidResult(incoming());
+      allow delete: if isAdminOfCentre(existing().get('centreId', ''));
     }
 
     // -------------------------------------------------------------------------
@@ -310,9 +352,9 @@ service cloud.firestore {
     // ACTIVITIES
     // -------------------------------------------------------------------------
     match /activities/{activityId} {
-      allow read: if isAdmin();
+      allow read: if isAdminOfCentre(resource.data.get('centreId', ''));
       allow create: if isVerified();
-      allow update, delete: if isAdmin();
+      allow update, delete: if isAdminOfCentre(existing().get('centreId', ''));
     }
 
     // -------------------------------------------------------------------------

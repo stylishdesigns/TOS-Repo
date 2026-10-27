@@ -50,7 +50,7 @@ async function seed() {
     await admin.doc('students/uid-stu').set(s);
     await admin.doc('students/uid-stu2').set({ ...s, uid: 'uid-stu2', email: 'stu2@test.com' });
     await admin.doc('students/stu-999').set({ ...s, uid: 'uid-stu', studentId: 'STU-9999' });
-    await admin.doc('admins/uid-adm').set({ name: 'Admin', email: 'adm@test.com', role: 'Super Administrator' });
+    await admin.doc('admins/uid-adm').set({ name: 'Admin', email: 'adm@test.com', role: 'Super Administrator', centreId: 'centre-excellence' });
     await admin.doc('programmes/prog-1').set({ name: 'Science' });
     await admin.doc('tutors/uid-tut').set({
     name: 'Tutor', email: 'tut@test.com', status: 'Suspended', hasChangedPassword: true,
@@ -60,6 +60,7 @@ async function seed() {
   });
     await admin.doc('payments/pay-b2').set({
       studentId: 'uid-stu2', studentName: 'Student Two', amountPaid: 75, status: 'Paid',
+      centreId: 'centre-excellence',
     });
     // Section 13 reads pay-3 and pay-5; since students can no longer create
     // payment records, seed them from the admin context instead.
@@ -136,12 +137,12 @@ try {
   //    does not exist, and the record id must be well-formed.
   await check('5a. admin create student with fake programme denied', async () => {
     await assertFails(admCtx().firestore().doc('students/stu-new1').set({
-      name: 'New', regNumber: 'R-2', status: 'Active', totalFee: 10, paidAmount: 0, programmeId: 'prog-fake',
+      name: 'New', regNumber: 'R-2', status: 'Active', totalFee: 10, paidAmount: 0, programmeId: 'prog-fake', centreId: 'centre-excellence',
     }));
   });
   await check('5b. admin create student with real programme allowed', async () => {
     await assertSucceeds(admCtx().firestore().doc('students/stu-new1').set({
-      name: 'New', regNumber: 'R-2', status: 'Active', totalFee: 10, paidAmount: 0, programmeId: 'prog-1',
+      name: 'New', regNumber: 'R-2', status: 'Active', totalFee: 10, paidAmount: 0, programmeId: 'prog-1', centreId: 'centre-excellence',
     }));
   });
 
@@ -215,7 +216,7 @@ try {
   await check('13f. student own-payments query allowed', async () => {
     await assertSucceeds(stuCtx().firestore().collection('payments').where('studentId', '==', 'uid-stu').get());
   });
-  await check('13g. admin reads any payment allowed', async () => {
+  await check('13g. admin reads own-centre payment allowed', async () => {
     await assertSucceeds(admCtx().firestore().doc('payments/pay-b2').get());
   });
 
@@ -237,7 +238,7 @@ try {
   await check('8a. admin create student with 200-char id denied', async () => {
     const bad = 'x'.repeat(200);
     await assertFails(admCtx().firestore().doc(`students/${bad}`).set({
-      name: 'Junk', regNumber: 'R-3', status: 'Active', totalFee: 1, paidAmount: 0,
+      name: 'Junk', regNumber: 'R-3', status: 'Active', totalFee: 1, paidAmount: 0, centreId: 'centre-excellence',
     }));
   });
 
