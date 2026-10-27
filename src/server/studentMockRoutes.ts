@@ -1,4 +1,5 @@
 import express from 'express';
+import * as crypto from 'crypto';
 import { FieldValue } from 'firebase-admin/firestore';
 import { adminDb } from './firebaseAdmin';
 import { Caller, httpError, listActiveMembershipsForUser } from './tenantService';
@@ -422,6 +423,53 @@ export function registerStudentMockRoutes(app: express.Express): void {
   // -----------------------------------------------------------------------
   // POST start: one attempt, idempotent, the clock set on the server.
   // -----------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
+  // The short-lived paper link (MB1 Step 3). The student never receives the
+  // paper in the start response; they receive a signed, 10-minute link that
+  // only their own identity can open, re-minted on every start and resume.
+  // The link is an HMAC token over mockId, uid and an expiry, signed with a
+  // server-side secret, so it cannot be forged, shared usefully (the uid is
+  // bound), or reused after it expires. The paper is served by GET
+  // /api/student/mock/paper only while the attempt is open and the mock is
+  // scheduled or live; answers stay in mockKeys, never in any link or
+  // response.
+  // ---------------------------------------------------------------------------
+  const PAPER_LINK_TTL_MS = 10 * 60 * 1000; // the 10-minute link, re-minted on resume
+
+  function paperLinkSecret(): string {
+    const secret = String(process.env.MOCK_PAPER_SECRET || process.env.INTERNAL_API_SECRET || '');
+    if (!secret) throw httpError(500, 'The server is missing its paper-link secret. Contact support.');
+    return secret;
+  }
+
+  function mintPaperLink(mockId: string, uid: string): { url: string; expiresAt: string } {
+    const exp = Date.now() + PAPER_LINK_TTL_MS;
+    const payload = `${mockId}|${uid}|${exp}`;
+    const sig = crypto.createHmac('sha256', paperLinkSecret()).update(payload).digest('base64url');
+    const token = `${Buffer.from(payload).toString('base64url')}.${sig}`;
+    return { url: `/api/student/mock/paper?t=${encodeURIComponent(token)}`, expiresAt: new Date(exp).toISOString() };
+  }
+
+  function verifyPaperLink(token: string): { mockId: string; uid: string; exp: number } {
+    const dot = String(token || '').lastIndexOf('.');
+    if (dot <= 0) throw httpError(403, 'That paper link is not valid. Tap Start to get a fresh one.');
+    const body = String(token).slice(0, dot);
+    const sig = String(token).slice(dot + 1);
+    let payload = '';
+    try {
+      payload = Buffer.from(body, 'base64url').toString('utf8');
+    } catch {
+      throw httpError(403, 'That paper link is not valid. Tap Start to get a fresh one.');
+    }
+    const expected = crypto.createHmac('sha256', paperLinkSecret()).update(payload).digest('base64url');
+    if (sig !== expected) throw httpError(403, 'That paper link is not valid. Tap Start to get a fresh one.');
+    const parts = payload.split('|');
+    const exp = Number(parts[2]);
+    if (parts.length !== 3 || !Number.isFinite(exp)) throw httpError(403, 'That paper link is not valid. Tap Start to get a fresh one.');
+    if (exp < Date.now()) throw httpError(401, 'Your paper link expired. Tap Start again to get a fresh one.');
+    return { mockId: parts[0], uid: parts[1], exp };
+  }
+
   app.post('/api/student/mock/start', async (req, res) => {
     try {
       const ctx = await requireStudent(req);
@@ -489,10 +537,14 @@ export function registerStudentMockRoutes(app: express.Express): void {
       if (created) void audit({ area: 'student-mock', action: 'start', mockId, studentId: ctx.studentId, by: ctx.caller.uid });
       cacheClearFor(ctx.caller.uid);
 
-      // The frozen paper: questions and options only, by design.
+      // The frozen paper stays server-side (MB1 Step 3): only its shape is
+      // confirmed here, and the student receives a short-lived link to fetch
+      // it. The paper never rides in this response; answers never leave
+      // mockKeys.
       const paperSnap = await adminDb.collection(MOCK_PAPERS).doc(mockId).get();
       if (!paperSnap.exists) throw httpError(500, 'The frozen paper is missing. Contact your centre.');
       const paper = paperSnap.data() as any;
+      const link = mintPaperLink(mockId, ctx.caller.uid);
 
       res.json({
         ok: true,
@@ -511,6 +563,50 @@ export function registerStudentMockRoutes(app: express.Express): void {
           examType: paper.examType,
           durationMinutes: paper.durationMinutes,
           questionCount: paper.questionCount,
+          url: link.url,
+          urlExpiresAt: link.expiresAt,
+        },
+      });
+    } catch (error: any) {
+      if (error?.status) return res.status(error.status).json({ error: error.message });
+      console.error('[student-mock] start failed:', error?.message || error);
+      res.status(500).json({ error: 'Could not start the mock.' });
+    }
+  });
+
+  // GET the paper through the short-lived link. Every check runs again here:
+  // the link must be valid and unexpired and belong to the caller, the mock
+  // must be today's and open, and the attempt must be open. A submitted
+  // attempt closes the door at once: a finished exam cannot re-download its
+  // paper before results release.
+  app.get('/api/student/mock/paper', async (req, res) => {
+    try {
+      const ctx = await requireStudent(req);
+      const parsed = verifyPaperLink(String(req.query.t || ''));
+      if (parsed.uid !== ctx.caller.uid) throw httpError(403, 'That paper link belongs to another student.');
+      const today = lagosToday();
+      if (parsed.mockId !== `mock-${today}`) throw httpError(403, 'That paper link is not for today. Tap Start.');
+      const mockSnap = await adminDb.collection(MOCKS).doc(parsed.mockId).get();
+      if (!mockSnap.exists) throw httpError(404, 'There is no mock today.');
+      if (!['scheduled', 'live'].includes(String((mockSnap.data() as any)?.status))) {
+        throw httpError(409, "Today's mock is not open.");
+      }
+      const attemptSnap = await adminDb.collection(MOCK_ATTEMPTS).doc(`${parsed.mockId}__${ctx.caller.uid}`).get();
+      if (!attemptSnap.exists) throw httpError(404, 'No attempt in progress. Tap Start.');
+      if (String((attemptSnap.data() as any)?.status) !== 'open') {
+        throw httpError(409, 'This attempt is finished. Results arrive at 6:00 am.');
+      }
+      const paperSnap = await adminDb.collection(MOCK_PAPERS).doc(parsed.mockId).get();
+      if (!paperSnap.exists) throw httpError(500, 'The frozen paper is missing. Contact your centre.');
+      const paper = paperSnap.data() as any;
+      res.set('Cache-Control', 'no-store');
+      res.json({
+        ok: true,
+        paper: {
+          mockId: parsed.mockId,
+          examType: paper.examType,
+          durationMinutes: paper.durationMinutes,
+          questionCount: paper.questionCount,
           questions: (paper.questions || []).map((q: any) => ({
             id: q.id, subject: q.subject, topic: q.topic, year: q.year ?? null,
             text: q.text, options: q.options || [], imageLink: q.imageLink || '',
@@ -519,8 +615,8 @@ export function registerStudentMockRoutes(app: express.Express): void {
       });
     } catch (error: any) {
       if (error?.status) return res.status(error.status).json({ error: error.message });
-      console.error('[student-mock] start failed:', error?.message || error);
-      res.status(500).json({ error: 'Could not start the mock.' });
+      console.error('[student-mock] paper failed:', error?.message || error);
+      res.status(500).json({ error: 'Could not load the paper.' });
     }
   });
 

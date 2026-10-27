@@ -555,7 +555,21 @@ export const StudentMockTab: React.FC<{
     setStarting(true); setNotice('');
     try {
       const r = await api('/api/student/mock/start', { method: 'POST', body: {} });
-      setExam(r);
+      // Start returns a short-lived paper link, not the paper. Fetch it at
+      // once; on a slow phone the 10-minute link can expire, so starting
+      // again (which mints a fresh link) and retrying once is built in.
+      const fetchPaper = async (link: string) => (await api(link))?.paper || null;
+      let meta: Json = r?.paper || null;
+      let paper: Json = null;
+      try {
+        paper = await fetchPaper(String(meta?.url || ''));
+      } catch {
+        const r2 = await api('/api/student/mock/start', { method: 'POST', body: {} });
+        meta = r2?.paper || null;
+        paper = await fetchPaper(String(meta?.url || ''));
+      }
+      if (!paper) throw new Error('The paper did not load. Tap Start again.');
+      setExam({ ...r, paper: { ...(meta || {}), ...paper } });
     } catch (e: any) { setNotice(e.message || 'Could not start the mock.'); }
     finally { setStarting(false); }
   };
