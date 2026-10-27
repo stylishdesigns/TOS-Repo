@@ -191,7 +191,12 @@ export const MockPapersTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) 
     }
   };
   const answersOf = (mm: any) => (mm.status === 'released' ? 'Released to students' : 'In Firestore only');
-  const paperOf = (mm: any) => (mm.paperFileUrl ? 'Built' : 'Not built yet');
+  const paperOf = (mm: any) => {
+    if (!mm.paperFilePublicId) return 'Not built yet';
+    const at = String(mm.paperFileUploadedAt || '');
+    const when = at ? new Date(at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '';
+    return when ? `Built ${when}` : 'Built';
+  };
 
   return (
     <div className="space-y-5">

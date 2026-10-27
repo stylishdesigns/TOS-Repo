@@ -2,6 +2,7 @@ import express from 'express';
 import { FieldValue, WriteBatch } from 'firebase-admin/firestore';
 import { adminDb } from './firebaseAdmin';
 import { Caller, httpError } from './tenantService';
+import * as crypto from 'crypto';
 
 /**
  * TOS Mocks (Prompt M, piece M2): the data model and the TOS-only management
@@ -893,6 +894,83 @@ export function registerMockRoutes(app: express.Express): void {
     }
   });
 
+
+// ---------------------------------------------------------------------------
+// The private paper file (MB1 Step 2): at freeze the frozen paper (questions
+// and options only, never answers or explanations) is written to Cloudinary
+// as an AUTHENTICATED asset, so no unauthenticated URL can ever serve it.
+// Students reach it only through a short-lived signed link minted on Start
+// (the student-side piece). Credentials come from the server's environment
+// only (Netlify env vars); the unsigned public preset is never used here.
+// If the file cannot be stored, scheduling fails loudly and nothing is
+// written: a mock never goes live without its paper safely stored.
+// ---------------------------------------------------------------------------
+async function uploadPrivatePaper(
+  mockId: string,
+  doc: { examType: string; date: string; durationMinutes: number; questionCount: number; scoreScale: number; questions: PaperQuestion[] },
+): Promise<{ publicId: string; version: string; uploadedAt: string }> {
+  const cloud = String(process.env.CLOUDINARY_CLOUD_NAME || '');
+  const apiKey = String(process.env.CLOUDINARY_API_KEY || '');
+  const apiSecret = String(process.env.CLOUDINARY_API_SECRET || '');
+  if (!cloud || !apiKey || !apiSecret) {
+    throw httpError(500, 'The private paper file could not be stored: Cloudinary credentials are missing on the server. The mock was not scheduled.');
+  }
+  const publicId = `tos/mock-papers/${mockId}`;
+  const timestamp = Math.floor(Date.now() / 1000);
+  // Signed-upload signature: the request params below, sorted alphabetically,
+  // joined as key=value with &, with the API secret appended, hashed SHA-1 hex.
+  const toSign = ['overwrite=true', `public_id=${publicId}`, `timestamp=${timestamp}`, 'type=authenticated'].join('&') + apiSecret;
+  const signature = crypto.createHash('sha1').update(toSign).digest('hex');
+  const form = new FormData();
+  form.append('file', JSON.stringify(doc));
+  form.append('overwrite', 'true');
+  form.append('public_id', publicId);
+  form.append('timestamp', String(timestamp));
+  form.append('type', 'authenticated');
+  form.append('api_key', apiKey);
+  form.append('signature', signature);
+  let resp: any = null;
+  try {
+    resp = await fetch(`https://api.cloudinary.com/v1_1/${cloud}/raw/upload`, { method: 'POST', body: form });
+  } catch (err: any) {
+    throw httpError(502, `The private paper file could not be stored (the upload did not go through): ${err?.message || err}. The mock was not scheduled.`);
+  }
+  const data = (await resp.json().catch(() => null)) as any;
+  if (!resp.ok || !data || !data.public_id || !data.version) {
+    const detail = data?.error?.message ? ` (${data.error.message})` : '';
+    throw httpError(502, `The private paper file could not be stored${detail}. The mock was not scheduled.`);
+  }
+  return { publicId: String(data.public_id), version: String(data.version), uploadedAt: new Date().toISOString() };
+}
+
+
+// Removing the private paper file when a Scheduled mock is cancelled or
+// voided, so no frozen paper lingers for a mock that never runs. Best effort:
+// the file is authenticated (no URL reaches it without a signature), so a
+// failed delete never blocks or endangers the cancel/void; it is audited.
+async function destroyPrivatePaper(mockId: string): Promise<boolean> {
+  const cloud = String(process.env.CLOUDINARY_CLOUD_NAME || '');
+  const apiKey = String(process.env.CLOUDINARY_API_KEY || '');
+  const apiSecret = String(process.env.CLOUDINARY_API_SECRET || '');
+  if (!cloud || !apiKey || !apiSecret) return false;
+  const publicId = `tos/mock-papers/${mockId}`;
+  const timestamp = Math.floor(Date.now() / 1000);
+  const toSign = [`public_id=${publicId}`, `timestamp=${timestamp}`].join('&') + apiSecret;
+  const signature = crypto.createHash('sha1').update(toSign).digest('hex');
+  const form = new FormData();
+  form.append('public_id', publicId);
+  form.append('timestamp', String(timestamp));
+  form.append('api_key', apiKey);
+  form.append('signature', signature);
+  try {
+    const resp = await fetch(`https://api.cloudinary.com/v1_1/${cloud}/raw/destroy`, { method: 'POST', body: form });
+    const data = (await resp.json().catch(() => null)) as any;
+    return Boolean(resp.ok && data?.result === 'deleted' || data?.result === 'not found');
+  } catch {
+    return false;
+  }
+}
+
   // Schedule (freeze): build the frozen paper without answers, build the
   // server-only key, and lock the mock. One batch write: paper + key + mock
   // status land together or not at all.
@@ -929,6 +1007,19 @@ export function registerMockRoutes(app: express.Express): void {
       }
       const durationMinutes = mock.examType === 'jamb' ? settings.jamb.durationMinutes : settings.waecNeco.durationMinutes;
       const scoreScale = mock.examType === 'jamb' ? settings.jamb.scoreScale : settings.waecNeco.scoreScale;
+      // MB1 Step 2: the paper itself is stored privately (authenticated
+      // Cloudinary asset, questions and options only) before anything is
+      // written to Firestore, so a failed upload never leaves a half-scheduled
+      // mock. The upload overwrites the same public id, so re-scheduling a
+      // date whose earlier mock was cancelled replaces the stale file.
+      const paperFile = await uploadPrivatePaper(id, {
+        examType: mock.examType,
+        date: mock.date,
+        durationMinutes,
+        questionCount: paper.length,
+        scoreScale,
+        questions: paper,
+      });
       const batch = adminDb.batch();
       batch.set(adminDb.collection(MOCK_PAPERS).doc(id), {
         mockId: id,
@@ -951,6 +1042,12 @@ export function registerMockRoutes(app: express.Express): void {
         status: 'scheduled' as MockStatus,
         frozenAt: new Date().toISOString(),
         frozenBy: caller.uid,
+        // MB1 Step 2: the ids the paper froze, kept on the mock itself so the
+        // bank's lock gate and the hub's locked count never read whole papers.
+        frozenQuestionIds: paper.map((q) => q.id),
+        paperFilePublicId: paperFile.publicId,
+        paperFileVersion: paperFile.version,
+        paperFileUploadedAt: paperFile.uploadedAt,
         durationMinutes,
         questionCount: paper.length,
         scoreScale,
@@ -991,13 +1088,18 @@ export function registerMockRoutes(app: express.Express): void {
           cancelledBy: caller.uid,
         });
       });
+      let paperFileRemoved: boolean | null = null;
       if (wasScheduled) {
         const batch = adminDb.batch();
         batch.delete(adminDb.collection(MOCK_PAPERS).doc(id));
         batch.delete(adminDb.collection(MOCK_KEYS).doc(id));
         await batch.commit();
+        const before = await adminDb.collection(MOCKS).doc(id).get();
+        if (String((before.data() as any)?.paperFilePublicId || '')) {
+          paperFileRemoved = await destroyPrivatePaper(id);
+        }
       }
-      void audit({ area: 'mocks', action: 'cancel', mockId: id, by: caller.uid, wasScheduled });
+      void audit({ area: 'mocks', action: 'cancel', mockId: id, by: caller.uid, wasScheduled, ...(paperFileRemoved !== null ? { paperFileRemoved } : {}) });
       res.json({ ok: true });
     } catch (error: any) {
       if (error?.status) return res.status(error.status).json({ error: error.message });
@@ -1143,6 +1245,7 @@ export function registerMockRoutes(app: express.Express): void {
         });
       });
       const batch = adminDb.batch();
+      let paperFileRemoved: boolean | null = null;
       if (wasScheduled) {
         batch.delete(adminDb.collection(MOCK_PAPERS).doc(id));
         batch.delete(adminDb.collection(MOCK_KEYS).doc(id));
@@ -1157,7 +1260,13 @@ export function registerMockRoutes(app: express.Express): void {
         }, { merge: true });
       }
       await batch.commit();
-      void audit({ area: 'mocks', action: 'void', mockId: id, by: caller.uid, wasScheduled, hadBoard });
+      if (wasScheduled) {
+        const before = await adminDb.collection(MOCKS).doc(id).get();
+        if (String((before.data() as any)?.paperFilePublicId || '')) {
+          paperFileRemoved = await destroyPrivatePaper(id);
+        }
+      }
+      void audit({ area: 'mocks', action: 'void', mockId: id, by: caller.uid, wasScheduled, hadBoard, ...(paperFileRemoved !== null ? { paperFileRemoved } : {}) });
       res.json({ ok: true, hadBoard });
     } catch (error: any) {
       if (error?.status) return res.status(error.status).json({ error: error.message });

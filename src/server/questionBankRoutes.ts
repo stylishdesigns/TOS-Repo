@@ -368,11 +368,19 @@ export function registerQuestionBankRoutes(app: express.Express): void {
       ]);
       const lockedIds = new Set<string>();
       for (const m of lockMocksSnap.docs) {
-        const p = await adminDb.collection(MOCK_PAPERS).doc(m.id).get();
-        if (p.exists) {
-          for (const q of ((p.data() as any)?.questions || []) as any[]) {
-            const qid = String(q?.id || '');
-            if (qid) lockedIds.add(qid);
+        const frozen = (m.data() as any)?.frozenQuestionIds;
+        if (Array.isArray(frozen)) {
+          for (const qid of frozen) {
+            const k = String(qid || '');
+            if (k) lockedIds.add(k);
+          }
+        } else {
+          const p = await adminDb.collection(MOCK_PAPERS).doc(m.id).get();
+          if (p.exists) {
+            for (const q of ((p.data() as any)?.questions || []) as any[]) {
+              const qid = String(q?.id || '');
+              if (qid) lockedIds.add(qid);
+            }
           }
         }
       }
@@ -383,6 +391,34 @@ export function registerQuestionBankRoutes(app: express.Express): void {
       res.status(error?.status || 500).json({ error: error?.message || 'Failed to build the bank summary.' });
     }
   });
+
+
+  // Mock-lock gate (MB1 Step 2): a mock-bank question that a Scheduled, Live
+  // or Closed mock froze into its paper is locked on the server: it cannot be
+  // edited or removed in the bank until that mock's results release, or the
+  // mock is cancelled or voided. The frozen paper is a copy, so the exam
+  // itself is never affected; the lock keeps the bank honest about the
+  // questions it served. Frozen ids live on the mock doc (written at freeze),
+  // so this is one small query, never a whole-paper read.
+  async function assertNotMockLocked(ids: string[]) {
+    const wanted = ids.map((x) => String(x || '').trim()).filter(Boolean);
+    if (wanted.length === 0) return;
+    const snap = await adminDb
+      .collection(MOCKS)
+      .where('status', 'in', ['scheduled', 'live', 'closed'])
+      .limit(50)
+      .get();
+    const active = snap.docs
+      .map((d) => ({ id: d.id, frozen: (d.data() as any)?.frozenQuestionIds }))
+      .filter((m) => Array.isArray(m.frozen))
+      .sort((a, b) => String(b.id).localeCompare(String(a.id)));
+    for (const m of active) {
+      const hit = wanted.find((qid) => (m.frozen as string[]).includes(qid));
+      if (hit) {
+        throw httpError(409, `Question ${hit} is frozen into a scheduled mock (${m.id}). It can be edited again after that mock's results release, or once the mock is cancelled or voided.`);
+      }
+    }
+  }
 
   // Create a draft question.
   app.post('/api/tos/questionbank/questions', async (req, res) => {
@@ -430,6 +466,7 @@ export function registerQuestionBankRoutes(app: express.Express): void {
       if (!doc.exists) throw httpError(404, 'Question not found.');
       const prev = doc.data() as any;
       if (prev?.status === 'removed') throw httpError(409, 'This question was removed. Restore is not supported; add it again as a new question.');
+      if (String(prev?.kind || '') === 'mock') await assertNotMockLocked([ref.id]);
       const now = new Date().toISOString();
       const next = { ...prev, ...q, updatedAt: now, editedByUid: caller.uid, editedByEmail: caller.email || '' };
       const batch = adminDb.batch();
@@ -587,6 +624,7 @@ export function registerQuestionBankRoutes(app: express.Express): void {
       if (!doc.exists) throw httpError(404, 'Question not found.');
       const prev = doc.data() as any;
       if (prev?.status === 'removed') throw httpError(409, 'This question is already removed.');
+      if (String(prev?.kind || '') === 'mock') await assertNotMockLocked([ref.id]);
       const now = new Date().toISOString();
       const batch = adminDb.batch();
       if (prev?.status === 'draft') {
