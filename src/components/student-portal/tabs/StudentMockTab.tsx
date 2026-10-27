@@ -514,6 +514,7 @@ export const StudentMockTab: React.FC<{
   const [reviewId, setReviewId] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
   const [notice, setNotice] = useState('');
+  const [rulesOpen, setRulesOpen] = useState(false);
   const skewRef = useRef(0);
 
   const loadStatus = useCallback(async () => {
@@ -669,7 +670,7 @@ export const StudentMockTab: React.FC<{
                       </div>
                       {notice && <p className="text-sm font-bold text-rose-600">{notice}</p>}
                       <button
-                        onClick={start}
+                        onClick={() => setRulesOpen(true)}
                         disabled={starting}
                         className={`w-full min-h-[56px] rounded-2xl font-black text-base uppercase tracking-widest flex items-center justify-center gap-2 ${starting ? 'bg-slate-100 text-slate-400' : 'bg-[#EA580C] text-white active:scale-[0.99]'}`}
                       >
@@ -842,6 +843,42 @@ export const StudentMockTab: React.FC<{
               </div>
             )}
           </>
+        )}
+        {rulesOpen && !exam && (
+          <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-4">
+            <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h3 className="text-xl font-black text-slate-900 tracking-tight">Before you start</h3>
+                  <p className="text-xs font-bold text-slate-500 mt-1">Five rules for every TOS mock, every centre.</p>
+                </div>
+                <button onClick={() => setRulesOpen(false)} className="w-9 h-9 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center" aria-label="Close">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <ol className="space-y-3">
+                {[
+                  'One mock each day, one attempt only. A missed mock stays missed.',
+                  'The clock runs on our servers: once you start, time keeps running even if you close the app.',
+                  'Finish before midnight. Starting closes at the cutoff time shown on your mock.',
+                  'Your answers save by themselves as you go, so stepping away for a moment is safe.',
+                  'Scores, answers and the leaderboard stay hidden until results drop at 6:00 am the next morning.',
+                ].map((rule, i) => (
+                  <li key={i} className="flex items-start gap-3">
+                    <span className="w-6 h-6 rounded-full bg-orange-100 text-[#EA580C] text-xs font-black flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
+                    <span className="text-sm text-slate-600 font-medium leading-relaxed">{rule}</span>
+                  </li>
+                ))}
+              </ol>
+              <button
+                onClick={start}
+                disabled={starting}
+                className={`w-full min-h-[56px] rounded-2xl font-black text-base uppercase tracking-widest flex items-center justify-center gap-2 ${starting ? 'bg-slate-100 text-slate-400' : 'bg-[#EA580C] text-white active:scale-[0.99]'}`}
+              >
+                <Play className="w-5 h-5" /> {starting ? 'Opening...' : "I've read the rules, start"}
+              </button>
+            </div>
+          </div>
         )}
       </div>
     </div>
