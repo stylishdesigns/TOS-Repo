@@ -97,13 +97,23 @@ service cloud.firestore {
     // ADMINS
     // -------------------------------------------------------------------------
     match /admins/{adminId} {
-      // Only existing admins may read the staff list or write staff records.
+      // Only admins of the same centre may read the staff list or write staff
+      // records (platform staff act across centres).
       // A signed-in user can still read their own record (by uid or by an
       // email-filtered lookup), which the login flow needs.
-      allow read: if isAdmin()
+      //
+      // Centre isolation (G2 follow-up): every centre check reads centreId from
+      // THIS collection, so it must not be writable across centres. Otherwise
+      // an admin of centre A could set their own record's centreId to centre B
+      // and instantly pass every other centre rule for B. An admin can read,
+      // create, change and remove admin records only inside their own centre,
+      // and no write may move a record into or out of a centre.
+      allow read: if isAdminOfCentre(resource.data.get('centreId', ''))
           || (isSignedIn() && request.auth.uid == adminId)
           || (isSignedIn() && resource.data.email == request.auth.token.email);
-      allow write: if isAdmin();
+      allow create: if isAdminOfCentre(incoming().get('centreId', ''));
+      allow update: if isAdminOfCentre(existing().get('centreId', '')) && centreTagUnchanged();
+      allow delete: if isAdminOfCentre(existing().get('centreId', ''));
     }
 
     // -------------------------------------------------------------------------
@@ -157,11 +167,21 @@ service cloud.firestore {
       function adminCentreOwnsStudent(data) {
         return isAdminOfCentre(data.get('centreId', ''));
       }
+      // A student creating their own record starts with a clean slate: no fee
+      // set, nothing paid, and no payment status other than Pending. (Every
+      // registration flow writes zero fees; fees are set by the centre.)
+      function selfCreateFeesClean() {
+        return incoming().get('totalFee', 0) == 0
+            && incoming().get('paidAmount', 0) == 0
+            && incoming().get('outstandingBalance', 0) == 0
+            && incoming().get('paymentStatus', 'Pending') == 'Pending';
+      }
       allow get: if isVerified() && (request.auth.uid == studentId || resource.data.uid == request.auth.uid || adminCentreOwnsStudent(resource.data));
       allow list: if adminCentreOwnsStudent(resource.data) || (isVerified() && resource.data.uid == request.auth.uid);
       allow create: if (isAdmin() && adminCentreOwnsStudent(incoming()) && isValidStudent(incoming()) && isValidId(studentId))
                     || (isVerified() && request.auth.uid == studentId
                         && incoming().uid == request.auth.uid
+                        && selfCreateFeesClean()
                         // A future or junk timestamp cannot be planted.
                         && (!('createdAt' in incoming())
                             || (incoming().createdAt is number && incoming().createdAt <= request.time.toMillis())));
