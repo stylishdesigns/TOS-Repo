@@ -52,6 +52,8 @@ const tosCtx = () => testEnv.authenticatedContext('uid-tos', { email: 'tos@test.
 const stuA = () => testEnv.authenticatedContext('uid-stu-a', { email: 'stua@test.com' });
 const tutA = () => testEnv.authenticatedContext('uid-tut-a', { email: 'tuta@test.com' });
 const tutB = () => testEnv.authenticatedContext('uid-tut-b', { email: 'tutb@test.com' });
+// The same tutor as tutA, with a verified email (JIT migration deletes need it).
+const tutAv = () => testEnv.authenticatedContext('uid-tut-a', { email: 'tuta@test.com', email_verified: true });
 
 const CATALOG = [
   { name: 'programmes', publicRead: true },
@@ -78,6 +80,7 @@ async function seed() {
     await db.doc('admins/uid-tos').set({ name: 'TOS', email: 'tos@test.com' });
     await db.doc('tutors/uid-tut-a').set({ name: 'Tutor A', email: 'tuta@test.com', status: 'Active', centreId: 'centre-a' });
     await db.doc('tutors/uid-tut-b').set({ name: 'Tutor B', email: 'tutb@test.com', status: 'Active', centreId: 'centre-b' });
+    await db.doc('tutors/legacy-dup').set({ name: 'Legacy Tutor', email: 'tuta@test.com', status: 'Active' });
     await db.doc('students/uid-stu-a').set({ uid: 'uid-stu-a', email: 'stua@test.com', status: 'Active', centreId: 'centre-a', totalFee: 0, paidAmount: 0, outstandingBalance: 0 });
     for (const { name } of CATALOG) {
       await db.doc(`${name}/a1`).set(item('centre-a'));
@@ -90,6 +93,9 @@ async function seed() {
     await db.doc('timetable/slot-a2').set({ title: 'Physics', centreId: 'centre-a', tutorId: 'uid-tut-a' });
     await db.doc('timetable/slot-a3').set({ title: 'Chem', centreId: 'centre-a', tutorId: 'someone-else' });
     await db.doc('timetable/slot-b1').set({ title: 'Maths B', centreId: 'centre-b', tutorId: 'uid-tut-b' });
+    await db.doc('timetable/slot-legacy').set({ title: 'Legacy Maths', centreId: 'centre-a', tutorId: 'legacy-tut-1' });
+    await db.doc('timetable/slot-live-b').set({ title: 'B slot in A', centreId: 'centre-a', tutorId: 'uid-tut-b' });
+    await db.doc('timetable/slot-unassigned').set({ title: 'Free slot', centreId: 'centre-a', tutorId: '' });
     await db.doc('cbt_exams/exam-a1').set(exam('centre-a', 'uid-tut-a'));
     await db.doc('cbt_exams/exam-a2').set(exam('centre-a', 'someone-else')); // same centre, another tutor's
     await db.doc('cbt_exams/exam-b1').set(exam('centre-b', 'uid-tut-b'));
@@ -205,6 +211,15 @@ try {
   await check('timetable: student updates a slot denied', async () => {
     await assertFails(stuA().firestore().doc('timetable/slot-a1').update({ title: 'X' }));
   });
+  await check('timetable: tutor re-points an orphaned legacy slot to themselves allowed (JIT migration)', async () => {
+    await assertSucceeds(tutA().firestore().doc('timetable/slot-legacy').update({ tutorId: 'uid-tut-a' }));
+  }, true);
+  await check("timetable: tutor re-points a live tutor's slot to themselves denied", async () => {
+    await assertFails(tutA().firestore().doc('timetable/slot-live-b').update({ tutorId: 'uid-tut-a' }));
+  });
+  await check('timetable: tutor claims an unassigned slot denied', async () => {
+    await assertFails(tutA().firestore().doc('timetable/slot-unassigned').update({ tutorId: 'uid-tut-a' }));
+  });
 
   // ---------- cbt_exams ----------
   await check('cbt_exams: unauthenticated read denied', async () => {
@@ -272,6 +287,17 @@ try {
   });
   await check('cbt_exams: centre A admin deletes an own-centre exam allowed', async () => {
     await assertSucceeds(admA().firestore().doc('cbt_exams/exam-del-2').delete());
+  });
+
+  // ---------- tutors: JIT legacy cleanup ----------
+  await check('tutors: the tutor deletes their own legacy duplicate doc allowed (verified email)', async () => {
+    await assertSucceeds(tutAv().firestore().doc('tutors/legacy-dup').delete());
+  }, true);
+  await check('tutors: another user cannot delete a tutors doc by email match', async () => {
+    await assertFails(tutB().firestore().doc('tutors/legacy-dup').delete());
+  });
+  await check('tutors: a tutor cannot delete their own live doc via the legacy path', async () => {
+    await assertFails(tutAv().firestore().doc('tutors/uid-tut-a').delete());
   });
 
   // ---------- legacy global collections: server-only writes ----------
