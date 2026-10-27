@@ -772,6 +772,8 @@ export function registerMockRoutes(app: express.Express): void {
           questionCount: d.questionCount ?? null,
           durationMinutes: d.durationMinutes ?? null,
           seriesId: d.seriesId ?? null,
+          paperFilePublicId: d.paperFilePublicId ?? null,
+          paperFileUploadedAt: d.paperFileUploadedAt ?? null,
         };
       });
       res.json({ ok: true, month, mocks });

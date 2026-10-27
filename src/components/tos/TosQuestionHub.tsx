@@ -4,6 +4,7 @@ import {
   BookOpen, AlertTriangle, ChevronRight, CheckCircle2, CircleDashed,
 } from 'lucide-react';
 import { api, Json } from './tosShared';
+import { MockDetail, STATUS_STYLES, EXAM_LABELS } from './TosMocks';
 
 /**
  * MB1 Step 1: the Question Bank hub (design screen 1) and the Mock Bank's
@@ -14,11 +15,11 @@ import { api, Json } from './tosShared';
  * two banks differ. Nothing here is hard-coded to today's data: every number
  * comes from /api/tos/questionbank/bank-summary.
  *
- * The Mock papers tab is Step 1's honest placeholder for the real workspace
- * (Step 4): it reads the mocks list and shows, for every mock that is past
- * Draft, its date, exam, size, paper-file state and answers state. No paper
- * file has ever been built yet, so "Not built yet" is read from the data, not
- * hard-coded: a mock carries no paperFile field until Step 4 builds one.
+ * The Mock papers tab is MB1 Step 4: the full paper workspace. It lists every
+ * mock of the month, drafts included, and tapping a row opens the same paper
+ * workspace the Mocks screen uses (readiness, schedule, the frozen paper,
+ * monitoring, corrections, void and release), so the lifecycle logic lives in
+ * one place. Every number is read from the server; nothing is hard-coded.
  */
 
 interface BankStat { kind: string; questions?: number; subjects?: number; drafts?: number; edited?: number; removed?: number; pending?: number; currentVersion?: number; currentPublishedAt?: string | null; currentFileUrl?: string; locked?: number; mockPapersCount?: number; }
@@ -147,11 +148,22 @@ export const QuestionBankHub: React.FC<{ summary: Summary; loading: boolean; err
 };
 
 // ---------------------------------------------------------------------------
-// Mock papers tab (design screen 7). Step 1 shows the workspace shape and the
-// real mock list; Step 4 fills the paper building in.
+// Mock papers tab (design screen 7). MB1 Step 4: the full paper workspace.
+// The month list shows every mock of the month, drafts included; tapping a
+// row opens the same paper workspace the Mocks screen uses (readiness,
+// schedule, the frozen paper, monitoring, corrections, void and release), so
+// the lifecycle logic lives in one place. Every number is read from the
+// server; nothing is hard-coded.
 // ---------------------------------------------------------------------------
 
 const lagosYmd = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Lagos', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+const lagosYm = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Lagos', year: 'numeric', month: '2-digit' }).format(new Date());
+const shiftMonth = (ym: string, delta: number) => {
+  const [y, m] = ym.split('-').map(Number);
+  const d = new Date(Date.UTC(y, m - 1 + delta, 1));
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+};
+const monthLabel = (ym: string) => new Date(`${ym}-01T12:00:00Z`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' });
 
 const MOCK_STEPS = [
   'Schedule the mock, size and exam type. From here or from the Mocks screen.',
@@ -161,13 +173,15 @@ const MOCK_STEPS = [
 ];
 
 export const MockPapersTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
+  const [month, setMonth] = useState<string>(lagosYm());
   const [data, setData] = useState<Json | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [openId, setOpenId] = useState<string | null>(null);
 
   useEffect(() => {
+    if (openId) return undefined; // the workspace is open; the list waits
     let alive = true;
-    const month = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Lagos', year: 'numeric', month: '2-digit' }).format(new Date());
     setLoading(true);
     setError('');
     api(`/api/tos/mocks?month=${month}`)
@@ -175,28 +189,46 @@ export const MockPapersTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) 
       .catch((e) => { if (alive) setError(e?.message || 'Could not load the mock list.'); })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
-  }, [refreshKey]);
+  }, [refreshKey, month, openId]);
 
   const mocks = Array.isArray(data?.mocks) ? (data.mocks as any[]) : [];
-  const shown = mocks.filter((mm) => mm.status && mm.status !== 'draft');
   const today = lagosYmd();
 
   const stateOf = (mm: any) => {
     switch (mm.status) {
+      case 'draft': return 'Draft';
       case 'scheduled': return mm.date === today ? 'Opens today' : 'Scheduled';
       case 'live': return 'Open today';
       case 'closed': return 'Closed, awaiting results';
       case 'released': return 'Results out';
-      default: return String(mm.status);
+      default: return String(mm.status || '\u2013');
     }
   };
-  const answersOf = (mm: any) => (mm.status === 'released' ? 'Released to students' : 'In Firestore only');
+  const answersOf = (mm: any) => {
+    if (mm.status === 'released') return 'Released to students';
+    if (['draft', 'cancelled', 'void'].includes(mm.status)) return '\u2013';
+    return 'In Firestore only';
+  };
   const paperOf = (mm: any) => {
     if (!mm.paperFilePublicId) return 'Not built yet';
     const at = String(mm.paperFileUploadedAt || '');
     const when = at ? new Date(at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '';
     return when ? `Built ${when}` : 'Built';
   };
+  const chipOf = (mm: any) => `inline-block px-2 py-0.5 rounded-lg border text-[10px] font-bold uppercase tracking-wider ${STATUS_STYLES[mm.status] || 'bg-slate-500/15 text-slate-300 border-slate-400/30'}`;
+
+  if (openId) {
+    return (
+      <div className="space-y-4">
+        <button onClick={() => setOpenId(null)} className="text-xs font-black text-slate-400 hover:text-white inline-flex items-center gap-1.5" aria-label="Back to all mock papers">
+          <ChevronRight className="w-4 h-4 rotate-180" /> All mock papers
+        </button>
+        <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-5">
+          <MockDetail mockId={openId} onChanged={() => { /* the list reloads when the workspace closes */ }} onClose={() => setOpenId(null)} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">
@@ -219,19 +251,28 @@ export const MockPapersTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) 
       <div className="rounded-2xl border border-white/10 bg-slate-900/50 overflow-hidden">
         <div className="px-5 pt-4 pb-3 flex items-center justify-between gap-3">
           <p className="text-sm font-black text-white">Papers</p>
-          <p className="text-[11px] text-slate-500">This month in Lagos time</p>
+          <div className="flex items-center gap-1">
+            <button onClick={() => setMonth(shiftMonth(month, -1))} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5" aria-label="Previous month">
+              <ChevronRight className="w-4 h-4 rotate-180" />
+            </button>
+            <p className="text-[11px] text-slate-500 min-w-[130px] text-center">{monthLabel(month)} &middot; Lagos time</p>
+            <button onClick={() => setMonth(shiftMonth(month, 1))} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5" aria-label="Next month">
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
         </div>
         {error && <p className="px-5 pb-4 text-sm text-rose-300">{error}</p>}
         {loading && <p className="px-5 pb-4 text-sm text-slate-500">Loading mocks&hellip;</p>}
-        {!loading && !error && shown.length === 0 && (
-          <p className="px-5 pb-5 text-sm text-slate-500">No mocks scheduled yet. Schedule one from the Mocks screen, or from the Mock Bank import tab once it is ready.</p>
+        {!loading && !error && mocks.length === 0 && (
+          <p className="px-5 pb-5 text-sm text-slate-500">No mocks this month. Create one from the Mocks screen, or from the Mock Bank import tab once it is ready.</p>
         )}
-        {!loading && !error && shown.length > 0 && (
+        {!loading && !error && mocks.length > 0 && (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[560px]">
+            <table className="w-full text-sm min-w-[680px]">
               <thead>
                 <tr className="text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 border-t border-white/5">
                   <th className="px-5 py-2.5">Date</th>
+                  <th className="px-3 py-2.5">Title</th>
                   <th className="px-3 py-2.5">Exam</th>
                   <th className="px-3 py-2.5">Size</th>
                   <th className="px-3 py-2.5">Paper file</th>
@@ -240,16 +281,21 @@ export const MockPapersTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) 
                 </tr>
               </thead>
               <tbody>
-                {shown.map((mm) => (
-                  <tr key={String(mm.id)} className="border-t border-white/5 text-slate-300">
+                {mocks.map((mm) => (
+                  <tr
+                    key={String(mm.id)}
+                    onClick={() => setOpenId(String(mm.id))}
+                    className="border-t border-white/5 text-slate-300 cursor-pointer hover:bg-white/[0.04] transition"
+                  >
                     <td className="px-5 py-3 font-bold text-slate-100 whitespace-nowrap">
                       {new Date(`${String(mm.date)}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
                     </td>
-                    <td className="px-3 py-3">{mm.examType === 'jamb' ? 'JAMB' : mm.examType === 'waec_neco' ? 'WAEC/NECO' : String(mm.examType)}</td>
+                    <td className="px-3 py-3 max-w-[220px] truncate" title={String(mm.title || '')}>{mm.title || 'Untitled mock'}</td>
+                    <td className="px-3 py-3">{EXAM_LABELS[mm.examType] || String(mm.examType)}</td>
                     <td className="px-3 py-3">{typeof mm.questionCount === 'number' ? `${mm.questionCount} questions` : '\u2013'}</td>
                     <td className="px-3 py-3">{paperOf(mm)}</td>
                     <td className="px-3 py-3">{answersOf(mm)}</td>
-                    <td className="px-3 py-3">{stateOf(mm)}</td>
+                    <td className="px-3 py-3"><span className={chipOf(mm)}>{stateOf(mm)}</span></td>
                   </tr>
                 ))}
               </tbody>
@@ -258,7 +304,7 @@ export const MockPapersTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) 
         )}
       </div>
 
-      <p className="text-[11px] text-slate-500">Step 4 of the Mock Bank build replaces this list with the full paper workspace: build the paper, inspect the frozen questions, watch attempts and release results.</p>
+      <p className="text-[11px] text-slate-500">Tap any row to open its workspace: check a draft&rsquo;s readiness, schedule it, read the frozen paper, watch attempts, correct a question, or void and release results.</p>
     </div>
   );
 };

@@ -24,7 +24,7 @@ import { api, Card, Field, inputCls, btnPrimary, btnGhost, fmtDateTime } from '.
 
 type Json = any;
 
-const STATUS_STYLES: Record<string, string> = {
+export const STATUS_STYLES: Record<string, string> = {
   draft: 'bg-slate-500/15 text-slate-300 border-slate-400/30',
   scheduled: 'bg-indigo-500/15 text-indigo-300 border-indigo-400/30',
   live: 'bg-emerald-500/15 text-emerald-300 border-emerald-400/30',
@@ -35,12 +35,12 @@ const STATUS_STYLES: Record<string, string> = {
   void: 'bg-purple-500/15 text-purple-300 border-purple-400/30',
 };
 
-const STATUS_LABELS: Record<string, string> = {
+export const STATUS_LABELS: Record<string, string> = {
   draft: 'Draft', scheduled: 'Scheduled', live: 'Live', closed: 'Closed',
   released: 'Results out', archived: 'Archived', cancelled: 'Cancelled', void: 'Voided',
 };
 
-const EXAM_LABELS: Record<string, string> = { jamb: 'JAMB', waec_neco: 'WAEC/NECO' };
+export const EXAM_LABELS: Record<string, string> = { jamb: 'JAMB', waec_neco: 'WAEC/NECO' };
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const monthRange = (ym: string) => {
@@ -255,7 +255,7 @@ const TypedConfirm: React.FC<{ word: string; label: string; onConfirm: () => voi
     );
   };
 
-const MockDetail: React.FC<{ mockId: string; onChanged: () => void; onClose: () => void }> = ({ mockId, onChanged, onClose }) => {
+export const MockDetail: React.FC<{ mockId: string; onChanged: () => void; onClose: () => void }> = ({ mockId, onChanged, onClose }) => {
   const [mock, setMock] = useState<Json | null>(null);
   const [loadError, setLoadError] = useState('');
   const [readiness, setReadiness] = useState<Json | null>(null);
