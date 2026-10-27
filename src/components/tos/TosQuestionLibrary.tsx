@@ -452,7 +452,7 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number; kind?: 'practice
         <p className="text-sm text-slate-500 py-4">
           {setupNeeded
             ? 'The counter setup has not finished for this stream yet; the banner above has the steps.'
-            : 'No questions in this stream yet. Go to Import & edit to add some.'}
+            : `No questions in this stream yet. Go to the ${kind === 'mock' ? 'Import' : 'Import & edit'} tab to add some.`}
         </p>
       ) : (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
