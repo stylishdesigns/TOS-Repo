@@ -135,18 +135,24 @@ async function main() {
 
   // Step 3: Backfill centreId on all tenant collections
   console.log(`\n3. Backfilling centreId across collections:`);
-  const report: Record<string, { total: number; alreadyTagged: number; newlyTagged: number }> = {};
+  const report: Record<string, { total: number; alreadyTagged: number; newlyTagged: number; otherCentre: number }> = {};
 
   for (const collName of TENANT_COLLECTIONS) {
     const snap = await adminDb.collection(collName).get();
     let alreadyTagged = 0;
     let newlyTagged = 0;
+    let otherCentre = 0;
 
     const docsToUpdate: Array<{ id: string; ref: FirebaseFirestore.DocumentReference }> = [];
     snap.forEach((docSnap) => {
       const data = docSnap.data();
       if (data.centreId === EXCELLENCE_CENTRE_ID) {
         alreadyTagged++;
+      } else if (typeof data.centreId === 'string' && data.centreId) {
+        // The row already belongs to a different centre (e.g. Champion).
+        // This script provisions centre #1 only; it must never re-tag or
+        // claim another centre's rows.
+        otherCentre++;
       } else {
         newlyTagged++;
         docsToUpdate.push({ id: docSnap.id, ref: docSnap.ref });
@@ -157,6 +163,7 @@ async function main() {
       total: snap.size,
       alreadyTagged,
       newlyTagged,
+      otherCentre,
     };
 
     if (isApply && docsToUpdate.length > 0) {
@@ -184,6 +191,8 @@ async function main() {
   for (const docSnap of adminsSnap.docs) {
     const data = docSnap.data();
     const uid = data.uid || docSnap.id;
+    // A person already tagged to a different centre belongs there.
+    if (typeof data.centreId === 'string' && data.centreId && data.centreId !== EXCELLENCE_CENTRE_ID) continue;
     if (uid) {
       let role: MembershipRole = 'admin';
       if (data.role === 'Super Admin') {
@@ -221,6 +230,7 @@ async function main() {
   for (const docSnap of tutorsSnap.docs) {
     const data = docSnap.data();
     const uid = data.uid || docSnap.id;
+    if (typeof data.centreId === 'string' && data.centreId && data.centreId !== EXCELLENCE_CENTRE_ID) continue;
     if (uid) {
       const membershipId = `${uid}__${EXCELLENCE_CENTRE_ID}`;
       const memDoc: CentreMembership = {
@@ -245,6 +255,7 @@ async function main() {
   for (const docSnap of studentsSnap.docs) {
     const data = docSnap.data();
     const uid = data.uid || docSnap.id;
+    if (typeof data.centreId === 'string' && data.centreId && data.centreId !== EXCELLENCE_CENTRE_ID) continue;
     if (uid) {
       const membershipId = `${uid}__${EXCELLENCE_CENTRE_ID}`;
       const memDoc: CentreMembership = {
@@ -276,15 +287,16 @@ async function main() {
     `Collection`.padEnd(20) +
     `Total Docs`.padEnd(14) +
     `Tagged centreId`.padEnd(18) +
+    `Other centre`.padEnd(16) +
     `Untagged (Pending)`
   );
-  console.log('-'.repeat(65));
+  console.log('-'.repeat(82));
 
   for (const [coll, stats] of Object.entries(report)) {
-    const tagged = isApply ? stats.total : stats.alreadyTagged;
+    const tagged = isApply ? stats.total - stats.otherCentre : stats.alreadyTagged;
     const pending = isApply ? 0 : stats.newlyTagged;
     console.log(
-      `${coll.padEnd(20)}${String(stats.total).padEnd(14)}${String(tagged).padEnd(18)}${String(pending)}`
+      `${coll.padEnd(20)}${String(stats.total).padEnd(14)}${String(tagged).padEnd(18)}${String(stats.otherCentre).padEnd(16)}${String(pending)}`
     );
   }
 
