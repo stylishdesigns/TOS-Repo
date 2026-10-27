@@ -501,8 +501,7 @@ const ReviewScreen: React.FC<{ mockId: string; onBack: () => void }> = ({ mockId
 export const StudentMockTab: React.FC<{
   initialTab?: 'today' | 'past' | 'board';
   onHideBottomNav?: (hide: boolean) => void;
-  onExitToGeneral?: () => void;
-}> = ({ initialTab, onHideBottomNav, onExitToGeneral }) => {
+}> = ({ initialTab, onHideBottomNav }) => {
   const [tab, setTab] = useState<'today' | 'past' | 'board'>(initialTab || 'today');
   const [status, setStatus] = useState<Json | null>(null);
   const [statusErr, setStatusErr] = useState('');
@@ -591,26 +590,25 @@ export const StudentMockTab: React.FC<{
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Header */}
-      <div className="bg-[#EA580C] text-white px-4 pt-3 pb-4 rounded-b-3xl">
-        <div className="flex items-center gap-2">
-          <button onClick={onExitToGeneral} className="w-11 h-11 rounded-xl bg-black/10 flex items-center justify-center" aria-label="Back to CBT">
-            <ChevronLeft className="w-6 h-6" />
-          </button>
-          <h2 className="text-xl font-black tracking-tight">TOS Mock</h2>
+      {/* MB2: one control only, and only Today and Past. The Mock |
+          Leaderboard switch lives on the CBT tab above this screen and the
+          leaderboard is its own side of that switch, so no second control
+          shows here. */}
+      {tab !== 'board' && (
+        <div className="px-4 pt-3 max-w-lg mx-auto">
+          <div className="bg-white rounded-[14px] p-1 border border-[#E2E8F0] shadow-2xs grid grid-cols-2 gap-1">
+            {([['today', 'Today'], ['past', 'Past']] as const).map(([key, label]) => (
+              <button
+                key={key}
+                onClick={() => setTab(key)}
+                className={`h-10 rounded-[10px] text-xs font-extrabold transition-all flex items-center justify-center cursor-pointer ${tab === key ? 'bg-[#0F172A] text-white shadow-xs' : 'text-[#64748B] hover:text-[#0F172A]'}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="mt-4 flex p-1 rounded-xl bg-black/10 border border-white/10">
-          {([['today', 'Today'], ['past', 'Past'], ['board', 'Leaderboard']] as const).map(([key, label]) => (
-            <button
-              key={key}
-              onClick={() => setTab(key)}
-              className={`flex-1 min-h-[44px] rounded-lg text-sm font-black ${tab === key ? 'bg-white text-[#EA580C] shadow-sm' : 'text-white/80'}`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
+      )}
 
       <div className="px-4 py-4 space-y-4">
         {loading && <div className="h-40 rounded-3xl bg-slate-200/60 animate-pulse" />}

@@ -1,6 +1,5 @@
 import React from 'react';
 import { Student, StudentResult } from '../../../types';
-import { CbtTab } from './CbtTab';
 import { StudentPractice } from './StudentPractice';
 import { PracticeAnalytics } from './PracticeAnalytics';
 import { StudentMockTab } from './StudentMockTab';
@@ -66,32 +65,15 @@ export const CbtTabWrapper: React.FC<CbtTabWrapperProps> = ({
           </div>
         </div>
 
-        {mockView === 'mock' ? (
-          <CbtTab
-            student={student}
-            lockedFrequency="Mock"
-            hideFrequencyToggle={true}
-            onHideBottomNav={(hide) => {
-              // Tell the PWA updater to hold its auto-reload while an exam screen is up.
-              try { sessionStorage.setItem('tos:defer-pwa-reload', hide ? '1' : '0'); } catch {}
-              onHideBottomNav?.(hide);
-            }}
-            initialSubjectFilter={cbtSubjectFilter}
-            directReviewResult={cbtReviewTarget?.result}
-            directReviewExamId={cbtReviewTarget?.result?.examId}
-            onExitReview={onExitReview}
-          />
-        ) : (
-          <StudentMockTab
-            initialTab="board"
-            onExitToGeneral={() => onMockViewChange('mock')}
-            onHideBottomNav={(hide) => {
-              // Same PWA auto-reload deferral the mock side uses while an exam screen is up.
-              try { sessionStorage.setItem('tos:defer-pwa-reload', hide ? '1' : '0'); } catch {}
-              onHideBottomNav?.(hide);
-            }}
-          />
-        )}
+        <StudentMockTab
+          key={mockView}
+          initialTab={mockView === 'leaderboard' ? 'board' : 'today'}
+          onHideBottomNav={(hide) => {
+            // Hold the PWA auto-reload while an exam screen is up.
+            try { sessionStorage.setItem('tos:defer-pwa-reload', hide ? '1' : '0'); } catch {}
+            onHideBottomNav?.(hide);
+          }}
+        />
       </div>
     );
   }
