@@ -141,4 +141,56 @@ span.text-slate-600:not(.dark-bg-mode *) {
   animation: splashFadeIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* ---------------------------------------------------------------------------
+   MB1 Step 1: bank colour scoping. Inside the Practice Bank workspace every
+   orange accent renders sky blue; inside the Mock Bank workspace it renders
+   amber. The scope class is set by the Question Bank shell on the wrapper
+   that holds the banner, the tabs and the active bank screen, so the rest of
+   the console keeps its own colours. Unlayered rules sit above Tailwind's
+   utility layer, so no !important is needed.
+   ------------------------------------------------------------------------- */
+.bank-scope-practice .text-orange-100 { color: #e0f2fe; }
+.bank-scope-practice .text-orange-200 { color: #bae6fd; }
+.bank-scope-practice .text-orange-200\/90 { color: rgba(186, 230, 253, 0.9); }
+.bank-scope-practice .text-orange-300 { color: #7dd3fc; }
+.bank-scope-practice .text-orange-300\/90 { color: rgba(125, 211, 252, 0.9); }
+.bank-scope-practice .text-orange-400 { color: #38bdf8; }
+.bank-scope-practice .text-orange-400\/60 { color: rgba(56, 189, 248, 0.6); }
+.bank-scope-practice .bg-orange-500 { background-color: #0ea5e9; }
+.bank-scope-practice .bg-orange-500\/10 { background-color: rgba(14, 165, 233, 0.10); }
+.bank-scope-practice .bg-orange-500\/15 { background-color: rgba(14, 165, 233, 0.15); }
+.bank-scope-practice .bg-orange-500\/20 { background-color: rgba(14, 165, 233, 0.20); }
+.bank-scope-practice .bg-orange-500\/25 { background-color: rgba(14, 165, 233, 0.25); }
+.bank-scope-practice .bg-orange-600 { background-color: #0284c7; }
+.bank-scope-practice .hover\:bg-orange-500:hover { background-color: #0ea5e9; }
+.bank-scope-practice .hover\:text-orange-300:hover { color: #7dd3fc; }
+.bank-scope-practice .border-orange-500\/30 { border-color: rgba(14, 165, 233, 0.30); }
+.bank-scope-practice .border-orange-500\/40 { border-color: rgba(14, 165, 233, 0.40); }
+.bank-scope-practice .border-orange-500\/50 { border-color: rgba(14, 165, 233, 0.50); }
+.bank-scope-practice .border-orange-500\/60 { border-color: rgba(14, 165, 233, 0.60); }
+.bank-scope-practice .focus\:border-orange-500\/60:focus { border-color: rgba(14, 165, 233, 0.60); }
+.bank-scope-practice .bg-orange-500.text-white,
+.bank-scope-practice .bg-orange-600.text-white { color: #082f49; }
 
+.bank-scope-mock .text-orange-100 { color: #fef3c7; }
+.bank-scope-mock .text-orange-200 { color: #fde68a; }
+.bank-scope-mock .text-orange-200\/90 { color: rgba(253, 230, 138, 0.9); }
+.bank-scope-mock .text-orange-300 { color: #fcd34d; }
+.bank-scope-mock .text-orange-300\/90 { color: rgba(252, 211, 77, 0.9); }
+.bank-scope-mock .text-orange-400 { color: #fbbf24; }
+.bank-scope-mock .text-orange-400\/60 { color: rgba(251, 191, 36, 0.6); }
+.bank-scope-mock .bg-orange-500 { background-color: #f59e0b; }
+.bank-scope-mock .bg-orange-500\/10 { background-color: rgba(245, 158, 11, 0.10); }
+.bank-scope-mock .bg-orange-500\/15 { background-color: rgba(245, 158, 11, 0.15); }
+.bank-scope-mock .bg-orange-500\/20 { background-color: rgba(245, 158, 11, 0.20); }
+.bank-scope-mock .bg-orange-500\/25 { background-color: rgba(245, 158, 11, 0.25); }
+.bank-scope-mock .bg-orange-600 { background-color: #d97706; }
+.bank-scope-mock .hover\:bg-orange-500:hover { background-color: #f59e0b; }
+.bank-scope-mock .hover\:text-orange-300:hover { color: #fcd34d; }
+.bank-scope-mock .border-orange-500\/30 { border-color: rgba(245, 158, 11, 0.30); }
+.bank-scope-mock .border-orange-500\/40 { border-color: rgba(245, 158, 11, 0.40); }
+.bank-scope-mock .border-orange-500\/50 { border-color: rgba(245, 158, 11, 0.50); }
+.bank-scope-mock .border-orange-500\/60 { border-color: rgba(245, 158, 11, 0.60); }
+.bank-scope-mock .focus\:border-orange-500\/60:focus { border-color: rgba(245, 158, 11, 0.60); }
+.bank-scope-mock .bg-orange-500.text-white,
+.bank-scope-mock .bg-orange-600.text-white { color: #451a03; }

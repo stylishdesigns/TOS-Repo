@@ -14,6 +14,7 @@ import { CentrePeople } from './TosDirectory';
 import { CentresTab } from './TosCentres';
 import { QuestionBankTab } from './TosQuestionBank';
 import { QuestionLibraryTab } from './TosQuestionLibrary';
+import { QuestionBankHub, MockPapersTab } from './TosQuestionHub';
 import { MocksTab } from './TosMocks';
 
 /**
@@ -756,16 +757,24 @@ const TABS = [
   { id: 'account', label: 'Account', mlabel: 'Account', icon: UserRound, group: 'System' },
 ] as const;
 
-// Question Bank shell (N2): one nav item, three tabs. Library is the default
-// and the last tab is remembered on this device. U1: the Practice/Mock
-// stream is chosen once here, in the shared header, and handed to both
-// screens, so no tab ever shows a second stream toggle.
-const QB_SUB_KEY = 'TOS_qb_subtab';
+// Question Bank shell (MB1 Step 1): Question Bank opens on the bank hub
+// (design screen 1). Opening a bank enters that bank's workspace: it wears
+// the bank's colour (Practice sky, Mock amber) and a banner that always says
+// which bank you are in, with a Switch bank link back to the hub. Each bank
+// has its own tabs and every screen below the banner lists only that bank's
+// questions; nothing in the UI moves a question across.
+//   Practice: Library, Import & edit, Publish (badge = changes ready to go out)
+//   Mock:     Library, Import, Mock papers (badge = mocks the papers tab lists)
 const QB_STREAM_KEY = 'TOS_qb_stream';
-const QB_SUBS = [
+const QB_SUBS_PRACTICE = [
   { id: 'library', label: 'Library' },
   { id: 'edit', label: 'Import & edit' },
   { id: 'publish', label: 'Publish' },
+] as const;
+const QB_SUBS_MOCK = [
+  { id: 'library', label: 'Library' },
+  { id: 'import', label: 'Import' },
+  { id: 'papers', label: 'Mock papers' },
 ] as const;
 
 // U1: the "How this works" guide. A plain-language side panel for a new
@@ -841,48 +850,93 @@ const QbGuidePanel: React.FC<{ open: boolean; onClose: () => void }> = ({ open, 
   );
 };
 
+type BankMode = 'hub' | 'practice' | 'mock';
+
 const QuestionBankShell: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
-  const [sub, setSub] = useState<string>(() => {
-    try {
-      const saved = localStorage.getItem(QB_SUB_KEY);
-      return saved === 'edit' || saved === 'publish' ? saved : 'library';
-    } catch { return 'library'; }
-  });
-  const pick = (id: string) => {
-    setSub(id);
-    try { localStorage.setItem(QB_SUB_KEY, id); } catch { /* storage unavailable */ }
-  };
-  // U1: the stream is chosen HERE only. One segmented control for all three
-  // tabs, remembered on this device exactly as before.
-  const [kind, setKindState] = useState<'practice' | 'mock'>(() => {
-    try { return localStorage.getItem(QB_STREAM_KEY) === 'mock' ? 'mock' : 'practice'; } catch { return 'practice'; }
-  });
-  const setKind = (k: 'practice' | 'mock') => {
-    setKindState(k);
-    try { localStorage.setItem(QB_STREAM_KEY, k); } catch { /* storage unavailable */ }
-  };
-  // The header's Refresh bumps a key both screens watch, so one button
-  // refreshes whichever tab is open.
+  // The hub is the landing screen every time Question Bank opens.
+  const [mode, setMode] = useState<BankMode>('hub');
+  const [sub, setSub] = useState<string>('library');
   const [localRefresh, setLocalRefresh] = useState(0);
   const [guideOpen, setGuideOpen] = useState(false);
+  // One small server read serves the hub cards, the tab badges and the
+  // banner's live-version line. It loads on entry and on Refresh.
+  const [summary, setSummary] = useState<Json | null>(null);
+  const [summaryError, setSummaryError] = useState('');
+  const [summaryLoading, setSummaryLoading] = useState(false);
+
   useEffect(() => {
     try { if (!localStorage.getItem(QB_GUIDE_SEEN_KEY)) setGuideOpen(true); } catch { /* storage unavailable */ }
   }, []);
-  const refresh = () => setLocalRefresh((n) => n + 1);
+
   const fullKey = refreshKey + localRefresh;
+  useEffect(() => {
+    let alive = true;
+    setSummaryLoading(true);
+    setSummaryError('');
+    api('/api/tos/questionbank/bank-summary')
+      .then((r) => { if (alive) setSummary(r); })
+      .catch((e: any) => { if (alive) setSummaryError(e?.message || 'Could not load the bank numbers.'); })
+      .finally(() => { if (alive) setSummaryLoading(false); });
+    return () => { alive = false; };
+  }, [fullKey]);
+
+  const openBank = (k: 'practice' | 'mock') => {
+    setMode(k);
+    setSub('library');
+    try { localStorage.setItem(QB_STREAM_KEY, k); } catch { /* storage unavailable */ }
+  };
+  const refresh = () => setLocalRefresh((n) => n + 1);
+
+  if (mode === 'hub') {
+    return (
+      <div className="space-y-5">
+        <div className="flex justify-end gap-2">
+          <button onClick={() => setGuideOpen(true)} aria-label="How this works" title="How this works"
+            className="p-2.5 rounded-xl border border-slate-700/60 text-slate-300 hover:text-white min-h-[44px] min-w-[44px]">
+            <HelpCircle className="w-4 h-4" />
+          </button>
+        </div>
+        <QuestionBankHub
+          summary={summary as { practice: any; mock: any } | null}
+          loading={summaryLoading}
+          error={summaryError}
+          onOpen={openBank}
+        />
+        <QbGuidePanel open={guideOpen} onClose={() => setGuideOpen(false)} />
+      </div>
+    );
+  }
+
+  const isMock = mode === 'mock';
+  const kind = isMock ? 'mock' : 'practice';
+  const subs = isMock ? QB_SUBS_MOCK : QB_SUBS_PRACTICE;
+  const liveVersion = Number((summary as any)?.practice?.currentVersion) || 0;
+  const badge = isMock
+    ? Number((summary as any)?.mock?.mockPapersCount) || 0
+    : Number((summary as any)?.practice?.pending) || 0;
+
   return (
-    <div className="space-y-5">
+    <div className={`space-y-4 ${isMock ? 'bank-scope-mock' : 'bank-scope-practice'}`}>
+      {/* The banner always says which bank this is (design screens 2-7). */}
+      <div className={`rounded-2xl border px-4 py-3.5 flex flex-wrap items-center gap-x-4 gap-y-2 ${isMock ? 'border-amber-400/50 bg-amber-400/10' : 'border-sky-400/50 bg-sky-400/10'}`}>
+        <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-[10px] sm:text-[11px] font-black tracking-wide ${isMock ? 'bg-amber-400 text-slate-950' : 'bg-sky-400 text-slate-950'}`}>
+          YOU ARE IN THE {isMock ? 'MOCK' : 'PRACTICE'} BANK
+        </span>
+        <p className="text-xs text-slate-300 flex-1 min-w-[220px] leading-relaxed">
+          {isMock
+            ? 'Daily mocks are built from this bank. Papers are private; answers never leave the server.'
+            : `Students practise from this bank${liveVersion ? `: live version ${liveVersion}` : ''}.`}
+        </p>
+        <button onClick={() => setMode('hub')}
+          className="text-xs font-bold text-slate-300 hover:text-white inline-flex items-center gap-0.5 min-h-[44px]">
+          Switch bank <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
+
       <div>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex rounded-xl border border-slate-700/60 overflow-hidden" role="group" aria-label="Question stream">
-            {(['practice', 'mock'] as const).map((k) => (
-              <button key={k} onClick={() => setKind(k)} aria-pressed={kind === k}
-                className={`px-4 py-2.5 text-sm font-bold min-h-[44px] ${kind === k ? 'bg-orange-500 text-white' : 'text-slate-400 hover:text-white'}`}>
-                {k === 'practice' ? 'Practice' : 'Mock'}
-              </button>
-            ))}
-          </div>
-          <button onClick={refresh} aria-label="Refresh the question bank" title="Refresh"
+          <h2 className="text-lg font-black text-white mr-auto">{isMock ? 'Mock Bank' : 'Practice Bank'}</h2>
+          <button onClick={refresh} aria-label="Refresh this bank" title="Refresh"
             className="p-2.5 rounded-xl border border-slate-700/60 text-slate-300 hover:text-white min-h-[44px] min-w-[44px]">
             <RefreshCw className="w-4 h-4" />
           </button>
@@ -892,13 +946,25 @@ const QuestionBankShell: React.FC<{ refreshKey: number }> = ({ refreshKey }) => 
           </button>
         </div>
         <div className="flex gap-1.5 overflow-x-auto pb-0.5 mt-2">
-          {QB_SUBS.map((t) => (
-            <button key={t.id} onClick={() => pick(t.id)} className={`min-h-[44px] px-5 py-2 rounded-xl text-sm font-bold border transition-all whitespace-nowrap ${sub === t.id ? 'bg-orange-500/15 text-orange-300 border-orange-500/30' : 'text-slate-400 border-white/10 hover:text-white'}`}>{t.label}</button>
+          {subs.map((t) => (
+            <button key={t.id} onClick={() => setSub(t.id)}
+              className={`min-h-[44px] px-5 py-2 rounded-xl text-sm font-bold border transition-all whitespace-nowrap inline-flex items-center gap-2 ${sub === t.id
+                ? (isMock ? 'bg-orange-500/15 text-orange-300 border-orange-500/30' : 'bg-orange-500/15 text-orange-300 border-orange-500/30')
+                : 'text-slate-400 border-white/10 hover:text-white'}`}>
+              {t.label}
+              {t.id === (isMock ? 'papers' : 'publish') && badge > 0 && (
+                <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded-full text-[10px] font-black ${isMock ? 'bg-amber-400 text-slate-950' : 'bg-orange-500 text-white'}`}>{badge}</span>
+              )}
+            </button>
           ))}
         </div>
       </div>
-      {sub === 'library' && <QuestionLibraryTab refreshKey={fullKey} kind={kind} onKindChange={setKind} />}
-      {sub !== 'library' && <QuestionBankTab refreshKey={fullKey} view={sub === 'publish' ? 'publish' : 'edit'} kind={kind} onKindChange={setKind} />}
+
+      {sub === 'library' && <QuestionLibraryTab refreshKey={fullKey} kind={kind} onKindChange={openBank} />}
+      {isMock && sub === 'import' && <QuestionBankTab refreshKey={fullKey} view="edit" kind={kind} onKindChange={openBank} />}
+      {isMock && sub === 'papers' && <MockPapersTab refreshKey={fullKey} />}
+      {!isMock && sub === 'edit' && <QuestionBankTab refreshKey={fullKey} view="edit" kind={kind} onKindChange={openBank} />}
+      {!isMock && sub === 'publish' && <QuestionBankTab refreshKey={fullKey} view="publish" kind={kind} onKindChange={openBank} />}
       <QbGuidePanel open={guideOpen} onClose={() => setGuideOpen(false)} />
     </div>
   );
@@ -975,7 +1041,7 @@ export const TosPortal: React.FC = () => {
             {tab === 'leads' && 'Sign-ups from the public site. Verify, provision, or decline.'}
             {tab === 'centres' && 'Every centre, its plan, seats, billing and access code.'}
             {tab === 'plans' && 'Pricing, caps and feature flags. All stored as data.'}
-            {tab === 'questions' && 'Browse, search and fix the bank, import new questions, and publish versions to the CDN.'}
+            {tab === 'questions' && 'Two separate banks: Practice and Mock. Pick one on the hub to work in.'}
             {tab === 'mocks' && "One mock a day for every centre's students. Create, freeze and manage them from here."}
             {tab === 'audit' && 'Every privileged action, recorded.'}
             {tab === 'team' && 'The people who run the platform.'}

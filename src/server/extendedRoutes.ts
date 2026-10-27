@@ -243,9 +243,11 @@ export function registerExtendedRoutes(app: express.Express): void {
   // same reason. No centre, student or result data is exposed here.
   // ==========================================================================
   app.get('/api/public/questionbank/current', async (req, res) => {
+    // MB1 decision: only the practice bank has a public file. The mock bank
+    // publishes nothing public, so no mock pointer is ever served here.
     const kindRaw = String(req.query.kind || 'practice').trim().toLowerCase();
-    if (kindRaw !== 'practice' && kindRaw !== 'mock') {
-      return res.status(400).json({ error: 'Kind must be practice or mock.' });
+    if (kindRaw !== 'practice') {
+      return res.status(400).json({ error: 'Only the practice bank has a public file. Mock papers are private.' });
     }
     const cached = qbPointerCache.get(kindRaw);
     if (cached && Date.now() - cached.at < QB_POINTER_TTL_MS) {

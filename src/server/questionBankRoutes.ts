@@ -4,6 +4,7 @@ import type { Query, QueryDocumentSnapshot, DocumentSnapshot, DocumentData, Writ
 import { Caller, httpError } from './tenantService';
 import { enrichFields, counterOpsForBatch, counterOpsForBatchMany, appendPublishCounterOps, mapKey, registerQuestionBankLibraryRoutes } from './questionBankLibrary';
 import { randomUUID } from 'crypto';
+import { MOCKS, MOCK_PAPERS } from './mockRoutes';
 
 /**
  * Platform Question Bank (Prompt G follow-on, publish pipeline).
@@ -314,6 +315,75 @@ export function registerQuestionBankRoutes(app: express.Express): void {
     }
   });
 
+  // MB1 Step 1: one small summary for the bank hub and the tab badges.
+  // Counter-based like the publish preview: the meta document plus a handful
+  // of count queries, so it costs about the same at any bank size. The mock
+  // side adds two numbers only the mock needs: how many questions are locked
+  // inside scheduled/live/closed mocks (read from their frozen papers), and
+  // how many mocks the Mock papers tab lists (everything past Draft).
+  app.get('/api/tos/questionbank/bank-summary', async (req, res) => {
+    try {
+      requireTos(req);
+      const summarize = async (kind: Kind) => {
+        const metaDoc = await adminDb.collection(QB_META).doc(kind).get();
+        const md = (metaDoc.exists ? metaDoc.data() : {}) as any;
+        const base = adminDb.collection(QB_QUESTIONS).where('kind', '==', kind);
+        const [totalSnap, draftsSnap] = await Promise.all([
+          base.count().get(),
+          base.where('status', '==', 'draft').count().get(),
+        ]);
+        let edited = 0;
+        let removed = 0;
+        const currentVersion = Number(md?.currentVersion) || 0;
+        const currentPublishedAt = md?.currentPublishedAt ? String(md.currentPublishedAt) : null;
+        if (currentVersion > 0 && currentPublishedAt) {
+          const [eSnap, rSnap] = await Promise.all([
+            base.where('status', '==', 'published').where('updatedAt', '>', currentPublishedAt).count().get(),
+            base.where('status', '==', 'removed').where('updatedAt', '>', currentPublishedAt).count().get(),
+          ]);
+          edited = eSnap.data().count || 0;
+          removed = rSnap.data().count || 0;
+        }
+        const drafts = draftsSnap.data().count || 0;
+        return {
+          kind,
+          currentVersion,
+          currentPublishedAt,
+          currentFileUrl: String(md?.currentFileUrl || ''),
+          questions: totalSnap.data().count || 0,
+          subjects: Object.keys(md?.bySubject || {}).length,
+          drafts,
+          edited,
+          removed,
+          pending: drafts + edited + removed,
+        };
+      };
+      const [practice, mockBase] = await Promise.all([summarize('practice'), summarize('mock')]);
+
+      const activeStatuses = ['scheduled', 'live', 'closed', 'released'];
+      const lockStatuses = ['scheduled', 'live', 'closed'];
+      const [papersCountSnap, lockMocksSnap] = await Promise.all([
+        adminDb.collection(MOCKS).where('status', 'in', activeStatuses).count().get(),
+        adminDb.collection(MOCKS).where('status', 'in', lockStatuses).get(),
+      ]);
+      const lockedIds = new Set<string>();
+      for (const m of lockMocksSnap.docs) {
+        const p = await adminDb.collection(MOCK_PAPERS).doc(m.id).get();
+        if (p.exists) {
+          for (const q of ((p.data() as any)?.questions || []) as any[]) {
+            const qid = String(q?.id || '');
+            if (qid) lockedIds.add(qid);
+          }
+        }
+      }
+      const mock = { ...mockBase, locked: lockedIds.size, mockPapersCount: papersCountSnap.data().count || 0 };
+      res.json({ practice, mock });
+    } catch (error: any) {
+      console.error('[tos/questionbank/bank-summary] failed:', error?.message || error);
+      res.status(error?.status || 500).json({ error: error?.message || 'Failed to build the bank summary.' });
+    }
+  });
+
   // Create a draft question.
   app.post('/api/tos/questionbank/questions', async (req, res) => {
     try {
@@ -560,6 +630,11 @@ export function registerQuestionBankRoutes(app: express.Express): void {
       const kindRaw = String(req.body?.kind ?? 'practice').trim().toLowerCase();
       if (!(KINDS as readonly string[]).includes(kindRaw)) throw httpError(400, 'Kind must be practice or mock.');
       const kind = kindRaw as Kind;
+      // MB1 decision: the Mock Bank publishes no public file at all. Mock
+      // questions stay in Firestore (the mock freeze reads them there) and a
+      // mock's paper is built as a PRIVATE Cloudinary file. Only practice
+      // publishes to the public CDN.
+      if (kind === 'mock') throw httpError(400, 'The Mock Bank does not publish a public file. Mock questions stay in Firestore, and mock papers are private files.');
       // Paged read on press (Prompt L6): the scan walks the stream 500 at a
       // time through cursors instead of loading it in one go, and reports how
       // much it read. No cap can truncate a publish.
