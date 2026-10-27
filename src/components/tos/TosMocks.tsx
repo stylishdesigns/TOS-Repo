@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  CalendarDays, ChevronLeft, ChevronRight, Loader2, Plus, Trash2,
+  CalendarDays, ChevronLeft, ChevronRight, HelpCircle, Loader2, Plus, Trash2,
   AlertTriangle, CheckCircle2, FileText, RefreshCw, Rocket, Trophy, X,
 } from 'lucide-react';
 import { api, Card, Field, inputCls, btnPrimary, btnGhost, fmtDateTime } from './tosShared';
@@ -71,14 +71,16 @@ const emptyForm = (examType: string): { title: string; examType: string; rows: S
 // (copy them from the Library tab).
 // ---------------------------------------------------------------------------
 const MockForm: React.FC<{
-  initial: { title: string; examType: string; rows: SubjectRow[]; source: 'random' | 'picked' };
+  initial: { title: string; examType: string; rows: SubjectRow[]; source: 'random' | 'picked'; date?: string };
   busy: boolean;
+  showDate?: boolean;
   onSubmit: (payload: Json) => void;
-}> = ({ initial, busy, onSubmit }) => {
+}> = ({ initial, busy, showDate, onSubmit }) => {
   const [title, setTitle] = useState(initial.title);
   const [examType, setExamType] = useState(initial.examType);
   const [rows, setRows] = useState<SubjectRow[]>(initial.rows);
   const [source, setSource] = useState<'random' | 'picked'>(initial.source);
+  const [date, setDate] = useState(initial.date || todayStr());
   const [localError, setLocalError] = useState('');
 
   const isJamb = examType === 'jamb';
@@ -106,11 +108,18 @@ const MockForm: React.FC<{
       subjects: cleaned.map((r) => (source === 'picked'
         ? { subject: r.subject, count: r.count, questionIds: r.ids }
         : { subject: r.subject, count: r.count })),
+      ...(showDate ? { date } : {}),
     });
   };
 
   return (
     <div className="space-y-4">
+      {showDate && (
+        <Field label="Mock date">
+          <input type="date" className={inputCls} value={date} min={todayStr()}
+            onChange={(e) => setDate(e.target.value)} />
+        </Field>
+      )}
       <Field label="Title">
         <input className={inputCls} value={title} onChange={(e) => setTitle(e.target.value)}
           placeholder="e.g. November full-length practice" maxLength={120} />
@@ -235,6 +244,31 @@ const PaperPreview: React.FC<{ mockId: string }> = ({ mockId }) => {
   );
 };
 
+// MB2: the three-step workflow strip shown on every mock panel, with the
+// current step highlighted. Step 2 is the Mock Bank's Publish tab (the bank
+// ships no public file); step 3 is the typed SCHEDULE freeze.
+const WORKFLOW_STEPS = ['Draft', 'Publish', 'Scheduled (students can take it)'];
+const WorkflowStrip: React.FC<{ active: number }> = ({ active }) => (
+  <div className="space-y-1.5">
+    <div className="flex items-center gap-1.5 flex-wrap">
+      {WORKFLOW_STEPS.map((label, i) => {
+        const done = i < active;
+        const now = i === active;
+        return (
+          <React.Fragment key={label}>
+            {i > 0 && <span className="text-slate-600 text-xs" aria-hidden="true">&#8594;</span>}
+            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-bold ${done ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-300' : now ? 'border-orange-400/60 bg-orange-500/15 text-orange-300' : 'border-white/10 bg-slate-950/40 text-slate-500'}`}>
+              {done ? <CheckCircle2 className="w-3.5 h-3.5" /> : <span>{i + 1}</span>}
+              {label}
+            </span>
+          </React.Fragment>
+        );
+      })}
+    </div>
+    <p className="text-xs text-slate-500">Scheduling freezes the questions, builds the private paper and opens the mock for students on its date.</p>
+  </div>
+);
+
 // ---------------------------------------------------------------------------
 // Detail panel: definition, readiness, schedule, cancel, paper preview.
 // ---------------------------------------------------------------------------
@@ -267,6 +301,7 @@ export const MockDetail: React.FC<{ mockId: string; onChanged: () => void; onClo
   const [showBoard, setShowBoard] = useState(false);
   const [showCorrect, setShowCorrect] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [scheduleBlock, setScheduleBlock] = useState('');
 
   const load = useCallback(async () => {
     setLoadError(''); setReadiness(null); setEditing(false);
@@ -275,11 +310,34 @@ export const MockDetail: React.FC<{ mockId: string; onChanged: () => void; onClo
   }, [mockId]);
   useEffect(() => { setMock(null); setShowPaper(false); load(); }, [load]);
 
-  const runReadiness = async () => {
+  const runReadiness = async (): Promise<Json | null> => {
     setChecking(true); setNotice('');
-    try { setReadiness(await api(`/api/tos/mocks/${mockId}/readiness`)); }
-    catch (e: any) { setNotice(e.message); }
+    try {
+      const r: Json = await api(`/api/tos/mocks/${mockId}/readiness`);
+      setReadiness(r);
+      if (r.ready) setScheduleBlock('');
+      return r;
+    }
+    catch (e: any) { setNotice(e.message); return null; }
     finally { setChecking(false); }
+  };
+
+  // MB2: the Schedule button is always visible on a draft. Pressing it runs
+  // the readiness check first (when it has not run yet) and jumps straight to
+  // the typed SCHEDULE confirmation when the check passes. When the check
+  // fails, the warnings show in red and the button stays disabled with the
+  // reason beside it until a fresh check passes.
+  const scheduleFromDraft = async () => {
+    setScheduleBlock('');
+    if (!readiness) {
+      const r = await runReadiness();
+      if (!r) return;
+      if (r.ready) { setConfirming('schedule'); return; }
+      const errs = (r.warnings || []).filter((w: Json) => w.level === 'error');
+      setScheduleBlock(errs[0]?.message || 'Readiness found problems. Fix them, then check readiness again.');
+      return;
+    }
+    if (readiness.ready) setConfirming('schedule');
   };
 
   const schedule = async () => {
@@ -342,6 +400,7 @@ export const MockDetail: React.FC<{ mockId: string; onChanged: () => void; onClo
   const isDraft = mock.status === 'draft';
   const isScheduled = mock.status === 'scheduled';
   const ready = readiness?.ready;
+  const stripActive = isDraft ? (readiness ? (ready ? 2 : 1) : 0) : 3;
   const errors = (readiness?.warnings || []).filter((w: Json) => w.level === 'error');
   const warns = (readiness?.warnings || []).filter((w: Json) => w.level !== 'error');
 
@@ -357,6 +416,8 @@ export const MockDetail: React.FC<{ mockId: string; onChanged: () => void; onClo
         </div>
         <button onClick={onClose} className="text-slate-500 hover:text-white p-1" aria-label="Close"><X className="w-5 h-5" /></button>
       </div>
+
+      <WorkflowStrip active={stripActive} />
 
       {editing ? (
         <MockForm
@@ -387,12 +448,20 @@ export const MockDetail: React.FC<{ mockId: string; onChanged: () => void; onClo
           </div>
 
           {isDraft && (
-            <div className="flex flex-wrap gap-2">
-              <button onClick={() => setEditing(true)} className={btnGhost}>Edit draft</button>
-              <button onClick={runReadiness} disabled={checking} className={btnGhost}>
-                {checking ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4 text-orange-400" />} Check readiness
-              </button>
-              <button onClick={() => { setConfirming('cancel'); setReadiness(null); }} className={btnGhost}>Cancel mock</button>
+            <div className="space-y-2">
+              <div className="flex flex-wrap gap-2">
+                <button onClick={() => setEditing(true)} className={btnGhost}>Edit draft</button>
+                {confirming !== 'schedule' && (
+                  <button onClick={scheduleFromDraft} disabled={checking || Boolean(readiness && !ready)} className={btnPrimary}>
+                    {checking ? <Loader2 className="w-4 h-4 animate-spin" /> : <CalendarDays className="w-4 h-4" />} Schedule this mock
+                  </button>
+                )}
+                <button onClick={runReadiness} disabled={checking} className={btnGhost}>
+                  {checking ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4 text-orange-400" />} Check readiness
+                </button>
+                <button onClick={() => { setConfirming('cancel'); setReadiness(null); }} className={btnGhost}>Cancel mock</button>
+              </div>
+              {scheduleBlock && <p className="text-xs text-rose-300">{scheduleBlock}</p>}
             </div>
           )}
 
@@ -417,13 +486,9 @@ export const MockDetail: React.FC<{ mockId: string; onChanged: () => void; onClo
             <p className="text-xs text-slate-500">Fix the red items, then check readiness again before scheduling.</p>
           )}
 
-          {isDraft && readiness && ready && confirming !== 'schedule' && (
-            <button onClick={() => setConfirming('schedule')} className={btnPrimary}><CalendarDays className="w-4 h-4" /> Schedule this mock</button>
-          )}
-          {isDraft && readiness && ready && confirming === 'schedule' && (
+          {isDraft && confirming === 'schedule' && (
             <TypedConfirm word="SCHEDULE" label="Schedule" busy={busy} onConfirm={schedule} onCancel={() => setConfirming('')} />
           )}
-          {isDraft && !readiness && confirming === 'schedule' && null}
 
           {confirming === 'cancel' && (
             <TypedConfirm word="CANCEL" label="Cancel mock" busy={busy} onConfirm={cancel} onCancel={() => setConfirming('')} />
@@ -1056,7 +1121,108 @@ const CorrectPanel: React.FC<{ mockId: string; released: boolean }> = ({ mockId,
 // ---------------------------------------------------------------------------
 // The tab: month calendar with a side panel for create and detail.
 // ---------------------------------------------------------------------------
-export const MocksTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
+// MB2: the next 14 days at a glance, beside the calendar on desktop and
+// under it on phones. A calendar alone hides drafts that are not on the
+// screen's month. Every empty day is one tap away from its own draft.
+const UpcomingMocks: React.FC<{
+  byDate: Record<string, Json>;
+  onPick: (date: string, mock: Json | null) => void;
+}> = ({ byDate, onPick }) => {
+  const start = todayStr();
+  const days: string[] = useMemo(() => {
+    const [sy, sm, sd] = start.split('-').map(Number);
+    const base = new Date(Date.UTC(sy, sm - 1, sd));
+    const out: string[] = [];
+    for (let i = 0; i < 14; i += 1) {
+      const d = new Date(base);
+      d.setUTCDate(d.getUTCDate() + i);
+      out.push(`${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`);
+    }
+    return out;
+  }, [start]);
+  return (
+    <Card title="Upcoming mocks">
+      <p className="text-xs text-slate-500 mb-3">The next 14 days. Tap a mock to open it, or a free day to create its mock.</p>
+      <div className="space-y-1.5">
+        {days.map((date) => {
+          const mk = byDate[date] || null;
+          const label = date === start
+            ? 'Today'
+            : new Date(`${date}T12:00:00Z`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
+          return (
+            <button key={date} onClick={() => onPick(date, mk)}
+              className={`w-full text-left rounded-xl border px-3 py-2.5 transition-colors ${mk ? `${STATUS_STYLES[mk.status]} hover:brightness-125` : 'border-white/5 bg-white/[0.02] hover:border-orange-500/40'}`}>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className={`text-xs font-black shrink-0 ${mk ? 'text-white' : 'text-slate-500'}`}>{label}</span>
+                {mk ? (
+                  <>
+                    <span className={`inline-block px-2 py-0.5 rounded-lg border text-[10px] font-bold uppercase tracking-wider ${STATUS_STYLES[mk.status] || ''}`}>
+                      {STATUS_LABELS[mk.status] || mk.status}
+                    </span>
+                    <span className="text-xs text-slate-200 flex-1 min-w-[120px] truncate">
+                      {EXAM_LABELS[mk.examType] || mk.examType} &middot; {(mk.subjects || []).map((x: Json) => x.subject).join(', ') || 'No subjects'}
+                    </span>
+                    <span className={`text-[11px] font-black px-2.5 py-1 rounded-lg shrink-0 ${mk.status === 'draft' ? 'bg-orange-500 text-white' : 'bg-white/10 text-slate-200'}`}>
+                      {mk.status === 'draft' ? 'Schedule' : 'View'}
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-xs text-slate-600 flex-1">Free &middot; tap to create</span>
+                )}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </Card>
+  );
+};
+
+// MB2: the Mocks screen guide, same style as the Question Bank guide.
+const MocksGuidePanel: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onClose }) => {
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 bg-slate-950 lg:bg-slate-950/80 lg:flex lg:justify-end" onClick={onClose}>
+      <div className="w-full lg:max-w-[480px] h-full bg-slate-950 border-l border-slate-800 overflow-y-auto p-5 lg:p-6 space-y-5" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <p className="text-lg font-black text-white">How this works</p>
+          <button onClick={onClose} aria-label="Close the guide" className="p-2 rounded-lg text-slate-400 hover:text-white min-h-[44px] min-w-[44px]"><X className="w-5 h-5" /></button>
+        </div>
+        <div className="space-y-2">
+          <p className="text-sm font-bold text-orange-300">One mock a day</p>
+          <p className="text-sm text-slate-300">Students get one mock per day, built from the Mock Bank. Scheduling freezes the questions and builds the private paper; results come out at 6:00 am the next morning.</p>
+        </div>
+        <div className="space-y-2">
+          <p className="text-sm font-bold text-orange-300">Order of work</p>
+          <ol className="text-sm text-slate-300 space-y-1.5 list-decimal list-inside">
+            <li>Create a draft: the New mock button, or tap a free day on the calendar.</li>
+            <li>Publish the Mock Bank so its questions go live (Question Bank, Mock Bank, Publish tab). No public file is written; papers stay private.</li>
+            <li>Open the draft and press Schedule this mock. It checks readiness first, then asks you to type SCHEDULE to freeze the paper.</li>
+          </ol>
+        </div>
+        <div className="space-y-2">
+          <p className="text-sm font-bold text-orange-300">What the states mean</p>
+          <ul className="text-sm text-slate-300 space-y-1.5">
+            <li><span className="font-bold text-white">Draft:</span> editable, not visible to students.</li>
+            <li><span className="font-bold text-white">Scheduled:</span> frozen, appears for students on its date.</li>
+            <li><span className="font-bold text-white">Live:</span> the mock day is open.</li>
+            <li><span className="font-bold text-white">Results out:</span> released after 6:00 am the morning after the mock.</li>
+          </ul>
+        </div>
+        <button onClick={() => { try { localStorage.setItem('TOS_mocks_guide_seen', '1'); } catch { /* storage unavailable */ } onClose(); }} className={btnPrimary}>Got it, don&apos;t show this again</button>
+        <p className="text-[11px] text-slate-500">The (?) button at the top of the Mocks screen brings this back at any time.</p>
+      </div>
+    </div>
+  );
+};
+
+export const MocksTab: React.FC<{ refreshKey: number; openCreateSignal?: number }> = ({ refreshKey, openCreateSignal }) => {
   const [month, setMonth] = useState(() => todayStr().slice(0, 7));
   const [byDate, setByDate] = useState<Record<string, Json>>({});
   const [loading, setLoading] = useState(false);
@@ -1073,13 +1239,23 @@ export const MocksTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
   };
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState('');
+  const [guideOpen, setGuideOpen] = useState(false);
+
+  useEffect(() => {
+    try { if (!localStorage.getItem('TOS_mocks_guide_seen')) setGuideOpen(true); } catch { /* storage unavailable */ }
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true); setError('');
     try {
-      const r = await api(`/api/tos/mocks?month=${month}`);
+      // The shown month plus the next one, so the upcoming-14-days list
+      // never misses a mock across a month boundary.
+      const [a, b] = await Promise.all([
+        api(`/api/tos/mocks?month=${month}`),
+        api(`/api/tos/mocks?month=${shiftMonth(month, 1)}`),
+      ]);
       const map: Record<string, Json> = {};
-      for (const m of r.mocks || []) map[m.date] = m;
+      for (const m of [...(a.mocks || []), ...(b.mocks || [])]) map[m.date] = m;
       setByDate(map);
     } catch (e: any) { setError(e.message); }
     finally { setLoading(false); }
@@ -1103,6 +1279,17 @@ export const MocksTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
     setCreateError('');
   };
 
+  // MB2: the Overview and Mock papers screens can send the admin here with
+  // the create form already open.
+  const seenSignal = useRef(openCreateSignal);
+  useEffect(() => {
+    if (openCreateSignal && openCreateSignal !== seenSignal.current) {
+      seenSignal.current = openCreateSignal;
+      setSubTab('calendar');
+      createOn(todayStr());
+    }
+  }, [openCreateSignal]);
+
   const MOCK_SUBS = [
     { id: 'calendar', label: 'Calendar' },
     { id: 'series', label: 'Series builder' },
@@ -1112,6 +1299,25 @@ export const MocksTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
 
   return (
     <div className="space-y-5">
+      <div className="flex flex-wrap items-center gap-2">
+        <button onClick={() => createOn(todayStr())} className={btnPrimary}>
+          <Plus className="w-4 h-4" /> New mock
+        </button>
+        <button onClick={() => setGuideOpen(true)} aria-label="How this works" title="How this works"
+          className="p-2.5 rounded-xl border border-slate-700/60 text-slate-300 hover:text-white min-h-[44px] min-w-[44px]">
+          <HelpCircle className="w-4 h-4" />
+        </button>
+      </div>
+      {!byDate[today] && (
+        <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 flex flex-wrap items-center gap-3">
+          <AlertTriangle className="w-4 h-4 text-amber-300 shrink-0" />
+          <p className="text-xs text-amber-100 flex-1 min-w-[200px]">No mock scheduled for today. Students will see &quot;no mock today&quot;.</p>
+          <button onClick={() => createOn(today)}
+            className="text-xs font-black px-3 py-2 rounded-lg bg-amber-400 text-slate-950 hover:bg-amber-300 min-h-[36px]">
+            Create it
+          </button>
+        </div>
+      )}
       <div className="flex gap-1.5 overflow-x-auto pb-0.5">
         {MOCK_SUBS.map((s) => (
           <button key={s.id} onClick={() => setSubTab(s.id)} className={`min-h-[44px] px-5 py-2 rounded-xl text-sm font-bold border transition-all whitespace-nowrap ${subTab === s.id ? 'bg-orange-500/15 text-orange-300 border-orange-500/30' : 'text-slate-400 border-white/10 hover:text-white'}`}>{s.label}</button>
@@ -1154,6 +1360,8 @@ export const MocksTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
         <p className="text-xs text-slate-500 mt-3">Tap a free day to create a mock for that date, or a filled day to open it. One mock per day.</p>
       </Card>
 
+      <div className="space-y-5">
+      <UpcomingMocks byDate={byDate} onPick={(date, mk) => (mk ? setPanel({ mode: 'detail', id: mk.id }) : createOn(date))} />
       <Card title={panel?.mode === 'create' ? `New mock · ${panel.date}` : panel?.mode === 'detail' ? 'Mock' : 'Mocks'}>
         {!panel && (
           <p className="text-sm text-slate-400">Pick a day on the calendar to create a mock, or open an existing one. Scheduling freezes the paper: questions are drawn from the mock bank and the marking key stays on the server.</p>
@@ -1161,12 +1369,13 @@ export const MocksTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
         {panel?.mode === 'create' && (
           <>
             <MockForm
-              initial={emptyForm('jamb')}
+              showDate
+              initial={{ ...emptyForm('jamb'), date: panel.date }}
               busy={creating}
               onSubmit={async (payload) => {
                 setCreating(true); setCreateError('');
                 try {
-                  const r = await api('/api/tos/mocks', { method: 'POST', body: { ...payload, date: panel.date } });
+                  const r = await api('/api/tos/mocks', { method: 'POST', body: { ...payload, date: payload.date || panel.date } });
                   setPanel({ mode: 'detail', id: r.id });
                   await load();
                 } catch (e: any) { setCreateError(e.message); }
@@ -1180,6 +1389,7 @@ export const MocksTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
           <MockDetail mockId={panel.id} onChanged={load} onClose={() => setPanel(null)} />
         )}
       </Card>
+      </div>
     </div>
       )}
       {subTab === 'series' && (
@@ -1198,6 +1408,7 @@ export const MocksTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
           <SettingsPanel />
         </Card>
       )}
+      <MocksGuidePanel open={guideOpen} onClose={() => setGuideOpen(false)} />
     </div>
   );
 };

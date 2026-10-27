@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, Building2, Wallet, ScrollText, UserPlus, Loader2,
   RefreshCw, Send, Ban, CheckCircle2, PlayCircle, Check, Plus, ShieldCheck,
   Clock, ArrowUpRight, UserRound, BookOpen, CalendarDays, Copy, HelpCircle,
-  X, ChevronRight,
+  AlertTriangle, X, ChevronRight,
 } from 'lucide-react';
 import {
   api, fmtDate, fmtDateTime, LEAD_STATUS_LABELS, STATUS_STYLES, Json,
@@ -31,11 +31,31 @@ import { MocksTab } from './TosMocks';
 // ---------------------------------------------------------------------------
 // OVERVIEW
 // ---------------------------------------------------------------------------
+// Lagos calendar day, for the no-mock-today check on the Overview.
+const lagosYmd = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Lagos', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+
 const OverviewTab: React.FC<{ onOpenCentre: (id: string) => void; refreshKey: number; onDataLoaded?: () => void }> = ({ onOpenCentre, refreshKey, onDataLoaded }) => {
   const [data, setData] = useState<Json | null>(null);
   const [error, setError] = useState('');
   const [sweeping, setSweeping] = useState(false);
   const [sweepResult, setSweepResult] = useState<string>('');
+  const [noMockToday, setNoMockToday] = useState<boolean | null>(null);
+
+  // MB2: computed from the real mock list, never a hard-coded date. A mock
+  // only counts when it is Scheduled or Live today; a draft, a cancelled or
+  // a voided mock leaves students with "no mock today".
+  useEffect(() => {
+    let alive = true;
+    const today = lagosYmd();
+    api(`/api/tos/mocks?month=${today.slice(0, 7)}`)
+      .then((r: Json) => {
+        if (!alive) return;
+        const mock = (r.mocks || []).find((m: Json) => m.date === today);
+        setNoMockToday(!(mock && ['scheduled', 'live'].includes(mock.status)));
+      })
+      .catch(() => { if (alive) setNoMockToday(null); });
+    return () => { alive = false; };
+  }, [refreshKey]);
 
   const load = useCallback(async () => {
     setError('');
@@ -71,6 +91,16 @@ const OverviewTab: React.FC<{ onOpenCentre: (id: string) => void; refreshKey: nu
   const leads = data.leads || {};
   return (
     <div className="space-y-5">
+      {noMockToday === true && (
+        <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 flex flex-wrap items-center gap-3">
+          <AlertTriangle className="w-4 h-4 text-amber-300 shrink-0" />
+          <p className="text-xs text-amber-100 flex-1 min-w-[200px]">No mock scheduled for today. Students will see &quot;no mock today&quot;.</p>
+          <button onClick={() => window.dispatchEvent(new CustomEvent('tos-open-mocks-new'))}
+            className="text-xs font-black px-3 py-2 rounded-lg bg-amber-400 text-slate-950 hover:bg-amber-300 min-h-[36px]">
+            Create it
+          </button>
+        </div>
+      )}
       <div className="flex justify-end">
         <button onClick={load} className={btnGhost}><RefreshCw className="w-4 h-4" /> Refresh</button>
       </div>
@@ -764,7 +794,8 @@ const TABS = [
 // has its own tabs and every screen below the banner lists only that bank's
 // questions; nothing in the UI moves a question across.
 //   Practice: Library, Import & edit, Publish (badge = changes ready to go out)
-//   Mock:     Library, Import, Mock papers (badge = mocks the papers tab lists)
+//   Mock:     Library, Import, Publish (badge = drafts waiting to go live),
+//             Mock papers (the mock list)
 const QB_STREAM_KEY = 'TOS_qb_stream';
 const QB_SUBS_PRACTICE = [
   { id: 'library', label: 'Library' },
@@ -774,6 +805,7 @@ const QB_SUBS_PRACTICE = [
 const QB_SUBS_MOCK = [
   { id: 'library', label: 'Library' },
   { id: 'import', label: 'Import' },
+  { id: 'publish', label: 'Publish' },
   { id: 'papers', label: 'Mock papers' },
 ] as const;
 
@@ -852,7 +884,7 @@ const QbGuidePanel: React.FC<{ open: boolean; onClose: () => void }> = ({ open, 
 
 type BankMode = 'hub' | 'practice' | 'mock';
 
-const QuestionBankShell: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
+const QuestionBankShell: React.FC<{ refreshKey: number; onNewMock?: () => void }> = ({ refreshKey, onNewMock }) => {
   // The hub is the landing screen every time Question Bank opens.
   const [mode, setMode] = useState<BankMode>('hub');
   const [sub, setSub] = useState<string>('library');
@@ -912,7 +944,7 @@ const QuestionBankShell: React.FC<{ refreshKey: number }> = ({ refreshKey }) => 
   const subs = isMock ? QB_SUBS_MOCK : QB_SUBS_PRACTICE;
   const liveVersion = Number((summary as any)?.practice?.currentVersion) || 0;
   const badge = isMock
-    ? Number((summary as any)?.mock?.mockPapersCount) || 0
+    ? Number((summary as any)?.mock?.pending) || 0
     : Number((summary as any)?.practice?.pending) || 0;
 
   return (
@@ -952,7 +984,7 @@ const QuestionBankShell: React.FC<{ refreshKey: number }> = ({ refreshKey }) => 
                 ? (isMock ? 'bg-orange-500/15 text-orange-300 border-orange-500/30' : 'bg-orange-500/15 text-orange-300 border-orange-500/30')
                 : 'text-slate-400 border-white/10 hover:text-white'}`}>
               {t.label}
-              {t.id === (isMock ? 'papers' : 'publish') && badge > 0 && (
+              {t.id === 'publish' && badge > 0 && (
                 <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded-full text-[10px] font-black ${isMock ? 'bg-amber-400 text-slate-950' : 'bg-orange-500 text-white'}`}>{badge}</span>
               )}
             </button>
@@ -962,7 +994,8 @@ const QuestionBankShell: React.FC<{ refreshKey: number }> = ({ refreshKey }) => 
 
       {sub === 'library' && <QuestionLibraryTab refreshKey={fullKey} kind={kind} onKindChange={openBank} />}
       {isMock && sub === 'import' && <QuestionBankTab refreshKey={fullKey} view="edit" kind={kind} onKindChange={openBank} />}
-      {isMock && sub === 'papers' && <MockPapersTab refreshKey={fullKey} />}
+      {isMock && sub === 'publish' && <QuestionBankTab refreshKey={fullKey} view="publish" kind={kind} onKindChange={openBank} />}
+      {isMock && sub === 'papers' && <MockPapersTab refreshKey={fullKey} onNewMock={onNewMock} />}
       {!isMock && sub === 'edit' && <QuestionBankTab refreshKey={fullKey} view="edit" kind={kind} onKindChange={openBank} />}
       {!isMock && sub === 'publish' && <QuestionBankTab refreshKey={fullKey} view="publish" kind={kind} onKindChange={openBank} />}
       <QbGuidePanel open={guideOpen} onClose={() => setGuideOpen(false)} />
@@ -974,6 +1007,7 @@ export const TosPortal: React.FC = () => {
   const [tab, setTab] = useState<string>('overview');
   const [refreshKey, setRefreshKey] = useState(0);
   const [openCentreId, setOpenCentreId] = useState<string>('');
+  const [mocksCreateKey, setMocksCreateKey] = useState(0);
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -982,6 +1016,14 @@ export const TosPortal: React.FC = () => {
     };
     window.addEventListener('tos-open-centre', handler);
     return () => window.removeEventListener('tos-open-centre', handler);
+  }, []);
+
+  // MB2: the Overview "Create it" button and the Mock papers "+ New mock"
+  // button both land on the Mocks screen with the create form already open.
+  useEffect(() => {
+    const handler = () => { setTab('mocks'); setMocksCreateKey((k) => k + 1); };
+    window.addEventListener('tos-open-mocks-new', handler);
+    return () => window.removeEventListener('tos-open-mocks-new', handler);
   }, []);
 
   // No automatic refresh anywhere: every tab loads when opened and when the
@@ -1052,9 +1094,9 @@ export const TosPortal: React.FC = () => {
         {tab === 'overview' && <OverviewTab onOpenCentre={(id) => { setOpenCentreId(id); setTab('centres'); }} refreshKey={refreshKey} onDataLoaded={() => setRefreshKey((k) => k)} />}
         {tab === 'leads' && <LeadsTab refreshKey={refreshKey} />}
         {tab === 'centres' && <CentresTab refreshKey={refreshKey} openCentreId={openCentreId} onClearOpenCentre={() => setOpenCentreId('')} onDataChanged={() => setRefreshKey((k) => k + 1)} />}
-        {tab === 'questions' && <QuestionBankShell refreshKey={refreshKey} />}
+        {tab === 'questions' && <QuestionBankShell refreshKey={refreshKey} onNewMock={() => { setTab('mocks'); setMocksCreateKey((k) => k + 1); }} />}
         {tab === 'library' && <QuestionLibraryTab refreshKey={refreshKey} />}
-        {tab === 'mocks' && <MocksTab refreshKey={refreshKey} />}
+        {tab === 'mocks' && <MocksTab refreshKey={refreshKey} openCreateSignal={mocksCreateKey} />}
         {tab === 'plans' && <PlansTab />}
         {tab === 'audit' && <AuditTab />}
         {tab === 'team' && <TeamTab />}

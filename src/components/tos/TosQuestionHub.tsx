@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   RefreshCw, Play, Lock, Globe2, FileJson, Eye, EyeOff, Users, CalendarDays,
-  BookOpen, AlertTriangle, ChevronRight, CheckCircle2, CircleDashed,
+  BookOpen, AlertTriangle, ChevronRight, CheckCircle2, CircleDashed, Plus,
 } from 'lucide-react';
 import { api, Json } from './tosShared';
 import { MockDetail, STATUS_STYLES, EXAM_LABELS } from './TosMocks';
@@ -172,7 +172,7 @@ const MOCK_STEPS = [
   'Results release at 6:00 am the next morning. Answers unlock, leaderboard settles.',
 ];
 
-export const MockPapersTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
+export const MockPapersTab: React.FC<{ refreshKey: number; onNewMock?: () => void }> = ({ refreshKey, onNewMock }) => {
   const [month, setMonth] = useState<string>(lagosYm());
   const [data, setData] = useState<Json | null>(null);
   const [error, setError] = useState('');
@@ -210,6 +210,7 @@ export const MockPapersTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) 
     return 'In Firestore only';
   };
   const paperOf = (mm: any) => {
+    if (mm.status === 'draft') return 'Not built yet · builds when you schedule it';
     if (!mm.paperFilePublicId) return 'Not built yet';
     const at = String(mm.paperFileUploadedAt || '');
     const when = at ? new Date(at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '';
@@ -251,7 +252,13 @@ export const MockPapersTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) 
       <div className="rounded-2xl border border-white/10 bg-slate-900/50 overflow-hidden">
         <div className="px-5 pt-4 pb-3 flex items-center justify-between gap-3">
           <p className="text-sm font-black text-white">Papers</p>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-2">
+            {onNewMock && (
+              <button onClick={onNewMock}
+                className="inline-flex items-center gap-1.5 text-xs font-black px-3 py-2 rounded-lg bg-orange-500 text-white hover:bg-orange-400 min-h-[36px] shrink-0">
+                <Plus className="w-3.5 h-3.5" /> New mock
+              </button>
+            )}
             <button onClick={() => setMonth(shiftMonth(month, -1))} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5" aria-label="Previous month">
               <ChevronRight className="w-4 h-4 rotate-180" />
             </button>
@@ -264,11 +271,11 @@ export const MockPapersTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) 
         {error && <p className="px-5 pb-4 text-sm text-rose-300">{error}</p>}
         {loading && <p className="px-5 pb-4 text-sm text-slate-500">Loading mocks&hellip;</p>}
         {!loading && !error && mocks.length === 0 && (
-          <p className="px-5 pb-5 text-sm text-slate-500">No mocks this month. Create one from the Mocks screen, or from the Mock Bank import tab once it is ready.</p>
+          <p className="px-5 pb-5 text-sm text-slate-500">No mocks this month. Use New mock above to create one.</p>
         )}
         {!loading && !error && mocks.length > 0 && (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[680px]">
+            <table className="w-full text-sm min-w-[760px]">
               <thead>
                 <tr className="text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 border-t border-white/5">
                   <th className="px-5 py-2.5">Date</th>
@@ -278,6 +285,7 @@ export const MockPapersTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) 
                   <th className="px-3 py-2.5">Paper file</th>
                   <th className="px-3 py-2.5">Answers</th>
                   <th className="px-3 py-2.5">State</th>
+                  <th className="px-3 py-2.5">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -296,6 +304,15 @@ export const MockPapersTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) 
                     <td className="px-3 py-3">{paperOf(mm)}</td>
                     <td className="px-3 py-3">{answersOf(mm)}</td>
                     <td className="px-3 py-3"><span className={chipOf(mm)}>{stateOf(mm)}</span></td>
+                    <td className="px-3 py-3">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setOpenId(String(mm.id)); }}
+                        title={mm.status === 'draft' ? 'Open the draft to check readiness and schedule it' : 'Open this mock'}
+                        className={`text-[11px] font-black px-2.5 py-1.5 rounded-lg min-h-[32px] ${mm.status === 'draft' ? 'bg-orange-500 text-white hover:bg-orange-400' : 'bg-white/10 text-slate-200 hover:bg-white/20'}`}
+                      >
+                        {mm.status === 'draft' ? 'Schedule' : 'View'}
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
