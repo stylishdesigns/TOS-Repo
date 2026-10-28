@@ -59,6 +59,17 @@ const todayStr = () => {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 };
 
+// Subject names can differ in wording ("English" in settings vs "English
+// Language" in the bank); match on normalised containment in either direction,
+// mirroring the server.
+const sameSubject = (a: unknown, b: unknown): boolean => {
+  const norm = (x: unknown) => String(x ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const x = norm(a);
+  const y = norm(b);
+  if (!x || !y) return false;
+  return x === y || x.includes(y) || y.includes(x);
+};
+
 interface SubjectRow { subject: string; count: string; ids: string; }
 
 const emptyForm = (examType: string): { title: string; examType: string; rows: SubjectRow[]; source: 'random' | 'picked' } => ({
@@ -107,15 +118,15 @@ const MockForm: React.FC<{
 
   const subjectOptions = (current: string) => {
     const labels = publishedSubjects.map((x) => x.label);
-    if (current && !labels.some((l) => l.toLowerCase() === current.toLowerCase())) labels.unshift(current);
+    if (current && !labels.some((l) => sameSubject(l, current))) labels.unshift(current);
     return labels;
   };
   const subjectField = (i: number, r: SubjectRow) => {
     if (publishedSubjects.length === 0 && !r.subject) {
-      return <input className={inputCls} value={r.subject} onChange={(e) => setRow(i, { subject: e.target.value })} placeholder="Subject name" maxLength={80} />;
+      return <input className={`${inputCls} flex-1 min-w-0 w-auto`} value={r.subject} onChange={(e) => setRow(i, { subject: e.target.value })} placeholder="Subject name" maxLength={80} />;
     }
     return (
-      <select className={inputCls} value={r.subject} onChange={(e) => setRow(i, { subject: e.target.value })}>
+      <select className={`${inputCls} flex-1 min-w-0 w-auto`} value={r.subject} onChange={(e) => setRow(i, { subject: e.target.value })}>
         <option value="">Select subject</option>
         {subjectOptions(r.subject).map((label) => {
           const info = publishedSubjects.find((x) => x.label === label);
@@ -125,7 +136,7 @@ const MockForm: React.FC<{
     );
   };
   const subjectHint = (label: string) => {
-    const x = publishedSubjects.find((s2) => s2.label.toLowerCase() === label.toLowerCase());
+    const x = publishedSubjects.find((s2) => sameSubject(s2.label, label));
     if (!x) return '';
     return `${x.published} published question${x.published === 1 ? '' : 's'} in the bank${x.topics.length ? ` · topics: ${x.topics.join(', ')}` : ''}`;
   };
@@ -206,7 +217,7 @@ const MockForm: React.FC<{
               <div key={i} className="space-y-1">
                 <div className="flex gap-2">
                   {subjectField(i, r)}
-                  <input className={`${inputCls} w-24 shrink-0`} value={r.count} inputMode="numeric"
+                  <input className={`${inputCls} w-20 shrink-0`} value={r.count} inputMode="numeric"
                     onChange={(e) => setRow(i, { count: e.target.value.replace(/[^0-9]/g, '') })} placeholder="Count" />
                   {isJamb && rows.length > 1 && (
                     <button type="button" onClick={() => setRows(rows.filter((_, j) => j !== i))} className="shrink-0 px-2 text-slate-500 hover:text-rose-300" aria-label="Remove subject">
@@ -225,7 +236,7 @@ const MockForm: React.FC<{
               <div key={i} className="bg-slate-950/40 border border-white/5 rounded-xl p-3 space-y-2">
                 <div className="flex gap-2">
                   {subjectField(i, r)}
-                  <input className={`${inputCls} w-24 shrink-0`} value={r.count} inputMode="numeric"
+                  <input className={`${inputCls} w-20 shrink-0`} value={r.count} inputMode="numeric"
                     onChange={(e) => setRow(i, { count: e.target.value.replace(/[^0-9]/g, '') })} placeholder="Count" />
                   {isJamb && rows.length > 1 && (
                     <button type="button" onClick={() => setRows(rows.filter((_, j) => j !== i))} className="shrink-0 px-2 text-slate-500 hover:text-rose-300" aria-label="Remove subject">
@@ -660,7 +671,7 @@ const SeriesPanel: React.FC<{ onCreated: () => void }> = ({ onCreated }) => {
   const extraOptions = (current: string) =>
     publishedSubjects
       .map((x) => x.label)
-      .filter((l) => !compulsory.some((c) => c.toLowerCase() === l.toLowerCase()))
+      .filter((l) => !compulsory.some((c) => sameSubject(c, l)))
       .concat(current && !publishedSubjects.some((x) => x.label === current) ? [current] : []);
 
   const body = () => ({
@@ -962,6 +973,23 @@ const SettingsPanel: React.FC = () => {
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
 
+  // Subject choices come from the mock bank itself, so settings name subjects
+  // the same way the bank does. Typed inputs remain only as a fallback when
+  // the bank has no published subjects yet.
+  const [publishedSubjects, setPublishedSubjects] = useState<string[]>([]);
+  useEffect(() => {
+    let alive = true;
+    api('/api/tos/questionbank/tree?kind=mock').then((r: any) => {
+      if (!alive) return;
+      const list = ((r.subjects || []) as any[])
+        .filter((x) => Number(x?.byStatus?.published) > 0)
+        .map((x) => String(x.label || x.key))
+        .sort((a, b) => a.localeCompare(b));
+      setPublishedSubjects(list);
+    }).catch(() => { /* typed inputs remain */ });
+    return () => { alive = false; };
+  }, []);
+
   const load = useCallback(async () => {
     setLoading(true); setError(''); setNotice('');
     try {
@@ -1037,7 +1065,16 @@ const SettingsPanel: React.FC = () => {
         </div>
         <label className="block space-y-1">
           <span className="text-xs text-slate-400">Compulsory subject name</span>
-          <input className={inputCls} value={s.jamb.compulsorySubject} onChange={(e) => set('jamb.compulsorySubject', e.target.value)} maxLength={80} />
+          {publishedSubjects.length > 0 ? (
+            <select className={inputCls} value={s.jamb.compulsorySubject} onChange={(e) => set('jamb.compulsorySubject', e.target.value)}>
+              {s.jamb.compulsorySubject && !publishedSubjects.some((x) => sameSubject(x, s.jamb.compulsorySubject)) && (
+                <option value={s.jamb.compulsorySubject}>{s.jamb.compulsorySubject} (current setting)</option>
+              )}
+              {publishedSubjects.map((x) => <option key={x} value={x}>{x}</option>)}
+            </select>
+          ) : (
+            <input className={inputCls} value={s.jamb.compulsorySubject} onChange={(e) => set('jamb.compulsorySubject', e.target.value)} maxLength={80} />
+          )}
         </label>
       </div>
       <div className="bg-slate-950/40 border border-white/5 rounded-xl p-3 space-y-3">
@@ -1047,10 +1084,33 @@ const SettingsPanel: React.FC = () => {
       </div>
       <div className="bg-slate-950/40 border border-white/5 rounded-xl p-3 space-y-3">
         <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Series and results</p>
-        <label className="block space-y-1">
+        <div className="space-y-1">
           <span className="text-xs text-slate-400">Compulsory subjects for the series builder (comma-separated)</span>
+          {(() => {
+            const chosen = String(s.compulsorySubjectsText || '').split(',').map((x: string) => x.trim()).filter(Boolean);
+            const names: string[] = [];
+            for (const x of publishedSubjects) if (!names.some((n) => sameSubject(n, x))) names.push(x);
+            for (const c of chosen) if (!names.some((n) => sameSubject(n, c))) names.push(c);
+            if (names.length === 0) return null;
+            return (
+              <div className="flex flex-wrap gap-1.5">
+                {names.map((n) => {
+                  const on = chosen.some((c) => sameSubject(c, n));
+                  return (
+                    <button key={n} type="button" onClick={() => {
+                      const next = on ? chosen.filter((c) => !sameSubject(c, n)) : [...chosen, n];
+                      set('compulsorySubjectsText', next.join(', '));
+                    }} className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${on ? 'bg-orange-500/15 text-orange-300 border-orange-500/40' : 'text-slate-300 border-white/10 hover:border-white/25 bg-slate-950/40'}`}>
+                      {n}
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })()}
           <input className={inputCls} value={s.compulsorySubjectsText} onChange={(e) => set('compulsorySubjectsText', e.target.value)} />
-        </label>
+          <p className="text-[11px] text-slate-500">Tap a subject above to add or remove it; the box lists the final set. Type here only for names the bank does not have yet.</p>
+        </div>
         <div className="grid grid-cols-2 gap-3">
           {num('Results release hour (Lagos)', 'releaseHourLagos', 0, 23)}
           {num('Results release minute', 'releaseMinuteLagos', 0, 59)}

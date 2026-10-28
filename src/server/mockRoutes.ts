@@ -180,12 +180,23 @@ function parseSubjects(raw: unknown, settings: MockSettings, examType: ExamType,
     out.push(spec);
   }
   if (examType === 'jamb') {
-    const compulsory = settings.jamb.compulsorySubject.toLowerCase();
-    if (!out.some((s) => s.subject.toLowerCase() === compulsory)) {
+    const compulsory = settings.jamb.compulsorySubject;
+    if (!out.some((s) => sameSubject(s.subject, compulsory))) {
       throw httpError(400, `A JAMB mock must include ${settings.jamb.compulsorySubject} (the compulsory subject can be changed in settings).`);
     }
   }
   return out;
+}
+
+// Subject names can differ in wording ("English" in settings vs "English
+// Language" in the bank), so matching normalises to lowercase words and
+// accepts containment in either direction.
+function sameSubject(a: unknown, b: unknown): boolean {
+  const norm = (x: unknown) => String(x ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const x = norm(a);
+  const y = norm(b);
+  if (!x || !y) return false;
+  return x === y || x.includes(y) || y.includes(x);
 }
 
 function parseQuestionSource(v: unknown): 'random' | 'picked' {
@@ -426,8 +437,7 @@ function parseSeriesRequest(body: any, settings: MockSettings): SeriesRequest {
   if (subjects.length < 1 || subjects.length > SUBJECTS_MAX) throw httpError(400, 'List 1 to 12 subjects for the series rotation.');
   if (subjects.some((x: string) => x.length < 1 || x.length > SUBJECT_MAX)) throw httpError(400, 'Each subject name must be 1 to 80 characters.');
   if (new Set(subjects.map((x: string) => x.toLowerCase())).size !== subjects.length) throw httpError(400, 'Subjects must not repeat in the rotation.');
-  const have = new Set(subjects.map((x: string) => x.toLowerCase()));
-  const missing = settings.compulsorySubjects.filter((c) => !have.has(c.toLowerCase()));
+  const missing = settings.compulsorySubjects.filter((c) => !subjects.some((x: string) => sameSubject(x, c)));
   if (missing.length > 0) throw httpError(400, `The series must cover every compulsory subject. Missing: ${missing.join(', ')}.`);
   const count = body?.count;
   if (!Number.isInteger(count) || count < 1 || count > COUNT_MAX) throw httpError(400, 'Questions per paper must be a whole number from 1 to 500.');
@@ -858,9 +868,9 @@ export function registerMockRoutes(app: express.Express): void {
         warnings.push({ level: 'error', code: 'past-date', message: 'The mock date is in the past and can no longer be scheduled.' });
       }
       if (mock.examType === 'jamb') {
-        const compulsory = String(settings.jamb.compulsorySubject).toLowerCase();
+        const compulsory = String(settings.jamb.compulsorySubject);
         const subjects: Array<{ subject: string }> = mock.subjects || [];
-        if (!subjects.some((s) => String(s.subject).toLowerCase() === compulsory)) {
+        if (!subjects.some((s) => sameSubject(s.subject, compulsory))) {
           warnings.push({ level: 'error', code: 'compulsory-subject', message: `A JAMB mock must include ${settings.jamb.compulsorySubject}.` });
         }
       }
@@ -988,8 +998,8 @@ async function destroyPrivatePaper(mockId: string): Promise<boolean> {
       if (mock.date < lagosToday()) throw httpError(400, 'The mock date is in the past.');
       const subjects: SubjectSpec[] = mock.subjects || [];
       if (mock.examType === 'jamb') {
-        const compulsory = String(settings.jamb.compulsorySubject).toLowerCase();
-        if (!subjects.some((s) => s.subject.toLowerCase() === compulsory)) {
+        const compulsory = String(settings.jamb.compulsorySubject);
+        if (!subjects.some((s) => sameSubject(s.subject, compulsory))) {
           throw httpError(400, `A JAMB mock must include ${settings.jamb.compulsorySubject}.`);
         }
       }
