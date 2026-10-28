@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
-  ChevronLeft, ChevronRight, Clock, Flag, Play, Trophy, History as HistoryIcon,
+  ChevronLeft, ChevronRight, Clock, Flag, Play, Trophy,
   CheckCircle2, XCircle, LayoutGrid, Check, AlertTriangle, Hourglass,
   CalendarX2, X, Send, Medal,
 } from 'lucide-react';
@@ -8,12 +8,13 @@ import { api } from '../../tos/tosShared';
 import { MathText, cleanOptionText } from '../../common/MathText';
 
 /**
- * TOS student mock screens (prompt S, pieces S3-S5). Three tabs wired to the
- * server-side mock routes: Today (status + start + the exam itself), Past
- * (only mocks the student took) and Leaderboard (one board across all
- * centres, usernames and scores only). Every rule the server enforces shows
- * up here as a state the student can see; the phone never decides anything
- * the server has not already told it.
+ * TOS student mock screens (prompt S, pieces S3-S5). One day view wired to
+ * the server-side mock routes: a date strip (yesterday, today, tomorrow)
+ * whose day card carries the mock for that date, the attempt and the released
+ * result, plus the leaderboard (one board across all centres, usernames and
+ * scores only). Every rule the server enforces shows up here as a state the
+ * student can see; the phone never decides anything the server has not
+ * already told it.
  */
 
 type Json = any;
@@ -502,11 +503,13 @@ export const StudentMockTab: React.FC<{
   initialTab?: 'today' | 'past' | 'board';
   onHideBottomNav?: (hide: boolean) => void;
 }> = ({ initialTab, onHideBottomNav }) => {
-  const [tab, setTab] = useState<'today' | 'past' | 'board'>(initialTab || 'today');
+  const [tab, setTab] = useState<'day' | 'board'>(initialTab === 'board' ? 'board' : 'day');
   const [status, setStatus] = useState<Json | null>(null);
   const [statusErr, setStatusErr] = useState('');
   const [loading, setLoading] = useState(true);
-  const [past, setPast] = useState<Json[] | null>(null);
+  const [dayOffset, setDayOffset] = useState(0);
+  const [dayInfo, setDayInfo] = useState<Json | null>(null);
+  const [dayErr, setDayErr] = useState('');
   const [board, setBoard] = useState<Json | null>(null);
   const [boardDate, setBoardDate] = useState<string | null>(null);
   const [exam, setExam] = useState<Json | null>(null);
@@ -533,12 +536,6 @@ export const StudentMockTab: React.FC<{
     return () => onHideBottomNav?.(false);
   }, [exam, reviewId, onHideBottomNav]);
 
-  const loadPast = useCallback(async () => {
-    setPast(null);
-    try { const r = await api('/api/student/mock/history'); setPast(r.rows || []); }
-    catch { setPast([]); }
-  }, []);
-
   const loadBoard = useCallback(async (date: string) => {
     setBoard(null);
     try { const r = await api(`/api/student/mock/leaderboard?date=${date}`); setBoard(r); }
@@ -546,9 +543,21 @@ export const StudentMockTab: React.FC<{
   }, []);
 
   useEffect(() => {
-    if (tab === 'past' && past === null) loadPast();
     if (tab === 'board' && board === null && status?.today) loadBoard(boardDate || status.today);
-  }, [tab, past, board, boardDate, status?.today, loadPast, loadBoard]);
+  }, [tab, board, boardDate, status?.today, loadBoard]);
+
+  // The selected day: today needs no extra fetch (status carries it); any
+  // other day asks the server for that date's mock, attempt and result.
+  const selectedDate = useMemo(() => (status?.today ? shiftDate(status.today, dayOffset) : ''), [status?.today, dayOffset]);
+  useEffect(() => {
+    if (tab !== 'day' || dayOffset === 0 || !selectedDate) { setDayInfo(null); setDayErr(''); return undefined; }
+    let dead = false;
+    setDayInfo(null); setDayErr('');
+    api(`/api/student/mock/status?date=${selectedDate}`)
+      .then((r) => { if (!dead) setDayInfo(r); })
+      .catch((e: any) => { if (!dead) setDayErr(e.message || 'Could not load that day.'); });
+    return () => { dead = true; };
+  }, [tab, dayOffset, selectedDate]);
 
   const start = async () => {
     setStarting(true); setNotice('');
@@ -582,7 +591,7 @@ export const StudentMockTab: React.FC<{
 
   const openReview = (mockId: string) => setReviewId(mockId);
 
-  if (reviewId) return <ReviewScreen mockId={reviewId} onBack={() => { setReviewId(null); loadStatus(); if (tab === 'past') loadPast(); }} />;
+  if (reviewId) return <ReviewScreen mockId={reviewId} onBack={() => { setReviewId(null); loadStatus(); }} />;
   if (exam) return <MockExam data={exam} onDone={examDone} onExit={examExit} />;
 
   const today = status?.today || '';
@@ -590,22 +599,35 @@ export const StudentMockTab: React.FC<{
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* MB2: one control only, and only Today and Past. The Mock |
-          Leaderboard switch lives on the CBT tab above this screen and the
-          leaderboard is its own side of that switch, so no second control
-          shows here. */}
-      {tab !== 'board' && (
+      {/* MB2: the date strip is the one control. Every day (past, today,
+          upcoming) renders the same day card, so there is no Today/Past
+          toggle to wonder about; the leaderboard keeps its own switch on the
+          CBT tab above this screen. */}
+      {tab === 'day' && status && (
         <div className="px-4 pt-3 max-w-lg mx-auto">
-          <div className="bg-white rounded-[14px] p-1 border border-[#E2E8F0] shadow-2xs grid grid-cols-2 gap-1">
-            {([['today', 'Today'], ['past', 'Past']] as const).map(([key, label]) => (
-              <button
-                key={key}
-                onClick={() => setTab(key)}
-                className={`h-10 rounded-[10px] text-xs font-extrabold transition-all flex items-center justify-center cursor-pointer ${tab === key ? 'bg-[#0F172A] text-white shadow-xs' : 'text-[#64748B] hover:text-[#0F172A]'}`}
-              >
-                {label}
-              </button>
-            ))}
+          <div className="bg-white rounded-[14px] border border-[#E2E8F0] shadow-2xs px-2 py-2 flex items-center gap-2">
+            <button
+              onClick={() => setDayOffset((n) => Math.max(-62, n - 1))}
+              disabled={dayOffset <= -62}
+              aria-label="Previous day"
+              className="w-11 h-11 shrink-0 rounded-xl bg-slate-100 flex items-center justify-center disabled:opacity-40 cursor-pointer"
+            >
+              <ChevronLeft className="w-5 h-5 text-slate-600" />
+            </button>
+            <div className="flex-1 text-center min-w-0">
+              <p className="text-xs font-black uppercase tracking-widest text-slate-400">
+                {dayOffset === 0 ? 'Today' : dayOffset > 0 ? 'Coming up' : 'Past'}
+              </p>
+              <p className="text-sm font-black text-slate-900 truncate">{selectedDate ? fmtDay(selectedDate) : '...'}</p>
+            </div>
+            <button
+              onClick={() => setDayOffset((n) => Math.min(62, n + 1))}
+              disabled={dayOffset >= 62}
+              aria-label="Next day"
+              className="w-11 h-11 shrink-0 rounded-xl bg-slate-100 flex items-center justify-center disabled:opacity-40 cursor-pointer"
+            >
+              <ChevronRight className="w-5 h-5 text-slate-600" />
+            </button>
           </div>
         </div>
       )}
@@ -622,7 +644,7 @@ export const StudentMockTab: React.FC<{
         )}
 
         {/* ------------------------------------------------ TODAY ---------- */}
-        {!loading && !statusErr && tab === 'today' && status && (
+        {!loading && !statusErr && tab === 'day' && dayOffset === 0 && status && (
           <>
             {unseen && (
               <button onClick={() => openReview(unseen.mockId)} className="w-full bg-emerald-600 text-white rounded-3xl p-5 text-left flex items-center justify-between active:scale-[0.99] transition">
@@ -735,60 +757,71 @@ export const StudentMockTab: React.FC<{
           </>
         )}
 
-        {/* ------------------------------------------------ PAST ----------- */}
-        {!loading && !statusErr && tab === 'past' && (
+        {/* ------------------------------------------------ ANY OTHER DAY -- */}
+        {!loading && !statusErr && tab === 'day' && dayOffset !== 0 && (
           <>
-            {past === null && <div className="h-40 rounded-3xl bg-slate-200/60 animate-pulse" />}
-            {past !== null && past.length === 0 && (
-              <div className="bg-white rounded-3xl border border-dashed border-slate-200 p-8 text-center">
-                <HistoryIcon className="w-12 h-12 text-slate-200 mx-auto mb-3" />
-                <p className="text-base font-black text-slate-900">Nothing here yet</p>
-                <p className="text-sm text-slate-500 mt-1">Only mocks you took appear here. Mocks you missed cannot be retaken.</p>
+            {dayInfo === null && !dayErr && <div className="h-40 rounded-3xl bg-slate-200/60 animate-pulse" />}
+            {dayErr && (
+              <div className="bg-white rounded-3xl border border-slate-200 p-6 text-center space-y-3">
+                <AlertTriangle className="w-10 h-10 text-amber-500 mx-auto" />
+                <p className="text-sm font-bold text-slate-600">{dayErr}</p>
+                <button onClick={() => setDayOffset(dayOffset)} className="min-h-[44px] px-6 rounded-2xl bg-[#EA580C] text-white font-black text-sm">Try again</button>
               </div>
             )}
-            {past !== null && past.length > 0 && (
-              <>
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="bg-white rounded-2xl border border-slate-200 p-4">
-                    <p className="text-xs font-black uppercase tracking-wide text-slate-400">Taken</p>
-                    <p className="text-2xl font-black text-slate-900 mt-1">{past.length}</p>
+            {dayInfo !== null && !dayErr && (
+              <div className="bg-white rounded-3xl border border-slate-200 p-5">
+                {dayInfo.state === 'no_mock' && (
+                  <div className="text-center py-6">
+                    <CalendarX2 className="w-12 h-12 text-slate-200 mx-auto mb-3" />
+                    <p className="text-base font-black text-slate-900">No mock this day</p>
                   </div>
-                  <div className="bg-white rounded-2xl border border-slate-200 p-4">
-                    <p className="text-xs font-black uppercase tracking-wide text-slate-400">Best rank</p>
-                    <p className="text-2xl font-black text-slate-900 mt-1">
-                      {past.filter((r: Json) => r.rank != null).length ? Math.min(...past.filter((r: Json) => r.rank != null).map((r: Json) => r.rank)) : '—'}
+                )}
+                {dayInfo.state === 'upcoming' && dayInfo.mock && (
+                  <div className="text-center py-2 space-y-3">
+                    <p className="text-xs font-black uppercase tracking-widest text-[#EA580C]">Scheduled</p>
+                    <h3 className="text-lg font-black text-slate-900">{dayInfo.mock.title || 'TOS Mock'}</h3>
+                    <p className="text-sm text-slate-500">
+                      {dayInfo.mock.subjects?.length ? dayInfo.mock.subjects.join(' · ') : 'All subjects'}
+                      {' · '}{dayInfo.mock.questionCount || '?'} questions · {dayInfo.mock.durationMinutes || '?'} min
                     </p>
+                    <p className="text-sm font-bold text-slate-500">Come back on the day to take it.</p>
                   </div>
-                  <div className="bg-white rounded-2xl border border-slate-200 p-4">
-                    <p className="text-xs font-black uppercase tracking-wide text-slate-400">Average</p>
-                    <p className="text-2xl font-black text-slate-900 mt-1">
-                      {past.filter((r: Json) => r.scoreScaled != null).length
-                        ? Math.round(past.filter((r: Json) => r.scoreScaled != null).reduce((n: number, r: Json) => n + r.scoreScaled, 0) / past.filter((r: Json) => r.scoreScaled != null).length)
-                        : '—'}
+                )}
+                {dayInfo.state === 'submitted' && dayInfo.released && dayInfo.result && (
+                  <div className="text-center py-4 space-y-3">
+                    <p className="text-xs font-black uppercase tracking-widest text-slate-400">{fmtDay(dayInfo.date)}</p>
+                    <div className="flex items-baseline justify-center gap-2">
+                      <span className="text-4xl font-black text-slate-900">{dayInfo.result.scoreScaled ?? '-'}</span>
+                      <span className="text-sm font-bold text-slate-400">{dayInfo.result.scoreScale === 100 ? '%' : `/ ${dayInfo.result.scoreScale || ''}`}</span>
+                    </div>
+                    <p className="text-sm text-slate-500 font-medium">
+                      {dayInfo.result.scoreCorrect} of {dayInfo.result.questionCount} correct{dayInfo.result.rank ? `, rank ${dayInfo.result.rank}` : ''}
                     </p>
-                  </div>
-                </div>
-                {notice && <p className="text-sm font-bold text-[#EA580C]">{notice}</p>}
-                <div className="space-y-3">
-                  {past.map((r: Json) => (
                     <button
-                      key={r.mockId}
-                      onClick={() => (r.released ? openReview(r.mockId) : setNotice(`Results for ${fmtDay(r.date)} drop at 6:00 am the morning after.`))}
-                      className="w-full bg-white rounded-2xl border border-slate-200 p-4 text-left flex items-center justify-between active:scale-[0.99] transition"
+                      onClick={() => openReview(String(dayInfo.mock?.id || ''))}
+                      className="w-full min-h-[52px] rounded-2xl bg-[#EA580C] text-white font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2"
                     >
-                      <div>
-                        <p className="text-base font-black text-slate-900">{r.title}</p>
-                        <p className="text-sm text-slate-500 font-medium">{fmtDay(r.date)}{r.rank ? `, rank ${r.rank}` : ''}</p>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <span className="text-2xl font-black text-slate-900">{r.scoreScaled ?? '—'}</span>
-                        <span className="text-sm font-bold text-slate-400">{r.scoreScale === 100 ? '%' : `/ ${r.scoreScale || ''}`}</span>
-                        <ChevronRight className="w-5 h-5 text-slate-300" />
-                      </div>
+                      <Check className="w-5 h-5" /> See your answers
                     </button>
-                  ))}
-                </div>
-              </>
+                  </div>
+                )}
+                {dayInfo.state === 'submitted' && (!dayInfo.released || !dayInfo.result) && (
+                  <div className="text-center py-6">
+                    <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto mb-3" />
+                    <p className="text-base font-black text-slate-900">Marked, waiting on release</p>
+                    <p className="text-sm text-slate-500 mt-1">Results drop {fmtClock(dayInfo.releaseAt)}.</p>
+                  </div>
+                )}
+                {dayInfo.state === 'missed' && (
+                  <div className="text-center py-6">
+                    <XCircle className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                    <p className="text-base font-black text-slate-900">You didn&apos;t take this mock</p>
+                    {dayInfo.mock && (
+                      <p className="text-sm text-slate-500 mt-1">{dayInfo.mock.title || 'A mock'} was scheduled that day. Missed mocks cannot be retaken.</p>
+                    )}
+                  </div>
+                )}
+              </div>
             )}
           </>
         )}

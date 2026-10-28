@@ -415,7 +415,7 @@ async function getCentreDoc(centreId: string): Promise<Centre | null> {
   }
 }
 
-async function getBillingDoc(centreId: string): Promise<CentreBilling | null> {
+export async function getBillingDoc(centreId: string): Promise<CentreBilling | null> {
   try {
     const doc = await adminDb.collection('centreBilling').doc(centreId).get();
     return doc.exists ? (doc.data() as CentreBilling) : null;

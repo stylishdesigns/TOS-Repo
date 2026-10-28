@@ -2,7 +2,7 @@ import express from 'express';
 import * as crypto from 'crypto';
 import { FieldValue } from 'firebase-admin/firestore';
 import { adminDb } from './firebaseAdmin';
-import { Caller, httpError, listActiveMembershipsForUser } from './tenantService';
+import { Caller, effectiveStatus, getBillingDoc, getPlatformConfig, httpError, listActiveMembershipsForUser } from './tenantService';
 import {
   MOCKS,
   MOCK_ATTEMPTS,
@@ -150,7 +150,13 @@ async function requireStudent(req: express.Request): Promise<StudentContext> {
   const centreSnap = await adminDb.collection('centres').doc(student.centreId).get();
   if (!centreSnap.exists) throw httpError(403, 'Your centre is not available.');
   const centre = centreSnap.data() as any;
-  if (String(centre?.status || 'active') !== 'active') throw httpError(403, 'Your centre is not available.');
+  // The platform's own member gate (same rule as validateActiveCentreService):
+  // only a suspended centre loses its students. Trial and awaiting-payment
+  // centres stay open for the students already enrolled in them.
+  const billing = await getBillingDoc(student.centreId);
+  const config = await getPlatformConfig();
+  const effStatus = effectiveStatus({ ...centre } as any, billing, config);
+  if (effStatus === 'suspended') throw httpError(403, 'Your centre is not available.');
   // The student record keyed by uid: the username register needs its id.
   const stuSnap = await adminDb.collection('students').where('uid', '==', caller.uid).limit(1).get();
   const stuDoc = stuSnap.docs[0];
@@ -213,6 +219,86 @@ export function markWithKey(savedAnswers: Record<string, any>, keyItems: KeyItem
 // ---------------------------------------------------------------------------
 // Routes
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// GET status?date=: one day's mock view for the student date strip. Today is
+// served by the main status route; this covers past and upcoming days: what
+// was scheduled, whether the student took it, and the released result.
+// ---------------------------------------------------------------------------
+async function dayStatus(res: express.Response, ctx: StudentContext, date: string, today: string): Promise<unknown> {
+  try {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw httpError(400, 'That date is not valid.');
+    const diff = Math.round((Date.parse(`${date}T12:00:00Z`) - Date.parse(`${today}T12:00:00Z`)) / 86400000);
+    if (Math.abs(diff) > 62) throw httpError(400, 'That date is out of range.');
+
+    const cacheKey = `status:${ctx.caller.uid}:${date}`;
+    const cached = cacheGet(cacheKey);
+    if (cached) return res.json(cached);
+
+    const mockSnap = await adminDb.collection(MOCKS).doc(`mock-${date}`).get();
+    const m = mockSnap.exists ? (mockSnap.data() as any) : null;
+    const usable = Boolean(m) && !['cancelled', 'void', 'draft', 'archived'].includes(String(m.status));
+
+    const aSnap = await adminDb.collection(MOCK_ATTEMPTS).doc(`mock-${date}__${ctx.caller.uid}`).get();
+    const a = aSnap.exists ? (aSnap.data() as any) : null;
+
+    const mock = usable ? {
+      id: `mock-${date}`,
+      title: String(m.title || ''),
+      examType: String(m.examType || ''),
+      subjects: (m.subjects || []).map((x: any) => String(x.subject || x)),
+      questionCount: Number(m.questionCount || 0),
+      durationMinutes: Number(m.durationMinutes || 0),
+      status: String(m.status),
+    } : null;
+
+    let state = 'no_mock';
+    if (diff > 0 && usable) state = 'upcoming';
+    else if (diff < 0 && usable) state = a && String(a.status) === 'submitted' ? 'submitted' : 'missed';
+
+    const released = state === 'submitted' && Boolean(
+      (m && String(m.status) === 'released')
+      || a?.rankCorrect != null
+      || (a?.releasesAt && Date.now() >= Date.parse(String(a.releasesAt))),
+    );
+
+    const { settings } = await readSettings();
+    const releaseAt = new Date(
+      Date.parse(`${dateAddDays(date, 1)}T00:00:00.000Z`)
+      + (settings.releaseHourLagos - 1) * 3600_000 + settings.releaseMinuteLagos * 60_000,
+    ).toISOString();
+
+    const body = {
+      ok: true,
+      date,
+      isToday: false,
+      state,
+      mock,
+      attempt: a ? {
+        status: String(a.status || ''),
+        submittedAt: a.submittedAt || null,
+        autoSubmitted: Boolean(a.autoSubmitted),
+      } : null,
+      released,
+      result: released ? {
+        scoreCorrect: Number(a.scoreCorrect || 0),
+        questionCount: Number(a.questionCount || 0),
+        scoreScaled: a.scoreScaled == null ? null : Number(a.scoreScaled),
+        scoreScale: Number(a.scoreScale || 0),
+        rank: a.rankCorrect == null ? null : Number(a.rankCorrect),
+      } : null,
+      releaseAt,
+    };
+    if (statusCache.size >= STATUS_CACHE_MAX) statusCache.clear();
+    statusCache.set(cacheKey, { at: Date.now(), body });
+    res.json(body);
+  } catch (error: any) {
+    if (error?.status) return res.status(error.status).json({ error: error.message });
+    console.error('[student-mock] day status failed:', error?.message || error);
+    res.status(500).json({ error: 'Could not load that day.' });
+  }
+}
+
 export function registerStudentMockRoutes(app: express.Express): void {
   // -----------------------------------------------------------------------
   // GET status: everything the Today tab needs, in one call.
@@ -221,6 +307,8 @@ export function registerStudentMockRoutes(app: express.Express): void {
     try {
       const ctx = await requireStudent(req);
       const today = lagosToday();
+      const qDate = String((req.query as any)?.date || '');
+      if (qDate && qDate !== today) return dayStatus(res, ctx, qDate, today);
       const cacheKey = `status:${ctx.caller.uid}:${today}`;
       const cached = cacheGet(cacheKey);
       if (cached) return res.json(cached);
