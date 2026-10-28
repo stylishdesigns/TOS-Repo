@@ -1244,21 +1244,22 @@ export const MocksTab: React.FC<{ refreshKey: number; openCreateSignal?: number 
   const [createError, setCreateError] = useState('');
   const [guideOpen, setGuideOpen] = useState(false);
 
-  // UI piece 1 (Oct 28): the panel is the answer to every tap on this
-  // screen, so when it opens (create or detail) it scrolls into view and
-  // the date field takes focus. A tapped calendar day keeps an orange
-  // ring while its form is open.
-  const panelRef = useRef<HTMLDivElement | null>(null);
+  // UI piece 1, revised Oct 28 (user's call): the panel is now a slide-in
+  // drawer instead of a card below the calendar, so a tap always brings the
+  // form to the front. The date field takes focus when the create drawer
+  // opens, Escape closes it, and the picked calendar day keeps its orange
+  // ring while the form is open.
+  const drawerRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
-    if (!panel || !panelRef.current) return undefined;
-    const el = panelRef.current;
-    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    if (!panel) return undefined;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !creating) setPanel(null); };
+    window.addEventListener('keydown', onKey);
     const t = window.setTimeout(() => {
-      const input = el.querySelector<HTMLInputElement>('input[type="date"]');
+      const input = drawerRef.current?.querySelector<HTMLInputElement>('input[type="date"]');
       if (input) input.focus({ preventScroll: true });
     }, 350);
-    return () => window.clearTimeout(t);
-  }, [panel]);
+    return () => { window.removeEventListener('keydown', onKey); window.clearTimeout(t); };
+  }, [panel, creating]);
 
   useEffect(() => {
     try { if (!localStorage.getItem('TOS_mocks_guide_seen')) setGuideOpen(true); } catch { /* storage unavailable */ }
@@ -1381,39 +1382,40 @@ export const MocksTab: React.FC<{ refreshKey: number; openCreateSignal?: number 
         <p className="text-xs text-slate-500 mt-3">Tap a free day to create a mock for that date, or a filled day to open it. One mock per day.</p>
       </Card>
 
-      <div className="space-y-5">
       <UpcomingMocks byDate={byDate} onPick={(date, mk) => (mk ? setPanel({ mode: 'detail', id: mk.id }) : createOn(date))} />
-      <div ref={panelRef} className="scroll-mt-24">
-      <Card title={panel?.mode === 'create' ? `New mock · ${panel.date}` : panel?.mode === 'detail' ? 'Mock' : 'Mocks'}>
-        {!panel && (
-          <p className="text-sm text-slate-400">Pick a day on the calendar to create a mock, or open an existing one. Scheduling freezes the paper: questions are drawn from the mock bank and the marking key stays on the server.</p>
-        )}
-        {panel?.mode === 'create' && (
-          <>
-            <MockForm
-              showDate
-              initial={{ ...emptyForm('jamb'), date: panel.date }}
-              busy={creating}
-              onSubmit={async (payload) => {
-                setCreating(true); setCreateError('');
-                try {
-                  const r = await api('/api/tos/mocks', { method: 'POST', body: { ...payload, date: payload.date || panel.date } });
-                  setPanel({ mode: 'detail', id: r.id });
-                  await load();
-                } catch (e: any) { setCreateError(e.message); }
-                finally { setCreating(false); }
-              }}
-            />
-            {createError && <p className="text-rose-300 text-sm mt-3">{createError}</p>}
-          </>
-        )}
-        {panel?.mode === 'detail' && (
-          <MockDetail mockId={panel.id} onChanged={load} onClose={() => setPanel(null)} />
-        )}
-      </Card>
-      </div>
-      </div>
     </div>
+      )}
+      {panel && (
+        <div className="fixed inset-0 z-50 bg-slate-950 lg:bg-slate-950/80 lg:flex lg:justify-end" onClick={() => { if (!creating) setPanel(null); }}>
+          <div ref={drawerRef} className="w-full lg:max-w-[480px] h-full bg-slate-950 border-l border-slate-800 overflow-y-auto p-5 lg:p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <p className="text-lg font-black text-white">{panel.mode === 'create' ? `New mock · ${panel.date}` : 'Mock'}</p>
+              <button onClick={() => setPanel(null)} aria-label="Close panel" className="p-2 rounded-lg text-slate-400 hover:text-white min-h-[44px] min-w-[44px]"><X className="w-5 h-5" /></button>
+            </div>
+            {panel.mode === 'create' && (
+              <>
+                <MockForm
+                  showDate
+                  initial={{ ...emptyForm('jamb'), date: panel.date }}
+                  busy={creating}
+                  onSubmit={async (payload) => {
+                    setCreating(true); setCreateError('');
+                    try {
+                      const r = await api('/api/tos/mocks', { method: 'POST', body: { ...payload, date: payload.date || panel.date } });
+                      setPanel({ mode: 'detail', id: r.id });
+                      await load();
+                    } catch (e: any) { setCreateError(e.message); }
+                    finally { setCreating(false); }
+                  }}
+                />
+                {createError && <p className="text-rose-300 text-sm mt-3">{createError}</p>}
+              </>
+            )}
+            {panel.mode === 'detail' && (
+              <MockDetail mockId={panel.id} onChanged={load} onClose={() => setPanel(null)} />
+            )}
+          </div>
+        </div>
       )}
       {subTab === 'series' && (
         <Card title="WAEC/NECO series builder">
