@@ -435,7 +435,7 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number; kind?: 'practice
   const openTopicPreview = (t: any) => {
     const subject = screenSubject;
     if (!subject) return;
-    setTopicPreview({ sKey: subject.key, sLabel: subject.label, tKey: t.key, tLabel: t.label, total: Number(t.total) || 0 });
+    setTopicModal({ sKey: subject.key, sLabel: subject.label, tKey: t.key, tLabel: t.label, total: Number(t.total) || 0 });
     setTopicQuestions(null);
     setTopicQState('loading');
     setTopicQError('');
@@ -449,7 +449,7 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number; kind?: 'practice
 
   const closeTopicPreview = () => {
     if (bulkEditBusy || topicDeleteBusy) return;
-    setTopicPreview(null);
+    setTopicModal(null);
     setTopicQuestions(null);
     setBulkEditMode(false);
     setBulkParseInfo(null);
@@ -477,7 +477,7 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number; kind?: 'practice
       const qs = Array.isArray(r?.questions) ? r.questions : [];
       setTopicQuestions(qs);
       setTopicQCapped(Boolean(r?.capped));
-      setTopicPreview((prev) => (prev ? { ...prev, total: Number(r?.total) || qs.length } : prev));
+      setTopicModal((prev) => (prev ? { ...prev, total: Number(r?.total) || qs.length } : prev));
       setTopicQState('ready');
     } catch (e: any) {
       setTopicQState('error');
@@ -524,7 +524,7 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number; kind?: 'practice
       setBulkEditMode(false);
       setBulkParseInfo(null);
       setBulkEditText('');
-      setTopicPreview((prev) => (prev ? { ...prev, total: topicQuestions.length } : prev));
+      setTopicModal((prev) => (prev ? { ...prev, total: topicQuestions.length } : prev));
       await Promise.all([fetchTopicQuestions(), loadTree()]);
       setTopicDeleteMsg(`All ${topicQuestions.length} questions saved.`);
     } catch (e: any) {
@@ -544,7 +544,7 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number; kind?: 'practice
       }) as any;
       setTopicDeleteBusy(false);
       setConfirmTopicDelete(false);
-      setTopicPreview(null);
+      setTopicModal(null);
       setTopicQuestions(null);
       await loadTree();
       if (listViewActive) loadList('replace');
