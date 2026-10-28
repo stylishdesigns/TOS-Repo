@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   CalendarDays, ChevronLeft, ChevronRight, HelpCircle, Loader2, Plus, Trash2,
   AlertTriangle, CheckCircle2, FileText, RefreshCw, Rocket, Trophy, X,
@@ -1244,6 +1244,22 @@ export const MocksTab: React.FC<{ refreshKey: number; openCreateSignal?: number 
   const [createError, setCreateError] = useState('');
   const [guideOpen, setGuideOpen] = useState(false);
 
+  // UI piece 1 (Oct 28): the panel is the answer to every tap on this
+  // screen, so when it opens (create or detail) it scrolls into view and
+  // the date field takes focus. A tapped calendar day keeps an orange
+  // ring while its form is open.
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!panel || !panelRef.current) return undefined;
+    const el = panelRef.current;
+    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    const t = window.setTimeout(() => {
+      const input = el.querySelector<HTMLInputElement>('input[type="date"]');
+      if (input) input.focus({ preventScroll: true });
+    }, 350);
+    return () => window.clearTimeout(t);
+  }, [panel]);
+
   useEffect(() => {
     try { if (!localStorage.getItem('TOS_mocks_guide_seen')) setGuideOpen(true); } catch { /* storage unavailable */ }
   }, []);
@@ -1352,7 +1368,7 @@ export const MocksTab: React.FC<{ refreshKey: number; openCreateSignal?: number 
                 return (
                   <button
                     onClick={() => (mk ? setPanel({ mode: 'detail', id: mk.id }) : createOn(c.date as string))}
-                    className={`w-full h-full min-h-[64px] rounded-xl border p-1.5 text-left transition-colors ${mk ? `${STATUS_STYLES[mk.status]} hover:brightness-125` : 'border-white/5 hover:border-orange-500/40 bg-white/[0.02]'} ${c.date === today ? 'ring-1 ring-orange-500/50' : ''}`}
+                    className={`w-full h-full min-h-[64px] rounded-xl border p-1.5 text-left transition-colors ${mk ? `${STATUS_STYLES[mk.status]} hover:brightness-125` : 'border-white/5 hover:border-orange-500/40 bg-white/[0.02]'} ${panel?.mode === 'create' && panel.date === c.date ? 'ring-2 ring-orange-400' : c.date === today ? 'ring-1 ring-orange-500/50' : ''}`}
                   >
                     <span className={`text-[11px] font-bold ${mk ? 'text-white' : 'text-slate-500'}`}>{day}</span>
                     {mk && <span className="block text-[9px] font-bold uppercase tracking-wider mt-0.5 truncate">{STATUS_LABELS[mk.status] || mk.status}</span>}
@@ -1367,6 +1383,7 @@ export const MocksTab: React.FC<{ refreshKey: number; openCreateSignal?: number 
 
       <div className="space-y-5">
       <UpcomingMocks byDate={byDate} onPick={(date, mk) => (mk ? setPanel({ mode: 'detail', id: mk.id }) : createOn(date))} />
+      <div ref={panelRef} className="scroll-mt-24">
       <Card title={panel?.mode === 'create' ? `New mock · ${panel.date}` : panel?.mode === 'detail' ? 'Mock' : 'Mocks'}>
         {!panel && (
           <p className="text-sm text-slate-400">Pick a day on the calendar to create a mock, or open an existing one. Scheduling freezes the paper: questions are drawn from the mock bank and the marking key stays on the server.</p>
@@ -1394,6 +1411,7 @@ export const MocksTab: React.FC<{ refreshKey: number; openCreateSignal?: number 
           <MockDetail mockId={panel.id} onChanged={load} onClose={() => setPanel(null)} />
         )}
       </Card>
+      </div>
       </div>
     </div>
       )}
