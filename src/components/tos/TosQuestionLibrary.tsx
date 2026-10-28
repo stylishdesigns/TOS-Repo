@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Loader2, Search, X, ChevronRight, Check, Pencil, Trash2 } from 'lucide-react';
 import { api, Json, Card, inputCls, btnPrimary, btnGhost, fmtDate } from './tosShared';
 import { BANK_YEARS } from '../../data/seniorSubjects';
+import { parseBankPaste } from '../../utils/questionParsing';
 
 /**
  * New question bank library (Prompt L, piece L3).
@@ -413,6 +414,147 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number; kind?: 'practice
     pickScope(type, key, label, subjectKey, subjectLabel);
   };
 
+  // ---- Subject drawer + topic preview + mass actions ------------------------
+  // Clicking a subject opens a right-side drawer listing every topic; clicking
+  // a topic opens a full preview of its questions with answers and
+  // explanations, and the two mass actions (edit all together, delete all).
+  const [topicModal, setTopicModal] = useState<{ sKey: string; sLabel: string; tKey: string; tLabel: string; total: number } | null>(null);
+  const [topicQuestions, setTopicQuestions] = useState<any[] | null>(null);
+  const [topicQState, setTopicQState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [topicQError, setTopicQError] = useState('');
+  const [topicQCapped, setTopicQCapped] = useState(false);
+  const [bulkEditMode, setBulkEditMode] = useState(false);
+  const [bulkEditText, setBulkEditText] = useState('');
+  const [bulkParseInfo, setBulkParseInfo] = useState<{ parsed: number; essay: number; empty: number } | null>(null);
+  const [bulkEditBusy, setBulkEditBusy] = useState(false);
+  const [bulkEditMsg, setBulkEditMsg] = useState('');
+  const [confirmTopicDelete, setConfirmTopicDelete] = useState(false);
+  const [topicDeleteBusy, setTopicDeleteBusy] = useState(false);
+  const [topicDeleteMsg, setTopicDeleteMsg] = useState('');
+
+  const openTopicPreview = (t: any) => {
+    const subject = screenSubject;
+    if (!subject) return;
+    setTopicPreview({ sKey: subject.key, sLabel: subject.label, tKey: t.key, tLabel: t.label, total: Number(t.total) || 0 });
+    setTopicQuestions(null);
+    setTopicQState('loading');
+    setTopicQError('');
+    setBulkEditMode(false);
+    setBulkEditText('');
+    setBulkParseInfo(null);
+    setBulkEditMsg('');
+    setConfirmTopicDelete(false);
+    setTopicDeleteMsg('');
+  };
+
+  const closeTopicPreview = () => {
+    if (bulkEditBusy || topicDeleteBusy) return;
+    setTopicPreview(null);
+    setTopicQuestions(null);
+    setBulkEditMode(false);
+    setBulkParseInfo(null);
+  };
+
+  const formatQuestionsForEdit = (items: any[]) => {
+    const blocks: string[] = [];
+    items.forEach((q: any, i: number) => {
+      const lines: string[] = [`${i + 1}. ${String(q.text || '')}`];
+      (q.options || []).forEach((o: any) => lines.push(`${o.key}: ${String(o.text || '')}`));
+      lines.push(`Answer: ${String(q.correct || '')}`);
+      if (kind !== 'mock' && q.year != null) lines.push(`Year: ${q.year}`);
+      if (String(q.explanation || '')) lines.push(`Explanation: ${String(q.explanation)}`);
+      blocks.push(lines.join('\n'));
+    });
+    return blocks.join('\n\n') + '\n';
+  };
+
+  const fetchTopicQuestions = useCallback(async () => {
+    if (!topicModal) return;
+    try {
+      setTopicQState('loading');
+      setTopicQError('');
+      const r = await api(`/api/tos/questionbank/topic-questions?kind=${kind}&subjectKey=${encodeURIComponent(topicModal.sKey)}&topicKey=${encodeURIComponent(topicModal.tKey)}`) as any;
+      const qs = Array.isArray(r?.questions) ? r.questions : [];
+      setTopicQuestions(qs);
+      setTopicQCapped(Boolean(r?.capped));
+      setTopicPreview((prev) => (prev ? { ...prev, total: Number(r?.total) || qs.length } : prev));
+      setTopicQState('ready');
+    } catch (e: any) {
+      setTopicQState('error');
+      setTopicQError(String(e?.message || 'Could not load the questions.'));
+    }
+  }, [topicModal, kind]);
+
+  useEffect(() => { if (topicModal) fetchTopicQuestions(); }, [topicModal?.sKey, topicModal?.tKey]);
+
+  const startBulkEdit = () => {
+    if (!topicQuestions) return;
+    setBulkEditText(formatQuestionsForEdit(topicQuestions));
+    setBulkParseInfo(null);
+    setBulkEditMsg('');
+    setBulkEditMode(true);
+  };
+
+  const parseBulkEdit = () => {
+    try {
+      const r = parseBankPaste(bulkEditText);
+      setBulkParseInfo({ parsed: r.questions.length, essay: r.skippedEssay, empty: r.skippedEmpty });
+      setBulkEditMsg('');
+    } catch {
+      setBulkParseInfo(null);
+      setBulkEditMsg('That paste did not parse. Check the format and try again.');
+    }
+  };
+
+  const applyBulkEdit = async () => {
+    if (!topicModal || !topicQuestions || !bulkParseInfo) return;
+    if (bulkParseInfo.parsed !== topicQuestions.length) {
+      setBulkEditMsg(`The topic holds ${topicQuestions.length} questions but the box parsed ${bulkParseInfo.parsed}. Keep the numbered blocks 1 to ${topicQuestions.length}.`);
+      return;
+    }
+    setBulkEditBusy(true);
+    setBulkEditMsg('');
+    try {
+      const parsed = parseBankPaste(bulkEditText);
+      await api('/api/tos/questionbank/topic-bulk-edit', {
+        method: 'POST',
+        body: { confirm: 'TOPIC-EDIT', kind, subjectKey: topicModal.sKey, topicKey: topicModal.tKey, questions: parsed.questions },
+      });
+      setBulkEditBusy(false);
+      setBulkEditMode(false);
+      setBulkParseInfo(null);
+      setBulkEditText('');
+      setTopicPreview((prev) => (prev ? { ...prev, total: topicQuestions.length } : prev));
+      await Promise.all([fetchTopicQuestions(), loadTree()]);
+      setTopicDeleteMsg(`All ${topicQuestions.length} questions saved.`);
+    } catch (e: any) {
+      setBulkEditBusy(false);
+      setBulkEditMsg(String(e?.message || 'The bulk edit failed.'));
+    }
+  };
+
+  const applyTopicDelete = async () => {
+    if (!topicModal) return;
+    setTopicDeleteBusy(true);
+    setTopicDeleteMsg('');
+    try {
+      const r = await api('/api/tos/questionbank/topic-bulk-delete', {
+        method: 'POST',
+        body: { confirm: 'TOPIC-DELETE', kind, subjectKey: topicModal.sKey, topicKey: topicModal.tKey },
+      }) as any;
+      setTopicDeleteBusy(false);
+      setConfirmTopicDelete(false);
+      setTopicPreview(null);
+      setTopicQuestions(null);
+      await loadTree();
+      if (listViewActive) loadList('replace');
+      setTopicDeleteMsg(`Cleared "${topicModal.tLabel}": ${Number(r?.hardDeleted) || 0} drafts deleted, ${Number(r?.softRemoved) || 0} published marked removed.`);
+    } catch (e: any) {
+      setTopicDeleteBusy(false);
+      setTopicDeleteMsg(String(e?.message || 'The bulk delete failed.'));
+    }
+  };
+
   const toggleScreenTopic = (tKey: string) => {
     setOpenTopicsInScreen((prev) => {
       const next = new Set(prev);
@@ -473,77 +615,6 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number; kind?: 'practice
     </Card>
   );
 
-  const subjectScreen = screenSubject ? (
-    <Card>
-      <div className="flex items-center gap-1.5 flex-wrap text-xs text-slate-500 mb-2">
-        <button onClick={() => setActiveSubject(null)} className="font-semibold hover:text-white px-1 min-h-[44px]">{kind === 'mock' ? 'Mock' : 'Practice'}</button>
-        <ChevronRight className="w-3.5 h-3.5 text-slate-600" />
-        <span className="text-orange-300 font-bold">{screenSubject.label}</span>
-      </div>
-      <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          <h3 className="text-lg font-extrabold text-white">{screenSubject.label}</h3>
-          <p className="text-xs text-slate-500 mt-0.5">
-            {countsHidden
-              ? '–'
-              : `${Number(screenSubject.total) || 0} question${Number(screenSubject.total) === 1 ? '' : 's'} · ${(screenSubject.topics || []).length} topic${(screenSubject.topics || []).length === 1 ? '' : 's'}${kind === 'mock' ? '' : ` · ${Object.keys(screenSubject.byYear || {}).length} year${Object.keys(screenSubject.byYear || {}).length === 1 ? '' : 's'}`}`}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button onClick={() => pickFromScreen('subject', screenSubject.key, screenSubject.label, screenSubject.key, screenSubject.label)}
-            disabled={countsHidden || !(Number(screenSubject.total) || 0)}
-            className={btnPrimary}>See all its questions</button>
-          <button onClick={() => { openTopics(); setTopicSubject(screenSubject.key); }} className={btnGhost}>Manage topics (rename or merge)</button>
-        </div>
-      </div>
-      {!(Number(screenSubject.total) || 0) && !countsHidden && (
-        <p className="text-sm text-slate-500 mt-3">No questions here yet. Go to Import & edit to add some.</p>
-      )}
-      {(screenSubject.topics || []).length > 0 && (
-        <div className="mt-4">
-          <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Topics</p>
-          <div className="space-y-2">
-            {(screenSubject.topics || []).map((t: any) => (
-              <div key={t.key} className="rounded-xl border border-slate-700/50 bg-slate-900/40">
-                <button onClick={() => toggleScreenTopic(t.key)} className="w-full flex items-center justify-between gap-2 px-3 py-2.5 text-left min-h-[44px]">
-                  <span className="text-sm font-semibold text-slate-200 truncate">{t.label}</span>
-                  <span className="flex items-center gap-1.5 shrink-0">
-                    <span className="text-[11px] text-slate-500">{countsHidden ? '–' : t.total}</span>
-                    <ChevronRight className={`w-4 h-4 text-slate-500 transition-transform ${openTopicsInScreen.has(t.key) ? 'rotate-90' : ''}`} />
-                  </span>
-                </button>
-                {openTopicsInScreen.has(t.key) && (
-                  <div className="px-3 pb-3 space-y-1">
-                    <button onClick={() => pickFromScreen('topic', t.key, t.label, screenSubject.key, screenSubject.label)} className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold text-orange-300/90 hover:bg-white/5 min-h-[36px]">
-                      <span>All {t.label} questions</span><span className="text-slate-600">{countsHidden ? '–' : t.total}</span>
-                    </button>
-                    {kind !== 'mock' && Object.entries(t.byYear || {}).sort((a: any, b: any) => Number(b[0]) - Number(a[0])).map(([y, n]: any) => (
-                      <button key={y} onClick={() => pickFromScreen('year', String(y), `Year ${y}`, screenSubject.key, screenSubject.label)} className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs text-slate-400 hover:bg-white/5 min-h-[36px]">
-                        <span>Year {y}</span><span className="text-slate-600">{countsHidden ? '–' : String(n)}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-      {kind !== 'mock' && Object.keys(screenSubject.byYear || {}).length > 0 && (
-        <div className="mt-4">
-          <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Years</p>
-          <div className="flex flex-wrap gap-2">
-            {Object.entries(screenSubject.byYear || {}).sort((a: any, b: any) => Number(b[0]) - Number(a[0])).map(([y, n]: any) => (
-              <button key={y} onClick={() => pickFromScreen('year', String(y), `Year ${y}`, screenSubject.key, screenSubject.label)}
-                className="px-3 py-2 rounded-xl border border-slate-700/60 text-sm text-slate-300 hover:text-white min-h-[44px]">
-                Year {y} <span className="text-slate-600 ml-1">{countsHidden ? '–' : String(n)}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-    </Card>
-  ) : null;
 
 
   // U3: the level-3 screen. The first crumb is always the stream and always
@@ -796,12 +867,167 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number; kind?: 'practice
       {listError && (
         <div className="rounded-2xl border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-200">{listError}</div>
       )}
+      {topicDeleteMsg && (
+        <div className="rounded-2xl border border-emerald-500/40 bg-emerald-500/10 p-3.5 text-sm text-emerald-200">{topicDeleteMsg}</div>
+      )}
 
-      {screenSubject && subjectScreen}
+      {activeSubject && screenSubject && (
+        <div className="fixed inset-0 z-40 bg-slate-950/70" onClick={() => setActiveSubject(null)}>
+          <div className="absolute right-0 top-0 h-full w-full sm:max-w-[430px] bg-slate-950 border-l border-slate-800 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="p-4 sm:p-5 space-y-4">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{kind === 'mock' ? 'Mock bank' : 'Practice bank'}</p>
+                  <h3 className="text-lg font-extrabold text-white">{screenSubject.label}</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {countsHidden ? '–' : `${Number(screenSubject.total) || 0} question${Number(screenSubject.total) === 1 ? '' : 's'} · ${(screenSubject.topics || []).length} topic${(screenSubject.topics || []).length === 1 ? '' : 's'}`}
+                  </p>
+                </div>
+                <button onClick={() => setActiveSubject(null)} className="p-2 rounded-lg text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
+              </div>
+              <button
+                onClick={() => pickFromScreen('subject', screenSubject.key, screenSubject.label, screenSubject.key, screenSubject.label)}
+                disabled={countsHidden || !(Number(screenSubject.total) || 0)}
+                className={`${btnPrimary} w-full justify-center`}
+              >
+                See all its questions
+              </button>
+              {(screenSubject.topics || []).length > 0 ? (
+                <div className="space-y-2">
+                  <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Topics</p>
+                  {(screenSubject.topics || []).map((t: any) => (
+                    <button key={t.key} onClick={() => openTopicPreview(t)}
+                      className="w-full flex items-center justify-between gap-2 px-3.5 py-3 rounded-xl border border-slate-700/50 bg-slate-900/40 hover:border-orange-500/40 text-left min-h-[52px]">
+                      <span className="text-sm font-semibold text-slate-200 truncate">{t.label}</span>
+                      <span className="text-xs text-slate-500 shrink-0">{countsHidden ? '–' : t.total}</span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-slate-500">No topics here yet.</p>
+              )}
+              {kind !== 'mock' && Object.keys(screenSubject.byYear || {}).length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Years</p>
+                  <div className="flex flex-wrap gap-2">
+                    {Object.entries(screenSubject.byYear || {}).sort((a: any, b: any) => Number(b[0]) - Number(a[0])).map(([y, n]: any) => (
+                      <button key={y} onClick={() => pickFromScreen('year', String(y), `Year ${y}`, screenSubject.key, screenSubject.label)}
+                        className="px-3 py-2 rounded-xl border border-slate-700/60 text-sm text-slate-300 hover:text-white min-h-[44px]">
+                        Year {y} <span className="text-slate-600 ml-1">{countsHidden ? '–' : String(n)}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <button onClick={() => { openTopics(); setTopicSubject(screenSubject.key); }} className="w-full px-3 py-2.5 rounded-xl border border-slate-700/60 text-xs font-bold text-slate-300 hover:text-white min-h-[44px]">
+                Manage topics (rename or merge)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
             {!screenSubject && !listViewActive && subjectShelf}
       {!screenSubject && listViewActive && level3}
 
+
+      {topicModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/90 overflow-y-auto p-4" onClick={closeTopicPreview}>
+          <div className="max-w-3xl mx-auto my-6 rounded-2xl border border-slate-700 bg-slate-900 p-4 sm:p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{topicModal.sLabel}</p>
+                <h3 className="text-lg font-extrabold text-white">{topicModal.tLabel}</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {topicModal.total} question{topicModal.total === 1 ? '' : 's'}{topicQCapped ? ' · showing the first 800' : ''}
+                </p>
+              </div>
+              <button onClick={closeTopicPreview} className="p-2 rounded-lg text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button onClick={startBulkEdit} disabled={topicQState !== 'ready' || !topicQuestions || topicQuestions.length === 0} className={btnPrimary}>Edit all together</button>
+              <button onClick={() => setConfirmTopicDelete(true)} disabled={topicQState !== 'ready' || !topicQuestions || topicQuestions.length === 0}
+                className="px-4 py-2.5 rounded-xl border border-red-500/50 text-red-200 text-sm font-bold min-h-[44px] hover:bg-red-500/10">
+                Delete all
+              </button>
+            </div>
+            {confirmTopicDelete && (
+              <div className="rounded-2xl border border-red-500/40 bg-red-500/10 p-4 space-y-2">
+                <p className="font-bold text-white">Delete all {topicModal.total} questions in {topicModal.tLabel}?</p>
+                <p className="text-sm text-red-200">Drafts are deleted outright; published ones are marked removed and stay in the Removed tab until the bin is emptied. Draft deletion cannot be undone.</p>
+                <div className="flex flex-wrap gap-2">
+                  <button onClick={applyTopicDelete} disabled={topicDeleteBusy}
+                    className="px-4 py-2.5 rounded-xl bg-red-600 text-white text-sm font-bold min-h-[44px] disabled:opacity-50">
+                    {topicDeleteBusy ? 'Deleting...' : 'Yes, delete all'}
+                  </button>
+                  <button onClick={() => setConfirmTopicDelete(false)} disabled={topicDeleteBusy} className={btnGhost}>Keep them</button>
+                </div>
+                {topicDeleteMsg && <p className="text-sm text-orange-200">{topicDeleteMsg}</p>}
+              </div>
+            )}
+            {bulkEditMode ? (
+              <div className="space-y-3">
+                <p className="text-xs text-slate-400">
+                  Every question in this topic is in the box below, in the same format the import uses. Edit anything you like, keep the numbered blocks, then parse and apply. The count must stay at {topicModal.total}.
+                </p>
+                <textarea value={bulkEditText} onChange={(e) => setBulkEditText(e.target.value)} rows={18} className={`${inputCls} font-mono text-xs`} />
+                <div className="flex flex-wrap gap-2">
+                  <button onClick={parseBulkEdit} className={btnGhost}>Parse & preview</button>
+                  <button onClick={applyBulkEdit} disabled={bulkEditBusy || !bulkParseInfo} className={btnPrimary}>
+                    {bulkEditBusy ? 'Saving...' : `Apply changes to all ${topicModal.total}`}
+                  </button>
+                  <button onClick={() => setBulkEditMode(false)} disabled={bulkEditBusy} className={btnGhost}>Back to the questions</button>
+                </div>
+                {bulkParseInfo && (
+                  <p className={`text-sm ${bulkParseInfo.parsed === topicModal.total ? 'text-emerald-300' : 'text-amber-300'}`}>
+                    Parsed {bulkParseInfo.parsed} of {topicModal.total}.{bulkParseInfo.essay ? ` ${bulkParseInfo.essay} essay-style blocks skipped.` : ''}{bulkParseInfo.empty ? ` ${bulkParseInfo.empty} empty blocks skipped.` : ''}
+                    {bulkParseInfo.parsed !== topicModal.total ? ' The counts must match before you can apply.' : ' Looks good; apply when ready.'}
+                  </p>
+                )}
+                {bulkEditMsg && <p className="text-sm text-orange-200">{bulkEditMsg}</p>}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {topicQState === 'loading' && <p className="text-sm text-slate-400">Loading questions...</p>}
+                {topicQState === 'error' && <p className="text-sm text-red-300">{topicQError}</p>}
+                {topicQState === 'ready' && topicQuestions && topicQuestions.length === 0 && (
+                  <p className="text-sm text-slate-500">No live questions in this topic; the shelf count may be stale. Refresh the page and try again.</p>
+                )}
+                {topicQState === 'ready' && (topicQuestions || []).map((q: any, i: number) => (
+                  <div key={q.id} className="rounded-2xl border border-slate-700/50 bg-slate-900/40 p-4 space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-sm font-semibold text-slate-100"><span className="text-orange-300 font-bold mr-1">Q{i + 1}.</span>{q.text}</p>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${q.status === 'published' ? 'bg-emerald-500/15 text-emerald-300' : q.status === 'draft' ? 'bg-sky-500/15 text-sky-300' : 'bg-amber-500/15 text-amber-300'}`}>{q.status}</span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                      {(q.options || []).map((o: any) => {
+                        const good = o.key === q.correct;
+                        return (
+                          <div key={o.key} className={`flex items-center gap-1.5 text-xs rounded-lg px-2.5 py-1.5 border ${good ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-200 font-semibold' : 'border-slate-700/60 text-slate-300'}`}>
+                            <span className="font-bold shrink-0">{o.key}.</span><span>{o.text}</span>
+                            {good && <Check className="w-3.5 h-3.5 ml-auto shrink-0" />}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <p className="text-[11px] font-bold text-emerald-300">Answer: {q.correct}</p>
+                    {String(q.explanation || '') && (
+                      <p className="text-xs text-slate-400 leading-relaxed"><span className="font-bold text-slate-500">Explanation: </span>{q.explanation}</p>
+                    )}
+                    <div className="flex flex-wrap gap-1.5 items-center">
+                      {kind !== 'mock' && q.year != null && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">{q.year}</span>}
+                      {kind !== 'mock' && q.difficulty && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">{DIFF_LABELS[q.difficulty] || q.difficulty}</span>}
+                      <button onClick={() => openEditor(q.id)} className="ml-auto text-[11px] font-semibold text-orange-300/90 hover:text-orange-200 flex items-center gap-1">
+                        <Pencil className="w-3 h-3" /> Edit alone
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {(editor || editorLoading) && (
         <div className="fixed inset-0 z-50 bg-slate-950 lg:bg-slate-950/80 lg:flex lg:justify-end" onClick={() => { if (!saving) setEditor(null); }}>

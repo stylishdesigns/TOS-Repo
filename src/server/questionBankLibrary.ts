@@ -63,6 +63,9 @@ const QB_SCAN_PAGE = 500;
 const QB_SCAN_PAGES_MAX = 200; // 100k documents, a hard stop for maintenance scans
 const BACKFILL_MAX_DOCS = 400;
 const SUBJECT_DOC_CAP = 200;
+const OPTION_KEYS = ['A', 'B', 'C', 'D'] as const;
+const TEXT_MAX = 4000;
+const OPTION_TEXT_MAX = 800;
 
 function parseKind(raw: unknown): Kind {
   const kind = String(raw ?? 'practice').trim().toLowerCase();
@@ -1017,6 +1020,215 @@ export function registerQuestionBankLibraryRoutes(
     } catch (error: any) {
       console.error('[tos/questionbank/topic-change] failed:', error?.message || error);
       res.status(error?.status || 500).json({ error: error?.message || 'Topic change failed.' });
+    }
+  });
+
+
+  // ---- Topic review, bulk edit and bulk delete (the Library drawer flow) ----
+  // The Library's subject drawer opens a topic preview listing every question
+  // with its answer and explanation; these routes feed that preview and run
+  // its two mass actions. Practice questions may carry per-question year and
+  // difficulty overrides in the edited paste, exactly like an import; mocks
+  // keep no year and no difficulty (server-enforced, same as the import).
+
+  const TOPIC_SCAN_CAP = 800; // far above any one topic; the preview says when it truncates
+
+  app.get('/api/tos/questionbank/topic-questions', async (req, res) => {
+    try {
+      requireTos(req);
+      const kind = parseKind(req.query.kind);
+      const subjectKey = mapKey(req.query.subjectKey);
+      const topicKey = mapKey(req.query.topicKey);
+      if (!subjectKey || !topicKey) throw httpError(400, 'Pick a subject and a topic first.');
+      const subjectDoc = await adminDb.collection(QB_COUNTS).doc(`${kind}__s__${subjectKey}`).get();
+      const sd = (subjectDoc.exists ? subjectDoc.data() : {}) as any;
+      const subjectLabel = String(sd.label || subjectKey);
+      const topicLabel = String(sd.byTopic?.[topicKey]?.label || topicKey);
+      const snap = await adminDb.collection(QB_QUESTIONS)
+        .where('kind', '==', kind)
+        .where('subjectKey', '==', subjectKey)
+        .where('topicKey', '==', topicKey)
+        .orderBy('__name__').limit(TOPIC_SCAN_CAP).get();
+      const questions = snap.docs
+        .map((s) => {
+          const d = s.data() as any;
+          return {
+            id: s.id,
+            status: String(d.status || 'draft'),
+            text: String(d.text || ''),
+            options: Array.isArray(d.options) ? d.options : [],
+            correct: String(d.correct || ''),
+            explanation: String(d.explanation || ''),
+            year: d.year ?? null,
+            difficulty: d.difficulty ?? null,
+            createdAt: String(d.createdAt || ''),
+          };
+        })
+        .filter((q) => q.status !== 'removed')
+        .sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)) || a.id.localeCompare(b.id));
+      res.json({
+        ok: true, kind, subjectKey, topicKey, subject: subjectLabel, topic: topicLabel,
+        total: questions.length, capped: snap.size >= TOPIC_SCAN_CAP, questions,
+      });
+    } catch (error: any) {
+      console.error('[tos/questionbank/topic-questions] failed:', error?.message || error);
+      res.status(error?.status || 500).json({ error: error?.message || 'Failed to load the topic.' });
+    }
+  });
+
+  // Bulk edit one topic in place: the paste is parsed client-side, posted as
+  // parsed questions, and applied position by position, so every question
+  // keeps its id, status, subject and topic. Nothing is written unless every
+  // question in the paste validates and the count matches the topic exactly.
+  app.post('/api/tos/questionbank/topic-bulk-edit', async (req, res) => {
+    try {
+      const caller = requireTos(req);
+      if (String(req.body?.confirm || '') !== 'TOPIC-EDIT') {
+        throw httpError(400, 'Missing confirm. Call with confirm:"TOPIC-EDIT" from the topic preview after the parse preview.');
+      }
+      const kind = parseKind(req.body?.kind);
+      const subjectKey = mapKey(req.body?.subjectKey);
+      const topicKey = mapKey(req.body?.topicKey);
+      if (!subjectKey || !topicKey) throw httpError(400, 'Pick a subject and a topic first.');
+      const items: any[] = Array.isArray(req.body?.questions) ? req.body.questions : [];
+      if (items.length === 0) throw httpError(400, 'No parsed questions arrived. Parse the paste again and try once more.');
+      if (items.length > TOPIC_SCAN_CAP) throw httpError(400, `Too many questions (${items.length}). The cap is ${TOPIC_SCAN_CAP}.`);
+
+      const snap = await adminDb.collection(QB_QUESTIONS)
+        .where('kind', '==', kind)
+        .where('subjectKey', '==', subjectKey)
+        .where('topicKey', '==', topicKey)
+        .orderBy('__name__').limit(TOPIC_SCAN_CAP).get();
+      const live = snap.docs.filter((s) => String((s.data() as any).status || 'draft') !== 'removed');
+      if (items.length !== live.length) {
+        throw httpError(400, `This topic holds ${live.length} questions but the paste parsed ${items.length}. Editing keeps every question in place, so the numbered blocks must stay 1 to ${live.length}. To change the count, remove single questions or delete the topic's questions and import again.`);
+      }
+
+      // Validate every item first: the write only starts once the whole paste
+      // passes, so a bad block cannot leave the topic half-edited.
+      const now = new Date().toISOString();
+      const updates: { ref: any; prev: any; next: any }[] = [];
+      for (let i = 0; i < live.length; i++) {
+        const doc = live[i];
+        const d = doc.data() as any;
+        const it = items[i] || {};
+        const text = String(it.text ?? '').trim();
+        const explanation = String(it.explanation ?? '').trim();
+        const rawOptions: any[] = Array.isArray(it.options) ? it.options : [];
+        if (!text || text.length > TEXT_MAX) throw httpError(400, `Question ${i + 1}: the text is empty or over ${TEXT_MAX} characters.`);
+        if (rawOptions.length !== 4) throw httpError(400, `Question ${i + 1}: it needs exactly four options.`);
+        if (explanation.length > TEXT_MAX) throw httpError(400, `Question ${i + 1}: the explanation is over ${TEXT_MAX} characters.`);
+        const options = OPTION_KEYS.map((key, j) => {
+          const t = String(rawOptions[j]?.text ?? '').trim();
+          if (!t || t.length > OPTION_TEXT_MAX) throw httpError(400, `Question ${i + 1}, option ${key}: empty or over ${OPTION_TEXT_MAX} characters.`);
+          return { key, text: t };
+        });
+        const correct = String(it.correct ?? '').trim().toUpperCase();
+        if (!(OPTION_KEYS as readonly string[]).includes(correct)) throw httpError(400, `Question ${i + 1}: the answer must be A, B, C or D.`);
+
+        // The document keeps its own year and difficulty unless the paste
+        // carries an override (practice only); mocks stay null on both.
+        let nextYear = d.year ?? null;
+        if (kind === 'practice' && it?.year != null && String(it.year).trim() !== '') {
+          const iy = Number(it.year);
+          if (!Number.isInteger(iy) || iy < 1978 || iy > 2099) throw httpError(400, `Question ${i + 1}: the year must be between 1978 and 2099.`);
+          nextYear = iy;
+        }
+        let nextDifficulty = kind === 'mock' ? null : (d.difficulty ?? null);
+        if (kind === 'practice') {
+          const idRaw = String(it?.difficulty ?? '').trim().toLowerCase();
+          if (['easy', 'hard'].includes(idRaw)) nextDifficulty = idRaw;
+        }
+        if (kind === 'mock') { nextYear = null; nextDifficulty = null; }
+
+        const enriched = enrichFields({ kind, examType: d.examType, subject: d.subject, topic: d.topic, year: nextYear, text, correct, batchId: d.batchId });
+        updates.push({
+          ref: doc.ref, prev: d,
+          next: {
+            text, options, correct, explanation,
+            year: nextYear, difficulty: nextDifficulty,
+            hash: enriched.hash, tokens: enriched.tokens,
+            updatedAt: now, editedByUid: caller.uid, editedByEmail: caller.email || '',
+          },
+        });
+      }
+
+      let updated = 0;
+      for (let i = 0; i < updates.length; i += BULK_CAP) {
+        const chunk = updates.slice(i, i + BULK_CAP);
+        const batch = adminDb.batch();
+        const acc = createCounterAcc();
+        chunk.forEach((u) => {
+          batch.update(u.ref, u.next);
+          acc.change(u.prev, { ...u.prev, ...u.next });
+        });
+        acc.flush(batch, kind);
+        await batch.commit();
+        updated += chunk.length;
+      }
+      await auditSafe(caller, 'QB_TOPIC_BULK_EDITED', { kind, subjectKey, topicKey, updated });
+      res.json({ ok: true, updated, done: true });
+    } catch (error: any) {
+      console.error('[tos/questionbank/topic-bulk-edit] failed:', error?.message || error);
+      res.status(error?.status || 500).json({ error: error?.message || 'Bulk edit failed.' });
+    }
+  });
+
+  // Delete every question in one topic. Drafts are deleted outright; published
+  // questions are soft-removed so the next publish records the removal in the
+  // version history. Pages through the topic 200 at a time until done, with
+  // the counters moving in the same atomic batch as every write.
+  app.post('/api/tos/questionbank/topic-bulk-delete', async (req, res) => {
+    try {
+      const caller = requireTos(req);
+      if (String(req.body?.confirm || '') !== 'TOPIC-DELETE') {
+        throw httpError(400, 'Missing confirm. Call with confirm:"TOPIC-DELETE" from the topic preview after reviewing the questions.');
+      }
+      const kind = parseKind(req.body?.kind);
+      const subjectKey = mapKey(req.body?.subjectKey);
+      const topicKey = mapKey(req.body?.topicKey);
+      if (!subjectKey || !topicKey) throw httpError(400, 'Pick a subject and a topic first.');
+
+      let hard = 0;
+      let soft = 0;
+      let skipped = 0;
+      let lastId = '';
+      for (let round = 0; round < QB_SCAN_PAGES_MAX; round++) {
+        let query = adminDb.collection(QB_QUESTIONS)
+          .where('kind', '==', kind)
+          .where('subjectKey', '==', subjectKey)
+          .where('topicKey', '==', topicKey)
+          .orderBy('__name__').limit(BULK_CAP);
+        if (lastId) query = query.startAfter(lastId);
+        const snap = await query.get();
+        if (snap.empty) break;
+        const batch = adminDb.batch();
+        const acc = createCounterAcc();
+        const now = new Date().toISOString();
+        snap.docs.forEach((s) => {
+          lastId = s.id;
+          const d = s.data() as any;
+          if (String(d.status || '') === 'removed') { skipped += 1; return; }
+          if (String(d.status || '') === 'draft') {
+            batch.delete(s.ref);
+            acc.change(d, null);
+            hard += 1;
+          } else {
+            const next = { ...d, status: 'removed', removedAt: now, removedByUid: caller.uid, updatedAt: now };
+            batch.update(s.ref, { status: 'removed', removedAt: now, removedByUid: caller.uid, updatedAt: now });
+            acc.change(d, next);
+            soft += 1;
+          }
+        });
+        acc.flush(batch, kind);
+        await batch.commit();
+        if (snap.size < BULK_CAP) break;
+      }
+      await auditSafe(caller, 'QB_TOPIC_DELETED', { kind, subjectKey, topicKey, hard, soft, skipped });
+      res.json({ ok: true, hardDeleted: hard, softRemoved: soft, skipped, done: true });
+    } catch (error: any) {
+      console.error('[tos/questionbank/topic-bulk-delete] failed:', error?.message || error);
+      res.status(error?.status || 500).json({ error: error?.message || 'Bulk delete failed.' });
     }
   });
 
