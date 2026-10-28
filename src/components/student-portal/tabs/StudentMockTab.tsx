@@ -889,8 +889,9 @@ export const StudentMockTab: React.FC<{
           </>
         )}
         {rulesOpen && !exam && (
-          <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-4">
-            <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+          <div className="fixed inset-0 z-50 bg-black/60 flex items-end justify-center p-0 sm:p-4">
+            <style>{'@keyframes tosSheetUp{from{transform:translateY(56px);opacity:0}to{transform:translateY(0);opacity:1}}'}</style>
+            <div className="bg-white rounded-t-3xl sm:rounded-3xl max-w-md w-full p-6 pb-8 space-y-4 shadow-2xl max-h-[85vh] overflow-y-auto" style={{ animation: 'tosSheetUp 0.22s ease-out' }}>
               <div className="flex items-start justify-between">
                 <div>
                   <h3 className="text-xl font-black text-slate-900 tracking-tight">Before you start</h3>
