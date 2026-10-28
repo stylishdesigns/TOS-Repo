@@ -307,6 +307,14 @@ export interface KeyItem {
   topic: string;
 }
 
+
+// Question options are stored as { key, text } objects (A to D); the paper
+// carries the option texts in that order. Plain strings are accepted too.
+function optionTexts(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  return v.map((o: any) => String((o && typeof o === 'object' ? (o.text ?? o.value ?? '') : (o ?? ''))).trim());
+}
+
 function shuffle<T>(arr: T[]): T[] {
   const out = arr.slice();
   for (let i = out.length - 1; i > 0; i -= 1) {
@@ -338,7 +346,7 @@ async function pickRandom(subject: string, count: number): Promise<{ paper: Pape
       topic: String(d.topic || ''),
       year: typeof d.year === 'number' ? d.year : null,
       text: String(d.text || ''),
-      options: Array.isArray(d.options) ? d.options.map((o: unknown) => String(o ?? '')) : [],
+      options: optionTexts(d.options),
       imageLink: String(d.imageLink || ''),
     });
     key.push({
@@ -371,7 +379,7 @@ async function pickPicked(subject: string, ids: string[]): Promise<{ paper: Pape
       topic: String(d.topic || ''),
       year: typeof d.year === 'number' ? d.year : null,
       text: String(d.text || ''),
-      options: Array.isArray(d.options) ? d.options.map((o: unknown) => String(o ?? '')) : [],
+      options: optionTexts(d.options),
       imageLink: String(d.imageLink || ''),
     });
     key.push({
@@ -934,7 +942,8 @@ async function uploadPrivatePaper(
   const toSign = ['overwrite=true', `public_id=${publicId}`, `timestamp=${timestamp}`, 'type=authenticated'].join('&') + apiSecret;
   const signature = crypto.createHash('sha1').update(toSign).digest('hex');
   const form = new FormData();
-  form.append('file', JSON.stringify(doc));
+  const payload = Buffer.from(JSON.stringify(doc), 'utf8').toString('base64');
+  form.append('file', `data:application/json;charset=utf-8;base64,${payload}`);
   form.append('overwrite', 'true');
   form.append('public_id', publicId);
   form.append('timestamp', String(timestamp));
