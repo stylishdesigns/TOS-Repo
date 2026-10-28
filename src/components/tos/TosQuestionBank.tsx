@@ -576,17 +576,9 @@ export const QuestionBankTab: React.FC<{ refreshKey: number; view?: 'edit' | 'pu
                 {preview.counterBased && (
                   <p className="text-[11px] text-slate-500 mb-2">This preview read the counters and ran three small count queries (about {preview.readsReport?.approxTotalReads ?? 35} reads) instead of scanning the bank, so it costs the same at any size.</p>
                 )}
-                <div className="max-h-52 overflow-y-auto space-y-1.5">
-                  {(preview.changes || []).slice(0, 50).map((c: any, i: number) => (
-                    <div key={i} className="flex items-center gap-2 text-xs">
-                      <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 text-[10px] font-bold shrink-0">{c.subject}</span>
-                      <span className="px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-300 text-[10px] font-bold shrink-0">{c.action}:</span>
-                      <span className="text-slate-300 truncate">{c.title}</span>
-                    </div>
-                  ))}
-                  {(preview.changes || []).length > 50 && <p className="text-[11px] text-slate-500 pt-1">+ {(preview.changes || []).length - 50} more changes.</p>}
-                  {(preview.changes || []).length === 0 && <p className="text-slate-500 text-xs">Nothing has changed since the last publish.</p>}
-                </div>
+                {(preview.changes || []).length === 0 && (
+                  <p className="text-slate-500 text-xs">Nothing has changed since the last publish.</p>
+                )}
               </div>
 
               <div className="bg-slate-950/50 border border-white/10 rounded-2xl p-4">

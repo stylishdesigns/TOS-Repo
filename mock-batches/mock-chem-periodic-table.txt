@@ -1,0 +1,199 @@
+1. The element with atomic number 11 is
+A: sodium
+B: magnesium
+C: neon
+D: potassium
+Answer: A
+Explanation: Atomic number 11 is sodium (Na).
+
+2. The elements of Group 1 are collectively called
+A: halogens
+B: alkali metals
+C: noble gases
+D: transition metals
+Answer: B
+Explanation: Li, Na, K and the rest are the alkali metals.
+
+3. The elements of Group 17 are called
+A: alkali metals
+B: alkaline earth metals
+C: halogens
+D: actinides
+Answer: C
+Explanation: Fluorine to astatine form the halogen family.
+
+4. Noble gases are chemically unreactive because their outer electron shells are
+A: only half filled
+B: completely empty
+C: unstable
+D: completely filled
+Answer: D
+Explanation: Full outer shells leave no tendency to gain or lose electrons.
+
+5. In the modern periodic table, the horizontal rows are called
+A: periods
+B: groups
+C: families
+D: blocks
+Answer: A
+Explanation: Rows are periods; columns are groups.
+
+6. The modern periodic table arranges elements in order of increasing
+A: atomic mass
+B: atomic number
+C: density
+D: reactivity
+Answer: B
+Explanation: Moseley's ordering is by atomic (proton) number.
+
+7. Across a period from left to right, the atomic radius
+A: increases
+B: remains constant
+C: decreases
+D: doubles
+Answer: C
+Explanation: Rising nuclear charge pulls the same shell closer.
+
+8. The most reactive metals are found in
+A: Group 18
+B: Group 17
+C: Group 7
+D: Group 1
+Answer: D
+Explanation: Alkali metals lose their single outer electron most readily.
+
+9. The halogen commonly used to disinfect water is
+A: chlorine
+B: iodine
+C: bromine
+D: helium
+Answer: A
+Explanation: Chlorine kills waterborne germs.
+
+10. An atom of chlorine (atomic number 17) has how many electrons in its outermost shell?
+A: 5
+B: 7
+C: 6
+D: 8
+Answer: B
+Explanation: Chlorine is 2,8,7, so seven outer electrons.
+
+11. Transition elements are noted for forming
+A: colourless ions with one fixed state
+B: only gaseous compounds
+C: coloured compounds and variable oxidation states
+D: no compounds at all
+Answer: C
+Explanation: Their partly filled d orbitals give colour and variable valency.
+
+12. The elements of Group 2 are called
+A: halogens
+B: coinage metals
+C: lanthanides
+D: alkaline earth metals
+Answer: D
+Explanation: Be, Mg, Ca and the rest form Group 2.
+
+13. The symbol Fe represents
+A: iron
+B: fluorine
+C: francium
+D: fermium
+Answer: A
+Explanation: Fe is iron, a transition metal.
+
+14. Down Group 1, the reactivity of the metals
+A: decreases
+B: increases
+C: stays constant
+D: falls to zero
+Answer: B
+Explanation: Outer electrons are lost more easily as the atoms grow larger.
+
+15. Down Group 17, the reactivity of the halogens
+A: increases
+B: stays constant
+C: decreases
+D: becomes metallic
+Answer: C
+Explanation: Larger atoms attract the extra electron less strongly.
+
+16. Isotopes of an element have the same
+A: mass number but different atomic numbers
+B: number of neutrons
+C: chemical symbol only
+D: atomic number but different mass numbers
+Answer: D
+Explanation: Isotopes differ only in neutron count.
+
+17. The noble gas used to fill balloons because it is light and unreactive is
+A: helium
+B: neon
+C: argon
+D: xenon
+Answer: A
+Explanation: Helium is both lighter than air and inert.
+
+18. Silicon is best classified as a
+A: alkali metal
+B: metalloid
+C: halogen
+D: noble gas
+Answer: B
+Explanation: Silicon shows both metallic and non-metallic character.
+
+19. Elements of Group 16 have how many electrons in their outermost shell?
+A: 2
+B: 5
+C: 6
+D: 7
+Answer: C
+Explanation: Group 16 (chalcogens) carry six outer electrons.
+
+20. The element with atomic number 20 belongs to
+A: Group 1
+B: Group 17
+C: Group 18
+D: Group 2
+Answer: D
+Explanation: Calcium (2,8,8,2) sits in Group 2.
+
+21. Oxides of metals are usually
+A: basic
+B: acidic
+C: neutral gases
+D: amphoteric always
+Answer: A
+Explanation: Metal oxides react with acids as bases.
+
+22. The most abundant element in the universe is
+A: oxygen
+B: hydrogen
+C: helium
+D: carbon
+Answer: B
+Explanation: Hydrogen makes up about three quarters of ordinary matter.
+
+23. Alkali metals are stored under oil to prevent them
+A: melting
+B: evaporating
+C: reacting with air and moisture
+D: becoming magnetic
+Answer: C
+Explanation: They react vigorously with oxygen and water.
+
+24. Which of these is a halogen?
+A: sodium
+B: calcium
+C: argon
+D: fluorine
+Answer: D
+Explanation: Fluorine heads Group 17.
+
+25. The vertical columns of the periodic table are called
+A: groups
+B: periods
+C: series only
+D: orbitals
+Answer: A
+Explanation: Columns are groups (families).

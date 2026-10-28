@@ -66,9 +66,9 @@ const emptyForm = (examType: string): { title: string; examType: string; rows: S
 });
 
 // ---------------------------------------------------------------------------
-// Editor: the create and edit form. Subjects start empty; every subject and
-// count is typed by the user. Hand-picked mocks take question ids per subject
-// (copy them from the Library tab).
+// Editor: the create and edit form. Subjects are picked from what the mock
+// bank has published (typed only as a fallback). Hand-picked mocks take
+// question ids per subject.
 // ---------------------------------------------------------------------------
 const MockForm: React.FC<{
   initial: { title: string; examType: string; rows: SubjectRow[]; source: 'random' | 'picked'; date?: string };
@@ -82,6 +82,53 @@ const MockForm: React.FC<{
   const [source, setSource] = useState<'random' | 'picked'>(initial.source);
   const [date, setDate] = useState(initial.date || todayStr());
   const [localError, setLocalError] = useState('');
+
+  // The subjects offered here come from the mock bank itself: anything with
+  // published questions shows up as a choice, so a paper is only built from
+  // what students can actually be given. Nothing hard-coded; if the bank has
+  // no published subjects yet, the form falls back to typing.
+  const [publishedSubjects, setPublishedSubjects] = useState<Array<{ label: string; published: number; topics: string[] }>>([]);
+  useEffect(() => {
+    let alive = true;
+    api('/api/tos/questionbank/tree?kind=mock').then((r: any) => {
+      if (!alive) return;
+      const list = ((r.subjects || []) as any[])
+        .filter((x) => Number(x?.byStatus?.published) > 0)
+        .map((x) => ({
+          label: String(x.label || x.key),
+          published: Number(x.byStatus.published) || 0,
+          topics: ((x.topics || []) as any[]).map((t) => String(t.label || t.key)),
+        }))
+        .sort((a, b) => a.label.localeCompare(b.label));
+      setPublishedSubjects(list);
+    }).catch(() => { /* the typed-input fallback still works */ });
+    return () => { alive = false; };
+  }, []);
+
+  const subjectOptions = (current: string) => {
+    const labels = publishedSubjects.map((x) => x.label);
+    if (current && !labels.some((l) => l.toLowerCase() === current.toLowerCase())) labels.unshift(current);
+    return labels;
+  };
+  const subjectField = (i: number, r: SubjectRow) => {
+    if (publishedSubjects.length === 0 && !r.subject) {
+      return <input className={inputCls} value={r.subject} onChange={(e) => setRow(i, { subject: e.target.value })} placeholder="Subject name" maxLength={80} />;
+    }
+    return (
+      <select className={inputCls} value={r.subject} onChange={(e) => setRow(i, { subject: e.target.value })}>
+        <option value="">Select subject</option>
+        {subjectOptions(r.subject).map((label) => {
+          const info = publishedSubjects.find((x) => x.label === label);
+          return <option key={label} value={label}>{label}{info ? ` (${info.published} published)` : ''}</option>;
+        })}
+      </select>
+    );
+  };
+  const subjectHint = (label: string) => {
+    const x = publishedSubjects.find((s2) => s2.label.toLowerCase() === label.toLowerCase());
+    if (!x) return '';
+    return `${x.published} published question${x.published === 1 ? '' : 's'} in the bank${x.topics.length ? ` · topics: ${x.topics.join(', ')}` : ''}`;
+  };
 
   const isJamb = examType === 'jamb';
   const setRow = (i: number, patch: Partial<SubjectRow>) =>
@@ -156,15 +203,18 @@ const MockForm: React.FC<{
         {source === 'random' ? (
           <div className="space-y-2">
             {rows.map((r, i) => (
-              <div key={i} className="flex gap-2">
-                <input className={inputCls} value={r.subject} onChange={(e) => setRow(i, { subject: e.target.value })} placeholder="Subject name" maxLength={80} />
-                <input className={`${inputCls} w-24 shrink-0`} value={r.count} inputMode="numeric"
-                  onChange={(e) => setRow(i, { count: e.target.value.replace(/[^0-9]/g, '') })} placeholder="Count" />
-                {isJamb && rows.length > 1 && (
-                  <button type="button" onClick={() => setRows(rows.filter((_, j) => j !== i))} className="shrink-0 px-2 text-slate-500 hover:text-rose-300" aria-label="Remove subject">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                )}
+              <div key={i} className="space-y-1">
+                <div className="flex gap-2">
+                  {subjectField(i, r)}
+                  <input className={`${inputCls} w-24 shrink-0`} value={r.count} inputMode="numeric"
+                    onChange={(e) => setRow(i, { count: e.target.value.replace(/[^0-9]/g, '') })} placeholder="Count" />
+                  {isJamb && rows.length > 1 && (
+                    <button type="button" onClick={() => setRows(rows.filter((_, j) => j !== i))} className="shrink-0 px-2 text-slate-500 hover:text-rose-300" aria-label="Remove subject">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+                {subjectHint(r.subject) && <p className="text-[11px] text-slate-500">{subjectHint(r.subject)}</p>}
               </div>
             ))}
             {!isJamb && <p className="text-xs text-slate-500">A WAEC/NECO mock is one paper: one subject for that day.</p>}
@@ -174,7 +224,7 @@ const MockForm: React.FC<{
             {rows.map((r, i) => (
               <div key={i} className="bg-slate-950/40 border border-white/5 rounded-xl p-3 space-y-2">
                 <div className="flex gap-2">
-                  <input className={inputCls} value={r.subject} onChange={(e) => setRow(i, { subject: e.target.value })} placeholder="Subject name" maxLength={80} />
+                  {subjectField(i, r)}
                   <input className={`${inputCls} w-24 shrink-0`} value={r.count} inputMode="numeric"
                     onChange={(e) => setRow(i, { count: e.target.value.replace(/[^0-9]/g, '') })} placeholder="Count" />
                   {isJamb && rows.length > 1 && (
@@ -183,8 +233,9 @@ const MockForm: React.FC<{
                     </button>
                   )}
                 </div>
+                {subjectHint(r.subject) && <p className="text-[11px] text-slate-500">{subjectHint(r.subject)}</p>}
                 <textarea className={`${inputCls} h-20`} value={r.ids} onChange={(e) => setRow(i, { ids: e.target.value })}
-                  placeholder="Paste the question ids from the Library tab, separated by spaces or commas" />
+                  placeholder="Paste the question ids, separated by spaces or commas" />
               </div>
             ))}
           </div>
@@ -591,6 +642,27 @@ const SeriesPanel: React.FC<{ onCreated: () => void }> = ({ onCreated }) => {
       .catch(() => setCompulsory([]));
   }, []);
 
+  // Extra subjects beyond the compulsory ones also pick from what the mock
+  // bank has published, minus the subjects already in the rotation.
+  const [publishedSubjects, setPublishedSubjects] = useState<Array<{ label: string; published: number }>>([]);
+  useEffect(() => {
+    let alive = true;
+    api('/api/tos/questionbank/tree?kind=mock').then((r: any) => {
+      if (!alive) return;
+      const list = ((r.subjects || []) as any[])
+        .filter((x) => Number(x?.byStatus?.published) > 0)
+        .map((x) => ({ label: String(x.label || x.key), published: Number(x.byStatus.published) || 0 }))
+        .sort((a, b) => a.label.localeCompare(b.label));
+      setPublishedSubjects(list);
+    }).catch(() => { /* typed fallback stays */ });
+    return () => { alive = false; };
+  }, []);
+  const extraOptions = (current: string) =>
+    publishedSubjects
+      .map((x) => x.label)
+      .filter((l) => !compulsory.some((c) => c.toLowerCase() === l.toLowerCase()))
+      .concat(current && !publishedSubjects.some((x) => x.label === current) ? [current] : []);
+
   const body = () => ({
     start,
     cadenceDays: [Number(day1), Number(day2)],
@@ -660,7 +732,17 @@ const SeriesPanel: React.FC<{ onCreated: () => void }> = ({ onCreated }) => {
             <div className="space-y-2">
               {extras.map((x, i) => (
                 <div key={i} className="flex gap-2">
-                  <input className={inputCls} value={x} onChange={(e) => setExtras(extras.map((v, j) => (j === i ? e.target.value : v)))} placeholder="Subject name" maxLength={80} />
+                  {publishedSubjects.length > 0 ? (
+                    <select className={inputCls} value={x} onChange={(e) => setExtras(extras.map((v, j) => (j === i ? e.target.value : v)))}>
+                      <option value="">Select subject</option>
+                      {extraOptions(x).map((label) => {
+                        const info = publishedSubjects.find((s2) => s2.label === label);
+                        return <option key={label} value={label}>{label}{info ? ` (${info.published} published)` : ''}</option>;
+                      })}
+                    </select>
+                  ) : (
+                    <input className={inputCls} value={x} onChange={(e) => setExtras(extras.map((v, j) => (j === i ? e.target.value : v)))} placeholder="Subject name" maxLength={80} />
+                  )}
                   <button type="button" onClick={() => setExtras(extras.filter((_, j) => j !== i))} className="shrink-0 px-2 text-slate-500 hover:text-rose-300" aria-label="Remove subject"><Trash2 className="w-4 h-4" /></button>
                 </div>
               ))}

@@ -1,0 +1,199 @@
+1. According to the kinetic theory of matter, the particles of matter
+A: are in constant random motion
+B: are always at rest
+C: all carry the same charge
+D: repel each other only
+Answer: A
+Explanation: Kinetic theory holds that particles move constantly and randomly.
+
+2. The change of state from solid directly to gas is called
+A: condensation
+B: sublimation
+C: freezing
+D: melting
+Answer: B
+Explanation: Sublimation skips the liquid state.
+
+3. Diffusion occurs fastest in
+A: solids
+B: liquids
+C: gases
+D: colloids
+Answer: C
+Explanation: Gas particles are freest and furthest apart, so they diffuse fastest.
+
+4. The irregular zig-zag movement of smoke particles in air is called
+A: diffusion
+B: osmosis
+C: sublimation
+D: Brownian motion
+Answer: D
+Explanation: Brownian motion is the random motion of particles bombarded by molecules.
+
+5. Boiling differs from evaporation in that boiling occurs
+A: throughout the liquid at a fixed temperature
+B: only at the surface at any temperature
+C: only in the presence of wind
+D: without heat
+Answer: A
+Explanation: Boiling is bulk vaporisation at a fixed boiling point.
+
+6. Under standard pressure, pure ice melts at
+A: 100 °C
+B: 0 °C
+C: 32 °C
+D: -10 °C
+Answer: B
+Explanation: The melting point of pure ice at 1 atm is 0 °C.
+
+7. Gases are easily compressed because their particles
+A: are very heavy
+B: repel each other
+C: are far apart
+D: carry no energy
+Answer: C
+Explanation: Large spaces between gas particles allow compression.
+
+8. When a metal rod is heated, it expands because its particles
+A: increase in size
+B: multiply in number
+C: lose energy
+D: move faster and vibrate over larger amplitudes
+Answer: D
+Explanation: Heating raises particle motion, increasing average spacing.
+
+9. The pressure exerted by a gas in a container is due to
+A: collisions of its particles with the walls
+B: the weight of the container
+C: gravity on the lid
+D: friction between particles
+Answer: A
+Explanation: Gas pressure arises from molecular bombardment of the walls.
+
+10. Evaporation of a liquid causes cooling because
+A: the container absorbs heat
+B: the fastest particles escape, taking energy away
+C: particles slow down on leaving
+D: air presses on the liquid
+Answer: B
+Explanation: The most energetic molecules leave, lowering the average energy left behind.
+
+11. Solids have fixed shapes because their particles
+A: move at high speed
+B: are far apart
+C: are tightly held in fixed positions
+D: carry opposite charges
+Answer: C
+Explanation: Fixed lattice positions give solids their shape.
+
+12. The spreading of bromine vapour in a closed tube of air demonstrates
+A: the weight of gases
+B: chemical combination
+C: the effect of gravity on liquids
+D: the movement of particles
+Answer: D
+Explanation: The spread shows particles of both gases moving and mixing.
+
+13. Which of the following is a physical change?
+A: the melting of ice
+B: the rusting of iron
+C: the burning of paper
+D: the souring of milk
+Answer: A
+Explanation: Melting changes state only; no new substance forms.
+
+14. The change of state from gas to liquid is called
+A: evaporation
+B: condensation
+C: sublimation
+D: solidification
+Answer: B
+Explanation: Condensation is gas turning to liquid.
+
+15. When the temperature of a gas falls, its particles
+A: move faster
+B: increase in size
+C: slow down
+D: stop completely
+Answer: C
+Explanation: Lower temperature means lower average kinetic energy.
+
+16. A liquid has
+A: fixed shape and fixed volume
+B: no fixed volume and no fixed shape
+C: fixed shape but no fixed volume
+D: fixed volume but no fixed shape
+Answer: D
+Explanation: Liquids take the container's shape but keep their volume.
+
+17. An everyday substance that sublimes is
+A: naphthalene
+B: common salt
+C: water
+D: ethanol
+Answer: A
+Explanation: Naphthalene (mothball) passes from solid to vapour.
+
+18. A gas with a smaller molecular mass diffuses
+A: slower than a heavier gas
+B: faster than a heavier gas at the same temperature
+C: at the same rate as a heavier gas
+D: only in darkness
+Answer: B
+Explanation: Lighter particles move faster at the same temperature.
+
+19. During melting, heat energy is
+A: released
+B: unchanged
+C: absorbed
+D: destroyed
+Answer: C
+Explanation: Melting absorbs latent heat of fusion.
+
+20. In the solid state, particles
+A: move about freely
+B: rotate only in circles
+C: are at absolute rest
+D: vibrate about fixed positions
+Answer: D
+Explanation: Solid particles vibrate without leaving their lattice sites.
+
+21. Perfume sprayed in one corner of a room soon reaches the other corner by
+A: diffusion
+B: osmosis
+C: evaporation of the room
+D: convection of cloth
+Answer: A
+Explanation: Gas molecules spread from high to low concentration by diffusion.
+
+22. A gas can be liquefied by
+A: lowering pressure and raising temperature
+B: increasing pressure and lowering temperature
+C: adding a catalyst
+D: passing a current through it
+Answer: B
+Explanation: Compression plus cooling brings particles close enough to liquefy.
+
+23. The change of state from liquid to solid is called
+A: melting
+B: condensation
+C: freezing
+D: boiling
+Answer: C
+Explanation: Freezing (solidification) turns liquid to solid.
+
+24. As the temperature of a substance rises, the kinetic energy of its particles
+A: decreases
+B: remains constant
+C: becomes negative
+D: increases
+Answer: D
+Explanation: Temperature is a measure of average kinetic energy.
+
+25. The state of matter with the strongest forces of attraction between particles is the
+A: solid state
+B: liquid state
+C: gaseous state
+D: plasma state
+Answer: A
+Explanation: Solids hold particles most tightly.
