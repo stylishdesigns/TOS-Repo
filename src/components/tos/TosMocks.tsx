@@ -118,7 +118,7 @@ const MockForm: React.FC<{
 
   const subjectOptions = (current: string) => {
     const labels = publishedSubjects.map((x) => x.label);
-    if (current && !labels.some((l) => sameSubject(l, current))) labels.unshift(current);
+    if (current && !labels.some((l) => l === current)) labels.unshift(current);
     return labels;
   };
   const subjectField = (i: number, r: SubjectRow) => {
@@ -1067,7 +1067,7 @@ const SettingsPanel: React.FC = () => {
           <span className="text-xs text-slate-400">Compulsory subject name</span>
           {publishedSubjects.length > 0 ? (
             <select className={inputCls} value={s.jamb.compulsorySubject} onChange={(e) => set('jamb.compulsorySubject', e.target.value)}>
-              {s.jamb.compulsorySubject && !publishedSubjects.some((x) => sameSubject(x, s.jamb.compulsorySubject)) && (
+              {s.jamb.compulsorySubject && !publishedSubjects.includes(s.jamb.compulsorySubject) && (
                 <option value={s.jamb.compulsorySubject}>{s.jamb.compulsorySubject} (current setting)</option>
               )}
               {publishedSubjects.map((x) => <option key={x} value={x}>{x}</option>)}
