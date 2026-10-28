@@ -19,6 +19,11 @@ export interface ParsedBankQuestion {
   options: { key: string; text: string }[];
   correct: string; // 'A' | 'B' | 'C' | 'D'
   explanation: string;
+  // Per-question overrides (rebuild piece 0). Present only when the paste
+  // carries a "Year:" or "Difficulty:" line for the question; the import
+  // falls back to the batch values chosen in Step 1 when they are absent.
+  year?: number;
+  difficulty?: string;
 }
 
 export interface ParseResult {
@@ -70,7 +75,14 @@ const splitInlineQuestion = (line: string): string[] | null => {
   });
   out.push('Answer: ' + answerMatch[1].toUpperCase());
   if (explanationMatch) {
-    out.push('Explanation: ' + line.slice(explanationMatch.index + explanationMatch[0].length).trim());
+    let expl = line.slice(explanationMatch.index + explanationMatch[0].length).trim();
+    // Lift a trailing Year/Difficulty out of the explanation onto its own
+    // line so the state machine captures it as a per-question override.
+    const iy = /(?:^|\s)Year\s*:\s*(\d{4})(?=\s|$)/i.exec(expl);
+    if (iy) { out.push('Year: ' + iy[1]); expl = expl.replace(iy[0], ' ').trim(); }
+    const idf = /(?:^|\s)Difficulty\s*:\s*(easy|hard)(?=\s|$)/i.exec(expl);
+    if (idf) { out.push('Difficulty: ' + idf[1].toLowerCase()); expl = expl.replace(idf[0], ' ').trim(); }
+    out.push('Explanation: ' + expl);
   }
   return out;
 };
@@ -123,6 +135,8 @@ export function parseBankPaste(input: string): ParseResult {
     const options: string[] = [];
     let correctAnswer = -1;
     let isCollectingAnswer = false;
+    let currentYear = -1;
+    let currentDifficulty = '';
 
     lines.forEach(line => {
       if (optionRegex.test(line)) {
@@ -135,6 +149,15 @@ export function parseBankPaste(input: string): ParseResult {
         isCollectingAnswer = true;
       } else if (/^(?:Model Answer|Explanation|Solution):/i.test(line)) {
         currentExplanation += (currentExplanation ? '\n' : '') + line.replace(/^(?:Model Answer|Explanation|Solution):/i, '').trim();
+        isCollectingAnswer = true;
+      } else if (/^Year\s*:\s*(\d{4})$/i.test(line)) {
+        // Per-question year override; an out-of-range value is ignored so the
+        // batch choice still applies.
+        const y = Number(line.match(/^Year\s*:\s*(\d{4})$/i)![1]);
+        if (y >= 1978 && y <= 2099) currentYear = y;
+        isCollectingAnswer = true;
+      } else if (/^Difficulty\s*:\s*(easy|hard)$/i.test(line)) {
+        currentDifficulty = (line.match(/^Difficulty\s*:\s*(easy|hard)$/i)![1] || '').toLowerCase();
         isCollectingAnswer = true;
       } else {
         if (isCollectingAnswer) {
@@ -152,12 +175,21 @@ export function parseBankPaste(input: string): ParseResult {
     });
 
     if (currentQuestionText.trim()) {
-      questions.push({
+      // Inline pastes can leave a trailing "Year:"/"Difficulty:" inside the
+      // explanation text; strip it so it never reads as part of the answer.
+      const explanationClean = currentExplanation.trim()
+        .replace(/\s*Year\s*:\s*\d{4}\s*$/i, '')
+        .replace(/\s*Difficulty\s*:\s*(?:easy|hard)\s*$/i, '')
+        .trim();
+      const q: ParsedBankQuestion = {
         text: currentQuestionText.trim(),
         options: ['A', 'B', 'C', 'D'].map((key, i) => ({ key, text: options[i] || '' })),
         correct: correctAnswer >= 0 ? ['A', 'B', 'C', 'D'][correctAnswer] : '',
-        explanation: currentExplanation.trim(),
-      });
+        explanation: explanationClean,
+      };
+      if (currentYear >= 0) q.year = currentYear;
+      if (currentDifficulty) q.difficulty = currentDifficulty;
+      questions.push(q);
     } else {
       skippedEmpty += 1;
     }
@@ -192,6 +224,7 @@ RULES:
 - Use exactly four options: A, B, C, D.
 - Use "Answer:" followed only by the correct letter.
 - Include a brief "Explanation:" line.
+- Optional per question: "Year: 2019" and "Difficulty: easy" (or "hard") on their own lines. They override the year and difficulty chosen in Step 1 for that question. Practice only.
 - Write maths and science notation in LaTeX inside $...$.
 - Putting everything on one line per question also works: the question, then A: ... B: ... C: ... D: ..., then Answer:, then Explanation:.
 - No tables, bullets, headings or extra text.`;

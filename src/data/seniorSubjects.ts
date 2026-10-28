@@ -57,8 +57,7 @@ export const SENIOR_SUBJECTS: Record<string, string[]> = {
     'Nationalism in Nigeria', 'Nigeria Since Independence', 'International Organizations',
   ],
   'Literature-in-English': [
-    'Poetry', 'Drama', 'Prose', 'Literary Appreciation', 'Figures of Speech', 'Literary Terms',
-    'Themes and Characters', 'Setting and Plot', 'Language and Style',
+    'Drama', 'Prose', 'Poetry', 'General Literary Principles', 'Literary Appreciation',
   ],
   'Geography': [
     'Map Reading and Interpretation', 'The Earth and Its Structure', 'Rocks and Landforms',

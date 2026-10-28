@@ -540,8 +540,22 @@ export function registerQuestionBankRoutes(app: express.Express): void {
         if (options.some((o) => o === null)) return;
         const correct = String(item?.correct ?? '').trim().toUpperCase();
         if (!(OPTION_KEYS as readonly string[]).includes(correct)) return;
+        // Per-question overrides (rebuild piece 0): practice questions may
+        // carry their own year and difficulty; the batch values are the
+        // fallback. Mocks keep no year and no difficulty (server-enforced).
+        let itemYear = year;
+        if (kind === 'practice' && item?.year != null && String(item.year).trim() !== '') {
+          const iy = Number(item.year);
+          if (!Number.isInteger(iy) || iy < 1978 || iy > 2099) return;
+          itemYear = iy;
+        }
+        const itemDifficultyRaw = String(item?.difficulty ?? '').trim().toLowerCase();
+        const itemDifficulty = kind === 'practice' && ['easy', 'hard'].includes(itemDifficultyRaw)
+          ? itemDifficultyRaw
+          : difficultyRaw;
         valid.push({
-          enriched: enrichFields({ kind, examType, subject, topic, year, text, correct, batchId }),
+          enriched: enrichFields({ kind, examType, subject, topic, year: itemYear, text, correct, batchId }),
+          itemYear, itemDifficulty,
           text, options, correct: correct as OptionKey, explanation,
         });
       });
@@ -586,7 +600,9 @@ export function registerQuestionBankRoutes(app: express.Express): void {
       const count = write.length;
       write.forEach((v) => {
         batch.create(adminDb.collection(QB_QUESTIONS).doc(), {
-          kind, examType, subject, klass, topic, year, difficulty: kind === 'mock' ? null : difficultyRaw,
+          kind, examType, subject, klass, topic,
+          year: kind === 'mock' ? null : v.itemYear,
+          difficulty: kind === 'mock' ? null : v.itemDifficulty,
           ...v.enriched,
           batchId,
           text: v.text, options: v.options, correct: v.correct, explanation: v.explanation, imageLink: '',
@@ -603,7 +619,16 @@ export function registerQuestionBankRoutes(app: express.Express): void {
       });
       // The whole import totals into the counters in memory; each counter
       // document is written exactly once, in the same atomic batch.
-      counterOpsForBatchMany(batch, kind, null, { kind, examType, subject, topic, year, status: 'draft' }, count);
+      // Counts follow each question's own year, so a mixed-year paste lands
+      // in the right byYear buckets. One counter write per distinct year.
+      const byYearCount = new Map<number | null, number>();
+      write.forEach((v) => {
+        const y = kind === 'mock' ? null : v.itemYear;
+        byYearCount.set(y, (byYearCount.get(y) || 0) + 1);
+      });
+      byYearCount.forEach((n, y) => {
+        counterOpsForBatchMany(batch, kind, null, { kind, examType, subject, topic, year: y, status: 'draft' }, n);
+      });
       await batch.commit();
       await audit({
         actorUid: caller.uid,

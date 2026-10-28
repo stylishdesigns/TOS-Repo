@@ -337,7 +337,7 @@ export const QuestionBankTab: React.FC<{ refreshKey: number; view?: 'edit' | 'pu
             <span className="w-8 h-8 rounded-xl bg-orange-500/15 border border-orange-500/30 text-orange-300 text-sm font-black flex items-center justify-center shrink-0">1</span>
             <div>
               <p className="text-sm font-bold text-white">Where these questions go</p>
-              <p className="text-xs text-slate-400 mt-0.5">One choice for the whole batch: every question pasted below arrives with this subject, topic, year and pipeline.</p>
+              <p className="text-xs text-slate-400 mt-0.5">One choice for the whole batch: every question pasted below arrives with this subject, topic, year and pipeline. A question can carry its own Year: or Difficulty: line to override the batch choice.</p>
             </div>
           </div>
 
@@ -388,7 +388,7 @@ export const QuestionBankTab: React.FC<{ refreshKey: number; view?: 'edit' | 'pu
             <span className="w-8 h-8 rounded-xl bg-orange-500/15 border border-orange-500/30 text-orange-300 text-sm font-black flex items-center justify-center shrink-0">2</span>
             <div>
               <p className="text-sm font-bold text-white">Paste the questions</p>
-              <p className="text-xs text-slate-400 mt-0.5">Paste only the questions into the box, not the setup lines. Numbered questions, A to D options, an Answer line, an Explanation line.</p>
+              <p className="text-xs text-slate-400 mt-0.5">Paste only the questions into the box, not the setup lines. Numbered questions, A to D options, an Answer line, an Explanation line. Optional per-question Year: and Difficulty: lines are honoured.</p>
             </div>
           </div>
 
