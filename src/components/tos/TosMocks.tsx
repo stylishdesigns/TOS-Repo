@@ -217,7 +217,7 @@ const MockForm: React.FC<{
               <div key={i} className="space-y-1">
                 <div className="flex gap-2">
                   {subjectField(i, r)}
-                  <input className={`${inputCls} w-20 shrink-0`} value={r.count} inputMode="numeric"
+                  <input className={`${inputCls} w-20 shrink-0`} style={{ width: '5rem' }} value={r.count} inputMode="numeric"
                     onChange={(e) => setRow(i, { count: e.target.value.replace(/[^0-9]/g, '') })} placeholder="Count" />
                   {isJamb && rows.length > 1 && (
                     <button type="button" onClick={() => setRows(rows.filter((_, j) => j !== i))} className="shrink-0 px-2 text-slate-500 hover:text-rose-300" aria-label="Remove subject">
@@ -236,7 +236,7 @@ const MockForm: React.FC<{
               <div key={i} className="bg-slate-950/40 border border-white/5 rounded-xl p-3 space-y-2">
                 <div className="flex gap-2">
                   {subjectField(i, r)}
-                  <input className={`${inputCls} w-20 shrink-0`} value={r.count} inputMode="numeric"
+                  <input className={`${inputCls} w-20 shrink-0`} style={{ width: '5rem' }} value={r.count} inputMode="numeric"
                     onChange={(e) => setRow(i, { count: e.target.value.replace(/[^0-9]/g, '') })} placeholder="Count" />
                   {isJamb && rows.length > 1 && (
                     <button type="button" onClick={() => setRows(rows.filter((_, j) => j !== i))} className="shrink-0 px-2 text-slate-500 hover:text-rose-300" aria-label="Remove subject">
