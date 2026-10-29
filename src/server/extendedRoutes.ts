@@ -24,6 +24,7 @@ import {
   runBillingSweep,
 } from './provisioning';
 import { deleteCentreCascade, loadBillingMap, registerTosRoutes2 } from './tosRoutes2';
+import { registerChatRoutes } from './chatRoutes';
 import { registerQuestionBankRoutes } from './questionBankRoutes';
 
 /**
@@ -822,6 +823,7 @@ export function registerExtendedRoutes(app: express.Express): void {
   // setting, team, directory views) register here so they stay behind the
   // same /api/tos guard and ahead of the static/SPA fallback.
   registerTosRoutes2(app);
+  registerChatRoutes(app);
 
   // Platform question bank: authoring + the versioned Cloudinary publish
   // pipeline. Same /api/tos guard; nothing here writes without confirm.

@@ -544,6 +544,42 @@ export interface AuditLogEntry {
   at: string;
 }
 
+// ===== CH1 student chat (Step 2) =====
+// Every number here is a setting, editable on its own screen (T2 for the
+// platform, C3 for a centre). The defaults in code are only the starting
+// values used until the screens save real ones.
+export interface ChatAccessRule {
+  mode: 'centre_default' | 'custom' | 'none';
+  thresholdPercent?: number | null;
+}
+
+export interface TosChatSettings {
+  /** Subjects the Mock and Practice style auto-groups are built from. */
+  defaultGroupSubjects: string[];
+  /** The TOS-owned cross-centre channel's display name. */
+  mockPracticeChannelName: string;
+  /** Minimum rolling 7-day practice score for the TOS channel. */
+  mockPracticeThresholdPercent: number;
+  photoMaxKb: number;
+  retentionDays: number;
+  messageMaxChars: number;
+  postRateLimitPerHour: number;
+  autoPosts: { mockOpen: boolean; resultsOut: boolean; practicePublished: boolean };
+  updatedAt?: string | null;
+}
+
+export interface CentreChatSettings {
+  defaultThresholdPercent: number;
+  /** Minimum answers in the 7-day window before the score counts at all. */
+  minAnswers: number;
+  autoSubjectGroups: boolean;
+  photosAllowed: boolean;
+  tutorsCanRemove: boolean;
+  paused: boolean;
+  muteDayOptions: number[];
+  updatedAt?: string | null;
+}
+
 export interface CentreEntitlements {
   chat: boolean;
   whatsappParentNotifications: boolean;

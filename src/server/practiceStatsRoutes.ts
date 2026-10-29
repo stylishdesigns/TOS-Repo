@@ -193,6 +193,22 @@ export function registerPracticeStatsRoutes(app: express.Express): void {
           applySplit(subject, topic, answered, correct);
         }
 
+        // CH1: per-day totals so the chat access gate can sum the last 7
+        // days from this one document instead of counting sessions. Written
+        // in this same transaction, so there are no extra writes, and pruned
+        // on the same 60-day window as `days`.
+        const daily: Record<string, { answered: number; correct: number }> = {};
+        const prevDaily = data?.daily && typeof data.daily === 'object' ? data.daily : {};
+        Object.keys(prevDaily).forEach((k) => {
+          const e = prevDaily[k];
+          if (k && e && typeof e === 'object') {
+            daily[k] = { answered: Number(e.answered) || 0, correct: Number(e.correct) || 0 };
+          }
+        });
+        const prevDayTotals = daily[day] || { answered: 0, correct: 0 };
+        daily[day] = { answered: prevDayTotals.answered + answered, correct: prevDayTotals.correct + correct };
+        Object.keys(daily).forEach((k) => { if (k < cutoff) delete daily[k]; });
+
         recent.unshift({ at, sessionId, subject, topic, examType, mode, answered, correct });
         while (recent.length > MAX_RECENT) recent.pop();
 
@@ -202,6 +218,7 @@ export function registerPracticeStatsRoutes(app: express.Express): void {
           updatedAt: new Date().toISOString(),
           totals,
           days,
+          daily,
           subjects,
           recent,
         });

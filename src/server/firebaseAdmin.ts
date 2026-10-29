@@ -1,5 +1,6 @@
 import { getApps, initializeApp, getApp, cert, App } from 'firebase-admin/app';
 import { getFirestore, Firestore } from 'firebase-admin/firestore';
+import { getDatabase, Database } from 'firebase-admin/database';
 import { getAuth, Auth } from 'firebase-admin/auth';
 import fs from 'fs';
 import path from 'path';
@@ -92,14 +93,28 @@ export const adminCredentialSource: 'service-account' | 'default' = explicitCred
   ? 'service-account'
   : 'default';
 
+// The student-chat Realtime Database lives in a non-US region, so the SDK
+// must be pointed at its URL explicitly (otherwise it assumes the US
+// instance). The region comes from the environment with the project's actual
+// region as the fallback, and can be overridden whole with FIREBASE_RTDB_URL.
+const rtdbRegion = process.env.FIREBASE_RTDB_REGION || 'europe-west1';
+const rtdbUrl =
+  process.env.FIREBASE_RTDB_URL ||
+  `https://${projectId}-default-rtdb.${rtdbRegion}.firebasedatabase.app`;
+
 export const adminApp: App = apps.length > 0
   ? apps[0]!
   : initializeApp({
       projectId,
+      databaseURL: rtdbUrl,
       ...(explicitCredential ? { credential: explicitCredential } : {}),
     });
 
-export { projectId, databaseId };
+export { projectId, databaseId, rtdbUrl };
 
 export const adminAuth: Auth = getAuth(adminApp);
 export const adminDb: Firestore = getFirestore(adminApp, databaseId);
+// initializeApp merges the options into an existing default app, so this is
+// safe even when the app was created elsewhere first.
+initializeApp({ databaseURL: rtdbUrl });
+export const adminRtdb: Database = getDatabase(adminApp);
