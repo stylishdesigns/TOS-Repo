@@ -15,6 +15,7 @@ import { CBTManager } from './components/academics/CBTManager';
 import { TimetableManager } from './components/academics/TimetableManager';
 import { AttendanceTracker } from './components/academics/AttendanceTracker';
 import { AnnouncementsManager } from './components/communications/AnnouncementsManager';
+import { ChatManager } from './components/communications/ChatManager';
 import { StudentPortal } from './components/student-portal/StudentPortal';
 import { TutorPortal } from './components/tutor-portal/TutorPortal';
 import { CmsManager } from './components/cms/CmsManager';
@@ -633,6 +634,7 @@ const MainLayout: React.FC = () => {
             {adminSection === 'attendance' && <AttendanceTracker />}
             {adminSection === 'results' && <PerformanceManager />}
             {adminSection === 'announcements' && <AnnouncementsManager />}
+            {adminSection === 'chat' && <ChatManager />}
             {adminSection === 'student-portal' && <StudentPortal />}
             {adminSection === 'tutor-portal' && <TutorPortal />}
             {(adminSection === 'finance' || adminSection === 'payments') && <FinanceManager />}

@@ -141,6 +141,7 @@ export type AdminSection =
   | 'cbt'
   | 'payments'
   | 'announcements'
+  | 'chat'
   | 'cms-editor'
   | 'branches'
   | 'settings'
