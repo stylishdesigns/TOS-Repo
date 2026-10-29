@@ -114,7 +114,18 @@ export { projectId, databaseId, rtdbUrl };
 
 export const adminAuth: Auth = getAuth(adminApp);
 export const adminDb: Firestore = getFirestore(adminApp, databaseId);
-// initializeApp merges the options into an existing default app, so this is
-// safe even when the app was created elsewhere first.
-initializeApp({ databaseURL: rtdbUrl });
-export const adminRtdb: Database = getDatabase(adminApp);
+// A second, named app carries the Realtime Database URL. The default app
+// already holds the Firestore credential, and Firebase refuses to merge a
+// different options set into an existing app, so the RTDB gets its own.
+const rtdbApp: App =
+  apps.find((a) => a.name === 'tos-rtdb') ||
+  initializeApp(
+    {
+      projectId,
+      databaseURL: rtdbUrl,
+      ...(explicitCredential ? { credential: explicitCredential } : {}),
+    },
+    'tos-rtdb',
+  );
+
+export const adminRtdb: Database = getDatabase(rtdbApp);
