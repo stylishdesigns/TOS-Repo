@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, Building2, Wallet, ScrollText, UserPlus, Loader2,
   RefreshCw, Send, Ban, CheckCircle2, PlayCircle, Check, Plus, ShieldCheck,
   Clock, ArrowUpRight, UserRound, BookOpen, CalendarDays, Copy, HelpCircle,
-  AlertTriangle, X, ChevronRight,
+  AlertTriangle, X, ChevronRight, MessageSquare,
 } from 'lucide-react';
 import {
   api, fmtDate, fmtDateTime, LEAD_STATUS_LABELS, STATUS_STYLES, Json,
@@ -16,6 +16,7 @@ import { QuestionBankTab } from './TosQuestionBank';
 import { QuestionLibraryTab } from './TosQuestionLibrary';
 import { QuestionBankHub, MockPapersTab } from './TosQuestionHub';
 import { MocksTab } from './TosMocks';
+import { TosChat } from './TosChat';
 
 /**
  * TOS platform console (Prompt C Part D).
@@ -782,6 +783,7 @@ const TABS = [
   { id: 'plans', label: 'Plans', mlabel: 'Plans', icon: Wallet, group: 'Business' },
   { id: 'questions', label: 'Question Bank', mlabel: 'Bank', icon: BookOpen, group: 'Content' },
   { id: 'mocks', label: 'Mocks', mlabel: 'Mocks', icon: CalendarDays, group: 'Content' },
+  { id: 'chat', label: 'Chat', mlabel: 'Chat', icon: MessageSquare, group: 'Content' },
   { id: 'audit', label: 'Audit log', mlabel: 'Audit', icon: ScrollText, group: 'System' },
   { id: 'team', label: 'Team', mlabel: 'Team', icon: Users, group: 'System' },
   { id: 'account', label: 'Account', mlabel: 'Account', icon: UserRound, group: 'System' },
@@ -1085,6 +1087,7 @@ export const TosPortal: React.FC = () => {
             {tab === 'plans' && 'Pricing, caps and feature flags. All stored as data.'}
             {tab === 'questions' && 'Two separate banks: Practice and Mock. Pick one on the hub to work in.'}
             {tab === 'mocks' && "One mock a day for every centre's students. Create, freeze and manage them from here."}
+            {tab === 'chat' && 'The platform channel, chat settings and escalated reports.'}
             {tab === 'audit' && 'Every privileged action, recorded.'}
             {tab === 'team' && 'The people who run the platform.'}
             {tab === 'account' && 'Your platform profile, password and sign-out.'}
@@ -1097,6 +1100,7 @@ export const TosPortal: React.FC = () => {
         {tab === 'questions' && <QuestionBankShell refreshKey={refreshKey} onNewMock={() => { setTab('mocks'); setMocksCreateKey((k) => k + 1); }} />}
         {tab === 'library' && <QuestionLibraryTab refreshKey={refreshKey} />}
         {tab === 'mocks' && <MocksTab refreshKey={refreshKey} openCreateSignal={mocksCreateKey} />}
+        {tab === 'chat' && <TosChat refreshKey={refreshKey} />}
         {tab === 'plans' && <PlansTab />}
         {tab === 'audit' && <AuditTab />}
         {tab === 'team' && <TeamTab />}
