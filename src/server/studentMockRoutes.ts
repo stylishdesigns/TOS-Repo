@@ -2,6 +2,7 @@ import express from 'express';
 import * as crypto from 'crypto';
 import { FieldValue } from 'firebase-admin/firestore';
 import { adminDb } from './firebaseAdmin';
+import { postMockOpenOnce } from './chatAutoPosts';
 import { Caller, effectiveStatus, getBillingDoc, getPlatformConfig, httpError, listActiveMembershipsForUser } from './tenantService';
 import {
   MOCKS,
@@ -448,6 +449,14 @@ export function registerStudentMockRoutes(app: express.Express): void {
         } else {
           state = 'missed';
         }
+
+      // CH1 Step 6: the first time today's mock registers as open to any
+      // student, announce it in the TOS channel. The once-per-mock claim
+      // lives on the mock doc itself; fire-and-forget, never blocks this
+      // response and never posts twice.
+      if (state === 'open' && todayMock) {
+        void postMockOpenOnce(adminDb.collection(MOCKS).doc(String(todayMock.id)));
+      }
       }
 
       // Lagos release time on the next day: Lagos is UTC+1, so subtract the hour.

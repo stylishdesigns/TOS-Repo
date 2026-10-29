@@ -22,6 +22,7 @@ import { adminDb } from './firebaseAdmin';
 import { httpError } from './tenantService';
 import { MOCKS, MOCK_ATTEMPTS, MOCK_TALLY, MOCK_LEADERBOARDS, MOCK_KEYS, KeyItem, audit, lagosToday, bumpMockTally } from './mockRoutes';
 import { markWithKey } from './studentMockRoutes';
+import { postAutoTos } from './chatAutoPosts';
 
 const TOP_ENTRIES = 100;
 const OPEN_ATTEMPT_CAP = 25;
@@ -166,6 +167,10 @@ async function releaseOne(mockId: string, mock: any, source: string, by?: string
   }
 
   void audit({ area: 'mocks', action: 'release', mockId, source, by: by || null, totalAttempts, entries: entries.length });
+
+  // CH1 Step 6: announce the release in the TOS channel. Fire-and-forget:
+  // a chat failure never blocks or delays the release itself.
+  void postAutoTos('resultsOut');
   return 'released';
 }
 

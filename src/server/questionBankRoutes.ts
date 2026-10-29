@@ -1,5 +1,6 @@
 import express from 'express';
 import { adminDb } from './firebaseAdmin';
+import { postAutoTos } from './chatAutoPosts';
 import type { Query, QueryDocumentSnapshot, DocumentSnapshot, DocumentData, WriteBatch } from 'firebase-admin/firestore';
 import { Caller, httpError } from './tenantService';
 import { enrichFields, counterOpsForBatch, counterOpsForBatchMany, appendPublishCounterOps, mapKey, registerQuestionBankLibraryRoutes } from './questionBankLibrary';
@@ -870,6 +871,10 @@ export function registerQuestionBankRoutes(app: express.Express): void {
         action: 'QUESTIONBANK_PUBLISHED',
         after: { version, fileUrl, added: added.length, edited: edited.length, removed: removed.length, live: questionsOut.length },
       });
+
+      // CH1 Step 6: announce the publish in the TOS channel. Fire-and-forget:
+      // a chat failure never blocks or fails the publish itself.
+      void postAutoTos('practicePublished');
 
       res.json({
         ok: true,

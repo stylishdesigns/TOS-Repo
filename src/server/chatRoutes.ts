@@ -142,7 +142,7 @@ function mergeCentreChat(raw: any): CentreChatSettings {
   return s;
 }
 
-async function getTosChat(): Promise<TosChatSettings> {
+export async function getTosChat(): Promise<TosChatSettings> {
   try {
     const cfg = await getPlatformConfig();
     return mergeTosChat((cfg as any)?.chat);
