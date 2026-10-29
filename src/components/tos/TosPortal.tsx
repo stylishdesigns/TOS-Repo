@@ -1067,7 +1067,8 @@ export const TosPortal: React.FC = () => {
         </nav>
       </aside>
 
-      {/* Mobile tab bar */}
+      {/* Mobile tab bar: steps aside while the channel chat is open */}
+      {tab !== 'channel' && (
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 backdrop-blur border-t border-white/10 flex overflow-x-auto">
         {TABS.map((t) => (
           <button key={t.id} onClick={() => setTab(t.id)} className={`flex-1 min-w-[64px] min-h-[44px] flex flex-col items-center justify-center gap-1 py-2 text-[10px] font-bold ${tab === t.id ? 'text-orange-300' : 'text-slate-500'}`}>
@@ -1075,6 +1076,7 @@ export const TosPortal: React.FC = () => {
           </button>
         ))}
       </div>
+      )}
 
       {/* Main */}
       <main className="flex-1 min-w-0 p-5 md:p-8 pb-24 md:pb-8">

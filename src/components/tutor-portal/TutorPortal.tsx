@@ -49,6 +49,7 @@ export const TutorPortal: React.FC = () => {
   };
 
   const [activeTab, setActiveTabState] = useState<TabType>(parseInitialTutorTab);
+  const [chatThreadOpen, setChatThreadOpen] = useState(false);
   const [desktopViewMode, setDesktopViewMode] = useState<'mobile_frame' | 'expanded'>('mobile_frame');
 
   const activeTutor = contextTutor || {
@@ -212,7 +213,7 @@ export const TutorPortal: React.FC = () => {
             {activeTab === 'home' && <HomeTab tutor={activeTutor} onNavigateTab={setActiveTab} />}
             {activeTab === 'classes' && <ScheduleTab tutor={activeTutor} />}
             {activeTab === 'assessment' && <AssessmentTab tutor={activeTutor} />}
-            {activeTab === 'chat' && <ChatManager />}
+            {activeTab === 'chat' && <ChatManager onThreadOpenChange={setChatThreadOpen} />}
             {activeTab === 'more' && (
               <MoreTab 
                 tutor={activeTutor} 
@@ -228,7 +229,7 @@ export const TutorPortal: React.FC = () => {
           </div>
 
           {/* 3. Bottom Navigation (Mobile App Style) */}
-          <nav className="fixed bottom-0 left-0 right-0 sm:absolute z-40 bg-[#EA580C] border-t border-orange-600/30 py-2 px-3 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] rounded-t-[24px]">
+          <nav className={`${chatThreadOpen ? 'hidden' : ''} fixed bottom-0 left-0 right-0 sm:absolute z-40 bg-[#EA580C] border-t border-orange-600/30 py-2 px-3 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] rounded-t-[24px]`}>
             <div className="max-w-md mx-auto grid grid-cols-5 gap-1 items-center">
               {/* Home */}
               <button

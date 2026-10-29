@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   BookOpen,
   Check,
@@ -130,7 +130,7 @@ function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boolean) =
   );
 }
 
-export const ChatManager: React.FC = () => {
+export const ChatManager: React.FC<{ onThreadOpenChange?: (open: boolean) => void }> = ({ onThreadOpenChange }) => {
   const { activeCentreId, addToast } = useApp();
   const [data, setData] = useState<Bootstrap | null>(null);
   const [loading, setLoading] = useState(true);
@@ -219,7 +219,7 @@ export const ChatManager: React.FC = () => {
           ))}
         </div>
 
-        {tab === 'groups' && data && <GroupsSection data={data} isAdmin={isAdmin} reload={load} addToast={addToast} centreId={activeCentreId || ''} />}
+        {tab === 'groups' && data && <GroupsSection data={data} isAdmin={isAdmin} reload={load} addToast={addToast} centreId={activeCentreId || ''} onThreadOpenChange={onThreadOpenChange} />}
         {tab === 'settings' && data && <SettingsSection data={data} isAdmin={isAdmin} reload={load} addToast={addToast} centreId={activeCentreId || ''} />}
         {tab === 'reports' && data && <ReportsSection data={data} isAdmin={isAdmin} reload={load} addToast={addToast} centreId={activeCentreId || ''} />}
       </div>
@@ -234,12 +234,13 @@ export const ChatManager: React.FC = () => {
 interface SectionProps {
   data: Bootstrap;
   isAdmin: boolean;
+  onThreadOpenChange?: (open: boolean) => void;
   reload: () => Promise<void>;
   addToast: (msg: string, kind?: string) => void;
   centreId: string;
 }
 
-const GroupsSection: React.FC<SectionProps> = ({ data, isAdmin, reload, addToast, centreId }) => {
+const GroupsSection: React.FC<SectionProps> = ({ data, isAdmin, reload, addToast, centreId, onThreadOpenChange }) => {
   const [creating, setCreating] = useState(false);
   const [busy, setBusy] = useState(false);
   const [name, setName] = useState('');
@@ -253,6 +254,13 @@ const GroupsSection: React.FC<SectionProps> = ({ data, isAdmin, reload, addToast
   const [editName, setEditName] = useState('');
   const [editMode, setEditMode] = useState<'centre_default' | 'custom' | 'none'>('centre_default');
   const [editThreshold, setEditThreshold] = useState('70');
+
+  // While a conversation is open the portal's bottom nav steps aside so the chat
+  // reads like a normal messaging screen.
+  useEffect(() => {
+    onThreadOpenChange?.(!!openId);
+    return () => onThreadOpenChange?.(false);
+  }, [openId, onThreadOpenChange]);
 
   const create = async () => {
     if (!name.trim() || busy) return;
@@ -782,6 +790,10 @@ function roleChipClass(role: string): string {
   return 'bg-slate-100 text-slate-500';
 }
 
+// The last thread shown for each group, kept in memory so reopening a chat puts
+// the conversation on screen straight away while a fresh sync runs behind it.
+const threadCache = new Map<string, ThreadMsg[]>();
+
 const ThreadPanel: React.FC<{
   group: ChatGroup;
   centreId: string;
@@ -789,8 +801,9 @@ const ThreadPanel: React.FC<{
   addToast: (msg: string, kind?: string) => void;
   onBack: () => void;
 }> = ({ group, centreId, messageMaxChars, addToast, onBack }) => {
-  const [messages, setMessages] = useState<ThreadMsg[] | null>(null);
+  const [messages, setMessages] = useState<ThreadMsg[] | null>(() => threadCache.get(group.id) || null);
   const [text, setText] = useState('');
+  const scrollRef = useRef<HTMLDivElement | null>(null);
   const [busy, setBusy] = useState(false);
   const [loadErr, setLoadErr] = useState('');
 
@@ -799,6 +812,7 @@ const ThreadPanel: React.FC<{
       const res = await api(`/api/centre/chat/groups/${group.id}/messages?centreId=${encodeURIComponent(centreId)}`);
       const d = res as { messages?: ThreadMsg[] };
       setMessages(d.messages || []);
+      threadCache.set(group.id, d.messages || []);
       setLoadErr('');
     } catch (e: any) {
       setLoadErr(String(e?.message || 'The chat could not be loaded.'));
@@ -810,6 +824,13 @@ const ThreadPanel: React.FC<{
     const t = setInterval(load, 15000);
     return () => clearInterval(t);
   }, [load]);
+
+  // Newest message sits at the bottom of the conversation, like any chat app.
+  const shown = [...(messages || [])].sort((a, b) => a.at - b.at);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages]);
 
   const send = async () => {
     if (busy) return;
@@ -831,7 +852,7 @@ const ThreadPanel: React.FC<{
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div className="h-[calc(100dvh-150px)] min-h-[460px] flex flex-col bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
       <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-3">
         <button onClick={onBack} className="p-1.5 rounded-lg bg-slate-100 text-slate-600 active:scale-95 transition" aria-label="Back to groups">
           <X className="w-4 h-4" />
@@ -848,14 +869,14 @@ const ThreadPanel: React.FC<{
         </div>
       )}
 
-      <div className="max-h-[420px] overflow-y-auto p-4 space-y-3">
+      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
         {messages === null && (
           <div className="flex items-center justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-[#EA580C]" /></div>
         )}
         {messages !== null && messages.length === 0 && (
           <p className="text-center text-xs text-slate-400 font-medium py-8">No messages yet. Send the first one.</p>
         )}
-        {(messages || []).map((m) => (
+        {shown.map((m) => (
           <div key={m.id} className={`flex flex-col ${m.mine ? 'items-end' : 'items-start'}`}>
             <div className="flex items-center gap-1.5 mb-0.5">
               <span className="text-[10px] font-black text-slate-500">{m.mine ? 'You' : m.username}</span>
@@ -872,7 +893,7 @@ const ThreadPanel: React.FC<{
         ))}
       </div>
 
-      <div className="border-t border-slate-100 p-3 flex items-end gap-2">
+      <div className="mt-auto border-t border-slate-100 p-3 flex items-end gap-2">
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}

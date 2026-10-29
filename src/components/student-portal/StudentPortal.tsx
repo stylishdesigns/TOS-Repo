@@ -548,6 +548,7 @@ export const StudentPortal: React.FC = () => {
                 student={activeStudent}
                 onGoToProfile={() => setActiveTab('more')}
                 onGoToPractice={() => setActiveTab('cbt')}
+                onHideBottomNav={setHideBottomNav}
               />
             )}
 

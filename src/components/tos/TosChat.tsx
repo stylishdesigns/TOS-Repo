@@ -74,8 +74,12 @@ const inputCls = 'w-full bg-slate-950/60 border border-white/10 rounded-xl px-3 
 
 // ---------------------------------------------------------------- Channel
 
+// The last channel state, kept in memory so reopening the channel puts the
+// conversation on screen straight away while a fresh sync runs behind it.
+let lastChannelState: ChannelState | null = null;
+
 const ChannelTab: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
-  const [state, setState] = useState<ChannelState | null>(null);
+  const [state, setState] = useState<ChannelState | null>(lastChannelState);
   const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState('');
   const [posting, setPosting] = useState(false);
@@ -86,7 +90,10 @@ const ChannelTab: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
   const load = useCallback(async () => {
     try {
       const r: Json = await api('/api/tos/chat/channel');
-      if (r && r.ok) setState(r as unknown as ChannelState);
+      if (r && r.ok) {
+        lastChannelState = r as unknown as ChannelState;
+        setState(r as unknown as ChannelState);
+      }
     } catch (e: any) {
       setError(e?.message || 'Could not load the channel.');
     } finally {
@@ -165,9 +172,9 @@ const ChannelTab: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
         </div>
       </Card>
       <Card>
-        <div ref={listRef} className="max-h-[420px] overflow-y-auto space-y-2.5 pr-1">
+        <div ref={listRef} className="h-[calc(100dvh-330px)] min-h-[320px] overflow-y-auto space-y-2.5 pr-1">
           {state.messages.length === 0 && <p className="text-xs text-slate-500 py-6 text-center">No messages yet.</p>}
-          {state.messages.map((m) => {
+          {state.messages.slice().sort((a, b) => a.at - b.at).map((m) => {
             const removed = removedOf(m);
             return (
               <div key={m.id} className={`rounded-xl px-3 py-2 border ${removed ? 'border-red-400/20 bg-red-500/5' : m.role === 'tos' ? 'border-orange-400/25 bg-orange-500/10' : 'border-white/10 bg-slate-950/40'}`}>

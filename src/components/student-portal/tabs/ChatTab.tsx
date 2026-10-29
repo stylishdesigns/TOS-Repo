@@ -129,9 +129,10 @@ interface ChatTabProps {
   student: Student;
   onGoToProfile?: () => void;
   onGoToPractice?: () => void;
+  onHideBottomNav?: (hide: boolean) => void;
 }
 
-export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoToPractice }) => {
+export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoToPractice, onHideBottomNav }) => {
   const [overview, setOverview] = useState<ChatOverview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -178,6 +179,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
           refreshOverview();
         }}
         onGoToPractice={onGoToPractice}
+        onHideBottomNav={onHideBottomNav}
       />
     );
   }
@@ -347,17 +349,22 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
 
 const PAGE_SIZE = 20; // how many messages one page of the chat history holds
 
+// The last thread each group showed, kept in memory so reopening a chat puts the
+// conversation on screen straight away while a fresh sync runs behind it.
+const roomCache = new Map<string, ChatMessage[]>();
+
 interface GroupRoomProps {
   groupId: string;
   group: ChatGroupSummary | null;
   onBack: () => void;
   onGoToPractice?: () => void;
+  onHideBottomNav?: (hide: boolean) => void;
 }
 
-const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPractice }) => {
+const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPractice, onHideBottomNav }) => {
   const [resp, setResp] = useState<MessagesResp | null>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => roomCache.get(groupId) || []);
+  const [loading, setLoading] = useState(() => !roomCache.has(groupId));
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [hasOlder, setHasOlder] = useState(false);
   const [error, setError] = useState('');
@@ -370,6 +377,13 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
   const [toast, setToast] = useState('');
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
+  // A chat thread takes the whole screen, so the portal's bottom nav steps aside
+  // while it is open and comes back when the student goes back to the list.
+  useEffect(() => {
+    onHideBottomNav?.(true);
+    return () => onHideBottomNav?.(false);
+  }, [onHideBottomNav]);
+
   const showToast = useCallback((msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(''), 2600);
@@ -380,9 +394,11 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
       if (page.length === 0) return prev;
       const byId = new Map<string, ChatMessage>(prev.map((m): [string, ChatMessage] => [m.id, m]));
       page.forEach((m) => byId.set(m.id, m));
-      return Array.from(byId.values()).sort((a, b) => a.at - b.at);
+      const merged = Array.from(byId.values()).sort((a, b) => a.at - b.at);
+      roomCache.set(groupId, merged.slice(-200));
+      return merged;
     });
-  }, []);
+  }, [groupId]);
 
   const markRead = useCallback(async (r: MessagesResp) => {
     const meta = r.meta;
