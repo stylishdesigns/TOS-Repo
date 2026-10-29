@@ -515,5 +515,8 @@ service cloud.firestore {
     match /mockLeaderboards/{doc} { allow read, write: if false; }
     match /usernames/{doc}      { allow read, write: if false; }
     match /mockSettings/{doc}   { allow read, write: if false; }
+    match /chatGroups/{doc}     { allow read, write: if false; }
+    match /chatReports/{doc}    { allow read, write: if false; }
+    match /chatMutes/{doc}      { allow read, write: if false; }
   }
 }
