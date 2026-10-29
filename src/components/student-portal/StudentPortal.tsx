@@ -548,6 +548,7 @@ export const StudentPortal: React.FC = () => {
             {activeTab === 'cbt' && (
               <CbtTabWrapper
                 student={activeStudent}
+                onGoToProfile={() => setActiveTab('more')}
                 subPage={cbtSubPage}
                 onSubPageChange={(sp) => {
                   setCbtSubPage(sp);

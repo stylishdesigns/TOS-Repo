@@ -58,71 +58,29 @@ const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
 // name before their first mock. 4-16 letters, numbers or underscores; the
 // server owns every rule, the phone only shows its answers.
 // ---------------------------------------------------------------------------
-const UsernameGate: React.FC<{ onClaimed: () => void }> = ({ onClaimed }) => {
-  const [name, setName] = useState('');
-  const [check, setCheck] = useState<Json>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    const trimmed = name.trim();
-    if (trimmed.length < 4) { setCheck(null); return undefined; }
-    const t = setTimeout(async () => {
-      try {
-        const r = await api(`/api/student/mock/username/check?name=${encodeURIComponent(trimmed)}`);
-        setCheck(r);
-      } catch { setCheck(null); }
-    }, 400);
-    return () => clearTimeout(t);
-  }, [name]);
-
-  const claim = async () => {
-    setBusy(true); setError('');
-    try {
-      await api('/api/student/mock/username', { method: 'POST', body: { name: name.trim() } });
-      onClaimed();
-    } catch (e: any) { setError(e.message || 'Could not save that name.'); }
-    finally { setBusy(false); }
-  };
-
-  const ok = check?.valid && check?.available;
+// CH1 Step 1: Profile is the only screen that creates a username, so the
+// leaderboard no longer asks for one. When it is missing, this card sends the
+// student to Profile; chat's welcome screen will do the same (Step 3).
+const UsernameGate: React.FC<{ onGoToProfile: () => void }> = ({ onGoToProfile }) => {
   return (
-    <div className="rounded-3xl p-5 space-y-3">
+    <div className="bg-white rounded-3xl border border-slate-200/90 shadow-sm p-5 space-y-3">
       <div className="flex items-center gap-2">
         <Medal className="w-5 h-5 text-[#EA580C]" />
-        <h3 className="text-base font-black text-slate-900">Pick your leaderboard name</h3>
+        <h3 className="text-base font-black text-slate-900">One thing before your first mock</h3>
       </div>
       <p className="text-sm text-slate-500 leading-relaxed">
-        The leaderboard shows names, never real ones. Choose a name other students will see.
+        The leaderboard shows names, never real ones. Your leaderboard name is set once in your profile, and chat uses the same name.
       </p>
-      <input
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        maxLength={16}
-        placeholder="e.g. swift_lion"
-        autoComplete="off"
-        className="w-full min-h-[48px] px-4 rounded-2xl border-2 border-slate-200 focus:border-[#EA580C] outline-none text-base font-bold text-slate-900 placeholder:text-slate-300 placeholder:font-medium"
-      />
-      {name.trim().length >= 4 && check && (
-        <p className={`text-sm font-bold ${check.valid && check.available ? 'text-emerald-600' : 'text-rose-600'}`}>
-          {check.valid ? (check.available ? `${name.trim()} is available.` : `${check.reason || 'That name is taken.'}`) : (check.reason || 'Not a valid name.')}
-        </p>
-      )}
-      {name.trim().length > 0 && name.trim().length < 4 && (
-        <p className="text-sm text-slate-400 font-medium">At least 4 characters.</p>
-      )}
-      {error && <p className="text-sm font-bold text-rose-600">{error}</p>}
       <button
-        onClick={claim}
-        disabled={!ok || busy}
-        className={`w-full min-h-[52px] rounded-2xl font-black text-sm uppercase tracking-widest transition-all ${ok && !busy ? 'bg-[#EA580C] text-white active:scale-[0.99]' : 'bg-slate-100 text-slate-400'}`}
+        type="button"
+        onClick={onGoToProfile}
+        className="w-full min-h-[48px] rounded-2xl bg-[#EA580C] text-white text-sm font-black tracking-wide"
       >
-        {busy ? 'Saving...' : 'Save this name'}
+        Go to Profile to set it
       </button>
     </div>
   );
 };
-
 // ---------------------------------------------------------------------------
 // The exam itself: full screen, one question at a time, server deadline on
 // the clock. Answers save in batches (5 changes, 10 idle seconds or a
@@ -502,7 +460,8 @@ const ReviewScreen: React.FC<{ mockId: string; onBack: () => void }> = ({ mockId
 export const StudentMockTab: React.FC<{
   initialTab?: 'today' | 'past' | 'board';
   onHideBottomNav?: (hide: boolean) => void;
-}> = ({ initialTab, onHideBottomNav }) => {
+  onGoToProfile?: () => void;
+}> = ({ initialTab, onHideBottomNav, onGoToProfile }) => {
   const [tab, setTab] = useState<'day' | 'board'>(initialTab === 'board' ? 'board' : 'day');
   const [status, setStatus] = useState<Json | null>(null);
   const [statusErr, setStatusErr] = useState('');
@@ -687,7 +646,7 @@ export const StudentMockTab: React.FC<{
                 <>
                   {!status.username ? (
                     <div className="mt-4">
-                      <UsernameGate onClaimed={loadStatus} />
+                      <UsernameGate onGoToProfile={() => { if (onGoToProfile) onGoToProfile(); }} />
                     </div>
                   ) : (
                     <div className="mt-4 space-y-4">

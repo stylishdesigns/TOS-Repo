@@ -19,6 +19,7 @@ interface CbtTabWrapperProps {
     source: 'performance_assessment';
   } | null;
   onExitReview?: () => void;
+  onGoToProfile?: () => void;
 }
 
 export const CbtTabWrapper: React.FC<CbtTabWrapperProps> = ({
@@ -33,6 +34,7 @@ export const CbtTabWrapper: React.FC<CbtTabWrapperProps> = ({
   cbtSubjectFilter,
   cbtReviewTarget,
   onExitReview,
+  onGoToProfile,
 }) => {
   if (subPage === 'mock') {
     return (
@@ -68,6 +70,7 @@ export const CbtTabWrapper: React.FC<CbtTabWrapperProps> = ({
         <StudentMockTab
           key={mockView}
           initialTab={mockView === 'leaderboard' ? 'board' : 'today'}
+          onGoToProfile={onGoToProfile}
           onHideBottomNav={(hide) => {
             // Hold the PWA auto-reload while an exam screen is up.
             try { sessionStorage.setItem('tos:defer-pwa-reload', hide ? '1' : '0'); } catch {}

@@ -1,5 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useApp } from '../../../context/AppContext';
+import { api, Json } from '../../tos/tosShared';
 import { Student } from '../../../types';
 import regeneratedStudentAvatar from '../../../assets/images/regenerated_image_1789369642757.jpg';
 import { ModernSelect } from '../../ui/ModernSelect';
@@ -145,6 +146,75 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
       console.error(e);
     } finally {
       setSavingSubjects(false);
+    }
+  };
+
+  // CH1 Step 1: username lives in Profile. One claim per student, set here,
+  // shown on chat and the mock leaderboard, changeable once every 30 days.
+  const [usernameInfo, setUsernameInfo] = useState<{
+    username: string;
+    lastChangedAt: string | null;
+    canChangeAt: string | null;
+    canChange: boolean;
+    mine: boolean;
+  } | null>(null);
+  const [usernameDraft, setUsernameDraft] = useState('');
+  const [usernameCheck, setUsernameCheck] = useState<Json | null>(null);
+  const [usernameBusy, setUsernameBusy] = useState(false);
+  const [usernameError, setUsernameError] = useState('');
+
+  useEffect(() => {
+    let dead = false;
+    (async () => {
+      try {
+        const r = await api('/api/student/profile/username');
+        if (dead) return;
+        const mine = Boolean(r?.studentId) && r.studentId === student.id;
+        setUsernameInfo({
+          username: String(r?.username || ''),
+          lastChangedAt: r?.lastChangedAt || null,
+          canChangeAt: r?.canChangeAt || null,
+          canChange: Boolean(r?.canChange),
+          mine,
+        });
+        setUsernameDraft(mine ? String(r?.username || '') : '');
+      } catch {
+        if (!dead) setUsernameInfo({ username: '', lastChangedAt: null, canChangeAt: null, canChange: false, mine: false });
+      }
+    })();
+    return () => { dead = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [student.id]);
+
+  useEffect(() => {
+    const trimmed = usernameDraft.trim();
+    if (!usernameInfo?.mine || trimmed === usernameInfo.username || trimmed.length < 4) {
+      setUsernameCheck(null);
+      return undefined;
+    }
+    const t = setTimeout(async () => {
+      try {
+        const r = await api(`/api/student/profile/username/check?name=${encodeURIComponent(trimmed)}`);
+        setUsernameCheck(r);
+      } catch { setUsernameCheck(null); }
+    }, 400);
+    return () => clearTimeout(t);
+  }, [usernameDraft, usernameInfo?.mine, usernameInfo?.username]);
+
+  const saveUsername = async () => {
+    if (!usernameInfo?.mine || !usernameInfo.canChange) return;
+    setUsernameBusy(true);
+    setUsernameError('');
+    try {
+      const r = await api('/api/student/profile/username', { method: 'POST', body: { name: usernameDraft.trim() } });
+      const nextCanChangeAt = r?.changed ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() : usernameInfo.canChangeAt;
+      setUsernameInfo({ username: String(r?.username || ''), lastChangedAt: new Date().toISOString(), canChangeAt: nextCanChangeAt, canChange: !r?.changed, mine: true });
+      setUsernameCheck(null);
+      addToast({ type: 'success', title: 'Username Saved', description: `${String(r?.username || '')} now shows on chat and the mock leaderboard.` });
+    } catch (e: any) {
+      setUsernameError(e.message || 'Could not save that username.');
+    } finally {
+      setUsernameBusy(false);
     }
   };
 
@@ -398,6 +468,75 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
         <h2 className="text-xl font-bold text-slate-900 mt-3.5 tracking-tight">
           {student.name}
         </h2>
+      </div>
+
+      {/* 1a-bis. SECTION: Username (CH1 Step 1). The single place a username
+          is set: chat and the mock leaderboard read it from here. */}
+      <div className="mt-7">
+        <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-1 mb-2">
+          Username
+        </div>
+        <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-4 space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center space-x-3 min-w-0">
+              <div className="w-9 h-9 rounded-full bg-orange-50 text-[#EA580C] flex items-center justify-center shrink-0">
+                <User className="w-4.5 h-4.5" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-sm font-semibold text-slate-800 block truncate">
+                  {usernameInfo?.username ? `@${usernameInfo.username}` : 'No username yet'}
+                </span>
+                <span className="text-[11px] text-slate-400 font-medium">
+                  Shown on chat and the mock leaderboard. Never your real name.
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {usernameInfo && !usernameInfo.mine ? (
+            <p className="text-xs text-slate-400 font-medium leading-relaxed">
+              Usernames are set by each student from their own profile.
+            </p>
+          ) : (
+            <>
+              {!usernameInfo?.canChange && usernameInfo?.canChangeAt ? (
+                <p className="text-xs text-amber-600 font-semibold leading-relaxed">
+                  You can change your username again on {new Date(usernameInfo.canChangeAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}.
+                </p>
+              ) : (
+                <>
+                  <input
+                    value={usernameDraft}
+                    onChange={(e) => { setUsernameDraft(e.target.value); setUsernameError(''); }}
+                    maxLength={16}
+                    placeholder="e.g. swift_lion"
+                    autoComplete="off"
+                    className="w-full min-h-[46px] px-4 rounded-xl border-2 border-slate-200 focus:border-[#EA580C] outline-none text-base font-bold text-slate-900 placeholder:text-slate-300 placeholder:font-medium"
+                  />
+                  {usernameDraft.trim().length >= 4 && usernameCheck && (
+                    <p className={`text-xs font-bold ${usernameCheck.valid && usernameCheck.available ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      {usernameCheck.valid
+                        ? (usernameCheck.available ? `${usernameDraft.trim()} is available.` : (usernameCheck.reason || 'That username is taken.'))
+                        : (usernameCheck.reason || 'Not a valid username.')}
+                    </p>
+                  )}
+                  {usernameDraft.trim().length > 0 && usernameDraft.trim().length < 4 && (
+                    <p className="text-xs text-slate-400 font-medium">At least 4 characters: letters, numbers or underscores.</p>
+                  )}
+                  {usernameError && <p className="text-xs font-bold text-rose-600">{usernameError}</p>}
+                  <button
+                    type="button"
+                    disabled={usernameBusy || usernameDraft.trim() === usernameInfo?.username || !(usernameCheck?.valid && usernameCheck?.available)}
+                    onClick={saveUsername}
+                    className="w-full min-h-[44px] rounded-xl bg-[#EA580C] text-white text-sm font-black tracking-wide disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {usernameBusy ? 'Saving…' : usernameInfo?.username ? 'Save new username' : 'Set username'}
+                  </button>
+                </>
+              )}
+            </>
+          )}
+        </div>
       </div>
 
       {/* 1b. SECTION: My Subjects */}

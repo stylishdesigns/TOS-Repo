@@ -170,6 +170,72 @@ async function findUsernameByUid(uid: string) {
   return snap.docs[0] || null;
 }
 
+/** Shape of the verified caller context the username helpers take. */
+type UsernameCtx = { caller: { uid: string }; centreId: string; studentId: string };
+
+/** The caller's own claim, for the Profile screen (CH1 Step 1). Returns the
+ * current username, when it may change again, and whose record it is. */
+async function usernameStatusFor(ctx: UsernameCtx) {
+  const doc = await findUsernameByUid(ctx.caller.uid);
+  const username = doc ? String((doc.data() as any).username || '') : '';
+  const lastChangedAt = doc ? String((doc.data() as any).lastChangedAt || (doc.data() as any).updatedAt || '') : '';
+  const parsed = Date.parse(lastChangedAt);
+  const canChangeAt = doc && Number.isFinite(parsed)
+    ? new Date(parsed + USERNAME_CHANGE_COOLDOWN_MS).toISOString()
+    : null;
+  const canChange = !doc || !Number.isFinite(parsed) || Date.now() - parsed >= USERNAME_CHANGE_COOLDOWN_MS;
+  return { username, lastChangedAt: lastChangedAt || null, canChangeAt, canChange, studentId: ctx.studentId };
+}
+
+/** Claim or change the caller's username: one transaction so two students can
+ * never hold one name. Shared by the mock gate and the Profile screen. */
+async function claimStudentUsername(ctx: UsernameCtx, name: string): Promise<{ username: string; changed: boolean }> {
+  if (!/^[A-Za-z0-9_]{4,16}$/.test(name)) throw httpError(400, 'Usernames are 4 to 16 letters, numbers or underscores.');
+  const lower = name.toLowerCase();
+  if (USERNAME_BLOCKED.some((w) => lower.includes(w))) throw httpError(400, 'That name is not allowed. Pick another.');
+  const nowIso = new Date().toISOString();
+  let changed = false;
+  await adminDb.runTransaction(async (tx) => {
+    const mine = await tx.get(adminDb.collection(USERNAMES).where('studentId', '==', ctx.studentId));
+    const current = mine.docs[0] || null;
+    if (current) {
+      const lastChange = Date.parse(String((current.data() as any).lastChangedAt || (current.data() as any).updatedAt || ''));
+      if (Number.isFinite(lastChange) && Date.now() - lastChange < USERNAME_CHANGE_COOLDOWN_MS) {
+        throw httpError(409, 'You can change your username once a month.');
+      }
+      if (current.id === lower) {
+        // Same name, nothing to do.
+        return;
+      }
+    }
+    const target = await tx.get(adminDb.collection(USERNAMES).doc(lower));
+    if (target.exists && String((target.data() as any)?.studentId || '') !== ctx.studentId) {
+      throw httpError(409, 'That username is already taken.');
+    }
+    changed = true;
+    for (const d of mine.docs) if (d.id !== lower) tx.delete(d.ref);
+    tx.set(adminDb.collection(USERNAMES).doc(lower), {
+      username: name,
+      usernameLower: lower,
+      studentId: ctx.studentId,
+      uid: ctx.caller.uid,
+      studentName: '',
+      centreId: ctx.centreId,
+      setBy: ctx.caller.uid,
+      setByStudent: true,
+      lastChangedAt: nowIso,
+      updatedAt: nowIso,
+    });
+  });
+  cacheClearFor(ctx.caller.uid);
+  if (!changed) {
+    void audit({ area: 'student-mock', action: 'username.keep', studentId: ctx.studentId, username: name, by: ctx.caller.uid });
+    return { username: name, changed: false };
+  }
+  void audit({ area: 'student-mock', action: 'username.claim', studentId: ctx.studentId, username: name, by: ctx.caller.uid });
+  return { username: name, changed: true };
+}
+
 // ---------------------------------------------------------------------------
 // Marking. A pure function over the saved answers and the server-only key.
 // The score scale comes from the mock's frozen settings, never from code.
@@ -457,53 +523,62 @@ export function registerStudentMockRoutes(app: express.Express): void {
     try {
       const ctx = await requireStudent(req);
       const name = String(req.body?.name || '').trim();
-      if (!/^[A-Za-z0-9_]{4,16}$/.test(name)) throw httpError(400, 'Usernames are 4 to 16 letters, numbers or underscores.');
-      const lower = name.toLowerCase();
-      if (USERNAME_BLOCKED.some((w) => lower.includes(w))) throw httpError(400, 'That name is not allowed. Pick another.');
-      const nowIso = new Date().toISOString();
-      let changed = false;
-      await adminDb.runTransaction(async (tx) => {
-        const mine = await tx.get(adminDb.collection(USERNAMES).where('studentId', '==', ctx.studentId));
-        const current = mine.docs[0] || null;
-        if (current) {
-          const lastChange = Date.parse(String((current.data() as any).lastChangedAt || (current.data() as any).updatedAt || ''));
-          if (Number.isFinite(lastChange) && Date.now() - lastChange < USERNAME_CHANGE_COOLDOWN_MS) {
-            throw httpError(409, 'You can change your username once a month.');
-          }
-          if (current.id === lower) {
-            // Same name, nothing to do; still refresh nothing.
-            return;
-          }
-        }
-        const target = await tx.get(adminDb.collection(USERNAMES).doc(lower));
-        if (target.exists && String((target.data() as any)?.studentId || '') !== ctx.studentId) {
-          throw httpError(409, 'That username is already taken.');
-        }
-        changed = true;
-        for (const d of mine.docs) if (d.id !== lower) tx.delete(d.ref);
-        tx.set(adminDb.collection(USERNAMES).doc(lower), {
-          username: name,
-          usernameLower: lower,
-          studentId: ctx.studentId,
-          uid: ctx.caller.uid,
-          studentName: '',
-          centreId: ctx.centreId,
-          setBy: ctx.caller.uid,
-          setByStudent: true,
-          lastChangedAt: nowIso,
-          updatedAt: nowIso,
-        });
-      });
-      cacheClearFor(ctx.caller.uid);
-      if (!changed) {
-        void audit({ area: 'student-mock', action: 'username.keep', studentId: ctx.studentId, username: name, by: ctx.caller.uid });
-        return res.json({ ok: true, username: name, changed: false });
-      }
-      void audit({ area: 'student-mock', action: 'username.claim', studentId: ctx.studentId, username: name, by: ctx.caller.uid });
-      res.json({ ok: true, username: name, changed: true });
+      const r = await claimStudentUsername(ctx, name);
+      res.json({ ok: true, username: r.username, changed: r.changed });
     } catch (error: any) {
       if (error?.status) return res.status(error.status).json({ error: error.message });
       console.error('[student-mock] username claim failed:', error?.message || error);
+      res.status(500).json({ error: 'Could not save your username.' });
+    }
+  });
+
+  // -----------------------------------------------------------------------
+  // CH1 Step 1: the same username register, but Profile is the only screen
+  // that offers it. The mock leaderboard keeps reading the same claim; these
+  // routes exist so Profile can show, check and save it, and so the mock and
+  // chat welcome screens can send an empty student to Profile.
+  // -----------------------------------------------------------------------
+  app.get('/api/student/profile/username', async (req, res) => {
+    try {
+      const ctx = await requireStudent(req);
+      const status = await usernameStatusFor(ctx);
+      res.json({ ok: true, ...status });
+    } catch (error: any) {
+      if (error?.status) return res.status(error.status).json({ error: error.message });
+      console.error('[student-mock] profile username status failed:', error?.message || error);
+      res.status(500).json({ error: 'Could not load your username.' });
+    }
+  });
+
+  app.get('/api/student/profile/username/check', async (req, res) => {
+    try {
+      await requireStudent(req);
+      const name = String(req.query.name || '').trim();
+      if (!/^[A-Za-z0-9_]{4,16}$/.test(name)) {
+        return res.json({ ok: true, name, valid: false, available: false, reason: 'Usernames are 4 to 16 letters, numbers or underscores.' });
+      }
+      const lower = name.toLowerCase();
+      if (USERNAME_BLOCKED.some((w) => lower.includes(w))) {
+        return res.json({ ok: true, name, valid: false, available: false, reason: 'That name is not allowed. Pick another.' });
+      }
+      const snap = await adminDb.collection(USERNAMES).doc(lower).get();
+      return res.json({ ok: true, name, valid: true, available: !snap.exists, reason: snap.exists ? 'That username is taken.' : null });
+    } catch (error: any) {
+      if (error?.status) return res.status(error.status).json({ error: error.message });
+      console.error('[student-mock] profile username check failed:', error?.message || error);
+      res.status(500).json({ error: 'Could not check that username.' });
+    }
+  });
+
+  app.post('/api/student/profile/username', async (req, res) => {
+    try {
+      const ctx = await requireStudent(req);
+      const name = String(req.body?.name || '').trim();
+      const r = await claimStudentUsername(ctx, name);
+      res.json({ ok: true, username: r.username, changed: r.changed });
+    } catch (error: any) {
+      if (error?.status) return res.status(error.status).json({ error: error.message });
+      console.error('[student-mock] profile username claim failed:', error?.message || error);
       res.status(500).json({ error: 'Could not save your username.' });
     }
   });

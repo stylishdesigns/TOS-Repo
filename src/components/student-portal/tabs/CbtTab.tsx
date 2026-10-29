@@ -49,6 +49,7 @@ interface CbtTabProps {
   onExitReview?: () => void;
   lockedFrequency?: 'General' | 'Mock';
   hideFrequencyToggle?: boolean;
+  onGoToProfile?: () => void;
   renderUnderHeader?: (showArchive: boolean) => React.ReactNode;
 }
 
@@ -64,6 +65,7 @@ export const CbtTab: React.FC<CbtTabProps> = ({
   lockedFrequency,
   hideFrequencyToggle = false,
   renderUnderHeader,
+  onGoToProfile,
 }) => {
   const { addToast, exams, results, addResult, centreName } = useApp();
 
@@ -723,6 +725,7 @@ export const CbtTab: React.FC<CbtTabProps> = ({
       return (
         <StudentMockTab
           onHideBottomNav={onHideBottomNav}
+          onGoToProfile={onGoToProfile}
           onExitToGeneral={() => setActiveFrequency('General')}
         />
       );
