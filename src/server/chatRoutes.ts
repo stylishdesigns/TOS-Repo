@@ -444,6 +444,28 @@ async function studentGroupContext(caller: Caller, groupId: string, forPost: boo
   return { student, centreId, group, centreChat, lock, isTosChannel };
 }
 
+/** One chat photo upload: a data URL in, a hosted URL out. Photos ride the
+ *  same unsigned Cloudinary preset the platform already uses, and the centre's
+ *  own photo size setting decides the cap. */
+async function uploadChatPhoto(dataUrl: string, photoMaxKb: number): Promise<string> {
+  const m = /^data:(image\/(?:png|jpe?g|webp|gif));base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl);
+  if (!m) throw httpError(400, 'That file is not a photo this chat can send.');
+  const bytes = Math.floor((m[2].length * 3) / 4);
+  if (bytes > photoMaxKb * 1024) throw httpError(413, `Photos can be up to ${photoMaxKb} KB after compression.`);
+  const cloud = String(process.env.CLOUDINARY_CLOUD_NAME || '');
+  const preset = String(process.env.CLOUDINARY_UPLOAD_PRESET || '');
+  if (!cloud || !preset) throw httpError(500, 'Photo hosting is not configured on this deployment.');
+  const form = new FormData();
+  form.append('upload_preset', preset);
+  form.append('folder', 'tos/chat');
+  form.append('file', dataUrl);
+  const resp = await fetch(`https://api.cloudinary.com/v1_1/${cloud}/image/upload`, { method: 'POST', body: form });
+  const data: any = await resp.json().catch(() => null);
+  const url = data && typeof data.secure_url === 'string' ? data.secure_url : '';
+  if (!resp.ok || !url) throw httpError(502, 'The photo could not be uploaded. Try again.');
+  return url;
+}
+
 // ============================================================================
 // Student routes
 // ============================================================================
@@ -580,6 +602,7 @@ export function registerChatRoutes(app: express.Express): void {
         kind: ctx.group.kind,
         canPost: ctx.group.kind !== 'announcements' && ctx.group.kind !== 'tos_channel',
         photosAllowed: ctx.isTosChannel ? false : ctx.centreChat.photosAllowed,
+        photoMaxKb: tosChat.photoMaxKb,
         messageMaxChars: tosChat.messageMaxChars,
         messages,
         unread: Math.max(0, meta.msgCount - meta.pruned - read),
@@ -903,6 +926,7 @@ async function staffDisplayName(caller: Caller): Promise<string> {
         role: ctx.membership.role,
         canPost: true,
         photosAllowed: ctx.centreChat.photosAllowed,
+        photoMaxKb: tosChat.photoMaxKb,
         messageMaxChars: tosChat.messageMaxChars,
         messages,
       });
@@ -973,6 +997,46 @@ async function staffDisplayName(caller: Caller): Promise<string> {
       res.json({ ok: true });
     } catch (error: any) {
       handleRouteError(res, error, '[chat] staff remove failed');
+    }
+  });
+
+  // Photo upload for student posts. The centre's own photo settings decide
+  // whether photos are allowed at all and how big one may be.
+  app.post('/api/student/chat/photo', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const stuSnap = await getStudentDoc(caller.uid);
+      if (!stuSnap) throw httpError(403, 'No student record is linked to this account.');
+      const student = stuSnap.data() as any;
+      const centreId = cleanStr(student.centreId, 120);
+      if (!centreId) throw httpError(403, 'No centre is linked to this account.');
+      await requireMembership(caller, centreId);
+      const entitlements = await getCentreEntitlements(centreId);
+      if (entitlements.chat !== true) throw httpError(403, 'Chat is not part of your centre\u2019s plan yet.');
+      const centreChat = await getCentreChat(centreId);
+      if (centreChat.paused) throw httpError(503, 'Chat is paused for your centre right now.');
+      if (!centreChat.photosAllowed) throw httpError(403, 'Your centre has turned photo sharing off.');
+      const url = await uploadChatPhoto(String(req.body?.dataUrl || ''), (await getTosChat()).photoMaxKb);
+      res.json({ ok: true, url });
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] student photo failed');
+    }
+  });
+
+  app.post('/api/centre/chat/photo', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const centreId = cleanStr(String(req.query.centreId || ''), 120);
+      await requireMembership(caller, centreId, ['owner', 'admin', 'tutor']);
+      const entitlements = await getCentreEntitlements(centreId);
+      if (entitlements.chat !== true) throw httpError(403, 'Chat is not part of your centre\u2019s plan yet.');
+      const centreChat = await getCentreChat(centreId);
+      if (centreChat.paused) throw httpError(503, 'Chat is paused for your centre right now.');
+      if (!centreChat.photosAllowed) throw httpError(403, 'Your centre has turned photo sharing off.');
+      const url = await uploadChatPhoto(String(req.body?.dataUrl || ''), (await getTosChat()).photoMaxKb);
+      res.json({ ok: true, url });
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] staff photo failed');
     }
   });
 

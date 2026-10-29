@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   BookOpen,
   Check,
+  ChevronLeft,
   Flag,
   Info,
   Loader2,
@@ -16,7 +17,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { api } from '../tos/tosShared';
-import { copyText, makeLongPress, MessageActionSheet, ReactionChips } from './chatActions';
+import { copyText, EmojiText, isEmojiOnly, makeLongPress, MessageActionSheet, ReactionChips } from './chatActions';
 
 // ============================================================================
 // CH1 centre admin chat screens (Step 4). Groups, settings and the reports
@@ -131,10 +132,14 @@ function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boolean) =
   );
 }
 
+// The last bootstrap kept in memory per centre so the chat screen renders
+// straight away while a fresh sync runs behind it.
+const bootstrapCache = new Map<string, Bootstrap>();
+
 export const ChatManager: React.FC<{ onThreadOpenChange?: (open: boolean) => void }> = ({ onThreadOpenChange }) => {
   const { activeCentreId, addToast } = useApp();
-  const [data, setData] = useState<Bootstrap | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<Bootstrap | null>(() => (activeCentreId && bootstrapCache.has(activeCentreId) ? bootstrapCache.get(activeCentreId) || null : null));
+  const [loading, setLoading] = useState(() => !(activeCentreId && bootstrapCache.has(activeCentreId)));
   const [error, setError] = useState('');
   const [tab, setTab] = useState<'groups' | 'settings' | 'reports'>('groups');
 
@@ -148,6 +153,7 @@ export const ChatManager: React.FC<{ onThreadOpenChange?: (open: boolean) => voi
     }
     try {
       const res = await api(`/api/centre/chat/bootstrap?centreId=${encodeURIComponent(activeCentreId)}`);
+      bootstrapCache.set(activeCentreId, res as Bootstrap);
       setData(res as Bootstrap);
       setError('');
     } catch (e: any) {
@@ -167,7 +173,8 @@ export const ChatManager: React.FC<{ onThreadOpenChange?: (open: boolean) => voi
     { id: 'groups', label: 'Groups', icon: Users },
     // Settings stay owner/admin only; the server enforces it too.
     ...(isAdmin ? [{ id: 'settings' as const, label: 'Settings', icon: Info }] : []),
-    { id: 'reports', label: 'Reports', icon: Flag, badge: pendingReports },
+    // Reports are centre-admin work; the server enforces that too.
+    ...(isAdmin ? [{ id: 'reports' as const, label: 'Reports', icon: Flag, badge: pendingReports }] : []),
   ];
 
   if (loading) {
@@ -197,8 +204,8 @@ export const ChatManager: React.FC<{ onThreadOpenChange?: (open: boolean) => voi
     <div className="flex-1 overflow-y-auto">
       <div className="p-4 sm:p-6 max-w-3xl mx-auto space-y-5 pb-10">
         <div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Student Chat</h1>
-          <p className="text-xs text-slate-500 font-medium mt-0.5">Groups, access rules and reports for your centre's student chat.</p>
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Chat</h1>
+          <p className="text-xs text-slate-500 font-medium mt-0.5">Your centre’s group conversations.</p>
         </div>
 
         <div className="flex gap-2">
@@ -329,6 +336,7 @@ const GroupsSection: React.FC<SectionProps> = ({ data, isAdmin, reload, addToast
           group={openGroup}
           centreId={centreId}
           messageMaxChars={data.platform.messageMaxChars}
+          photosAllowed={data.settings.photosAllowed}
           addToast={addToast}
           onBack={() => setOpenId(null)}
         />
@@ -432,7 +440,11 @@ const GroupsSection: React.FC<SectionProps> = ({ data, isAdmin, reload, addToast
       )}
 
       {data.groups.map((g) => (
-        <div key={g.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-2">
+        <div
+          key={g.id}
+          onClick={() => { if (editingId !== g.id) setOpenId(g.id); }}
+          className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-2 cursor-pointer active:scale-[0.995] transition"
+        >
           {editingId === g.id ? (
             <div className="space-y-3">
               <input
@@ -493,15 +505,9 @@ const GroupsSection: React.FC<SectionProps> = ({ data, isAdmin, reload, addToast
                 <p className="text-[10px] text-slate-400 font-medium mt-0.5">Created {fmtDate(g.createdAt)}</p>
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
-                <button
-                  onClick={() => setOpenId(g.id)}
-                  className="px-3 py-1.5 rounded-lg bg-[#EA580C] text-white text-[11px] font-black active:scale-95 transition"
-                >
-                  Chat
-                </button>
                 {isAdmin && (
                   <button
-                    onClick={() => startEdit(g)}
+                    onClick={(e) => { e.stopPropagation(); startEdit(g); }}
                     className="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 text-[11px] font-black active:scale-95 transition"
                   >
                     Edit
@@ -802,11 +808,14 @@ const ThreadPanel: React.FC<{
   group: ChatGroup;
   centreId: string;
   messageMaxChars: number;
+  photosAllowed: boolean;
   addToast: (msg: string, kind?: string) => void;
   onBack: () => void;
-}> = ({ group, centreId, messageMaxChars, addToast, onBack }) => {
+}> = ({ group, centreId, messageMaxChars, photosAllowed, addToast, onBack }) => {
   const [messages, setMessages] = useState<ThreadMsg[] | null>(() => threadCache.get(group.id) || null);
   const [text, setText] = useState('');
+  const [attachPreview, setAttachPreview] = useState('');
+  const fileRef = useRef<HTMLInputElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [busy, setBusy] = useState(false);
   const [loadErr, setLoadErr] = useState('');
@@ -841,14 +850,21 @@ const ThreadPanel: React.FC<{
   const send = async () => {
     if (busy) return;
     const value = text.trim();
-    if (!value) return;
+    if (!value && !attachPreview) return;
     setBusy(true);
     try {
+      let photoUrl: string | undefined;
+      if (attachPreview) {
+        const res = await api(`/api/centre/chat/photo?centreId=${encodeURIComponent(centreId)}`, { method: 'POST', body: { dataUrl: attachPreview } });
+        photoUrl = String(res?.url || '');
+        if (!photoUrl) throw new Error('The photo could not be uploaded.');
+      }
       await api(`/api/centre/chat/groups/${group.id}/messages?centreId=${encodeURIComponent(centreId)}`, {
         method: 'POST',
-        body: { text: value, replyTo: replyTo ? replyTo.id : undefined },
+        body: { text: value, photoUrl, replyTo: replyTo ? replyTo.id : undefined },
       });
       setText('');
+      setAttachPreview('');
       setReplyTo(null);
       await load();
     } catch (e: any) {
@@ -856,6 +872,34 @@ const ThreadPanel: React.FC<{
     } finally {
       setBusy(false);
     }
+  };
+
+  const onPhotoPicked = (file: File | null | undefined) => {
+    if (!file) return;
+    if (!/^image\//.test(file.type || '')) { addToast('Only photos can be attached here.'); return; }
+    if (file.size > 12 * 1024 * 1024) { addToast('That photo is too large. Choose a smaller one.'); return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const max = 1400;
+        const scale = Math.min(1, max / Math.max(img.width || 1, img.height || 1));
+        const w = Math.max(1, Math.round((img.width || max) * scale));
+        const h = Math.max(1, Math.round((img.height || max) * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { addToast('That photo could not be read. Try another.'); return; }
+        ctx.drawImage(img, 0, 0, w, h);
+        let out = canvas.toDataURL('image/jpeg', 0.82);
+        let q = 0.82;
+        while (out.length * 0.75 > 900 * 1024 && q > 0.35) { q -= 0.15; out = canvas.toDataURL('image/jpeg', q); }
+        setAttachPreview(out);
+      };
+      img.onerror = () => addToast('That photo could not be read. Try another.');
+      img.src = String(reader.result || '');
+    };
+    reader.readAsDataURL(file);
   };
 
   const myUid = (messages || []).find((m) => m.mine)?.uid || '';
@@ -901,15 +945,17 @@ const ThreadPanel: React.FC<{
     addToast(ok ? 'Copied' : 'Could not copy on this device', ok ? 'success' : 'error');
   };
 
+  // Same shell as the student room: a fixed screen with the header and the
+  // composer both pinned, and only the messages scroll between them.
   return (
-    <div className="h-[calc(100dvh-150px)] min-h-[460px] flex flex-col bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-      <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-3">
-        <button onClick={onBack} className="p-1.5 rounded-lg bg-slate-100 text-slate-600 active:scale-95 transition" aria-label="Back to groups">
-          <X className="w-4 h-4" />
+    <div className="fixed inset-0 z-40 flex flex-col bg-[#FFF3E7]" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+      <div className="px-3 sm:px-5 py-2.5 flex items-center gap-2 bg-[#EA580C] shadow-sm shrink-0">
+        <button onClick={onBack} className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center text-white active:scale-95 transition shrink-0" aria-label="Back to groups">
+          <ChevronLeft className="w-4 h-4" />
         </button>
-        <div className="min-w-0">
-          <p className="text-sm font-black text-slate-900 truncate">{group.name}</p>
-          <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">{kindLabel(group.kind)}</p>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-black text-white truncate">{group.name}</p>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-orange-100">{kindLabel(group.kind)}</p>
         </div>
       </div>
 
@@ -928,6 +974,7 @@ const ThreadPanel: React.FC<{
         )}
         {shown.map((m) => {
           const press = makeLongPress(() => { if (!m.removed) setActionMsg(m); });
+          const emojiOnly = !m.removed && !!m.text && isEmojiOnly(m.text);
           return (
           <div key={m.id} className={`flex flex-col ${m.mine ? 'items-end' : 'items-start'}`}>
             <div className="flex items-center gap-1.5 mb-0.5">
@@ -943,7 +990,7 @@ const ThreadPanel: React.FC<{
             )}
             <div
               {...press}
-              className={`max-w-[85%] select-none px-3.5 py-2 rounded-2xl text-xs leading-relaxed cursor-pointer ${m.mine ? 'bg-[#EA580C] text-white' : 'bg-slate-100 text-slate-800'}`}
+              className={`max-w-[85%] select-none px-3.5 py-2 rounded-2xl text-xs leading-relaxed cursor-pointer ${m.mine && !emojiOnly ? 'bg-[#EA580C] text-white' : 'bg-white text-slate-800 border border-slate-200'}`}
             >
               {m.replyTo && (
                 <div className={`mb-1 rounded-lg border-l-2 px-2 py-1 ${m.mine ? 'border-orange-200 bg-white/10' : 'border-orange-300 bg-orange-50/70'}`}>
@@ -951,7 +998,7 @@ const ThreadPanel: React.FC<{
                   <p className={`text-[10px] truncate ${m.mine ? 'text-orange-100/80' : 'text-slate-500'}`}>{m.replyTo.excerpt}</p>
                 </div>
               )}
-              {m.removed ? <span className="italic opacity-70">Message removed</span> : m.text}
+              {m.removed ? <span className="italic opacity-70">Message removed</span> : emojiOnly ? <span className="block text-2xl leading-snug whitespace-pre-wrap">{m.text}</span> : <EmojiText text={m.text} mine={m.mine && !emojiOnly} className="whitespace-pre-wrap break-words" />}
             </div>
             {!m.removed && (
               <ReactionChips reactions={m.reactions} mineUid={myUid} onToggle={(emoji) => doReact(m, emoji)} />
@@ -961,9 +1008,18 @@ const ThreadPanel: React.FC<{
         })}
       </div>
 
-      <div className="mt-auto border-t border-slate-100 p-3 flex items-end gap-2">
-        {replyTo && (
-          <div className="absolute left-4 right-4 bottom-[92px] flex items-start gap-2 rounded-xl bg-orange-50 border border-orange-100 px-3 py-2">
+      <div className="relative shrink-0 bg-white border-t border-slate-200 p-3 flex items-end gap-2">
+        {attachPreview && (
+          <div className="absolute bottom-full left-3 right-3 mb-1 flex items-center gap-2 rounded-xl bg-slate-50 border border-slate-200 px-2 py-1.5">
+            <img src={attachPreview} alt="Photo to send" className="w-10 h-10 rounded-lg object-cover" />
+            <p className="text-[11px] font-bold text-slate-600 flex-1">Photo ready to send</p>
+            <button onClick={() => setAttachPreview('')} className="rounded-full p-1 text-slate-400 hover:bg-slate-100" aria-label="Remove photo">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+        {replyTo && !attachPreview && (
+          <div className="absolute bottom-full left-3 right-3 mb-1 flex items-start gap-2 rounded-xl bg-orange-50 border border-orange-100 px-3 py-2">
             <div className="min-w-0 flex-1">
               <p className="text-[10px] font-black text-[#C2410C]">Replying to {replyTo.username}</p>
               <p className="text-[11px] text-slate-500 truncate">{replyTo.removed ? 'Message removed' : (replyTo.text || 'Photo')}</p>
@@ -972,6 +1028,24 @@ const ThreadPanel: React.FC<{
               <X className="w-3.5 h-3.5" />
             </button>
           </div>
+        )}
+        {photosAllowed && (
+          <>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => { onPhotoPicked(e.target.files && e.target.files[0]); e.target.value = ''; }}
+            />
+            <button
+              onClick={() => fileRef.current?.click()}
+              className="w-11 h-11 rounded-2xl bg-slate-100 border border-slate-200 text-slate-600 flex items-center justify-center active:scale-95 transition shrink-0"
+              aria-label="Attach a photo"
+            >
+              <Plus className="w-5 h-5" />
+            </button>
+          </>
         )}
         <textarea
           value={text}

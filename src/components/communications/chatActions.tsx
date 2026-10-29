@@ -319,3 +319,36 @@ export function MessageActionSheet({
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Emoji presentation (Step 8c). On coloured (own) bubbles an emoji sits on a
+// small white chip instead of the bubble colour, and a message made of only
+// emojis reads like WhatsApp: a white pill with the emojis large.
+// ---------------------------------------------------------------------------
+
+const EMOJI_RUN = /(\p{Extended_Pictographic}(?:\uFE0F|\u200D\p{Extended_Pictographic})*)/gu;
+
+export function isEmojiOnly(text: string): boolean {
+  const t = (text || '').trim();
+  if (!t) return false;
+  return t.replace(EMOJI_RUN, '').replace(/\s+/g, '').length === 0;
+}
+
+export function EmojiText({ text, mine, className }: { text: string; mine?: boolean; className?: string }) {
+  if (!mine) return <span className={className}>{text}</span>;
+  const parts = text.split(EMOJI_RUN);
+  return (
+    <span className={className}>
+      {parts.map((part, i) => {
+        if (i % 2 === 1) {
+          return (
+            <span key={i} className="mx-px inline-block rounded-md bg-white px-1 leading-[1.3]">
+              {part}
+            </span>
+          );
+        }
+        return part ? <React.Fragment key={i}>{part}</React.Fragment> : null;
+      })}
+    </span>
+  );
+}

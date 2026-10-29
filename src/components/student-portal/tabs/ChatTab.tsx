@@ -9,6 +9,7 @@ import {
   Lock,
   Megaphone,
   MessageSquare,
+  Plus,
   RefreshCw,
   Send,
   ShieldAlert,
@@ -19,7 +20,7 @@ import {
 } from 'lucide-react';
 import { Student } from '../../../types';
 import { api } from '../../tos/tosShared';
-import { copyText, makeLongPress, MessageActionSheet, ReactionChips } from '../../communications/chatActions';
+import { copyText, EmojiText, isEmojiOnly, makeLongPress, MessageActionSheet, ReactionChips } from '../../communications/chatActions';
 
 // ============================================================================
 // CH1 student chat (Step 3). The screens are thin: every rule (entitlement,
@@ -150,9 +151,13 @@ interface ChatTabProps {
   onHideBottomNav?: (hide: boolean) => void;
 }
 
+// Last overview kept in memory so reopening the chat list renders straight
+// away while the refresh runs behind it.
+let overviewCache: ChatOverview | null = null;
+
 export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoToPractice, onHideBottomNav }) => {
-  const [overview, setOverview] = useState<ChatOverview | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [overview, setOverview] = useState<ChatOverview | null>(overviewCache);
+  const [loading, setLoading] = useState(() => !overviewCache);
   const [error, setError] = useState('');
   const [showRules, setShowRules] = useState(() => {
     try {
@@ -167,6 +172,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
   const load = useCallback(async () => {
     try {
       const res = await api('/api/student/chat/overview');
+      overviewCache = res as ChatOverview;
       setOverview(res as ChatOverview);
       setError('');
     } catch (e: any) {
@@ -410,6 +416,9 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
   const [reportReason, setReportReason] = useState('');
   const [sendingReport, setSendingReport] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
+  const [attaching, setAttaching] = useState(false);
+  const [attachPreview, setAttachPreview] = useState('');
+  const fileRef = useRef<HTMLInputElement | null>(null);
   const [toast, setToast] = useState('');
   const [actionMsg, setActionMsg] = useState<ChatMessage | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
@@ -519,13 +528,50 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, resp?.locked]);
 
+  // A photo is compressed on the device first, then hosted when the message
+  // goes out. The centre's own photo setting decides the size cap.
+  const onPhotoPicked = useCallback((file: File | null | undefined) => {
+    if (!file) return;
+    if (!/^image\//.test(file.type || '')) { showToast('Only photos can be attached here.'); return; }
+    if (file.size > 12 * 1024 * 1024) { showToast('That photo is too large. Choose a smaller one.'); return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const max = 1400;
+        const scale = Math.min(1, max / Math.max(img.width || 1, img.height || 1));
+        const w = Math.max(1, Math.round((img.width || max) * scale));
+        const h = Math.max(1, Math.round((img.height || max) * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { showToast('That photo could not be read. Try another.'); return; }
+        ctx.drawImage(img, 0, 0, w, h);
+        let out = canvas.toDataURL('image/jpeg', 0.82);
+        let q = 0.82;
+        while (out.length * 0.75 > 900 * 1024 && q > 0.35) { q -= 0.15; out = canvas.toDataURL('image/jpeg', q); }
+        setAttachPreview(out);
+      };
+      img.onerror = () => showToast('That photo could not be read. Try another.');
+      img.src = String(reader.result || '');
+    };
+    reader.readAsDataURL(file);
+  }, [showToast]);
+
   const send = useCallback(async () => {
     const t = text.trim();
     if (!t || sending) return;
     setSending(true);
     try {
-      await api(`/api/student/chat/groups/${groupId}/messages`, { method: 'POST', body: { text: t, replyTo: replyTo ? replyTo.id : undefined } });
+      let photoUrl: string | undefined;
+      if (attachPreview) {
+        const res = await api('/api/student/chat/photo', { method: 'POST', body: { dataUrl: attachPreview } });
+        photoUrl = String(res?.url || '');
+        if (!photoUrl) throw new Error('The photo could not be uploaded. Try again.');
+      }
+      await api(`/api/student/chat/groups/${groupId}/messages`, { method: 'POST', body: { text: t, photoUrl, replyTo: replyTo ? replyTo.id : undefined } });
       setText('');
+      setAttachPreview('');
       setReplyTo(null);
       await loadLatest();
       scrollToBottom();
@@ -534,7 +580,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
     } finally {
       setSending(false);
     }
-  }, [groupId, text, sending, replyTo, loadLatest, scrollToBottom, showToast]);
+  }, [groupId, text, sending, replyTo, attachPreview, loadLatest, scrollToBottom, showToast]);
 
   const myUid = messages.find((m) => m.mine)?.uid || '';
 
@@ -709,6 +755,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
 
   const bubble = (m: ChatMessage) => {
     const chip = roleChip(m);
+    const emojiOnly = !m.removed && !!m.text && isEmojiOnly(m.text);
     const press = makeLongPress(() => { if (!m.removed) setActionMsg(m); });
     return (
       <div key={m.id} className={`flex flex-col ${m.mine ? 'items-end' : 'items-start'} px-1`}>
@@ -716,7 +763,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
           {...press}
           onClick={() => { if (!m.mine && !m.removed) setReportTarget(m); }}
           className={`max-w-[82%] select-none rounded-2xl px-3.5 py-2.5 ${
-            m.mine
+            m.mine && !emojiOnly
               ? 'bg-[#EA580C] text-white rounded-br-md'
               : 'bg-white text-slate-800 border border-slate-200/90 rounded-bl-md shadow-sm'
           } ${!m.mine && !m.removed ? 'cursor-pointer active:scale-[0.99] transition' : 'cursor-pointer'}`}
@@ -744,10 +791,14 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
           )}
           {m.removed ? (
             <p className="text-[11px] italic text-slate-400 font-medium">Message removed</p>
+          ) : m.text && isEmojiOnly(m.text) ? (
+            <p className="text-3xl leading-snug whitespace-pre-wrap break-words">{m.text}</p>
           ) : m.text ? (
-            <p className={`text-[13px] leading-relaxed font-medium whitespace-pre-wrap break-words ${m.mine ? 'text-white' : 'text-slate-800'}`}>
-              {m.text}
-            </p>
+            <EmojiText
+              text={m.text}
+              mine={m.mine && !emojiOnly}
+              className={`text-[13px] leading-relaxed font-medium whitespace-pre-wrap break-words ${m.mine ? 'text-white' : 'text-slate-800'}`}
+            />
           ) : m.photoUrl ? (
             <img src={m.photoUrl} alt="Shared photo" className="rounded-xl max-h-60 w-auto" />
           ) : null}
@@ -764,23 +815,25 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
     );
   };
 
+  // WhatsApp-style room: a fixed screen with the header and the composer both
+  // pinned, and only the messages scroll between them.
   return (
-    <div className="max-w-lg mx-auto animate-in fade-in duration-300 flex flex-col" style={{ minHeight: 'calc(100vh - 140px)' }}>
-      <div className="px-4 sm:px-5 pt-4 pb-2 flex items-center gap-2">
+    <div className="fixed inset-0 z-40 flex flex-col bg-[#FFF3E7] animate-in fade-in duration-300" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+      <div className="px-3 sm:px-5 py-2.5 flex items-center gap-2 bg-[#EA580C] shadow-sm shrink-0">
         <button
           onClick={onBack}
-          className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 active:scale-95 transition shrink-0"
+          className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center text-white active:scale-95 transition shrink-0"
           aria-label="Back"
         >
           <ChevronLeft className="w-4 h-4" />
         </button>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-black text-slate-900 truncate">{resp?.groupName || group?.name}</p>
-          <p className="text-[10px] font-black uppercase tracking-wider text-[#C2410C]">{kindLabel}</p>
+          <p className="text-sm font-black text-white truncate">{resp?.groupName || group?.name}</p>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-orange-100">{kindLabel}</p>
         </div>
         <button
           onClick={() => setShowInfo(true)}
-          className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-500 active:scale-95 transition shrink-0"
+          className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center text-white active:scale-95 transition shrink-0"
           aria-label="Group info"
         >
           <Info className="w-4 h-4" />
@@ -819,7 +872,16 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
         {messages.map(bubble)}
       </div>
 
-      <div className="sticky bottom-[72px] px-4 sm:px-5 pt-2 pb-1 bg-gradient-to-t from-white via-white/95 to-transparent">
+      <div className="relative shrink-0 bg-white border-t border-slate-200 px-3 sm:px-4 pt-2 pb-2">
+        {attachPreview && (
+          <div className="flex items-center gap-2 mb-2 rounded-xl bg-slate-50 border border-slate-200 px-2 py-1.5">
+            <img src={attachPreview} alt="Photo to send" className="w-10 h-10 rounded-lg object-cover" />
+            <p className="text-[11px] font-bold text-slate-600 flex-1">Photo ready to send</p>
+            <button onClick={() => setAttachPreview('')} className="rounded-full p-1 text-slate-400 hover:bg-slate-100" aria-label="Remove photo">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
         {canPost ? (
           <div className="flex items-end gap-2">
             {replyTo && (
@@ -836,6 +898,24 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
                   <X className="w-3.5 h-3.5" />
                 </button>
               </div>
+            )}
+            {resp?.photosAllowed !== false && (
+              <>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => { onPhotoPicked(e.target.files && e.target.files[0]); e.target.value = ''; }}
+                />
+                <button
+                  onClick={() => fileRef.current?.click()}
+                  className="w-11 h-11 rounded-2xl bg-slate-100 border border-slate-200 text-slate-600 flex items-center justify-center active:scale-95 transition shrink-0"
+                  aria-label="Attach a photo"
+                >
+                  <Plus className="w-5 h-5" />
+                </button>
+              </>
             )}
             <input
               value={text}
