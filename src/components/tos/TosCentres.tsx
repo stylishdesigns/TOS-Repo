@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { loadLastGood, saveLastGood } from '../../lib/lastGood';
 import {
   Loader2, ChevronLeft, AlertTriangle, Send, Ban, RefreshCw,
   Copy, Wallet, CheckCircle2, Plus, Trash2,
@@ -17,7 +18,7 @@ import { AddCentreModal } from './TosAddCentre';
 // CENTRES
 // ---------------------------------------------------------------------------
 const CentreDetail: React.FC<{ centreId: string; onBack: () => void; onDataChanged: () => void }> = ({ centreId, onBack, onDataChanged }) => {
-  const [data, setData] = useState<Json | null>(null);
+  const [data, setData] = useState<Json | null>(() => loadLastGood<Json>(`tos:centre:${centreId}`));
   const [plans, setPlans] = useState<any[]>([]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState('');
@@ -38,6 +39,7 @@ const CentreDetail: React.FC<{ centreId: string; onBack: () => void; onDataChang
     try {
       const [d, p] = await Promise.all([api(`/api/tos/centres/${centreId}`), api('/api/tos/plans')]);
       setData(d);
+      saveLastGood(`tos:centre:${centreId}`, d);
       setPlans(p.plans || []);
       setSeatEdits({
         seatCap: d.billing?.seatCap != null ? String(d.billing.seatCap) : '',

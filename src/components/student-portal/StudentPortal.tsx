@@ -1,3 +1,4 @@
+import { loadLastGoodFlag, saveLastGoodFlag } from '../../lib/lastGood';
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useFirebase } from '../../context/FirebaseContext';
@@ -49,10 +50,18 @@ export const StudentPortal: React.FC = () => {
 
     const checkProfile = () => {
       if (user) {
+        // A saved "profile exists" flag for this account lets the portal open
+        // straight away on later visits; the live snapshot still confirms or
+        // corrects it behind the scenes.
+        if (loadLastGoodFlag(`hasProfile:${user.uid}`)) {
+          setHasProfile(true);
+          setProfileLoading(false);
+        }
         const docRef = doc(db, 'students', user.uid);
         unsubscribe = onSnapshot(
           docRef,
           (docSnap) => {
+            saveLastGoodFlag(`hasProfile:${user.uid}`, docSnap.exists());
             setHasProfile(docSnap.exists());
             setProfileLoading(false);
           },

@@ -18,6 +18,7 @@ import {
 import { useApp } from '../../context/AppContext';
 import { api } from '../tos/tosShared';
 import { copyText, EmojiText, isEmojiOnly, makeLongPress, MessageActionSheet, ReactionChips } from './chatActions';
+import { loadLastGood, saveLastGood } from '../../lib/lastGood';
 
 // ============================================================================
 // CH1 centre admin chat screens (Step 4). Groups, settings and the reports
@@ -138,8 +139,11 @@ const bootstrapCache = new Map<string, Bootstrap>();
 
 export const ChatManager: React.FC<{ onThreadOpenChange?: (open: boolean) => void }> = ({ onThreadOpenChange }) => {
   const { activeCentreId, addToast } = useApp();
-  const [data, setData] = useState<Bootstrap | null>(() => (activeCentreId && bootstrapCache.has(activeCentreId) ? bootstrapCache.get(activeCentreId) || null : null));
-  const [loading, setLoading] = useState(() => !(activeCentreId && bootstrapCache.has(activeCentreId)));
+  const cachedBoot: Bootstrap | null = activeCentreId
+    ? (bootstrapCache.has(activeCentreId) ? bootstrapCache.get(activeCentreId) || null : loadLastGood<Bootstrap>(`chat:bootstrap:${activeCentreId}`))
+    : null;
+  const [data, setData] = useState<Bootstrap | null>(cachedBoot);
+  const [loading, setLoading] = useState(() => !cachedBoot);
   const [error, setError] = useState('');
   const [tab, setTab] = useState<'groups' | 'settings' | 'reports'>('groups');
 
@@ -154,6 +158,7 @@ export const ChatManager: React.FC<{ onThreadOpenChange?: (open: boolean) => voi
     try {
       const res = await api(`/api/centre/chat/bootstrap?centreId=${encodeURIComponent(activeCentreId)}`);
       bootstrapCache.set(activeCentreId, res as Bootstrap);
+      saveLastGood(`chat:bootstrap:${activeCentreId}`, res);
       setData(res as Bootstrap);
       setError('');
     } catch (e: any) {

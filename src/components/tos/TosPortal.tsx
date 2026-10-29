@@ -10,6 +10,7 @@ import {
   api, fmtDate, fmtDateTime, LEAD_STATUS_LABELS, STATUS_STYLES, Json,
   StatusPill, Card, Field, inputCls, btnPrimary, btnGhost, CredentialsModal,
 } from './tosShared';
+import { loadLastGood, saveLastGood } from '../../lib/lastGood';
 import { CentrePeople } from './TosDirectory';
 import { CentresTab } from './TosCentres';
 import { QuestionBankTab } from './TosQuestionBank';
@@ -36,7 +37,7 @@ import { TosChat } from './TosChat';
 const lagosYmd = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Lagos', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 
 const OverviewTab: React.FC<{ onOpenCentre: (id: string) => void; refreshKey: number; onDataLoaded?: () => void }> = ({ onOpenCentre, refreshKey, onDataLoaded }) => {
-  const [data, setData] = useState<Json | null>(null);
+  const [data, setData] = useState<Json | null>(() => loadLastGood<Json>('tos:overview'));
   const [error, setError] = useState('');
   const [sweeping, setSweeping] = useState(false);
   const [sweepResult, setSweepResult] = useState<string>('');
@@ -63,6 +64,7 @@ const OverviewTab: React.FC<{ onOpenCentre: (id: string) => void; refreshKey: nu
     try {
       const d = await api('/api/tos/overview');
       setData(d);
+      saveLastGood('tos:overview', d);
       onDataLoaded?.();
     } catch (e: any) {
       setError(e.message);
@@ -171,7 +173,7 @@ const OverviewTab: React.FC<{ onOpenCentre: (id: string) => void; refreshKey: nu
 // LEADS
 // ---------------------------------------------------------------------------
 const LeadsTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
-  const [leads, setLeads] = useState<any[]>([]);
+  const [leads, setLeads] = useState<any[]>(() => loadLastGood<any[]>('tos:leads') || []);
   const [filter, setFilter] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -186,6 +188,7 @@ const LeadsTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
     try {
       const d = await api('/api/tos/leads');
       setLeads(d.leads || []);
+      saveLastGood('tos:leads', d.leads || []);
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -229,7 +232,7 @@ const LeadsTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
         <button onClick={load} className={btnGhost}><RefreshCw className="w-4 h-4" /> Refresh</button>
       </div>
       {error && <p className="text-rose-300 text-sm">{error}</p>}
-      {loading ? (
+      {loading && shown.length === 0 ? (
         <div className="flex items-center gap-2 text-slate-400 text-sm py-10 justify-center"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</div>
       ) : shown.length === 0 ? (
         <Card><p className="text-slate-400 text-sm">No leads here yet. Sign-ups from the public site land in this list.</p></Card>
@@ -312,8 +315,8 @@ const LeadsTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
 // PLANS
 // ---------------------------------------------------------------------------
 const PlansTab: React.FC = () => {
-  const [plans, setPlans] = useState<any[]>([]);
-  const [config, setConfig] = useState<any>({});
+  const [plans, setPlans] = useState<any[]>(() => loadLastGood<any[]>('tos:plans') || []);
+  const [config, setConfig] = useState<any>(() => loadLastGood<any>('tos:plansConfig') || {});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
@@ -325,6 +328,8 @@ const PlansTab: React.FC = () => {
       const d = await api('/api/tos/plans');
       setPlans(d.plans || []);
       setConfig(d.config || {});
+      saveLastGood('tos:plans', d.plans || []);
+      saveLastGood('tos:plansConfig', d.config || {});
       setError('');
     } catch (e: any) {
       setError(e.message);
@@ -353,7 +358,7 @@ const PlansTab: React.FC = () => {
   const setPlan = (id: string, key: string, value: any) =>
     setPlans((ps) => ps.map((p) => (p.id === id ? { ...p, [key]: value } : p)));
 
-  if (loading) return <div className="flex items-center gap-2 text-slate-400 text-sm py-10 justify-center"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</div>;
+  if (loading && plans.length === 0) return <div className="flex items-center gap-2 text-slate-400 text-sm py-10 justify-center"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</div>;
 
   const configFields: [string, string][] = [
     ['trialDays', 'Trial length (days)'],
@@ -419,7 +424,7 @@ const PlansTab: React.FC = () => {
 // AUDIT
 // ---------------------------------------------------------------------------
 const AuditTab: React.FC = () => {
-  const [entries, setEntries] = useState<any[]>([]);
+  const [entries, setEntries] = useState<any[]>(() => loadLastGood<any[]>('tos:audit') || []);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -430,6 +435,7 @@ const AuditTab: React.FC = () => {
     try {
       const d = await api(`/api/tos/audit${query ? `?query=${encodeURIComponent(query)}` : ''}`);
       setEntries(d.entries || []);
+      saveLastGood('tos:audit', d.entries || []);
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -493,7 +499,7 @@ function generateTeamPassword(): string {
 }
 
 const TeamTab: React.FC = () => {
-  const [staff, setStaff] = useState<any[]>([]);
+  const [staff, setStaff] = useState<any[]>(() => loadLastGood<any[]>('tos:team') || []);
   const [form, setForm] = useState({ name: '', email: '', role: 'support', tempPassword: '' });
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -506,6 +512,7 @@ const TeamTab: React.FC = () => {
     try {
       const d = await api('/api/tos/team');
       setStaff(d.staff || []);
+      saveLastGood('tos:team', d.staff || []);
       setError('');
     } catch (e: any) {
       setError(e.message);

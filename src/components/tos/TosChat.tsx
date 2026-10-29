@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { loadLastGood, saveLastGood } from '../../lib/lastGood';
 import { Loader2, RefreshCw, Send, Ban, Check, Plus, Megaphone, Settings2, ShieldAlert, Users, X } from 'lucide-react';
 import { copyText, makeLongPress, MessageActionSheet, ReactionChips } from '../communications/chatActions';
 import { api, Json } from './tosShared';
@@ -84,8 +85,8 @@ const inputCls = 'w-full bg-slate-950/60 border border-white/10 rounded-xl px-3 
 let lastChannelState: ChannelState | null = null;
 
 const ChannelTab: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
-  const [state, setState] = useState<ChannelState | null>(lastChannelState);
-  const [loading, setLoading] = useState(true);
+  const [state, setState] = useState<ChannelState | null>(() => lastChannelState || loadLastGood<ChannelState>('tos:chat:state'));
+  const [loading, setLoading] = useState(() => !(lastChannelState || loadLastGood<ChannelState>('tos:chat:state')));
   const [draft, setDraft] = useState('');
   const [posting, setPosting] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -99,6 +100,7 @@ const ChannelTab: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
       const r: Json = await api('/api/tos/chat/channel');
       if (r && r.ok) {
         lastChannelState = r as unknown as ChannelState;
+        saveLastGood('tos:chat:state', lastChannelState);
         setState(r as unknown as ChannelState);
       }
     } catch (e: any) {
@@ -188,7 +190,7 @@ const ChannelTab: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
     if (!ok) setError('Could not copy on this device.');
   };
 
-  if (loading) {
+  if (loading && !state) {
     return <div className="py-14 flex items-center justify-center text-slate-400"><Loader2 className="w-5 h-5 animate-spin" /></div>;
   }
 

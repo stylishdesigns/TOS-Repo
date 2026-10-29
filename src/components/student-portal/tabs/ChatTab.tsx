@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { Student } from '../../../types';
 import { api } from '../../tos/tosShared';
+import { loadLastGood, saveLastGood } from '../../../lib/lastGood';
 import { copyText, EmojiText, isEmojiOnly, makeLongPress, MessageActionSheet, ReactionChips } from '../../communications/chatActions';
 
 // ============================================================================
@@ -151,13 +152,13 @@ interface ChatTabProps {
   onHideBottomNav?: (hide: boolean) => void;
 }
 
-// Last overview kept in memory so reopening the chat list renders straight
-// away while the refresh runs behind it.
-let overviewCache: ChatOverview | null = null;
-
+// The chat list's last good copy, scoped to this student and kept across
+// full reloads, so the list renders straight away while the refresh runs
+// behind it.
 export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoToPractice, onHideBottomNav }) => {
-  const [overview, setOverview] = useState<ChatOverview | null>(overviewCache);
-  const [loading, setLoading] = useState(() => !overviewCache);
+  const cachedOverview = loadLastGood<ChatOverview>(`chat:overview:${student.id}`);
+  const [overview, setOverview] = useState<ChatOverview | null>(cachedOverview);
+  const [loading, setLoading] = useState(() => !cachedOverview);
   const [error, setError] = useState('');
   const [showRules, setShowRules] = useState(() => {
     try {
@@ -172,7 +173,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
   const load = useCallback(async () => {
     try {
       const res = await api('/api/student/chat/overview');
-      overviewCache = res as ChatOverview;
+      saveLastGood(`chat:overview:${student.id}`, res);
       setOverview(res as ChatOverview);
       setError('');
     } catch (e: any) {

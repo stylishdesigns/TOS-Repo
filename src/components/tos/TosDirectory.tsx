@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { loadLastGood, saveLastGood } from '../../lib/lastGood';
 import { Loader2, Ban, Trash2, RotateCcw, X } from 'lucide-react';
 import {
   api, fmtDate, fmtDateTime,
@@ -48,9 +49,9 @@ const ACTION_COPY: Record<string, string> = {
 
 export const CentrePeople: React.FC<{ centreId: string }> = ({ centreId }) => {
   const [type, setType] = useState<string>('students');
-  const [items, setItems] = useState<any[]>([]);
-  const [counts, setCounts] = useState<any | null>(null);
-  const [seats, setSeats] = useState<any | null>(null);
+  const [items, setItems] = useState<any[]>(() => loadLastGood<any[]>(`dir:${centreId}:${'students'}:items`) || []);
+  const [counts, setCounts] = useState<any | null>(() => loadLastGood<any>(`dir:${centreId}:students:counts`));
+  const [seats, setSeats] = useState<any | null>(() => loadLastGood<any>(`dir:${centreId}:students:seats`));
   const [nextCursor, setNextCursor] = useState('');
   const [loading, setLoading] = useState(true);
   const [moreBusy, setMoreBusy] = useState(false);
@@ -65,6 +66,9 @@ export const CentrePeople: React.FC<{ centreId: string }> = ({ centreId }) => {
       setItems((d.items || []).slice(0, MAX_MEMBERS));
       setCounts(d.counts || null);
       setSeats(d.seats || null);
+      saveLastGood(`dir:${centreId}:${t}:items`, (d.items || []).slice(0, MAX_MEMBERS));
+      saveLastGood(`dir:${centreId}:${t}:counts`, d.counts || null);
+      saveLastGood(`dir:${centreId}:${t}:seats`, d.seats || null);
     } else {
       setItems((prev) => [...prev, ...(d.items || [])].slice(0, MAX_MEMBERS));
     }
@@ -80,7 +84,18 @@ export const CentrePeople: React.FC<{ centreId: string }> = ({ centreId }) => {
 
   useEffect(() => { load(type); }, [type, load]);
 
-  const switchType = (t: string) => { setType(t); setExpanded(false); setPending(null); };
+  const switchType = (t: string) => {
+    setType(t); setExpanded(false); setPending(null);
+    // Show the saved copy of this people type at once, then refresh.
+    const cachedItems = loadLastGood<any[]>(`dir:${centreId}:${t}:items`);
+    if (cachedItems && cachedItems.length) {
+      setItems(cachedItems);
+      setCounts(loadLastGood<any>(`dir:${centreId}:${t}:counts`) || null);
+      setSeats(loadLastGood<any>(`dir:${centreId}:${t}:seats`) || null);
+    } else {
+      setItems([]); setCounts(null); setSeats(null);
+    }
+  };
 
   // "See the rest": pull every remaining page of this people type at once.
   const seeAll = async () => {
@@ -225,7 +240,7 @@ export const CentrePeople: React.FC<{ centreId: string }> = ({ centreId }) => {
         ))}
       </div>
       {error && <p className="text-rose-300 text-sm">{error}</p>}
-      {loading ? <LoadingRow /> : items.length === 0 ? (
+      {loading && items.length === 0 ? <LoadingRow /> : items.length === 0 ? (
         <p className="text-slate-500 text-sm">Nothing recorded here yet.</p>
       ) : (
         <div className="overflow-x-auto">
