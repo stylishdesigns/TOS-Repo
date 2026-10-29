@@ -543,7 +543,13 @@ export const StudentPortal: React.FC = () => {
               />
             )}
 
-            {activeTab === 'chat' && <ChatTab student={activeStudent} />}
+            {activeTab === 'chat' && (
+              <ChatTab
+                student={activeStudent}
+                onGoToProfile={() => setActiveTab('more')}
+                onGoToPractice={() => setActiveTab('cbt')}
+              />
+            )}
 
             {activeTab === 'cbt' && (
               <CbtTabWrapper
