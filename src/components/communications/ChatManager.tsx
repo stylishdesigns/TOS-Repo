@@ -9,6 +9,7 @@ import {
   Megaphone,
   MessageSquare,
   Plus,
+  Send,
   ShieldAlert,
   Users,
   X,
@@ -163,7 +164,8 @@ export const ChatManager: React.FC = () => {
 
   const tabs: { id: 'groups' | 'settings' | 'reports'; label: string; icon: React.ElementType; badge?: number }[] = [
     { id: 'groups', label: 'Groups', icon: Users },
-    { id: 'settings', label: 'Settings', icon: Info },
+    // Settings stay owner/admin only; the server enforces it too.
+    ...(isAdmin ? [{ id: 'settings' as const, label: 'Settings', icon: Info }] : []),
     { id: 'reports', label: 'Reports', icon: Flag, badge: pendingReports },
   ];
 
@@ -246,6 +248,8 @@ const GroupsSection: React.FC<SectionProps> = ({ data, isAdmin, reload, addToast
   const [accessMode, setAccessMode] = useState<'centre_default' | 'custom' | 'none'>('centre_default');
   const [threshold, setThreshold] = useState('70');
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const openGroup = openId ? data.groups.find((g) => g.id === openId) || null : null;
   const [editName, setEditName] = useState('');
   const [editMode, setEditMode] = useState<'centre_default' | 'custom' | 'none'>('centre_default');
   const [editThreshold, setEditThreshold] = useState('70');
@@ -311,6 +315,16 @@ const GroupsSection: React.FC<SectionProps> = ({ data, isAdmin, reload, addToast
 
   return (
     <div className="space-y-4">
+      {openGroup ? (
+        <ThreadPanel
+          group={openGroup}
+          centreId={centreId}
+          messageMaxChars={data.platform.messageMaxChars}
+          addToast={addToast}
+          onBack={() => setOpenId(null)}
+        />
+      ) : (
+      <>
       <div className="bg-violet-50 rounded-2xl p-4 border border-violet-100 flex items-start gap-3">
         <Lock className="w-4 h-4 text-violet-600 shrink-0 mt-0.5" />
         <p className="text-[11px] text-violet-900 font-medium leading-relaxed">
@@ -469,18 +483,28 @@ const GroupsSection: React.FC<SectionProps> = ({ data, isAdmin, reload, addToast
                 </p>
                 <p className="text-[10px] text-slate-400 font-medium mt-0.5">Created {fmtDate(g.createdAt)}</p>
               </div>
-              {isAdmin && (
+              <div className="flex items-center gap-1.5 shrink-0">
                 <button
-                  onClick={() => startEdit(g)}
-                  className="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 text-[11px] font-black shrink-0 active:scale-95 transition"
+                  onClick={() => setOpenId(g.id)}
+                  className="px-3 py-1.5 rounded-lg bg-[#EA580C] text-white text-[11px] font-black active:scale-95 transition"
                 >
-                  Edit
+                  Chat
                 </button>
-              )}
+                {isAdmin && (
+                  <button
+                    onClick={() => startEdit(g)}
+                    className="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 text-[11px] font-black active:scale-95 transition"
+                  >
+                    Edit
+                  </button>
+                )}
+              </div>
             </div>
           )}
         </div>
       ))}
+      </>
+      )}
     </div>
   );
 };
@@ -723,6 +747,148 @@ const ReportsSection: React.FC<SectionProps> = ({ data, isAdmin, reload, addToas
           )}
         </div>
       ))}
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// THREAD (Step 7): staff read and post in a group. Same rules as students;
+// the server re-checks membership, pause, length and the rate limit.
+// ---------------------------------------------------------------------------
+
+interface ThreadMsg {
+  id: string;
+  uid: string;
+  username: string;
+  role: string;
+  text: string;
+  photoUrl: string | null;
+  at: number;
+  removed: boolean;
+  mine: boolean;
+}
+
+function roleChip(role: string): string {
+  if (role === 'admin') return 'Admin';
+  if (role === 'tutor') return 'Tutor';
+  if (role === 'tos') return 'TOS';
+  return 'Student';
+}
+
+function roleChipClass(role: string): string {
+  if (role === 'tos') return 'bg-violet-100 text-violet-700';
+  if (role === 'admin') return 'bg-orange-100 text-[#EA580C]';
+  if (role === 'tutor') return 'bg-amber-100 text-amber-700';
+  return 'bg-slate-100 text-slate-500';
+}
+
+const ThreadPanel: React.FC<{
+  group: ChatGroup;
+  centreId: string;
+  messageMaxChars: number;
+  addToast: (msg: string, kind?: string) => void;
+  onBack: () => void;
+}> = ({ group, centreId, messageMaxChars, addToast, onBack }) => {
+  const [messages, setMessages] = useState<ThreadMsg[] | null>(null);
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [loadErr, setLoadErr] = useState('');
+
+  const load = useCallback(async () => {
+    try {
+      const res = await api(`/api/centre/chat/groups/${group.id}/messages?centreId=${encodeURIComponent(centreId)}`);
+      const d = res as { messages?: ThreadMsg[] };
+      setMessages(d.messages || []);
+      setLoadErr('');
+    } catch (e: any) {
+      setLoadErr(String(e?.message || 'The chat could not be loaded.'));
+    }
+  }, [group.id, centreId]);
+
+  useEffect(() => {
+    load();
+    const t = setInterval(load, 15000);
+    return () => clearInterval(t);
+  }, [load]);
+
+  const send = async () => {
+    if (busy) return;
+    const value = text.trim();
+    if (!value) return;
+    setBusy(true);
+    try {
+      await api(`/api/centre/chat/groups/${group.id}/messages?centreId=${encodeURIComponent(centreId)}`, {
+        method: 'POST',
+        body: { text: value },
+      });
+      setText('');
+      await load();
+    } catch (e: any) {
+      addToast(String(e?.message || 'The message could not be sent.'), 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-3">
+        <button onClick={onBack} className="p-1.5 rounded-lg bg-slate-100 text-slate-600 active:scale-95 transition" aria-label="Back to groups">
+          <X className="w-4 h-4" />
+        </button>
+        <div className="min-w-0">
+          <p className="text-sm font-black text-slate-900 truncate">{group.name}</p>
+          <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">{kindLabel(group.kind)}</p>
+        </div>
+      </div>
+
+      {loadErr && (
+        <div className="px-4 py-3 bg-rose-50 border-b border-rose-100">
+          <p className="text-[11px] font-bold text-rose-700">{loadErr}</p>
+        </div>
+      )}
+
+      <div className="max-h-[420px] overflow-y-auto p-4 space-y-3">
+        {messages === null && (
+          <div className="flex items-center justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-[#EA580C]" /></div>
+        )}
+        {messages !== null && messages.length === 0 && (
+          <p className="text-center text-xs text-slate-400 font-medium py-8">No messages yet. Send the first one.</p>
+        )}
+        {(messages || []).map((m) => (
+          <div key={m.id} className={`flex flex-col ${m.mine ? 'items-end' : 'items-start'}`}>
+            <div className="flex items-center gap-1.5 mb-0.5">
+              <span className="text-[10px] font-black text-slate-500">{m.mine ? 'You' : m.username}</span>
+              <span className={`text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full ${roleChipClass(m.role)}`}>{roleChip(m.role)}</span>
+              <span className="text-[9px] text-slate-400">{m.at ? fmtDateTime(new Date(m.at).toISOString()) : ''}</span>
+            </div>
+            {!m.removed && m.photoUrl && (
+              <img src={m.photoUrl} alt="Shared photo" className="rounded-xl max-h-60 w-auto" />
+            )}
+            <div className={`max-w-[85%] px-3.5 py-2 rounded-2xl text-xs leading-relaxed ${m.mine ? 'bg-[#EA580C] text-white' : 'bg-slate-100 text-slate-800'}`}>
+              {m.removed ? <span className="italic opacity-70">Message removed</span> : m.text}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="border-t border-slate-100 p-3 flex items-end gap-2">
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          maxLength={messageMaxChars}
+          rows={2}
+          placeholder="Write a message…"
+          className="flex-1 resize-none px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium text-slate-800 focus:outline-none focus:border-orange-300"
+        />
+        <button
+          onClick={send}
+          disabled={busy || !text.trim()}
+          className="px-4 py-2.5 rounded-xl bg-[#EA580C] text-white text-xs font-black active:scale-95 transition disabled:opacity-50 flex items-center gap-1.5"
+        >
+          {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />} Send
+        </button>
+      </div>
     </div>
   );
 };

@@ -6,6 +6,7 @@ import { ScheduleTab } from './tabs/ScheduleTab';
 import { RollCallTab } from './tabs/RollCallTab';
 import { AssessmentTab } from './tabs/AssessmentTab';
 import { MoreTab } from './tabs/MoreTab';
+import { ChatManager } from '../communications/ChatManager';
 import { PWAInstallButton } from '../pwa/PWAInstallButton';
 import {
   Home,
@@ -21,13 +22,14 @@ import {
   Shield,
   Eye,
   EyeOff,
-  Laptop
+  Laptop,
+  MessageSquare
 } from 'lucide-react';
 
 import { PasswordChangeOverlay } from '../auth/PasswordChangeOverlay';
 import { useScrollLock } from '../../hooks/useScrollLock';
 
-type TabType = 'home' | 'classes' | 'assessment' | 'more';
+type TabType = 'home' | 'classes' | 'assessment' | 'chat' | 'more';
 
 export const TutorPortal: React.FC = () => {
   const { tutors, settings, setViewMode, isAdmin, activeTutor: contextTutor, updateTutor, logout } = useApp();
@@ -210,6 +212,7 @@ export const TutorPortal: React.FC = () => {
             {activeTab === 'home' && <HomeTab tutor={activeTutor} onNavigateTab={setActiveTab} />}
             {activeTab === 'classes' && <ScheduleTab tutor={activeTutor} />}
             {activeTab === 'assessment' && <AssessmentTab tutor={activeTutor} />}
+            {activeTab === 'chat' && <ChatManager />}
             {activeTab === 'more' && (
               <MoreTab 
                 tutor={activeTutor} 
@@ -226,7 +229,7 @@ export const TutorPortal: React.FC = () => {
 
           {/* 3. Bottom Navigation (Mobile App Style) */}
           <nav className="fixed bottom-0 left-0 right-0 sm:absolute z-40 bg-[#EA580C] border-t border-orange-600/30 py-2 px-3 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] rounded-t-[24px]">
-            <div className="max-w-md mx-auto grid grid-cols-4 gap-1 items-center">
+            <div className="max-w-md mx-auto grid grid-cols-5 gap-1 items-center">
               {/* Home */}
               <button
                 onClick={() => setActiveTab('home')}
@@ -261,6 +264,18 @@ export const TutorPortal: React.FC = () => {
                 <Laptop className={`w-5 h-5 ${activeTab === 'assessment' ? 'fill-white/10' : ''}`} />
                 <span className="text-[10px] mt-1 font-bold">Assessment</span>
                 {activeTab === 'assessment' && <div className="w-1 h-1 bg-white rounded-full mt-0.5" />}
+              </button>
+
+              {/* Chat */}
+              <button
+                onClick={() => setActiveTab('chat')}
+                className={`flex flex-col items-center justify-center py-1 transition-all ${
+                  activeTab === 'chat' ? 'text-white scale-110' : 'text-orange-100/70'
+                }`}
+              >
+                <MessageSquare className={`w-5 h-5 ${activeTab === 'chat' ? 'fill-white/10' : ''}`} />
+                <span className="text-[10px] mt-1 font-bold">Chat</span>
+                {activeTab === 'chat' && <div className="w-1 h-1 bg-white rounded-full mt-0.5" />}
               </button>
 
               {/* More */}

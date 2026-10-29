@@ -619,6 +619,122 @@ export function registerChatRoutes(app: express.Express): void {
   // Centre admin routes (C1-C4 screens)
   // ------------------------------------------------------------------
 
+
+// ---------------------------------------------------------------------------
+// Centre staff chat (Step 7): admins and tutors read and post in their own
+// centre's groups. Every check stays server-side; the same limits students
+// have (length, rate limit, photos setting, pause) apply to staff posts, and
+// each message records the sender's role ('admin' or 'tutor').
+// ---------------------------------------------------------------------------
+
+async function staffGroupContext(caller: Caller, centreId: string, groupId: string) {
+  if (!centreId) throw httpError(400, 'No centre is selected.');
+  const membership = await requireMembership(caller, centreId, ['owner', 'admin', 'tutor']);
+  const entitlements = await getCentreEntitlements(centreId);
+  if (entitlements.chat !== true) {
+    throw httpError(403, 'Chat is not part of your centre\u2019s plan yet.');
+  }
+  const group = await loadGroup(groupId);
+  if (group.kind === 'tos_channel' || group.centreId !== centreId) throw httpError(404, 'Group not found.');
+  const centreChat = await getCentreChat(centreId);
+  return { membership, group, centreChat };
+}
+
+/** Staff display name: their centre staff record's name, else the email prefix. */
+async function staffDisplayName(caller: Caller): Promise<string> {
+  try {
+    let snap = await adminDb.collection('admins').where('uid', '==', caller.uid).limit(1).get();
+    if (snap.empty && cleanStr(caller.email, 120)) {
+      snap = await adminDb.collection('admins').where('email', '==', cleanStr(caller.email, 120).toLowerCase()).limit(1).get();
+    }
+    if (!snap.empty) {
+      const d = snap.docs[0].data() as any;
+      const nm = cleanStr(d.name || d.displayName || d.fullName, 40);
+      if (nm) return nm;
+    }
+  } catch { /* fall through to the email prefix */ }
+  const prefix = cleanStr(caller.email, 120).split('@')[0] || '';
+  return cleanStr(prefix, 40) || 'Staff';
+}
+
+
+  // Staff thread read. Owner/admin/tutor of the group's centre; same shape as
+  // the student read minus the student gate.
+  app.get('/api/centre/chat/groups/:id/messages', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const centreId = cleanStr(String(req.query.centreId || ''), 120);
+      const ctx = await staffGroupContext(caller, centreId, String(req.params.id || ''));
+      const tosChat = await getTosChat();
+      const limit = clampInt(req.query.limit, 1, MAX_PAGE, DEFAULT_PAGE);
+      const before = Math.floor(Number(req.query.before) || 0);
+      await pruneOld(ctx.group, tosChat.retentionDays);
+      let q = adminRtdb.ref(`chat/groups/${ctx.group.id}/messages`).orderByChild('at');
+      if (before > 0) q = q.endBefore(before);
+      const snap = await q.limitToLast(limit).get();
+      const messages: any[] = [];
+      snap.forEach((c) => {
+        const v = c.val() || {};
+        messages.push({
+          id: c.key,
+          uid: cleanStr(v.uid, 64),
+          username: cleanStr(v.username, 16),
+          role: cleanStr(v.role, 20),
+          text: String(v.text ?? '').slice(0, tosChat.messageMaxChars),
+          photoUrl: typeof v.photoUrl === 'string' ? v.photoUrl.slice(0, MAX_PHOTO_URL_CHARS) : null,
+          at: Number(v.at) || 0,
+          removed: Boolean(v.removed),
+          mine: v.uid === caller.uid,
+        });
+      });
+      messages.reverse(); // oldest first for a chat timeline
+      res.json({
+        ok: true,
+        groupName: ctx.group.name,
+        kind: ctx.group.kind,
+        role: ctx.membership.role,
+        canPost: true,
+        photosAllowed: ctx.centreChat.photosAllowed,
+        messageMaxChars: tosChat.messageMaxChars,
+        messages,
+      });
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] staff read failed');
+    }
+  });
+
+  // Staff posting. Announcements groups are centre-posted, so staff can write
+  // there; the pause, mutes, length and rate limit all re-check here.
+  app.post('/api/centre/chat/groups/:id/messages', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const centreId = cleanStr(String(req.query.centreId || ''), 120);
+      const ctx = await staffGroupContext(caller, centreId, String(req.params.id || ''));
+      if (ctx.centreChat.paused) throw httpError(503, 'Chat is paused for your centre right now.');
+      const mute = await mutedUntil(caller.uid, centreId);
+      if (mute) {
+        const days = Math.max(1, Math.ceil((mute - Date.now()) / DAY_MS));
+        throw httpError(403, `You have been muted from this centre's chats for ${days} more day${days === 1 ? '' : 's'}.`);
+      }
+      const tosChat = await getTosChat();
+      const body = req.body || {};
+      const text = String(body.text ?? '').replace(/\s+$/g, '');
+      const photoUrl = ctx.centreChat.photosAllowed && typeof body.photoUrl === 'string' && body.photoUrl.trim()
+        ? body.photoUrl.trim().slice(0, MAX_PHOTO_URL_CHARS)
+        : null;
+      if (!text && !photoUrl) throw httpError(400, 'Write a message first.');
+      if (text.length > tosChat.messageMaxChars) throw httpError(400, `Messages can be up to ${tosChat.messageMaxChars} characters.`);
+      await consumePostRateLimit(caller.uid, tosChat.postRateLimitPerHour);
+      const username = (await staffDisplayName(caller)).slice(0, 16);
+      const role = ctx.membership.role === 'tutor' ? 'tutor' : 'admin';
+      await writeMessage(ctx.group, { uid: caller.uid, username, role }, text.slice(0, tosChat.messageMaxChars), photoUrl);
+      const meta = await readMeta(ctx.group.id);
+      res.json({ ok: true, meta });
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] staff post failed');
+    }
+  });
+
   app.get('/api/centre/chat/bootstrap', async (req, res) => {
     try {
       const caller = getCaller(req);
