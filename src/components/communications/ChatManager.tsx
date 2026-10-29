@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { api } from '../tos/tosShared';
+import { copyText, makeLongPress, MessageActionSheet, ReactionChips } from './chatActions';
 
 // ============================================================================
 // CH1 centre admin chat screens (Step 4). Groups, settings and the reports
@@ -774,6 +775,9 @@ interface ThreadMsg {
   at: number;
   removed: boolean;
   mine: boolean;
+  forwardedFrom?: string | null;
+  replyTo?: { id: string; username: string; excerpt: string } | null;
+  reactions?: Record<string, string> | null;
 }
 
 function roleChip(role: string): string {
@@ -806,6 +810,8 @@ const ThreadPanel: React.FC<{
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [busy, setBusy] = useState(false);
   const [loadErr, setLoadErr] = useState('');
+  const [actionMsg, setActionMsg] = useState<ThreadMsg | null>(null);
+  const [replyTo, setReplyTo] = useState<ThreadMsg | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -840,15 +846,59 @@ const ThreadPanel: React.FC<{
     try {
       await api(`/api/centre/chat/groups/${group.id}/messages?centreId=${encodeURIComponent(centreId)}`, {
         method: 'POST',
-        body: { text: value },
+        body: { text: value, replyTo: replyTo ? replyTo.id : undefined },
       });
       setText('');
+      setReplyTo(null);
       await load();
     } catch (e: any) {
       addToast(String(e?.message || 'The message could not be sent.'), 'error');
     } finally {
       setBusy(false);
     }
+  };
+
+  const myUid = (messages || []).find((m) => m.mine)?.uid || '';
+
+  const applyReaction = (msgId: string, uid: string, emoji: string | null) => {
+    setMessages((prev) => (prev || []).map((m) => {
+      if (m.id !== msgId) return m;
+      const r: Record<string, string> = {};
+      Object.entries(m.reactions || {}).forEach(([k, v]) => { if (typeof v === 'string' && v) r[k] = v; });
+      if (emoji && r[uid] !== emoji) r[uid] = emoji;
+      else delete r[uid];
+      return { ...m, reactions: Object.keys(r).length ? r : null };
+    }));
+  };
+
+  const doReact = async (m: ThreadMsg, emoji: string) => {
+    const mineNow = (m.reactions || {})[myUid];
+    applyReaction(m.id, myUid, mineNow === emoji ? null : emoji);
+    try {
+      await api(`/api/centre/chat/groups/${group.id}/messages/${m.id}/react?centreId=${encodeURIComponent(centreId)}`, { method: 'POST', body: { emoji } });
+    } catch (e: any) {
+      addToast(String(e?.message || 'Could not react. Try again.'), 'error');
+      load();
+    }
+  };
+
+  const doDelete = async (m: ThreadMsg) => {
+    setBusy(true);
+    try {
+      await api(`/api/centre/chat/groups/${group.id}/messages/${m.id}/remove?centreId=${encodeURIComponent(centreId)}`, { method: 'POST', body: {} });
+      setMessages((prev) => (prev || []).map((x) => (x.id === m.id ? { ...x, removed: true } : x)));
+      if (messages) threadCache.set(group.id, messages.map((x) => (x.id === m.id ? { ...x, removed: true } : x)));
+      addToast('Message removed', 'success');
+    } catch (e: any) {
+      addToast(String(e?.message || 'Could not remove the message. Try again.'), 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const doCopy = async (m: ThreadMsg) => {
+    const ok = await copyText(m.text || '');
+    addToast(ok ? 'Copied' : 'Could not copy on this device', ok ? 'success' : 'error');
   };
 
   return (
@@ -876,24 +926,53 @@ const ThreadPanel: React.FC<{
         {messages !== null && messages.length === 0 && (
           <p className="text-center text-xs text-slate-400 font-medium py-8">No messages yet. Send the first one.</p>
         )}
-        {shown.map((m) => (
+        {shown.map((m) => {
+          const press = makeLongPress(() => { if (!m.removed) setActionMsg(m); });
+          return (
           <div key={m.id} className={`flex flex-col ${m.mine ? 'items-end' : 'items-start'}`}>
             <div className="flex items-center gap-1.5 mb-0.5">
               <span className="text-[10px] font-black text-slate-500">{m.mine ? 'You' : m.username}</span>
               <span className={`text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full ${roleChipClass(m.role)}`}>{roleChip(m.role)}</span>
               <span className="text-[9px] text-slate-400">{m.at ? fmtDateTime(new Date(m.at).toISOString()) : ''}</span>
             </div>
+            {m.forwardedFrom && (
+              <p className={`text-[9px] font-bold italic ${m.mine ? 'text-orange-100' : 'text-slate-400'}`}>Forwarded from {m.forwardedFrom}</p>
+            )}
             {!m.removed && m.photoUrl && (
               <img src={m.photoUrl} alt="Shared photo" className="rounded-xl max-h-60 w-auto" />
             )}
-            <div className={`max-w-[85%] px-3.5 py-2 rounded-2xl text-xs leading-relaxed ${m.mine ? 'bg-[#EA580C] text-white' : 'bg-slate-100 text-slate-800'}`}>
+            <div
+              {...press}
+              className={`max-w-[85%] select-none px-3.5 py-2 rounded-2xl text-xs leading-relaxed cursor-pointer ${m.mine ? 'bg-[#EA580C] text-white' : 'bg-slate-100 text-slate-800'}`}
+            >
+              {m.replyTo && (
+                <div className={`mb-1 rounded-lg border-l-2 px-2 py-1 ${m.mine ? 'border-orange-200 bg-white/10' : 'border-orange-300 bg-orange-50/70'}`}>
+                  <p className={`text-[10px] font-black ${m.mine ? 'text-orange-100' : 'text-[#C2410C]'}`}>{m.replyTo.username}</p>
+                  <p className={`text-[10px] truncate ${m.mine ? 'text-orange-100/80' : 'text-slate-500'}`}>{m.replyTo.excerpt}</p>
+                </div>
+              )}
               {m.removed ? <span className="italic opacity-70">Message removed</span> : m.text}
             </div>
+            {!m.removed && (
+              <ReactionChips reactions={m.reactions} mineUid={myUid} onToggle={(emoji) => doReact(m, emoji)} />
+            )}
           </div>
-        ))}
+          );
+        })}
       </div>
 
       <div className="mt-auto border-t border-slate-100 p-3 flex items-end gap-2">
+        {replyTo && (
+          <div className="absolute left-4 right-4 bottom-[92px] flex items-start gap-2 rounded-xl bg-orange-50 border border-orange-100 px-3 py-2">
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-black text-[#C2410C]">Replying to {replyTo.username}</p>
+              <p className="text-[11px] text-slate-500 truncate">{replyTo.removed ? 'Message removed' : (replyTo.text || 'Photo')}</p>
+            </div>
+            <button onClick={() => setReplyTo(null)} className="rounded-full p-1 text-slate-400 hover:bg-orange-100" aria-label="Cancel reply">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -910,6 +989,17 @@ const ThreadPanel: React.FC<{
           {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />} Send
         </button>
       </div>
+
+      {actionMsg && (
+        <MessageActionSheet
+          message={actionMsg}
+          onClose={() => setActionMsg(null)}
+          onReact={(emoji) => doReact(actionMsg, emoji)}
+          onReply={() => setReplyTo(actionMsg)}
+          onDelete={() => doDelete(actionMsg)}
+          onCopy={actionMsg.text ? () => doCopy(actionMsg) : undefined}
+        />
+      )}
     </div>
   );
 };

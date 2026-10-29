@@ -311,7 +311,7 @@ async function consumePostRateLimit(uid: string, maxPerHour: number): Promise<vo
   });
 }
 
-async function writeMessage(group: GroupDoc, sender: { uid: string; username: string; role: string }, text: string, photoUrl: string | null): Promise<void> {
+async function writeMessage(group: GroupDoc, sender: { uid: string; username: string; role: string }, text: string, photoUrl: string | null, extras?: Record<string, unknown>): Promise<void> {
   const msgRef = adminRtdb.ref(`chat/groups/${group.id}/messages`).push();
   await msgRef.set({
     uid: sender.uid,
@@ -321,6 +321,7 @@ async function writeMessage(group: GroupDoc, sender: { uid: string; username: st
     photoUrl: photoUrl || null,
     at: ServerValue.TIMESTAMP,
     removed: null,
+    ...(extras || {}),
   });
   const metaRef = adminRtdb.ref(`chat/groups/${group.id}/meta`);
   await metaRef.transaction((m: any) => ({ ...(m || {}), msgCount: (Number(m?.msgCount) || 0) + 1 }));
@@ -345,6 +346,62 @@ async function pruneOld(group: GroupDoc, retentionDays: number): Promise<void> {
   await adminRtdb.ref(`chat/groups/${group.id}/messages`).update(updates);
   const metaRef = adminRtdb.ref(`chat/groups/${group.id}/meta`);
   await metaRef.transaction((m: any) => ({ ...(m || {}), pruned: (Number(m?.pruned) || 0) + keys.length }));
+}
+
+/** Reactions may only be emoji: one short emoji string, nothing else. */
+const EMOJI_OK = /^(?:[\u{1F000}-\u{1FAFF}]|[\u{2600}-\u{27BF}]|[\u{2B00}-\u{2BFF}]|[\u{1F1E6}-\u{1F1FF}]|[\u{00A9}\u{00AE}\u{203C}\u{2049}\u{2122}]|[\u{FE0F}\u{200D}\u{20E3}])+$/u;
+function sanitizeEmoji(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  const e = raw.trim();
+  if (!e || e.length > 16) return null;
+  return EMOJI_OK.test(e) ? e : null;
+}
+
+/** Only real emoji strings survive a read, keyed by the reacting user's id. */
+function sanitizeReactions(v: unknown): Record<string, string> | null {
+  if (!v || typeof v !== 'object') return null;
+  const out: Record<string, string> = {};
+  Object.entries(v as Record<string, unknown>).forEach(([k, val]) => {
+    if (typeof val === 'string' && val && val.length <= 16) out[cleanStr(k, 64)] = val;
+  });
+  return Object.keys(out).length ? out : null;
+}
+
+/** One message straight off the RTDB node, for actions that act on it. */
+async function loadMessage(groupId: string, msgId: string): Promise<Record<string, any>> {
+  const snap = await adminRtdb.ref(`chat/groups/${groupId}/messages/${cleanStr(msgId, 128)}`).get();
+  const v = snap.val();
+  if (!v) throw httpError(404, 'That message is no longer available.');
+  return v as Record<string, any>;
+}
+
+/** Reactions: one emoji per person per message; sending the same emoji again
+ *  takes it back off. The reactions live on the message node itself. */
+async function toggleReaction(groupId: string, msgId: string, uid: string, emoji: string): Promise<void> {
+  const ref = adminRtdb.ref(`chat/groups/${groupId}/messages/${cleanStr(msgId, 128)}`);
+  const v = await loadMessage(groupId, msgId);
+  const reactions: Record<string, string> = {};
+  const existing = (v.reactions && typeof v.reactions === 'object') ? v.reactions : {};
+  Object.entries(existing).forEach(([k, val]) => {
+    if (typeof val === 'string' && val && val.length <= 16) reactions[cleanStr(k, 64)] = val;
+  });
+  if (reactions[uid] === emoji) delete reactions[uid];
+  else reactions[uid] = emoji;
+  await ref.child('reactions').set(Object.keys(reactions).length ? reactions : null);
+}
+
+/** Reply context: a short quote of the message being replied to, built on the
+ *  server so a reply always matches the real message it points at. */
+async function buildReplyTo(groupId: string, msgId: unknown): Promise<Record<string, string> | null> {
+  if (typeof msgId !== 'string' || !msgId.trim()) return null;
+  const id = msgId.trim().slice(0, 128);
+  const v = await loadMessage(groupId, id);
+  if (v.removed) throw httpError(404, 'The message you replied to is no longer available.');
+  return {
+    id,
+    username: cleanStr(v.username, 16) || 'Member',
+    excerpt: v.text ? String(v.text).slice(0, 120) : '[Photo]',
+  };
 }
 
 async function getStudentDoc(uid: string) {
@@ -507,6 +564,9 @@ export function registerChatRoutes(app: express.Express): void {
           photoUrl: typeof v.photoUrl === 'string' ? v.photoUrl.slice(0, MAX_PHOTO_URL_CHARS) : null,
           at: Number(v.at) || 0,
           removed: Boolean(v.removed),
+          forwardedFrom: typeof v.forwardedFrom === 'string' ? cleanStr(v.forwardedFrom, 80) : null,
+          replyTo: v.replyTo && typeof v.replyTo === 'object' ? { id: cleanStr(v.replyTo.id, 128), username: cleanStr(v.replyTo.username, 16), excerpt: String(v.replyTo.excerpt ?? '').slice(0, 140) } : null,
+          reactions: sanitizeReactions(v.reactions),
           mine: v.uid === caller.uid,
         });
       });
@@ -559,7 +619,8 @@ export function registerChatRoutes(app: express.Express): void {
       if (!text && !photoUrl) throw httpError(400, 'Write a message first.');
       if (text.length > tosChat.messageMaxChars) throw httpError(400, `Messages can be up to ${tosChat.messageMaxChars} characters.`);
       await consumePostRateLimit(caller.uid, tosChat.postRateLimitPerHour);
-      await writeMessage(ctx.group, { uid: caller.uid, username, role: 'student' }, text.slice(0, tosChat.messageMaxChars), photoUrl);
+      const replyTo = await buildReplyTo(ctx.group.id, body.replyTo);
+      await writeMessage(ctx.group, { uid: caller.uid, username, role: 'student' }, text.slice(0, tosChat.messageMaxChars), photoUrl, replyTo ? { replyTo } : undefined);
       const meta = await readMeta(ctx.group.id);
       res.json({ ok: true, meta });
     } catch (error: any) {
@@ -584,6 +645,150 @@ export function registerChatRoutes(app: express.Express): void {
 
   // A student reports a message. The report goes to the centre only; the
   // reporter gets a confirmation and nothing about what happens next.
+  // Reactions inside a group: one emoji per person per message.
+  app.post('/api/student/chat/groups/:id/messages/:msgId/react', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const ctx = await studentGroupContext(caller, String(req.params.id || ''), false);
+      if (ctx.lock.locked) throw httpError(403, JSON.stringify({ locked: true, myPercent: ctx.lock.myPercent, thresholdPercent: ctx.lock.thresholdPercent, myAnswers: ctx.lock.myAnswers, minAnswers: ctx.lock.minAnswers }));
+      const emoji = sanitizeEmoji(req.body?.emoji);
+      if (!emoji) throw httpError(400, 'Pick a reaction from the list.');
+      await toggleReaction(ctx.group.id, String(req.params.msgId || ''), caller.uid, emoji);
+      res.json({ ok: true });
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] react failed');
+    }
+  });
+
+  // Starred messages: a private copy per student, so a favourite keeps its text
+  // even after the group's retention window removes the original.
+  app.get('/api/student/chat/starred', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const snap = await adminRtdb.ref(`chat/starred/${caller.uid}`).get();
+      const items: any[] = [];
+      snap.forEach((c) => {
+        const v = c.val() || {};
+        items.push({
+          key: c.key,
+          groupId: cleanStr(v.groupId, 120),
+          groupName: cleanStr(v.groupName, 80),
+          msgId: cleanStr(v.msgId, 128),
+          username: cleanStr(v.username, 16),
+          role: cleanStr(v.role, 20),
+          text: String(v.text ?? '').slice(0, 2000),
+          photoUrl: typeof v.photoUrl === 'string' ? v.photoUrl.slice(0, MAX_PHOTO_URL_CHARS) : null,
+          at: Number(v.at) || 0,
+          starredAt: Number(v.starredAt) || 0,
+        });
+      });
+      items.sort((a, b) => b.starredAt - a.starredAt);
+      res.json({ ok: true, items });
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] starred read failed');
+    }
+  });
+
+  app.post('/api/student/chat/starred', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const body = req.body || {};
+      const groupId = cleanStr(body.groupId, 120);
+      const msgId = cleanStr(body.msgId, 128);
+      if (!groupId || !msgId) throw httpError(400, 'Which message should be saved?');
+      const ctx = await studentGroupContext(caller, groupId, false);
+      const v = await loadMessage(ctx.group.id, msgId);
+      if (v.removed) throw httpError(404, 'That message is no longer available.');
+      const key = `${ctx.group.id}__${msgId}`;
+      await adminRtdb.ref(`chat/starred/${caller.uid}/${key}`).set({
+        groupId: ctx.group.id,
+        groupName: cleanStr(ctx.group.name, 80),
+        msgId,
+        username: cleanStr(v.username, 16),
+        role: cleanStr(v.role, 20),
+        text: String(v.text ?? '').slice(0, 2000),
+        photoUrl: typeof v.photoUrl === 'string' ? v.photoUrl.slice(0, MAX_PHOTO_URL_CHARS) : null,
+        at: Number(v.at) || 0,
+        starredAt: ServerValue.TIMESTAMP,
+      });
+      res.json({ ok: true });
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] star failed');
+    }
+  });
+
+  app.post('/api/student/chat/starred/unstar', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const body = req.body || {};
+      const groupId = cleanStr(body.groupId, 120);
+      const msgId = cleanStr(body.msgId, 128);
+      if (!groupId || !msgId) throw httpError(400, 'Which message should be removed from favourites?');
+      await adminRtdb.ref(`chat/starred/${caller.uid}/${groupId}__${msgId}`).set(null);
+      res.json({ ok: true });
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] unstar failed');
+    }
+  });
+
+  // Forwarding: a fresh copy of one message into another group the student can
+  // post in. Every check a normal post goes through applies here too, and the
+  // rate limit counts it like any other message.
+  app.post('/api/student/chat/forward', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const body = req.body || {};
+      const fromId = cleanStr(body.fromGroupId, 120);
+      const toId = cleanStr(body.toGroupId, 120);
+      const msgId = cleanStr(body.msgId, 128);
+      if (!fromId || !toId || !msgId) throw httpError(400, 'Choose a message and a group to forward it to.');
+      const fromCtx = await studentGroupContext(caller, fromId, false);
+      const v = await loadMessage(fromCtx.group.id, msgId);
+      if (v.removed) throw httpError(404, 'That message is no longer available.');
+      const toCtx = await studentGroupContext(caller, toId, true);
+      if (toCtx.group.kind === 'announcements') throw httpError(403, 'Only your centre can post in Announcements.');
+      if (toCtx.group.kind === 'tos_channel') throw httpError(403, 'Only TOS can post in this channel.');
+      if (toCtx.centreChat.paused) throw httpError(503, 'Chat is paused for your centre right now.');
+      const mute = await mutedUntil(caller.uid, toCtx.centreId);
+      if (mute) {
+        const days = Math.max(1, Math.ceil((mute - Date.now()) / DAY_MS));
+        throw httpError(403, `You have been muted from this centre's chats for ${days} more day${days === 1 ? '' : 's'}.`);
+      }
+      const username = await usernameFor(caller.uid);
+      if (!username) throw httpError(403, 'Set your username in your profile before using chat.');
+      const tosChat = await getTosChat();
+      await consumePostRateLimit(caller.uid, tosChat.postRateLimitPerHour);
+      const text = String(v.text ?? '').slice(0, tosChat.messageMaxChars);
+      const photoUrl = toCtx.centreChat.photosAllowed && typeof v.photoUrl === 'string' ? v.photoUrl.slice(0, MAX_PHOTO_URL_CHARS) : null;
+      if (!text && !photoUrl) throw httpError(400, 'Nothing to forward.');
+      await writeMessage(toCtx.group, { uid: caller.uid, username, role: 'student' }, text, photoUrl, {
+        forwardedFrom: cleanStr(fromCtx.group.name, 80),
+      });
+      res.json({ ok: true });
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] forward failed');
+    }
+  });
+
+  // Deleting your own message from a group.
+  app.post('/api/student/chat/groups/:id/messages/:msgId/remove', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const ctx = await studentGroupContext(caller, String(req.params.id || ''), false);
+      if (ctx.lock.locked) throw httpError(403, 'Open the group to manage your messages.');
+      const msgRef = adminRtdb.ref(`chat/groups/${ctx.group.id}/messages/${cleanStr(String(req.params.msgId || ''), 128)}`);
+      const snap = await msgRef.get();
+      const v = snap.val();
+      if (!v) throw httpError(404, 'That message is no longer available.');
+      if (v.uid !== caller.uid) throw httpError(403, 'You can only delete your own messages.');
+      if (v.removed) return res.json({ ok: true });
+      await msgRef.set({ ...v, removed: { by: caller.uid, byRole: 'student', at: ServerValue.TIMESTAMP } });
+      res.json({ ok: true });
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] student remove failed');
+    }
+  });
+
   app.post('/api/student/chat/groups/:id/report', async (req, res) => {
     try {
       const caller = getCaller(req);
@@ -684,6 +889,9 @@ async function staffDisplayName(caller: Caller): Promise<string> {
           photoUrl: typeof v.photoUrl === 'string' ? v.photoUrl.slice(0, MAX_PHOTO_URL_CHARS) : null,
           at: Number(v.at) || 0,
           removed: Boolean(v.removed),
+          forwardedFrom: typeof v.forwardedFrom === 'string' ? cleanStr(v.forwardedFrom, 80) : null,
+          replyTo: v.replyTo && typeof v.replyTo === 'object' ? { id: cleanStr(v.replyTo.id, 128), username: cleanStr(v.replyTo.username, 16), excerpt: String(v.replyTo.excerpt ?? '').slice(0, 140) } : null,
+          reactions: sanitizeReactions(v.reactions),
           mine: v.uid === caller.uid,
         });
       });
@@ -727,11 +935,44 @@ async function staffDisplayName(caller: Caller): Promise<string> {
       await consumePostRateLimit(caller.uid, tosChat.postRateLimitPerHour);
       const username = (await staffDisplayName(caller)).slice(0, 16);
       const role = ctx.membership.role === 'tutor' ? 'tutor' : 'admin';
-      await writeMessage(ctx.group, { uid: caller.uid, username, role }, text.slice(0, tosChat.messageMaxChars), photoUrl);
+      const replyTo = await buildReplyTo(ctx.group.id, body.replyTo);
+      await writeMessage(ctx.group, { uid: caller.uid, username, role }, text.slice(0, tosChat.messageMaxChars), photoUrl, replyTo ? { replyTo } : undefined);
       const meta = await readMeta(ctx.group.id);
       res.json({ ok: true, meta });
     } catch (error: any) {
       handleRouteError(res, error, '[chat] staff post failed');
+    }
+  });
+
+  // Staff reactions and removals inside their centre's groups.
+  app.post('/api/centre/chat/groups/:id/messages/:msgId/react', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const centreId = cleanStr(String(req.query.centreId || ''), 120);
+      const ctx = await staffGroupContext(caller, centreId, String(req.params.id || ''));
+      const emoji = sanitizeEmoji(req.body?.emoji);
+      if (!emoji) throw httpError(400, 'Pick a reaction from the list.');
+      await toggleReaction(ctx.group.id, String(req.params.msgId || ''), caller.uid, emoji);
+      res.json({ ok: true });
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] staff react failed');
+    }
+  });
+
+  app.post('/api/centre/chat/groups/:id/messages/:msgId/remove', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const centreId = cleanStr(String(req.query.centreId || ''), 120);
+      const ctx = await staffGroupContext(caller, centreId, String(req.params.id || ''));
+      const msgRef = adminRtdb.ref(`chat/groups/${ctx.group.id}/messages/${cleanStr(String(req.params.msgId || ''), 128)}`);
+      const snap = await msgRef.get();
+      const v = snap.val();
+      if (!v) throw httpError(404, 'That message is no longer available.');
+      if (v.removed) return res.json({ ok: true });
+      await msgRef.set({ ...v, removed: { by: caller.uid, byRole: ctx.membership.role, at: ServerValue.TIMESTAMP } });
+      res.json({ ok: true });
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] staff remove failed');
     }
   });
 
@@ -1011,6 +1252,10 @@ async function staffDisplayName(caller: Caller): Promise<string> {
           text: String(v.text ?? '').slice(0, tosChat.messageMaxChars),
           at: Number(v.at) || 0,
           removed: Boolean(v.removed),
+          forwardedFrom: typeof v.forwardedFrom === 'string' ? cleanStr(v.forwardedFrom, 80) : null,
+          replyTo: v.replyTo && typeof v.replyTo === 'object' ? { id: cleanStr(v.replyTo.id, 128), username: cleanStr(v.replyTo.username, 16), excerpt: String(v.replyTo.excerpt ?? '').slice(0, 140) } : null,
+          reactions: sanitizeReactions(v.reactions),
+          mine: v.uid === caller.uid,
         });
       });
       res.json({ ok: true, channel: group, messages: messages.reverse(), meta: await readMeta(group.id) });
@@ -1030,10 +1275,47 @@ async function staffDisplayName(caller: Caller): Promise<string> {
       const text = String(req.body?.text ?? '').replace(/\s+$/g, '');
       if (!text) throw httpError(400, 'Write a message first.');
       if (text.length > tosChat.messageMaxChars) throw httpError(400, `Messages can be up to ${tosChat.messageMaxChars} characters.`);
-      await writeMessage(group, { uid: caller.uid, username: 'TOS', role: 'tos' }, text.slice(0, tosChat.messageMaxChars), null);
+      const replyTo = await buildReplyTo(group.id, req.body?.replyTo);
+      await writeMessage(group, { uid: caller.uid, username: 'TOS', role: 'tos' }, text.slice(0, tosChat.messageMaxChars), null, replyTo ? { replyTo } : undefined);
       res.json({ ok: true });
     } catch (error: any) {
       handleRouteError(res, error, '[chat] tos post failed');
+    }
+  });
+
+  // TOS reactions and removals inside the platform channel.
+  app.post('/api/tos/chat/channel/messages/:msgId/react', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      if (!caller.tos) throw httpError(403, 'Not allowed.');
+      const snap = await adminDb.collection('chatGroups').where('kind', '==', 'tos_channel').limit(1).get();
+      if (snap.empty) throw httpError(404, 'Create the channel first.');
+      const group = loadGroupFromDoc(snap.docs[0]);
+      const emoji = sanitizeEmoji(req.body?.emoji);
+      if (!emoji) throw httpError(400, 'Pick a reaction from the list.');
+      await toggleReaction(group.id, String(req.params.msgId || ''), caller.uid, emoji);
+      res.json({ ok: true });
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] tos react failed');
+    }
+  });
+
+  app.post('/api/tos/chat/channel/messages/:msgId/remove', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      if (!caller.tos) throw httpError(403, 'Not allowed.');
+      const snap = await adminDb.collection('chatGroups').where('kind', '==', 'tos_channel').limit(1).get();
+      if (snap.empty) throw httpError(404, 'Create the channel first.');
+      const group = loadGroupFromDoc(snap.docs[0]);
+      const msgRef = adminRtdb.ref(`chat/groups/${group.id}/messages/${cleanStr(String(req.params.msgId || ''), 128)}`);
+      const m = await msgRef.get();
+      const v = m.val();
+      if (!v) throw httpError(404, 'That message is no longer available.');
+      if (v.removed) return res.json({ ok: true });
+      await msgRef.set({ ...v, removed: { by: caller.uid, byRole: 'tos', at: ServerValue.TIMESTAMP } });
+      res.json({ ok: true });
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] tos remove failed');
     }
   });
 

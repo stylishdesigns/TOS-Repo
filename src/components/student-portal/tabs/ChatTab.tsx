@@ -12,12 +12,14 @@ import {
   RefreshCw,
   Send,
   ShieldAlert,
+  Star,
   Users,
   X,
   Zap,
 } from 'lucide-react';
 import { Student } from '../../../types';
 import { api } from '../../tos/tosShared';
+import { copyText, makeLongPress, MessageActionSheet, ReactionChips } from '../../communications/chatActions';
 
 // ============================================================================
 // CH1 student chat (Step 3). The screens are thin: every rule (entitlement,
@@ -62,6 +64,22 @@ interface ChatMessage {
   at: number;
   removed: boolean;
   mine: boolean;
+  forwardedFrom?: string | null;
+  replyTo?: { id: string; username: string; excerpt: string } | null;
+  reactions?: Record<string, string> | null;
+}
+
+interface StarredItem {
+  key: string;
+  groupId: string;
+  groupName: string;
+  msgId: string;
+  username: string;
+  role: string;
+  text: string;
+  photoUrl: string | null;
+  at: number;
+  starredAt: number;
 }
 
 interface MessagesResp {
@@ -144,6 +162,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
     }
   });
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
+  const [starredOpen, setStarredOpen] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -180,8 +199,15 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
         }}
         onGoToPractice={onGoToPractice}
         onHideBottomNav={onHideBottomNav}
+        postableGroups={(overview?.groups || [])
+          .filter((g) => g.id !== activeGroupId && g.canPost && !g.locked && g.kind !== 'announcements' && g.kind !== 'tos_channel')
+          .map((g) => ({ id: g.id, name: g.name }))}
       />
     );
+  }
+
+  if (starredOpen) {
+    return <StarredScreen onBack={() => setStarredOpen(false)} />;
   }
 
   if (showRules) {
@@ -231,13 +257,22 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
           </span>
           <h2 className="text-xl font-black text-[#0F172A] tracking-tight">Student Chat</h2>
         </div>
-        <button
-          onClick={load}
-          className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-500 active:scale-95 transition"
-          aria-label="Refresh"
-        >
-          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setStarredOpen(true)}
+            className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-500 active:scale-95 transition"
+            aria-label="Favourites"
+          >
+            <Star className="w-4 h-4" />
+          </button>
+          <button
+            onClick={load}
+            className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-500 active:scale-95 transition"
+            aria-label="Refresh"
+          >
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -359,9 +394,10 @@ interface GroupRoomProps {
   onBack: () => void;
   onGoToPractice?: () => void;
   onHideBottomNav?: (hide: boolean) => void;
+  postableGroups: { id: string; name: string }[];
 }
 
-const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPractice, onHideBottomNav }) => {
+const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPractice, onHideBottomNav, postableGroups }) => {
   const [resp, setResp] = useState<MessagesResp | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>(() => roomCache.get(groupId) || []);
   const [loading, setLoading] = useState(() => !roomCache.has(groupId));
@@ -375,6 +411,11 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
   const [sendingReport, setSendingReport] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
   const [toast, setToast] = useState('');
+  const [actionMsg, setActionMsg] = useState<ChatMessage | null>(null);
+  const [actionBusy, setActionBusy] = useState(false);
+  const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
+  const [forwardMsg, setForwardMsg] = useState<ChatMessage | null>(null);
+  const [starredIds, setStarredIds] = useState<Set<string>>(new Set());
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   // A chat thread takes the whole screen, so the portal's bottom nav steps aside
@@ -388,6 +429,16 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
     setToast(msg);
     setTimeout(() => setToast(''), 2600);
   }, []);
+
+  // Which messages in this thread the student has already starred, so the star
+  // button shows the right state and can take a star back off.
+  const refreshStarred = useCallback(async () => {
+    try {
+      const d = await api('/api/student/chat/starred');
+      setStarredIds(new Set<string>(((d.items || []) as StarredItem[]).map((it) => `${it.groupId}__${it.msgId}`)));
+    } catch { /* favourites stay optional: everything else still works */ }
+  }, []);
+  useEffect(() => { refreshStarred(); }, [refreshStarred]);
 
   const mergeMessages = useCallback((page: ChatMessage[]) => {
     setMessages((prev) => {
@@ -473,8 +524,9 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
     if (!t || sending) return;
     setSending(true);
     try {
-      await api(`/api/student/chat/groups/${groupId}/messages`, { method: 'POST', body: { text: t } });
+      await api(`/api/student/chat/groups/${groupId}/messages`, { method: 'POST', body: { text: t, replyTo: replyTo ? replyTo.id : undefined } });
       setText('');
+      setReplyTo(null);
       await loadLatest();
       scrollToBottom();
     } catch (e: any) {
@@ -482,7 +534,89 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
     } finally {
       setSending(false);
     }
-  }, [groupId, text, sending, loadLatest, scrollToBottom, showToast]);
+  }, [groupId, text, sending, replyTo, loadLatest, scrollToBottom, showToast]);
+
+  const myUid = messages.find((m) => m.mine)?.uid || '';
+
+  // Reactions update the thread straight away; the server is the one that
+  // stores them and enforces one reaction per person.
+  const applyReaction = useCallback((msgId: string, uid: string, emoji: string | null) => {
+    setMessages((prev) => prev.map((m) => {
+      if (m.id !== msgId) return m;
+      const r: Record<string, string> = {};
+      Object.entries(m.reactions || {}).forEach(([k, v]) => { if (typeof v === 'string' && v) r[k] = v; });
+      if (emoji && r[uid] !== emoji) r[uid] = emoji;
+      else delete r[uid];
+      return { ...m, reactions: Object.keys(r).length ? r : null };
+    }));
+  }, []);
+
+  const doReact = useCallback(async (m: ChatMessage, emoji: string) => {
+    const mineNow = (m.reactions || {})[myUid];
+    applyReaction(m.id, myUid, mineNow === emoji ? null : emoji);
+    try {
+      await api(`/api/student/chat/groups/${groupId}/messages/${m.id}/react`, { method: 'POST', body: { emoji } });
+    } catch (e: any) {
+      showToast(String(e?.message || 'Could not react. Try again.'));
+      await loadLatest();
+    }
+  }, [groupId, myUid, applyReaction, loadLatest, showToast]);
+
+  const doStar = useCallback(async (m: ChatMessage) => {
+    const key = `${groupId}__${m.id}`;
+    const starred = starredIds.has(key);
+    setStarredIds((prev) => {
+      const n = new Set(prev);
+      if (starred) n.delete(key);
+      else n.add(key);
+      return n;
+    });
+    try {
+      await api(starred ? '/api/student/chat/starred/unstar' : '/api/student/chat/starred', { method: 'POST', body: { groupId, msgId: m.id } });
+      showToast(starred ? 'Removed from favourites' : 'Saved to your favourites');
+    } catch (e: any) {
+      setStarredIds((prev) => {
+        const n = new Set(prev);
+        if (starred) n.add(key);
+        else n.delete(key);
+        return n;
+      });
+      showToast(String(e?.message || 'Could not save that. Try again.'));
+    }
+  }, [groupId, starredIds, showToast]);
+
+  const doDelete = useCallback(async (m: ChatMessage) => {
+    setActionBusy(true);
+    try {
+      await api(`/api/student/chat/groups/${groupId}/messages/${m.id}/remove`, { method: 'POST', body: {} });
+      setMessages((prev) => prev.map((x) => (x.id === m.id ? { ...x, removed: true } : x)));
+      roomCache.set(groupId, messages.slice(-200));
+      showToast('Message deleted');
+    } catch (e: any) {
+      showToast(String(e?.message || 'Could not delete the message. Try again.'));
+    } finally {
+      setActionBusy(false);
+    }
+  }, [groupId, messages, showToast]);
+
+  const doCopy = useCallback(async (m: ChatMessage) => {
+    const ok = await copyText(m.text || '');
+    showToast(ok ? 'Copied' : 'Could not copy on this device');
+  }, [showToast]);
+
+  const doForward = useCallback(async (m: ChatMessage, to: { id: string; name: string }) => {
+    setActionBusy(true);
+    try {
+      await api('/api/student/chat/forward', { method: 'POST', body: { fromGroupId: groupId, msgId: m.id, toGroupId: to.id } });
+      setForwardMsg(null);
+      showToast(`Forwarded to ${to.name}`);
+      await loadLatest();
+    } catch (e: any) {
+      showToast(String(e?.message || 'Could not forward. Try again.'));
+    } finally {
+      setActionBusy(false);
+    }
+  }, [groupId, loadLatest, showToast]);
 
   const submitReport = useCallback(async () => {
     if (!reportTarget || sendingReport) return;
@@ -575,16 +709,29 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
 
   const bubble = (m: ChatMessage) => {
     const chip = roleChip(m);
+    const press = makeLongPress(() => { if (!m.removed) setActionMsg(m); });
     return (
-      <div key={m.id} className={`flex ${m.mine ? 'justify-end' : 'justify-start'} px-1`}>
+      <div key={m.id} className={`flex flex-col ${m.mine ? 'items-end' : 'items-start'} px-1`}>
         <div
+          {...press}
           onClick={() => { if (!m.mine && !m.removed) setReportTarget(m); }}
-          className={`max-w-[82%] rounded-2xl px-3.5 py-2.5 ${
+          className={`max-w-[82%] select-none rounded-2xl px-3.5 py-2.5 ${
             m.mine
               ? 'bg-[#EA580C] text-white rounded-br-md'
               : 'bg-white text-slate-800 border border-slate-200/90 rounded-bl-md shadow-sm'
-          } ${!m.mine && !m.removed ? 'cursor-pointer active:scale-[0.99] transition' : ''}`}
+          } ${!m.mine && !m.removed ? 'cursor-pointer active:scale-[0.99] transition' : 'cursor-pointer'}`}
         >
+          {m.forwardedFrom && (
+            <p className={`text-[9px] font-bold italic mb-0.5 ${m.mine ? 'text-orange-100' : 'text-slate-400'}`}>
+              Forwarded from {m.forwardedFrom}
+            </p>
+          )}
+          {m.replyTo && (
+            <div className={`mb-1 rounded-lg border-l-2 px-2 py-1 ${m.mine ? 'border-orange-200 bg-white/10' : 'border-orange-300 bg-orange-50/70'}`}>
+              <p className={`text-[10px] font-black ${m.mine ? 'text-orange-100' : 'text-[#C2410C]'}`}>{m.replyTo.username}</p>
+              <p className={`text-[10px] truncate ${m.mine ? 'text-orange-100/80' : 'text-slate-500'}`}>{m.replyTo.excerpt}</p>
+            </div>
+          )}
           {!m.mine && (m.username || chip) && (
             <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
               {m.username && <span className="text-[10px] font-black text-slate-500">{m.username}</span>}
@@ -608,6 +755,11 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
             {fmtTime(m.at)}
           </p>
         </div>
+        {!m.removed && (
+          <div className="max-w-[82%]">
+            <ReactionChips reactions={m.reactions} mineUid={myUid} onToggle={(emoji) => doReact(m, emoji)} />
+          </div>
+        )}
       </div>
     );
   };
@@ -670,6 +822,21 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
       <div className="sticky bottom-[72px] px-4 sm:px-5 pt-2 pb-1 bg-gradient-to-t from-white via-white/95 to-transparent">
         {canPost ? (
           <div className="flex items-end gap-2">
+            {replyTo && (
+              <div className="absolute bottom-full left-4 right-4 mb-1 flex items-start gap-2 rounded-xl bg-orange-50 border border-orange-100 px-3 py-2">
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] font-black text-[#C2410C]">Replying to {replyTo.username}</p>
+                  <p className="text-[11px] text-slate-500 truncate">{replyTo.removed ? 'Message removed' : (replyTo.text || 'Photo')}</p>
+                </div>
+                <button
+                  onClick={() => setReplyTo(null)}
+                  className="rounded-full p-1 text-slate-400 hover:bg-orange-100"
+                  aria-label="Cancel reply"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
             <input
               value={text}
               onChange={(e) => setText(e.target.value)}
@@ -693,6 +860,50 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
           </div>
         )}
       </div>
+
+      {actionMsg && (
+        <MessageActionSheet
+          message={actionMsg}
+          busy={actionBusy}
+          starred={starredIds.has(`${groupId}__${actionMsg.id}`)}
+          onClose={() => { if (!actionBusy) setActionMsg(null); }}
+          onReact={(emoji) => doReact(actionMsg, emoji)}
+          onReply={canPost ? () => setReplyTo(actionMsg) : undefined}
+          onStar={() => doStar(actionMsg)}
+          onDelete={actionMsg.mine && !actionMsg.removed ? () => doDelete(actionMsg) : undefined}
+          onCopy={actionMsg.text ? () => doCopy(actionMsg) : undefined}
+          onForward={canPost && !actionMsg.removed && postableGroups.length > 0 ? () => setForwardMsg(actionMsg) : undefined}
+        />
+      )}
+
+      {forwardMsg && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-end justify-center" onClick={() => { if (!actionBusy) setForwardMsg(null); }}>
+          <div className="w-full max-w-lg bg-white rounded-t-3xl p-5 space-y-3" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-black text-slate-900">Forward to which group?</p>
+              <button onClick={() => setForwardMsg(null)} className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500" aria-label="Close">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="max-h-64 overflow-y-auto space-y-2">
+              {postableGroups.length === 0 && (
+                <p className="text-xs text-slate-500">There is no other group you can post in yet.</p>
+              )}
+              {postableGroups.map((g) => (
+                <button
+                  key={g.id}
+                  disabled={actionBusy}
+                  onClick={() => doForward(forwardMsg, g)}
+                  className="w-full flex items-center justify-between px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 text-left active:scale-[0.99] transition disabled:opacity-60"
+                >
+                  <span className="text-sm font-bold text-slate-800">{g.name}</span>
+                  <Send className="w-4 h-4 text-[#EA580C]" />
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {reportTarget && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-end justify-center" onClick={() => { if (!sendingReport) setReportTarget(null); }}>
@@ -774,6 +985,103 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
       {toast && (
         <div className="fixed bottom-28 left-0 right-0 flex justify-center z-50 pointer-events-none">
           <div className="bg-slate-900 text-white text-xs font-bold px-4 py-2.5 rounded-full shadow-lg max-w-[85%] text-center">{toast}</div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// Favourites: every message the student starred, kept as a private copy so it
+// survives even after the group's retention window removes the original.
+// ---------------------------------------------------------------------------
+const StarredScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
+  const [items, setItems] = useState<StarredItem[] | null>(null);
+  const [error, setError] = useState('');
+  const [busyKey, setBusyKey] = useState('');
+
+  const load = useCallback(async () => {
+    try {
+      const d = await api('/api/student/chat/starred');
+      setItems((d.items || []) as StarredItem[]);
+      setError('');
+    } catch (e: any) {
+      setError(String(e?.message || 'Favourites could not be loaded. Try again.'));
+    }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const unstar = useCallback(async (it: StarredItem) => {
+    setBusyKey(it.key);
+    try {
+      await api('/api/student/chat/starred/unstar', { method: 'POST', body: { groupId: it.groupId, msgId: it.msgId } });
+      setItems((prev) => (prev || []).filter((x) => x.key !== it.key));
+    } catch (e: any) {
+      setError(String(e?.message || 'Could not remove that. Try again.'));
+    } finally {
+      setBusyKey('');
+    }
+  }, []);
+
+  return (
+    <div className="p-4 sm:p-5 max-w-lg mx-auto space-y-4 animate-in fade-in duration-300 pb-20">
+      <div className="pt-1 flex items-center gap-2">
+        <button
+          onClick={onBack}
+          className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 active:scale-95 transition shrink-0"
+          aria-label="Back"
+        >
+          <ChevronLeft className="w-4 h-4" />
+        </button>
+        <div>
+          <span className="text-[10px] font-extrabold uppercase text-[#C2410C] tracking-wider block">Communications</span>
+          <h2 className="text-xl font-black text-[#0F172A] tracking-tight">Favourites</h2>
+        </div>
+      </div>
+
+      {error && (
+        <div className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-sm">
+          <p className="text-xs text-slate-600 font-medium">{error}</p>
+          <button onClick={load} className="mt-2 px-3 py-2 rounded-xl bg-[#EA580C] text-white text-[11px] font-black active:scale-95 transition">
+            Try again
+          </button>
+        </div>
+      )}
+
+      {items && items.length === 0 && (
+        <div className="text-center py-14">
+          <Star className="w-8 h-8 mx-auto text-slate-300" />
+          <p className="mt-3 text-xs text-slate-400 font-medium">No favourites yet. Long-press a message and star it.</p>
+        </div>
+      )}
+
+      {items && items.length > 0 && (
+        <div className="space-y-2">
+          {items.map((it) => (
+            <div key={it.key} className="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-3 flex items-start gap-3">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
+                  <span className="text-[10px] font-black text-[#C2410C]">{it.groupName}</span>
+                  <span className="text-[10px] font-black text-slate-400">·</span>
+                  <span className="text-[10px] font-black text-slate-500">{it.username}</span>
+                  <span className="text-[9px] font-bold text-slate-400">{fmtTime(it.at)}</span>
+                </div>
+                {it.photoUrl && !it.text ? (
+                  <img src={it.photoUrl} alt="Saved photo" className="rounded-xl max-h-40 w-auto" />
+                ) : (
+                  <p className="text-[12px] text-slate-700 font-medium whitespace-pre-wrap break-words">{it.text}</p>
+                )}
+              </div>
+              <button
+                onClick={() => unstar(it)}
+                disabled={busyKey === it.key}
+                className="shrink-0 w-9 h-9 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-500 active:scale-95 transition disabled:opacity-60"
+                aria-label="Remove from favourites"
+              >
+                {busyKey === it.key ? <Loader2 className="w-4 h-4 animate-spin" /> : <Star className="w-4 h-4 fill-amber-400" />}
+              </button>
+            </div>
+          ))}
         </div>
       )}
     </div>

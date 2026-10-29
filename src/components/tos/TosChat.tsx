@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Loader2, RefreshCw, Send, Ban, Check, Plus, Megaphone, Settings2, ShieldAlert, Users } from 'lucide-react';
+import { Loader2, RefreshCw, Send, Ban, Check, Plus, Megaphone, Settings2, ShieldAlert, Users, X } from 'lucide-react';
+import { copyText, makeLongPress, MessageActionSheet, ReactionChips } from '../communications/chatActions';
 import { api, Json } from './tosShared';
 
 // TOS chat screens (CH1 Step 5): the platform channel, the platform chat
@@ -27,6 +28,10 @@ type ChannelMessage = {
   text: string;
   at: number;
   removed: any;
+  forwardedFrom?: string | null;
+  replyTo?: { id: string; username: string; excerpt: string } | null;
+  reactions?: Record<string, string> | null;
+  mine?: boolean;
 };
 
 type ChannelState = {
@@ -85,6 +90,8 @@ const ChannelTab: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
   const [posting, setPosting] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [actionMsg, setActionMsg] = useState<ChannelMessage | null>(null);
+  const [replyTo, setReplyTo] = useState<ChannelMessage | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
 
   const load = useCallback(async () => {
@@ -130,12 +137,55 @@ const ChannelTab: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
     setPosting(true);
     setError('');
     try {
-      const r: Json = await api('/api/tos/chat/channel/messages', { method: 'POST', body: { text } });
-      if (r && r.ok) { setDraft(''); await load(); }
+      const r: Json = await api('/api/tos/chat/channel/messages', { method: 'POST', body: { text, replyTo: replyTo ? replyTo.id : undefined } });
+      if (r && r.ok) { setDraft(''); setReplyTo(null); await load(); }
       else setError((r && (r as any).error) || 'Could not post.');
     } catch (e: any) {
       setError(e?.message || 'Could not post.');
     } finally { setPosting(false); }
+  };
+
+  const myUid = (state?.messages || []).find((m) => m.mine)?.uid || '';
+
+  const applyReaction = (msgId: string, uid: string, emoji: string | null) => {
+    setState((prev) => {
+      if (!prev) return prev;
+      const msgs = (prev.messages || []).map((m) => {
+        if (m.id !== msgId) return m;
+        const r: Record<string, string> = {};
+        Object.entries(m.reactions || {}).forEach(([k, v]) => { if (typeof v === 'string' && v) r[k] = v; });
+        if (emoji && r[uid] !== emoji) r[uid] = emoji;
+        else delete r[uid];
+        return { ...m, reactions: Object.keys(r).length ? r : null };
+      });
+      return { ...prev, messages: msgs };
+    });
+  };
+
+  const doReact = async (m: ChannelMessage, emoji: string) => {
+    const mineNow = (m.reactions || {})[myUid];
+    applyReaction(m.id, myUid, mineNow === emoji ? null : emoji);
+    try {
+      await api(`/api/tos/chat/channel/messages/${m.id}/react`, { method: 'POST', body: { emoji } });
+    } catch (e: any) {
+      setError(e?.message || 'Could not react.');
+      load();
+    }
+  };
+
+  const doDelete = async (m: ChannelMessage) => {
+    setError('');
+    try {
+      await api(`/api/tos/chat/channel/messages/${m.id}/remove`, { method: 'POST', body: {} });
+      await load();
+    } catch (e: any) {
+      setError(e?.message || 'Could not remove the message.');
+    }
+  };
+
+  const doCopy = async (m: ChannelMessage) => {
+    const ok = await copyText(m.text || '');
+    if (!ok) setError('Could not copy on this device.');
   };
 
   if (loading) {
@@ -176,6 +226,7 @@ const ChannelTab: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
           {state.messages.length === 0 && <p className="text-xs text-slate-500 py-6 text-center">No messages yet.</p>}
           {state.messages.slice().sort((a, b) => a.at - b.at).map((m) => {
             const removed = removedOf(m);
+            const press = makeLongPress(() => { if (!removed) setActionMsg(m); });
             return (
               <div key={m.id} className={`rounded-xl px-3 py-2 border ${removed ? 'border-red-400/20 bg-red-500/5' : m.role === 'tos' ? 'border-orange-400/25 bg-orange-500/10' : 'border-white/10 bg-slate-950/40'}`}>
                 <div className="flex items-center gap-2 flex-wrap">
@@ -183,13 +234,38 @@ const ChannelTab: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
                   {m.role === 'tos' && <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-300">TOS</span>}
                   <span className="text-[10px] text-slate-500">{fmtWhen(m.at)}</span>
                 </div>
+                {m.forwardedFrom && <p className="text-[10px] font-bold italic text-slate-500 mt-1">Forwarded from {m.forwardedFrom}</p>}
                 {removed
                   ? <p className="text-xs text-red-300/80 italic mt-1">Removed by {removed.byRole === 'tos' ? 'TOS' : 'the centre'}.</p>
-                  : <p className="text-xs text-slate-200 mt-1 whitespace-pre-wrap break-words">{m.text}</p>}
+                  : (
+                    <div {...press} className="cursor-pointer select-none">
+                      {m.replyTo && (
+                        <div className="mt-1 mb-1 rounded-lg border-l-2 border-orange-400/50 bg-white/5 px-2 py-1">
+                          <p className="text-[10px] font-black text-orange-300">{m.replyTo.username}</p>
+                          <p className="text-[10px] truncate text-slate-400">{m.replyTo.excerpt}</p>
+                        </div>
+                      )}
+                      <p className="text-xs text-slate-200 mt-1 whitespace-pre-wrap break-words">{m.text}</p>
+                    </div>
+                  )}
+                {!removed && (
+                  <ReactionChips reactions={m.reactions} mineUid={myUid} onToggle={(emoji) => doReact(m, emoji)} />
+                )}
               </div>
             );
           })}
         </div>
+        {replyTo && (
+          <div className="mt-3 flex items-start gap-2 rounded-xl border border-orange-400/30 bg-orange-500/10 px-3 py-2">
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-black text-orange-300">Replying to {replyTo.username}</p>
+              <p className="text-[11px] text-slate-400 truncate">{replyTo.text || 'Message'}</p>
+            </div>
+            <button onClick={() => setReplyTo(null)} className="rounded-full p-1 text-slate-400 hover:bg-white/10" aria-label="Cancel reply">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
         <div className="mt-3 flex items-end gap-2">
           <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={2} placeholder="Write to every centre..." className={inputCls + ' resize-none'} />
           <button onClick={post} disabled={posting || !draft.trim()} className="shrink-0 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-40">
@@ -198,6 +274,17 @@ const ChannelTab: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
         </div>
         {error && <p className="mt-2 text-xs text-red-300">{error}</p>}
       </Card>
+
+      {actionMsg && (
+        <MessageActionSheet
+          message={actionMsg}
+          onClose={() => setActionMsg(null)}
+          onReact={(emoji) => doReact(actionMsg, emoji)}
+          onReply={() => setReplyTo(actionMsg)}
+          onDelete={() => doDelete(actionMsg)}
+          onCopy={actionMsg.text ? () => doCopy(actionMsg) : undefined}
+        />
+      )}
     </div>
   );
 };
