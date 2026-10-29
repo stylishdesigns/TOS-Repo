@@ -123,7 +123,7 @@ const ChannelTab: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
     setPosting(true);
     setError('');
     try {
-      const r: Json = await api('/api/tos/chat/channel/messages', { method: 'POST', body: JSON.stringify({ text }) });
+      const r: Json = await api('/api/tos/chat/channel/messages', { method: 'POST', body: { text } });
       if (r && r.ok) { setDraft(''); await load(); }
       else setError((r && (r as any).error) || 'Could not post.');
     } catch (e: any) {
@@ -238,7 +238,7 @@ const SettingsTab: React.FC<{ onSaved: () => void }> = ({ onSaved }) => {
     setError('');
     setDone(false);
     try {
-      const r: Json = await api('/api/tos/chat/settings', { method: 'PUT', body: JSON.stringify({ confirm: 'APPLY', settings: s }) });
+      const r: Json = await api('/api/tos/chat/settings', { method: 'PUT', body: { confirm: 'APPLY', settings: s } });
       if (r && r.ok) {
         setS((r as any).settings as TosChatSettings);
         setConfirmText('');
@@ -358,7 +358,7 @@ const EscalationsTab: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
     setBusyId(report.id);
     setError('');
     try {
-      const r: Json = await api(`/api/tos/chat/reports/${report.id}/action`, { method: 'POST', body: JSON.stringify({ action }) });
+      const r: Json = await api(`/api/tos/chat/reports/${report.id}/action`, { method: 'POST', body: { action } });
       if (r && r.ok) { await load(); onChanged(); }
       else setError((r && (r as any).error) || 'Could not act on that report.');
     } catch (e: any) {
