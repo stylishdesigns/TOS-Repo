@@ -331,10 +331,6 @@ export const StudentPortal: React.FC = () => {
     setChatFanOpen(false);
     setStatusScreenOpen(true);
   }, []);
-  const backToChatFan = React.useCallback(() => {
-    setStatusScreenOpen(false);
-    setChatFanOpen(true);
-  }, []);
 
   useEffect(() => {
     if (!chatFanOpen) return;
@@ -644,8 +640,7 @@ export const StudentPortal: React.FC = () => {
                 onHideBottomNav={setHideBottomNav}
                 onUnreadTotal={setOrbUnread}
                 view={chatView}
-                onBackToFan={backToChatFan}
-              />
+                              />
             )}
 
             {activeTab === 'cbt' && (
@@ -722,13 +717,6 @@ export const StudentPortal: React.FC = () => {
             <div className="fixed inset-0 z-40 bg-slate-50 overflow-y-auto animate-in fade-in duration-200">
               <div className="p-4 sm:p-5 max-w-lg mx-auto pt-6 pb-24">
                 <div className="flex items-center gap-3">
-                  <button
-                    onClick={backToChatFan}
-                    className="w-10 h-10 rounded-2xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 active:scale-95 transition"
-                    aria-label="Back to chat menu"
-                  >
-                    <ChevronLeft className="w-5 h-5" />
-                  </button>
                   <div>
                     <h2 className="text-2xl font-black text-slate-900 tracking-tight">Status</h2>
                     <p className="text-[11px] text-slate-500 font-medium">Updates from your centre</p>

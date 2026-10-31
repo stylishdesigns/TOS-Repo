@@ -155,14 +155,12 @@ interface ChatTabProps {
   onUnreadTotal?: (total: number) => void;
   // Phase 1 C/D: which fan section opened this tab.
   view?: 'chats' | 'channels';
-  // Back from a Chats/Channels screen returns to the open fan.
-  onBackToFan?: () => void;
 }
 
 // The chat list's last good copy, scoped to this student and kept across
 // full reloads, so the list renders straight away while the refresh runs
 // behind it.
-export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoToPractice, onHideBottomNav, onUnreadTotal, view = 'chats', onBackToFan }) => {
+export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoToPractice, onHideBottomNav, onUnreadTotal, view = 'chats' }) => {
   const cachedOverview = loadLastGood<ChatOverview>(`chat:overview:${student.id}`);
   const [overview, setOverview] = useState<ChatOverview | null>(cachedOverview);
   const [loading, setLoading] = useState(() => !cachedOverview);
@@ -279,15 +277,6 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
     <div className="p-4 sm:p-5 max-w-lg mx-auto space-y-4 animate-in fade-in duration-300 pb-20">
       <div className="pt-1 flex items-end justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
-          {onBackToFan && (
-            <button
-              onClick={onBackToFan}
-              className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-500 active:scale-95 transition shrink-0"
-              aria-label="Back to chat menu"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-          )}
           <div className="min-w-0">
             <span className="text-[10px] font-extrabold uppercase text-[#C2410C] tracking-wider block">
               {student.name} · Communications
