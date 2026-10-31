@@ -16,12 +16,34 @@ const mem = new Map<string, unknown>();
 
 let ownerUid: string | null = null;
 
-// Set (or clear) the signed-in identity. Whenever it changes - including
-// changing to null on sign-out - every saved copy is wiped first, so a new
-// account can never inherit the previous one's data.
+// Set (or clear) the signed-in identity. A new account never inherits the
+// previous one's data:
+//  - uid -> a different uid: every saved copy is wiped.
+//  - uid -> null (sign-out): every saved copy is wiped. logout() also calls
+//    clearAllLastGood() itself, so a failed auth callback cannot leave copies.
+//  - null -> uid (the page reloading with the same person still signed in):
+//    keys already belonging to that same uid are KEPT, so the instant open
+//    survives a refresh; keys belonging to anyone else are removed.
+// The listener can also fire with the same uid again; that changes nothing.
 export function setLastGoodOwner(uid: string | null): void {
   if (uid === ownerUid) return;
-  clearAllLastGood();
+  if (!uid) {
+    clearAllLastGood();
+  } else {
+    try {
+      const doomed: string[] = [];
+      for (let i = 0; i < localStorage.length; i += 1) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('lastgood:') && !k.startsWith(`lastgood:${uid}:`)) doomed.push(k);
+      }
+      doomed.forEach((k) => localStorage.removeItem(k));
+    } catch {
+      // Blocked storage: fall through to the map sweep below.
+    }
+    for (const k of [...mem.keys()]) {
+      if (!k.startsWith(`${uid}:`)) mem.delete(k);
+    }
+  }
   ownerUid = uid;
 }
 
