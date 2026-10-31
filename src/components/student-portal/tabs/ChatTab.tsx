@@ -21,6 +21,7 @@ import {
 import { Student } from '../../../types';
 import { api } from '../../tos/tosShared';
 import { loadLastGood, saveLastGood } from '../../../lib/lastGood';
+import { totalUnread } from './chatNav';
 import { copyText, EmojiText, isEmojiOnly, makeLongPress, MessageActionSheet, ReactionChips } from '../../communications/chatActions';
 
 // ============================================================================
@@ -150,12 +151,14 @@ interface ChatTabProps {
   onGoToProfile?: () => void;
   onGoToPractice?: () => void;
   onHideBottomNav?: (hide: boolean) => void;
+  // Phase 1 A: the orb badge in the shell reads this instead of polling.
+  onUnreadTotal?: (total: number) => void;
 }
 
 // The chat list's last good copy, scoped to this student and kept across
 // full reloads, so the list renders straight away while the refresh runs
 // behind it.
-export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoToPractice, onHideBottomNav }) => {
+export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoToPractice, onHideBottomNav, onUnreadTotal }) => {
   const cachedOverview = loadLastGood<ChatOverview>(`chat:overview:${student.id}`);
   const [overview, setOverview] = useState<ChatOverview | null>(cachedOverview);
   const [loading, setLoading] = useState(() => !cachedOverview);
@@ -175,13 +178,14 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
       const res = await api('/api/student/chat/overview');
       saveLastGood(`chat:overview:${student.id}`, res);
       setOverview(res as ChatOverview);
+      onUnreadTotal?.(totalUnread((res as ChatOverview).groups || []));
       setError('');
     } catch (e: any) {
       setError(String(e?.message || 'Chat could not be loaded. Try again.'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [onUnreadTotal]);
 
   useEffect(() => {
     load();
@@ -190,8 +194,13 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
   }, [load]);
 
   const refreshOverview = useCallback(() => {
-    api('/api/student/chat/overview').then((res) => setOverview(res as ChatOverview)).catch(() => undefined);
-  }, []);
+    api('/api/student/chat/overview')
+      .then((res) => {
+        setOverview(res as ChatOverview);
+        onUnreadTotal?.(totalUnread((res as ChatOverview).groups || []));
+      })
+      .catch(() => undefined);
+  }, [onUnreadTotal]);
 
   const activeGroup = overview?.groups.find((g) => g.id === activeGroupId) || null;
 

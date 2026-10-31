@@ -46,7 +46,7 @@ export function splitGroupsAndChannels(
  * sends unread 0 for locked groups; the guard keeps the badge honest if a
  * stale cached copy disagrees).
  */
-export function totalUnread(all: readonly ChatNavGroup[]): number {
+export function totalUnread(all: readonly { unread?: number; locked?: boolean }[]): number {
   let total = 0;
   for (const g of all) {
     if (!g.locked) total += Math.max(0, g.unread || 0);

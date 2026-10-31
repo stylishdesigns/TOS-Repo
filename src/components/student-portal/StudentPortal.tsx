@@ -1,4 +1,4 @@
-import { loadLastGoodFlag, saveLastGoodFlag } from '../../lib/lastGood';
+import { loadLastGood, loadLastGoodFlag, saveLastGoodFlag } from '../../lib/lastGood';
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useFirebase } from '../../context/FirebaseContext';
@@ -26,6 +26,26 @@ import {
   Sparkles,
 } from 'lucide-react';
 
+import { orbBadgeLabel, totalUnread } from './tabs/chatNav';
+
+// Phase 1 chat orb icon: bubble with a plus and a small sparkle (design spec).
+const ChatOrbIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg
+    viewBox="0 0 32 32"
+    className={className}
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={2.2}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M5 14.5C5 9.8 9.4 6 14.8 6h2.4C22.6 6 27 9.8 27 14.5S22.6 23 17.2 23h-2.6L9 27v-4.6C6.6 21 5 18 5 14.5z" />
+    <path d="M16 11.5v6M13 14.5h6" />
+    <path d="M27 1.5l1 2.5 2.5 1-2.5 1-1 2.5-1-2.5-2.5-1 2.5-1z" fill="currentColor" stroke="none" />
+  </svg>
+);
+
 export type TabType = 'home' | 'classes' | 'chat' | 'cbt' | 'results' | 'more';
 
 export const StudentPortal: React.FC = () => {
@@ -38,6 +58,9 @@ export const StudentPortal: React.FC = () => {
   const [portalMode, setPortalMode] = useState<'student' | 'parent'>('student');
   const [desktopViewMode] = useState<'mobile_frame' | 'expanded'>('mobile_frame');
   const [hideBottomNav, setHideBottomNav] = useState(false);
+  // Orb badge: seeded from the chat overview's last good copy (no new reads);
+  // ChatTab reports each fresh total through onUnreadTotal after its loads.
+  const [orbUnread, setOrbUnread] = useState(0);
   const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
@@ -417,6 +440,17 @@ export const StudentPortal: React.FC = () => {
   const todayLog = attendanceLogs.find(
     (l) => l.studentId === activeStudent.id && l.date === todayStr
   );
+  // Seed the orb badge from this student's last good chat overview.
+  useEffect(() => {
+    if (!activeStudent) return;
+    const cached = loadLastGood<{ groups?: { unread?: number; locked?: boolean }[] }>(
+      `chat:overview:${activeStudent.id}`,
+    );
+    if (cached?.groups) setOrbUnread(totalUnread(cached.groups));
+  }, [activeStudent?.id]);
+
+  const orbBadgeText = orbBadgeLabel(orbUnread);
+
   const lateMinutesThreshold = parseTime(attendanceSettings.lateArrivalTime || '08:30 AM');
   const currentMinutes = currentTime.getHours() * 60 + currentTime.getMinutes();
   const isRunningLate = !todayLog?.clockInAt && currentMinutes > lateMinutesThreshold;
@@ -558,6 +592,7 @@ export const StudentPortal: React.FC = () => {
                 onGoToProfile={() => setActiveTab('more')}
                 onGoToPractice={() => setActiveTab('cbt')}
                 onHideBottomNav={setHideBottomNav}
+                onUnreadTotal={setOrbUnread}
               />
             )}
 
@@ -668,27 +703,10 @@ export const StudentPortal: React.FC = () => {
                   <span className="text-[10px] mt-0.5 tracking-tight">Classes</span>
                 </button>
 
-                {/* 3: Chat (rendered only if entitled, Part E) */}
-                {entitlements?.chat && (
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab('chat')}
-                    className={`flex flex-col items-center justify-center py-1.5 px-1 rounded-2xl transition-all cursor-pointer ${
-                      activeTab === 'chat'
-                        ? 'text-orange-400 font-black'
-                        : 'text-slate-400 hover:text-slate-200 font-semibold'
-                    }`}
-                  >
-                    <div
-                      className={`p-1 rounded-xl transition-all ${
-                        activeTab === 'chat' ? 'bg-orange-500/20 text-orange-400' : ''
-                      }`}
-                    >
-                      <MessageSquare className="w-5 h-5" />
-                    </div>
-                    <span className="text-[10px] mt-0.5 tracking-tight">Chat</span>
-                  </button>
-                )}
+                                {/* 3: Chat orb (rendered only if entitled, Phase 1 A). The orb
+                    floats above this slot, centred on the bar's top edge;
+                    the empty cell keeps the 5-column rhythm. */}
+                {entitlements?.chat && <div aria-hidden="true" />}
 
 
                 {/* 4: CBT (opens bottom sheet) */}
@@ -731,6 +749,28 @@ export const StudentPortal: React.FC = () => {
                   <span className="text-[10px] mt-0.5 tracking-tight">More</span>
                 </button>
               </div>
+              {entitlements?.chat && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('chat')}
+                  aria-label={`Open chat menu, ${orbUnread} unread`}
+                  className="absolute left-1/2 top-0 z-50 -translate-x-1/2 -translate-y-1/2 rounded-full cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400/70"
+                  style={{
+                    width: 62,
+                    height: 62,
+                    background: 'linear-gradient(145deg, #EA580C, #9A3412)',
+                    border: '4px solid #020617',
+                    boxShadow: '0 0 0 5px rgba(234,88,12,.22), 0 10px 24px rgba(234,88,12,.5), inset 0 2px 0 rgba(255,255,255,.35)',
+                  }}
+                >
+                  <ChatOrbIcon className="w-8 h-8" />
+                  {orbBadgeText && (
+                    <span className="absolute -top-0.5 -right-0.5 min-w-[22px] h-[22px] px-1 rounded-full bg-white text-[#EA580C] text-[11px] font-black flex items-center justify-center border border-orange-200 shadow-sm">
+                      {orbBadgeText}
+                    </span>
+                  )}
+                </button>
+              )}
             </nav>
           )}
 
