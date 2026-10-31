@@ -20,7 +20,7 @@ export const AccountView: React.FC = () => {
   // Profile Form State
   const [firstName, setFirstName] = useState('Platform');
   const [lastName, setLastName] = useState('Admin');
-  const [email, setEmail] = useState('nativebrandsdev@gmail.com');
+  const [email, setEmail] = useState(activeUser?.email || ''); // No hardcoded demo email
   const [phone, setPhone] = useState('08056765455');
   const [jobTitle, setJobTitle] = useState('Platform Owner');
   const [department, setDepartment] = useState('Technology');
@@ -59,7 +59,7 @@ export const AccountView: React.FC = () => {
               </span>
             </div>
             <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 mt-1">
-              <span>nativebrandsdev@gmail.com</span>
+              <span>{email}</span>
               <span>•</span>
               <span>08056765455</span>
               <span>•</span>

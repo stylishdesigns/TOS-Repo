@@ -1,0 +1,199 @@
+1. A p.d. of 12 V drives a current through a 4 Ω resistor. The current is
+A: 3 A
+B: 48 A
+C: 8 A
+D: 0.33 A
+Answer: A
+Explanation: I = V/R = 12/4 = 3 A.
+
+2. The SI unit of resistance is the
+A: ampere
+B: ohm
+C: volt
+D: watt
+Answer: B
+Explanation: Resistance is measured in ohms.
+
+3. The SI unit of electric current is the
+A: volt
+B: ohm
+C: ampere
+D: coulomb
+Answer: C
+Explanation: Current is measured in amperes.
+
+4. Ohm's law states that
+A: voltage varies inversely with current
+B: resistance varies with current
+C: power varies with charge
+D: current varies directly with voltage at constant temperature
+Answer: D
+Explanation: V = IR at constant temperature.
+
+5. The total resistance of 2 Ω, 3 Ω and 5 Ω resistors connected in series is
+A: 10 Ω
+B: 0.6 Ω
+C: 1.0 Ω
+D: 30 Ω
+Answer: A
+Explanation: Series resistances add: 2+3+5 = 10 Ω.
+
+6. Two 6 Ω resistors connected in parallel give a combined resistance of
+A: 12 Ω
+B: 3 Ω
+C: 6 Ω
+D: 0.33 Ω
+Answer: B
+Explanation: Equal parallel resistors halve: 6/2 = 3 Ω.
+
+7. The power dissipated by a device drawing 2 A at 12 V is
+A: 6 W
+B: 14 W
+C: 24 W
+D: 144 W
+Answer: C
+Explanation: P = VI = 12×2 = 24 W.
+
+8. The electrical power dissipated in a resistor equals
+A: IR
+B: V/R
+C: I/V
+D: I²R
+Answer: D
+Explanation: P = I²R = V²/R.
+
+9. The main purpose of a fuse in a circuit is to
+A: protect the circuit from excessive current
+B: increase the current
+C: store charge
+D: reduce the voltage
+Answer: A
+Explanation: The fuse melts when current exceeds its rating.
+
+10. In a correct circuit connection, an ammeter is connected in
+A: parallel and a voltmeter in series
+B: series and a voltmeter in parallel
+C: series with a voltmeter also in series
+D: parallel with a voltmeter also in parallel
+Answer: B
+Explanation: Ammeters carry the current; voltmeters bridge the component.
+
+11. In the external circuit, conventional current flows from the
+A: negative terminal to the positive
+B: earth to the sky
+C: positive terminal to the negative terminal
+D: load to the source
+Answer: C
+Explanation: Conventional current leaves the positive terminal.
+
+12. The charge carried when a steady 2 A flows for 60 s is
+A: 30 C
+B: 62 C
+C: 7200 C
+D: 120 C
+Answer: D
+Explanation: Q = It = 2×60 = 120 C.
+
+13. For a metallic conductor, resistance normally
+A: increases as temperature rises
+B: falls as temperature rises
+C: is independent of temperature
+D: falls as length increases
+Answer: A
+Explanation: Hotter lattices scatter electrons more.
+
+14. A 60 W lamp burning for 10 hours consumes
+A: 6 kWh
+B: 0.6 kWh
+C: 60 kWh
+D: 600 kWh
+Answer: B
+Explanation: 60 W × 10 h = 600 Wh = 0.6 kWh.
+
+15. Which of these is a good conductor of electricity?
+A: rubber
+B: glass
+C: copper
+D: plastic
+Answer: C
+Explanation: Copper is a standard conductor.
+
+16. An example of an insulator is
+A: iron
+B: sea water
+C: graphite
+D: rubber
+Answer: D
+Explanation: Rubber does not conduct.
+
+17. In a series circuit, the current at every point is
+A: the same
+B: different at each point
+C: zero
+D: equal to the voltage
+Answer: A
+Explanation: Series circuits carry one current.
+
+18. In a parallel circuit, the voltage across each branch is
+A: different on each branch
+B: the same
+C: zero
+D: half the total
+Answer: B
+Explanation: Branches share the same two nodes.
+
+19. Adding more resistors in parallel
+A: increases the total resistance
+B: does not change resistance
+C: decreases the total resistance
+D: cuts the current to zero
+Answer: C
+Explanation: More parallel paths ease the flow.
+
+20. The electromotive force of a cell is
+A: the current it delivers
+B: the heat it produces
+C: its internal resistance
+D: the work done per coulomb by the cell in driving charge round the circuit
+Answer: D
+Explanation: Emf is energy supplied per unit charge.
+
+21. A 9 V battery is connected to a 3 Ω resistor. The current is
+A: 3 A
+B: 27 A
+C: 0.33 A
+D: 6 A
+Answer: A
+Explanation: I = 9/3 = 3 A.
+
+22. The unit of electrical power is the
+A: ohm
+B: watt
+C: coulomb
+D: joule per coulomb
+Answer: B
+Explanation: One watt is one joule per second.
+
+23. A 100 W bulb used for 5 hours costs, at 10 naira per kWh,
+A: 0.5 naira
+B: 50 naira
+C: 5 naira
+D: 500 naira
+Answer: C
+Explanation: 0.5 kWh × 10 = 5 naira.
+
+24. A thicker wire of the same material and length has
+A: more resistance
+B: the same resistance
+C: infinite resistance
+D: less resistance
+Answer: D
+Explanation: A larger cross-section lets charge flow more easily.
+
+25. A short circuit is a path of
+A: very low resistance which draws a dangerously large current
+B: high resistance which blocks current
+C: zero voltage
+D: no connection at all
+Answer: A
+Explanation: Low-resistance bypasses cause current surges.

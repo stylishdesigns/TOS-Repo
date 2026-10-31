@@ -1,11 +1,26 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
-import {defineConfig} from 'vite';
+import {defineConfig, loadEnv} from 'vite';
 import {VitePWA} from 'vite-plugin-pwa';
 
-export default defineConfig(() => {
+export default defineConfig(({mode}) => {
+  // Expose ONLY these public Firebase web identifiers to the client bundle.
+  // Everything else in the environment (service account, AI key) stays
+  // server-side and can never reach the browser bundle.
+  const env = {...loadEnv(mode, process.cwd(), ''), ...process.env} as Record<string, string | undefined>;
+  const pub = (key: string) => JSON.stringify(env[key] ?? '');
   return {
+    define: {
+      'import.meta.env.FIREBASE_API_KEY': pub('FIREBASE_API_KEY'),
+      'import.meta.env.FIREBASE_APP_ID': pub('FIREBASE_APP_ID'),
+      'import.meta.env.FIREBASE_PROJECT_ID': pub('FIREBASE_PROJECT_ID'),
+      'import.meta.env.FIREBASE_AUTH_DOMAIN': pub('FIREBASE_AUTH_DOMAIN'),
+      'import.meta.env.FIREBASE_STORAGE_BUCKET': pub('FIREBASE_STORAGE_BUCKET'),
+      'import.meta.env.FIREBASE_MESSAGING_SENDER_ID': pub('FIREBASE_MESSAGING_SENDER_ID'),
+      'import.meta.env.FIREBASE_OAUTH_CLIENT_ID': pub('FIREBASE_OAUTH_CLIENT_ID'),
+      'import.meta.env.FIRESTORE_DATABASE_ID': pub('FIRESTORE_DATABASE_ID'),
+    },
     plugins: [
       react(),
       tailwindcss(),
@@ -34,20 +49,31 @@ export default defineConfig(() => {
               src: '/pwa-512x512.png',
               sizes: '512x512',
               type: 'image/png',
-              purpose: 'any',
-            },
-            {
-              src: '/pwa-maskable-512x512.png',
-              sizes: '512x512',
-              type: 'image/png',
               purpose: 'maskable',
             },
           ],
         },
         workbox: {
           maximumFileSizeToCacheInBytes: 10 * 1024 * 1024, // 10 MiB
-          globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,webmanifest}'],
+          // index.html is deliberately NOT precached: the app shell is fetched
+          // network-first (see runtimeCaching below) so a new deploy can never
+          // hide behind an offline copy. Hashed assets below stay precached.
+          globPatterns: ['**/*.{js,css,ico,png,svg,woff2,webmanifest}'],
+          cleanupOutdatedCaches: true,
+          // No precache fallback for navigations: the shell itself is network-first.
+          navigateFallback: undefined,
           runtimeCaching: [
+            {
+              // App shell: network first, cached copy only when offline.
+              urlPattern: /^\/(?:$|\?)/,
+              handler: 'NetworkFirst',
+              options: {
+                cacheName: 'app-shell',
+                networkTimeoutSeconds: 4,
+                expiration: { maxEntries: 1, purgeOnQuotaError: true },
+                cacheableResponse: { statuses: [0, 200] },
+              },
+            },
             {
               urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
               handler: 'CacheFirst',
@@ -105,7 +131,7 @@ export default defineConfig(() => {
     },
     server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
-      // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
+      // Do not modify—file watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true' ? { overlay: false } : false,
       // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
       watch: process.env.DISABLE_HMR === 'true' ? null : {},

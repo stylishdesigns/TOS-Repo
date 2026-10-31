@@ -3,6 +3,7 @@ import { ModernSelect } from '../../ui/ModernSelect';
 import { useApp } from '../../../context/AppContext';
 import { Student, CBTExam, QuizQuestion, StudentResult, EssayPart, EssaySubPart } from '../../../types';
 import { CalculatorModal } from '../CalculatorModal';
+import { StudentMockTab } from './StudentMockTab';
 import { EssayQuestion } from '../../common/EssayQuestion';
 import { flattenEssayAnswers, getEssayStructure } from '../../../utils/essay';
 import { gradeAllEssays } from '../../../utils/essayGrading';
@@ -48,6 +49,7 @@ interface CbtTabProps {
   onExitReview?: () => void;
   lockedFrequency?: 'General' | 'Mock';
   hideFrequencyToggle?: boolean;
+  onGoToProfile?: () => void;
   renderUnderHeader?: (showArchive: boolean) => React.ReactNode;
 }
 
@@ -63,8 +65,9 @@ export const CbtTab: React.FC<CbtTabProps> = ({
   lockedFrequency,
   hideFrequencyToggle = false,
   renderUnderHeader,
+  onGoToProfile,
 }) => {
-  const { addToast, exams, results, addResult } = useApp();
+  const { addToast, exams, results, addResult, centreName } = useApp();
 
   const [examState, setExamState] = useState<ExamState>('select');
   const [selectedExam, setSelectedExam] = useState<CBTExam | null>(null);
@@ -578,7 +581,7 @@ export const CbtTab: React.FC<CbtTabProps> = ({
                   EX
                 </div>
                 <h2 className="text-lg font-black tracking-tight uppercase text-slate-900">
-                  Excellence Tutorial Centre
+                  {centreName}
                 </h2>
                 <div className="inline-block px-4 py-1 bg-slate-100 text-slate-800 rounded-full text-[10px] font-black uppercase tracking-[0.2em]">
                   Assessment Report
@@ -716,6 +719,17 @@ export const CbtTab: React.FC<CbtTabProps> = ({
   // ---------------- VIEW 1: Exam Selection ----------------
   if (examState === 'select') {
     const isMock = activeFrequency === 'Mock' && !showArchive;
+    // The Mock tab is the TOS mock system, whole and only: today's mock,
+    // the past list and the leaderboard. Nothing a tutor writes reaches it.
+    if (isMock) {
+      return (
+        <StudentMockTab
+          onHideBottomNav={onHideBottomNav}
+          onGoToProfile={onGoToProfile}
+          onExitToGeneral={() => setActiveFrequency('General')}
+        />
+      );
+    }
     return (
       <div className={`space-y-4 transition-all duration-500 min-h-screen relative ${showArchive ? 'bg-slate-50' : (activeFrequency === 'Mock' ? 'bg-[#EA580C]' : 'bg-slate-50')} p-4`}>
         {renderModals()}

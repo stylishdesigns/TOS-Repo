@@ -1,3 +1,4 @@
+import { loadLastGoodFlag, saveLastGoodFlag } from '../../lib/lastGood';
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useFirebase } from '../../context/FirebaseContext';
@@ -28,7 +29,7 @@ import {
 export type TabType = 'home' | 'classes' | 'chat' | 'cbt' | 'results' | 'more';
 
 export const StudentPortal: React.FC = () => {
-  const { students, settings, isAdmin, attendanceSettings, attendanceLogs, entitlements } = useApp();
+  const { students, settings, isAdmin, attendanceSettings, attendanceLogs, entitlements, centreName } = useApp();
 
   const { user, loading: authLoading } = useFirebase();
   const [profileLoading, setProfileLoading] = useState(true);
@@ -49,10 +50,18 @@ export const StudentPortal: React.FC = () => {
 
     const checkProfile = () => {
       if (user) {
+        // A saved "profile exists" flag for this account lets the portal open
+        // straight away on later visits; the live snapshot still confirms or
+        // corrects it behind the scenes.
+        if (loadLastGoodFlag(`hasProfile:${user.uid}`)) {
+          setHasProfile(true);
+          setProfileLoading(false);
+        }
         const docRef = doc(db, 'students', user.uid);
         unsubscribe = onSnapshot(
           docRef,
           (docSnap) => {
+            saveLastGoodFlag(`hasProfile:${user.uid}`, docSnap.exists());
             setHasProfile(docSnap.exists());
             setProfileLoading(false);
           },
@@ -421,7 +430,7 @@ export const StudentPortal: React.FC = () => {
           <div className="flex items-center space-x-2.5">
             <span className="w-2.5 h-2.5 rounded-full bg-orange-500 animate-pulse shrink-0 shadow-sm shadow-orange-500" />
             <span className="font-black text-sm uppercase tracking-[0.2em]">
-              {settings.centreName || 'Excellence Tutorial Centre'}
+              {centreName}
             </span>
           </div>
 
@@ -543,11 +552,19 @@ export const StudentPortal: React.FC = () => {
               />
             )}
 
-            {activeTab === 'chat' && <ChatTab student={activeStudent} />}
+            {activeTab === 'chat' && (
+              <ChatTab
+                student={activeStudent}
+                onGoToProfile={() => setActiveTab('more')}
+                onGoToPractice={() => setActiveTab('cbt')}
+                onHideBottomNav={setHideBottomNav}
+              />
+            )}
 
             {activeTab === 'cbt' && (
               <CbtTabWrapper
                 student={activeStudent}
+                onGoToProfile={() => setActiveTab('more')}
                 subPage={cbtSubPage}
                 onSubPageChange={(sp) => {
                   setCbtSubPage(sp);

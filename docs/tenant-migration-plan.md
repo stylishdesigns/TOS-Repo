@@ -1,7 +1,7 @@
 # Tutorial OS Tenant Migration Plan & Data Audit
 
 ## 1. Overview
-Tutorial OS is transitioning from a single-tenant architecture (currently hosting Excellence Tutorial Centre, Firebase project `excellence-tutorial-b20f7`) to a multi-tenant SaaS for tutorial centres and independent tutors across Nigeria.
+Tutorial OS is transitioning from a single-tenant architecture (currently hosting Excellence Tutorial Centre; the Firebase project ID is supplied through the `FIREBASE_PROJECT_ID` environment variable) to a multi-tenant SaaS for tutorial centres across Nigeria.
 
 This audit documents every Firestore collection read and written by the application, assumed document IDs, onSnapshot listeners, write call sites, and localStorage cache keys. It also outlines the multi-tenant data model, custom claims strategy, backfill execution, client-side query scoping, and two-stage security rules.
 
@@ -38,7 +38,7 @@ This audit documents every Firestore collection read and written by the applicat
 ## 3. New Multi-Tenant Collections (Prompt 1)
 
 1. `centres/{centreId}`
-   - Data: `name`, `type` ('centre' | 'independent'), `status` ('trial' | 'active' | 'overdue' | 'suspended' | 'closed'), `ownerUid`, `branding` (logo, colours), `audienceTypes` (string[]), `autoApproveStudents` (boolean), `createdAt`.
+   - Data: `name`, `status` ('trial' | 'active' | 'overdue' | 'suspended' | 'closed'), `ownerUid`, `branding` (logo, colours), `audienceTypes` (string[]), `autoApproveStudents` (boolean), `createdAt`.
 2. `centreBilling/{centreId}` (TOS staff only)
    - Data: `planId`, `seatCap`, `billedSeatsMinimum`, `trialStartsAt`, `trialEndsAt`, `skippedTrial`, `discountPct`, `paidThrough`, `notes`.
 3. `accessCodes/{code}`

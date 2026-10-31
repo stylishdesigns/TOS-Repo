@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useApp } from '../../../context/AppContext';
+import { api, Json } from '../../tos/tosShared';
 import { Student } from '../../../types';
 import regeneratedStudentAvatar from '../../../assets/images/regenerated_image_1789369642757.jpg';
 import { ModernSelect } from '../../ui/ModernSelect';
@@ -37,6 +38,7 @@ import {
   EyeOff,
   Building2,
   Banknote,
+  BookOpen,
   Upload,
   Image as ImageIcon,
 } from 'lucide-react';
@@ -74,10 +76,147 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
     setBgTheme,
     isAdmin,
     logout,
+    centreName,
+    subjects,
   } = useApp();
 
   // Active bottom splash-up modal
   const [activeModal, setActiveModal] = useState<ModalType>(null);
+
+  // My subjects: view and edit the student's registered subjects from the centre's own list
+  const [showSubjectsEditor, setShowSubjectsEditor] = useState<boolean>(() => {
+    try {
+      if (sessionStorage.getItem('EXCELLENCE_open_subject_editor') === '1') {
+        sessionStorage.removeItem('EXCELLENCE_open_subject_editor');
+        return true;
+      }
+    } catch {}
+    return false;
+  });
+  const [subjectSearch, setSubjectSearch] = useState('');
+  const [draftSubjects, setDraftSubjects] = useState<Set<string>>(() => new Set<string>());
+  const [savingSubjects, setSavingSubjects] = useState(false);
+
+  // Only this centre's subjects, never another centre's.
+  const centreSubjects = subjects.filter(
+    (sub) => !student.centreId || !sub.centreId || sub.centreId === student.centreId
+  );
+  const registeredNames = useMemo(
+    () => (student.subjects || []).map((n) => String(n).trim()).filter(Boolean),
+    [student]
+  );
+  const departmentOf = (name: string): string => {
+    const found = centreSubjects.find((sub) => sub.name.trim().toLowerCase() === name.trim().toLowerCase());
+    return found ? found.department : 'Other';
+  };
+  const groupOrder = ['General', 'Science', 'Commercial', 'Arts', 'Other'];
+  const groupedRegistered = useMemo(() => {
+    const acc: Record<string, string[]> = {};
+    registeredNames.forEach((name) => {
+      const dept = departmentOf(name);
+      (acc[dept] = acc[dept] || []).push(name);
+    });
+    return acc;
+  }, [registeredNames, centreSubjects]);
+  const filteredCentreSubjects = centreSubjects.filter(
+    (sub) => sub.name.toLowerCase().includes(subjectSearch.trim().toLowerCase())
+  );
+
+  const openSubjectsEditor = () => {
+    setDraftSubjects(new Set(registeredNames));
+    setSubjectSearch('');
+    setShowSubjectsEditor(true);
+  };
+  const toggleDraftSubject = (name: string) => {
+    setDraftSubjects((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  };
+  const saveSubjects = async () => {
+    setSavingSubjects(true);
+    try {
+      await updateStudent(student.id, {
+        subjects: Array.from(draftSubjects as Set<string>).sort((a, b) => a.localeCompare(b)),
+      });
+      setShowSubjectsEditor(false);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSavingSubjects(false);
+    }
+  };
+
+  // CH1 Step 1: username lives in Profile. One claim per student, set here,
+  // shown on chat and the mock leaderboard, changeable once every 30 days.
+  const [usernameInfo, setUsernameInfo] = useState<{
+    username: string;
+    lastChangedAt: string | null;
+    canChangeAt: string | null;
+    canChange: boolean;
+    mine: boolean;
+  } | null>(null);
+  const [usernameDraft, setUsernameDraft] = useState('');
+  const [usernameCheck, setUsernameCheck] = useState<Json | null>(null);
+  const [usernameBusy, setUsernameBusy] = useState(false);
+  const [usernameError, setUsernameError] = useState('');
+
+  useEffect(() => {
+    let dead = false;
+    (async () => {
+      try {
+        const r = await api('/api/student/profile/username');
+        if (dead) return;
+        const mine = Boolean(r?.studentId) && r.studentId === student.id;
+        setUsernameInfo({
+          username: String(r?.username || ''),
+          lastChangedAt: r?.lastChangedAt || null,
+          canChangeAt: r?.canChangeAt || null,
+          canChange: Boolean(r?.canChange),
+          mine,
+        });
+        setUsernameDraft(mine ? String(r?.username || '') : '');
+      } catch {
+        if (!dead) setUsernameInfo({ username: '', lastChangedAt: null, canChangeAt: null, canChange: false, mine: false });
+      }
+    })();
+    return () => { dead = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [student.id]);
+
+  useEffect(() => {
+    const trimmed = usernameDraft.trim();
+    if (!usernameInfo?.mine || trimmed === usernameInfo.username || trimmed.length < 4) {
+      setUsernameCheck(null);
+      return undefined;
+    }
+    const t = setTimeout(async () => {
+      try {
+        const r = await api(`/api/student/profile/username/check?name=${encodeURIComponent(trimmed)}`);
+        setUsernameCheck(r);
+      } catch { setUsernameCheck(null); }
+    }, 400);
+    return () => clearTimeout(t);
+  }, [usernameDraft, usernameInfo?.mine, usernameInfo?.username]);
+
+  const saveUsername = async () => {
+    if (!usernameInfo?.mine || !usernameInfo.canChange) return;
+    setUsernameBusy(true);
+    setUsernameError('');
+    try {
+      const r = await api('/api/student/profile/username', { method: 'POST', body: { name: usernameDraft.trim() } });
+      const nextCanChangeAt = r?.changed ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() : usernameInfo.canChangeAt;
+      setUsernameInfo({ username: String(r?.username || ''), lastChangedAt: new Date().toISOString(), canChangeAt: nextCanChangeAt, canChange: !r?.changed, mine: true });
+      setUsernameCheck(null);
+      addToast({ type: 'success', title: 'Username Saved', description: `${String(r?.username || '')} now shows on chat and the mock leaderboard.` });
+    } catch (e: any) {
+      setUsernameError(e.message || 'Could not save that username.');
+    } finally {
+      setUsernameBusy(false);
+    }
+  };
 
   // Biometric toggle state
   const [biometricEnabled, setBiometricEnabled] = useState(true);
@@ -92,7 +231,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
   const [firstName, setFirstName] = useState(student.name.split(' ')[0] || 'John');
   const [lastName, setLastName] = useState(student.name.split(' ').slice(1).join(' ') || 'Ade');
   const [phone, setPhone] = useState(student.phone || '+234 812 345 6789');
-  const [email, setEmail] = useState(student.email || 'john.ade@gmail.com');
+  const [email, setEmail] = useState(student.email || '');
   const [gender, setGender] = useState(student.gender || 'Male');
   const [dob, setDob] = useState(student.dob || '2008-04-12');
   const [address, setAddress] = useState(student.address || '12 Admiralty Way, Lekki Phase 1, Lagos');
@@ -231,7 +370,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
   };
 
   // Handle Tuition Payment
-  const handleCompletePayment = (e: React.FormEvent) => {
+  const handleCompletePayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (payAmount <= 0) {
       addToast({
@@ -253,32 +392,22 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
 
     setIsSubmittingPayment(true);
     try {
-      recordPayment({
+      const result = await recordPayment({
         studentId: student.id,
-        studentName: student.name,
-        programmeName: student.programmeName,
         amountPaid: payAmount,
-        totalFee: student.totalFee,
-        balance: Math.max(0, student.outstandingBalance - payAmount),
-        status: student.outstandingBalance - payAmount <= 0 ? 'Paid' : 'Partial',
         method: paymentMode,
         evidenceUrl: evidenceDataUrl || undefined,
         evidenceName: evidenceFileName || undefined,
         note: paymentNote.trim() || undefined,
-        submittedBy: 'Student',
       });
-
-      student.paidAmount = (student.paidAmount || 0) + payAmount;
-      student.outstandingBalance = Math.max(0, student.totalFee - student.paidAmount);
-      updateStudent(student.id, {
-        paidAmount: student.paidAmount,
-        outstandingBalance: student.outstandingBalance,
-      });
+      if (!result) return; // The payment helper already explained the failure.
 
       addToast({
         type: 'success',
-        title: 'Payment Submitted',
-        description: `Your payment of ${settings.currencySymbol}${(payAmount || 0).toLocaleString()} via ${paymentMode} has been recorded and synced live with the admin.`,
+        title: result.pending ? 'Payment Sent for Confirmation' : 'Payment Submitted',
+        description: result.pending
+          ? `Your payment of ${settings.currencySymbol}${(payAmount || 0).toLocaleString()} via ${paymentMode} was sent to the centre. Your balance updates once the centre confirms it.`
+          : `Your payment of ${settings.currencySymbol}${(payAmount || 0).toLocaleString()} via ${paymentMode} has been recorded. Receipt ${result.receiptNumber}.`,
       });
 
       setEvidenceDataUrl(null);
@@ -339,6 +468,190 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
         <h2 className="text-xl font-bold text-slate-900 mt-3.5 tracking-tight">
           {student.name}
         </h2>
+      </div>
+
+      {/* 1a-bis. SECTION: Username (CH1 Step 1). The single place a username
+          is set: chat and the mock leaderboard read it from here. */}
+      <div className="mt-7">
+        <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-1 mb-2">
+          Username
+        </div>
+        <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-4 space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center space-x-3 min-w-0">
+              <div className="w-9 h-9 rounded-full bg-orange-50 text-[#EA580C] flex items-center justify-center shrink-0">
+                <User className="w-4.5 h-4.5" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-sm font-semibold text-slate-800 block truncate">
+                  {usernameInfo?.username ? `@${usernameInfo.username}` : 'No username yet'}
+                </span>
+                <span className="text-[11px] text-slate-400 font-medium">
+                  Shown on chat and the mock leaderboard. Never your real name.
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {usernameInfo && !usernameInfo.mine ? (
+            <p className="text-xs text-slate-400 font-medium leading-relaxed">
+              Usernames are set by each student from their own profile.
+            </p>
+          ) : (
+            <>
+              {!usernameInfo?.canChange && usernameInfo?.canChangeAt ? (
+                <p className="text-xs text-amber-600 font-semibold leading-relaxed">
+                  You can change your username again on {new Date(usernameInfo.canChangeAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}.
+                </p>
+              ) : (
+                <>
+                  <input
+                    value={usernameDraft}
+                    onChange={(e) => { setUsernameDraft(e.target.value); setUsernameError(''); }}
+                    maxLength={16}
+                    placeholder="e.g. swift_lion"
+                    autoComplete="off"
+                    className="w-full min-h-[46px] px-4 rounded-xl border-2 border-slate-200 focus:border-[#EA580C] outline-none text-base font-bold text-slate-900 placeholder:text-slate-300 placeholder:font-medium"
+                  />
+                  {usernameDraft.trim().length >= 4 && usernameCheck && (
+                    <p className={`text-xs font-bold ${usernameCheck.valid && usernameCheck.available ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      {usernameCheck.valid
+                        ? (usernameCheck.available ? `${usernameDraft.trim()} is available.` : (usernameCheck.reason || 'That username is taken.'))
+                        : (usernameCheck.reason || 'Not a valid username.')}
+                    </p>
+                  )}
+                  {usernameDraft.trim().length > 0 && usernameDraft.trim().length < 4 && (
+                    <p className="text-xs text-slate-400 font-medium">At least 4 characters: letters, numbers or underscores.</p>
+                  )}
+                  {usernameError && <p className="text-xs font-bold text-rose-600">{usernameError}</p>}
+                  <button
+                    type="button"
+                    disabled={usernameBusy || usernameDraft.trim() === usernameInfo?.username || !(usernameCheck?.valid && usernameCheck?.available)}
+                    onClick={saveUsername}
+                    className="w-full min-h-[44px] rounded-xl bg-[#EA580C] text-white text-sm font-black tracking-wide disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {usernameBusy ? 'Saving…' : usernameInfo?.username ? 'Save new username' : 'Set username'}
+                  </button>
+                </>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* 1b. SECTION: My Subjects */}
+      <div className="mt-7">
+        <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-1 mb-2">
+          My Subjects
+        </div>
+        <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden">
+          <button
+            type="button"
+            onClick={openSubjectsEditor}
+            className="w-full flex items-center justify-between p-3.5 hover:bg-slate-50/80 active:bg-slate-100/80 transition-colors text-left group"
+          >
+            <div className="flex items-center space-x-3">
+              <div className="w-9 h-9 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                <BookOpen className="w-4.5 h-4.5" />
+              </div>
+              <div>
+                <span className="text-sm font-semibold text-slate-800 block">Registered subjects</span>
+                <span className="text-[11px] text-slate-400 font-medium">
+                  {registeredNames.length === 0 ? 'None yet' : `${registeredNames.length} registered`}
+                </span>
+              </div>
+            </div>
+            <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-slate-600 transition-colors" />
+          </button>
+
+          {showSubjectsEditor && (
+            <div className="px-3.5 pb-3.5 pt-3 border-t border-slate-100 space-y-3">
+              {registeredNames.length === 0 ? (
+                <p className="text-xs text-slate-500 font-medium leading-relaxed">
+                  You have no registered subjects yet. Choose from your centre's list below.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {groupOrder.map((dept) =>
+                    groupedRegistered[dept] ? (
+                      <div key={dept}>
+                        <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-1">{dept}</div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {groupedRegistered[dept].map((n) => (
+                            <span key={n} className="px-2 py-1 rounded-full bg-slate-100 text-[11px] font-semibold text-slate-700">{n}</span>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null
+                  )}
+                </div>
+              )}
+
+              {centreSubjects.length === 0 ? (
+                <p className="text-xs text-slate-500 font-medium leading-relaxed">
+                  Your centre hasn't set up its subject list yet. Please ask your centre to add subjects.
+                </p>
+              ) : (
+                <>
+                  <input
+                    value={subjectSearch}
+                    onChange={(e) => setSubjectSearch(e.target.value)}
+                    placeholder="Search your centre's subjects"
+                    className="w-full h-10 px-3 rounded-xl border border-slate-200 text-xs font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#EA580C]/30"
+                  />
+                  <div className="max-h-48 overflow-y-auto rounded-xl border border-slate-100 divide-y divide-slate-100">
+                    {filteredCentreSubjects.map((sub) => {
+                      const checked = draftSubjects.has(sub.name);
+                      return (
+                        <button
+                          key={sub.id}
+                          type="button"
+                          onClick={() => toggleDraftSubject(sub.name)}
+                          className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-slate-50/80 active:bg-slate-100/80 transition-colors text-left"
+                        >
+                          <div className="flex items-center space-x-2.5 min-w-0">
+                            <span
+                              className={`w-4.5 h-4.5 rounded-md border flex items-center justify-center shrink-0 ${
+                                checked ? 'bg-[#EA580C] border-[#EA580C] text-white' : 'border-slate-300 bg-white'
+                              }`}
+                            >
+                              {checked ? <Check className="w-3 h-3" /> : null}
+                            </span>
+                            <span className="text-xs font-semibold text-slate-800 truncate">{sub.name}</span>
+                          </div>
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 shrink-0 ml-2">{sub.department}</span>
+                        </button>
+                      );
+                    })}
+                    {filteredCentreSubjects.length === 0 ? (
+                      <div className="px-3 py-2.5 text-xs text-slate-400 font-medium">No subjects match your search.</div>
+                    ) : null}
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[11px] font-bold text-slate-500">{draftSubjects.size} selected</span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowSubjectsEditor(false)}
+                        className="h-10 px-4 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        disabled={savingSubjects}
+                        onClick={saveSubjects}
+                        className="h-10 px-4 rounded-xl bg-[#EA580C] text-white text-xs font-bold hover:bg-[#C2410C] transition-colors cursor-pointer disabled:opacity-60"
+                      >
+                        {savingSubjects ? 'Saving...' : 'Save subjects'}
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* 2. SECTION: Account */}
@@ -584,7 +897,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
 
       {/* 5. Version Footer (Exact look from video) */}
       <div className="text-center pt-6 pb-4 text-slate-400 text-xs font-medium">
-        {settings.centreName || 'Excellence Tutorial Centre'} • Version 1.0.0 (2026)
+        {centreName} • Version 1.0.0 (2026)
       </div>
 
       {/* =========================================================================
@@ -840,7 +1153,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                       </div>
                       <div>
                         <span className="text-xs font-black tracking-wider uppercase block leading-none">
-                          {settings.centreName || 'Excellence Tutorial Centre'}
+                          {centreName}
                         </span>
                         <span className="text-[9px] text-orange-400 font-semibold tracking-wider uppercase">
                           Official Student Identity Card
@@ -1086,7 +1399,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                             <div className="flex justify-between items-center text-xs">
                               <span className="text-slate-500 font-medium">Account Name:</span>
                               <span className="font-bold text-slate-900 truncate max-w-[180px]">
-                                {settings.bankAccountName || 'Excellence Tutorial Centre Ltd'}
+                                {settings.bankAccountName || centreName}
                               </span>
                             </div>
                           </div>
@@ -1299,14 +1612,21 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
                                       p.status === 'Paid'
                                         ? 'bg-emerald-100 text-emerald-800'
+                                        : p.status === 'Pending'
+                                        ? 'bg-blue-100 text-blue-800'
+                                        : p.status === 'Rejected'
+                                        ? 'bg-rose-100 text-rose-800'
                                         : 'bg-amber-100 text-amber-800'
                                     }`}>
-                                      {p.status}
+                                      {p.status === 'Pending' ? 'Awaiting confirmation' : p.status}
                                     </span>
                                   </div>
                                   <p className="text-[10px] text-slate-500 font-mono mt-0.5">
-                                    {p.receiptNumber} • {p.date} • {p.method}
+                                    {p.status === 'Pending' || p.status === 'Rejected' ? p.status === 'Pending' ? 'Not yet counted' : 'Not counted' : p.receiptNumber} • {p.date} • {p.method}
                                   </p>
+                                  {p.status === 'Rejected' && p.rejectionReason && (
+                                    <p className="text-[10px] text-rose-700 mt-0.5">Reason: {p.rejectionReason}</p>
+                                  )}
                                 </div>
 
                                 {p.evidenceUrl && (

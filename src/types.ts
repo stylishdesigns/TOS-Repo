@@ -341,14 +341,30 @@ export interface PaymentRecord {
   amountPaid: number;
   totalFee: number;
   balance: number;
-  status: 'Paid' | 'Partial' | 'Pending';
+  // 'Pending' = a student's claim awaiting centre confirmation (no balance change yet).
+  // 'Rejected' = the centre declined the claim. Only Paid/Partial count as money received.
+  status: 'Paid' | 'Partial' | 'Pending' | 'Rejected';
   method: 'Card' | 'Bank Transfer' | 'Cash';
   date: string;
   evidenceUrl?: string;
   evidenceName?: string;
   note?: string;
   submittedBy?: 'Student' | 'Admin';
+  rejectionReason?: string;
 }
+
+/** What the payment route reports back to the client. */
+export interface RecordPaymentResult {
+  pending: boolean;
+  receiptNumber: string;
+  paidAmount?: number;
+  outstandingBalance?: number;
+  paymentStatus?: 'Paid' | 'Partial';
+}
+
+/** A payment counts as received money only once the centre has confirmed it. */
+export const isConfirmedPayment = (p: { status?: string }): boolean =>
+  p.status === 'Paid' || p.status === 'Partial';
 
 export interface Announcement {
   id: string;
@@ -436,7 +452,6 @@ export interface SubjectEntry {
 // MULTI-TENANT DATA MODELS (Step 1)
 // ---------------------------------------------------------------------------
 
-export type CentreAccountType = 'centre' | 'independent';
 export type CentreStatus = 'trial' | 'active' | 'overdue' | 'suspended' | 'closed';
 
 export interface CentreBranding {
@@ -454,7 +469,6 @@ export interface CentreBranding {
 export interface Centre {
   id: string;
   name: string;
-  type: CentreAccountType;
   status: CentreStatus;
   ownerUid: string;
   branding?: CentreBranding;
@@ -466,7 +480,9 @@ export interface Centre {
 
 export interface CentreBilling {
   centreId: string;
-  planId: 'independent' | 'centre_standard' | 'centre_plus' | string;
+  /** Transactional counter of active student seats (maintained by the server). */
+  activeStudentCount?: number;
+  planId: 'centre_standard' | 'centre_plus' | string;
   seatCap: number;
   billedSeatsMinimum: number;
   trialStartsAt?: string | null;
@@ -495,9 +511,8 @@ export interface CentreMembership {
 }
 
 export interface PlatformPlan {
-  id: string; // 'independent' | 'centre_standard' | 'centre_plus'
+  id: string; // 'centre_standard' | 'centre_plus'
   name: string;
-  accountType: CentreAccountType;
   price: number;
   priceType: 'flat' | 'per_seat';
   seatCap: number;
@@ -514,6 +529,9 @@ export interface PlatformConfigGlobal {
   trialDays: number; // 30
   skipTrialDiscountPct: number; // e.g. 10
   trialGraceDays: number; // e.g. 7
+  seatSwapLimitPerStudent?: number; // default 2
+  seatSwapWindowDays?: number; // default 30
+  aiRouteRateLimitPerHour?: number; // per-user hourly cap on the AI routes
 }
 
 export interface AuditLogEntry {
@@ -524,6 +542,42 @@ export interface AuditLogEntry {
   before?: any;
   after?: any;
   at: string;
+}
+
+// ===== CH1 student chat (Step 2) =====
+// Every number here is a setting, editable on its own screen (T2 for the
+// platform, C3 for a centre). The defaults in code are only the starting
+// values used until the screens save real ones.
+export interface ChatAccessRule {
+  mode: 'centre_default' | 'custom' | 'none';
+  thresholdPercent?: number | null;
+}
+
+export interface TosChatSettings {
+  /** Subjects the Mock and Practice style auto-groups are built from. */
+  defaultGroupSubjects: string[];
+  /** The TOS-owned cross-centre channel's display name. */
+  mockPracticeChannelName: string;
+  /** Minimum rolling 7-day practice score for the TOS channel. */
+  mockPracticeThresholdPercent: number;
+  photoMaxKb: number;
+  retentionDays: number;
+  messageMaxChars: number;
+  postRateLimitPerHour: number;
+  autoPosts: { mockOpen: boolean; resultsOut: boolean; practicePublished: boolean };
+  updatedAt?: string | null;
+}
+
+export interface CentreChatSettings {
+  defaultThresholdPercent: number;
+  /** Minimum answers in the 7-day window before the score counts at all. */
+  minAnswers: number;
+  autoSubjectGroups: boolean;
+  photosAllowed: boolean;
+  tutorsCanRemove: boolean;
+  paused: boolean;
+  muteDayOptions: number[];
+  updatedAt?: string | null;
 }
 
 export interface CentreEntitlements {
@@ -550,7 +604,5 @@ export interface CentreUserRole {
   centreId: string;
   role: MembershipRole;
   centreName: string;
-  type: CentreAccountType;
   logo?: string;
 }
-

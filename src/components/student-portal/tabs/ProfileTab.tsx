@@ -24,7 +24,7 @@ interface ProfileTabProps {
 }
 
 export const ProfileTab: React.FC<ProfileTabProps> = ({ student, onSelectStudent }) => {
-  const { students, settings, payments, addPayment, addToast } = useApp();
+  const { students, settings, payments, recordPayment, addToast, centreName } = useApp();
 
   const [showPayModal, setShowPayModal] = useState(false);
   const [payAmount, setPayAmount] = useState<number>(
@@ -50,33 +50,24 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({ student, onSelectStudent
       : MALE_NIGERIAN_AVATAR);
 
   // Simulate payment
-  const handleCompletePayment = (e: React.FormEvent) => {
+  const handleCompletePayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (payAmount <= 0) return;
 
-    const receiptNum = `REC-2026-${Math.floor(1000 + Math.random() * 9000)}`;
-    addPayment({
-      receiptNumber: receiptNum,
+    const result = await recordPayment({
       studentId: student.id,
-      studentName: student.name,
-      programmeName: student.programmeName,
       amountPaid: payAmount,
-      totalFee: student.totalFee,
-      balance: Math.max(0, student.outstandingBalance - payAmount),
-      status: student.outstandingBalance - payAmount <= 0 ? 'Paid' : 'Partial',
       method: 'Card',
-      date: new Date().toISOString().split('T')[0],
     });
-
-    // Update student's paidAmount
-    student.paidAmount += payAmount;
-    student.outstandingBalance = Math.max(0, student.totalFee - student.paidAmount);
+    if (!result) return; // The payment helper already explained the failure.
 
     setShowPayModal(false);
     addToast({
       type: 'success',
-      title: 'Payment Successful',
-      description: `Payment of ${settings.currencySymbol}${(payAmount || 0).toLocaleString()} confirmed. Receipt ${receiptNum} issued.`,
+      title: result.pending ? 'Payment Sent for Confirmation' : 'Payment Successful',
+      description: result.pending
+        ? `Your payment of ${settings.currencySymbol}${(payAmount || 0).toLocaleString()} was sent to the centre. Your balance updates once the centre confirms it.`
+        : `Payment of ${settings.currencySymbol}${(payAmount || 0).toLocaleString()} confirmed. Receipt ${result.receiptNumber} issued.`,
     });
   };
 
@@ -120,7 +111,7 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({ student, onSelectStudent
             </div>
             <div>
               <span className="text-xs font-black tracking-wider uppercase block leading-none">
-                {settings.centreName}
+                {centreName}
               </span>
               <span className="text-[9px] text-orange-400 font-semibold tracking-wider uppercase">
                 Official Student Identity Card
@@ -273,14 +264,12 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({ student, onSelectStudent
                     {(p.amountPaid || 0).toLocaleString()}
                   </div>
                   <div className="text-[10px] text-slate-400 font-mono">
-                    {p.receiptNumber} • {p.date}
+                    {p.status === 'Pending'
+                      ? 'Awaiting confirmation'
+                      : p.status === 'Rejected'
+                      ? 'Rejected'
+                      : p.receiptNumber} • {p.date}
                   </div>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <span className="text-[10px] text-slate-400 font-mono">
-                    {p.receiptNumber} • {p.date}
-                  </span>
                 </div>
               </div>
             ))}

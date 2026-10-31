@@ -1,0 +1,199 @@
+1. The three major genres of literature are
+A: prose, fiction and essay
+B: prose, poetry and drama
+C: poetry, novel and novella
+D: drama, tragedy and comedy
+Answer: B
+Explanation: Literature is traditionally divided into three major genres: prose, poetry and drama.
+Year: 2014
+Difficulty: easy
+
+2. A metaphor differs from a simile because it
+A: uses "like" or "as" to make the comparison
+B: states the opposite of the truth
+C: compares only human beings
+D: compares directly without "like" or "as"
+Answer: D
+Explanation: A simile compares using "like" or "as"; a metaphor makes the comparison directly.
+Year: 2012
+Difficulty: easy
+
+3. Giving human qualities to non-human things is
+A: hyperbole
+B: personification
+C: alliteration
+D: pun
+Answer: B
+Explanation: Personification attributes human qualities to objects, ideas or animals.
+Year: 2018
+Difficulty: easy
+
+4. A deliberate exaggeration used for effect, not to be taken literally, is
+A: euphemism
+B: oxymoron
+C: hyperbole
+D: irony
+Answer: C
+Explanation: Hyperbole exaggerates for effect, as in 'I have told you a million times'.
+Year: 2011
+Difficulty: easy
+
+5. A mild or pleasant expression used in place of a harsh or unpleasant one is
+A: sarcasm
+B: euphemism
+C: metaphor
+D: litotes
+Answer: B
+Explanation: A euphemism softens an unpleasant expression, as 'passed away' stands for 'died'.
+Year: 2020
+Difficulty: easy
+
+6. Words whose sounds imitate the noises they describe form
+A: assonance
+B: alliteration
+C: rhyme
+D: onomatopoeia
+Answer: D
+Explanation: Onomatopoeia imitates sound, as in 'buzz' and 'hiss'.
+Year: 2015
+Difficulty: easy
+
+7. An oxymoron is a figure of speech that
+A: places two contrasting or contradictory terms side by side
+B: repeats two similar sounds
+C: joins two unrelated clauses
+D: links two complete stanzas
+Answer: A
+Explanation: An oxymoron pairs contradictory terms, as in 'sweet sorrow' or 'deafening silence'.
+Year: 2019
+Difficulty: hard
+
+8. Verbal irony occurs when a speaker
+A: repeats a phrase for emphasis
+B: exaggerates for comic effect
+C: says the opposite of what is meant
+D: quotes another writer directly
+Answer: C
+Explanation: In verbal irony the intended meaning is the opposite of the literal words.
+Year: 2021
+Difficulty: easy
+
+9. Dramatic irony occurs when
+A: the audience knows more than the character does
+B: the character knows more than the audience
+C: two characters exchange witty remarks
+D: the play ends in tragedy
+Answer: A
+Explanation: In dramatic irony the audience holds knowledge the character lacks.
+Year: 2013
+Difficulty: hard
+
+10. A long narrative poem that celebrates the deeds of a hero is
+A: an elegy
+B: an epic
+C: a ballad
+D: a lyric
+Answer: B
+Explanation: An epic is a long narrative poem on heroic deeds, such as Homer's Odyssey.
+Year: 2016
+Difficulty: easy
+
+11. An elegy is a poem that
+A: praises a ruler at a ceremony
+B: tells a comic story in verse
+C: laments the dead or reflects on loss
+D: describes a landscape in detail
+Answer: C
+Explanation: An elegy is a meditative poem of mourning, often for the dead.
+Year: 2017
+Difficulty: easy
+
+12. A soliloquy in drama is
+A: a conversation between two characters
+B: a character alone on stage speaking thoughts aloud
+C: a brief remark to the audience unheard by other characters
+D: the closing speech of the play
+Answer: B
+Explanation: In a soliloquy a character alone reveals thoughts aloud; an aside is the brief audience-directed remark.
+Year: 2015
+Difficulty: hard
+
+13. The repetition of the same initial consonant sound in nearby words is
+A: alliteration
+B: assonance
+C: refrain
+D: onomatopoeia
+Answer: A
+Explanation: Alliteration repeats initial consonant sounds, as in 'wild and windy'.
+Year: 2010
+Difficulty: easy
+
+14. Assonance is the repetition of
+A: initial consonant sounds
+B: vowel sounds within nearby words
+C: whole words at the ends of lines
+D: grammatical structures
+Answer: B
+Explanation: Assonance repeats vowel sounds, as in 'the light of the fire'.
+Year: 2022
+Difficulty: hard
+
+15. The central idea that a literary work explores is its
+A: plot
+B: theme
+C: setting
+D: mood
+Answer: B
+Explanation: The theme is the controlling idea or message of a work.
+Year: 2011
+Difficulty: easy
+
+16. The sequence of events in a narrative is the
+A: plot
+B: theme
+C: setting
+D: style
+Answer: A
+Explanation: Plot is the arranged sequence of events in a story.
+Year: 2013
+Difficulty: easy
+
+17. The time and place in which the action of a story happens make up its
+A: conflict
+B: narrator's point of view
+C: characters' motives
+D: setting
+Answer: D
+Explanation: Setting is the time and place of the action.
+Year: 2018
+Difficulty: easy
+
+18. The character who opposes the protagonist is the
+A: foil
+B: confidant
+C: antagonist
+D: narrator
+Answer: C
+Explanation: The antagonist stands against the leading character.
+Year: 2019
+Difficulty: easy
+
+19. First-person narration is recognised by its use of
+A: "he" and "she"
+B: "you" and "your"
+C: "they" and "them"
+D: "I" and "we"
+Answer: D
+Explanation: A first-person narrator tells the story with 'I' and 'we'.
+Year: 2021
+Difficulty: easy
+
+20. A brief indirect reference to another text, person or event is
+A: a brief indirect reference to another text, person or event
+B: a short amusing personal story
+C: a story carrying a second moral meaning
+D: a concluding section after the story
+Answer: A
+Explanation: An allusion points indirectly to another work, person or event, often from history or myth.
+Year: 2016
+Difficulty: hard
