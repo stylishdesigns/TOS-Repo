@@ -8,7 +8,7 @@
     "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
     "start": "NODE_ENV=production node dist/server.cjs",
     "clean": "rm -rf dist server.js",
-    "test": "tsx src/components/student-portal/tabs/performance/utils/performance.test.ts && tsx src/server/paymentLogic.test.ts && tsx src/server/paymentService.test.ts",
+    "test": "tsx src/components/student-portal/tabs/chatNav.test.ts && tsx src/components/student-portal/tabs/performance/utils/performance.test.ts && tsx src/server/paymentLogic.test.ts && tsx src/server/paymentService.test.ts",
     "lint": "tsc --noEmit",
     "test:rules": "npx firebase-tools emulators:exec --only firestore --project demo-tos-rules \"node tests/rules/dirtyDozen.rules.test.mjs && node tests/rules/centreScope.rules.test.mjs && node tests/rules/adminScope.rules.test.mjs && node tests/rules/catalogScope.rules.test.mjs\""
   },
