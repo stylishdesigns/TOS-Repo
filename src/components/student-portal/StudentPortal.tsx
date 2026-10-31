@@ -426,22 +426,6 @@ export const StudentPortal: React.FC = () => {
     },
   ];
 
-  if (!isAdmin && (authLoading || profileLoading)) {
-    return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <div className="w-12 h-12 border-4 border-orange-500/30 border-t-orange-500 rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  if (!isAdmin && !user) {
-    return <StudentLogin onSuccess={() => {}} />;
-  }
-
-  if (!isAdmin && !hasProfile) {
-    return <StudentOnboarding onComplete={() => setOnboardingComplete(true)} />;
-  }
-
   const MALE_NIGERIAN_AVATAR =
     regeneratedStudentAvatar ||
     'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=500&q=80';
@@ -497,6 +481,23 @@ export const StudentPortal: React.FC = () => {
     );
     if (cached?.groups) setOrbUnread(totalUnread(cached.groups));
   }, [activeStudent?.id]);
+
+  if (!isAdmin && (authLoading || profileLoading)) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-orange-500/30 border-t-orange-500 rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!isAdmin && !user) {
+    return <StudentLogin onSuccess={() => {}} />;
+  }
+
+  if (!isAdmin && !hasProfile) {
+    return <StudentOnboarding onComplete={() => setOnboardingComplete(true)} />;
+  }
+
 
   const orbBadgeText = orbBadgeLabel(orbUnread);
 
