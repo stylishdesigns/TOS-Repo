@@ -29,11 +29,11 @@ export function isTosChannel(g: ChatNavGroup): boolean {
  * Split the overview's groups into the Chats > Groups list and the Channels list.
  * Every group lands on exactly one side; nothing is dropped or duplicated.
  */
-export function splitGroupsAndChannels(
-  all: readonly ChatNavGroup[],
-): { groups: ChatNavGroup[]; channels: ChatNavGroup[] } {
-  const groups: ChatNavGroup[] = [];
-  const channels: ChatNavGroup[] = [];
+export function splitGroupsAndChannels<T extends ChatNavGroup>(
+  all: readonly T[],
+): { groups: T[]; channels: T[] } {
+  const groups: T[] = [];
+  const channels: T[] = [];
   for (const g of all) {
     if (isTosChannel(g)) channels.push(g);
     else groups.push(g);

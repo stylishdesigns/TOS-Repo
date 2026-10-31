@@ -24,6 +24,10 @@ import {
   MessageSquare,
   FileText,
   Sparkles,
+  ChevronLeft,
+  Hash,
+  MessageCircle,
+  X,
 } from 'lucide-react';
 
 import { orbBadgeLabel, totalUnread } from './tabs/chatNav';
@@ -296,6 +300,51 @@ export const StudentPortal: React.FC = () => {
     window.addEventListener('hashchange', handleHash);
     return () => window.removeEventListener('hashchange', handleHash);
   }, [activeTab]);
+
+  // Phase 1 B: the chat orb opens a fan menu (Status / Chats / Channels).
+  // Escape, the dimmed page and the orb's X all close it; focus moves to
+  // Chats on open and returns to the orb on close. Reduced-motion users
+  // get no entrance animation.
+  const [chatFanOpen, setChatFanOpen] = useState(false);
+  const [chatView, setChatView] = useState<'chats' | 'channels'>('chats');
+  const [statusScreenOpen, setStatusScreenOpen] = useState(false);
+  const orbRef = React.useRef<HTMLButtonElement>(null);
+  const fanChatsRef = React.useRef<HTMLButtonElement>(null);
+  const prefersReducedMotion = React.useMemo(
+    () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+    [],
+  );
+  const openChatFan = React.useCallback(() => {
+    setChatFanOpen(true);
+  }, []);
+  const closeChatFan = React.useCallback(() => {
+    setChatFanOpen(false);
+    orbRef.current?.focus();
+  }, []);
+  const openChatSection = React.useCallback((next: 'chats' | 'channels') => {
+    setChatView(next);
+    setChatFanOpen(false);
+    setStatusScreenOpen(false);
+    setActiveTab('chat');
+  }, []);
+  const openStatusScreen = React.useCallback(() => {
+    setChatFanOpen(false);
+    setStatusScreenOpen(true);
+  }, []);
+  const backToChatFan = React.useCallback(() => {
+    setStatusScreenOpen(false);
+    setChatFanOpen(true);
+  }, []);
+
+  useEffect(() => {
+    if (!chatFanOpen) return;
+    fanChatsRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeChatFan();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [chatFanOpen, closeChatFan]);
 
   // Bottom navigation handlers: Classes and CBT open bottom sheet
   const handleNavClassesClick = () => {
@@ -593,6 +642,8 @@ export const StudentPortal: React.FC = () => {
                 onGoToPractice={() => setActiveTab('cbt')}
                 onHideBottomNav={setHideBottomNav}
                 onUnreadTotal={setOrbUnread}
+                view={chatView}
+                onBackToFan={backToChatFan}
               />
             )}
 
@@ -655,6 +706,45 @@ export const StudentPortal: React.FC = () => {
 
             {activeTab === 'more' && <MoreTab student={activeStudent} />}
           </div>
+
+          {/* Phase 1 B: dims the page behind the fan (the bar stays bright). */}
+          {chatFanOpen && !hideBottomNav && (
+            <div
+              className="fixed inset-0 z-40 bg-slate-950/60"
+              onClick={closeChatFan}
+              aria-hidden="true"
+            />
+          )}
+
+          {/* Phase 1 E: Status placeholder so the fan entry works. */}
+          {statusScreenOpen && !hideBottomNav && (
+            <div className="fixed inset-0 z-40 bg-slate-50 overflow-y-auto animate-in fade-in duration-200">
+              <div className="p-4 sm:p-5 max-w-lg mx-auto pt-6 pb-24">
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={backToChatFan}
+                    className="w-10 h-10 rounded-2xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 active:scale-95 transition"
+                    aria-label="Back to chat menu"
+                  >
+                    <ChevronLeft className="w-5 h-5" />
+                  </button>
+                  <div>
+                    <h2 className="text-2xl font-black text-slate-900 tracking-tight">Status</h2>
+                    <p className="text-[11px] text-slate-500 font-medium">Updates from your centre</p>
+                  </div>
+                </div>
+                <div className="mt-6 bg-white rounded-3xl p-6 border border-slate-200/90 shadow-sm text-center space-y-2">
+                  <div className="w-14 h-14 rounded-full border-2 border-dashed border-[#EA580C] text-[#EA580C] flex items-center justify-center mx-auto">
+                    <Sparkles className="w-6 h-6" />
+                  </div>
+                  <h3 className="text-base font-black text-slate-900 tracking-tight">Coming soon</h3>
+                  <p className="text-xs text-slate-500 leading-relaxed font-medium max-w-xs mx-auto">
+                    Status updates are on the way. You will be able to share short photo and text updates with your centre.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* 3. Persistent Mobile Bottom Navigation Bar (5 Items: Home · Classes · Chat · CBT · More) */}
           {!hideBottomNav && (
@@ -752,24 +842,95 @@ export const StudentPortal: React.FC = () => {
               {entitlements?.chat && (
                 <button
                   type="button"
-                  onClick={() => setActiveTab('chat')}
-                  aria-label={`Open chat menu, ${orbUnread} unread`}
+                  ref={orbRef}
+                  onClick={() => (chatFanOpen ? closeChatFan() : openChatFan())}
+                  aria-label={chatFanOpen ? 'Close chat menu' : `Open chat menu, ${orbUnread} unread`}
+                  aria-haspopup="menu"
+                  aria-expanded={chatFanOpen}
                   className="absolute left-1/2 top-0 z-50 -translate-x-1/2 -translate-y-1/2 rounded-full cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400/70"
-                  style={{
-                    width: 62,
-                    height: 62,
-                    background: 'linear-gradient(145deg, #EA580C, #9A3412)',
-                    border: '4px solid #020617',
-                    boxShadow: '0 0 0 5px rgba(234,88,12,.22), 0 10px 24px rgba(234,88,12,.5), inset 0 2px 0 rgba(255,255,255,.35)',
-                  }}
+                  style={
+                    chatFanOpen
+                      ? {
+                          width: 62,
+                          height: 62,
+                          background: '#FFFFFF',
+                          border: '4px solid #020617',
+                          boxShadow: '0 0 0 5px rgba(234,88,12,.18), 0 10px 24px rgba(15,23,42,.35)',
+                        }
+                      : {
+                          width: 62,
+                          height: 62,
+                          background: 'linear-gradient(145deg, #EA580C, #9A3412)',
+                          border: '4px solid #020617',
+                          boxShadow: '0 0 0 5px rgba(234,88,12,.22), 0 10px 24px rgba(234,88,12,.5), inset 0 2px 0 rgba(255,255,255,.35)',
+                        }
+                  }
                 >
-                  <ChatOrbIcon className="w-8 h-8" />
-                  {orbBadgeText && (
+                  {chatFanOpen ? (
+                    <X className="w-7 h-7 text-slate-900" />
+                  ) : (
+                    <ChatOrbIcon className="w-8 h-8 text-white" />
+                  )}
+                  {orbBadgeText && !chatFanOpen && (
                     <span className="absolute -top-0.5 -right-0.5 min-w-[22px] h-[22px] px-1 rounded-full bg-white text-[#EA580C] text-[11px] font-black flex items-center justify-center border border-orange-200 shadow-sm">
                       {orbBadgeText}
                     </span>
                   )}
                 </button>
+              )}
+              {chatFanOpen && entitlements?.chat && (
+                <div
+                  role="menu"
+                  aria-label="Chat menu"
+                  className="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2"
+                >
+                  {/* Status (left of the arc) */}
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={openStatusScreen}
+                    aria-label="Status"
+                    className={`absolute w-12 h-12 rounded-full bg-white text-[#EA580C] flex items-center justify-center shadow-lg cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 ${prefersReducedMotion ? '' : 'animate-in fade-in zoom-in-95 duration-200'}`}
+                    style={{ left: -97, top: -56, transform: 'translate(-50%, -50%)' }}
+                  >
+                    <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden="true">
+                      <circle cx="12" cy="12" r="9" strokeDasharray="3.5 3.5" />
+                      <path d="M12 8.5v7M8.5 12h7" />
+                    </svg>
+                    <span className="absolute top-full mt-2 left-1/2 -translate-x-1/2 whitespace-nowrap text-[11px] font-bold text-white pointer-events-none">
+                      Status
+                    </span>
+                  </button>
+                  {/* Chats (middle of the arc, largest, filled orange) */}
+                  <button
+                    type="button"
+                    ref={fanChatsRef}
+                    role="menuitem"
+                    onClick={() => openChatSection('chats')}
+                    aria-label="Chats"
+                    className={`absolute w-14 h-14 rounded-full text-white flex items-center justify-center shadow-xl cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-200 ${prefersReducedMotion ? '' : 'animate-in fade-in zoom-in-95 duration-200'}`}
+                    style={{ left: 0, top: -112, transform: 'translate(-50%, -50%)', background: 'linear-gradient(145deg, #EA580C, #9A3412)' }}
+                  >
+                    <MessageCircle className="w-7 h-7" />
+                    <span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 whitespace-nowrap text-[11px] font-bold text-white pointer-events-none">
+                      Chats
+                    </span>
+                  </button>
+                  {/* Channels (right of the arc) */}
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => openChatSection('channels')}
+                    aria-label="Channels"
+                    className={`absolute w-12 h-12 rounded-full bg-white text-slate-800 flex items-center justify-center shadow-lg cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 ${prefersReducedMotion ? '' : 'animate-in fade-in zoom-in-95 duration-200'}`}
+                    style={{ left: 97, top: -56, transform: 'translate(-50%, -50%)' }}
+                  >
+                    <Hash className="w-6 h-6" />
+                    <span className="absolute top-full mt-2 left-1/2 -translate-x-1/2 whitespace-nowrap text-[11px] font-bold text-white pointer-events-none">
+                      Channels
+                    </span>
+                  </button>
+                </div>
               )}
             </nav>
           )}

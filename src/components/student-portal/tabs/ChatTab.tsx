@@ -21,7 +21,7 @@ import {
 import { Student } from '../../../types';
 import { api } from '../../tos/tosShared';
 import { loadLastGood, saveLastGood } from '../../../lib/lastGood';
-import { totalUnread } from './chatNav';
+import { splitGroupsAndChannels, totalUnread } from './chatNav';
 import { copyText, EmojiText, isEmojiOnly, makeLongPress, MessageActionSheet, ReactionChips } from '../../communications/chatActions';
 
 // ============================================================================
@@ -153,12 +153,16 @@ interface ChatTabProps {
   onHideBottomNav?: (hide: boolean) => void;
   // Phase 1 A: the orb badge in the shell reads this instead of polling.
   onUnreadTotal?: (total: number) => void;
+  // Phase 1 C/D: which fan section opened this tab.
+  view?: 'chats' | 'channels';
+  // Back from a Chats/Channels screen returns to the open fan.
+  onBackToFan?: () => void;
 }
 
 // The chat list's last good copy, scoped to this student and kept across
 // full reloads, so the list renders straight away while the refresh runs
 // behind it.
-export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoToPractice, onHideBottomNav, onUnreadTotal }) => {
+export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoToPractice, onHideBottomNav, onUnreadTotal, view = 'chats', onBackToFan }) => {
   const cachedOverview = loadLastGood<ChatOverview>(`chat:overview:${student.id}`);
   const [overview, setOverview] = useState<ChatOverview | null>(cachedOverview);
   const [loading, setLoading] = useState(() => !cachedOverview);
@@ -203,6 +207,13 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
   }, [onUnreadTotal]);
 
   const activeGroup = overview?.groups.find((g) => g.id === activeGroupId) || null;
+
+  // Phase 1 C/D: the fan's two entries share this component. Chats lists
+  // every group except TOS-owned channels; Channels lists only kind
+  // 'tos_channel'. The split never drops or duplicates a group.
+  const overviewGroups: ChatGroupSummary[] = overview?.groups ?? [];
+  const splitLists = splitGroupsAndChannels(overviewGroups);
+  const listForView = view === 'channels' ? splitLists.channels : splitLists.groups;
 
   if (activeGroupId) {
     return (
@@ -266,12 +277,28 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
 
   return (
     <div className="p-4 sm:p-5 max-w-lg mx-auto space-y-4 animate-in fade-in duration-300 pb-20">
-      <div className="pt-1 flex items-end justify-between">
-        <div>
-          <span className="text-[10px] font-extrabold uppercase text-[#C2410C] tracking-wider block">
-            {student.name} · Communications
-          </span>
-          <h2 className="text-xl font-black text-[#0F172A] tracking-tight">Student Chat</h2>
+      <div className="pt-1 flex items-end justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          {onBackToFan && (
+            <button
+              onClick={onBackToFan}
+              className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-500 active:scale-95 transition shrink-0"
+              aria-label="Back to chat menu"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+          )}
+          <div className="min-w-0">
+            <span className="text-[10px] font-extrabold uppercase text-[#C2410C] tracking-wider block">
+              {student.name} · Communications
+            </span>
+            <h2 className="text-xl font-black text-[#0F172A] tracking-tight">
+              {view === 'channels' ? 'Channels' : 'Chats'}
+            </h2>
+            {view === 'channels' && (
+              <p className="text-[11px] text-slate-500 font-medium">Run by Tutorial OS</p>
+            )}
+          </div>
         </div>
         <div className="flex gap-2">
           <button
@@ -290,6 +317,30 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
           </button>
         </div>
       </div>
+
+
+      {view !== 'channels' && (
+        <div className="flex gap-2" aria-label="Chats filter">
+          <button
+            type="button"
+            aria-pressed="true"
+            className="px-4 py-2 rounded-full bg-[#EA580C] text-white text-xs font-black shadow-sm cursor-default"
+          >
+            Groups
+          </button>
+          <button
+            type="button"
+            disabled
+            title="Coming soon in a later phase"
+            className="px-4 py-2 rounded-full bg-white border border-slate-200 text-slate-400 text-xs font-black cursor-not-allowed"
+          >
+            <span className="flex flex-col items-center leading-tight">
+              <span>Personal</span>
+              <span className="text-[8px] font-bold uppercase tracking-wider">Coming soon</span>
+            </span>
+          </button>
+        </div>
+      )}
 
       {error && (
         <div className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-sm space-y-2">
@@ -326,7 +377,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
         </div>
       )}
 
-      {!error && overview && overview.groups.length === 0 && (
+      {!error && overview && view !== 'channels' && listForView.length === 0 && (
         <div className="bg-white rounded-3xl p-8 border border-slate-200/90 shadow-sm text-center space-y-2">
           <div className="w-14 h-14 rounded-2xl bg-orange-50 border border-orange-100 text-[#EA580C] flex items-center justify-center mx-auto">
             <MessageSquare className="w-7 h-7" />
@@ -338,7 +389,19 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
         </div>
       )}
 
-      {!error && overview && overview.groups.map((g) => (
+      {!error && overview && view === 'channels' && listForView.length === 0 && (
+        <div className="bg-white rounded-3xl p-8 border border-slate-200/90 shadow-sm text-center space-y-2">
+          <div className="w-14 h-14 rounded-2xl bg-violet-50 border border-violet-100 text-violet-600 flex items-center justify-center mx-auto">
+            <Zap className="w-7 h-7" />
+          </div>
+          <h3 className="text-base font-black text-slate-900 tracking-tight">No channels yet</h3>
+          <p className="text-xs text-slate-500 leading-relaxed font-medium max-w-xs mx-auto">
+            Channels run by Tutorial OS will appear here.
+          </p>
+        </div>
+      )}
+
+      {!error && overview && listForView.map((g) => (
         <button
           key={g.id}
           onClick={() => setActiveGroupId(g.id)}
