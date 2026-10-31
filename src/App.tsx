@@ -1,34 +1,14 @@
-import React, { useRef,  useState, useEffect, Component, ErrorInfo, ReactNode } from 'react';
+import React, { useRef,  useState, useEffect, Component, ErrorInfo, ReactNode, lazy, Suspense } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { Sidebar } from './components/layout/Sidebar';
 import { TopNav } from './components/layout/TopNav';
 import { ToastContainer } from './components/layout/ToastContainer';
-import { DashboardOverview } from './components/dashboard/DashboardOverview';
-import { StudentsList } from './components/students/StudentsList';
-import { AdmissionsManager } from './components/admissions/AdmissionsManager';
-import { SubjectsManager } from './components/academics/SubjectsManager';
-import { ProgrammesManager } from './components/programmes/ProgrammesManager';
-import { FinanceManager } from './components/finance/FinanceManager';
-import { TutorsManager } from './components/tutors/TutorsManager';
-import { PerformanceManager } from './components/academics/PerformanceManager';
-import { CBTManager } from './components/academics/CBTManager';
-import { TimetableManager } from './components/academics/TimetableManager';
-import { AttendanceTracker } from './components/academics/AttendanceTracker';
-import { AnnouncementsManager } from './components/communications/AnnouncementsManager';
-import { ChatManager } from './components/communications/ChatManager';
-import { StudentPortal } from './components/student-portal/StudentPortal';
-import { TutorPortal } from './components/tutor-portal/TutorPortal';
-import { CmsManager } from './components/cms/CmsManager';
-import { StaffRolesManager } from './components/staff/StaffRolesManager';
-import { SettingsView } from './components/settings/SettingsView';
 import { PublicWebsite } from './components/public/PublicWebsite';
 import { TutorialOsLanding } from './components/public/TutorialOsLanding';
-import { StudentDetailModal } from './components/modals/StudentDetailModal';
 import { OfflineIndicator } from './components/pwa/OfflineIndicator';
 import { AuthPortal } from './components/auth/AuthPortal';
 import { WelcomeScreen } from './components/auth/WelcomeScreen';
 import { TosAdminLogin } from './components/auth/TosAdminLogin';
-import { TosPortal } from './components/tos/TosPortal';
 import { FirstLoginPasswordChange } from './components/auth/FirstLoginPasswordChange';
 import { EnterAccessCodeScreen } from './components/auth/EnterAccessCodeScreen';
 import { CentreCodeGate } from './components/auth/CentreCodeGate';
@@ -316,7 +296,7 @@ const MainLayout: React.FC = () => {
   // Signed-in platform staff open the TOS console by default, TOS door or
   // not; #centre in the URL is the way back into the tenant (centre) app.
   // The #tos door still signs visitors in and shows non-staff a not-found.
-  if (currentUser && isTosAdmin && !centreAppRequested) return <TosPortal />;
+  if (currentUser && isTosAdmin && !centreAppRequested) return <Suspense fallback={<ScreenFallback />}><TosPortal /></Suspense>;
 
   // Platform staff never see the centre access-code screen (Prompt E). When a
   // staff member opens a centre door without an active centre membership,
@@ -570,7 +550,7 @@ const MainLayout: React.FC = () => {
   if (viewMode === 'student') {
     return (
       <>
-        <StudentPortal />
+        <Suspense fallback={<PortalFallback />}><StudentPortal /></Suspense>
         <OfflineIndicator />
         <ToastContainer />
       </>
@@ -581,7 +561,7 @@ const MainLayout: React.FC = () => {
   if (viewMode === 'tutor') {
     return (
       <>
-        <TutorPortal />
+        <Suspense fallback={<PortalFallback />}><TutorPortal /></Suspense>
         <OfflineIndicator />
         <ToastContainer />
       </>
@@ -623,6 +603,7 @@ const MainLayout: React.FC = () => {
           } transition-colors duration-300`}
         >
           <div className="pb-12">
+            <Suspense fallback={<PageFallback />}>
             {(adminSection === 'dashboard' || adminSection === 'overview') && <DashboardOverview />}
             {adminSection === 'students' && <StudentsList />}
             {adminSection === 'subjects' && <SubjectsManager />}
@@ -641,12 +622,13 @@ const MainLayout: React.FC = () => {
             {(adminSection === 'account' || adminSection === 'staff-roles') && <StaffRolesManager />}
             {adminSection === 'settings' && <SettingsView />}
             {(adminSection === 'cms' || adminSection === 'cms-editor') && <CmsManager />}
+            </Suspense>
           </div>
         </main>
       </div>
 
       {/* Global Modals & Notifications */}
-      {selectedStudent && <StudentDetailModal />}
+      {selectedStudent && <Suspense fallback={null}><StudentDetailModal /></Suspense>}
       <OfflineIndicator />
       <ToastContainer />
     </div>
@@ -654,6 +636,48 @@ const MainLayout: React.FC = () => {
 };
 
 import { FirebaseProvider } from './context/FirebaseContext';
+
+// Code splitting: each page and portal downloads only when it is first
+// opened, so the first screen no longer waits for the whole app. The
+// sign-in, access-code, password and landing screens stay bundled (eager)
+// so the first door a visitor knocks on always opens instantly.
+const DashboardOverview = lazy(() => import('./components/dashboard/DashboardOverview').then((m) => ({ default: m.DashboardOverview })));
+const StudentsList = lazy(() => import('./components/students/StudentsList').then((m) => ({ default: m.StudentsList })));
+const AdmissionsManager = lazy(() => import('./components/admissions/AdmissionsManager').then((m) => ({ default: m.AdmissionsManager })));
+const SubjectsManager = lazy(() => import('./components/academics/SubjectsManager').then((m) => ({ default: m.SubjectsManager })));
+const ProgrammesManager = lazy(() => import('./components/programmes/ProgrammesManager').then((m) => ({ default: m.ProgrammesManager })));
+const FinanceManager = lazy(() => import('./components/finance/FinanceManager').then((m) => ({ default: m.FinanceManager })));
+const TutorsManager = lazy(() => import('./components/tutors/TutorsManager').then((m) => ({ default: m.TutorsManager })));
+const PerformanceManager = lazy(() => import('./components/academics/PerformanceManager').then((m) => ({ default: m.PerformanceManager })));
+const CBTManager = lazy(() => import('./components/academics/CBTManager').then((m) => ({ default: m.CBTManager })));
+const TimetableManager = lazy(() => import('./components/academics/TimetableManager').then((m) => ({ default: m.TimetableManager })));
+const AttendanceTracker = lazy(() => import('./components/academics/AttendanceTracker').then((m) => ({ default: m.AttendanceTracker })));
+const AnnouncementsManager = lazy(() => import('./components/communications/AnnouncementsManager').then((m) => ({ default: m.AnnouncementsManager })));
+const ChatManager = lazy(() => import('./components/communications/ChatManager').then((m) => ({ default: m.ChatManager })));
+const StudentPortal = lazy(() => import('./components/student-portal/StudentPortal').then((m) => ({ default: m.StudentPortal })));
+const TutorPortal = lazy(() => import('./components/tutor-portal/TutorPortal').then((m) => ({ default: m.TutorPortal })));
+const CmsManager = lazy(() => import('./components/cms/CmsManager').then((m) => ({ default: m.CmsManager })));
+const StaffRolesManager = lazy(() => import('./components/staff/StaffRolesManager').then((m) => ({ default: m.StaffRolesManager })));
+const SettingsView = lazy(() => import('./components/settings/SettingsView').then((m) => ({ default: m.SettingsView })));
+const StudentDetailModal = lazy(() => import('./components/modals/StudentDetailModal').then((m) => ({ default: m.StudentDetailModal })));
+const TosPortal = lazy(() => import('./components/tos/TosPortal').then((m) => ({ default: m.TosPortal })));
+
+const PageFallback = () => (
+  <div className="p-6 space-y-4 animate-pulse" aria-busy="true" aria-label="Loading page">
+    <div className="h-8 w-48 rounded-xl bg-slate-200/70" />
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="h-24 rounded-2xl bg-slate-200/70" /><div className="h-24 rounded-2xl bg-slate-200/70" />
+      <div className="h-24 rounded-2xl bg-slate-200/70" /><div className="h-24 rounded-2xl bg-slate-200/70" />
+    </div>
+    <div className="h-64 rounded-2xl bg-slate-200/70" />
+  </div>
+);
+const ScreenFallback = () => (
+  <div className="h-screen w-full bg-slate-900" aria-busy="true" />
+);
+const PortalFallback = () => (
+  <div className="h-screen w-full bg-[#FFF3E7]" aria-busy="true" />
+);
 
 interface ErrorBoundaryProps {
   children: ReactNode;
