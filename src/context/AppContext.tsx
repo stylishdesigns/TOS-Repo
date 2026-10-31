@@ -78,6 +78,7 @@ import {
   createUserWithEmailAndPassword
 } from 'firebase/auth';
 import { db, auth as firebaseAuth, firebaseConfigValues } from '../firebase';
+import { setLastGoodOwner, clearAllLastGood } from '../lib/lastGood';
 
 // -------------------------------------------------------------------------
 // CONSTANTS
@@ -921,6 +922,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     const unsub = onAuthStateChanged(firebaseAuth, async (u) => {
       setUser(u);
+      // Prompt PF2: the last-good copies live on this device per person.
+      // Tie them to the signed-in uid (and wipe them on sign-out or account
+      // switch) so a shared phone or computer never shows another account's data.
+      setLastGoodOwner(u ? u.uid : null);
       if (u) {
         // Determine Auth Method
         const isGoogle = u.providerData.some(p => p.providerId === 'google.com');
@@ -2693,6 +2698,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const logout = async () => {
+    // Prompt PF2: wipe every saved last-good copy before the session ends,
+    // so nothing is left on the device after sign-out.
+    clearAllLastGood();
     await signOut(firebaseAuth);
   };
 

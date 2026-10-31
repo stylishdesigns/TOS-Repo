@@ -49,7 +49,9 @@ const ACTION_COPY: Record<string, string> = {
 
 export const CentrePeople: React.FC<{ centreId: string }> = ({ centreId }) => {
   const [type, setType] = useState<string>('students');
-  const [items, setItems] = useState<any[]>(() => loadLastGood<any[]>(`dir:${centreId}:${'students'}:items`) || []);
+  // Prompt PF2: full people lists (names, emails, phone numbers) are no longer
+  // saved on the phone. Only the aggregates (counts, seats) are cached.
+  const [items, setItems] = useState<any[]>([]);
   const [counts, setCounts] = useState<any | null>(() => loadLastGood<any>(`dir:${centreId}:students:counts`));
   const [seats, setSeats] = useState<any | null>(() => loadLastGood<any>(`dir:${centreId}:students:seats`));
   const [nextCursor, setNextCursor] = useState('');
@@ -66,7 +68,6 @@ export const CentrePeople: React.FC<{ centreId: string }> = ({ centreId }) => {
       setItems((d.items || []).slice(0, MAX_MEMBERS));
       setCounts(d.counts || null);
       setSeats(d.seats || null);
-      saveLastGood(`dir:${centreId}:${t}:items`, (d.items || []).slice(0, MAX_MEMBERS));
       saveLastGood(`dir:${centreId}:${t}:counts`, d.counts || null);
       saveLastGood(`dir:${centreId}:${t}:seats`, d.seats || null);
     } else {
@@ -87,14 +88,11 @@ export const CentrePeople: React.FC<{ centreId: string }> = ({ centreId }) => {
   const switchType = (t: string) => {
     setType(t); setExpanded(false); setPending(null);
     // Show the saved copy of this people type at once, then refresh.
-    const cachedItems = loadLastGood<any[]>(`dir:${centreId}:${t}:items`);
-    if (cachedItems && cachedItems.length) {
-      setItems(cachedItems);
-      setCounts(loadLastGood<any>(`dir:${centreId}:${t}:counts`) || null);
-      setSeats(loadLastGood<any>(`dir:${centreId}:${t}:seats`) || null);
-    } else {
-      setItems([]); setCounts(null); setSeats(null);
-    }
+    // Prompt PF2: people lists load fresh from the server each time (they are
+    // not saved on the phone); only counts and seats replay instantly.
+    setItems([]);
+    setCounts(loadLastGood<any>(`dir:${centreId}:${t}:counts`) || null);
+    setSeats(loadLastGood<any>(`dir:${centreId}:${t}:seats`) || null);
   };
 
   // "See the rest": pull every remaining page of this people type at once.
