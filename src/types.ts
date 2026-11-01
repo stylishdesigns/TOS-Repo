@@ -570,6 +570,8 @@ export interface TosStatusSettings {
   maxVideoMb: number;
   /** How many statuses one student may post per day. */
   statusesPerDay: number;
+  /** Longest text update, in characters. */
+  maxTextChars: number;
 }
 
 export interface TosChatSettings {

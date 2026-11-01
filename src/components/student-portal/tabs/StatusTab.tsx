@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, X } from 'lucide-react';
 import { Student } from '../../../types';
 import { api } from '../../tos/tosShared';
 import { loadLastGood, saveLastGood } from '../../../lib/lastGood';
@@ -11,9 +11,9 @@ import { loadLastGood, saveLastGood } from '../../../lib/lastGood';
 // RECENT UPDATES and VIEWED. Every number here is server data: the screen
 // renders what GET /api/student/chat/status/overview returned and invents
 // nothing. The instant-open last-good copy opens the screen on old data while
-// a fresh sync runs behind it, with no loading screen. Posting (S2), the
-// viewer (S3) and media statuses (S4) arrive in their own pieces, so for now
-// the rows are display-only and nothing here writes to the server.
+// a fresh sync runs behind it, with no loading screen. Text posting (S2) is
+// wired here; the viewer (S3) and media statuses (S4) arrive in their own
+// pieces, so own-status viewing taps stay on the add path for now.
 // ============================================================================
 
 interface StatusEntry {
@@ -38,6 +38,8 @@ interface StatusOverview {
     allowReplies: boolean;
     lastsHours: number;
     statusesPerDay: number;
+    maxTextChars: number;
+    maxVideoSeconds: number;
   };
   me?: {
     name: string;
@@ -72,6 +74,191 @@ function statusTimeLabel(at: number, now = Date.now()): string {
   if (days === 1) return 'Yesterday';
   return d.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' });
 }
+
+/** Escape closes any status overlay, matching the fan menu's Escape behaviour. */
+function useEscape(onEscape: () => void) {
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onEscape();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onEscape]);
+}
+
+/** The composer's background palette. This is screen furniture, not data:
+ *  the update itself stores whichever colour was picked, and the settings
+ *  (not this list) decide every limit. */
+const STATUS_BG = [
+  '#0F172A', '#7C3AED', '#2563EB', '#059669',
+  '#CA8A04', '#DB2777', '#EA580C', '#0F766E',
+];
+
+function bgLuminance(hex: string): number {
+  const m = /^#?([0-9a-fA-F]{6})$/.exec(hex);
+  if (!m) return 0;
+  const n = parseInt(m[1], 16);
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+}
+
+const AddStatusSheet: React.FC<{
+  settings: NonNullable<StatusOverview['settings']>;
+  onClose: () => void;
+  onText: () => void;
+}> = ({ settings, onClose, onText }) => {
+  useEscape(onClose);
+  return (
+  <div
+    className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50"
+    role="dialog"
+    aria-modal="true"
+    aria-label="Add status"
+    onClick={onClose}
+  >
+    <div
+      className="w-full max-w-lg bg-white rounded-t-3xl p-5 pb-8 shadow-2xl animate-in slide-in-from-bottom duration-200"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-black text-slate-900 tracking-tight">Add status</h3>
+        <button
+          onClick={onClose}
+          className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 active:scale-95 transition"
+          aria-label="Close"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+      <p className="text-xs text-slate-500 font-medium">Choose what to share</p>
+      <div className="mt-4 space-y-2">
+        {settings.allowText && (
+          <button
+            onClick={onText}
+            className="w-full text-left rounded-2xl px-4 py-3 border border-slate-200 bg-white active:scale-[0.99] transition flex items-center gap-3"
+          >
+            <span className="w-10 h-10 rounded-xl bg-[#FFF7ED] text-[#C2410C] flex items-center justify-center font-black">Aa</span>
+            <span className="min-w-0">
+              <span className="block text-sm font-black text-slate-900">Text</span>
+              <span className="block text-xs text-slate-500 font-medium">Type an update on a colour background</span>
+            </span>
+          </button>
+        )}
+        {[
+          { label: 'Photo', note: 'From your gallery or camera' },
+          { label: 'Video', note: `Up to ${settings.maxVideoSeconds} sec, set by Tutorial OS` },
+          { label: 'Music', note: 'Share a track with your status' },
+        ].map((row) => (
+          <div
+            key={row.label}
+            className="rounded-2xl px-4 py-3 border border-slate-200 bg-slate-50 flex items-center gap-3 opacity-60"
+            aria-disabled="true"
+          >
+            <span className="w-10 h-10 rounded-xl bg-slate-200 text-slate-500 flex items-center justify-center font-black">
+              {row.label[0]}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-black text-slate-700">{row.label}</span>
+              <span className="block text-xs text-slate-500 font-medium">{row.note}</span>
+            </span>
+            <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400 bg-white border border-slate-200 rounded-full px-2 py-1">soon</span>
+          </div>
+        ))}
+      </div>
+      <p className="mt-4 text-[11px] text-slate-400 font-medium text-center">
+        Your status disappears after {settings.lastsHours} hours. Limits are set by Tutorial OS.
+      </p>
+    </div>
+  </div>
+  );
+};
+
+const TextComposer: React.FC<{
+  settings: NonNullable<StatusOverview['settings']>;
+  onClose: () => void;
+  onPosted: (status: { statusId: string; kind: string; at: number; expiresAt: number; text: string }) => void;
+}> = ({ settings, onClose, onPosted }) => {
+  useEscape(onClose);
+  const [bg, setBg] = useState(STATUS_BG[0]);
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+
+  const share = async () => {
+    if (!text.trim() || busy) return;
+    setBusy(true);
+    setErr('');
+    try {
+      const d = await api('/api/student/chat/status', { method: 'POST', body: { kind: 'text', text: text.trim(), bg } });
+      if (d && d.ok && d.status) onPosted(d.status);
+      else throw new Error(String(d?.error || 'The update could not be shared. Try again.'));
+    } catch (e: any) {
+      setErr(String(e?.message || 'The update could not be shared. Try again.'));
+      setBusy(false);
+    }
+  };
+
+  const dark = bgLuminance(bg) < 0.5;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex flex-col"
+      style={{ backgroundColor: bg }}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Add a text status"
+    >
+      <div className="flex items-center justify-between p-4">
+        <button
+          onClick={onClose}
+          className="w-9 h-9 rounded-xl flex items-center justify-center active:scale-95 transition"
+          style={{ color: dark ? '#FFFFFF' : '#0F172A', backgroundColor: dark ? 'rgba(255,255,255,0.15)' : 'rgba(15,23,42,0.08)' }}
+          aria-label="Discard update"
+        >
+          <X className="w-4 h-4" />
+        </button>
+        <button
+          onClick={share}
+          disabled={!text.trim() || busy}
+          className="px-5 h-9 rounded-xl font-black text-sm active:scale-95 transition disabled:opacity-40"
+          style={{ color: dark ? '#0F172A' : '#FFFFFF', backgroundColor: dark ? '#FFFFFF' : 'rgba(255,255,255,0.25)' }}
+        >
+          {busy ? 'Sharing...' : 'Share'}
+        </button>
+      </div>
+      <div className="flex-1 flex items-center justify-center px-8">
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value.slice(0, settings.maxTextChars))}
+          placeholder="Type an update"
+          rows={4}
+          className="w-full bg-transparent text-center text-2xl font-black tracking-tight resize-none outline-none placeholder:opacity-40"
+          style={{ color: dark ? '#FFFFFF' : '#0F172A' }}
+        />
+      </div>
+      {err && (
+        <p className="px-6 pb-2 text-xs font-bold text-center" style={{ color: dark ? '#FFFFFF' : '#B91C1C' }}>{err}</p>
+      )}
+      <div className="p-5 pb-8 space-y-3">
+        <div className="flex items-center justify-center gap-2.5">
+          {STATUS_BG.map((c) => (
+            <button
+              key={c}
+              onClick={() => setBg(c)}
+              className={`w-8 h-8 rounded-full transition ${bg === c ? 'ring-2 ring-white ring-offset-2 ring-offset-transparent' : ''}`}
+              style={{ backgroundColor: c, outline: bg === c ? `2px solid ${dark ? '#FFFFFF' : '#0F172A'}` : 'none', outlineOffset: '2px' }}
+              aria-label={`Background ${c}`}
+              aria-pressed={bg === c}
+            />
+          ))}
+        </div>
+        <p className="text-center text-[11px] font-bold" style={{ color: dark ? 'rgba(255,255,255,0.7)' : 'rgba(15,23,42,0.5)' }}>
+          {text.length}/{settings.maxTextChars}
+        </p>
+      </div>
+    </div>
+  );
+};
 
 const StatusRow: React.FC<{ entry: StatusEntry; dimmed?: boolean }> = ({ entry, dimmed }) => (
   <div
@@ -114,6 +301,8 @@ export const StatusScreen: React.FC<{ student: Student }> = ({ student }) => {
   const cacheKey = 'chat:status';
   const [data, setData] = useState<StatusOverview | null>(() => loadLastGood<StatusOverview>(cacheKey));
   const [failed, setFailed] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [composing, setComposing] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -159,10 +348,13 @@ export const StatusScreen: React.FC<{ student: Student }> = ({ student }) => {
 
       {data && data.enabled !== false && (
         <>
-          {/* My status row. Posting is piece S2, so this row is display-only
-              for now: it shows my latest status's age, or the prototype's
-              add prompt when I have none. */}
-          <div className="bg-white rounded-3xl p-4 border border-slate-200/90 shadow-sm flex items-center gap-3">
+          {/* My status row. Tapping it opens the Add sheet (piece S2); the
+              own-status viewer is the next piece, so a posted status shows
+              its age here and viewing taps stay on the add path for now. */}
+          <button
+            onClick={() => setSheetOpen(true)}
+            className="w-full text-left bg-white rounded-3xl p-4 border border-slate-200/90 shadow-sm flex items-center gap-3 active:scale-[0.99] transition"
+          >
             <div className="relative shrink-0">
               <div className="w-12 h-12 rounded-full bg-[#FFF7ED] border-2 border-[#EA580C] flex items-center justify-center text-[#C2410C] text-sm font-black">
                 {initials(me?.name || student.name)}
@@ -179,7 +371,7 @@ export const StatusScreen: React.FC<{ student: Student }> = ({ student }) => {
                 {me?.latest ? statusTimeLabel(me.latest.at) : 'Tap to add a photo or text update'}
               </p>
             </div>
-          </div>
+          </button>
 
           {!showLists && (
             <div className="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-sm text-center">
@@ -190,6 +382,34 @@ export const StatusScreen: React.FC<{ student: Student }> = ({ student }) => {
           {recent.length > 0 && <StatusList label="RECENT UPDATES" items={recent} />}
           {viewed.length > 0 && <StatusList label="VIEWED" items={viewed} dimmed />}
         </>
+      )}
+
+      {sheetOpen && data?.settings && (
+        <AddStatusSheet
+          settings={data.settings}
+          onClose={() => setSheetOpen(false)}
+          onText={() => {
+            setSheetOpen(false);
+            setComposing(true);
+          }}
+        />
+      )}
+
+      {composing && data?.settings && (
+        <TextComposer
+          settings={data.settings}
+          onClose={() => setComposing(false)}
+          onPosted={(status) => {
+            setComposing(false);
+            setSheetOpen(false);
+            setData((prev) => {
+              if (!prev) return prev;
+              const next: StatusOverview = { ...prev, me: { name: prev.me?.name || student.name, username: prev.me?.username || '', latest: status } };
+              saveLastGood(cacheKey, next);
+              return next;
+            });
+          }}
+        />
       )}
 
       {!data && failed && (

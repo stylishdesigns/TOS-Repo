@@ -58,6 +58,7 @@ const START_TOS_CHAT: TosChatSettings = {
     maxVideoSeconds: 30,
     maxVideoMb: 50,
     statusesPerDay: 5,
+    maxTextChars: 280,
   },
   updatedAt: null,
 };
@@ -151,6 +152,7 @@ function mergeTosChat(raw: any): TosChatSettings {
       maxVideoSeconds: clampInt(w.maxVideoSeconds, 5, 120, s.status.maxVideoSeconds),
       maxVideoMb: clampInt(w.maxVideoMb, 1, 500, s.status.maxVideoMb),
       statusesPerDay: clampInt(w.statusesPerDay, 1, 20, s.status.statusesPerDay),
+      maxTextChars: clampInt(w.maxTextChars, 20, 1000, s.status.maxTextChars),
     };
   }
   if (typeof raw.updatedAt === 'string') s.updatedAt = raw.updatedAt;
@@ -680,6 +682,8 @@ export function registerChatRoutes(app: express.Express): void {
           allowReplies: st.allowReplies,
           lastsHours: st.lastsHours,
           statusesPerDay: st.statusesPerDay,
+          maxTextChars: st.maxTextChars,
+          maxVideoSeconds: st.maxVideoSeconds,
         },
         me: {
           name: cleanStr(student.name, MAX_NAME_CHARS),
@@ -693,6 +697,58 @@ export function registerChatRoutes(app: express.Express): void {
       });
     } catch (error: any) {
       handleRouteError(res, error, '[chat] status overview failed');
+    }
+  });
+
+  // Piece 2: posting a text status. The same preconditions as the overview,
+  // then the stored settings decide everything: whether status is on at all,
+  // whether text updates are allowed, how long the status lives (expiresAt is
+  // fixed at post time from the setting in force then) and how many statuses
+  // one student may post in a rolling 24 hours. Nothing is decided in a
+  // screen and no cap lives in code.
+  app.post('/api/student/chat/status', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const body = req.body || {};
+      const stuSnap = await getStudentDoc(caller.uid);
+      if (!stuSnap) throw httpError(403, 'No student record is linked to this account.');
+      const student = stuSnap.data() as any;
+      const centreId = cleanStr(student.centreId, 120);
+      if (!centreId) throw httpError(403, 'No centre is linked to this account.');
+      await requireMembership(caller, centreId);
+      const entitlements = await getCentreEntitlements(centreId);
+      if (entitlements.chat !== true) throw httpError(403, 'Chat is not part of your centre\u2019s plan yet.');
+      const st = (await getTosChat()).status;
+      if (!st.enabled) throw httpError(403, 'Status is not turned on.');
+      const kind = cleanStr(body.kind, 10) || 'text';
+      if (kind !== 'text') throw httpError(400, 'Only text updates are open so far.');
+      if (!st.allowText) throw httpError(403, 'Text updates are turned off.');
+      const text = cleanStr(body.text, st.maxTextChars);
+      if (!text) throw httpError(400, 'Type your update first.');
+      const bg = cleanStr(body.bg, 9);
+      if (!/^#[0-9a-fA-F]{6}$/.test(bg)) throw httpError(400, 'Pick a background colour for the update.');
+
+      const now = Date.now();
+      let inWindow = 0;
+      const mine = await adminRtdb.ref(`chat/status/${centreId}/${caller.uid}`).get();
+      mine.forEach((c) => {
+        const v = c.val() || {};
+        if ((Number(v.at) || 0) > now - DAY_MS) inWindow += 1;
+      });
+      if (inWindow >= st.statusesPerDay) {
+        throw httpError(429, 'You have reached the status limit for today. Try again later.');
+      }
+
+      const expiresAt = now + st.lastsHours * 60 * 60 * 1000;
+      const ref = adminRtdb.ref(`chat/status/${centreId}/${caller.uid}`).push();
+      await ref.set({ kind: 'text', text, bg, at: now, expiresAt });
+      res.json({
+        ok: true,
+        status: { statusId: ref.key, kind: 'text', text, bg, at: now, expiresAt },
+        remainingToday: Math.max(0, st.statusesPerDay - (inWindow + 1)),
+      });
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] status post failed');
     }
   });
 
