@@ -25,6 +25,27 @@ interface StatusEntry {
   at: number;
   expiresAt: number;
   text: string;
+  bg?: string;
+}
+
+interface StatusReply {
+  uid: string;
+  name: string;
+  username: string;
+  text: string;
+  at: number;
+  replyId?: string;
+}
+
+interface ViewerStatus {
+  statusId: string;
+  kind: string;
+  at: number;
+  expiresAt: number;
+  text: string;
+  bg?: string;
+  views?: number;
+  replies?: StatusReply[];
 }
 
 interface StatusOverview {
@@ -260,11 +281,263 @@ const TextComposer: React.FC<{
   );
 };
 
-const StatusRow: React.FC<{ entry: StatusEntry; dimmed?: boolean }> = ({ entry, dimmed }) => (
-  <div
-    className={`bg-white rounded-2xl px-4 py-3 border border-slate-200/90 shadow-sm flex items-center gap-3 ${
+// ============================================================================
+// Status, piece S3: the full-screen status viewer.
+//
+// One person's statuses, one at a time, with tap-through navigation and the
+// stored settings deciding what the viewer may do: replies appear only when
+// allowReplies is on, and every view a non-owner makes is marked seen on the
+// server. The owner's own viewer instead shows who has seen it and the
+// replies, since replying to yourself makes no sense.
+// ============================================================================
+
+const StatusViewer: React.FC<{
+  person: { uid: string; name: string; username: string };
+  mine: boolean;
+  settings: NonNullable<StatusOverview['settings']>;
+  onClose: () => void;
+  onSeenUpdate: (ownerUid: string, statusId: string) => void;
+}> = ({ person, mine, settings, onClose, onSeenUpdate }) => {
+  useEscape(onClose);
+  const [statuses, setStatuses] = useState<ViewerStatus[] | null>(null);
+  const [idx, setIdx] = useState(0);
+  const [err, setErr] = useState('');
+  const [replyText, setReplyText] = useState('');
+  const [replyBusy, setReplyBusy] = useState(false);
+  const [replyNote, setReplyNote] = useState('');
+  const seenFired = React.useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    let alive = true;
+    api(`/api/student/chat/status/user/${encodeURIComponent(person.uid)}`)
+      .then((d: any) => {
+        if (!alive) return;
+        if (d && d.ok) setStatuses(Array.isArray(d.statuses) ? d.statuses : []);
+        else setErr(String(d?.error || 'The status could not load. Try again.'));
+      })
+      .catch(() => {
+        if (alive) setErr('The status could not load. Try again.');
+      });
+    return () => {
+      alive = false;
+    };
+  }, [person.uid]);
+
+  const current: ViewerStatus | null = statuses && idx < statuses.length ? statuses[idx] : null;
+
+  // Marking seen: fire once per status the moment it is on screen. Errors are
+  // ignored here on purpose; the next overview refresh settles the row's
+  // place, and a missed ping only means the row stays RECENT.
+  useEffect(() => {
+    if (!current || mine) return;
+    if (seenFired.current.has(current.statusId)) return;
+    seenFired.current.add(current.statusId);
+    onSeenUpdate(person.uid, current.statusId);
+    api('/api/student/chat/status/seen', {
+      method: 'POST',
+      body: { ownerUid: person.uid, statusId: current.statusId },
+    }).catch(() => undefined);
+  }, [current, mine, person.uid, onSeenUpdate]);
+
+  const sendReply = async () => {
+    if (!replyText.trim() || replyBusy || !current) return;
+    setReplyBusy(true);
+    setErr('');
+    try {
+      const d = await api('/api/student/chat/status/reply', {
+        method: 'POST',
+        body: { ownerUid: person.uid, statusId: current.statusId, text: replyText.trim() },
+      });
+      if (d && d.ok && d.reply) {
+        setStatuses((prev) => {
+          if (!prev) return prev;
+          const next = [...prev];
+          next[idx] = { ...next[idx], replies: [d.reply, ...(next[idx].replies || [])] };
+          return next;
+        });
+        setReplyText('');
+        setReplyNote('Reply sent');
+        window.setTimeout(() => setReplyNote(''), 2500);
+      } else {
+        throw new Error(String(d?.error || 'The reply could not be sent. Try again.'));
+      }
+    } catch (e: any) {
+      setErr(String(e?.message || 'The reply could not be sent. Try again.'));
+    } finally {
+      setReplyBusy(false);
+    }
+  };
+
+  const bg = current?.kind === 'text' && /^#[0-9a-fA-F]{6}$/.test(String(current.bg || '')) ? String(current.bg) : '#0F172A';
+  const dark = bgLuminance(bg) < 0.5;
+  const total = statuses?.length || 0;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex flex-col"
+      style={{ backgroundColor: bg }}
+      role="dialog"
+      aria-modal="true"
+      aria-label={`${person.name || person.username}'s status`}
+    >
+      {/* Top bar: close, who, when, and the tap-through dots. */}
+      <div className="p-4 space-y-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div
+              className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-black shrink-0"
+              style={{ color: dark ? '#FFFFFF' : '#0F172A', backgroundColor: dark ? 'rgba(255,255,255,0.2)' : 'rgba(15,23,42,0.08)' }}
+            >
+              {initials(person.name || person.username)}
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-black truncate" style={{ color: dark ? '#FFFFFF' : '#0F172A' }}>
+                {mine ? 'My status' : person.name || (person.username ? `@${person.username}` : 'Student')}
+              </p>
+              <p className="text-[11px] font-medium truncate" style={{ color: dark ? 'rgba(255,255,255,0.7)' : 'rgba(15,23,42,0.55)' }}>
+                {current ? statusTimeLabel(current.at) : ''}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-9 h-9 rounded-xl flex items-center justify-center active:scale-95 transition shrink-0"
+            style={{ color: dark ? '#FFFFFF' : '#0F172A', backgroundColor: dark ? 'rgba(255,255,255,0.15)' : 'rgba(15,23,42,0.08)' }}
+            aria-label="Close status"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        {total > 1 && (
+          <div className="flex items-center justify-center gap-1.5">
+            {statuses!.map((st, i) => (
+              <span
+                key={st.statusId}
+                className="h-1 rounded-full transition-all"
+                style={{
+                  width: i === idx ? 18 : 8,
+                  backgroundColor: dark ? 'rgba(255,255,255,0.7)' : 'rgba(15,23,42,0.4)',
+                  opacity: i === idx ? 1 : 0.35,
+                }}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* The update itself, with tap-through when there is more than one. */}
+      <div className="flex-1 flex items-center justify-center px-8 relative">
+        {current && current.kind === 'text' && (
+          <p className="text-center text-2xl font-black tracking-tight" style={{ color: dark ? '#FFFFFF' : '#0F172A' }}>
+            {current.text}
+          </p>
+        )}
+        {current && current.kind !== 'text' && (
+          <p className="text-center text-sm font-bold" style={{ color: dark ? '#FFFFFF' : '#0F172A' }}>
+            This update type opens in a later piece.
+          </p>
+        )}
+        {total > 1 && (
+          <>
+            {idx > 0 && (
+              <button
+                onClick={() => setIdx(idx - 1)}
+                className="absolute left-0 top-0 bottom-0 w-1/4"
+                aria-label="Previous update"
+              />
+            )}
+            {idx < total - 1 && (
+              <button
+                onClick={() => setIdx(idx + 1)}
+                className="absolute right-0 top-0 bottom-0 w-1/4"
+                aria-label="Next update"
+              />
+            )}
+          </>
+        )}
+        {!current && statuses && statuses.length === 0 && (
+          <p className="text-center text-sm font-bold" style={{ color: dark ? '#FFFFFF' : '#0F172A' }}>
+            This status is no longer available.
+          </p>
+        )}
+        {!statuses && !err && (
+          <p className="text-center text-sm font-bold" style={{ color: dark ? 'rgba(255,255,255,0.7)' : 'rgba(15,23,42,0.5)' }}>
+            Loading...
+          </p>
+        )}
+      </div>
+
+      {/* Bottom: the owner sees who has seen it and the replies; everyone
+          else sees the reply box when replies are switched on. */}
+      {err && (
+        <p className="px-6 pb-2 text-xs font-bold text-center" style={{ color: dark ? '#FFFFFF' : '#B91C1C' }}>{err}</p>
+      )}
+      {mine && current && (
+        <div className="px-4 pb-8 space-y-2">
+          <p className="text-xs font-bold" style={{ color: dark ? 'rgba(255,255,255,0.85)' : 'rgba(15,23,42,0.7)' }}>
+            Seen by {current.views || 0}
+          </p>
+          {(current.replies || []).length > 0 && (
+            <div className="max-h-40 overflow-y-auto space-y-1.5 rounded-2xl p-3"
+              style={{ backgroundColor: dark ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.06)' }}>
+              {current.replies!.map((rp, i) => (
+                <div key={rp.replyId || `${rp.uid}-${rp.at}-${i}`} className="text-xs">
+                  <span className="font-black" style={{ color: dark ? '#FFFFFF' : '#0F172A' }}>
+                    {rp.name || (rp.username ? `@${rp.username}` : 'Student')}
+                  </span>
+                  <span style={{ color: dark ? 'rgba(255,255,255,0.85)' : 'rgba(15,23,42,0.8)' }}> {rp.text}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {(current.replies || []).length === 0 && (
+            <p className="text-[11px] font-medium" style={{ color: dark ? 'rgba(255,255,255,0.6)' : 'rgba(15,23,42,0.5)' }}>
+              No replies yet.
+            </p>
+          )}
+        </div>
+      )}
+      {!mine && current && settings.allowReplies && (
+        <div className="p-4 pb-8 space-y-2">
+          {replyNote && (
+            <p className="text-[11px] font-bold text-center" style={{ color: dark ? '#FFFFFF' : '#0F172A' }}>{replyNote}</p>
+          )}
+          <div className="flex items-center gap-2">
+            <input
+              value={replyText}
+              onChange={(e) => setReplyText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  sendReply();
+                }
+              }}
+              placeholder="Reply to status"
+              className="flex-1 h-11 rounded-full px-4 text-sm font-medium outline-none"
+              style={{ color: dark ? '#FFFFFF' : '#0F172A', backgroundColor: dark ? 'rgba(255,255,255,0.15)' : 'rgba(15,23,42,0.06)' }}
+            />
+            <button
+              onClick={sendReply}
+              disabled={!replyText.trim() || replyBusy}
+              className="px-4 h-11 rounded-full font-black text-sm active:scale-95 transition disabled:opacity-40"
+              style={{ color: dark ? '#0F172A' : '#FFFFFF', backgroundColor: dark ? '#FFFFFF' : 'rgba(255,255,255,0.25)' }}
+            >
+              {replyBusy ? 'Sending...' : 'Send'}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const StatusRow: React.FC<{ entry: StatusEntry; dimmed?: boolean; onPress?: () => void }> = ({ entry, dimmed, onPress }) => (
+  <button
+    onClick={onPress}
+    disabled={!onPress}
+    className={`bg-white rounded-2xl px-4 py-3 border border-slate-200/90 shadow-sm flex items-center gap-3 w-full text-left ${
       dimmed ? 'opacity-60' : ''
-    }`}
+    } ${onPress ? 'active:scale-[0.99] transition' : ''}`}
   >
     <div
       className={`w-11 h-11 rounded-full flex items-center justify-center text-sm font-black shrink-0 ${
@@ -283,15 +556,15 @@ const StatusRow: React.FC<{ entry: StatusEntry; dimmed?: boolean }> = ({ entry, 
         {statusTimeLabel(entry.at)}
       </p>
     </div>
-  </div>
+  </button>
 );
 
-const StatusList: React.FC<{ label: string; items: StatusEntry[]; dimmed?: boolean }> = ({ label, items, dimmed }) => (
+const StatusList: React.FC<{ label: string; items: StatusEntry[]; dimmed?: boolean; onOpen: (e: StatusEntry) => void }> = ({ label, items, dimmed, onOpen }) => (
   <div className="space-y-2">
     <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 px-1">{label}</p>
     <div className="space-y-2">
       {items.map((it) => (
-        <StatusRow key={it.statusId} entry={it} dimmed={dimmed} />
+        <StatusRow key={it.statusId} entry={it} dimmed={dimmed} onPress={() => onOpen(it)} />
       ))}
     </div>
   </div>
@@ -303,6 +576,7 @@ export const StatusScreen: React.FC<{ student: Student }> = ({ student }) => {
   const [failed, setFailed] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [composing, setComposing] = useState(false);
+  const [viewer, setViewer] = useState<{ person: { uid: string; name: string; username: string }; mine: boolean } | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -330,6 +604,35 @@ export const StatusScreen: React.FC<{ student: Student }> = ({ student }) => {
   const viewed = data?.viewed || [];
   const showLists = recent.length > 0 || viewed.length > 0;
 
+  // Viewing a status moves its row to VIEWED straight away, and closing the
+  // viewer re-syncs once so the counts and lists come back from the server.
+  const openViewer = (entry: { uid: string; name: string; username: string }) => setViewer({ person: entry, mine: false });
+  const closeViewer = () => {
+    setViewer(null);
+    api('/api/student/chat/status/overview')
+      .then((d: StatusOverview) => {
+        if (d && d.ok) {
+          setData(d);
+          saveLastGood(cacheKey, d);
+        }
+      })
+      .catch(() => undefined);
+  };
+  const moveToViewed = (ownerUid: string, statusId: string) => {
+    setData((prev) => {
+      if (!prev) return prev;
+      const hit = prev.recent.find((o) => o.uid === ownerUid && o.statusId === statusId);
+      if (!hit) return prev;
+      const next: StatusOverview = {
+        ...prev,
+        recent: prev.recent.filter((o) => !(o.uid === ownerUid && o.statusId === statusId)),
+        viewed: [hit, ...prev.viewed],
+      };
+      saveLastGood(cacheKey, next);
+      return next;
+    });
+  };
+
   return (
     <div className="space-y-5 animate-in fade-in duration-300">
       <div>
@@ -348,11 +651,11 @@ export const StatusScreen: React.FC<{ student: Student }> = ({ student }) => {
 
       {data && data.enabled !== false && (
         <>
-          {/* My status row. Tapping it opens the Add sheet (piece S2); the
-              own-status viewer is the next piece, so a posted status shows
-              its age here and viewing taps stay on the add path for now. */}
+          {/* My status row. With an update up, tapping opens my own viewer
+              with the seen count and replies; without one, it opens the
+              Add sheet. */}
           <button
-            onClick={() => setSheetOpen(true)}
+            onClick={() => (me?.latest ? setViewer({ person: { uid: student.uid || '', name: me.name || student.name, username: me.username || '' }, mine: true }) : setSheetOpen(true))}
             className="w-full text-left bg-white rounded-3xl p-4 border border-slate-200/90 shadow-sm flex items-center gap-3 active:scale-[0.99] transition"
           >
             <div className="relative shrink-0">
@@ -379,8 +682,8 @@ export const StatusScreen: React.FC<{ student: Student }> = ({ student }) => {
             </div>
           )}
 
-          {recent.length > 0 && <StatusList label="RECENT UPDATES" items={recent} />}
-          {viewed.length > 0 && <StatusList label="VIEWED" items={viewed} dimmed />}
+          {recent.length > 0 && <StatusList label="RECENT UPDATES" items={recent} onOpen={openViewer} />}
+          {viewed.length > 0 && <StatusList label="VIEWED" items={viewed} dimmed onOpen={openViewer} />}
         </>
       )}
 
@@ -392,6 +695,16 @@ export const StatusScreen: React.FC<{ student: Student }> = ({ student }) => {
             setSheetOpen(false);
             setComposing(true);
           }}
+        />
+      )}
+
+      {viewer && data?.settings && (
+        <StatusViewer
+          person={viewer.person}
+          mine={viewer.mine}
+          settings={data.settings}
+          onClose={closeViewer}
+          onSeenUpdate={moveToViewed}
         />
       )}
 

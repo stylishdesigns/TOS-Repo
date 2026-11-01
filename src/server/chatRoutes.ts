@@ -610,7 +610,7 @@ export function registerChatRoutes(app: express.Express): void {
       if (!st.enabled) return res.json({ ok: true, enabled: false });
 
       const now = Date.now();
-      interface One { uid: string; statusId: string; kind: string; at: number; expiresAt: number; text: string; }
+      interface One { uid: string; statusId: string; kind: string; at: number; expiresAt: number; text: string; bg: string; }
       const latestByUid = new Map<string, One>();
       const centreSnap = await adminRtdb.ref(`chat/status/${centreId}`).get();
       centreSnap.forEach((c) => {
@@ -627,6 +627,7 @@ export function registerChatRoutes(app: express.Express): void {
             at: Number(v.at) || 0,
             expiresAt,
             text: cleanStr(v.text, 300),
+            bg: cleanStr(v.bg, 9),
           };
           const prev = latestByUid.get(uid);
           if (!prev || item.at > prev.at) latestByUid.set(uid, item);
@@ -669,6 +670,7 @@ export function registerChatRoutes(app: express.Express): void {
         at: o.at,
         expiresAt: o.expiresAt,
         text: o.text,
+        bg: o.bg,
       });
 
       res.json({
@@ -689,7 +691,7 @@ export function registerChatRoutes(app: express.Express): void {
           name: cleanStr(student.name, MAX_NAME_CHARS),
           username: await usernameFor(caller.uid),
           latest: myLatest
-            ? { statusId: myLatest.statusId, kind: myLatest.kind, at: myLatest.at, expiresAt: myLatest.expiresAt, text: myLatest.text }
+            ? { statusId: myLatest.statusId, kind: myLatest.kind, at: myLatest.at, expiresAt: myLatest.expiresAt, text: myLatest.text, bg: myLatest.bg }
             : null,
         },
         recent: others.filter((o) => !seen.has(o.statusId)).map(shape),
@@ -749,6 +751,175 @@ export function registerChatRoutes(app: express.Express): void {
       });
     } catch (error: any) {
       handleRouteError(res, error, '[chat] status post failed');
+    }
+  });
+
+  // Piece 3: viewing statuses. One endpoint returns one person's active
+  // statuses; the viewer marks them seen (POST seen) and may reply (POST
+  // reply). Every route re-checks membership, the chat entitlement and the
+  // stored status settings; nothing is decided in a screen.
+  app.get('/api/student/chat/status/user/:uid', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const stuSnap = await getStudentDoc(caller.uid);
+      if (!stuSnap) return res.status(403).json({ error: 'No student record is linked to this account.' });
+      const student = stuSnap.data() as any;
+      const centreId = cleanStr(student.centreId, 120);
+      if (!centreId) return res.status(403).json({ error: 'No centre is linked to this account.' });
+      await requireMembership(caller, centreId);
+      const entitlements = await getCentreEntitlements(centreId);
+      if (entitlements.chat !== true) return res.status(403).json({ error: 'Chat is not part of your centre\u2019s plan yet.' });
+      const st = (await getTosChat()).status;
+      if (!st.enabled) return res.json({ ok: true, enabled: false, statuses: [] });
+
+      const ownerUid = cleanStr(req.params?.uid, 64);
+      if (!ownerUid) return res.status(400).json({ error: 'Which status is this?' });
+      const now = Date.now();
+      const mine = await adminRtdb.ref(`chat/status/${centreId}/${ownerUid}`).get();
+      const statuses: any[] = [];
+      mine.forEach((s) => {
+        const v = s.val() || {};
+        const expiresAt = Number(v.expiresAt) || 0;
+        if (expiresAt <= now) return;
+        statuses.push({
+          statusId: cleanStr(s.key as string, 64),
+          kind: cleanStr(v.kind, 10) || 'text',
+          at: Number(v.at) || 0,
+          expiresAt,
+          text: cleanStr(v.text, 300),
+          bg: cleanStr(v.bg, 9),
+        });
+      });
+      statuses.sort((a, b) => a.at - b.at);
+
+      if (ownerUid === caller.uid) {
+        for (const s of statuses) {
+          const viewsSnap = await adminRtdb.ref(`chat/statusSeenCount/${centreId}/${s.statusId}`).get();
+          s.views = Number(viewsSnap.val()) || 0;
+          const repliesSnap = await adminRtdb.ref(`chat/statusReplies/${centreId}/${s.statusId}`).get();
+          const replies: any[] = [];
+          repliesSnap.forEach((c) => {
+            const v = c.val() || {};
+            replies.push({
+              uid: cleanStr(v.uid, 64),
+              name: cleanStr(v.name, MAX_NAME_CHARS),
+              username: cleanStr(v.username, 16),
+              text: cleanStr(v.text, 2000),
+              at: Number(v.at) || 0,
+            });
+          });
+          replies.sort((a, b) => b.at - a.at);
+          s.replies = replies.slice(0, 50);
+        }
+      }
+
+      const ownerName = ownerUid === caller.uid
+        ? cleanStr(student.name, MAX_NAME_CHARS)
+        : (await adminDb.collection('students').where('uid', '==', ownerUid).limit(1).get())
+            .docs[0]?.data()?.name || '';
+      res.json({
+        ok: true,
+        owner: { uid: ownerUid, name: cleanStr(ownerName, MAX_NAME_CHARS), username: await usernameFor(ownerUid) },
+        statuses,
+      });
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] status user failed');
+    }
+  });
+
+  // Marking a status seen. Idempotent per viewer: the first view writes the
+  // seen index and bumps the owner's seen counter, later ones change nothing.
+  app.post('/api/student/chat/status/seen', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const body = req.body || {};
+      const stuSnap = await getStudentDoc(caller.uid);
+      if (!stuSnap) return res.status(403).json({ error: 'No student record is linked to this account.' });
+      const student = stuSnap.data() as any;
+      const centreId = cleanStr(student.centreId, 120);
+      if (!centreId) return res.status(403).json({ error: 'No centre is linked to this account.' });
+      await requireMembership(caller, centreId);
+      const entitlements = await getCentreEntitlements(centreId);
+      if (entitlements.chat !== true) return res.status(403).json({ error: 'Chat is not part of your centre\u2019s plan yet.' });
+      const st = (await getTosChat()).status;
+      if (!st.enabled) return res.json({ ok: true });
+
+      const ownerUid = cleanStr(body.ownerUid, 64);
+      const statusId = cleanStr(body.statusId, 64);
+      if (!ownerUid || !statusId) return res.status(400).json({ error: 'Which status is this?' });
+      if (ownerUid === caller.uid) return res.json({ ok: true }); // Own views never count as seen.
+
+      const now = Date.now();
+      const statusSnap = await adminRtdb.ref(`chat/status/${centreId}/${ownerUid}/${statusId}`).get();
+      const sv = statusSnap.val() || {};
+      if (!statusSnap.exists() || (Number(sv.expiresAt) || 0) <= now) {
+        return res.status(404).json({ error: 'That status is gone.' });
+      }
+
+      const seenRef = adminRtdb.ref(`chat/statusViews/${centreId}/${caller.uid}/${statusId}`);
+      const already = await seenRef.get();
+      if (!already.exists()) {
+        await seenRef.set({ at: now });
+        const countRef = adminRtdb.ref(`chat/statusSeenCount/${centreId}/${statusId}`);
+        await countRef.set(ServerValue.increment(1));
+      }
+      res.json({ ok: true });
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] status seen failed');
+    }
+  });
+
+  // Replying to a status. Replies live with the status, and only the owner
+  // reads them back, so the reply rides the same preconditions as viewing:
+  // membership, entitlement, and the stored allowReplies setting in force
+  // right now. The reply length uses the chat message cap, and posting
+  // shares the chat rate limit so replies cannot be used to flood.
+  app.post('/api/student/chat/status/reply', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const body = req.body || {};
+      const stuSnap = await getStudentDoc(caller.uid);
+      if (!stuSnap) return res.status(403).json({ error: 'No student record is linked to this account.' });
+      const student = stuSnap.data() as any;
+      const centreId = cleanStr(student.centreId, 120);
+      if (!centreId) return res.status(403).json({ error: 'No centre is linked to this account.' });
+      await requireMembership(caller, centreId);
+      const entitlements = await getCentreEntitlements(centreId);
+      if (entitlements.chat !== true) return res.status(403).json({ error: 'Chat is not part of your centre\u2019s plan yet.' });
+      const tosChat = await getTosChat();
+      const st = tosChat.status;
+      if (!st.enabled) return res.status(403).json({ error: 'Status is not turned on.' });
+      if (!st.allowReplies) return res.status(403).json({ error: 'Status replies are turned off.' });
+
+      const ownerUid = cleanStr(body.ownerUid, 64);
+      const statusId = cleanStr(body.statusId, 64);
+      const text = String(body.text ?? '').trim();
+      if (!ownerUid || !statusId || !text) return res.status(400).json({ error: 'Type your reply first.' });
+      if (ownerUid === caller.uid) return res.status(400).json({ error: 'You cannot reply to your own status.' });
+      if (text.length > tosChat.messageMaxChars) {
+        return res.status(400).json({ error: `Replies can be up to ${tosChat.messageMaxChars} characters.` });
+      }
+      await consumePostRateLimit(caller.uid, tosChat.postRateLimitPerHour);
+
+      const now = Date.now();
+      const statusSnap = await adminRtdb.ref(`chat/status/${centreId}/${ownerUid}/${statusId}`).get();
+      const sv = statusSnap.val() || {};
+      if (!statusSnap.exists() || (Number(sv.expiresAt) || 0) <= now) {
+        return res.status(404).json({ error: 'That status is gone.' });
+      }
+
+      const ref = adminRtdb.ref(`chat/statusReplies/${centreId}/${statusId}`).push();
+      const reply = {
+        uid: caller.uid,
+        name: cleanStr(student.name, MAX_NAME_CHARS),
+        username: await usernameFor(caller.uid),
+        text: text.slice(0, tosChat.messageMaxChars),
+        at: now,
+      };
+      await ref.set(reply);
+      res.json({ ok: true, reply: { ...reply, replyId: ref.key } });
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] status reply failed');
     }
   });
 
