@@ -9,7 +9,7 @@ import {
   httpError,
   requireMembership,
 } from './tenantService';
-import { CentreChatSettings, ChatAccessRule, TosChatSettings } from '../types';
+import { CentreChatSettings, ChatAccessRule, TosChatSettings, TosStatusSettings } from '../types';
 
 // ============================================================================
 // CH1 student chat, Step 2: the server engine.
@@ -57,6 +57,7 @@ const START_TOS_CHAT: TosChatSettings = {
     lastsHours: 24,
     maxVideoSeconds: 30,
     maxVideoMb: 50,
+    maxAudioMb: 10,
     statusesPerDay: 5,
     maxTextChars: 280,
   },
@@ -151,6 +152,7 @@ function mergeTosChat(raw: any): TosChatSettings {
       lastsHours: clampInt(w.lastsHours, 1, 720, s.status.lastsHours),
       maxVideoSeconds: clampInt(w.maxVideoSeconds, 5, 120, s.status.maxVideoSeconds),
       maxVideoMb: clampInt(w.maxVideoMb, 1, 500, s.status.maxVideoMb),
+      maxAudioMb: clampInt(w.maxAudioMb, 1, 50, s.status.maxAudioMb),
       statusesPerDay: clampInt(w.statusesPerDay, 1, 20, s.status.statusesPerDay),
       maxTextChars: clampInt(w.maxTextChars, 20, 1000, s.status.maxTextChars),
     };
@@ -501,6 +503,46 @@ async function uploadChatPhoto(dataUrl: string, photoMaxKb: number): Promise<str
   return url;
 }
 
+// Status media upload. The same unsigned Cloudinary preset the chat photo
+// route uses; video and music files go through the video endpoint, which is
+// where Cloudinary takes audio too. Each kind is capped by its own stored
+// setting, checked here before anything leaves the server.
+async function uploadStatusMedia(kind: 'photo' | 'video' | 'music', dataUrl: string, st: TosStatusSettings, photoMaxKb: number): Promise<string> {
+  const pattern = kind === 'photo'
+    ? /^data:(image\/(?:png|jpe?g|webp|gif));base64,([A-Za-z0-9+/=]+)$/
+    : kind === 'video'
+      ? /^data:(video\/(?:mp4|webm|quicktime|x-m4v|3gpp|ogg));base64,([A-Za-z0-9+/=]+)$/
+      : /^data:(audio\/(?:mpeg|mp3|ogg|wav|x-m4a|m4a|aac|flac|webm));base64,([A-Za-z0-9+/=]+)$/;
+  const m = pattern.exec(dataUrl);
+  if (!m) {
+    const what = kind === 'photo' ? 'photo' : kind === 'video' ? 'video' : 'music file';
+    throw httpError(400, `That file is not a ${what} this status can use.`);
+  }
+  const bytes = Math.floor((m[2].length * 3) / 4);
+  if (kind === 'photo' && bytes > photoMaxKb * 1024) {
+    throw httpError(413, `Photos can be up to ${photoMaxKb} KB after compression.`);
+  }
+  if (kind === 'video' && bytes > st.maxVideoMb * 1024 * 1024) {
+    throw httpError(413, `Videos can be up to ${st.maxVideoMb} MB.`);
+  }
+  if (kind === 'music' && bytes > st.maxAudioMb * 1024 * 1024) {
+    throw httpError(413, `Music files can be up to ${st.maxAudioMb} MB.`);
+  }
+  const cloud = String(process.env.CLOUDINARY_CLOUD_NAME || '');
+  const preset = String(process.env.CLOUDINARY_UPLOAD_PRESET || '');
+  if (!cloud || !preset) throw httpError(500, 'Media hosting is not configured on this deployment.');
+  const endpoint = kind === 'photo' ? 'image' : 'video';
+  const form = new FormData();
+  form.append('upload_preset', preset);
+  form.append('folder', 'tos/status');
+  form.append('file', dataUrl);
+  const resp = await fetch(`https://api.cloudinary.com/v1_1/${cloud}/${endpoint}/upload`, { method: 'POST', body: form });
+  const data: any = await resp.json().catch(() => null);
+  const url = data && typeof data.secure_url === 'string' ? data.secure_url : '';
+  if (!resp.ok || !url) throw httpError(502, 'The upload could not be completed. Try again.');
+  return url;
+}
+
 // ============================================================================
 // Student routes
 // ============================================================================
@@ -606,11 +648,12 @@ export function registerChatRoutes(app: express.Express): void {
       if (entitlements.chat !== true) {
         return res.status(403).json({ error: 'Chat is not part of your centre\u2019s plan yet.' });
       }
-      const st = (await getTosChat()).status;
+      const tosChat = await getTosChat();
+      const st = tosChat.status;
       if (!st.enabled) return res.json({ ok: true, enabled: false });
 
       const now = Date.now();
-      interface One { uid: string; statusId: string; kind: string; at: number; expiresAt: number; text: string; bg: string; }
+      interface One { uid: string; statusId: string; kind: string; at: number; expiresAt: number; text: string; bg: string; photoUrl: string; videoUrl: string; audioUrl: string; durationSeconds: number; }
       const latestByUid = new Map<string, One>();
       const centreSnap = await adminRtdb.ref(`chat/status/${centreId}`).get();
       centreSnap.forEach((c) => {
@@ -628,6 +671,10 @@ export function registerChatRoutes(app: express.Express): void {
             expiresAt,
             text: cleanStr(v.text, 300),
             bg: cleanStr(v.bg, 9),
+            photoUrl: cleanStr(v.photoUrl, 400),
+            videoUrl: cleanStr(v.videoUrl, 400),
+            audioUrl: cleanStr(v.audioUrl, 400),
+            durationSeconds: Number(v.durationSeconds) || 0,
           };
           const prev = latestByUid.get(uid);
           if (!prev || item.at > prev.at) latestByUid.set(uid, item);
@@ -671,6 +718,10 @@ export function registerChatRoutes(app: express.Express): void {
         expiresAt: o.expiresAt,
         text: o.text,
         bg: o.bg,
+        photoUrl: o.photoUrl,
+        videoUrl: o.videoUrl,
+        audioUrl: o.audioUrl,
+        durationSeconds: o.durationSeconds,
       });
 
       res.json({
@@ -686,12 +737,19 @@ export function registerChatRoutes(app: express.Express): void {
           statusesPerDay: st.statusesPerDay,
           maxTextChars: st.maxTextChars,
           maxVideoSeconds: st.maxVideoSeconds,
+          maxVideoMb: st.maxVideoMb,
+          maxAudioMb: st.maxAudioMb,
+          photoMaxKb: tosChat.photoMaxKb,
         },
         me: {
           name: cleanStr(student.name, MAX_NAME_CHARS),
           username: await usernameFor(caller.uid),
           latest: myLatest
-            ? { statusId: myLatest.statusId, kind: myLatest.kind, at: myLatest.at, expiresAt: myLatest.expiresAt, text: myLatest.text, bg: myLatest.bg }
+            ? {
+                statusId: myLatest.statusId, kind: myLatest.kind, at: myLatest.at, expiresAt: myLatest.expiresAt,
+                text: myLatest.text, bg: myLatest.bg, photoUrl: myLatest.photoUrl, videoUrl: myLatest.videoUrl,
+                audioUrl: myLatest.audioUrl, durationSeconds: myLatest.durationSeconds,
+              }
             : null,
         },
         recent: others.filter((o) => !seen.has(o.statusId)).map(shape),
@@ -720,15 +778,28 @@ export function registerChatRoutes(app: express.Express): void {
       await requireMembership(caller, centreId);
       const entitlements = await getCentreEntitlements(centreId);
       if (entitlements.chat !== true) throw httpError(403, 'Chat is not part of your centre\u2019s plan yet.');
-      const st = (await getTosChat()).status;
+      const tosChat = await getTosChat();
+      const st = tosChat.status;
       if (!st.enabled) throw httpError(403, 'Status is not turned on.');
       const kind = cleanStr(body.kind, 10) || 'text';
-      if (kind !== 'text') throw httpError(400, 'Only text updates are open so far.');
-      if (!st.allowText) throw httpError(403, 'Text updates are turned off.');
       const text = cleanStr(body.text, st.maxTextChars);
-      if (!text) throw httpError(400, 'Type your update first.');
-      const bg = cleanStr(body.bg, 9);
-      if (!/^#[0-9a-fA-F]{6}$/.test(bg)) throw httpError(400, 'Pick a background colour for the update.');
+
+      if (kind === 'text') {
+        if (!st.allowText) throw httpError(403, 'Text updates are turned off.');
+        if (!text) throw httpError(400, 'Type your update first.');
+      } else if (kind === 'photo' || kind === 'video' || kind === 'music') {
+        if (kind === 'photo' && !st.allowPhoto) throw httpError(403, 'Photo updates are turned off.');
+        if (kind === 'video' && !st.allowVideo) throw httpError(403, 'Video updates are turned off.');
+        if (kind === 'music' && !st.allowMusic) throw httpError(403, 'Music updates are turned off.');
+        if (kind === 'video') {
+          const dur = Math.round(Number(body.durationSeconds) || 0);
+          if (dur <= 0 || dur > st.maxVideoSeconds) {
+            throw httpError(400, `Videos can be up to ${st.maxVideoSeconds} seconds.`);
+          }
+        }
+      } else {
+        throw httpError(400, 'That kind of update is not open yet.');
+      }
 
       const now = Date.now();
       let inWindow = 0;
@@ -743,14 +814,77 @@ export function registerChatRoutes(app: express.Express): void {
 
       const expiresAt = now + st.lastsHours * 60 * 60 * 1000;
       const ref = adminRtdb.ref(`chat/status/${centreId}/${caller.uid}`).push();
-      await ref.set({ kind: 'text', text, bg, at: now, expiresAt });
+      let status: Record<string, unknown>;
+      if (kind === 'text') {
+        const bg = cleanStr(body.bg, 9);
+        if (!/^#[0-9a-fA-F]{6}$/.test(bg)) throw httpError(400, 'Pick a background colour for the update.');
+        status = { kind: 'text', text, bg, at: now, expiresAt };
+      } else {
+        // Media updates only accept files this app uploaded itself: the URL
+        // must point at this deployment's Cloudinary cloud, so a client
+        // cannot post an arbitrary link as its own photo or video.
+        const cloud = String(process.env.CLOUDINARY_CLOUD_NAME || '');
+        const prefix = `https://res.cloudinary.com/${cloud}/${kind === 'photo' ? 'image' : 'video'}/upload/`;
+        const url = cleanStr(body.url, 400);
+        if (!cloud || !url.startsWith(prefix)) throw httpError(400, 'Upload the file through this app first.');
+        status = { kind, at: now, expiresAt };
+        if (text) status.text = text;
+        if (kind === 'photo') status.photoUrl = url;
+        if (kind === 'video') {
+          status.videoUrl = url;
+          status.durationSeconds = Math.round(Number(body.durationSeconds) || 0);
+        }
+        if (kind === 'music') {
+          status.audioUrl = url;
+          const bg = cleanStr(body.bg, 9);
+          status.bg = /^#[0-9a-fA-F]{6}$/.test(bg) ? bg : '#7C3AED';
+        }
+      }
+      await ref.set(status);
       res.json({
         ok: true,
-        status: { statusId: ref.key, kind: 'text', text, bg, at: now, expiresAt },
+        status: { statusId: ref.key, ...status },
         remainingToday: Math.max(0, st.statusesPerDay - (inWindow + 1)),
       });
     } catch (error: any) {
       handleRouteError(res, error, '[chat] status post failed');
+    }
+  });
+
+  // Piece 4: media uploads for statuses. Same preconditions as posting; the
+  // kind's stored setting decides the cap, and the video length is checked
+  // against maxVideoSeconds before anything is stored. The upload returns a
+  // Cloudinary URL that the status POST then verifies belongs to this app.
+  app.post('/api/student/chat/status/upload', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const body = req.body || {};
+      const stuSnap = await getStudentDoc(caller.uid);
+      if (!stuSnap) throw httpError(403, 'No student record is linked to this account.');
+      const student = stuSnap.data() as any;
+      const centreId = cleanStr(student.centreId, 120);
+      if (!centreId) throw httpError(403, 'No centre is linked to this account.');
+      await requireMembership(caller, centreId);
+      const entitlements = await getCentreEntitlements(centreId);
+      if (entitlements.chat !== true) throw httpError(403, 'Chat is not part of your centre\u2019s plan yet.');
+      const tosChat = await getTosChat();
+      const st = tosChat.status;
+      if (!st.enabled) throw httpError(403, 'Status is not turned on.');
+      const kind = cleanStr(body.kind, 10);
+      if (kind !== 'photo' && kind !== 'video' && kind !== 'music') throw httpError(400, 'Which kind of update is this?');
+      if (kind === 'photo' && !st.allowPhoto) throw httpError(403, 'Photo updates are turned off.');
+      if (kind === 'video' && !st.allowVideo) throw httpError(403, 'Video updates are turned off.');
+      if (kind === 'music' && !st.allowMusic) throw httpError(403, 'Music updates are turned off.');
+      if (kind === 'video') {
+        const dur = Math.round(Number(body.durationSeconds) || 0);
+        if (dur <= 0 || dur > st.maxVideoSeconds) {
+          throw httpError(400, `Videos can be up to ${st.maxVideoSeconds} seconds.`);
+        }
+      }
+      const url = await uploadStatusMedia(kind, String(body.dataUrl || ''), st, tosChat.photoMaxKb);
+      res.json({ ok: true, url });
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] status upload failed');
     }
   });
 
@@ -788,6 +922,10 @@ export function registerChatRoutes(app: express.Express): void {
           expiresAt,
           text: cleanStr(v.text, 300),
           bg: cleanStr(v.bg, 9),
+          photoUrl: cleanStr(v.photoUrl, 400),
+          videoUrl: cleanStr(v.videoUrl, 400),
+          audioUrl: cleanStr(v.audioUrl, 400),
+          durationSeconds: Number(v.durationSeconds) || 0,
         });
       });
       statuses.sort((a, b) => a.at - b.at);

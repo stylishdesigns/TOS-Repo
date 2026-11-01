@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, X } from 'lucide-react';
+import { Plus, X, Image as ImageIcon, Film, Music } from 'lucide-react';
 import { Student } from '../../../types';
 import { api } from '../../tos/tosShared';
 import { loadLastGood, saveLastGood } from '../../../lib/lastGood';
@@ -11,9 +11,8 @@ import { loadLastGood, saveLastGood } from '../../../lib/lastGood';
 // RECENT UPDATES and VIEWED. Every number here is server data: the screen
 // renders what GET /api/student/chat/status/overview returned and invents
 // nothing. The instant-open last-good copy opens the screen on old data while
-// a fresh sync runs behind it, with no loading screen. Text posting (S2) is
-// wired here; the viewer (S3) and media statuses (S4) arrive in their own
-// pieces, so own-status viewing taps stay on the add path for now.
+// a fresh sync runs behind it, with no loading screen. Text posting (S2), the
+// viewer (S3) and media statuses (S4) are built on top of it.
 // ============================================================================
 
 interface StatusEntry {
@@ -26,6 +25,10 @@ interface StatusEntry {
   expiresAt: number;
   text: string;
   bg?: string;
+  photoUrl?: string;
+  videoUrl?: string;
+  audioUrl?: string;
+  durationSeconds?: number;
 }
 
 interface StatusReply {
@@ -44,6 +47,10 @@ interface ViewerStatus {
   expiresAt: number;
   text: string;
   bg?: string;
+  photoUrl?: string;
+  videoUrl?: string;
+  audioUrl?: string;
+  durationSeconds?: number;
   views?: number;
   replies?: StatusReply[];
 }
@@ -61,11 +68,17 @@ interface StatusOverview {
     statusesPerDay: number;
     maxTextChars: number;
     maxVideoSeconds: number;
+    maxVideoMb: number;
+    maxAudioMb: number;
+    photoMaxKb: number;
   };
   me?: {
     name: string;
     username: string;
-    latest: { statusId: string; kind: string; at: number; expiresAt: number; text: string } | null;
+    latest: {
+      statusId: string; kind: string; at: number; expiresAt: number; text: string;
+      photoUrl?: string; videoUrl?: string; audioUrl?: string; durationSeconds?: number;
+    } | null;
   };
   recent?: StatusEntry[];
   viewed?: StatusEntry[];
@@ -127,8 +140,11 @@ const AddStatusSheet: React.FC<{
   settings: NonNullable<StatusOverview['settings']>;
   onClose: () => void;
   onText: () => void;
-}> = ({ settings, onClose, onText }) => {
+  onMediaPick: (kind: 'photo' | 'video' | 'music', file: File) => void;
+}> = ({ settings, onClose, onText, onMediaPick }) => {
   useEscape(onClose);
+  const inputRefs = React.useRef<Record<string, HTMLInputElement | null>>({});
+  const pick = (kind: 'photo' | 'video' | 'music') => inputRefs.current[kind]?.click();
   return (
   <div
     className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50"
@@ -165,27 +181,56 @@ const AddStatusSheet: React.FC<{
             </span>
           </button>
         )}
-        {[
-          { label: 'Photo', note: 'From your gallery or camera' },
-          { label: 'Video', note: `Up to ${settings.maxVideoSeconds} sec, set by Tutorial OS` },
-          { label: 'Music', note: 'Share a track with your status' },
-        ].map((row) => (
-          <div
-            key={row.label}
-            className="rounded-2xl px-4 py-3 border border-slate-200 bg-slate-50 flex items-center gap-3 opacity-60"
-            aria-disabled="true"
+        {([
+          { kind: 'photo', label: 'Photo', note: 'From your gallery or camera', allowed: settings.allowPhoto, icon: <ImageIcon className="w-5 h-5" /> },
+          { kind: 'video', label: 'Video', note: `Up to ${settings.maxVideoSeconds} sec, set by Tutorial OS`, allowed: settings.allowVideo, icon: <Film className="w-5 h-5" /> },
+          { kind: 'music', label: 'Music', note: 'Share a track with your status', allowed: settings.allowMusic, icon: <Music className="w-5 h-5" /> },
+        ] as const).map((row) => (
+          <button
+            key={row.kind}
+            onClick={() => (row.allowed ? pick(row.kind) : undefined)}
+            disabled={!row.allowed}
+            className={`w-full text-left rounded-2xl px-4 py-3 border flex items-center gap-3 transition ${
+              row.allowed ? 'border-slate-200 bg-white active:scale-[0.99]' : 'border-slate-200 bg-slate-50 opacity-60'
+            }`}
           >
-            <span className="w-10 h-10 rounded-xl bg-slate-200 text-slate-500 flex items-center justify-center font-black">
-              {row.label[0]}
+            <span className={`w-10 h-10 rounded-xl flex items-center justify-center font-black ${row.allowed ? 'bg-[#FFF7ED] text-[#C2410C]' : 'bg-slate-200 text-slate-500'}`}>
+              {row.icon}
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block text-sm font-black text-slate-700">{row.label}</span>
-              <span className="block text-xs text-slate-500 font-medium">{row.note}</span>
+              <span className="block text-sm font-black text-slate-900">{row.label}</span>
+              <span className="block text-xs text-slate-500 font-medium">{row.allowed ? row.note : 'Not available right now'}</span>
             </span>
-            <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400 bg-white border border-slate-200 rounded-full px-2 py-1">soon</span>
-          </div>
+            {!row.allowed && (
+              <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400 bg-white border border-slate-200 rounded-full px-2 py-1">off</span>
+            )}
+          </button>
         ))}
       </div>
+      {/* The file pickers live here so the sheet stays open while the picker
+          is up; picking hands the file to the screen, which closes the sheet
+          and opens the media composer. */}
+      <input
+        ref={(el) => { inputRefs.current.photo = el; }}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) onMediaPick('photo', f); }}
+      />
+      <input
+        ref={(el) => { inputRefs.current.video = el; }}
+        type="file"
+        accept="video/*"
+        className="hidden"
+        onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) onMediaPick('video', f); }}
+      />
+      <input
+        ref={(el) => { inputRefs.current.music = el; }}
+        type="file"
+        accept="audio/*"
+        className="hidden"
+        onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) onMediaPick('music', f); }}
+      />
       <p className="mt-4 text-[11px] text-slate-400 font-medium text-center">
         Your status disappears after {settings.lastsHours} hours. Limits are set by Tutorial OS.
       </p>
@@ -197,7 +242,7 @@ const AddStatusSheet: React.FC<{
 const TextComposer: React.FC<{
   settings: NonNullable<StatusOverview['settings']>;
   onClose: () => void;
-  onPosted: (status: { statusId: string; kind: string; at: number; expiresAt: number; text: string }) => void;
+  onPosted: (status: Record<string, any>) => void;
 }> = ({ settings, onClose, onPosted }) => {
   useEscape(onClose);
   const [bg, setBg] = useState(STATUS_BG[0]);
@@ -275,6 +320,232 @@ const TextComposer: React.FC<{
         </div>
         <p className="text-center text-[11px] font-bold" style={{ color: dark ? 'rgba(255,255,255,0.7)' : 'rgba(15,23,42,0.5)' }}>
           {text.length}/{settings.maxTextChars}
+        </p>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// Status, piece S4: photo, video and music updates.
+//
+// One composer for all three media kinds. The stored settings decide every
+// limit and the screen only reads them: a photo is downscaled toward the
+// stored photo cap, a video is refused when it runs past the stored seconds
+// or megabytes, a music file past the stored megabytes. Sharing uploads the
+// file through the server's own upload route and then posts the status, so
+// the server sees and checks both steps.
+// ============================================================================
+
+const MediaComposer: React.FC<{
+  kind: 'photo' | 'video' | 'music';
+  file: File;
+  settings: NonNullable<StatusOverview['settings']>;
+  onClose: () => void;
+  onPosted: (status: Record<string, any>) => void;
+}> = ({ kind, file, settings, onClose, onPosted }) => {
+  useEscape(onClose);
+  const [preview, setPreview] = useState('');
+  const [ready, setReady] = useState(false);
+  const [caption, setCaption] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const [fatal, setFatal] = useState('');
+  const durationRef = React.useRef(0);
+
+  useEffect(() => {
+    if (kind === 'photo') {
+      // Same downscale the chat composer uses: long edge 1400px, then a
+      // quality loop toward the stored photo cap in KB.
+      const reader = new FileReader();
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          const max = 1400;
+          const scale = Math.min(1, max / Math.max(img.width || 1, img.height || 1));
+          const w = Math.max(1, Math.round((img.width || max) * scale));
+          const h = Math.max(1, Math.round((img.height || max) * scale));
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) { setFatal('That photo could not be read. Try another.'); return; }
+          ctx.drawImage(img, 0, 0, w, h);
+          const capBytes = Math.max(10, settings.photoMaxKb) * 1024;
+          let q = 0.82;
+          let out = canvas.toDataURL('image/jpeg', q);
+          while (out.length * 0.75 > capBytes && q > 0.35) { q -= 0.15; out = canvas.toDataURL('image/jpeg', q); }
+          if (out.length * 0.75 > capBytes) {
+            setFatal(`Photos can be up to ${settings.photoMaxKb} KB. Choose a smaller one.`);
+            return;
+          }
+          setPreview(out);
+          setReady(true);
+        };
+        img.onerror = () => setFatal('That photo could not be read. Try another.');
+        img.src = String(reader.result || '');
+      };
+      reader.onerror = () => setFatal('That photo could not be read. Try another.');
+      reader.readAsDataURL(file);
+      return;
+    }
+    if (kind === 'video') {
+      if (file.size > settings.maxVideoMb * 1024 * 1024) {
+        setFatal(`Videos can be up to ${settings.maxVideoMb} MB.`);
+        return;
+      }
+      const url = URL.createObjectURL(file);
+      const probe = document.createElement('video');
+      probe.preload = 'metadata';
+      probe.onloadedmetadata = () => {
+        const dur = Math.round(probe.duration || 0);
+        if (dur <= 0) { URL.revokeObjectURL(url); setFatal('That video could not be read. Try another.'); return; }
+        if (dur > settings.maxVideoSeconds) {
+          URL.revokeObjectURL(url);
+          setFatal(`Videos can be up to ${settings.maxVideoSeconds} seconds. This one is ${dur}.`);
+          return;
+        }
+        durationRef.current = dur;
+        setPreview(url);
+        setReady(true);
+      };
+      probe.onerror = () => { URL.revokeObjectURL(url); setFatal('That video could not be read. Try another.'); };
+      probe.src = url;
+      return () => {
+        URL.revokeObjectURL(url);
+      };
+    }
+    // Music: an audio file on a colour background.
+    if (file.size > settings.maxAudioMb * 1024 * 1024) {
+      setFatal(`Music files can be up to ${settings.maxAudioMb} MB.`);
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    setPreview(url);
+    setReady(true);
+    return () => {
+      URL.revokeObjectURL(url);
+    };
+  }, [kind, file, settings]);
+
+  const share = async () => {
+    if (!ready || busy) return;
+    setBusy(true);
+    setErr('');
+    try {
+      let dataUrl = '';
+      if (kind !== 'photo') {
+        dataUrl = await new Promise<string>((resolve, reject) => {
+          const fr = new FileReader();
+          fr.onload = () => resolve(String(fr.result || ''));
+          fr.onerror = () => reject(new Error('That file could not be read. Try another.'));
+          fr.readAsDataURL(file);
+        });
+      }
+      const up = await api('/api/student/chat/status/upload', {
+        method: 'POST',
+        body: {
+          kind,
+          dataUrl: kind === 'photo' ? preview : dataUrl,
+          durationSeconds: kind === 'video' ? durationRef.current : undefined,
+        },
+      });
+      if (!(up && up.ok && up.url)) {
+        throw new Error(String(up?.error || 'The upload could not be completed. Try again.'));
+      }
+      const post = await api('/api/student/chat/status', {
+        method: 'POST',
+        body: {
+          kind,
+          url: up.url,
+          text: caption.trim() || undefined,
+          durationSeconds: kind === 'video' ? durationRef.current : undefined,
+          bg: kind === 'music' ? '#7C3AED' : undefined,
+        },
+      });
+      if (post && post.ok && post.status) onPosted(post.status);
+      else throw new Error(String(post?.error || 'The update could not be shared. Try again.'));
+    } catch (e: any) {
+      const msg = String(e?.message || '');
+      setErr(
+        msg.startsWith('Failed to fetch')
+          ? 'The upload did not go through. If the file is large, try a smaller one.'
+          : msg || 'The update could not be shared. Try again.'
+      );
+      setBusy(false);
+    }
+  };
+
+  const bg = kind === 'music' ? '#7C3AED' : '#0F172A';
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex flex-col"
+      style={{ backgroundColor: bg }}
+      role="dialog"
+      aria-modal="true"
+      aria-label={kind === 'photo' ? 'Add a photo status' : kind === 'video' ? 'Add a video status' : 'Add a music status'}
+    >
+      <div className="flex items-center justify-between p-4">
+        <button
+          onClick={onClose}
+          disabled={busy}
+          className="w-9 h-9 rounded-xl flex items-center justify-center active:scale-95 transition disabled:opacity-40"
+          style={{ color: '#FFFFFF', backgroundColor: 'rgba(255,255,255,0.15)' }}
+          aria-label="Discard update"
+        >
+          <X className="w-4 h-4" />
+        </button>
+        <button
+          onClick={share}
+          disabled={!ready || busy}
+          className="px-5 h-9 rounded-xl font-black text-sm active:scale-95 transition disabled:opacity-40"
+          style={{ color: '#0F172A', backgroundColor: '#FFFFFF' }}
+        >
+          {busy ? 'Sharing...' : 'Share'}
+        </button>
+      </div>
+      <div className="flex-1 flex items-center justify-center px-6 min-h-0">
+        {fatal ? (
+          <div className="text-center space-y-3">
+            <p className="text-sm font-bold" style={{ color: '#FFFFFF' }}>{fatal}</p>
+            <button
+              onClick={onClose}
+              className="px-4 h-9 rounded-xl font-black text-sm active:scale-95 transition"
+              style={{ color: '#0F172A', backgroundColor: '#FFFFFF' }}
+            >
+              Back
+            </button>
+          </div>
+        ) : kind === 'photo' && preview ? (
+          <img src={preview} alt="Status preview" className="max-h-full max-w-full rounded-2xl object-contain" />
+        ) : kind === 'video' && preview ? (
+          <video src={preview} controls playsInline className="max-h-full max-w-full rounded-2xl" />
+        ) : kind === 'music' ? (
+          <div className="w-full max-w-sm rounded-3xl p-6 space-y-4" style={{ backgroundColor: 'rgba(255,255,255,0.12)' }}>
+            <div className="w-16 h-16 rounded-2xl mx-auto flex items-center justify-center" style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}>
+              <Music className="w-8 h-8 text-white" />
+            </div>
+            <p className="text-sm font-black text-white text-center truncate">{file.name}</p>
+            {preview && <audio src={preview} controls className="w-full" />}
+          </div>
+        ) : (
+          <p className="text-sm font-bold" style={{ color: 'rgba(255,255,255,0.7)' }}>Preparing...</p>
+        )}
+      </div>
+      {err && (
+        <p className="px-6 pb-2 text-xs font-bold text-center" style={{ color: '#FCA5A5' }}>{err}</p>
+      )}
+      <div className="p-5 pb-8">
+        <input
+          value={caption}
+          onChange={(e) => setCaption(e.target.value.slice(0, settings.maxTextChars))}
+          placeholder="Add a caption (optional)"
+          className="w-full h-11 rounded-full px-4 text-sm font-medium outline-none"
+          style={{ color: '#FFFFFF', backgroundColor: 'rgba(255,255,255,0.15)' }}
+        />
+        <p className="text-center text-[11px] font-bold mt-2" style={{ color: 'rgba(255,255,255,0.6)' }}>
+          {caption.length}/{settings.maxTextChars}
         </p>
       </div>
     </div>
@@ -368,7 +639,10 @@ const StatusViewer: React.FC<{
     }
   };
 
-  const bg = current?.kind === 'text' && /^#[0-9a-fA-F]{6}$/.test(String(current.bg || '')) ? String(current.bg) : '#0F172A';
+  const bg =
+    current && (current.kind === 'text' || current.kind === 'music') && /^#[0-9a-fA-F]{6}$/.test(String(current.bg || ''))
+      ? String(current.bg)
+      : '#0F172A';
   const dark = bgLuminance(bg) < 0.5;
   const total = statuses?.length || 0;
 
@@ -432,10 +706,19 @@ const StatusViewer: React.FC<{
             {current.text}
           </p>
         )}
-        {current && current.kind !== 'text' && (
-          <p className="text-center text-sm font-bold" style={{ color: dark ? '#FFFFFF' : '#0F172A' }}>
-            This update type opens in a later piece.
-          </p>
+        {current && current.kind === 'photo' && current.photoUrl && (
+          <img src={current.photoUrl} alt="Status" className="absolute inset-0 w-full h-full object-contain" />
+        )}
+        {current && current.kind === 'video' && current.videoUrl && (
+          <video src={current.videoUrl} controls autoPlay playsInline className="max-h-full max-w-full rounded-2xl" />
+        )}
+        {current && current.kind === 'music' && current.audioUrl && (
+          <div className="w-full max-w-sm rounded-3xl p-6 space-y-4" style={{ backgroundColor: 'rgba(255,255,255,0.12)' }}>
+            <div className="w-16 h-16 rounded-2xl mx-auto flex items-center justify-center" style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}>
+              <Music className="w-8 h-8 text-white" />
+            </div>
+            <audio src={current.audioUrl} controls className="w-full" />
+          </div>
         )}
         {total > 1 && (
           <>
@@ -466,6 +749,18 @@ const StatusViewer: React.FC<{
           </p>
         )}
       </div>
+
+      {/* Media updates can carry a caption; it rides above the bottom bar. */}
+      {current && current.kind !== 'text' && current.text && (
+        <div className="px-6 pb-2">
+          <p
+            className="mx-auto max-w-md rounded-2xl px-4 py-2 text-sm font-bold text-center"
+            style={{ color: '#FFFFFF', backgroundColor: 'rgba(15,23,42,0.55)' }}
+          >
+            {current.text}
+          </p>
+        </div>
+      )}
 
       {/* Bottom: the owner sees who has seen it and the replies; everyone
           else sees the reply box when replies are switched on. */}
@@ -576,6 +871,7 @@ export const StatusScreen: React.FC<{ student: Student }> = ({ student }) => {
   const [failed, setFailed] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [composing, setComposing] = useState(false);
+  const [media, setMedia] = useState<{ kind: 'photo' | 'video' | 'music'; file: File } | null>(null);
   const [viewer, setViewer] = useState<{ person: { uid: string; name: string; username: string }; mine: boolean } | null>(null);
 
   useEffect(() => {
@@ -603,6 +899,23 @@ export const StatusScreen: React.FC<{ student: Student }> = ({ student }) => {
   const recent = data?.recent || [];
   const viewed = data?.viewed || [];
   const showLists = recent.length > 0 || viewed.length > 0;
+
+  // Any posted update (text, photo, video or music) lands in the My status
+  // row right away; the next overview sync reconciles it.
+  const applyPosted = (status: Record<string, any>) => {
+    setComposing(false);
+    setMedia(null);
+    setSheetOpen(false);
+    setData((prev) => {
+      if (!prev) return prev;
+      const next: StatusOverview = {
+        ...prev,
+        me: { name: prev.me?.name || student.name, username: prev.me?.username || '', latest: status },
+      };
+      saveLastGood(cacheKey, next);
+      return next;
+    });
+  };
 
   // Viewing a status moves its row to VIEWED straight away, and closing the
   // viewer re-syncs once so the counts and lists come back from the server.
@@ -695,6 +1008,10 @@ export const StatusScreen: React.FC<{ student: Student }> = ({ student }) => {
             setSheetOpen(false);
             setComposing(true);
           }}
+          onMediaPick={(kind, file) => {
+            setSheetOpen(false);
+            setMedia({ kind, file });
+          }}
         />
       )}
 
@@ -709,20 +1026,11 @@ export const StatusScreen: React.FC<{ student: Student }> = ({ student }) => {
       )}
 
       {composing && data?.settings && (
-        <TextComposer
-          settings={data.settings}
-          onClose={() => setComposing(false)}
-          onPosted={(status) => {
-            setComposing(false);
-            setSheetOpen(false);
-            setData((prev) => {
-              if (!prev) return prev;
-              const next: StatusOverview = { ...prev, me: { name: prev.me?.name || student.name, username: prev.me?.username || '', latest: status } };
-              saveLastGood(cacheKey, next);
-              return next;
-            });
-          }}
-        />
+        <TextComposer settings={data.settings} onClose={() => setComposing(false)} onPosted={applyPosted} />
+      )}
+
+      {media && data?.settings && (
+        <MediaComposer kind={media.kind} file={media.file} settings={data.settings} onClose={() => setMedia(null)} onPosted={applyPosted} />
       )}
 
       {!data && failed && (

@@ -568,6 +568,8 @@ export interface TosStatusSettings {
   lastsHours: number;
   maxVideoSeconds: number;
   maxVideoMb: number;
+  /** How large a music file may be, in megabytes. */
+  maxAudioMb: number;
   /** How many statuses one student may post per day. */
   statusesPerDay: number;
   /** Longest text update, in characters. */
