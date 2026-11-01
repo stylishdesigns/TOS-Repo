@@ -967,18 +967,24 @@ export const StatusScreen: React.FC<{ student: Student }> = ({ student }) => {
           {/* My status row. With an update up, tapping opens my own viewer
               with the seen count and replies; without one, it opens the
               Add sheet. */}
-          <button
+          <div
             onClick={() => (me?.latest ? setViewer({ person: { uid: student.uid || '', name: me.name || student.name, username: me.username || '' }, mine: true }) : setSheetOpen(true))}
-            className="w-full text-left bg-white rounded-3xl p-4 border border-slate-200/90 shadow-sm flex items-center gap-3 active:scale-[0.99] transition"
+            role="button"
+            className="w-full text-left bg-white rounded-3xl p-4 border border-slate-200/90 shadow-sm flex items-center gap-3 active:scale-[0.99] transition cursor-pointer"
           >
             <div className="relative shrink-0">
               <div className="w-12 h-12 rounded-full bg-[#FFF7ED] border-2 border-[#EA580C] flex items-center justify-center text-[#C2410C] text-sm font-black">
                 {initials(me?.name || student.name)}
               </div>
-              {!me?.latest && (
-                <div className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-[#EA580C] text-white flex items-center justify-center border-2 border-white">
+              {(!me?.latest || (data?.settings && (data.settings.allowText || data.settings.allowPhoto || data.settings.allowVideo || data.settings.allowMusic))) && (
+                <button
+                  type="button"
+                  aria-label="Add another status"
+                  onClick={(e) => { e.stopPropagation(); setSheetOpen(true); }}
+                  className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-[#EA580C] text-white flex items-center justify-center border-2 border-white active:scale-90 transition"
+                >
                   <Plus className="w-3 h-3" />
-                </div>
+                </button>
               )}
             </div>
             <div className="min-w-0">
@@ -987,7 +993,7 @@ export const StatusScreen: React.FC<{ student: Student }> = ({ student }) => {
                 {me?.latest ? statusTimeLabel(me.latest.at) : 'Tap to add a photo or text update'}
               </p>
             </div>
-          </button>
+          </div>
 
           {!showLists && (
             <div className="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-sm text-center">
