@@ -9,6 +9,7 @@ import { StudentOnboarding } from './StudentOnboarding';
 import { HomeTab } from './tabs/HomeTab';
 import { ClassesTabWrapper } from './tabs/ClassesTabWrapper';
 import { ChatTab } from './tabs/ChatTab';
+import { StatusScreen } from './tabs/StatusTab';
 import { CbtTabWrapper } from './tabs/CbtTabWrapper';
 import { MoreTab } from './tabs/MoreTab';
 import { ActionSheetModal, ActionSheetItem } from './tabs/ActionSheetModal';
@@ -712,25 +713,13 @@ export const StudentPortal: React.FC = () => {
             />
           )}
 
-          {/* Phase 1 E: Status placeholder so the fan entry works. */}
+          {/* Phase 2 S1: the read-only Status screen, wired to the stored
+              allow-status flag and status limits. No back control: the chat
+              orb is the way back to the fan. */}
           {statusScreenOpen && !hideBottomNav && (
             <div className="fixed inset-0 z-40 bg-slate-50 overflow-y-auto animate-in fade-in duration-200">
               <div className="p-4 sm:p-5 max-w-lg mx-auto pt-6 pb-24">
-                <div className="flex items-center gap-3">
-                  <div>
-                    <h2 className="text-2xl font-black text-slate-900 tracking-tight">Status</h2>
-                    <p className="text-[11px] text-slate-500 font-medium">Updates from your centre</p>
-                  </div>
-                </div>
-                <div className="mt-6 bg-white rounded-3xl p-6 border border-slate-200/90 shadow-sm text-center space-y-2">
-                  <div className="w-14 h-14 rounded-full border-2 border-dashed border-[#EA580C] text-[#EA580C] flex items-center justify-center mx-auto">
-                    <Sparkles className="w-6 h-6" />
-                  </div>
-                  <h3 className="text-base font-black text-slate-900 tracking-tight">Coming soon</h3>
-                  <p className="text-xs text-slate-500 leading-relaxed font-medium max-w-xs mx-auto">
-                    Status updates are on the way. You will be able to share short photo and text updates with your centre.
-                  </p>
-                </div>
+                <StatusScreen student={activeStudent} />
               </div>
             </div>
           )}

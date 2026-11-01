@@ -553,6 +553,25 @@ export interface ChatAccessRule {
   thresholdPercent?: number | null;
 }
 
+/** Status feature settings. Stored as data (the platform config document),
+ *  editable on the TOS settings screen, and applied going forward: nothing
+ *  here rewrites statuses that already exist. */
+export interface TosStatusSettings {
+  enabled: boolean;
+  allowText: boolean;
+  allowPhoto: boolean;
+  allowVideo: boolean;
+  allowMusic: boolean;
+  allowReplies: boolean;
+  adminsCanRemove: boolean;
+  /** How long a status stays visible, in hours. */
+  lastsHours: number;
+  maxVideoSeconds: number;
+  maxVideoMb: number;
+  /** How many statuses one student may post per day. */
+  statusesPerDay: number;
+}
+
 export interface TosChatSettings {
   /** Subjects the Mock and Practice style auto-groups are built from. */
   defaultGroupSubjects: string[];
@@ -565,6 +584,7 @@ export interface TosChatSettings {
   messageMaxChars: number;
   postRateLimitPerHour: number;
   autoPosts: { mockOpen: boolean; resultsOut: boolean; practicePublished: boolean };
+  status: TosStatusSettings;
   updatedAt?: string | null;
 }
 

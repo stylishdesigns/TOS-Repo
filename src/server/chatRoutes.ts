@@ -46,6 +46,19 @@ const START_TOS_CHAT: TosChatSettings = {
   messageMaxChars: 2000,
   postRateLimitPerHour: 30,
   autoPosts: { mockOpen: true, resultsOut: true, practicePublished: true },
+  status: {
+    enabled: true,
+    allowText: true,
+    allowPhoto: true,
+    allowVideo: true,
+    allowMusic: true,
+    allowReplies: true,
+    adminsCanRemove: true,
+    lastsHours: 24,
+    maxVideoSeconds: 30,
+    maxVideoMb: 50,
+    statusesPerDay: 5,
+  },
   updatedAt: null,
 };
 
@@ -97,7 +110,11 @@ function clampInt(v: unknown, min: number, max: number, fallback: number): numbe
 }
 
 function mergeTosChat(raw: any): TosChatSettings {
-  const s: TosChatSettings = { ...START_TOS_CHAT, autoPosts: { ...START_TOS_CHAT.autoPosts } };
+  const s: TosChatSettings = {
+    ...START_TOS_CHAT,
+    autoPosts: { ...START_TOS_CHAT.autoPosts },
+    status: { ...START_TOS_CHAT.status },
+  };
   if (!raw || typeof raw !== 'object') return s;
   if (Array.isArray(raw.defaultGroupSubjects)) {
     s.defaultGroupSubjects = raw.defaultGroupSubjects
@@ -118,6 +135,22 @@ function mergeTosChat(raw: any): TosChatSettings {
       mockOpen: raw.autoPosts.mockOpen !== false,
       resultsOut: raw.autoPosts.resultsOut !== false,
       practicePublished: raw.autoPosts.practicePublished !== false,
+    };
+  }
+  if (raw.status && typeof raw.status === 'object') {
+    const w = raw.status;
+    s.status = {
+      enabled: w.enabled !== false,
+      allowText: w.allowText !== false,
+      allowPhoto: w.allowPhoto !== false,
+      allowVideo: w.allowVideo !== false,
+      allowMusic: w.allowMusic !== false,
+      allowReplies: w.allowReplies !== false,
+      adminsCanRemove: w.adminsCanRemove !== false,
+      lastsHours: clampInt(w.lastsHours, 1, 720, s.status.lastsHours),
+      maxVideoSeconds: clampInt(w.maxVideoSeconds, 5, 120, s.status.maxVideoSeconds),
+      maxVideoMb: clampInt(w.maxVideoMb, 1, 500, s.status.maxVideoMb),
+      statusesPerDay: clampInt(w.statusesPerDay, 1, 20, s.status.statusesPerDay),
     };
   }
   if (typeof raw.updatedAt === 'string') s.updatedAt = raw.updatedAt;
@@ -546,6 +579,120 @@ export function registerChatRoutes(app: express.Express): void {
       });
     } catch (error: any) {
       handleRouteError(res, error, '[chat] overview failed');
+    }
+  });
+
+  // Status home, piece 1 (read-only): the centre's active status updates,
+  // split into new and already-seen for this viewer. Status data lives in the
+  // Realtime Database under chat/status/{centreId}/{uid}/{statusId} and is
+  // read ONLY here, like every other chat path. A status is active until its
+  // stored expiresAt, which the poster's write sets from the lasts-hours
+  // setting that was in force when it was posted: settings apply going
+  // forward, nothing is rewritten in old statuses. The seen index lives at
+  // chat/statusViews/{centreId}/{viewerUid}/{statusId} and is written by the
+  // viewer route in a later piece, so until then nothing counts as seen.
+  app.get('/api/student/chat/status/overview', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const stuSnap = await getStudentDoc(caller.uid);
+      if (!stuSnap) return res.status(403).json({ error: 'No student record is linked to this account.' });
+      const student = stuSnap.data() as any;
+      const centreId = cleanStr(student.centreId, 120);
+      if (!centreId) return res.status(403).json({ error: 'No centre is linked to this account.' });
+      await requireMembership(caller, centreId);
+      const entitlements = await getCentreEntitlements(centreId);
+      if (entitlements.chat !== true) {
+        return res.status(403).json({ error: 'Chat is not part of your centre\u2019s plan yet.' });
+      }
+      const st = (await getTosChat()).status;
+      if (!st.enabled) return res.json({ ok: true, enabled: false });
+
+      const now = Date.now();
+      interface One { uid: string; statusId: string; kind: string; at: number; expiresAt: number; text: string; }
+      const latestByUid = new Map<string, One>();
+      const centreSnap = await adminRtdb.ref(`chat/status/${centreId}`).get();
+      centreSnap.forEach((c) => {
+        const uid = cleanStr(c.key as string, 64);
+        if (!uid) return;
+        c.forEach((s) => {
+          const v = s.val() || {};
+          const expiresAt = Number(v.expiresAt) || 0;
+          if (expiresAt <= now) return; // expired statuses vanish everywhere.
+          const item: One = {
+            uid,
+            statusId: cleanStr(s.key as string, 64),
+            kind: cleanStr(v.kind, 10) || 'text',
+            at: Number(v.at) || 0,
+            expiresAt,
+            text: cleanStr(v.text, 300),
+          };
+          const prev = latestByUid.get(uid);
+          if (!prev || item.at > prev.at) latestByUid.set(uid, item);
+        });
+      });
+
+      const seen = new Set<string>();
+      const seenSnap = await adminRtdb.ref(`chat/statusViews/${centreId}/${caller.uid}`).get();
+      seenSnap.forEach((c) => {
+        if (c.val() !== null && c.val() !== undefined) seen.add(String(c.key));
+      });
+
+      const myLatest = latestByUid.get(caller.uid) || null;
+      const others = [...latestByUid.values()]
+        .filter((o) => o.uid !== caller.uid)
+        .sort((a, b) => b.at - a.at);
+
+      const nameByUid = new Map<string, string>();
+      const handleByUid = new Map<string, string>();
+      const uids = others.map((o) => o.uid);
+      for (let i = 0; i < uids.length; i += 10) {
+        const chunk = uids.slice(i, i + 10);
+        const stuList = await adminDb.collection('students').where('uid', 'in', chunk).get();
+        stuList.forEach((d) => {
+          const v = d.data() as any;
+          nameByUid.set(cleanStr(v.uid, 64), cleanStr(v.name, MAX_NAME_CHARS));
+        });
+        const userList = await adminDb.collection('usernames').where('studentId', 'in', chunk).get();
+        userList.forEach((d) => {
+          const v = d.data() as any;
+          handleByUid.set(cleanStr(v.studentId, 64), cleanStr(v.username, 16));
+        });
+      }
+      const shape = (o: One) => ({
+        uid: o.uid,
+        name: nameByUid.get(o.uid) || '',
+        username: handleByUid.get(o.uid) || '',
+        statusId: o.statusId,
+        kind: o.kind,
+        at: o.at,
+        expiresAt: o.expiresAt,
+        text: o.text,
+      });
+
+      res.json({
+        ok: true,
+        enabled: true,
+        settings: {
+          allowText: st.allowText,
+          allowPhoto: st.allowPhoto,
+          allowVideo: st.allowVideo,
+          allowMusic: st.allowMusic,
+          allowReplies: st.allowReplies,
+          lastsHours: st.lastsHours,
+          statusesPerDay: st.statusesPerDay,
+        },
+        me: {
+          name: cleanStr(student.name, MAX_NAME_CHARS),
+          username: await usernameFor(caller.uid),
+          latest: myLatest
+            ? { statusId: myLatest.statusId, kind: myLatest.kind, at: myLatest.at, expiresAt: myLatest.expiresAt, text: myLatest.text }
+            : null,
+        },
+        recent: others.filter((o) => !seen.has(o.statusId)).map(shape),
+        viewed: others.filter((o) => seen.has(o.statusId)).map(shape),
+      });
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] status overview failed');
     }
   });
 
