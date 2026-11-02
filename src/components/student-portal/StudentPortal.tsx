@@ -554,7 +554,7 @@ export const StudentPortal: React.FC = () => {
             desktopViewMode === 'mobile_frame'
               ? 'max-w-md mx-auto sm:rounded-[36px] sm:shadow-2xl sm:border-[6px] sm:border-slate-800'
               : 'max-w-4xl mx-auto sm:rounded-3xl sm:border sm:border-slate-800'
-          } bg-slate-50 min-h-screen sm:min-h-[844px] flex flex-col relative overflow-hidden`}
+          } bg-slate-50 h-screen h-[100dvh] sm:h-auto sm:min-h-[844px] flex flex-col relative overflow-hidden`}
         >
           {/* Parent Mode Indicator Notification if active */}
           {portalMode === 'parent' && (
