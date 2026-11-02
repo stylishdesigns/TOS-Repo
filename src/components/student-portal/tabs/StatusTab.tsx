@@ -3,6 +3,8 @@ import { Plus, X, Image as ImageIcon, Film, Music } from 'lucide-react';
 import { Student } from '../../../types';
 import { api } from '../../tos/tosShared';
 import { loadLastGood, saveLastGood } from '../../../lib/lastGood';
+import { useApp } from '../../../context/AppContext';
+import { getAuth } from 'firebase/auth';
 
 // ============================================================================
 // Status, piece S1: the read-only Status screen.
@@ -137,10 +139,11 @@ function bgLuminance(hex: string): number {
 }
 
 const TextComposer: React.FC<{
+  call: (path: string, opts?: any) => Promise<any>;
   settings: NonNullable<StatusOverview['settings']>;
   onClose: () => void;
   onPosted: (status: Record<string, any>) => void;
-}> = ({ settings, onClose, onPosted }) => {
+}> = ({ call, settings, onClose, onPosted }) => {
   useEscape(onClose);
   const [bg, setBg] = useState(STATUS_BG[0]);
   const [text, setText] = useState('');
@@ -152,7 +155,7 @@ const TextComposer: React.FC<{
     setBusy(true);
     setErr('');
     try {
-      const d = await api('/api/student/chat/status', { method: 'POST', body: { kind: 'text', text: text.trim(), bg } });
+      const d = await call('', { method: 'POST', body: { kind: 'text', text: text.trim(), bg } });
       if (d && d.ok && d.status) onPosted(d.status);
       else throw new Error(String(d?.error || 'The update could not be shared. Try again.'));
     } catch (e: any) {
@@ -237,10 +240,11 @@ const TextComposer: React.FC<{
 const MediaComposer: React.FC<{
   kind: 'photo' | 'video' | 'music';
   file: File;
+  call: (path: string, opts?: any) => Promise<any>;
   settings: NonNullable<StatusOverview['settings']>;
   onClose: () => void;
   onPosted: (status: Record<string, any>) => void;
-}> = ({ kind, file, settings, onClose, onPosted }) => {
+}> = ({ kind, file, call, settings, onClose, onPosted }) => {
   useEscape(onClose);
   const [preview, setPreview] = useState('');
   const [ready, setReady] = useState(false);
@@ -339,7 +343,7 @@ const MediaComposer: React.FC<{
           fr.readAsDataURL(file);
         });
       }
-      const up = await api('/api/student/chat/status/upload', {
+      const up = await call('/upload', {
         method: 'POST',
         body: {
           kind,
@@ -350,7 +354,7 @@ const MediaComposer: React.FC<{
       if (!(up && up.ok && up.url)) {
         throw new Error(String(up?.error || 'The upload could not be completed. Try again.'));
       }
-      const post = await api('/api/student/chat/status', {
+      const post = await call('', {
         method: 'POST',
         body: {
           kind,
@@ -462,10 +466,11 @@ const MediaComposer: React.FC<{
 const StatusViewer: React.FC<{
   person: { uid: string; name: string; username: string };
   mine: boolean;
+  call: (path: string, opts?: any) => Promise<any>;
   settings: NonNullable<StatusOverview['settings']>;
   onClose: () => void;
   onSeenUpdate: (ownerUid: string, statusId: string) => void;
-}> = ({ person, mine, settings, onClose, onSeenUpdate }) => {
+}> = ({ person, mine, call, settings, onClose, onSeenUpdate }) => {
   useEscape(onClose);
   const [statuses, setStatuses] = useState<ViewerStatus[] | null>(null);
   const [idx, setIdx] = useState(0);
@@ -477,7 +482,7 @@ const StatusViewer: React.FC<{
 
   useEffect(() => {
     let alive = true;
-    api(`/api/student/chat/status/user/${encodeURIComponent(person.uid)}`)
+    call(`/user/${encodeURIComponent(person.uid)}`)
       .then((d: any) => {
         if (!alive) return;
         if (d && d.ok) setStatuses(Array.isArray(d.statuses) ? d.statuses : []);
@@ -501,7 +506,7 @@ const StatusViewer: React.FC<{
     if (seenFired.current.has(current.statusId)) return;
     seenFired.current.add(current.statusId);
     onSeenUpdate(person.uid, current.statusId);
-    api('/api/student/chat/status/seen', {
+    call('/seen', {
       method: 'POST',
       body: { ownerUid: person.uid, statusId: current.statusId },
     }).catch(() => undefined);
@@ -512,7 +517,7 @@ const StatusViewer: React.FC<{
     setReplyBusy(true);
     setErr('');
     try {
-      const d = await api('/api/student/chat/status/reply', {
+      const d = await call('/reply', {
         method: 'POST',
         body: { ownerUid: person.uid, statusId: current.statusId, text: replyText.trim() },
       });
@@ -762,8 +767,8 @@ const StatusList: React.FC<{ label: string; items: StatusEntry[]; dimmed?: boole
   </div>
 );
 
-export const StatusScreen: React.FC<{ student: Student }> = ({ student }) => {
-  const cacheKey = 'chat:status';
+export const StatusScreenCore: React.FC<{ call: (path: string, opts?: any) => Promise<any>; uid: string; cacheKey?: string; fallbackName?: string }> =
+({ call, uid, cacheKey = 'chat:status', fallbackName = '' }) => {
   const [data, setData] = useState<StatusOverview | null>(() => loadLastGood<StatusOverview>(cacheKey));
   const [failed, setFailed] = useState(false);
   const [fanOpen, setFanOpen] = useState(false);
@@ -782,7 +787,7 @@ export const StatusScreen: React.FC<{ student: Student }> = ({ student }) => {
 
   useEffect(() => {
     let alive = true;
-    api('/api/student/chat/status/overview')
+    call('/overview')
       .then((d: StatusOverview) => {
         if (!alive) return;
         if (d && d.ok) {
@@ -816,7 +821,7 @@ export const StatusScreen: React.FC<{ student: Student }> = ({ student }) => {
       if (!prev) return prev;
       const next: StatusOverview = {
         ...prev,
-        me: { name: prev.me?.name || student.name, username: prev.me?.username || '', latest: status },
+        me: { name: prev.me?.name || fallbackName, username: prev.me?.username || '', latest: status },
       };
       saveLastGood(cacheKey, next);
       return next;
@@ -828,7 +833,7 @@ export const StatusScreen: React.FC<{ student: Student }> = ({ student }) => {
   const openViewer = (entry: { uid: string; name: string; username: string }) => setViewer({ person: entry, mine: false });
   const closeViewer = () => {
     setViewer(null);
-    api('/api/student/chat/status/overview')
+    call('/overview')
       .then((d: StatusOverview) => {
         if (d && d.ok) {
           setData(d);
@@ -874,13 +879,13 @@ export const StatusScreen: React.FC<{ student: Student }> = ({ student }) => {
               with the seen count and replies; without one, it opens the
               Add sheet. */}
           <div
-            onClick={() => (me?.latest ? setViewer({ person: { uid: student.uid || '', name: me.name || student.name, username: me.username || '' }, mine: true }) : setFanOpen(true))}
+            onClick={() => (me?.latest ? setViewer({ person: { uid, name: me.name || fallbackName, username: me.username || '' }, mine: true }) : setFanOpen(true))}
             role="button"
             className="w-full text-left bg-white rounded-3xl p-4 border border-slate-200/90 shadow-sm flex items-center gap-3 active:scale-[0.99] transition cursor-pointer"
           >
             <div className="relative shrink-0">
               <div className="w-12 h-12 rounded-full bg-[#FFF7ED] border-2 border-[#EA580C] flex items-center justify-center text-[#C2410C] text-sm font-black">
-                {initials(me?.name || student.name)}
+                {initials(me?.name || fallbackName)}
               </div>
             </div>
             <div className="min-w-0">
@@ -982,6 +987,7 @@ export const StatusScreen: React.FC<{ student: Student }> = ({ student }) => {
         <StatusViewer
           person={viewer.person}
           mine={viewer.mine}
+          call={call}
           settings={data.settings}
           onClose={closeViewer}
           onSeenUpdate={moveToViewed}
@@ -989,11 +995,11 @@ export const StatusScreen: React.FC<{ student: Student }> = ({ student }) => {
       )}
 
       {composing && data?.settings && (
-        <TextComposer settings={data.settings} onClose={() => setComposing(false)} onPosted={applyPosted} />
+        <TextComposer call={call} settings={data.settings} onClose={() => setComposing(false)} onPosted={applyPosted} />
       )}
 
       {media && data?.settings && (
-        <MediaComposer kind={media.kind} file={media.file} settings={data.settings} onClose={() => setMedia(null)} onPosted={applyPosted} />
+        <MediaComposer kind={media.kind} file={media.file} call={call} settings={data.settings} onClose={() => setMedia(null)} onPosted={applyPosted} />
       )}
 
       {!data && failed && (
@@ -1003,4 +1009,27 @@ export const StatusScreen: React.FC<{ student: Student }> = ({ student }) => {
       )}
     </div>
   );
+};
+
+// Student entry point: the student's own endpoints.
+export const StatusScreen: React.FC<{ student: Student }> = ({ student }) => {
+  const call = React.useCallback(
+    (path: string, opts?: any) => api('/api/student/chat/status' + path, opts),
+    [],
+  );
+  return <StatusScreenCore call={call} uid={student.uid || ''} fallbackName={student.name} />;
+};
+
+// Staff entry point (ST1): admins and tutors use the same screen against
+// their centre's status endpoints; centreId comes from the shared app
+// context, the same way ChatManager finds it.
+export const StaffStatusScreen: React.FC = () => {
+  const { activeCentreId } = useApp();
+  const myUid = getAuth().currentUser?.uid || '';
+  const call = React.useCallback(
+    (path: string, opts?: any) =>
+      api('/api/centre/chat/status' + path + '?centreId=' + encodeURIComponent(String(activeCentreId || '')), opts),
+    [activeCentreId],
+  );
+  return <StatusScreenCore call={call} uid={myUid} cacheKey="chat:staff-status" />;
 };

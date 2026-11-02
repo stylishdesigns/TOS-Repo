@@ -7,6 +7,8 @@ import { RollCallTab } from './tabs/RollCallTab';
 import { AssessmentTab } from './tabs/AssessmentTab';
 import { MoreTab } from './tabs/MoreTab';
 import { ChatManager } from '../communications/ChatManager';
+import { StaffStatusScreen } from '../student-portal/tabs/StatusTab';
+import { ChatSplash } from '../communications/ChatSplash';
 import { PWAInstallButton } from '../pwa/PWAInstallButton';
 import {
   Home,
@@ -50,6 +52,8 @@ export const TutorPortal: React.FC = () => {
 
   const [activeTab, setActiveTabState] = useState<TabType>(parseInitialTutorTab);
   const [chatThreadOpen, setChatThreadOpen] = useState(false);
+  // Which thing chat opens: the splash chooser first, then Status or Chat.
+  const [chatMode, setChatMode] = useState<'choose' | 'status' | 'chat'>('chat');
   const [desktopViewMode, setDesktopViewMode] = useState<'mobile_frame' | 'expanded'>('mobile_frame');
 
   const activeTutor = contextTutor || {
@@ -85,6 +89,7 @@ export const TutorPortal: React.FC = () => {
   };
 
   const setActiveTab = (tab: TabType) => {
+    if (tab === 'chat') setChatMode('choose');
     setActiveTabState(tab);
     try {
       localStorage.setItem('EXCELLENCE_TUTORIAL_DATA_V1_tutorTab', tab);
@@ -213,7 +218,15 @@ export const TutorPortal: React.FC = () => {
             {activeTab === 'home' && <HomeTab tutor={activeTutor} onNavigateTab={setActiveTab} />}
             {activeTab === 'classes' && <ScheduleTab tutor={activeTutor} />}
             {activeTab === 'assessment' && <AssessmentTab tutor={activeTutor} />}
-            {activeTab === 'chat' && <ChatManager onThreadOpenChange={setChatThreadOpen} />}
+            {activeTab === 'chat' && chatMode === 'status' && <StaffStatusScreen />}
+            {activeTab === 'chat' && chatMode === 'chat' && <ChatManager onThreadOpenChange={setChatThreadOpen} />}
+            {activeTab === 'chat' && chatMode === 'choose' && (
+              <ChatSplash
+                onStatus={() => setChatMode('status')}
+                onChat={() => setChatMode('chat')}
+                onClose={() => setChatMode('chat')}
+              />
+            )}
             {activeTab === 'more' && (
               <MoreTab 
                 tutor={activeTutor} 

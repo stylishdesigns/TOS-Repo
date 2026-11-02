@@ -648,113 +648,7 @@ export function registerChatRoutes(app: express.Express): void {
       if (entitlements.chat !== true) {
         return res.status(403).json({ error: 'Chat is not part of your centre\u2019s plan yet.' });
       }
-      const tosChat = await getTosChat();
-      const st = tosChat.status;
-      if (!st.enabled) return res.json({ ok: true, enabled: false });
-
-      const now = Date.now();
-      interface One { uid: string; statusId: string; kind: string; at: number; expiresAt: number; text: string; bg: string; photoUrl: string; videoUrl: string; audioUrl: string; durationSeconds: number; }
-      const latestByUid = new Map<string, One>();
-      const centreSnap = await adminRtdb.ref(`chat/status/${centreId}`).get();
-      centreSnap.forEach((c) => {
-        const uid = cleanStr(c.key as string, 64);
-        if (!uid) return;
-        c.forEach((s) => {
-          const v = s.val() || {};
-          const expiresAt = Number(v.expiresAt) || 0;
-          if (expiresAt <= now) return; // expired statuses vanish everywhere.
-          const item: One = {
-            uid,
-            statusId: cleanStr(s.key as string, 64),
-            kind: cleanStr(v.kind, 10) || 'text',
-            at: Number(v.at) || 0,
-            expiresAt,
-            text: cleanStr(v.text, 300),
-            bg: cleanStr(v.bg, 9),
-            photoUrl: cleanStr(v.photoUrl, 400),
-            videoUrl: cleanStr(v.videoUrl, 400),
-            audioUrl: cleanStr(v.audioUrl, 400),
-            durationSeconds: Number(v.durationSeconds) || 0,
-          };
-          const prev = latestByUid.get(uid);
-          if (!prev || item.at > prev.at) latestByUid.set(uid, item);
-        });
-      });
-
-      const seen = new Set<string>();
-      const seenSnap = await adminRtdb.ref(`chat/statusViews/${centreId}/${caller.uid}`).get();
-      seenSnap.forEach((c) => {
-        if (c.val() !== null && c.val() !== undefined) seen.add(String(c.key));
-      });
-
-      const myLatest = latestByUid.get(caller.uid) || null;
-      const others = [...latestByUid.values()]
-        .filter((o) => o.uid !== caller.uid)
-        .sort((a, b) => b.at - a.at);
-
-      const nameByUid = new Map<string, string>();
-      const handleByUid = new Map<string, string>();
-      const uids = others.map((o) => o.uid);
-      for (let i = 0; i < uids.length; i += 10) {
-        const chunk = uids.slice(i, i + 10);
-        const stuList = await adminDb.collection('students').where('uid', 'in', chunk).get();
-        stuList.forEach((d) => {
-          const v = d.data() as any;
-          nameByUid.set(cleanStr(v.uid, 64), cleanStr(v.name, MAX_NAME_CHARS));
-        });
-        const userList = await adminDb.collection('usernames').where('studentId', 'in', chunk).get();
-        userList.forEach((d) => {
-          const v = d.data() as any;
-          handleByUid.set(cleanStr(v.studentId, 64), cleanStr(v.username, 16));
-        });
-      }
-      const shape = (o: One) => ({
-        uid: o.uid,
-        name: nameByUid.get(o.uid) || '',
-        username: handleByUid.get(o.uid) || '',
-        statusId: o.statusId,
-        kind: o.kind,
-        at: o.at,
-        expiresAt: o.expiresAt,
-        text: o.text,
-        bg: o.bg,
-        photoUrl: o.photoUrl,
-        videoUrl: o.videoUrl,
-        audioUrl: o.audioUrl,
-        durationSeconds: o.durationSeconds,
-      });
-
-      res.json({
-        ok: true,
-        enabled: true,
-        settings: {
-          allowText: st.allowText,
-          allowPhoto: st.allowPhoto,
-          allowVideo: st.allowVideo,
-          allowMusic: st.allowMusic,
-          allowReplies: st.allowReplies,
-          lastsHours: st.lastsHours,
-          statusesPerDay: st.statusesPerDay,
-          maxTextChars: st.maxTextChars,
-          maxVideoSeconds: st.maxVideoSeconds,
-          maxVideoMb: st.maxVideoMb,
-          maxAudioMb: st.maxAudioMb,
-          photoMaxKb: tosChat.photoMaxKb,
-        },
-        me: {
-          name: cleanStr(student.name, MAX_NAME_CHARS),
-          username: await usernameFor(caller.uid),
-          latest: myLatest
-            ? {
-                statusId: myLatest.statusId, kind: myLatest.kind, at: myLatest.at, expiresAt: myLatest.expiresAt,
-                text: myLatest.text, bg: myLatest.bg, photoUrl: myLatest.photoUrl, videoUrl: myLatest.videoUrl,
-                audioUrl: myLatest.audioUrl, durationSeconds: myLatest.durationSeconds,
-              }
-            : null,
-        },
-        recent: others.filter((o) => !seen.has(o.statusId)).map(shape),
-        viewed: others.filter((o) => seen.has(o.statusId)).map(shape),
-      });
+      res.json(await statusOverviewCore(caller, centreId, { name: cleanStr(student.name, MAX_NAME_CHARS), username: await usernameFor(caller.uid) }));
     } catch (error: any) {
       handleRouteError(res, error, '[chat] status overview failed');
     }
@@ -778,74 +672,7 @@ export function registerChatRoutes(app: express.Express): void {
       await requireMembership(caller, centreId);
       const entitlements = await getCentreEntitlements(centreId);
       if (entitlements.chat !== true) throw httpError(403, 'Chat is not part of your centre\u2019s plan yet.');
-      const tosChat = await getTosChat();
-      const st = tosChat.status;
-      if (!st.enabled) throw httpError(403, 'Status is not turned on.');
-      const kind = cleanStr(body.kind, 10) || 'text';
-      const text = cleanStr(body.text, st.maxTextChars);
-
-      if (kind === 'text') {
-        if (!st.allowText) throw httpError(403, 'Text updates are turned off.');
-        if (!text) throw httpError(400, 'Type your update first.');
-      } else if (kind === 'photo' || kind === 'video' || kind === 'music') {
-        if (kind === 'photo' && !st.allowPhoto) throw httpError(403, 'Photo updates are turned off.');
-        if (kind === 'video' && !st.allowVideo) throw httpError(403, 'Video updates are turned off.');
-        if (kind === 'music' && !st.allowMusic) throw httpError(403, 'Music updates are turned off.');
-        if (kind === 'video') {
-          const dur = Math.round(Number(body.durationSeconds) || 0);
-          if (dur <= 0 || dur > st.maxVideoSeconds) {
-            throw httpError(400, `Videos can be up to ${st.maxVideoSeconds} seconds.`);
-          }
-        }
-      } else {
-        throw httpError(400, 'That kind of update is not open yet.');
-      }
-
-      const now = Date.now();
-      let inWindow = 0;
-      const mine = await adminRtdb.ref(`chat/status/${centreId}/${caller.uid}`).get();
-      mine.forEach((c) => {
-        const v = c.val() || {};
-        if ((Number(v.at) || 0) > now - DAY_MS) inWindow += 1;
-      });
-      if (inWindow >= st.statusesPerDay) {
-        throw httpError(429, 'You have reached the status limit for today. Try again later.');
-      }
-
-      const expiresAt = now + st.lastsHours * 60 * 60 * 1000;
-      const ref = adminRtdb.ref(`chat/status/${centreId}/${caller.uid}`).push();
-      let status: Record<string, unknown>;
-      if (kind === 'text') {
-        const bg = cleanStr(body.bg, 9);
-        if (!/^#[0-9a-fA-F]{6}$/.test(bg)) throw httpError(400, 'Pick a background colour for the update.');
-        status = { kind: 'text', text, bg, at: now, expiresAt };
-      } else {
-        // Media updates only accept files this app uploaded itself: the URL
-        // must point at this deployment's Cloudinary cloud, so a client
-        // cannot post an arbitrary link as its own photo or video.
-        const cloud = String(process.env.CLOUDINARY_CLOUD_NAME || '');
-        const prefix = `https://res.cloudinary.com/${cloud}/${kind === 'photo' ? 'image' : 'video'}/upload/`;
-        const url = cleanStr(body.url, 400);
-        if (!cloud || !url.startsWith(prefix)) throw httpError(400, 'Upload the file through this app first.');
-        status = { kind, at: now, expiresAt };
-        if (text) status.text = text;
-        if (kind === 'photo') status.photoUrl = url;
-        if (kind === 'video') {
-          status.videoUrl = url;
-          status.durationSeconds = Math.round(Number(body.durationSeconds) || 0);
-        }
-        if (kind === 'music') {
-          status.audioUrl = url;
-          const bg = cleanStr(body.bg, 9);
-          status.bg = /^#[0-9a-fA-F]{6}$/.test(bg) ? bg : '#7C3AED';
-        }
-      }
-      await ref.set(status);
-      res.json({
-        ok: true,
-        status: { statusId: ref.key, ...status },
-        remainingToday: Math.max(0, st.statusesPerDay - (inWindow + 1)),
-      });
+      res.json(await statusPostCore(caller, centreId, body));
     } catch (error: any) {
       handleRouteError(res, error, '[chat] status post failed');
     }
@@ -867,22 +694,7 @@ export function registerChatRoutes(app: express.Express): void {
       await requireMembership(caller, centreId);
       const entitlements = await getCentreEntitlements(centreId);
       if (entitlements.chat !== true) throw httpError(403, 'Chat is not part of your centre\u2019s plan yet.');
-      const tosChat = await getTosChat();
-      const st = tosChat.status;
-      if (!st.enabled) throw httpError(403, 'Status is not turned on.');
-      const kind = cleanStr(body.kind, 10);
-      if (kind !== 'photo' && kind !== 'video' && kind !== 'music') throw httpError(400, 'Which kind of update is this?');
-      if (kind === 'photo' && !st.allowPhoto) throw httpError(403, 'Photo updates are turned off.');
-      if (kind === 'video' && !st.allowVideo) throw httpError(403, 'Video updates are turned off.');
-      if (kind === 'music' && !st.allowMusic) throw httpError(403, 'Music updates are turned off.');
-      if (kind === 'video') {
-        const dur = Math.round(Number(body.durationSeconds) || 0);
-        if (dur <= 0 || dur > st.maxVideoSeconds) {
-          throw httpError(400, `Videos can be up to ${st.maxVideoSeconds} seconds.`);
-        }
-      }
-      const url = await uploadStatusMedia(kind, String(body.dataUrl || ''), st, tosChat.photoMaxKb);
-      res.json({ ok: true, url });
+      res.json(await statusUploadCore(caller, centreId, body));
     } catch (error: any) {
       handleRouteError(res, error, '[chat] status upload failed');
     }
@@ -903,63 +715,9 @@ export function registerChatRoutes(app: express.Express): void {
       await requireMembership(caller, centreId);
       const entitlements = await getCentreEntitlements(centreId);
       if (entitlements.chat !== true) return res.status(403).json({ error: 'Chat is not part of your centre\u2019s plan yet.' });
-      const st = (await getTosChat()).status;
-      if (!st.enabled) return res.json({ ok: true, enabled: false, statuses: [] });
-
       const ownerUid = cleanStr(req.params?.uid, 64);
       if (!ownerUid) return res.status(400).json({ error: 'Which status is this?' });
-      const now = Date.now();
-      const mine = await adminRtdb.ref(`chat/status/${centreId}/${ownerUid}`).get();
-      const statuses: any[] = [];
-      mine.forEach((s) => {
-        const v = s.val() || {};
-        const expiresAt = Number(v.expiresAt) || 0;
-        if (expiresAt <= now) return;
-        statuses.push({
-          statusId: cleanStr(s.key as string, 64),
-          kind: cleanStr(v.kind, 10) || 'text',
-          at: Number(v.at) || 0,
-          expiresAt,
-          text: cleanStr(v.text, 300),
-          bg: cleanStr(v.bg, 9),
-          photoUrl: cleanStr(v.photoUrl, 400),
-          videoUrl: cleanStr(v.videoUrl, 400),
-          audioUrl: cleanStr(v.audioUrl, 400),
-          durationSeconds: Number(v.durationSeconds) || 0,
-        });
-      });
-      statuses.sort((a, b) => a.at - b.at);
-
-      if (ownerUid === caller.uid) {
-        for (const s of statuses) {
-          const viewsSnap = await adminRtdb.ref(`chat/statusSeenCount/${centreId}/${s.statusId}`).get();
-          s.views = Number(viewsSnap.val()) || 0;
-          const repliesSnap = await adminRtdb.ref(`chat/statusReplies/${centreId}/${s.statusId}`).get();
-          const replies: any[] = [];
-          repliesSnap.forEach((c) => {
-            const v = c.val() || {};
-            replies.push({
-              uid: cleanStr(v.uid, 64),
-              name: cleanStr(v.name, MAX_NAME_CHARS),
-              username: cleanStr(v.username, 16),
-              text: cleanStr(v.text, 2000),
-              at: Number(v.at) || 0,
-            });
-          });
-          replies.sort((a, b) => b.at - a.at);
-          s.replies = replies.slice(0, 50);
-        }
-      }
-
-      const ownerName = ownerUid === caller.uid
-        ? cleanStr(student.name, MAX_NAME_CHARS)
-        : (await adminDb.collection('students').where('uid', '==', ownerUid).limit(1).get())
-            .docs[0]?.data()?.name || '';
-      res.json({
-        ok: true,
-        owner: { uid: ownerUid, name: cleanStr(ownerName, MAX_NAME_CHARS), username: await usernameFor(ownerUid) },
-        statuses,
-      });
+      res.json(await statusUserCore(caller, centreId, ownerUid, cleanStr(student.name, MAX_NAME_CHARS), await usernameFor(caller.uid)));
     } catch (error: any) {
       handleRouteError(res, error, '[chat] status user failed');
     }
@@ -979,29 +737,7 @@ export function registerChatRoutes(app: express.Express): void {
       await requireMembership(caller, centreId);
       const entitlements = await getCentreEntitlements(centreId);
       if (entitlements.chat !== true) return res.status(403).json({ error: 'Chat is not part of your centre\u2019s plan yet.' });
-      const st = (await getTosChat()).status;
-      if (!st.enabled) return res.json({ ok: true });
-
-      const ownerUid = cleanStr(body.ownerUid, 64);
-      const statusId = cleanStr(body.statusId, 64);
-      if (!ownerUid || !statusId) return res.status(400).json({ error: 'Which status is this?' });
-      if (ownerUid === caller.uid) return res.json({ ok: true }); // Own views never count as seen.
-
-      const now = Date.now();
-      const statusSnap = await adminRtdb.ref(`chat/status/${centreId}/${ownerUid}/${statusId}`).get();
-      const sv = statusSnap.val() || {};
-      if (!statusSnap.exists() || (Number(sv.expiresAt) || 0) <= now) {
-        return res.status(404).json({ error: 'That status is gone.' });
-      }
-
-      const seenRef = adminRtdb.ref(`chat/statusViews/${centreId}/${caller.uid}/${statusId}`);
-      const already = await seenRef.get();
-      if (!already.exists()) {
-        await seenRef.set({ at: now });
-        const countRef = adminRtdb.ref(`chat/statusSeenCount/${centreId}/${statusId}`);
-        await countRef.set(ServerValue.increment(1));
-      }
-      res.json({ ok: true });
+      res.json(await statusSeenCore(caller, centreId, body));
     } catch (error: any) {
       handleRouteError(res, error, '[chat] status seen failed');
     }
@@ -1024,40 +760,84 @@ export function registerChatRoutes(app: express.Express): void {
       await requireMembership(caller, centreId);
       const entitlements = await getCentreEntitlements(centreId);
       if (entitlements.chat !== true) return res.status(403).json({ error: 'Chat is not part of your centre\u2019s plan yet.' });
-      const tosChat = await getTosChat();
-      const st = tosChat.status;
-      if (!st.enabled) return res.status(403).json({ error: 'Status is not turned on.' });
-      if (!st.allowReplies) return res.status(403).json({ error: 'Status replies are turned off.' });
-
-      const ownerUid = cleanStr(body.ownerUid, 64);
-      const statusId = cleanStr(body.statusId, 64);
-      const text = String(body.text ?? '').trim();
-      if (!ownerUid || !statusId || !text) return res.status(400).json({ error: 'Type your reply first.' });
-      if (ownerUid === caller.uid) return res.status(400).json({ error: 'You cannot reply to your own status.' });
-      if (text.length > tosChat.messageMaxChars) {
-        return res.status(400).json({ error: `Replies can be up to ${tosChat.messageMaxChars} characters.` });
-      }
-      await consumePostRateLimit(caller.uid, tosChat.postRateLimitPerHour);
-
-      const now = Date.now();
-      const statusSnap = await adminRtdb.ref(`chat/status/${centreId}/${ownerUid}/${statusId}`).get();
-      const sv = statusSnap.val() || {};
-      if (!statusSnap.exists() || (Number(sv.expiresAt) || 0) <= now) {
-        return res.status(404).json({ error: 'That status is gone.' });
-      }
-
-      const ref = adminRtdb.ref(`chat/statusReplies/${centreId}/${statusId}`).push();
-      const reply = {
-        uid: caller.uid,
-        name: cleanStr(student.name, MAX_NAME_CHARS),
-        username: await usernameFor(caller.uid),
-        text: text.slice(0, tosChat.messageMaxChars),
-        at: now,
-      };
-      await ref.set(reply);
-      res.json({ ok: true, reply: { ...reply, replyId: ref.key } });
+      res.json(await statusReplyCore(caller, centreId, body, { name: cleanStr(student.name, MAX_NAME_CHARS), username: await usernameFor(caller.uid) }));
     } catch (error: any) {
       handleRouteError(res, error, '[chat] status reply failed');
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // Staff status (ST1): admins and tutors post to their centre's status and
+  // view students' updates under the same stored settings and the same limits
+  // students have. Their updates land in the same centre-wide list students
+  // see, and the shared status engine keeps every rule in one place.
+  // ---------------------------------------------------------------------------
+
+  app.get('/api/centre/chat/status/overview', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const centreId = cleanStr(String(req.query.centreId || ''), 120);
+      await staffStatusContext(caller, centreId);
+      res.json(await statusOverviewCore(caller, centreId, { name: await staffDisplayName(caller), username: '' }));
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] staff status overview failed');
+    }
+  });
+
+  app.post('/api/centre/chat/status', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const centreId = cleanStr(String(req.query.centreId || ''), 120);
+      await staffStatusContext(caller, centreId);
+      res.json(await statusPostCore(caller, centreId, req.body || {}));
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] staff status post failed');
+    }
+  });
+
+  app.post('/api/centre/chat/status/upload', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const centreId = cleanStr(String(req.query.centreId || ''), 120);
+      await staffStatusContext(caller, centreId);
+      res.json(await statusUploadCore(caller, centreId, req.body || {}));
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] staff status upload failed');
+    }
+  });
+
+  app.get('/api/centre/chat/status/user/:uid', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const centreId = cleanStr(String(req.query.centreId || ''), 120);
+      await staffStatusContext(caller, centreId);
+      const ownerUid = cleanStr(req.params?.uid, 64);
+      if (!ownerUid) throw httpError(400, 'Which status is this?');
+      res.json(await statusUserCore(caller, centreId, ownerUid, await staffDisplayName(caller), ''));
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] staff status user failed');
+    }
+  });
+
+  app.post('/api/centre/chat/status/seen', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const centreId = cleanStr(String(req.query.centreId || ''), 120);
+      await staffStatusContext(caller, centreId);
+      res.json(await statusSeenCore(caller, centreId, req.body || {}));
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] staff status seen failed');
+    }
+  });
+
+  app.post('/api/centre/chat/status/reply', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const centreId = cleanStr(String(req.query.centreId || ''), 120);
+      await staffStatusContext(caller, centreId);
+      res.json(await statusReplyCore(caller, centreId, req.body || {}, { name: await staffDisplayName(caller), username: '' }));
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] staff status reply failed');
     }
   });
 
@@ -1395,6 +1175,396 @@ async function staffDisplayName(caller: Caller): Promise<string> {
   } catch { /* fall through to the email prefix */ }
   const prefix = cleanStr(caller.email, 120).split('@')[0] || '';
   return cleanStr(prefix, 40) || 'Staff';
+}
+
+/** Resolve the display name for one status owner: their student record first,
+ *  then their admin or tutor record. Used so a staff member's status shows a
+ *  real name in every list, students' and staff's alike. */
+async function statusOwnerName(ownerUid: string): Promise<string> {
+  const uid = cleanStr(ownerUid, 64);
+  if (!uid) return '';
+  try {
+    const stu = await adminDb.collection('students').where('uid', '==', uid).limit(1).get();
+    const stuName = cleanStr(stu.docs[0]?.data()?.name, MAX_NAME_CHARS);
+    if (stuName) return stuName;
+  } catch { /* keep looking */ }
+  for (const col of ['admins', 'tutors'] as const) {
+    try {
+      const snap = await adminDb.collection(col).where('uid', '==', uid).limit(1).get();
+      const nm = cleanStr(snap.docs[0]?.data()?.name || snap.docs[0]?.data()?.displayName || snap.docs[0]?.data()?.fullName, MAX_NAME_CHARS);
+      if (nm) return nm;
+    } catch { /* keep looking */ }
+  }
+  return '';
+}
+
+/** Name and handle maps for a batch of status owners. Students get their
+ *  stored name plus their chat handle; admins and tutors get their staff
+ *  record's name with no handle (staff are shown by name, like their chat
+ *  messages are). Batched the same way the overview did, 10 uids per query. */
+async function statusNamesFor(uids: string[]): Promise<Map<string, { name: string; username: string }>> {
+  const out = new Map<string, { name: string; username: string }>();
+  const unresolved = new Set<string>(uids.map((u) => cleanStr(u, 64)).filter(Boolean));
+  const chunks: string[][] = [];
+  const all = [...unresolved];
+  for (let i = 0; i < all.length; i += 10) chunks.push(all.slice(i, i + 10));
+  for (const part of chunks) {
+    const stuList = await adminDb.collection('students').where('uid', 'in', part).get();
+    stuList.forEach((d) => {
+      const v = d.data() as any;
+      const uid = cleanStr(v.uid, 64);
+      if (uid) { out.set(uid, { name: cleanStr(v.name, MAX_NAME_CHARS), username: '' }); unresolved.delete(uid); }
+    });
+    const userList = await adminDb.collection('usernames').where('studentId', 'in', part).get();
+    userList.forEach((d) => {
+      const v = d.data() as any;
+      const sid = cleanStr(v.studentId, 64);
+      const cur = out.get(sid);
+      if (cur && !cur.username) cur.username = cleanStr(v.username, 16);
+    });
+  }
+  const staffChunks: string[][] = [];
+  const rest = [...unresolved];
+  for (let i = 0; i < rest.length; i += 10) staffChunks.push(rest.slice(i, i + 10));
+  for (const part of staffChunks) {
+    const admList = await adminDb.collection('admins').where('uid', 'in', part).get();
+    admList.forEach((d) => {
+      const v = d.data() as any;
+      const uid = cleanStr(d.id, 64);
+      if (uid) { out.set(uid, { name: cleanStr(v.name || v.displayName || v.fullName, MAX_NAME_CHARS), username: '' }); unresolved.delete(uid); }
+    });
+  }
+  const rest2 = [...unresolved];
+  if (rest2.length) {
+    const tutList = await adminDb.collection('tutors').where('uid', 'in', rest2).get();
+    tutList.forEach((d) => {
+      const v = d.data() as any;
+      const uid = cleanStr(d.id, 64);
+      if (uid) out.set(uid, { name: cleanStr(v.name || v.displayName || v.fullName, MAX_NAME_CHARS), username: '' });
+    });
+  }
+  return out;
+}
+
+/** ---------------------------------------------------------------------------
+ * Shared status engine. Once a caller's own gate has run (student or staff),
+ * every status route uses the same stored settings, the same RTDB paths and
+ * the same limits, so staff and students get identical behaviour from one
+ * implementation. Nothing here knows who called: identity arrives as plain
+ * name and handle values from the route's own gate.
+ * ------------------------------------------------------------------------- */
+
+async function statusOverviewCore(caller: Caller, centreId: string, me: { name: string; username: string }): Promise<Record<string, unknown>> {
+  const tosChat = await getTosChat();
+  const st = tosChat.status;
+  if (!st.enabled) return { ok: true, enabled: false };
+
+  const now = Date.now();
+  interface One { uid: string; statusId: string; kind: string; at: number; expiresAt: number; text: string; bg: string; photoUrl: string; videoUrl: string; audioUrl: string; durationSeconds: number; }
+  const latestByUid = new Map<string, One>();
+  const centreSnap = await adminRtdb.ref(`chat/status/${centreId}`).get();
+  centreSnap.forEach((c) => {
+    const uid = cleanStr(c.key as string, 64);
+    if (!uid) return;
+    c.forEach((s) => {
+      const v = s.val() || {};
+      const expiresAt = Number(v.expiresAt) || 0;
+      if (expiresAt <= now) return; // expired statuses vanish everywhere.
+      const item: One = {
+        uid,
+        statusId: cleanStr(s.key as string, 64),
+        kind: cleanStr(v.kind, 10) || 'text',
+        at: Number(v.at) || 0,
+        expiresAt,
+        text: cleanStr(v.text, 300),
+        bg: cleanStr(v.bg, 9),
+        photoUrl: cleanStr(v.photoUrl, 400),
+        videoUrl: cleanStr(v.videoUrl, 400),
+        audioUrl: cleanStr(v.audioUrl, 400),
+        durationSeconds: Number(v.durationSeconds) || 0,
+      };
+      const prev = latestByUid.get(uid);
+      if (!prev || item.at > prev.at) latestByUid.set(uid, item);
+    });
+  });
+
+  const seen = new Set<string>();
+  const seenSnap = await adminRtdb.ref(`chat/statusViews/${centreId}/${caller.uid}`).get();
+  seenSnap.forEach((c) => {
+    if (c.val() !== null && c.val() !== undefined) seen.add(String(c.key));
+  });
+
+  const myLatest = latestByUid.get(caller.uid) || null;
+  const others = [...latestByUid.values()]
+    .filter((o) => o.uid !== caller.uid)
+    .sort((a, b) => b.at - a.at);
+
+  const names = await statusNamesFor(others.map((o) => o.uid));
+  const shape = (o: One) => ({
+    uid: o.uid,
+    name: names.get(o.uid)?.name || '',
+    username: names.get(o.uid)?.username || '',
+    statusId: o.statusId,
+    kind: o.kind,
+    at: o.at,
+    expiresAt: o.expiresAt,
+    text: o.text,
+    bg: o.bg,
+    photoUrl: o.photoUrl,
+    videoUrl: o.videoUrl,
+    audioUrl: o.audioUrl,
+    durationSeconds: o.durationSeconds,
+  });
+
+  return {
+    ok: true,
+    enabled: true,
+    settings: {
+      allowText: st.allowText,
+      allowPhoto: st.allowPhoto,
+      allowVideo: st.allowVideo,
+      allowMusic: st.allowMusic,
+      allowReplies: st.allowReplies,
+      lastsHours: st.lastsHours,
+      statusesPerDay: st.statusesPerDay,
+      maxTextChars: st.maxTextChars,
+      maxVideoSeconds: st.maxVideoSeconds,
+      maxVideoMb: st.maxVideoMb,
+      maxAudioMb: st.maxAudioMb,
+      photoMaxKb: tosChat.photoMaxKb,
+    },
+    me: {
+      name: me.name,
+      username: me.username,
+      latest: myLatest
+        ? {
+            statusId: myLatest.statusId, kind: myLatest.kind, at: myLatest.at, expiresAt: myLatest.expiresAt,
+            text: myLatest.text, bg: myLatest.bg, photoUrl: myLatest.photoUrl, videoUrl: myLatest.videoUrl,
+            audioUrl: myLatest.audioUrl, durationSeconds: myLatest.durationSeconds,
+          }
+        : null,
+    },
+    recent: others.filter((o) => !seen.has(o.statusId)).map(shape),
+    viewed: others.filter((o) => seen.has(o.statusId)).map(shape),
+  };
+}
+
+async function statusUserCore(caller: Caller, centreId: string, ownerUid: string, ownName: string, ownUsername: string): Promise<Record<string, unknown>> {
+  const st = (await getTosChat()).status;
+  if (!st.enabled) return { ok: true, enabled: false, statuses: [] };
+
+  const now = Date.now();
+  const mine = await adminRtdb.ref(`chat/status/${centreId}/${ownerUid}`).get();
+  const statuses: any[] = [];
+  mine.forEach((s) => {
+    const v = s.val() || {};
+    const expiresAt = Number(v.expiresAt) || 0;
+    if (expiresAt <= now) return;
+    statuses.push({
+      statusId: cleanStr(s.key as string, 64),
+      kind: cleanStr(v.kind, 10) || 'text',
+      at: Number(v.at) || 0,
+      expiresAt,
+      text: cleanStr(v.text, 300),
+      bg: cleanStr(v.bg, 9),
+      photoUrl: cleanStr(v.photoUrl, 400),
+      videoUrl: cleanStr(v.videoUrl, 400),
+      audioUrl: cleanStr(v.audioUrl, 400),
+      durationSeconds: Number(v.durationSeconds) || 0,
+    });
+  });
+  statuses.sort((a, b) => a.at - b.at);
+
+  if (ownerUid === caller.uid) {
+    for (const s of statuses) {
+      const viewsSnap = await adminRtdb.ref(`chat/statusSeenCount/${centreId}/${s.statusId}`).get();
+      s.views = Number(viewsSnap.val()) || 0;
+      const repliesSnap = await adminRtdb.ref(`chat/statusReplies/${centreId}/${s.statusId}`).get();
+      const replies: any[] = [];
+      repliesSnap.forEach((c) => {
+        const v = c.val() || {};
+        replies.push({
+          uid: cleanStr(v.uid, 64),
+          name: cleanStr(v.name, MAX_NAME_CHARS),
+          username: cleanStr(v.username, 16),
+          text: cleanStr(v.text, 2000),
+          at: Number(v.at) || 0,
+        });
+      });
+      replies.sort((a, b) => b.at - a.at);
+      s.replies = replies.slice(0, 50);
+    }
+  }
+
+  const ownerName = ownerUid === caller.uid ? ownName : (await statusOwnerName(ownerUid)) || '';
+  return {
+    ok: true,
+    owner: { uid: ownerUid, name: cleanStr(ownerName, MAX_NAME_CHARS), username: ownerUid === caller.uid ? ownUsername : await usernameFor(ownerUid) },
+    statuses,
+  };
+}
+
+async function statusPostCore(caller: Caller, centreId: string, body: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const tosChat = await getTosChat();
+  const st = tosChat.status;
+  if (!st.enabled) throw httpError(403, 'Status is not turned on.');
+  const kind = cleanStr(body.kind, 10) || 'text';
+  const text = cleanStr(body.text, st.maxTextChars);
+
+  if (kind === 'text') {
+    if (!st.allowText) throw httpError(403, 'Text updates are turned off.');
+    if (!text) throw httpError(400, 'Type your update first.');
+  } else if (kind === 'photo' || kind === 'video' || kind === 'music') {
+    if (kind === 'photo' && !st.allowPhoto) throw httpError(403, 'Photo updates are turned off.');
+    if (kind === 'video' && !st.allowVideo) throw httpError(403, 'Video updates are turned off.');
+    if (kind === 'music' && !st.allowMusic) throw httpError(403, 'Music updates are turned off.');
+    if (kind === 'video') {
+      const dur = Math.round(Number(body.durationSeconds) || 0);
+      if (dur <= 0 || dur > st.maxVideoSeconds) {
+        throw httpError(400, `Videos can be up to ${st.maxVideoSeconds} seconds.`);
+      }
+    }
+  } else {
+    throw httpError(400, 'That kind of update is not open yet.');
+  }
+
+  const now = Date.now();
+  let inWindow = 0;
+  const mine = await adminRtdb.ref(`chat/status/${centreId}/${caller.uid}`).get();
+  mine.forEach((c) => {
+    const v = c.val() || {};
+    if ((Number(v.at) || 0) > now - DAY_MS) inWindow += 1;
+  });
+  if (inWindow >= st.statusesPerDay) {
+    throw httpError(429, 'You have reached the status limit for today. Try again later.');
+  }
+
+  const expiresAt = now + st.lastsHours * 60 * 60 * 1000;
+  const ref = adminRtdb.ref(`chat/status/${centreId}/${caller.uid}`).push();
+  let status: Record<string, unknown>;
+  if (kind === 'text') {
+    const bg = cleanStr(body.bg, 9);
+    if (!/^#[0-9a-fA-F]{6}$/.test(bg)) throw httpError(400, 'Pick a background colour for the update.');
+    status = { kind: 'text', text, bg, at: now, expiresAt };
+  } else {
+    // Media updates only accept files this app uploaded itself: the URL
+    // must point at this deployment's Cloudinary cloud, so a client
+    // cannot post an arbitrary link as its own photo or video.
+    const cloud = String(process.env.CLOUDINARY_CLOUD_NAME || '');
+    const prefix = `https://res.cloudinary.com/${cloud}/${kind === 'photo' ? 'image' : 'video'}/upload/`;
+    const url = cleanStr(body.url, 400);
+    if (!cloud || !url.startsWith(prefix)) throw httpError(400, 'Upload the file through this app first.');
+    status = { kind, at: now, expiresAt };
+    if (text) status.text = text;
+    if (kind === 'photo') status.photoUrl = url;
+    if (kind === 'video') {
+      status.videoUrl = url;
+      status.durationSeconds = Math.round(Number(body.durationSeconds) || 0);
+    }
+    if (kind === 'music') {
+      status.audioUrl = url;
+      const bg = cleanStr(body.bg, 9);
+      status.bg = /^#[0-9a-fA-F]{6}$/.test(bg) ? bg : '#7C3AED';
+    }
+  }
+  await ref.set(status);
+  return {
+    ok: true,
+    status: { statusId: ref.key, ...status },
+    remainingToday: Math.max(0, st.statusesPerDay - (inWindow + 1)),
+  };
+}
+
+async function statusUploadCore(caller: Caller, centreId: string, body: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const tosChat = await getTosChat();
+  const st = tosChat.status;
+  if (!st.enabled) throw httpError(403, 'Status is not turned on.');
+  const kind = cleanStr(body.kind, 10);
+  if (kind !== 'photo' && kind !== 'video' && kind !== 'music') throw httpError(400, 'Which kind of update is this?');
+  if (kind === 'photo' && !st.allowPhoto) throw httpError(403, 'Photo updates are turned off.');
+  if (kind === 'video' && !st.allowVideo) throw httpError(403, 'Video updates are turned off.');
+  if (kind === 'music' && !st.allowMusic) throw httpError(403, 'Music updates are turned off.');
+  if (kind === 'video') {
+    const dur = Math.round(Number(body.durationSeconds) || 0);
+    if (dur <= 0 || dur > st.maxVideoSeconds) {
+      throw httpError(400, `Videos can be up to ${st.maxVideoSeconds} seconds.`);
+    }
+  }
+  const url = await uploadStatusMedia(kind, String(body.dataUrl || ''), st, tosChat.photoMaxKb);
+  return { ok: true, url };
+}
+
+async function statusSeenCore(caller: Caller, centreId: string, body: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const st = (await getTosChat()).status;
+  if (!st.enabled) return { ok: true };
+
+  const ownerUid = cleanStr(body.ownerUid, 64);
+  const statusId = cleanStr(body.statusId, 64);
+  if (!ownerUid || !statusId) throw httpError(400, 'Which status is this?');
+  if (ownerUid === caller.uid) return { ok: true }; // Own views never count as seen.
+
+  const now = Date.now();
+  const statusSnap = await adminRtdb.ref(`chat/status/${centreId}/${ownerUid}/${statusId}`).get();
+  const sv = statusSnap.val() || {};
+  if (!statusSnap.exists() || (Number(sv.expiresAt) || 0) <= now) {
+    throw httpError(404, 'That status is gone.');
+  }
+
+  const seenRef = adminRtdb.ref(`chat/statusViews/${centreId}/${caller.uid}/${statusId}`);
+  const already = await seenRef.get();
+  if (!already.exists()) {
+    await seenRef.set({ at: now });
+    const countRef = adminRtdb.ref(`chat/statusSeenCount/${centreId}/${statusId}`);
+    await countRef.set(ServerValue.increment(1));
+  }
+  return { ok: true };
+}
+
+async function statusReplyCore(caller: Caller, centreId: string, body: Record<string, unknown>, identity: { name: string; username: string }): Promise<Record<string, unknown>> {
+  const tosChat = await getTosChat();
+  const st = tosChat.status;
+  if (!st.enabled) throw httpError(403, 'Status is not turned on.');
+  if (!st.allowReplies) throw httpError(403, 'Status replies are turned off.');
+
+  const ownerUid = cleanStr(body.ownerUid, 64);
+  const statusId = cleanStr(body.statusId, 64);
+  const text = String(body.text ?? '').trim();
+  if (!ownerUid || !statusId || !text) throw httpError(400, 'Type your reply first.');
+  if (ownerUid === caller.uid) throw httpError(400, 'You cannot reply to your own status.');
+  if (text.length > tosChat.messageMaxChars) {
+    throw httpError(400, `Replies can be up to ${tosChat.messageMaxChars} characters.`);
+  }
+  await consumePostRateLimit(caller.uid, tosChat.postRateLimitPerHour);
+
+  const now = Date.now();
+  const statusSnap = await adminRtdb.ref(`chat/status/${centreId}/${ownerUid}/${statusId}`).get();
+  const sv = statusSnap.val() || {};
+  if (!statusSnap.exists() || (Number(sv.expiresAt) || 0) <= now) {
+    throw httpError(404, 'That status is gone.');
+  }
+
+  const ref = adminRtdb.ref(`chat/statusReplies/${centreId}/${statusId}`).push();
+  const reply = {
+    uid: caller.uid,
+    name: cleanStr(identity.name, MAX_NAME_CHARS),
+    username: cleanStr(identity.username, 16),
+    text: text.slice(0, tosChat.messageMaxChars),
+    at: now,
+  };
+  await ref.set(reply);
+  return { ok: true, reply: { ...reply, replyId: ref.key } };
+}
+
+/** Staff status gate: a centre membership with a staff role plus the chat
+ *  entitlement. Same bar the centre staff chat routes use. */
+async function staffStatusContext(caller: Caller, centreId: string) {
+  if (!centreId) throw httpError(400, 'No centre is selected.');
+  const membership = await requireMembership(caller, centreId, ['owner', 'admin', 'tutor']);
+  const entitlements = await getCentreEntitlements(centreId);
+  if (entitlements.chat !== true) {
+    throw httpError(403, 'Chat is not part of your centre\u2019s plan yet.');
+  }
+  return membership;
 }
 
 

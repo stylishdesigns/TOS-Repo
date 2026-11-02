@@ -615,7 +615,7 @@ const MainLayout: React.FC = () => {
             {adminSection === 'attendance' && <AttendanceTracker />}
             {adminSection === 'results' && <PerformanceManager />}
             {adminSection === 'announcements' && <AnnouncementsManager />}
-            {adminSection === 'chat' && <ChatManager />}
+            {adminSection === 'chat' && <AdminChatEntry />}
             {adminSection === 'student-portal' && <StudentPortal />}
             {adminSection === 'tutor-portal' && <TutorPortal />}
             {(adminSection === 'finance' || adminSection === 'payments') && <FinanceManager />}
@@ -654,6 +654,7 @@ const TimetableManager = lazy(() => import('./components/academics/TimetableMana
 const AttendanceTracker = lazy(() => import('./components/academics/AttendanceTracker').then((m) => ({ default: m.AttendanceTracker })));
 const AnnouncementsManager = lazy(() => import('./components/communications/AnnouncementsManager').then((m) => ({ default: m.AnnouncementsManager })));
 const ChatManager = lazy(() => import('./components/communications/ChatManager').then((m) => ({ default: m.ChatManager })));
+const AdminChatEntry = lazy(() => import('./components/communications/AdminChatEntry').then((m) => ({ default: m.AdminChatEntry })));
 const StudentPortal = lazy(() => import('./components/student-portal/StudentPortal').then((m) => ({ default: m.StudentPortal })));
 const TutorPortal = lazy(() => import('./components/tutor-portal/TutorPortal').then((m) => ({ default: m.TutorPortal })));
 const CmsManager = lazy(() => import('./components/cms/CmsManager').then((m) => ({ default: m.CmsManager })));
