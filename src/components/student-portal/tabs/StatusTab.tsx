@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, X, Image as ImageIcon, Film, Music } from 'lucide-react';
+import { Plus, X, Image as ImageIcon, Film, Music, Volume2, VolumeX } from 'lucide-react';
 import { Student } from '../../../types';
 import { api } from '../../tos/tosShared';
 import { loadLastGood, saveLastGood } from '../../../lib/lastGood';
@@ -96,6 +96,25 @@ interface StatusOverview {
   };
   recent?: StatusEntry[];
   viewed?: StatusEntry[];
+  // The caller's own live updates, one entry each, with their own permanent
+  // seen and reply counts straight from the server.
+  mine?: MineEntry[];
+}
+
+interface MineEntry {
+  statusId: string;
+  kind: string;
+  at: number;
+  expiresAt: number;
+  text: string;
+  bg?: string;
+  photoUrl?: string;
+  videoUrl?: string;
+  audioUrl?: string;
+  durationSeconds?: number;
+  centreId?: string;
+  views?: number;
+  replyCount?: number;
 }
 
 function initials(name: string): string {
@@ -160,6 +179,15 @@ const STATUS_BG = [
   '#0F172A', '#7C3AED', '#2563EB', '#059669',
   '#CA8A04', '#DB2777', '#EA580C', '#0F766E',
 ];
+
+/** The short word for an update's kind on the My status rows. Text rows
+ *  show a snippet of the words instead. */
+function statusKindWord(kind: string): string {
+  if (kind === 'photo') return 'Photo';
+  if (kind === 'video') return 'Video';
+  if (kind === 'music') return 'Music';
+  return 'Text';
+}
 
 function bgLuminance(hex: string): number {
   const m = /^#?([0-9a-fA-F]{6})$/.exec(hex);
@@ -563,7 +591,10 @@ export const StatusViewer: React.FC<{
   settings: NonNullable<StatusOverview['settings']>;
   onClose: () => void;
   onSeenUpdate: (ownerUid: string, statusId: string) => void;
-}> = ({ person, mine, call, settings, onClose, onSeenUpdate }) => {
+  // When the owner opens one specific update of theirs from the My status
+  // list, the viewer starts on that update instead of the first one.
+  startStatusId?: string;
+}> = ({ person, mine, call, settings, onClose, onSeenUpdate, startStatusId }) => {
   useEscape(onClose);
   useLockBodyScroll();
   const [statuses, setStatuses] = useState<ViewerStatus[] | null>(null);
@@ -579,8 +610,14 @@ export const StatusViewer: React.FC<{
     call(`/user/${encodeURIComponent(person.uid)}${person.centreId ? `?centreId=${encodeURIComponent(person.centreId)}` : ''}`)
       .then((d: any) => {
         if (!alive) return;
-        if (d && d.ok) setStatuses(Array.isArray(d.statuses) ? d.statuses : []);
-        else setErr(String(d?.error || 'The status could not load. Try again.'));
+        if (d && d.ok) {
+          const list = Array.isArray(d.statuses) ? d.statuses : [];
+          setStatuses(list);
+          if (startStatusId) {
+            const at = list.findIndex((x: ViewerStatus) => x.statusId === startStatusId);
+            if (at >= 0) setIdx(at);
+          }
+        } else setErr(String(d?.error || 'The status could not load. Try again.'));
       })
       .catch(() => {
         if (alive) setErr('The status could not load. Try again.');
@@ -651,6 +688,39 @@ export const StatusViewer: React.FC<{
   const [tick, setTick] = useState(0);
   const pausedRef = React.useRef(false);
   const replyInputRef = React.useRef<HTMLInputElement>(null);
+  // Video updates play with their sound on. If the phone's autoplay rule
+  // refuses sound before a tap, the update falls back to silent and the
+  // sound button in the corner brings the sound back with one tap.
+  const videoRef = React.useRef<HTMLVideoElement>(null);
+  const [vidMuted, setVidMuted] = useState(false);
+  React.useEffect(() => {
+    setVidMuted(false);
+  }, [current?.statusId]);
+  const playVideo = () => {
+    const el = videoRef.current;
+    if (!el) return;
+    el.muted = vidMuted;
+    const p = el.play();
+    if (p && typeof p.catch === 'function') {
+      p.catch(() => {
+        setVidMuted(true);
+        const el2 = videoRef.current;
+        if (el2) {
+          el2.muted = true;
+          el2.play().catch(() => undefined);
+        }
+      });
+    }
+  };
+  const toggleVideoSound = () => {
+    const next = !vidMuted;
+    setVidMuted(next);
+    const el = videoRef.current;
+    if (el) {
+      el.muted = next;
+      el.play().catch(() => undefined);
+    }
+  };
   // Swiping up on the update is the reply gesture for every status: it
   // opens (focuses) the reply box, the same move a reel uses.
   const swipeStartY = React.useRef(0);
@@ -726,14 +796,26 @@ export const StatusViewer: React.FC<{
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="w-9 h-9 rounded-xl flex items-center justify-center active:scale-95 transition shrink-0"
-            style={{ color: dark ? '#FFFFFF' : '#0F172A', backgroundColor: dark ? 'rgba(255,255,255,0.15)' : 'rgba(15,23,42,0.08)' }}
-            aria-label="Close status"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            {current?.kind === 'video' && (
+              <button
+                onClick={toggleVideoSound}
+                className="w-9 h-9 rounded-xl flex items-center justify-center active:scale-95 transition shrink-0"
+                style={{ color: dark ? '#FFFFFF' : '#0F172A', backgroundColor: dark ? 'rgba(255,255,255,0.15)' : 'rgba(15,23,42,0.08)' }}
+                aria-label={vidMuted ? 'Turn the sound on' : 'Turn the sound off'}
+              >
+                {vidMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="w-9 h-9 rounded-xl flex items-center justify-center active:scale-95 transition shrink-0"
+              style={{ color: dark ? '#FFFFFF' : '#0F172A', backgroundColor: dark ? 'rgba(255,255,255,0.15)' : 'rgba(15,23,42,0.08)' }}
+              aria-label="Close status"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
         {total > 0 && (
           <div className="flex items-center gap-1">
@@ -790,11 +872,14 @@ export const StatusViewer: React.FC<{
         )}
         {current && current.kind === 'video' && current.videoUrl && (
           <video
+            key={current.statusId}
+            ref={videoRef}
             src={current.videoUrl}
             autoPlay
             playsInline
-            muted
+            muted={vidMuted}
             className="absolute inset-0 w-full h-full object-cover"
+            onLoadedMetadata={playVideo}
             onEnded={() => advance(1)}
           />
         )}
@@ -983,7 +1068,7 @@ export const StatusScreenCore: React.FC<{ call: (path: string, opts?: any) => Pr
   );
   const [composing, setComposing] = useState(false);
   const [media, setMedia] = useState<{ kind: 'photo' | 'video' | 'music'; file: File } | null>(null);
-  const [viewer, setViewer] = useState<{ person: { uid: string; name: string; username: string; avatar?: string; centreId?: string }; mine: boolean } | null>(null);
+  const [viewer, setViewer] = useState<{ person: { uid: string; name: string; username: string; avatar?: string; centreId?: string }; mine: boolean; startStatusId?: string } | null>(null);
 
   useEscape(() => setFanOpen(false));
 
@@ -1012,6 +1097,11 @@ export const StatusScreenCore: React.FC<{ call: (path: string, opts?: any) => Pr
   const recent = data?.recent || [];
   const viewed = data?.viewed || [];
   const showLists = recent.length > 0 || viewed.length > 0;
+  // My status lists every update I have up, one row each, so each stays
+  // individually viewable with its own permanent seen and reply counts.
+  // Until the first sync lands, the latest update stands in alone.
+  const mineRows: MineEntry[] =
+    data?.mine && data.mine.length ? data.mine : me?.latest ? [me.latest] : [];
 
   // Any posted update (text, photo, video or music) lands in the My status
   // row right away; the next overview sync reconciles it.
@@ -1077,32 +1167,47 @@ export const StatusScreenCore: React.FC<{ call: (path: string, opts?: any) => Pr
 
       {data && data.enabled !== false && (
         <>
-          {/* My status row. Tapping it always previews my own status (with
-              the seen count and replies when one is up); posting happens
+          {/* My status: one row per update I have up, each opening that exact
+              update with its own seen and reply counts. Posting happens
               through the orange + button in the corner, never here. */}
-          <div
-            onClick={() => setViewer({ person: { uid, name: me?.name || fallbackName, username: me?.username || '', avatar: me?.avatar, centreId: me?.latest?.centreId }, mine: true })}
-            role="button"
-            className="w-full text-left bg-white rounded-3xl p-4 border border-slate-200/90 shadow-sm flex items-center gap-3 active:scale-[0.99] transition cursor-pointer"
-          >
-            <div className="relative shrink-0">
-              {me?.avatar ? (
-                <img src={me.avatar} alt="" className="w-12 h-12 rounded-full object-cover border-2 border-[#EA580C]" />
-              ) : (
-                <div className="w-12 h-12 rounded-full bg-[#FFF7ED] border-2 border-[#EA580C] flex items-center justify-center text-[#C2410C] text-sm font-black">
-                  {initials(me?.name || fallbackName)}
+          {mineRows.length === 0 ? (
+            <div className="w-full bg-white rounded-3xl p-4 border border-slate-200/90 shadow-sm flex items-center gap-3">
+              <div className="w-12 h-12 rounded-full bg-[#FFF7ED] border-2 border-[#EA580C] flex items-center justify-center text-[#C2410C] text-sm font-black shrink-0">
+                {initials(me?.name || fallbackName)}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-black text-slate-900">My status</p>
+                <p className="text-xs text-slate-500 font-medium truncate">No status up right now</p>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {mineRows.map((m) => (
+                <div
+                  key={m.statusId}
+                  onClick={() => setViewer({ person: { uid, name: me?.name || fallbackName, username: me?.username || '', avatar: me?.avatar, centreId: m.centreId }, mine: true, startStatusId: m.statusId })}
+                  role="button"
+                  className="w-full text-left bg-white rounded-3xl p-4 border border-slate-200/90 shadow-sm flex items-center gap-3 active:scale-[0.99] transition cursor-pointer"
+                >
+                  <div className="w-12 h-12 rounded-full bg-[#FFF7ED] border-2 border-[#EA580C] flex items-center justify-center text-[#C2410C] shrink-0">
+                    {m.kind === 'photo' ? <ImageIcon className="w-5 h-5" />
+                      : m.kind === 'video' ? <Film className="w-5 h-5" />
+                      : m.kind === 'music' ? <Music className="w-5 h-5" />
+                      : <span className="text-sm font-black">Aa</span>}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-black text-slate-900 truncate">
+                      {m.kind === 'text' && m.text ? m.text : 'My status'}
+                    </p>
+                    <p className="text-xs text-slate-500 font-medium truncate">
+                      {statusKindWord(m.kind)} · {statusTimeLabel(m.at)}
+                      {typeof m.views === 'number' ? ` · ${m.views} seen · ${m.replyCount || 0} replies` : ''}
+                    </p>
+                  </div>
                 </div>
-              )}
+              ))}
             </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-black text-slate-900">My status</p>
-              <p className="text-xs text-slate-500 font-medium truncate">
-                {me?.latest
-                  ? `${statusTimeLabel(me.latest.at)}${typeof me.latest.views === 'number' ? ` · ${me.latest.views} seen · ${me.latest.replyCount || 0} replies` : ''}`
-                  : 'No status up right now'}
-              </p>
-            </div>
-          </div>
+          )}
 
           {!showLists && (
             <div className="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-sm text-center">
@@ -1196,6 +1301,7 @@ export const StatusScreenCore: React.FC<{ call: (path: string, opts?: any) => Pr
           <StatusViewer
             person={viewer.person}
             mine={viewer.mine}
+            startStatusId={viewer.startStatusId}
             call={call}
             settings={data.settings}
             onClose={closeViewer}
@@ -1241,8 +1347,15 @@ export const StaffStatusScreen: React.FC = () => {
   const { activeCentreId } = useApp();
   const myUid = getAuth().currentUser?.uid || '';
   const call = React.useCallback(
-    (path: string, opts?: any) =>
-      api('/api/centre/chat/status' + path + '?centreId=' + encodeURIComponent(String(activeCentreId || '')), opts),
+    (path: string, opts?: any) => {
+      // A path that already names its centre (the status viewer does) keeps
+      // it; a bare path gets this centre. Duplicating the query would garble
+      // the value and fail the server's membership check.
+      const centreQ = path.includes('centreId=')
+        ? ''
+        : `${path.includes('?') ? '&' : '?'}centreId=${encodeURIComponent(String(activeCentreId || ''))}`;
+      return api('/api/centre/chat/status' + path + centreQ, opts);
+    },
     [activeCentreId],
   );
   return <StatusScreenCore call={call} uid={myUid} cacheKey="chat:staff-status" />;

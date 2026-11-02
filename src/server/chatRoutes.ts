@@ -1988,6 +1988,9 @@ async function statusOverviewCore(caller: Caller, centreIds: string[], me: { nam
   const now = Date.now();
   interface One { centreId: string; uid: string; statusId: string; kind: string; at: number; expiresAt: number; text: string; bg: string; photoUrl: string; videoUrl: string; audioUrl: string; durationSeconds: number; }
   const latestByUid = new Map<string, One>();
+  // Every live update the caller themself posted, across all their feeds;
+  // the overview lists each one separately for the owner.
+  const mineAll: One[] = [];
   // Seen marks are stored per centre, so keys carry the centre too and two
   // feeds can never collapse one status into another.
   const seenKeys = new Set<string>();
@@ -2019,6 +2022,7 @@ async function statusOverviewCore(caller: Caller, centreIds: string[], me: { nam
         };
         const ck = `${centreId}:${uid}`;
         counts.set(ck, (counts.get(ck) || 0) + 1);
+        if (uid === caller.uid) mineAll.push(item);
         const prev = latestByUid.get(uid);
         if (!prev || item.at > prev.at) latestByUid.set(uid, item);
       });
@@ -2069,6 +2073,26 @@ async function statusOverviewCore(caller: Caller, centreIds: string[], me: { nam
     settingsOut.upload = { cloud: cloudName, preset: presetName, folder: 'tos/status' };
   }
 
+  // The owner's own live updates, oldest first, each carrying its own seen
+  // and reply counts. Those counts live in permanent server records keyed by
+  // the status id, so a view never disappears: it stays on the exact update
+  // it belongs to for as long as that update is up.
+  const mineOut: Record<string, unknown>[] = [];
+  mineAll.sort((a, b) => a.at - b.at);
+  for (const o of mineAll) {
+    const vc = await adminRtdb.ref(`chat/statusSeenCount/${o.centreId}/${o.statusId}`).get();
+    const rc = await adminRtdb.ref(`chat/statusReplies/${o.centreId}/${o.statusId}`).get();
+    let replyCount = 0;
+    rc.forEach(() => { replyCount += 1; });
+    mineOut.push({
+      centreId: o.centreId,
+      statusId: o.statusId, kind: o.kind, at: o.at, expiresAt: o.expiresAt,
+      text: o.text, bg: o.bg, photoUrl: o.photoUrl, videoUrl: o.videoUrl,
+      audioUrl: o.audioUrl, durationSeconds: o.durationSeconds,
+      views: Number(vc.val()) || 0, replyCount,
+    });
+  }
+
   const shape = (o: One) => ({
     centreId: o.centreId,
     uid: o.uid,
@@ -2091,6 +2115,7 @@ async function statusOverviewCore(caller: Caller, centreIds: string[], me: { nam
     ok: true,
     enabled: true,
     settings: settingsOut,
+    mine: mineOut,
     me: {
       name: me.name,
       username: me.username,

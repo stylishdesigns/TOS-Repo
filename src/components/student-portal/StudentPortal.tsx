@@ -524,7 +524,7 @@ export const StudentPortal: React.FC = () => {
   const isRunningLate = !todayLog?.clockInAt && currentMinutes > lateMinutesThreshold;
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col justify-between selection:bg-orange-500 selection:text-white">
+    <div className="h-[100svh] overflow-hidden bg-slate-50 flex flex-col justify-between selection:bg-orange-500 selection:text-white sm:h-auto sm:min-h-screen sm:overflow-visible">
       {/* 1. Top Desktop Control Bar */}
       <header className="bg-slate-950 text-white px-4 py-3 z-40 sticky top-0 overflow-hidden shadow-md">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-3 relative">
@@ -560,13 +560,13 @@ export const StudentPortal: React.FC = () => {
       </header>
 
       {/* 2. Main Body: Phone Shell Container */}
-      <main className="flex-1 flex items-center justify-center p-0 sm:py-6 sm:px-4">
+      <main className="flex-1 min-h-0 flex items-center justify-center p-0 sm:py-6 sm:px-4">
         <div
           className={`w-full transition-all duration-300 ${
             desktopViewMode === 'mobile_frame'
               ? 'max-w-md mx-auto sm:rounded-[36px] sm:shadow-2xl sm:border-[6px] sm:border-slate-800'
               : 'max-w-4xl mx-auto sm:rounded-3xl sm:border sm:border-slate-800'
-          } bg-slate-50 h-[100svh] flex flex-col relative overflow-hidden`}
+          } bg-slate-50 h-full sm:h-[100svh] flex flex-col relative overflow-hidden`}
         >
           {/* Parent Mode Indicator Notification if active */}
           {portalMode === 'parent' && (

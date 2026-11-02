@@ -201,30 +201,40 @@ const MainLayout: React.FC = () => {
       setTosClaimsSettled(true);
     };
     (async () => {
-      try {
-        const r = await u.getIdTokenResult();
-        if (r.claims?.tos === true) { settle(r.claims); return; }
-        // No `tos` claim in the current token. The server is the only thing
-        // that can mint it (first verified sign-in from TOS_BOOTSTRAP_EMAILS,
-        // or a grant written by scripts/grant-tos.ts), so ask it once and read
-        // the answer back from a freshly forced token; the claim is never
-        // decoded or inferred client-side. Every sign-in runs this sync, so a
-        // platform staff member can never end up on the centre access-code
-        // screen (Prompt E) no matter which door they arrive through.
-        const token = await u.getIdToken(true);
-        const res = await fetch('/api/session/sync', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        });
-        if (!res.ok) {
-          if (!cancelled) setTosDoorError(true);
-          settle(null);
+      // On a weak connection this check can fail on its first tries (the
+      // token refresh and the server round trip both need the network), which
+      // used to drop a still-signed-in platform admin onto the public pages
+      // and look exactly like being logged out. Try a few times before
+      // giving up, and when it still fails, say so honestly (the screen
+      // below) instead of pretending the session is gone.
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        try {
+          const r = await u.getIdTokenResult();
+          if (r.claims?.tos === true) { settle(r.claims); return; }
+          // No `tos` claim in the current token. The server is the only thing
+          // that can mint it (first verified sign-in from TOS_BOOTSTRAP_EMAILS,
+          // or a grant written by scripts/grant-tos.ts), so ask it and read
+          // the answer back from a freshly forced token; the claim is never
+          // decoded or inferred client-side. Every sign-in runs this sync, so a
+          // platform staff member can never end up on the centre access-code
+          // screen (Prompt E) no matter which door they arrive through.
+          const token = await u.getIdToken(true);
+          const res = await fetch('/api/session/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          });
+          if (!res.ok) throw new Error('sync failed');
+          const fresh = await u.getIdTokenResult(true);
+          settle(fresh.claims);
           return;
+        } catch (e) {
+          if (attempt < 2) {
+            await new Promise((r2) => setTimeout(r2, 1200));
+            if (cancelled) return;
+            continue;
+          }
+          if (!cancelled) { setTosDoorError(true); settle(null); }
         }
-        const fresh = await u.getIdTokenResult(true);
-        settle(fresh.claims);
-      } catch (e) {
-        if (!cancelled) { setTosDoorError(true); settle(null); }
       }
     })();
     return () => { cancelled = true; };
@@ -297,6 +307,37 @@ const MainLayout: React.FC = () => {
   // not; #centre in the URL is the way back into the tenant (centre) app.
   // The #tos door still signs visitors in and shows non-staff a not-found.
   if (currentUser && isTosAdmin && !centreAppRequested) return <Suspense fallback={<ScreenFallback />}><TosPortal /></Suspense>;
+
+  // A signed-in account whose platform check could not finish (a weak
+  // connection) is still signed in: say that plainly here instead of showing
+  // the public pages, which read as having been logged out.
+  if (currentUser && !isTosAdmin && tosDoorError && !centreAppRequested && !activeCentreId && !pendingCentre && !centreEntryBusy) {
+    return (
+      <div className="min-h-screen w-full bg-slate-950 flex flex-col items-center justify-center text-center p-6">
+        <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center mb-5">
+          <AlertCircle className="w-7 h-7 text-amber-400" />
+        </div>
+        <h1 className="text-xl font-bold text-white mb-2">You are still signed in</h1>
+        <p className="text-slate-400 text-sm mb-6 max-w-sm">
+          The connection is too weak to verify your account right now, so your page cannot open yet. Your sign-in was not lost. Tap retry, or try again in a moment.
+        </p>
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          <button
+            onClick={() => { setTosDoorError(false); setTosClaimsSettled(false); setTosDoorAttempt((a) => a + 1); }}
+            className="px-4 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-sm font-bold transition-colors"
+          >
+            Try again
+          </button>
+          <button
+            onClick={handleLogout}
+            className="px-4 py-2.5 rounded-xl border border-white/10 hover:border-white/20 text-slate-300 text-sm font-semibold transition-colors"
+          >
+            Sign out
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // Platform staff never see the centre access-code screen (Prompt E). When a
   // staff member opens a centre door without an active centre membership,
