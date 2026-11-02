@@ -79,7 +79,7 @@ interface GroupDoc {
   id: string;
   centreId: string | null;
   name: string;
-  kind: 'subject' | 'announcements' | 'custom' | 'tos_channel';
+  kind: 'subject' | 'announcements' | 'custom' | 'tos_channel' | 'personal';
   subject: string | null;
   access: ChatAccessRule;
   createdBy: string;
@@ -220,6 +220,7 @@ async function loadGroup(groupId: string): Promise<GroupDoc> {
 }
 
 function gateFor(group: GroupDoc, centreChat: CentreChatSettings, tosChat: TosChatSettings): { useGate: boolean; thresholdPercent: number } {
+  if (group.kind === 'personal') return { useGate: false, thresholdPercent: 0 };
   if (group.kind === 'tos_channel') {
     const t = clampInt(tosChat.mockPracticeThresholdPercent, 0, 100, 0);
     return { useGate: t > 0, thresholdPercent: t };
@@ -297,6 +298,213 @@ function studentInGroup(studentSubjects: unknown, group: GroupDoc): boolean {
   if (group.kind === 'tos_channel') return true;
   if (group.subject) return Array.isArray(studentSubjects) && (studentSubjects as string[]).includes(group.subject);
   return true;
+}
+
+// ============================================================================
+// Personal chats (one-to-one) and friend requests.
+//
+// The rules the platform enforces here: inside one centre, every member can
+// message every other member with no request of any kind. A one-to-one chat
+// across two centres exists only between two students who have accepted each
+// other as friends, so friend requests are only ever needed across centres.
+// Staff (admins and tutors) never chat across centres, and students only
+// discover students from other centres through the leaderboard and the TOS
+// channels, so a friend request starts from a leaderboard username.
+// ============================================================================
+
+const MAX_FRIENDS_PAGE = 100;
+
+/** Deterministic ids for a pair of people, so both sides and every repeated
+ *  attempt land on the same chat document and the same friend-request record. */
+function pairId(prefix: string, a: string, b: string): string {
+  const pair = [cleanStr(a, 64), cleanStr(b, 64)].sort();
+  return `${prefix}-${pair[0]}__${pair[1]}`;
+}
+
+/** The two members of a personal chat, read fresh from its document. */
+async function personalMembersOf(chatId: string): Promise<string[]> {
+  const snap = await adminDb.collection('chatGroups').doc(chatId).get();
+  if (!snap.exists) return [];
+  const d = snap.data() as any;
+  if (d.kind !== 'personal' || d.active === false) return [];
+  const members = Array.isArray(d.members)
+    ? d.members.map((x: unknown) => cleanStr(x, 64)).filter(Boolean)
+    : [];
+  return members.length === 2 ? members : [];
+}
+
+/** Two students are friends when their friend-request document says accepted.
+ *  A declined or missing record means not friends. */
+async function friendshipAccepted(a: string, b: string): Promise<boolean> {
+  const snap = await adminDb.collection('chatFriendRequests').doc(pairId('fr', a, b)).get();
+  return snap.exists && (snap.data() as any)?.status === 'accepted';
+}
+
+/** Who a chat target is: their student record when they are a student, plus
+ *  every centre they hold a staff membership in. Memberships stay the source
+ *  of truth for staff centres, exactly like the rest of the platform. */
+async function chatTargetInfo(uid: string): Promise<{ uid: string; isStudent: boolean; centres: string[]; name: string; username: string } | null> {
+  const id = cleanStr(uid, 64);
+  if (!id) return null;
+  const centres = new Set<string>();
+  let name = '';
+  let isStudent = false;
+  const stuSnap = await adminDb.collection('students').doc(id).get();
+  if (stuSnap.exists) {
+    const v = stuSnap.data() as any;
+    const c = cleanStr(v?.centreId, 120);
+    if (c) centres.add(c);
+    name = cleanStr(v?.name, MAX_NAME_CHARS);
+    isStudent = true;
+  }
+  const memSnap = await adminDb.collection('memberships').where('uid', '==', id).limit(10).get();
+  memSnap.forEach((d) => {
+    const v = d.data() as any;
+    const role = cleanStr(v?.role, 20);
+    const c = cleanStr(v?.centreId, 120);
+    if (c && ['owner', 'admin', 'tutor'].includes(role)) centres.add(c);
+  });
+  if (centres.size === 0 && !isStudent) return null;
+  try {
+    const adm = await adminDb.collection('admins').doc(id).get();
+    if (adm.exists) {
+      const v = adm.data() as any;
+      name = cleanStr(v?.name || v?.displayName || v?.fullName, MAX_NAME_CHARS) || name;
+    }
+  } catch { /* the student name stands */ }
+  if (!name) {
+    try {
+      const tut = await adminDb.collection('tutors').where('uid', '==', id).limit(1).get();
+      if (!tut.empty) name = cleanStr(tut.docs[0].data()?.name, MAX_NAME_CHARS) || name;
+    } catch { /* keep what we have */ }
+  }
+  const username = await usernameFor(id);
+  return { uid: id, isStudent, centres: [...centres], name, username };
+}
+
+/** The chat name of a person follows the platform rule: students show their
+ *  username, staff show their staff name. */
+function personDisplayName(p: { isStudent: boolean; name: string; username: string }): string {
+  return p.isStudent ? (p.username || p.name) : (p.name || 'Staff');
+}
+
+async function centreNamesFor(ids: string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  for (const id of Array.from(new Set(ids.filter(Boolean))).slice(0, 10)) {
+    try {
+      const snap = await adminDb.collection('centres').doc(id).get();
+      out.set(id, snap.exists ? (cleanStr((snap.data() as any)?.name, 120) || id) : id);
+    } catch { out.set(id, id); }
+  }
+  return out;
+}
+
+/** Shared student preconditions for the personal-chat and friend routes. */
+async function studentChatBase(caller: Caller): Promise<{ student: any; centreId: string }> {
+  const stuSnap = await getStudentDoc(caller.uid);
+  if (!stuSnap) throw httpError(403, 'No student record is linked to this account.');
+  const student = stuSnap.data() as any;
+  const centreId = cleanStr(student.centreId, 120);
+  if (!centreId) throw httpError(403, 'No centre is linked to this account.');
+  await requireMembership(caller, centreId);
+  const entitlements = await getCentreEntitlements(centreId);
+  if (entitlements.chat !== true) {
+    throw httpError(403, 'Chat is not part of your centre\u2019s plan yet.');
+  }
+  return { student, centreId };
+}
+
+/** Open (or return) the one-to-one chat between the caller and one target.
+ *  Same centre: open to everyone, no request of any kind. Across centres:
+ *  students only, and only when an accepted friend request links them. Staff
+ *  callers never reach past their own centre. */
+async function openPersonalCore(caller: Caller, opts: { role: 'student' | 'staff'; centreId: string; targetUid: string }): Promise<Record<string, unknown>> {
+  const targetUid = cleanStr(opts.targetUid, 64);
+  if (!targetUid) throw httpError(400, 'Choose who you want to chat with.');
+  if (targetUid === caller.uid) throw httpError(400, 'You cannot start a chat with yourself.');
+  const target = await chatTargetInfo(targetUid);
+  if (!target) throw httpError(404, 'No member was found for that chat.');
+
+  const staffRole = opts.role === 'staff';
+  const sameCentre = target.centres.includes(opts.centreId);
+  if (!sameCentre) {
+    if (staffRole || !target.isStudent) {
+      throw httpError(403, 'Staff can only chat with people in their own centre.');
+    }
+    if (!(await friendshipAccepted(caller.uid, targetUid))) {
+      throw httpError(403, 'You can only chat with students from other centres after you become friends. Send a friend request from the leaderboard.');
+    }
+  }
+
+  const chatId = pairId('dm', caller.uid, targetUid);
+  const snap = await adminDb.collection('chatGroups').doc(chatId).get();
+  const now = new Date().toISOString();
+  const memberCentres: Record<string, string> = { [caller.uid]: opts.centreId };
+  memberCentres[targetUid] = sameCentre ? opts.centreId : (target.centres.find((c) => c !== opts.centreId) || '');
+  await adminDb.collection('chatGroups').doc(chatId).set({
+    kind: 'personal',
+    centreId: sameCentre ? opts.centreId : null,
+    crossCentre: !sameCentre,
+    members: [caller.uid, targetUid].sort(),
+    memberCentres,
+    access: { mode: 'none' },
+    createdBy: snap.exists ? cleanStr((snap.data() as any)?.createdBy, 64) || caller.uid : caller.uid,
+    createdByRole: snap.exists ? cleanStr((snap.data() as any)?.createdByRole, 20) || (staffRole ? 'centre_admin' : 'student') : (staffRole ? 'centre_admin' : 'student'),
+    createdAt: snap.exists ? cleanStr((snap.data() as any)?.createdAt, 40) || now : now,
+    updatedAt: now,
+    active: true,
+  }, { merge: true });
+  return {
+    ok: true,
+    chatId,
+    created: !snap.exists,
+    name: personDisplayName(target),
+    username: target.username,
+    crossCentre: !sameCentre,
+  };
+}
+
+/** The pending and accepted friend requests of one student. */
+async function friendsListFor(caller: Caller): Promise<Record<string, unknown>> {
+  const { centreId } = await studentChatBase(caller);
+  const [outSnap, inSnap] = await Promise.all([
+    adminDb.collection('chatFriendRequests').where('fromUid', '==', caller.uid).limit(MAX_FRIENDS_PAGE).get(),
+    adminDb.collection('chatFriendRequests').where('toUid', '==', caller.uid).limit(MAX_FRIENDS_PAGE).get(),
+  ]);
+  const centreIds: string[] = [centreId];
+  const incoming: any[] = [];
+  const outgoing: any[] = [];
+  const friends: any[] = [];
+  const seen = new Set<string>();
+  const handle = (doc: QueryDocumentSnapshot<DocumentData>) => {
+    const d = doc.data() as any;
+    const status = cleanStr(d?.status, 12);
+    const fromUid = cleanStr(d?.fromUid, 64);
+    const toUid = cleanStr(d?.toUid, 64);
+    if (!fromUid || !toUid) return;
+    const iAmFrom = fromUid === caller.uid;
+    const otherUid = iAmFrom ? toUid : fromUid;
+    if (!otherUid || otherUid === caller.uid) return;
+    const entry = {
+      id: doc.id,
+      uid: otherUid,
+      username: cleanStr(iAmFrom ? d?.toUsername : d?.fromUsername, 16),
+      centreId: cleanStr(iAmFrom ? d?.toCentreId : d?.fromCentreId, 120),
+      at: cleanStr(d?.createdAt, 40),
+    };
+    if (entry.centreId) centreIds.push(entry.centreId);
+    if (status === 'pending') {
+      (iAmFrom ? outgoing : incoming).push(entry);
+    } else if (status === 'accepted' && !seen.has(otherUid)) {
+      seen.add(otherUid);
+      friends.push({ ...entry, chatId: pairId('dm', caller.uid, otherUid) });
+    }
+  };
+  outSnap.forEach(handle);
+  inSnap.forEach(handle);
+  const centreNames = await centreNamesFor(centreIds);
+  const withCentre = (x: any) => ({ ...x, centreName: centreNames.get(x.centreId) || x.centreId });
+  return { ok: true, incoming: incoming.map(withCentre), outgoing: outgoing.map(withCentre), friends: friends.map(withCentre) };
 }
 
 async function readMeta(groupId: string): Promise<{ msgCount: number; pruned: number }> {
@@ -463,9 +671,16 @@ async function studentGroupContext(caller: Caller, groupId: string, forPost: boo
   }
   const group = await loadGroup(groupId);
   const isTosChannel = group.kind === 'tos_channel';
-  if (!isTosChannel && group.centreId !== centreId) throw httpError(404, 'Group not found.');
-  if (isTosChannel && group.centreId) throw httpError(404, 'Group not found.');
-  const centreChat = isTosChannel ? await getCentreChat(centreId) : await getCentreChat(group.centreId as string);
+  const isPersonal = group.kind === 'personal';
+  if (isPersonal) {
+    // A one-to-one chat is open only to its two members, whatever centres
+    // they belong to; the friend rules were already checked when it opened.
+    if (!(await personalMembersOf(groupId)).includes(caller.uid)) throw httpError(404, 'Group not found.');
+  } else {
+    if (!isTosChannel && group.centreId !== centreId) throw httpError(404, 'Group not found.');
+    if (isTosChannel && group.centreId) throw httpError(404, 'Group not found.');
+  }
+  const centreChat = isTosChannel || isPersonal ? await getCentreChat(centreId) : await getCentreChat(group.centreId as string);
   if (!isTosChannel && centreChat.paused) {
     throw httpError(503, 'Chat is paused for your centre right now.');
   }
@@ -477,7 +692,7 @@ async function studentGroupContext(caller: Caller, groupId: string, forPost: boo
       throw httpError(403, JSON.stringify({ locked: true, myPercent: lock.myPercent, thresholdPercent: lock.thresholdPercent, myAnswers: lock.myAnswers, minAnswers: lock.minAnswers }));
     }
   }
-  if (!studentInGroup(student.subjects, group)) throw httpError(403, 'You are not a member of this group.');
+  if (!isPersonal && !studentInGroup(student.subjects, group)) throw httpError(403, 'You are not a member of this group.');
   return { student, centreId, group, centreChat, lock, isTosChannel };
 }
 
@@ -598,6 +813,50 @@ export function registerChatRoutes(app: express.Express): void {
           minAnswers: lock.minAnswers,
           lastMessage: last,
           canPost: group.kind !== 'announcements' && group.kind !== 'tos_channel',
+        });
+      }
+      // One-to-one chats: every personal chat this student is in, named after
+      // the other person by the platform's chat-name rule. Personal chats are
+      // never gated, so their lock is always open.
+      const personalSnap = await adminDb.collection('chatGroups')
+        .where('members', 'array-contains', caller.uid).limit(100).get();
+      const personalDocs: { id: string; other: string }[] = [];
+      const otherUids: string[] = [];
+      personalSnap.forEach((d) => {
+        const v = d.data() as any;
+        if (v.kind !== 'personal' || v.active === false) return;
+        const members = Array.isArray(v.members) ? v.members.map((x: any) => cleanStr(x, 64)).filter(Boolean) : [];
+        if (members.length !== 2 || !members.includes(caller.uid)) return;
+        const other = members.find((m) => m !== caller.uid) as string;
+        personalDocs.push({ id: d.id, other });
+        otherUids.push(other);
+      });
+      const personalNames = await statusNamesFor(otherUids);
+      for (const p of personalDocs) {
+        const info = personalNames.get(p.other);
+        const displayName = info ? (info.username || info.name || 'Chat') : 'Chat';
+        const unread = await unreadFor(p.id, caller.uid);
+        let last: any = null;
+        const snap = await adminRtdb.ref(`chat/groups/${p.id}/messages`).limitToLast(1).get();
+        snap.forEach((c) => {
+          const v = c.val() || {};
+          last = { text: cleanStr(v.text, 120), at: Number(v.at) || 0, removed: Boolean(v.removed), role: cleanStr(v.role, 20) };
+        });
+        groups.push({
+          id: p.id,
+          name: displayName,
+          kind: 'personal',
+          subject: null,
+          unread,
+          locked: false,
+          thresholdPercent: 0,
+          myPercent: stats.percent,
+          myAnswers: stats.answered,
+          minAnswers: centreChat.minAnswers,
+          lastMessage: last,
+          canPost: true,
+          peerUid: p.other,
+          peerUsername: info?.username || '',
         });
       }
       groups.sort((a, b) => {
@@ -843,6 +1102,152 @@ export function registerChatRoutes(app: express.Express): void {
 
   // Paged history for one group. A locked student gets the lock state back
   // with their real numbers (the S4 screen), never the messages.
+  // ---------------------------------------------------------------------------
+  // Personal chats and friend requests. Opening a one-to-one chat enforces the
+  // platform rules: inside one centre everyone can chat with everyone, with no
+  // request of any kind; across centres it is students only, and only with an
+  // accepted friend request; staff never chat across centres. Friend requests
+  // start from a leaderboard username, which is the one place students see
+  // students from other centres outside the TOS channels.
+  // ---------------------------------------------------------------------------
+  app.post('/api/student/chat/personal', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const { centreId } = await studentChatBase(caller);
+      const centreChat = await getCentreChat(centreId);
+      if (centreChat.paused) throw httpError(503, 'Chat is paused for your centre right now.');
+      res.json(await openPersonalCore(caller, { role: 'student', centreId, targetUid: String((req.body || {}).uid || '') }));
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] personal open failed');
+    }
+  });
+
+  app.post('/api/centre/chat/personal', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const body = req.body || {};
+      const centreId = cleanStr(body.centreId, 120);
+      if (!centreId) throw httpError(400, 'centreId is required.');
+      await requireMembership(caller, centreId, ['owner', 'admin', 'tutor']);
+      const entitlements = await getCentreEntitlements(centreId);
+      if (entitlements.chat !== true) {
+        throw httpError(403, 'Chat is not part of your centre\u2019s plan yet.');
+      }
+      const centreChat = await getCentreChat(centreId);
+      if (centreChat.paused) throw httpError(503, 'Chat is paused for your centre right now.');
+      res.json(await openPersonalCore(caller, { role: 'staff', centreId, targetUid: String(body.uid || '') }));
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] staff personal open failed');
+    }
+  });
+
+  app.post('/api/student/chat/friends/request', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const { centreId } = await studentChatBase(caller);
+      const uname = cleanStr((req.body || {}).username, 16);
+      if (!uname) throw httpError(400, 'Type the username to add.');
+      let snap = await adminDb.collection('usernames').where('username', '==', uname).limit(1).get();
+      if (snap.empty && uname.toLowerCase() !== uname) {
+        snap = await adminDb.collection('usernames').where('username', '==', uname.toLowerCase()).limit(1).get();
+      }
+      if (snap.empty) throw httpError(404, 'No student uses that username on the leaderboard.');
+      const targetUid = cleanStr(snap.docs[0].data()?.studentId, 64);
+      if (!targetUid || targetUid === caller.uid) throw httpError(404, 'No student uses that username on the leaderboard.');
+      const target = await chatTargetInfo(targetUid);
+      if (!target || !target.isStudent) throw httpError(404, 'No student uses that username on the leaderboard.');
+      const targetCentre = target.centres[0] || '';
+      if (!targetCentre || targetCentre === centreId) {
+        throw httpError(400, 'You can already chat with students in your centre. Start a chat with them instead.');
+      }
+      const docRef = adminDb.collection('chatFriendRequests').doc(pairId('fr', caller.uid, targetUid));
+      const existing = await docRef.get();
+      if (existing.exists) {
+        const d = existing.data() as any;
+        if (d?.status === 'accepted') throw httpError(409, 'You are already friends.');
+        if (d?.status === 'pending' && cleanStr(d?.fromUid, 64) === caller.uid) {
+          return res.json({ ok: true, status: 'pending', already: true });
+        }
+        if (d?.status === 'pending' && cleanStr(d?.toUid, 64) === caller.uid) {
+          // They asked first, so this request answers theirs.
+          await docRef.set({ status: 'accepted', respondedAt: new Date().toISOString() }, { merge: true });
+          return res.json({ ok: true, status: 'accepted' });
+        }
+      }
+      const now = new Date().toISOString();
+      await docRef.set({
+        fromUid: caller.uid,
+        fromCentreId: centreId,
+        fromUsername: await usernameFor(caller.uid),
+        toUid: targetUid,
+        toCentreId: targetCentre,
+        toUsername: target.username,
+        status: 'pending',
+        createdAt: existing.exists ? cleanStr((existing.data() as any)?.createdAt, 40) || now : now,
+        respondedAt: null,
+      }, { merge: true });
+      res.json({ ok: true, status: 'pending' });
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] friend request failed');
+    }
+  });
+
+  app.post('/api/student/chat/friends/respond', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      await studentChatBase(caller);
+      const body = req.body || {};
+      const requestId = cleanStr(body.requestId, 80);
+      const action = body.action === 'accept' ? 'accept' : body.action === 'decline' ? 'decline' : '';
+      if (!requestId || !action) throw httpError(400, 'Choose a request and what to do with it.');
+      const ref = adminDb.collection('chatFriendRequests').doc(requestId);
+      const snap = await ref.get();
+      if (!snap.exists) throw httpError(404, 'That request is not there anymore.');
+      const d = snap.data() as any;
+      if (cleanStr(d?.toUid, 64) !== caller.uid) throw httpError(403, 'Only the person who received this request can respond.');
+      if (d?.status !== 'pending') throw httpError(409, 'That request has already been answered.');
+      await ref.set({ status: action === 'accept' ? 'accepted' : 'declined', respondedAt: new Date().toISOString() }, { merge: true });
+      res.json({ ok: true, status: action === 'accept' ? 'accepted' : 'declined' });
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] friend response failed');
+    }
+  });
+
+  app.get('/api/student/chat/friends', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      res.json(await friendsListFor(caller));
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] friends list failed');
+    }
+  });
+
+  app.get('/api/student/chat/directory', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const { centreId } = await studentChatBase(caller);
+      res.json(await chatDirectoryFor(centreId, caller.uid));
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] student directory failed');
+    }
+  });
+
+  app.get('/api/centre/chat/directory', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const centreId = cleanStr(req.query.centreId, 120);
+      if (!centreId) throw httpError(400, 'centreId is required.');
+      await requireMembership(caller, centreId, ['owner', 'admin', 'tutor']);
+      const entitlements = await getCentreEntitlements(centreId);
+      if (entitlements.chat !== true) {
+        throw httpError(403, 'Chat is not part of your centre\u2019s plan yet.');
+      }
+      res.json(await chatDirectoryFor(centreId, caller.uid));
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] staff directory failed');
+    }
+  });
+
   app.get('/api/student/chat/groups/:id/messages', async (req, res) => {
     try {
       const caller = getCaller(req);
@@ -1155,7 +1560,9 @@ async function staffGroupContext(caller: Caller, centreId: string, groupId: stri
     throw httpError(403, 'Chat is not part of your centre\u2019s plan yet.');
   }
   const group = await loadGroup(groupId);
-  if (group.kind === 'tos_channel' || group.centreId !== centreId) throw httpError(404, 'Group not found.');
+  const isPersonal = group.kind === 'personal';
+  if (group.kind === 'tos_channel' || (!isPersonal && group.centreId !== centreId)) throw httpError(404, 'Group not found.');
+  if (isPersonal && !(await personalMembersOf(groupId)).includes(caller.uid)) throw httpError(404, 'Group not found.');
   const centreChat = await getCentreChat(centreId);
   return { membership, group, centreChat };
 }
@@ -1253,6 +1660,38 @@ async function statusNamesFor(uids: string[]): Promise<Map<string, { name: strin
  * implementation. Nothing here knows who called: identity arrives as plain
  * name and handle values from the route's own gate.
  * ------------------------------------------------------------------------- */
+
+/** One centre's chat directory: students by username, staff by staff name.
+ *  This is what a new-chat picker lists, so the platform's chat-name rule
+ *  holds there too. */
+async function chatDirectoryFor(centreId: string, excludeUid: string): Promise<Record<string, unknown>> {
+  const stuSnap = await adminDb.collection('students').where('centreId', '==', centreId).limit(200).get();
+  const uids: string[] = [];
+  stuSnap.forEach((d) => {
+    const u = cleanStr((d.data() as any)?.uid, 64);
+    if (u) uids.push(u);
+  });
+  const studentMap = await statusNamesFor(uids);
+  const students = uids
+    .filter((u) => u !== excludeUid && (studentMap.get(u)?.username || '') !== '')
+    .map((u) => ({ uid: u, username: (studentMap.get(u) as { username: string }).username }))
+    .sort((a, b) => a.username.localeCompare(b.username))
+    .slice(0, 100);
+  const memSnap = await adminDb.collection('memberships').where('centreId', '==', centreId).limit(200).get();
+  const staffUids: string[] = [];
+  memSnap.forEach((d) => {
+    const v = d.data() as any;
+    const u = cleanStr(v?.uid, 64);
+    const role = cleanStr(v?.role, 20);
+    if (u && u !== excludeUid && ['owner', 'admin', 'tutor'].includes(role) && !staffUids.includes(u)) staffUids.push(u);
+  });
+  const staffMap = await statusNamesFor(staffUids);
+  const staff = staffUids
+    .map((u) => ({ uid: u, name: personDisplayName({ isStudent: false, name: staffMap.get(u)?.name || '', username: '' }) }))
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .slice(0, 50);
+  return { ok: true, students, staff };
+}
 
 async function statusOverviewCore(caller: Caller, centreId: string, me: { name: string; username: string }): Promise<Record<string, unknown>> {
   const tosChat = await getTosChat();
@@ -1736,6 +2175,35 @@ async function staffStatusContext(caller: Caller, centreId: string) {
         .filter((g) => g.active)
         .sort((a, b) => a.name.localeCompare(b.name))
         .map((g) => ({ id: g.id, name: g.name, kind: g.kind, subject: g.subject, access: g.access, createdAt: g.createdAt }));
+      // One-to-one chats this staff member is part of, same-centre only by
+      // the rules that guard opening one.
+      const staffPersonalSnap = await adminDb.collection('chatGroups')
+        .where('members', 'array-contains', caller.uid).limit(100).get();
+      const staffPersonalDocs: { id: string; other: string }[] = [];
+      const staffOtherUids: string[] = [];
+      staffPersonalSnap.forEach((d) => {
+        const v = d.data() as any;
+        if (v.kind !== 'personal' || v.active === false) return;
+        const members = Array.isArray(v.members) ? v.members.map((x: any) => cleanStr(x, 64)).filter(Boolean) : [];
+        if (members.length !== 2 || !members.includes(caller.uid)) return;
+        const other = members.find((m) => m !== caller.uid) as string;
+        staffPersonalDocs.push({ id: d.id, other });
+        staffOtherUids.push(other);
+      });
+      const staffPersonalNames = await statusNamesFor(staffOtherUids);
+      for (const p of staffPersonalDocs) {
+        const info = staffPersonalNames.get(p.other);
+        groups.push({
+          id: p.id,
+          name: info ? (info.username || info.name || 'Chat') : 'Chat',
+          kind: 'personal',
+          subject: null,
+          access: { mode: 'none' },
+          createdAt: '',
+          peerUid: p.other,
+          peerUsername: info?.username || '',
+        } as any);
+      }
       const reportsSnap = await adminDb.collection('chatReports')
         .where('centreId', '==', centreId).orderBy('createdAt', 'desc').limit(50).get();
       const reports = reportsSnap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }));

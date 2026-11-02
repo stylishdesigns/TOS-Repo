@@ -12,6 +12,8 @@ import {
   Plus,
   Send,
   ShieldAlert,
+  User,
+  UserPlus,
   Users,
   X,
 } from 'lucide-react';
@@ -34,7 +36,9 @@ interface ChatAccess {
 interface ChatGroup {
   id: string;
   name: string;
-  kind: 'announcements' | 'custom' | 'tos_channel';
+  kind: 'announcements' | 'custom' | 'tos_channel' | 'personal';
+  peerUid?: string;
+  peerUsername?: string;
   subject: string | null;
   access: ChatAccess;
   createdAt: string;
@@ -83,6 +87,7 @@ interface Bootstrap {
     autoPosts: Record<string, boolean>;
   };
   groups: ChatGroup[];
+  personalChats?: ChatGroup[];
   reports: ChatReport[];
 }
 
@@ -93,6 +98,7 @@ function accessLabel(g: ChatGroup): string {
 }
 
 function kindLabel(kind: string): string {
+  if (kind === 'personal') return 'Personal';
   if (kind === 'announcements') return 'Announcements';
   if (kind === 'tos_channel') return 'TOS channel';
   return 'Custom group';
@@ -262,8 +268,10 @@ const GroupsSection: React.FC<SectionProps> = ({ data, isAdmin, reload, addToast
   const [accessMode, setAccessMode] = useState<'centre_default' | 'custom' | 'none'>('centre_default');
   const [threshold, setThreshold] = useState('70');
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [staffFilter, setStaffFilter] = useState<'groups' | 'personal'>('groups');
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
-  const openGroup = openId ? data.groups.find((g) => g.id === openId) || null : null;
+  const openGroup = openId ? (data.groups.find((g) => g.id === openId) || data.personalChats?.find((g) => g.id === openId)) || null : null;
   const [editName, setEditName] = useState('');
   const [editMode, setEditMode] = useState<'centre_default' | 'custom' | 'none'>('centre_default');
   const [editThreshold, setEditThreshold] = useState('70');
@@ -434,7 +442,51 @@ const GroupsSection: React.FC<SectionProps> = ({ data, isAdmin, reload, addToast
         </div>
       )}
 
-      {data.groups.length === 0 && (
+      {!openGroup && (
+        <div className="flex gap-2" aria-label="Chats filter">
+          <button
+            type="button"
+            aria-pressed={staffFilter === 'groups'}
+            onClick={() => setStaffFilter('groups')}
+            className={`px-4 py-2 rounded-full text-xs font-black shadow-sm transition ${staffFilter === 'groups' ? 'bg-[#EA580C] text-white' : 'bg-white border border-slate-200 text-slate-500'}`}
+          >
+            Groups
+          </button>
+          <button
+            type="button"
+            aria-pressed={staffFilter === 'personal'}
+            onClick={() => setStaffFilter('personal')}
+            className={`px-4 py-2 rounded-full text-xs font-black shadow-sm transition ${staffFilter === 'personal' ? 'bg-[#EA580C] text-white' : 'bg-white border border-slate-200 text-slate-500'}`}
+          >
+            Personal
+          </button>
+        </div>
+      )}
+
+      {staffFilter === 'personal' && !openGroup && (
+        <button
+          onClick={() => setPickerOpen(true)}
+          className="w-full flex items-center gap-3 bg-white rounded-2xl p-3.5 border border-dashed border-[#EA580C]/50 shadow-sm active:scale-[0.99] transition"
+        >
+          <div className="w-10 h-10 rounded-xl bg-orange-50 border border-orange-100 text-[#EA580C] flex items-center justify-center shrink-0">
+            <UserPlus className="w-4 h-4" />
+          </div>
+          <div className="flex-1 text-left">
+            <p className="text-sm font-black text-slate-900">New chat</p>
+            <p className="text-[11px] text-slate-500 font-medium">Message anyone in your centre.</p>
+          </div>
+        </button>
+      )}
+
+      {staffFilter === 'personal' && !openGroup && (data.personalChats || []).length === 0 && (
+        <div className="bg-white rounded-2xl p-8 border border-slate-200 text-center space-y-1.5">
+          <User className="w-7 h-7 text-slate-300 mx-auto" />
+          <p className="text-sm font-black text-slate-800">No personal chats yet</p>
+          <p className="text-xs text-slate-500 font-medium">Tap New chat to message someone in your centre.</p>
+        </div>
+      )}
+
+      {staffFilter === 'groups' && data.groups.length === 0 && (
         <div className="bg-white rounded-2xl p-8 border border-slate-200 text-center space-y-1.5">
           <Users className="w-7 h-7 text-slate-300 mx-auto" />
           <p className="text-sm font-black text-slate-800">No groups yet</p>
@@ -444,7 +496,10 @@ const GroupsSection: React.FC<SectionProps> = ({ data, isAdmin, reload, addToast
         </div>
       )}
 
-      {data.groups.map((g) => (
+      {(staffFilter === 'groups'
+        ? data.groups.filter((g) => g.kind !== 'personal')
+        : data.personalChats || []
+      ).map((g) => (
         <div
           key={g.id}
           onClick={() => { if (editingId !== g.id) setOpenId(g.id); }}
@@ -497,7 +552,7 @@ const GroupsSection: React.FC<SectionProps> = ({ data, isAdmin, reload, addToast
               <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${
                 g.kind === 'announcements' ? 'bg-amber-50 border-amber-100 text-amber-600' : 'bg-orange-50 border-orange-100 text-[#EA580C]'
               }`}>
-                {g.kind === 'announcements' ? <Megaphone className="w-4 h-4" /> : <MessageSquare className="w-4 h-4" />}
+                {g.kind === 'personal' ? <User className="w-4 h-4" /> : g.kind === 'announcements' ? <Megaphone className="w-4 h-4" /> : <MessageSquare className="w-4 h-4" />}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -507,10 +562,10 @@ const GroupsSection: React.FC<SectionProps> = ({ data, isAdmin, reload, addToast
                 <p className="text-[11px] text-slate-500 font-medium mt-0.5">
                   {g.subject ? `Subject: ${g.subject} · ` : ''}{accessLabel(g)}
                 </p>
-                <p className="text-[10px] text-slate-400 font-medium mt-0.5">Created {fmtDate(g.createdAt)}</p>
+                <p className="text-[10px] text-slate-400 font-medium mt-0.5">{g.kind !== 'personal' && `Created ${fmtDate(g.createdAt)}`}</p>
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
-                {isAdmin && (
+                {isAdmin && g.kind !== 'personal' && (
                   <button
                     onClick={(e) => { e.stopPropagation(); startEdit(g); }}
                     className="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 text-[11px] font-black active:scale-95 transition"
@@ -524,6 +579,18 @@ const GroupsSection: React.FC<SectionProps> = ({ data, isAdmin, reload, addToast
         </div>
       ))}
       </>
+      )}
+      {pickerOpen && (
+        <StaffNewChatSheet
+          centreId={centreId}
+          onClose={() => setPickerOpen(false)}
+          onOpenChat={async (chatId, name) => {
+            setPickerOpen(false);
+            await reload();
+            setOpenId(chatId);
+            addToast(`Chat with ${name} opened`);
+          }}
+        />
       )}
     </div>
   );
@@ -1079,6 +1146,108 @@ const ThreadPanel: React.FC<{
           onCopy={actionMsg.text ? () => doCopy(actionMsg) : undefined}
         />
       )}
+    </div>
+  );
+};
+
+// ============================================================================
+// Staff new-chat sheet: one centre, no friend requests. Everyone inside the
+// centre is directly chattable; the server rejects anyone outside it.
+// ============================================================================
+
+interface StaffDirectoryEntry { uid: string; username?: string; name?: string }
+
+const StaffNewChatSheet: React.FC<{
+  centreId: string;
+  onClose: () => void;
+  onOpenChat: (chatId: string, name: string) => Promise<void> | void;
+}> = ({ centreId, onClose, onOpenChat }) => {
+  const [directory, setDirectory] = useState<{ students: StaffDirectoryEntry[]; staff: StaffDirectoryEntry[] } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await api(`/api/centre/chat/directory?centreId=${encodeURIComponent(centreId)}`);
+        if (alive) setDirectory(res as any);
+      } catch (e: any) {
+        if (alive) setError(String(e?.message || 'Your centre members could not be loaded.'));
+      }
+    })();
+    return () => { alive = false; };
+  }, [centreId]);
+
+  const openWith = async (uid: string) => {
+    if (busy) return;
+    setBusy(true);
+    setError('');
+    try {
+      const res: any = await api('/api/centre/chat/personal', {
+        method: 'POST',
+        body: JSON.stringify({ centreId, uid }),
+      });
+      await onOpenChat(res.chatId, res.name || 'Chat');
+    } catch (e: any) {
+      setError(String(e?.message || 'That chat could not be opened.'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col justify-end" role="dialog" aria-label="New chat">
+      <button className="absolute inset-0 bg-slate-950/40" onClick={onClose} aria-label="Close new chat" />
+      <div className="relative bg-white rounded-t-3xl max-h-[80vh] overflow-y-auto animate-in slide-in-from-bottom duration-300">
+        <div className="sticky top-0 bg-white rounded-t-3xl border-b border-slate-100 px-5 pt-4 pb-3 flex items-center justify-between">
+          <h2 className="text-base font-black text-slate-900">New chat</h2>
+          <button onClick={onClose} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500" aria-label="Close">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="px-5 py-4 space-y-5">
+          {error && <p className="text-[11px] font-bold text-rose-600 bg-rose-50 rounded-xl px-3 py-2">{error}</p>}
+          {directory && (
+            <>
+              {directory.students.length === 0 && directory.staff.length === 0 && (
+                <p className="text-[11px] text-slate-400 font-medium">No one to chat with yet.</p>
+              )}
+              {directory.students.length > 0 && (
+                <div>
+                  <p className="text-[11px] font-black uppercase tracking-wider text-slate-400 mb-1.5">Students</p>
+                  <div className="space-y-2">
+                    {directory.students.map((s) => (
+                      <button key={s.uid} onClick={() => openWith(s.uid)} disabled={busy} className="w-full text-left bg-white border border-slate-200 rounded-2xl px-3.5 py-2.5 active:scale-[0.99] transition disabled:opacity-50">
+                        <p className="text-sm font-black text-slate-900 truncate">{s.username}</p>
+                        <p className="text-[10px] text-slate-400 font-medium">Student</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {directory.staff.length > 0 && (
+                <div>
+                  <p className="text-[11px] font-black uppercase tracking-wider text-slate-400 mb-1.5">Staff</p>
+                  <div className="space-y-2">
+                    {directory.staff.map((st) => (
+                      <button key={st.uid} onClick={() => openWith(st.uid)} disabled={busy} className="w-full text-left bg-white border border-slate-200 rounded-2xl px-3.5 py-2.5 active:scale-[0.99] transition disabled:opacity-50">
+                        <p className="text-sm font-black text-slate-900 truncate">{st.name}</p>
+                        <p className="text-[10px] text-slate-400 font-medium">Staff</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+          {!directory && !error && (
+            <div className="flex items-center justify-center py-6 text-slate-400">
+              <Loader2 className="w-5 h-5 animate-spin" />
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 };

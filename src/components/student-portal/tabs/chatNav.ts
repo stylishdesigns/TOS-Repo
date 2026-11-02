@@ -4,7 +4,7 @@
 // counts and lock states stay owned by src/server/chatRoutes.ts; nothing
 // here invents data.
 
-export type ChatNavGroupKind = 'subject' | 'announcements' | 'custom' | 'tos_channel';
+export type ChatNavGroupKind = 'subject' | 'announcements' | 'custom' | 'tos_channel' | 'personal';
 
 /** Structural view of one group from GET /api/student/chat/overview. */
 export interface ChatNavGroup {
@@ -15,7 +15,7 @@ export interface ChatNavGroup {
   locked: boolean;
 }
 
-/** Everything except TOS-owned channels: subject groups, announcements and centre custom groups. */
+/** Everything except TOS-owned channels: subject groups, announcements, centre custom groups and personal chats. */
 export function isChatGroup(g: ChatNavGroup): boolean {
   return g.kind !== 'tos_channel';
 }

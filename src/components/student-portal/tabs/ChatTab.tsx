@@ -14,6 +14,8 @@ import {
   Send,
   ShieldAlert,
   Star,
+  User,
+  UserPlus,
   Users,
   X,
   Zap,
@@ -22,6 +24,7 @@ import { Student } from '../../../types';
 import { api } from '../../tos/tosShared';
 import { loadLastGood, saveLastGood } from '../../../lib/lastGood';
 import { splitGroupsAndChannels, totalUnread } from './chatNav';
+import { PersonalNewChatSheet } from './PersonalChat';
 import { copyText, EmojiText, isEmojiOnly, makeLongPress, MessageActionSheet, ReactionChips } from '../../communications/chatActions';
 
 // ============================================================================
@@ -33,7 +36,9 @@ import { copyText, EmojiText, isEmojiOnly, makeLongPress, MessageActionSheet, Re
 interface ChatGroupSummary {
   id: string;
   name: string;
-  kind: 'subject' | 'announcements' | 'custom' | 'tos_channel';
+  kind: 'subject' | 'announcements' | 'custom' | 'tos_channel' | 'personal';
+  peerUid?: string;
+  peerUsername?: string;
   subject: string | null;
   unread: number;
   locked: boolean;
@@ -138,6 +143,7 @@ function fmtListTime(at: number): string {
 }
 
 function groupIcon(kind: string, size: string) {
+  if (kind === 'personal') return <User className={size} />;
   if (kind === 'announcements') return <Megaphone className={size} />;
   if (kind === 'tos_channel') return <Zap className={size} />;
   if (kind === 'subject') return <BookOpen className={size} />;
@@ -174,6 +180,8 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
   });
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
   const [starredOpen, setStarredOpen] = useState(false);
+  const [chatFilter, setChatFilter] = useState<'groups' | 'personal'>('groups');
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -206,12 +214,41 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
 
   const activeGroup = overview?.groups.find((g) => g.id === activeGroupId) || null;
 
+  const openPersonalChat = useCallback(async (chatId: string, name: string) => {
+    setPickerOpen(false);
+    setOverview((cur) => {
+      const groups = cur?.groups ?? [];
+      if (groups.some((g) => g.id === chatId)) return cur;
+      const entry: ChatGroupSummary = {
+        id: chatId,
+        name,
+        kind: 'personal',
+        subject: null,
+        unread: 0,
+        locked: false,
+        thresholdPercent: 0,
+        myPercent: 0,
+        myAnswers: 0,
+        minAnswers: 0,
+        lastMessage: null,
+        canPost: true,
+      };
+      return cur ? { ...cur, groups: [...groups, entry] } : cur;
+    });
+    setActiveGroupId(chatId);
+    refreshOverview();
+  }, [refreshOverview]);
+
   // Phase 1 C/D: the fan's two entries share this component. Chats lists
   // every group except TOS-owned channels; Channels lists only kind
   // 'tos_channel'. The split never drops or duplicates a group.
   const overviewGroups: ChatGroupSummary[] = overview?.groups ?? [];
   const splitLists = splitGroupsAndChannels(overviewGroups);
-  const listForView = view === 'channels' ? splitLists.channels : splitLists.groups;
+  const listForView = view === 'channels'
+    ? splitLists.channels
+    : chatFilter === 'personal'
+      ? splitLists.groups.filter((g) => g.kind === 'personal')
+      : splitLists.groups.filter((g) => g.kind !== 'personal');
 
   if (activeGroupId) {
     return (
@@ -312,21 +349,19 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
         <div className="flex gap-2" aria-label="Chats filter">
           <button
             type="button"
-            aria-pressed="true"
-            className="px-4 py-2 rounded-full bg-[#EA580C] text-white text-xs font-black shadow-sm cursor-default"
+            aria-pressed={chatFilter === 'groups'}
+            onClick={() => setChatFilter('groups')}
+            className={`px-4 py-2 rounded-full text-xs font-black shadow-sm transition ${chatFilter === 'groups' ? 'bg-[#EA580C] text-white' : 'bg-white border border-slate-200 text-slate-500'}`}
           >
             Groups
           </button>
           <button
             type="button"
-            disabled
-            title="Coming soon in a later phase"
-            className="px-4 py-2 rounded-full bg-white border border-slate-200 text-slate-400 text-xs font-black cursor-not-allowed"
+            aria-pressed={chatFilter === 'personal'}
+            onClick={() => setChatFilter('personal')}
+            className={`px-4 py-2 rounded-full text-xs font-black shadow-sm transition ${chatFilter === 'personal' ? 'bg-[#EA580C] text-white' : 'bg-white border border-slate-200 text-slate-500'}`}
           >
-            <span className="flex flex-col items-center leading-tight">
-              <span>Personal</span>
-              <span className="text-[8px] font-bold uppercase tracking-wider">Coming soon</span>
-            </span>
+            Personal
           </button>
         </div>
       )}
@@ -390,6 +425,21 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
         </div>
       )}
 
+      {!error && view !== 'channels' && chatFilter === 'personal' && (
+        <button
+          onClick={() => setPickerOpen(true)}
+          className="w-full flex items-center gap-3 bg-white rounded-2xl p-3.5 border border-dashed border-[#EA580C]/50 shadow-sm active:scale-[0.99] transition"
+        >
+          <div className="w-11 h-11 rounded-2xl bg-orange-50 border border-orange-100 text-[#EA580C] flex items-center justify-center shrink-0">
+            <UserPlus className="w-5 h-5" />
+          </div>
+          <div className="flex-1 text-left">
+            <p className="text-sm font-black text-slate-900">New chat</p>
+            <p className="text-[11px] text-slate-500 font-medium">Pick someone in your centre, or add a friend by username.</p>
+          </div>
+        </button>
+      )}
+
       {!error && overview && listForView.map((g) => (
         <button
           key={g.id}
@@ -441,6 +491,9 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
         <div className="bg-white rounded-3xl p-8 border border-slate-200/90 shadow-sm flex items-center justify-center">
           <Loader2 className="w-6 h-6 animate-spin text-[#EA580C]" />
         </div>
+      )}
+      {pickerOpen && (
+        <PersonalNewChatSheet onClose={() => setPickerOpen(false)} onOpenChat={openPersonalChat} />
       )}
     </div>
   );
