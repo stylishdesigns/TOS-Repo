@@ -488,6 +488,18 @@ export const StudentPortal: React.FC = () => {
     if (cached?.groups) setOrbUnread(totalUnread(cached.groups));
   }, [activeStudent?.id]);
 
+  // The shell pins to the stable small viewport (100svh), so the bottom nav
+  // keeps one fixed screen position even while the browser URL bar slides in
+  // or out. The strip that can open up under the shell then shows the page
+  // background, which is kept the nav's dark colour while this portal is up.
+  React.useEffect(() => {
+    const prev = document.body.style.backgroundColor;
+    document.body.style.backgroundColor = '#020617';
+    return () => {
+      document.body.style.backgroundColor = prev;
+    };
+  }, []);
+
   if (!isAdmin && (authLoading || profileLoading)) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
@@ -504,18 +516,6 @@ export const StudentPortal: React.FC = () => {
     return <StudentOnboarding onComplete={() => setOnboardingComplete(true)} />;
   }
 
-
-  // The shell pins to the stable small viewport (100svh), so the bottom nav
-  // keeps one fixed screen position even while the browser URL bar slides in
-  // or out. The strip that can open up under the shell then shows the page
-  // background, which is kept the nav's dark colour while this portal is up.
-  React.useEffect(() => {
-    const prev = document.body.style.backgroundColor;
-    document.body.style.backgroundColor = '#020617';
-    return () => {
-      document.body.style.backgroundColor = prev;
-    };
-  }, []);
 
   const orbBadgeText = orbBadgeLabel(orbUnread);
 
