@@ -255,7 +255,12 @@ function validateEssayBlock(rawBlock: string): { valid: boolean; reason?: string
 
 async function startServer() {
   const app = express();
-  app.use(express.json());
+  // The default 100 KB JSON limit rejected every media data URL (photos,
+  // videos and music statuses all failed to post while text worked). 5 MB
+  // covers the largest JSON the API legitimately carries (a compressed photo
+  // rides base64) and stays under the serverless request cap; video and music
+  // no longer ride JSON at all - they upload straight to media hosting.
+  app.use(express.json({ limit: '5mb' }));
   app.disable("x-powered-by");
 
   // ---------------------------------------------------------------------------

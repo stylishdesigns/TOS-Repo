@@ -3,7 +3,8 @@ import { loadLastGood, saveLastGood } from '../../lib/lastGood';
 import { Loader2, RefreshCw, Send, Ban, Check, Plus, Megaphone, Settings2, ShieldAlert, Users, X, Camera } from 'lucide-react';
 import { copyText, makeLongPress, MessageActionSheet, ReactionChips } from '../communications/chatActions';
 import { api, Json } from './tosShared';
-import { TextComposer, MediaComposer } from '../student-portal/tabs/StatusTab';
+import { TextComposer, MediaComposer, StatusViewer, Overlay } from '../student-portal/tabs/StatusTab';
+import { getAuth } from 'firebase/auth';
 
 // TOS chat screens (CH1 Step 5): the platform channel, the platform chat
 // settings (saved with the type-to-confirm APPLY step), and the escalation
@@ -553,6 +554,8 @@ const TosStatusTab: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
   const [data, setData] = useState<TosStatusOverview | null>(() => loadLastGood<TosStatusOverview>('tos:status:overview'));
   const [err, setErr] = useState('');
   const [composingText, setComposingText] = useState(false);
+  const [viewing, setViewing] = useState(false);
+  const myUid = getAuth().currentUser?.uid || '';
   const [media, setMedia] = useState<{ kind: 'photo' | 'video' | 'music'; file: File } | null>(null);
   const [note, setNote] = useState('');
   const photoRef = React.useRef<HTMLInputElement>(null);
@@ -610,11 +613,18 @@ const TosStatusTab: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
       <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-4 space-y-2">
         <p className="text-sm font-black text-orange-300">TOS status</p>
         {latest ? (
-          <div className="space-y-1">
+          <div
+            className="space-y-1 cursor-pointer"
+            role="button"
+            tabIndex={0}
+            aria-label="Preview my status"
+            onClick={() => { if (myUid) setViewing(true); }}
+            onKeyDown={(e) => { if (e.key === 'Enter' && myUid) setViewing(true); }}
+          >
             <p className="text-xs text-slate-300">
               Up now: {latest.kind === 'text' ? (latest.text || '') : latest.kind} · posted {fmtWhen(latest.at)}
             </p>
-            <p className="text-[11px] text-slate-500">Every student sees this in their status feed until it expires.</p>
+            <p className="text-[11px] text-slate-500">Every student sees this in their status feed until it expires. Tap this card to view it the way students see it.</p>
             <button type="button" onClick={removeLatest} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border border-red-500/40 text-red-300 hover:bg-red-500/10 transition-colors cursor-pointer">
               <Ban className="w-3.5 h-3.5" /> Remove
             </button>
@@ -652,10 +662,26 @@ const TosStatusTab: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
       <input ref={musicRef} type="file" accept="audio/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) setMedia({ kind: 'music', file: f }); }} />
 
       {composingText && settings && (
-        <TextComposer call={call} settings={settings} onClose={() => setComposingText(false)} onPosted={applyPosted} />
+        <Overlay>
+          <TextComposer call={call} settings={settings} onClose={() => setComposingText(false)} onPosted={applyPosted} />
+        </Overlay>
       )}
       {media && settings && (
-        <MediaComposer kind={media.kind} file={media.file} call={call} settings={settings} onClose={() => setMedia(null)} onPosted={applyPosted} />
+        <Overlay>
+          <MediaComposer kind={media.kind} file={media.file} call={call} settings={settings} onClose={() => setMedia(null)} onPosted={applyPosted} />
+        </Overlay>
+      )}
+      {viewing && settings && myUid && (
+        <Overlay>
+          <StatusViewer
+            person={{ uid: myUid, name: 'TOS', username: '' }}
+            mine={true}
+            call={call}
+            settings={settings}
+            onClose={() => setViewing(false)}
+            onSeenUpdate={() => undefined}
+          />
+        </Overlay>
       )}
     </div>
   );

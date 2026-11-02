@@ -5,6 +5,7 @@ import { api } from '../../tos/tosShared';
 import { loadLastGood, saveLastGood } from '../../../lib/lastGood';
 import { useApp } from '../../../context/AppContext';
 import { getAuth } from 'firebase/auth';
+import { createPortal } from 'react-dom';
 
 // ============================================================================
 // Status, piece S1: the read-only Status screen.
@@ -125,6 +126,25 @@ function useEscape(onEscape: () => void) {
   }, [onEscape]);
 }
 
+/** While a full-screen status overlay is open the page behind it must not
+ *  scroll: the overlay locks the body, so a drag on the overlay never moves
+ *  the list underneath. */
+function useLockBodyScroll() {
+  React.useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
+}
+
+/** Renders its children at the top of the document, outside every scroll and
+ *  stacking context of the app shell, so a status overlay always covers the
+ *  whole screen, bottom nav included. */
+export const Overlay: React.FC<{ children: React.ReactNode }> = ({ children }) =>
+  createPortal(<>{children}</>, document.body);
+
 /** The composer's background palette. This is screen furniture, not data:
  *  the update itself stores whichever colour was picked, and the settings
  *  (not this list) decide every limit. */
@@ -240,6 +260,49 @@ export const TextComposer: React.FC<{
 // the server sees and checks both steps.
 // ============================================================================
 
+/** Direct browser-to-hosting upload for one media file: the server hands the
+ *  composer the unsigned preset details after checking the stored caps, the
+ *  file goes straight to the host with a progress percentage, and only the
+ *  hosted URL comes back to ride the status POST. Large videos never travel
+ *  through the app's own server as base64. */
+function uploadToCloudinary(
+  cloud: string,
+  endpoint: string,
+  preset: string,
+  folder: string,
+  blob: Blob,
+  onProgress: (pct: number) => void,
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const form = new FormData();
+    form.append('upload_preset', preset);
+    form.append('folder', folder);
+    form.append('file', blob);
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `https://api.cloudinary.com/v1_1/${cloud}/${endpoint}/upload`);
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable && e.total > 0) onProgress(Math.min(99, Math.round((e.loaded / e.total) * 100)));
+    };
+    xhr.onload = () => {
+      let data: any = null;
+      try { data = JSON.parse(xhr.responseText || '{}'); } catch { data = null; }
+      if (xhr.status >= 200 && xhr.status < 300 && data && typeof data.secure_url === 'string' && data.secure_url) {
+        onProgress(100);
+        resolve(String(data.secure_url));
+      } else {
+        const msg = String(data?.error?.message || '');
+        reject(new Error(
+          msg
+            ? `The upload was refused: ${msg}`
+            : 'The upload could not be completed. Try again.'
+        ));
+      }
+    };
+    xhr.onerror = () => reject(new Error('The upload did not go through. Check your connection and try again.'));
+    xhr.send(form);
+  });
+}
+
 export const MediaComposer: React.FC<{
   kind: 'photo' | 'video' | 'music';
   file: File;
@@ -255,6 +318,7 @@ export const MediaComposer: React.FC<{
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [fatal, setFatal] = useState('');
+  const [progress, setProgress] = useState(0);
   const durationRef = React.useRef(0);
 
   useEffect(() => {
@@ -336,32 +400,37 @@ export const MediaComposer: React.FC<{
     if (!ready || busy) return;
     setBusy(true);
     setErr('');
+    setProgress(0);
     try {
-      let dataUrl = '';
-      if (kind !== 'photo') {
-        dataUrl = await new Promise<string>((resolve, reject) => {
-          const fr = new FileReader();
-          fr.onload = () => resolve(String(fr.result || ''));
-          fr.onerror = () => reject(new Error('That file could not be read. Try another.'));
-          fr.readAsDataURL(file);
-        });
-      }
-      const up = await call('/upload', {
+      // The file that actually posts: photos as the downscaled copy, video and
+      // music exactly as picked.
+      const blob: Blob = kind === 'photo' ? await (await fetch(preview)).blob() : file;
+      // The server authorises the upload against the stored settings first,
+      // so its limit messages reach the screen before any bytes move.
+      const cfg = await call('/upload-config', {
         method: 'POST',
         body: {
           kind,
-          dataUrl: kind === 'photo' ? preview : dataUrl,
+          sizeBytes: blob.size,
           durationSeconds: kind === 'video' ? durationRef.current : undefined,
         },
       });
-      if (!(up && up.ok && up.url)) {
-        throw new Error(String(up?.error || 'The upload could not be completed. Try again.'));
+      if (!(cfg && cfg.ok && cfg.cloud && cfg.preset)) {
+        throw new Error(String(cfg?.error || 'The upload could not be started. Try again.'));
       }
+      const url = await uploadToCloudinary(
+        String(cfg.cloud),
+        String(cfg.endpoint || (kind === 'photo' ? 'image' : 'video')),
+        String(cfg.preset),
+        String(cfg.folder || 'tos/status'),
+        blob,
+        setProgress,
+      );
       const post = await call('', {
         method: 'POST',
         body: {
           kind,
-          url: up.url,
+          url,
           text: caption.trim() || undefined,
           durationSeconds: kind === 'video' ? durationRef.current : undefined,
           bg: kind === 'music' ? '#7C3AED' : undefined,
@@ -406,7 +475,7 @@ export const MediaComposer: React.FC<{
           className="px-5 h-9 rounded-xl font-black text-sm active:scale-95 transition disabled:opacity-40"
           style={{ color: '#0F172A', backgroundColor: '#FFFFFF' }}
         >
-          {busy ? 'Sharing...' : 'Share'}
+          {busy ? (progress > 0 && progress < 100 ? `Uploading ${progress}%...` : 'Sharing...') : 'Share'}
         </button>
       </div>
       <div className="flex-1 flex items-center justify-center px-6 min-h-0">
@@ -441,6 +510,13 @@ export const MediaComposer: React.FC<{
         <p className="px-6 pb-2 text-xs font-bold text-center" style={{ color: '#FCA5A5' }}>{err}</p>
       )}
       <div className="p-5 pb-8">
+        <p className="text-center text-[11px] font-bold mb-1" style={{ color: 'rgba(255,255,255,0.6)' }}>
+          {kind === 'photo'
+            ? `Photos can be up to ${settings.photoMaxKb} KB`
+            : kind === 'video'
+              ? `Videos can be up to ${settings.maxVideoSeconds} seconds and ${settings.maxVideoMb} MB`
+              : `Music files can be up to ${settings.maxAudioMb} MB`}
+        </p>
         <input
           value={caption}
           onChange={(e) => setCaption(e.target.value.slice(0, settings.maxTextChars))}
@@ -466,7 +542,7 @@ export const MediaComposer: React.FC<{
 // replies, since replying to yourself makes no sense.
 // ============================================================================
 
-const StatusViewer: React.FC<{
+export const StatusViewer: React.FC<{
   person: { uid: string; name: string; username: string; avatar?: string; centreId?: string };
   mine: boolean;
   call: (path: string, opts?: any) => Promise<any>;
@@ -475,6 +551,7 @@ const StatusViewer: React.FC<{
   onSeenUpdate: (ownerUid: string, statusId: string) => void;
 }> = ({ person, mine, call, settings, onClose, onSeenUpdate }) => {
   useEscape(onClose);
+  useLockBodyScroll();
   const [statuses, setStatuses] = useState<ViewerStatus[] | null>(null);
   const [idx, setIdx] = useState(0);
   const [err, setErr] = useState('');
@@ -551,6 +628,49 @@ const StatusViewer: React.FC<{
   const dark = bgLuminance(bg) < 0.5;
   const total = statuses?.length || 0;
 
+  // WhatsApp-style playback: the thin line at the top fills by itself and the
+  // viewer moves to the next update when it fills; touching and holding the
+  // update pauses it until the finger lifts. Video and music run on their own
+  // clock instead and move on when the media ends. The end of the last update
+  // closes the viewer, the way a status viewer closes itself.
+  const [tick, setTick] = useState(0);
+  const pausedRef = React.useRef(false);
+  const advance = (n: number) => {
+    if (idx + n >= total) onClose();
+    else {
+      setIdx(idx + n);
+      setTick(0);
+      pausedRef.current = false;
+    }
+  };
+  const displayMs = (st: ViewerStatus | null): number => {
+    if (!st) return 5000;
+    if (st.kind === 'text') return Math.min(9000, Math.max(4000, 2200 + (st.text || '').length * 45));
+    if (st.kind === 'photo') return 5000;
+    return 0;
+  };
+  React.useEffect(() => {
+    const cur = statuses && idx < statuses.length ? statuses[idx] : null;
+    if (!cur) return;
+    const ms = displayMs(cur);
+    if (ms <= 0) return; // video and music advance when the media ends
+    setTick(0);
+    let acc = 0;
+    let last = Date.now();
+    const id = window.setInterval(() => {
+      const now = Date.now();
+      if (!pausedRef.current) acc += now - last;
+      last = now;
+      setTick(Math.min(1000, Math.round((acc / ms) * 1000)));
+      if (acc >= ms) {
+        window.clearInterval(id);
+        advance(1);
+      }
+    }, 100);
+    return () => window.clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statuses, idx]);
+
   return (
     <div
       className="fixed inset-0 z-50 flex flex-col"
@@ -591,25 +711,37 @@ const StatusViewer: React.FC<{
             <X className="w-4 h-4" />
           </button>
         </div>
-        {total > 1 && (
-          <div className="flex items-center justify-center gap-1.5">
+        {total > 0 && (
+          <div className="flex items-center gap-1">
             {statuses!.map((st, i) => (
-              <span
+              <div
                 key={st.statusId}
-                className="h-1 rounded-full transition-all"
-                style={{
-                  width: i === idx ? 18 : 8,
-                  backgroundColor: dark ? 'rgba(255,255,255,0.7)' : 'rgba(15,23,42,0.4)',
-                  opacity: i === idx ? 1 : 0.35,
-                }}
-              />
+                className="h-1 flex-1 rounded-full overflow-hidden"
+                style={{ backgroundColor: dark ? 'rgba(255,255,255,0.25)' : 'rgba(15,23,42,0.15)' }}
+              >
+                <div
+                  className="h-full rounded-full"
+                  style={{
+                    width: i < idx ? '100%' : i === idx ? `${Math.min(100, (tick / 1000) * 100)}%` : '0%',
+                    backgroundColor: dark ? '#FFFFFF' : '#0F172A',
+                    transition: 'width 100ms linear',
+                  }}
+                />
+              </div>
             ))}
           </div>
         )}
       </div>
 
-      {/* The update itself, with tap-through when there is more than one. */}
-      <div className="flex-1 flex items-center justify-center px-8 relative">
+      {/* The update itself, with tap-through when there is more than one.
+          Holding a finger on it pauses the progress line until it lifts. */}
+      <div
+        className="flex-1 flex items-center justify-center px-8 relative"
+        onPointerDown={() => { pausedRef.current = true; }}
+        onPointerUp={() => { pausedRef.current = false; }}
+        onPointerLeave={() => { pausedRef.current = false; }}
+        onPointerCancel={() => { pausedRef.current = false; }}
+      >
         {current && current.kind === 'text' && (
           <p className="text-center text-2xl font-black tracking-tight" style={{ color: dark ? '#FFFFFF' : '#0F172A' }}>
             {current.text}
@@ -619,14 +751,14 @@ const StatusViewer: React.FC<{
           <img src={current.photoUrl} alt="Status" className="absolute inset-0 w-full h-full object-contain" />
         )}
         {current && current.kind === 'video' && current.videoUrl && (
-          <video src={current.videoUrl} controls autoPlay playsInline className="max-h-full max-w-full rounded-2xl" />
+          <video src={current.videoUrl} controls autoPlay playsInline className="max-h-full max-w-full rounded-2xl" onEnded={() => advance(1)} />
         )}
         {current && current.kind === 'music' && current.audioUrl && (
           <div className="w-full max-w-sm rounded-3xl p-6 space-y-4" style={{ backgroundColor: 'rgba(255,255,255,0.12)' }}>
             <div className="w-16 h-16 rounded-2xl mx-auto flex items-center justify-center" style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}>
               <Music className="w-8 h-8 text-white" />
             </div>
-            <audio src={current.audioUrl} controls className="w-full" />
+            <audio src={current.audioUrl} controls className="w-full" onEnded={() => advance(1)} />
           </div>
         )}
         {total > 1 && (
@@ -1002,22 +1134,28 @@ export const StatusScreenCore: React.FC<{ call: (path: string, opts?: any) => Pr
       )}
 
       {viewer && data?.settings && (
-        <StatusViewer
-          person={viewer.person}
-          mine={viewer.mine}
-          call={call}
-          settings={data.settings}
-          onClose={closeViewer}
-          onSeenUpdate={moveToViewed}
-        />
+        <Overlay>
+          <StatusViewer
+            person={viewer.person}
+            mine={viewer.mine}
+            call={call}
+            settings={data.settings}
+            onClose={closeViewer}
+            onSeenUpdate={moveToViewed}
+          />
+        </Overlay>
       )}
 
       {composing && data?.settings && (
-        <TextComposer call={call} settings={data.settings} onClose={() => setComposing(false)} onPosted={applyPosted} />
+        <Overlay>
+          <TextComposer call={call} settings={data.settings} onClose={() => setComposing(false)} onPosted={applyPosted} />
+        </Overlay>
       )}
 
       {media && data?.settings && (
-        <MediaComposer kind={media.kind} file={media.file} call={call} settings={data.settings} onClose={() => setMedia(null)} onPosted={applyPosted} />
+        <Overlay>
+          <MediaComposer kind={media.kind} file={media.file} call={call} settings={data.settings} onClose={() => setMedia(null)} onPosted={applyPosted} />
+        </Overlay>
       )}
 
       {!data && failed && (

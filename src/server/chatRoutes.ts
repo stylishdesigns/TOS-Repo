@@ -1007,6 +1007,26 @@ export function registerChatRoutes(app: express.Express): void {
     }
   });
 
+  // Upload authorization for the direct browser-to-hosting upload the media
+  // composer uses; the stored settings decide every cap, checked here.
+  app.post('/api/student/chat/status/upload-config', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const body = req.body || {};
+      const stuSnap = await getStudentDoc(caller.uid);
+      if (!stuSnap) throw httpError(403, 'No student record is linked to this account.');
+      const student = stuSnap.data() as any;
+      const centreId = cleanStr(student.centreId, 120);
+      if (!centreId) throw httpError(403, 'No centre is linked to this account.');
+      await requireMembership(caller, centreId);
+      const entitlements = await getCentreEntitlements(centreId);
+      if (entitlements.chat !== true) throw httpError(403, 'Chat is not part of your centre\u2019s plan yet.');
+      res.json(await statusUploadConfigCore(caller, centreId, body));
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] status upload config failed');
+    }
+  });
+
   // Piece 3: viewing statuses. One endpoint returns one person's active
   // statuses; the viewer marks them seen (POST seen) and may reply (POST
   // reply). Every route re-checks membership, the chat entitlement and the
@@ -1146,6 +1166,16 @@ export function registerChatRoutes(app: express.Express): void {
     }
   });
 
+  app.post('/api/tos/chat/status/upload-config', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      if (!caller.tos) throw httpError(403, 'TOS staff only.');
+      res.json(await statusUploadConfigCore(caller, TOS_STATUS_CENTRE, req.body || {}));
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] tos status upload config failed');
+    }
+  });
+
   app.get('/api/tos/chat/status/user/:uid', async (req, res) => {
     try {
       const caller = getCaller(req);
@@ -1228,6 +1258,17 @@ export function registerChatRoutes(app: express.Express): void {
       res.json(await statusUploadCore(caller, centreId, req.body || {}));
     } catch (error: any) {
       handleRouteError(res, error, '[chat] staff status upload failed');
+    }
+  });
+
+  app.post('/api/centre/chat/status/upload-config', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const centreId = cleanStr(String(req.query.centreId || ''), 120);
+      await staffStatusContext(caller, centreId);
+      res.json(await statusUploadConfigCore(caller, centreId, req.body || {}));
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] staff status upload config failed');
     }
   });
 
@@ -2142,6 +2183,7 @@ async function statusPostCore(caller: Caller, centreId: string, body: Record<str
     const prefix = `https://res.cloudinary.com/${cloud}/${kind === 'photo' ? 'image' : 'video'}/upload/`;
     const url = cleanStr(body.url, 400);
     if (!cloud || !url.startsWith(prefix)) throw httpError(400, 'Upload the file through this app first.');
+    await verifyStatusMediaSize(kind, url, st, tosChat.photoMaxKb);
     status = { kind, at: now, expiresAt };
     if (text) status.text = text;
     if (kind === 'photo') status.photoUrl = url;
@@ -2180,6 +2222,71 @@ async function statusUploadCore(caller: Caller, centreId: string, body: Record<s
   }
   const url = await uploadStatusMedia(kind, String(body.dataUrl || ''), st, tosChat.photoMaxKb);
   return { ok: true, url };
+}
+
+// Upload authorization for direct browser-to-hosting uploads. The server
+// checks the same preconditions and stored caps the /upload route checks,
+// then hands the browser the unsigned preset details so a video or music
+// file can upload straight to the media host instead of riding through the
+// server as base64 (the serverless function's request cap is far below a
+// video's stored size cap). The stored URL is still verified at post time to
+// belong to this app's media host and to sit within the stored size cap.
+async function statusUploadConfigCore(caller: Caller, centreId: string, body: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const tosChat = await getTosChat();
+  const st = tosChat.status;
+  if (!st.enabled) throw httpError(403, 'Status is not turned on.');
+  const kind = cleanStr(body.kind, 10);
+  if (kind !== 'photo' && kind !== 'video' && kind !== 'music') throw httpError(400, 'Which kind of update is this?');
+  if (kind === 'photo' && !st.allowPhoto) throw httpError(403, 'Photo updates are turned off.');
+  if (kind === 'video' && !st.allowVideo) throw httpError(403, 'Video updates are turned off.');
+  if (kind === 'music' && !st.allowMusic) throw httpError(403, 'Music updates are turned off.');
+  const sizeBytes = Math.floor(Number(body.sizeBytes) || 0);
+  if (sizeBytes <= 0) throw httpError(400, 'Choose the file first.');
+  if (kind === 'photo' && sizeBytes > Math.max(10, tosChat.photoMaxKb) * 1024) {
+    throw httpError(413, `Photos can be up to ${tosChat.photoMaxKb} KB after compression.`);
+  }
+  if (kind === 'video') {
+    if (sizeBytes > st.maxVideoMb * 1024 * 1024) throw httpError(413, `Videos can be up to ${st.maxVideoMb} MB.`);
+    const dur = Math.round(Number(body.durationSeconds) || 0);
+    if (dur <= 0 || dur > st.maxVideoSeconds) {
+      throw httpError(400, `Videos can be up to ${st.maxVideoSeconds} seconds.`);
+    }
+  }
+  if (kind === 'music' && sizeBytes > st.maxAudioMb * 1024 * 1024) {
+    throw httpError(413, `Music files can be up to ${st.maxAudioMb} MB.`);
+  }
+  const cloud = String(process.env.CLOUDINARY_CLOUD_NAME || '');
+  const preset = String(process.env.CLOUDINARY_UPLOAD_PRESET || '');
+  if (!cloud || !preset) throw httpError(500, 'Media hosting is not configured on this deployment.');
+  return { ok: true, cloud, preset, folder: 'tos/status', endpoint: kind === 'photo' ? 'image' : 'video' };
+}
+
+// Server-side size enforcement for media statuses: the URL a status points at
+// must hold a file no bigger than that kind's stored cap. A HEAD request reads
+// the file's size from the media host without downloading it; when the size
+// cannot be read, the URL-origin check in statusPostCore still holds.
+async function verifyStatusMediaSize(kind: 'photo' | 'video' | 'music', url: string, st: TosStatusSettings, photoMaxKb: number): Promise<void> {
+  try {
+    const head = await fetch(url, { method: 'HEAD' });
+    const len = Number(head.headers.get('content-length') || 0);
+    if (!head.ok || !len) return;
+    const cap = kind === 'photo'
+      ? Math.max(10, photoMaxKb) * 1024
+      : kind === 'video'
+        ? st.maxVideoMb * 1024 * 1024
+        : st.maxAudioMb * 1024 * 1024;
+    if (len > cap) {
+      const what = kind === 'photo'
+        ? `Photos can be up to ${photoMaxKb} KB after compression.`
+        : kind === 'video'
+          ? `Videos can be up to ${st.maxVideoMb} MB.`
+          : `Music files can be up to ${st.maxAudioMb} MB.`;
+      throw httpError(413, what);
+    }
+  } catch (e: any) {
+    if (e && typeof e.status === 'number') throw e; // our own limit error
+    // A network hiccup reading the size must not block a legitimate post.
+  }
 }
 
 async function statusSeenCore(caller: Caller, centreId: string, body: Record<string, unknown>): Promise<Record<string, unknown>> {
