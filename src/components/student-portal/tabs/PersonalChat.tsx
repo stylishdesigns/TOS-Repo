@@ -118,7 +118,7 @@ export const PersonalNewChatSheet: React.FC<{
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="Leaderboard username"
-                className="flex-1 px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-900 placeholder:text-slate-400 placeholder:font-medium focus:outline-none focus:border-[#EA580C]"
+                className="flex-1 min-w-0 px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-900 placeholder:text-slate-400 placeholder:font-medium focus:outline-none focus:border-[#EA580C]"
                 aria-label="Username to add"
               />
               <button

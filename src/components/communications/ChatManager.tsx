@@ -92,6 +92,7 @@ interface Bootstrap {
 }
 
 function accessLabel(g: ChatGroup): string {
+  if (g.kind === 'personal') return 'Private one-to-one chat';
   if (g.access.mode === 'none') return 'Open to everyone';
   if (g.access.mode === 'custom') return `Opens at ${g.access.thresholdPercent ?? 0}% practice`;
   return 'Centre default';

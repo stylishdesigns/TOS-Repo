@@ -810,7 +810,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
     );
   }
 
-  const kindLabel = resp?.kind === 'announcements' ? 'Announcements' : resp?.kind === 'tos_channel' ? 'TOS channel' : resp?.kind === 'subject' ? 'Subject group' : 'Group';
+  const kindLabel = resp?.kind === 'personal' ? 'Personal' : resp?.kind === 'announcements' ? 'Announcements' : resp?.kind === 'tos_channel' ? 'TOS channel' : resp?.kind === 'subject' ? 'Subject group' : 'Group';
 
   if (resp?.locked) {
     return (
