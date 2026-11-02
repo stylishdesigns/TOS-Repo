@@ -18,8 +18,23 @@ type TosChatSettings = {
   photoMaxKb: number;
   retentionDays: number;
   messageMaxChars: number;
-  postRateLimitPerHour: number;
+  postRateLimitPerDay: number;
   autoPosts: { mockOpen: boolean; resultsOut: boolean; practicePublished: boolean };
+  status?: {
+    enabled: boolean;
+    allowText: boolean;
+    allowPhoto: boolean;
+    allowVideo: boolean;
+    allowMusic: boolean;
+    allowReplies: boolean;
+    adminsCanRemove: boolean;
+    lastsHours: number;
+    maxVideoSeconds: number;
+    maxVideoMb: number;
+    maxAudioMb: number;
+    statusesPerDay: number;
+    maxTextChars: number;
+  };
   updatedAt?: string | null;
 };
 
@@ -330,6 +345,11 @@ const SettingsTab: React.FC<{ onSaved: () => void }> = ({ onSaved }) => {
     setS((prev) => (prev ? { ...prev, [key]: value } : prev));
   };
 
+  // Nested setter for the status limits block in the settings screen.
+  const setSt = (key: string, value: any) => {
+    setS((prev) => prev ? { ...prev, status: { ...(prev.status || {}), [key]: value } as TosChatSettings['status'] } : prev);
+  };
+
   const save = async () => {
     if (!s || confirmText.trim() !== 'APPLY') return;
     setBusy(true);
@@ -385,11 +405,65 @@ const SettingsTab: React.FC<{ onSaved: () => void }> = ({ onSaved }) => {
             <input type="number" min={1} max={365} value={s.retentionDays} onChange={(e) => set('retentionDays', Number(e.target.value))} className={inputCls} />
           </div>
           <div>
-            <Label>Posts per member per hour</Label>
-            <input type="number" min={1} max={1000} value={s.postRateLimitPerHour} onChange={(e) => set('postRateLimitPerHour', Number(e.target.value))} className={inputCls} />
+            <Label>Posts per member per day</Label>
+            <input type="number" min={1} max={1000} value={s.postRateLimitPerDay} onChange={(e) => set('postRateLimitPerDay', Number(e.target.value))} className={inputCls} />
           </div>
         </div>
-        <p className="text-[11px] text-slate-500 mt-3">Ranges: messages 100 to 8000 characters, photos 10 to 10240 KB, retention 1 to 365 days, rate 1 to 1000 posts an hour, threshold 0 to 100%. Values outside are clamped on save.</p>
+        <p className="text-[11px] text-slate-500 mt-3">Ranges: messages 100 to 8000 characters, photos 10 to 10240 KB, retention 1 to 365 days, 1 to 1000 posts a day, threshold 0 to 100%. Values outside are clamped on save.</p>
+      </Card>
+
+      <Card>
+        <h3 className="text-sm font-black text-white mb-4">Status limits</h3>
+        <p className="text-[11px] text-slate-400 mb-4">The same limits the student and staff status screens enforce, all stored here and checked on the server.</p>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label>Updates stay up (hours)</Label>
+            <input type="number" min={1} max={720} value={s.status?.lastsHours ?? 24} onChange={(e) => setSt('lastsHours', Number(e.target.value))} className={inputCls} />
+          </div>
+          <div>
+            <Label>Updates per member per day</Label>
+            <input type="number" min={1} max={20} value={s.status?.statusesPerDay ?? 5} onChange={(e) => setSt('statusesPerDay', Number(e.target.value))} className={inputCls} />
+          </div>
+          <div>
+            <Label>Video length cap (seconds)</Label>
+            <input type="number" min={5} max={600} value={s.status?.maxVideoSeconds ?? 60} onChange={(e) => setSt('maxVideoSeconds', Number(e.target.value))} className={inputCls} />
+          </div>
+          <div>
+            <Label>Video size cap (MB)</Label>
+            <input type="number" min={1} max={500} value={s.status?.maxVideoMb ?? 50} onChange={(e) => setSt('maxVideoMb', Number(e.target.value))} className={inputCls} />
+          </div>
+          <div>
+            <Label>Music size cap (MB)</Label>
+            <input type="number" min={1} max={50} value={s.status?.maxAudioMb ?? 10} onChange={(e) => setSt('maxAudioMb', Number(e.target.value))} className={inputCls} />
+          </div>
+          <div>
+            <Label>Text update length (chars)</Label>
+            <input type="number" min={20} max={1000} value={s.status?.maxTextChars ?? 280} onChange={(e) => setSt('maxTextChars', Number(e.target.value))} className={inputCls} />
+          </div>
+        </div>
+        <p className="text-[11px] text-slate-500 mt-3">What members may post: tap to turn on or off.</p>
+        <div className="flex flex-wrap gap-2 mt-2">
+          {([
+            ['allowText', 'Text'],
+            ['allowPhoto', 'Photos'],
+            ['allowVideo', 'Videos'],
+            ['allowMusic', 'Music'],
+            ['allowReplies', 'Replies'],
+          ] as const).map(([key, label]) => {
+            const on = s.status ? s.status[key] !== false : true;
+            return (
+              <button
+                key={key}
+                type="button"
+                aria-pressed={on}
+                onClick={() => setSt(key, !on)}
+                className={`px-4 py-2 rounded-full text-xs font-black transition ${on ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-slate-800 text-slate-400 border border-slate-700'}`}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
       </Card>
 
       <Card>

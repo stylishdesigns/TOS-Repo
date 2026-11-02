@@ -586,7 +586,7 @@ export interface TosChatSettings {
   photoMaxKb: number;
   retentionDays: number;
   messageMaxChars: number;
-  postRateLimitPerHour: number;
+  postRateLimitPerDay: number;
   autoPosts: { mockOpen: boolean; resultsOut: boolean; practicePublished: boolean };
   status: TosStatusSettings;
   updatedAt?: string | null;

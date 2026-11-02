@@ -1,22 +1,21 @@
 import React, { useState } from 'react';
 import { ChatManager } from './ChatManager';
-import { ChatSplash } from './ChatSplash';
+import { ChatModeToggle } from './ChatSplash';
 import { StaffStatusScreen } from '../student-portal/tabs/StatusTab';
 
 /**
  * Admin chat entry: admins reach chat from their sidebar menu (no bottom
- * nav), and the same bottom splash tutors get opens first with Status and
- * Chat. Leaving the section and coming back shows the splash again.
+ * nav). The section opens on Status with the Status/Chat toggle at the top
+ * to switch over to chat.
  */
 export const AdminChatEntry: React.FC = () => {
-  const [mode, setMode] = useState<'choose' | 'status' | 'chat'>('choose');
-  if (mode === 'status') return <StaffStatusScreen />;
-  if (mode === 'chat') return <ChatManager />;
+  const [mode, setMode] = useState<'status' | 'chat'>('status');
   return (
-    <ChatSplash
-      onStatus={() => setMode('status')}
-      onChat={() => setMode('chat')}
-      onClose={() => setMode('chat')}
-    />
+    <div>
+      <div className="sticky top-0 z-20 bg-slate-50/95 backdrop-blur px-4 pt-4 pb-2">
+        <ChatModeToggle mode={mode} onChange={setMode} />
+      </div>
+      {mode === 'status' ? <StaffStatusScreen /> : <ChatManager />}
+    </div>
   );
 };

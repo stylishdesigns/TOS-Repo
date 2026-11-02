@@ -505,6 +505,18 @@ export const StudentPortal: React.FC = () => {
   }
 
 
+  // The shell pins to the stable small viewport (100svh), so the bottom nav
+  // keeps one fixed screen position even while the browser URL bar slides in
+  // or out. The strip that can open up under the shell then shows the page
+  // background, which is kept the nav's dark colour while this portal is up.
+  React.useEffect(() => {
+    const prev = document.body.style.backgroundColor;
+    document.body.style.backgroundColor = '#020617';
+    return () => {
+      document.body.style.backgroundColor = prev;
+    };
+  }, []);
+
   const orbBadgeText = orbBadgeLabel(orbUnread);
 
   const lateMinutesThreshold = parseTime(attendanceSettings.lateArrivalTime || '08:30 AM');
@@ -554,7 +566,7 @@ export const StudentPortal: React.FC = () => {
             desktopViewMode === 'mobile_frame'
               ? 'max-w-md mx-auto sm:rounded-[36px] sm:shadow-2xl sm:border-[6px] sm:border-slate-800'
               : 'max-w-4xl mx-auto sm:rounded-3xl sm:border sm:border-slate-800'
-          } bg-slate-50 h-[100dvh] flex flex-col relative overflow-hidden`}
+          } bg-slate-50 h-[100svh] flex flex-col relative overflow-hidden`}
         >
           {/* Parent Mode Indicator Notification if active */}
           {portalMode === 'parent' && (
@@ -878,7 +890,7 @@ export const StudentPortal: React.FC = () => {
                     onClick={openStatusScreen}
                     aria-label="Status"
                     className={`absolute w-12 h-12 rounded-full bg-white text-[#EA580C] flex items-center justify-center shadow-lg cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 ${prefersReducedMotion ? '' : 'animate-in fade-in zoom-in-95 duration-200'}`}
-                    style={{ left: -97, top: -56, transform: 'translate(-50%, -50%)' }}
+                    style={{ left: -72, top: -42, transform: 'translate(-50%, -50%)' }}
                   >
                     <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden="true">
                       <circle cx="12" cy="12" r="9" strokeDasharray="3.5 3.5" />
@@ -896,7 +908,7 @@ export const StudentPortal: React.FC = () => {
                     onClick={() => openChatSection('chats')}
                     aria-label="Chats"
                     className={`absolute w-14 h-14 rounded-full text-white flex items-center justify-center shadow-xl cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-200 ${prefersReducedMotion ? '' : 'animate-in fade-in zoom-in-95 duration-200'}`}
-                    style={{ left: 0, top: -112, transform: 'translate(-50%, -50%)', background: 'linear-gradient(145deg, #EA580C, #9A3412)' }}
+                    style={{ left: 0, top: -84, transform: 'translate(-50%, -50%)', background: 'linear-gradient(145deg, #EA580C, #9A3412)' }}
                   >
                     <MessageCircle className="w-7 h-7" />
                     <span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 whitespace-nowrap text-[11px] font-bold text-white pointer-events-none">
@@ -910,7 +922,7 @@ export const StudentPortal: React.FC = () => {
                     onClick={() => openChatSection('channels')}
                     aria-label="Channels"
                     className={`absolute w-12 h-12 rounded-full bg-white text-slate-800 flex items-center justify-center shadow-lg cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 ${prefersReducedMotion ? '' : 'animate-in fade-in zoom-in-95 duration-200'}`}
-                    style={{ left: 97, top: -56, transform: 'translate(-50%, -50%)' }}
+                    style={{ left: 72, top: -42, transform: 'translate(-50%, -50%)' }}
                   >
                     <Hash className="w-6 h-6" />
                     <span className="absolute top-full mt-2 left-1/2 -translate-x-1/2 whitespace-nowrap text-[11px] font-bold text-white pointer-events-none">

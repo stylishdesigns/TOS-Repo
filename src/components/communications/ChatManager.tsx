@@ -83,7 +83,7 @@ interface Bootstrap {
     photoMaxKb: number;
     retentionDays: number;
     messageMaxChars: number;
-    postRateLimitPerHour: number;
+    postRateLimitPerDay: number;
     autoPosts: Record<string, boolean>;
   };
   groups: ChatGroup[];
@@ -699,7 +699,7 @@ const SettingsSection: React.FC<SectionProps> = ({ data, isAdmin, reload, addToa
 
       <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200 space-y-1.5">
         <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Set by TOS for every centre</p>
-        <p className="text-[11px] text-slate-500 font-medium">Photos up to {data.platform.photoMaxKb} KB · messages up to {data.platform.messageMaxChars} characters · messages kept {data.platform.retentionDays} days · up to {data.platform.postRateLimitPerHour} messages per hour.</p>
+        <p className="text-[11px] text-slate-500 font-medium">Photos up to {data.platform.photoMaxKb} KB · messages up to {data.platform.messageMaxChars} characters · messages kept {data.platform.retentionDays} days · up to {data.platform.postRateLimitPerDay} posts per day.</p>
       </div>
 
       <button

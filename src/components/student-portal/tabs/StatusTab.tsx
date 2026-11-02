@@ -23,6 +23,9 @@ interface StatusEntry {
   name: string;
   username: string;
   centreId?: string;
+  // How many live updates this person has up in the feed (more than one
+  // when they posted several today); shown on the row as a small count.
+  count?: number;
   statusId: string;
   kind: string;
   at: number;
@@ -75,6 +78,9 @@ interface StatusOverview {
     maxVideoMb: number;
     maxAudioMb: number;
     photoMaxKb: number;
+    // Direct-upload details served with the overview so the composer can
+    // start uploading the moment Share is tapped (no extra round trip).
+    upload?: { cloud: string; preset: string; folder: string };
   };
   me?: {
     name: string;
@@ -84,6 +90,8 @@ interface StatusOverview {
       statusId: string; kind: string; at: number; expiresAt: number; text: string;
       photoUrl?: string; videoUrl?: string; audioUrl?: string; durationSeconds?: number;
       centreId?: string;
+      // The author's tracking numbers for their own latest update.
+      views?: number; replyCount?: number;
     } | null;
   };
   recent?: StatusEntry[];
@@ -405,16 +413,22 @@ export const MediaComposer: React.FC<{
       // The file that actually posts: photos as the downscaled copy, video and
       // music exactly as picked.
       const blob: Blob = kind === 'photo' ? await (await fetch(preview)).blob() : file;
-      // The server authorises the upload against the stored settings first,
-      // so its limit messages reach the screen before any bytes move.
-      const cfg = await call('/upload-config', {
-        method: 'POST',
-        body: {
-          kind,
-          sizeBytes: blob.size,
-          durationSeconds: kind === 'video' ? durationRef.current : undefined,
-        },
-      });
+      // Upload config comes with the overview, so the upload starts the
+      // moment Share is tapped; the server-side route stays as the fallback
+      // and re-checks the same stored limits when the overview had none.
+      let cfg: any = settings.upload && settings.upload.cloud && settings.upload.preset
+        ? { ok: true, ...settings.upload, endpoint: kind === 'photo' ? 'image' : 'video' }
+        : null;
+      if (!cfg) {
+        cfg = await call('/upload-config', {
+          method: 'POST',
+          body: {
+            kind,
+            sizeBytes: blob.size,
+            durationSeconds: kind === 'video' ? durationRef.current : undefined,
+          },
+        });
+      }
       if (!(cfg && cfg.ok && cfg.cloud && cfg.preset)) {
         throw new Error(String(cfg?.error || 'The upload could not be started. Try again.'));
       }
@@ -610,6 +624,7 @@ export const StatusViewer: React.FC<{
         });
         setReplyText('');
         setReplyNote('Reply sent');
+        replyInputRef.current?.blur();
         window.setTimeout(() => setReplyNote(''), 2500);
       } else {
         throw new Error(String(d?.error || 'The reply could not be sent. Try again.'));
@@ -635,6 +650,15 @@ export const StatusViewer: React.FC<{
   // closes the viewer, the way a status viewer closes itself.
   const [tick, setTick] = useState(0);
   const pausedRef = React.useRef(false);
+  const replyInputRef = React.useRef<HTMLInputElement>(null);
+  // Swiping up on the update is the reply gesture for every status: it
+  // opens (focuses) the reply box, the same move a reel uses.
+  const swipeStartY = React.useRef(0);
+  const swipeFired = React.useRef(false);
+  const replyTouchOpen = () => {
+    if (mine || !settings.allowReplies) return;
+    replyInputRef.current?.focus();
+  };
   const advance = (n: number) => {
     if (idx + n >= total) onClose();
     else {
@@ -741,6 +765,20 @@ export const StatusViewer: React.FC<{
         onPointerUp={() => { pausedRef.current = false; }}
         onPointerLeave={() => { pausedRef.current = false; }}
         onPointerCancel={() => { pausedRef.current = false; }}
+        onTouchStart={(e) => {
+          swipeStartY.current = e.touches[0]?.clientY || 0;
+          swipeFired.current = false;
+        }}
+        onTouchMove={(e) => {
+          if (swipeFired.current) return;
+          const y = e.touches[0]?.clientY || 0;
+          if (swipeStartY.current - y > 60) {
+            swipeFired.current = true;
+            replyTouchOpen();
+          }
+        }}
+        onTouchEnd={() => { swipeFired.current = false; }}
+        onTouchCancel={() => { swipeFired.current = false; }}
       >
         {current && current.kind === 'text' && (
           <p className="text-center text-2xl font-black tracking-tight" style={{ color: dark ? '#FFFFFF' : '#0F172A' }}>
@@ -751,7 +789,14 @@ export const StatusViewer: React.FC<{
           <img src={current.photoUrl} alt="Status" className="absolute inset-0 w-full h-full object-contain" />
         )}
         {current && current.kind === 'video' && current.videoUrl && (
-          <video src={current.videoUrl} controls autoPlay playsInline className="max-h-full max-w-full rounded-2xl" onEnded={() => advance(1)} />
+          <video
+            src={current.videoUrl}
+            autoPlay
+            playsInline
+            muted
+            className="absolute inset-0 w-full h-full object-cover"
+            onEnded={() => advance(1)}
+          />
         )}
         {current && current.kind === 'music' && current.audioUrl && (
           <div className="w-full max-w-sm rounded-3xl p-6 space-y-4" style={{ backgroundColor: 'rgba(255,255,255,0.12)' }}>
@@ -847,8 +892,11 @@ export const StatusViewer: React.FC<{
           )}
           <div className="flex items-center gap-2">
             <input
+              ref={replyInputRef}
               value={replyText}
               onChange={(e) => setReplyText(e.target.value)}
+              onFocus={() => { pausedRef.current = true; }}
+              onBlur={() => { pausedRef.current = false; }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
@@ -899,6 +947,14 @@ const StatusRow: React.FC<{ entry: StatusEntry; dimmed?: boolean; onPress?: () =
         {statusTimeLabel(entry.at)}
       </p>
     </div>
+    {(entry.count || 0) > 1 && (
+      <span
+        className="shrink-0 text-[10px] font-black text-[#C2410C] bg-[#FFF7ED] border border-[#EA580C]/40 rounded-full px-2 py-0.5"
+        title={`${entry.count} updates in this status`}
+      >
+        ×{entry.count}
+      </span>
+    )}
   </button>
 );
 
@@ -1038,10 +1094,12 @@ export const StatusScreenCore: React.FC<{ call: (path: string, opts?: any) => Pr
                 </div>
               )}
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-sm font-black text-slate-900">My status</p>
               <p className="text-xs text-slate-500 font-medium truncate">
-                {me?.latest ? statusTimeLabel(me.latest.at) : 'No status up right now'}
+                {me?.latest
+                  ? `${statusTimeLabel(me.latest.at)}${typeof me.latest.views === 'number' ? ` · ${me.latest.views} seen · ${me.latest.replyCount || 0} replies` : ''}`
+                  : 'No status up right now'}
               </p>
             </div>
           </div>

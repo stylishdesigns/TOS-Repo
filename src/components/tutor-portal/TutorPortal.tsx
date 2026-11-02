@@ -8,7 +8,7 @@ import { AssessmentTab } from './tabs/AssessmentTab';
 import { MoreTab } from './tabs/MoreTab';
 import { ChatManager } from '../communications/ChatManager';
 import { StaffStatusScreen } from '../student-portal/tabs/StatusTab';
-import { ChatSplash } from '../communications/ChatSplash';
+import { ChatModeToggle } from '../communications/ChatSplash';
 import { PWAInstallButton } from '../pwa/PWAInstallButton';
 import {
   Home,
@@ -53,7 +53,7 @@ export const TutorPortal: React.FC = () => {
   const [activeTab, setActiveTabState] = useState<TabType>(parseInitialTutorTab);
   const [chatThreadOpen, setChatThreadOpen] = useState(false);
   // Which thing chat opens: the splash chooser first, then Status or Chat.
-  const [chatMode, setChatMode] = useState<'choose' | 'status' | 'chat'>('chat');
+  const [chatMode, setChatMode] = useState<'status' | 'chat'>('status');
   const [desktopViewMode, setDesktopViewMode] = useState<'mobile_frame' | 'expanded'>('mobile_frame');
 
   const activeTutor = contextTutor || {
@@ -218,14 +218,14 @@ export const TutorPortal: React.FC = () => {
             {activeTab === 'home' && <HomeTab tutor={activeTutor} onNavigateTab={setActiveTab} />}
             {activeTab === 'classes' && <ScheduleTab tutor={activeTutor} />}
             {activeTab === 'assessment' && <AssessmentTab tutor={activeTutor} />}
-            {activeTab === 'chat' && chatMode === 'status' && <StaffStatusScreen />}
-            {activeTab === 'chat' && chatMode === 'chat' && <ChatManager onThreadOpenChange={setChatThreadOpen} />}
-            {activeTab === 'chat' && chatMode === 'choose' && (
-              <ChatSplash
-                onStatus={() => setChatMode('status')}
-                onChat={() => setChatMode('chat')}
-                onClose={() => setChatMode('chat')}
-              />
+            {activeTab === 'chat' && (
+              <>
+                <div className="sticky top-0 z-20 bg-slate-50/95 backdrop-blur px-4 py-3 -mt-1">
+                  <ChatModeToggle mode={chatMode === 'choose' ? 'status' : chatMode} onChange={(m) => setChatMode(m)} />
+                </div>
+                {chatMode !== 'chat' && <StaffStatusScreen />}
+                {chatMode === 'chat' && <ChatManager onThreadOpenChange={setChatThreadOpen} />}
+              </>
             )}
             {activeTab === 'more' && (
               <MoreTab 

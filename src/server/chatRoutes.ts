@@ -44,7 +44,7 @@ const START_TOS_CHAT: TosChatSettings = {
   photoMaxKb: 500,
   retentionDays: 30,
   messageMaxChars: 2000,
-  postRateLimitPerHour: 30,
+  postRateLimitPerDay: 30,
   autoPosts: { mockOpen: true, resultsOut: true, practicePublished: true },
   status: {
     enabled: true,
@@ -55,7 +55,7 @@ const START_TOS_CHAT: TosChatSettings = {
     allowReplies: true,
     adminsCanRemove: true,
     lastsHours: 24,
-    maxVideoSeconds: 30,
+    maxVideoSeconds: 60,
     maxVideoMb: 50,
     maxAudioMb: 10,
     statusesPerDay: 5,
@@ -131,7 +131,7 @@ function mergeTosChat(raw: any): TosChatSettings {
   s.photoMaxKb = clampInt(raw.photoMaxKb, 10, 10240, s.photoMaxKb);
   s.retentionDays = clampInt(raw.retentionDays, 1, 365, s.retentionDays);
   s.messageMaxChars = clampInt(raw.messageMaxChars, 100, 8000, s.messageMaxChars);
-  s.postRateLimitPerHour = clampInt(raw.postRateLimitPerHour, 1, 1000, s.postRateLimitPerHour);
+  s.postRateLimitPerDay = clampInt(raw.postRateLimitPerDay, 1, 1000, s.postRateLimitPerDay);
   if (raw.autoPosts && typeof raw.autoPosts === 'object') {
     s.autoPosts = {
       mockOpen: raw.autoPosts.mockOpen !== false,
@@ -150,7 +150,10 @@ function mergeTosChat(raw: any): TosChatSettings {
       allowReplies: w.allowReplies !== false,
       adminsCanRemove: w.adminsCanRemove !== false,
       lastsHours: clampInt(w.lastsHours, 1, 720, s.status.lastsHours),
-      maxVideoSeconds: clampInt(w.maxVideoSeconds, 5, 120, s.status.maxVideoSeconds),
+      // The 30s cap predates the 60s default and no screen ever let an
+      // admin change it, so a stored 30 is the old default, not a choice:
+      // it lifts to the new default of 60.
+      maxVideoSeconds: clampInt(Number(w.maxVideoSeconds) === 30 ? 60 : w.maxVideoSeconds, 5, 600, s.status.maxVideoSeconds),
       maxVideoMb: clampInt(w.maxVideoMb, 1, 500, s.status.maxVideoMb),
       maxAudioMb: clampInt(w.maxAudioMb, 1, 50, s.status.maxAudioMb),
       statusesPerDay: clampInt(w.statusesPerDay, 1, 20, s.status.statusesPerDay),
@@ -573,22 +576,23 @@ async function usernameFor(uid: string): Promise<string> {
   return cleanStr(snap.docs[0].data().username, 16);
 }
 
-async function consumePostRateLimit(uid: string, maxPerHour: number): Promise<void> {
+async function consumePostRateLimit(uid: string, maxPerDay: number): Promise<void> {
   await adminDb.runTransaction(async (tx) => {
     const ref = adminDb.collection('rateLimits').doc(`chat:${uid}`);
     const doc = await tx.get(ref);
     const now = Date.now();
+    const DAY = 24 * 60 * 60 * 1000;
     let count = 1;
     let windowStart = now;
-    if (doc.exists && now - ((doc.data() as any)?.windowStart || 0) <= 60 * 60 * 1000) {
+    if (doc.exists && now - ((doc.data() as any)?.windowStart || 0) <= DAY) {
       count = ((doc.data() as any)?.count || 0) + 1;
       windowStart = (doc.data() as any).windowStart;
     }
-    if (count > maxPerHour) {
-      const waitMinutes = Math.ceil((windowStart + 60 * 60 * 1000 - now) / 60000);
-      throw httpError(429, `You are sending messages too quickly. Please wait ${waitMinutes} minutes.`);
+    if (count > maxPerDay) {
+      const waitHours = Math.max(1, Math.ceil((windowStart + DAY - now) / 3600000));
+      throw httpError(429, `You have reached your posting limit for today. Try again in about ${waitHours} hour${waitHours === 1 ? '' : 's'}.`);
     }
-    tx.set(ref, { count, windowStart, expiresAt: new Date(windowStart + 2 * 60 * 60 * 1000) }, { merge: true });
+    tx.set(ref, { count, windowStart, expiresAt: new Date(windowStart + 2 * DAY) }, { merge: true });
   });
 }
 
@@ -1123,7 +1127,7 @@ export function registerChatRoutes(app: express.Express): void {
         const entitlements = await getCentreEntitlements(centreId);
         if (entitlements.chat !== true) return res.status(403).json({ error: 'Chat is not part of your centre\u2019s plan yet.' });
       }
-      res.json(await statusReplyCore(caller, centreId, body, { name: cleanStr(student.name, MAX_NAME_CHARS), username: await usernameFor(caller.uid) }));
+      res.json(await statusReplyCore(caller, centreId, body, { name: cleanStr(student.name, MAX_NAME_CHARS), username: await usernameFor(caller.uid), role: 'student' }));
     } catch (error: any) {
       handleRouteError(res, error, '[chat] status reply failed');
     }
@@ -1300,8 +1304,8 @@ export function registerChatRoutes(app: express.Express): void {
     try {
       const caller = getCaller(req);
       const centreId = cleanStr(String(req.query.centreId || ''), 120);
-      await staffStatusContext(caller, centreId);
-      res.json(await statusReplyCore(caller, centreId, req.body || {}, { name: await staffDisplayName(caller), username: '' }));
+      const staffCtx = await staffStatusContext(caller, centreId);
+      res.json(await statusReplyCore(caller, centreId, req.body || {}, { name: await staffDisplayName(caller), username: '', role: staffCtx.role }));
     } catch (error: any) {
       handleRouteError(res, error, '[chat] staff status reply failed');
     }
@@ -1593,7 +1597,7 @@ export function registerChatRoutes(app: express.Express): void {
         : null;
       if (!text && !photoUrl) throw httpError(400, 'Write a message first.');
       if (text.length > tosChat.messageMaxChars) throw httpError(400, `Messages can be up to ${tosChat.messageMaxChars} characters.`);
-      await consumePostRateLimit(caller.uid, tosChat.postRateLimitPerHour);
+      await consumePostRateLimit(caller.uid, tosChat.postRateLimitPerDay);
       const replyTo = await buildReplyTo(ctx.group.id, body.replyTo);
       await writeMessage(ctx.group, { uid: caller.uid, username, role: 'student' }, text.slice(0, tosChat.messageMaxChars), photoUrl, replyTo ? { replyTo } : undefined);
       const meta = await readMeta(ctx.group.id);
@@ -1732,7 +1736,7 @@ export function registerChatRoutes(app: express.Express): void {
       const username = await usernameFor(caller.uid);
       if (!username) throw httpError(403, 'Set your username in your profile before using chat.');
       const tosChat = await getTosChat();
-      await consumePostRateLimit(caller.uid, tosChat.postRateLimitPerHour);
+      await consumePostRateLimit(caller.uid, tosChat.postRateLimitPerDay);
       const text = String(v.text ?? '').slice(0, tosChat.messageMaxChars);
       const photoUrl = toCtx.centreChat.photosAllowed && typeof v.photoUrl === 'string' ? v.photoUrl.slice(0, MAX_PHOTO_URL_CHARS) : null;
       if (!text && !photoUrl) throw httpError(400, 'Nothing to forward.');
@@ -1987,6 +1991,9 @@ async function statusOverviewCore(caller: Caller, centreIds: string[], me: { nam
   // Seen marks are stored per centre, so keys carry the centre too and two
   // feeds can never collapse one status into another.
   const seenKeys = new Set<string>();
+  // How many live updates each person has up in this feed, so a row can
+  // show that more than one update is waiting behind the latest one.
+  const counts = new Map<string, number>();
   for (const centreId of ids) {
     const centreSnap = await adminRtdb.ref(`chat/status/${centreId}`).get();
     centreSnap.forEach((c) => {
@@ -2010,6 +2017,8 @@ async function statusOverviewCore(caller: Caller, centreIds: string[], me: { nam
           audioUrl: cleanStr(v.audioUrl, 400),
           durationSeconds: Number(v.durationSeconds) || 0,
         };
+        const ck = `${centreId}:${uid}`;
+        counts.set(ck, (counts.get(ck) || 0) + 1);
         const prev = latestByUid.get(uid);
         if (!prev || item.at > prev.at) latestByUid.set(uid, item);
       });
@@ -2026,6 +2035,40 @@ async function statusOverviewCore(caller: Caller, centreIds: string[], me: { nam
     .sort((a, b) => b.at - a.at);
 
   const names = await statusNamesFor(others.map((o) => o.uid));
+  // The owner tracks their own latest update: how many people have seen it
+  // and how many replies it has collected.
+  let myViews = 0;
+  let myReplyCount = 0;
+  if (myLatest) {
+    const vc = await adminRtdb.ref(`chat/statusSeenCount/${myLatest.centreId}/${myLatest.statusId}`).get();
+    myViews = Number(vc.val()) || 0;
+    const rc = await adminRtdb.ref(`chat/statusReplies/${myLatest.centreId}/${myLatest.statusId}`).get();
+    rc.forEach(() => { myReplyCount += 1; });
+  }
+
+  const cloudName = String(process.env.CLOUDINARY_CLOUD_NAME || '');
+  const presetName = String(process.env.CLOUDINARY_UPLOAD_PRESET || '');
+  const settingsOut: Record<string, unknown> = {
+    allowText: st.allowText,
+    allowPhoto: st.allowPhoto,
+    allowVideo: st.allowVideo,
+    allowMusic: st.allowMusic,
+    allowReplies: st.allowReplies,
+    lastsHours: st.lastsHours,
+    statusesPerDay: st.statusesPerDay,
+    maxTextChars: st.maxTextChars,
+    maxVideoSeconds: st.maxVideoSeconds,
+    maxVideoMb: st.maxVideoMb,
+    maxAudioMb: st.maxAudioMb,
+    photoMaxKb: tosChat.photoMaxKb,
+  };
+  // The unsigned upload details ride with the overview so the composer can
+  // start an upload the moment Share is tapped instead of waiting on a
+  // second server round trip. Entitlement is still enforced at post time.
+  if ((st.allowPhoto || st.allowVideo || st.allowMusic) && cloudName && presetName) {
+    settingsOut.upload = { cloud: cloudName, preset: presetName, folder: 'tos/status' };
+  }
+
   const shape = (o: One) => ({
     centreId: o.centreId,
     uid: o.uid,
@@ -2041,25 +2084,13 @@ async function statusOverviewCore(caller: Caller, centreIds: string[], me: { nam
     videoUrl: o.videoUrl,
     audioUrl: o.audioUrl,
     durationSeconds: o.durationSeconds,
+    count: counts.get(`${o.centreId}:${o.uid}`) || 0,
   });
 
   return {
     ok: true,
     enabled: true,
-    settings: {
-      allowText: st.allowText,
-      allowPhoto: st.allowPhoto,
-      allowVideo: st.allowVideo,
-      allowMusic: st.allowMusic,
-      allowReplies: st.allowReplies,
-      lastsHours: st.lastsHours,
-      statusesPerDay: st.statusesPerDay,
-      maxTextChars: st.maxTextChars,
-      maxVideoSeconds: st.maxVideoSeconds,
-      maxVideoMb: st.maxVideoMb,
-      maxAudioMb: st.maxAudioMb,
-      photoMaxKb: tosChat.photoMaxKb,
-    },
+    settings: settingsOut,
     me: {
       name: me.name,
       username: me.username,
@@ -2070,6 +2101,7 @@ async function statusOverviewCore(caller: Caller, centreIds: string[], me: { nam
             statusId: myLatest.statusId, kind: myLatest.kind, at: myLatest.at, expiresAt: myLatest.expiresAt,
             text: myLatest.text, bg: myLatest.bg, photoUrl: myLatest.photoUrl, videoUrl: myLatest.videoUrl,
             audioUrl: myLatest.audioUrl, durationSeconds: myLatest.durationSeconds,
+            views: myViews, replyCount: myReplyCount,
           }
         : null,
     },
@@ -2315,7 +2347,7 @@ async function statusSeenCore(caller: Caller, centreId: string, body: Record<str
   return { ok: true };
 }
 
-async function statusReplyCore(caller: Caller, centreId: string, body: Record<string, unknown>, identity: { name: string; username: string }): Promise<Record<string, unknown>> {
+async function statusReplyCore(caller: Caller, centreId: string, body: Record<string, unknown>, identity: { name: string; username: string; role?: string }): Promise<Record<string, unknown>> {
   const tosChat = await getTosChat();
   const st = tosChat.status;
   if (!st.enabled) throw httpError(403, 'Status is not turned on.');
@@ -2329,7 +2361,7 @@ async function statusReplyCore(caller: Caller, centreId: string, body: Record<st
   if (text.length > tosChat.messageMaxChars) {
     throw httpError(400, `Replies can be up to ${tosChat.messageMaxChars} characters.`);
   }
-  await consumePostRateLimit(caller.uid, tosChat.postRateLimitPerHour);
+  await consumePostRateLimit(caller.uid, tosChat.postRateLimitPerDay);
 
   const now = Date.now();
   const statusSnap = await adminRtdb.ref(`chat/status/${centreId}/${ownerUid}/${statusId}`).get();
@@ -2347,6 +2379,48 @@ async function statusReplyCore(caller: Caller, centreId: string, body: Record<st
     at: now,
   };
   await ref.set(reply);
+
+  // Mirror the reply into the personal chat between the replier and the
+  // status owner when the owner is centre staff, so replies reach admins
+  // and tutors in a chat they can answer from. The viewer still shows the
+  // reply either way, and a mirror problem must never block the reply.
+  if (centreId !== TOS_STATUS_CENTRE) {
+    try {
+      const ownerMem = await adminDb.collection('memberships').where('uid', '==', ownerUid).limit(20).get();
+      let ownerRole = '';
+      ownerMem.forEach((d) => {
+        const v = d.data() as any;
+        if (cleanStr(v?.centreId, 120) === centreId) ownerRole = cleanStr(v?.role, 20);
+      });
+      if (['owner', 'admin', 'tutor'].includes(ownerRole)) {
+        const chatId = pairId('dm', caller.uid, ownerUid);
+        const gSnap = await adminDb.collection('chatGroups').doc(chatId).get();
+        const prev = (gSnap.data() || {}) as any;
+        const doc = {
+          kind: 'personal',
+          centreId,
+          crossCentre: false,
+          members: [caller.uid, ownerUid].sort(),
+          memberCentres: { [caller.uid]: centreId, [ownerUid]: centreId },
+          access: { mode: 'none' },
+          createdBy: cleanStr(prev.createdBy, 64) || caller.uid,
+          createdByRole: cleanStr(prev.createdByRole, 20) || (cleanStr(identity.role, 20) === 'student' ? 'student' : 'centre_admin'),
+          createdAt: cleanStr(prev.createdAt, 40) || new Date(now).toISOString(),
+          updatedAt: new Date(now).toISOString(),
+          active: true,
+        };
+        await adminDb.collection('chatGroups').doc(chatId).set(doc, { merge: true });
+        await writeMessage(
+          { id: chatId } as any,
+          { uid: caller.uid, username: cleanStr(identity.username, 16), role: cleanStr(identity.role, 20) || 'student' },
+          text.slice(0, tosChat.messageMaxChars),
+          null,
+        );
+      }
+    } catch {
+      // mirroring is best-effort
+    }
+  }
   return { ok: true, reply: { ...reply, replyId: ref.key } };
 }
 
@@ -2433,7 +2507,7 @@ async function staffStatusContext(caller: Caller, centreId: string) {
         : null;
       if (!text && !photoUrl) throw httpError(400, 'Write a message first.');
       if (text.length > tosChat.messageMaxChars) throw httpError(400, `Messages can be up to ${tosChat.messageMaxChars} characters.`);
-      await consumePostRateLimit(caller.uid, tosChat.postRateLimitPerHour);
+      await consumePostRateLimit(caller.uid, tosChat.postRateLimitPerDay);
       const username = (await staffDisplayName(caller)).slice(0, 16);
       const role = ctx.membership.role === 'tutor' ? 'tutor' : 'admin';
       const replyTo = await buildReplyTo(ctx.group.id, body.replyTo);
@@ -2574,7 +2648,7 @@ async function staffStatusContext(caller: Caller, centreId: string) {
           photoMaxKb: tosChat.photoMaxKb,
           retentionDays: tosChat.retentionDays,
           messageMaxChars: tosChat.messageMaxChars,
-          postRateLimitPerHour: tosChat.postRateLimitPerHour,
+          postRateLimitPerDay: tosChat.postRateLimitPerDay,
           autoPosts: tosChat.autoPosts,
         },
         groups,
