@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { loadLastGood, saveLastGood } from '../../lib/lastGood';
-import { Loader2, RefreshCw, Send, Ban, Check, Plus, Megaphone, Settings2, ShieldAlert, Users, X } from 'lucide-react';
+import { Loader2, RefreshCw, Send, Ban, Check, Plus, Megaphone, Settings2, ShieldAlert, Users, X, Camera } from 'lucide-react';
 import { copyText, makeLongPress, MessageActionSheet, ReactionChips } from '../communications/chatActions';
 import { api, Json } from './tosShared';
+import { TextComposer, MediaComposer } from '../student-portal/tabs/StatusTab';
 
 // TOS chat screens (CH1 Step 5): the platform channel, the platform chat
 // settings (saved with the type-to-confirm APPLY step), and the escalation
@@ -513,16 +514,165 @@ const EscalationsTab: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
   );
 };
 
+// ------------------------------------------------------------- Status tab
+
+// The platform's own status feed. Same settings and limits as the centres'
+// status engine, stored under the reserved centre id '__tos__'; every
+// student's status overview merges this feed in.
+type TosStatusSettings = {
+  allowText: boolean;
+  allowPhoto: boolean;
+  allowVideo: boolean;
+  allowMusic: boolean;
+  allowReplies: boolean;
+  lastsHours: number;
+  statusesPerDay: number;
+  maxTextChars: number;
+  maxVideoSeconds: number;
+  maxVideoMb: number;
+  maxAudioMb: number;
+  photoMaxKb: number;
+};
+
+type TosStatusOverview = {
+  ok: boolean;
+  enabled: boolean;
+  settings?: TosStatusSettings;
+  me?: {
+    name: string;
+    username: string;
+    avatar?: string;
+    latest: {
+      statusId: string; kind: string; at: number; expiresAt: number; text: string;
+      bg?: string; photoUrl?: string; videoUrl?: string; audioUrl?: string; durationSeconds?: number;
+    } | null;
+  };
+};
+
+const TosStatusTab: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
+  const [data, setData] = useState<TosStatusOverview | null>(() => loadLastGood<TosStatusOverview>('tos:status:overview'));
+  const [err, setErr] = useState('');
+  const [composingText, setComposingText] = useState(false);
+  const [media, setMedia] = useState<{ kind: 'photo' | 'video' | 'music'; file: File } | null>(null);
+  const [note, setNote] = useState('');
+  const photoRef = React.useRef<HTMLInputElement>(null);
+  const videoRef = React.useRef<HTMLInputElement>(null);
+  const musicRef = React.useRef<HTMLInputElement>(null);
+
+  const call = React.useCallback((path: string, opts?: any) => api('/api/tos/chat/status' + path, opts), []);
+
+  React.useEffect(() => {
+    let alive = true;
+    call('/overview')
+      .then((d: any) => {
+        if (!alive) return;
+        if (d && d.ok) { setData(d); saveLastGood('tos:status:overview', d); setErr(''); }
+        else setErr(String(d?.error || 'The status overview could not load.'));
+      })
+      .catch(() => { if (alive) setErr('The status overview could not load.'); });
+    return () => { alive = false; };
+  }, [call]);
+
+  const flash = (text: string) => { setNote(text); window.setTimeout(() => setNote(''), 2500); };
+
+  const applyPosted = (status: Record<string, any>) => {
+    setComposingText(false);
+    setMedia(null);
+    setData((prev) => (prev ? { ...prev, me: { name: 'TOS', username: '', ...(prev.me || {}), latest: status } } : prev));
+    saveLastGood('tos:status:overview', { ...(data || {}), me: { name: 'TOS', username: '', latest: status } } as TosStatusOverview);
+    onChanged();
+  };
+
+  const removeLatest = async () => {
+    const latest = data?.me?.latest;
+    if (!latest) return;
+    try {
+      await call('/delete', { method: 'POST', body: { statusId: latest.statusId } });
+      setData((prev) => (prev ? { ...prev, me: { name: 'TOS', username: '', ...(prev.me || {}), latest: null } } : prev));
+      flash('Status removed');
+      onChanged();
+    } catch (e: any) {
+      setErr(String(e?.message || 'The status could not be removed. Try again.'));
+    }
+  };
+
+  const latest = data?.me?.latest || null;
+  const settings = data?.settings || null;
+  const kinds: Array<{ key: 'text' | 'photo' | 'video' | 'music'; label: string; allowed: boolean; pick: () => void }> = [
+    { key: 'text', label: 'Text', allowed: !!settings?.allowText, pick: () => setComposingText(true) },
+    { key: 'photo', label: 'Photo', allowed: !!settings?.allowPhoto, pick: () => photoRef.current?.click() },
+    { key: 'video', label: 'Video', allowed: !!settings?.allowVideo, pick: () => videoRef.current?.click() },
+    { key: 'music', label: 'Music', allowed: !!settings?.allowMusic, pick: () => musicRef.current?.click() },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-4 space-y-2">
+        <p className="text-sm font-black text-orange-300">TOS status</p>
+        {latest ? (
+          <div className="space-y-1">
+            <p className="text-xs text-slate-300">
+              Up now: {latest.kind === 'text' ? (latest.text || '') : latest.kind} · posted {fmtWhen(latest.at)}
+            </p>
+            <p className="text-[11px] text-slate-500">Every student sees this in their status feed until it expires.</p>
+            <button type="button" onClick={removeLatest} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border border-red-500/40 text-red-300 hover:bg-red-500/10 transition-colors cursor-pointer">
+              <Ban className="w-3.5 h-3.5" /> Remove
+            </button>
+          </div>
+        ) : (
+          <p className="text-xs text-slate-400">Nothing is up right now. Post one below; students see it in their status feed.</p>
+        )}
+        {note && <p className="text-[11px] text-emerald-300 font-bold">{note}</p>}
+        {err && <p className="text-[11px] text-red-300 font-bold">{err}</p>}
+      </div>
+
+      {settings && (
+        <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-4 space-y-3">
+          <p className="text-sm font-black text-orange-300">Post a status</p>
+          <div className="flex gap-2 flex-wrap">
+            {kinds.map((k) => (
+              <button
+                key={k.key}
+                type="button"
+                disabled={!k.allowed}
+                onClick={k.allowed ? k.pick : undefined}
+                title={k.allowed ? undefined : 'Off in status settings'}
+                className={`px-4 py-2 rounded-xl text-xs font-bold border transition-colors ${k.allowed ? 'border-orange-500/40 text-orange-300 hover:bg-orange-500/10 cursor-pointer' : 'border-white/10 text-slate-600 cursor-not-allowed'}`}
+              >
+                {k.label}
+              </button>
+            ))}
+          </div>
+          <p className="text-[11px] text-slate-500">Limits come from the platform status settings: {settings.lastsHours}h life, {settings.statusesPerDay}/day, text {settings.maxTextChars} chars, video {settings.maxVideoSeconds}s / {settings.maxVideoMb} MB, audio {settings.maxAudioMb} MB, photos {settings.photoMaxKb} KB.</p>
+        </div>
+      )}
+
+      <input ref={photoRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) setMedia({ kind: 'photo', file: f }); }} />
+      <input ref={videoRef} type="file" accept="video/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) setMedia({ kind: 'video', file: f }); }} />
+      <input ref={musicRef} type="file" accept="audio/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) setMedia({ kind: 'music', file: f }); }} />
+
+      {composingText && settings && (
+        <TextComposer call={call} settings={settings} onClose={() => setComposingText(false)} onPosted={applyPosted} />
+      )}
+      {media && settings && (
+        <MediaComposer kind={media.kind} file={media.file} call={call} settings={settings} onClose={() => setMedia(null)} onPosted={applyPosted} />
+      )}
+    </div>
+  );
+};
+
+
 // ------------------------------------------------------------------ Shell
 
 export type TosChatProps = { refreshKey?: number };
 
 export const TosChat: React.FC<TosChatProps> = ({ refreshKey }) => {
-  const [tab, setTab] = useState<'channel' | 'settings' | 'escalations'>('channel');
+  const [tab, setTab] = useState<'channel' | 'settings' | 'escalations' | 'status'>('channel');
   const [refreshTick, setRefreshTick] = useState(0);
 
   const tabs: Array<{ id: typeof tab; label: string; icon: React.ElementType }> = [
     { id: 'channel', label: 'Channel', icon: Megaphone },
+    { id: 'status', label: 'Status', icon: Camera },
     { id: 'settings', label: 'Settings', icon: Settings2 },
     { id: 'escalations', label: 'Escalations', icon: ShieldAlert },
   ];
@@ -540,6 +690,7 @@ export const TosChat: React.FC<TosChatProps> = ({ refreshKey }) => {
         ))}
       </div>
       {tab === 'channel' && <ChannelTab onChanged={() => setRefreshTick((k) => k + 1)} />}
+      {tab === 'status' && <TosStatusTab onChanged={() => setRefreshTick((k) => k + 1)} />}
       {tab === 'settings' && <SettingsTab onSaved={() => setRefreshTick((k) => k + 1)} />}
       {tab === 'escalations' && <EscalationsTab onChanged={() => setRefreshTick((k) => k + 1)} />}
       {refreshTick < 0 && null}

@@ -900,14 +900,26 @@ export function registerChatRoutes(app: express.Express): void {
       const stuSnap = await getStudentDoc(caller.uid);
       if (!stuSnap) return res.status(403).json({ error: 'No student record is linked to this account.' });
       const student = stuSnap.data() as any;
-      const centreId = cleanStr(student.centreId, 120);
-      if (!centreId) return res.status(403).json({ error: 'No centre is linked to this account.' });
-      await requireMembership(caller, centreId);
-      const entitlements = await getCentreEntitlements(centreId);
-      if (entitlements.chat !== true) {
+      // Every centre this student belongs to, not just the one they joined
+      // first; statuses from all of them (plus TOS's own feed) make up the
+      // overview. A centre whose plan has no chat contributes nothing.
+      const memSnap = await adminDb.collection('memberships').where('uid', '==', caller.uid).limit(10).get();
+      const centreIds: string[] = [];
+      memSnap.forEach((d) => {
+        const v = d.data() as any;
+        const cid = cleanStr(v?.centreId, 120);
+        const role = cleanStr(v?.role, 20);
+        if (cid && ['student', ''].includes(role) && !centreIds.includes(cid)) centreIds.push(cid);
+      });
+      const activeCentreIds: string[] = [];
+      for (const cid of centreIds) {
+        const ent = await getCentreEntitlements(cid);
+        if (ent.chat === true) activeCentreIds.push(cid);
+      }
+      if (!activeCentreIds.length) {
         return res.status(403).json({ error: 'Chat is not part of your centre\u2019s plan yet.' });
       }
-      res.json(await statusOverviewCore(caller, centreId, { name: cleanStr(student.name, MAX_NAME_CHARS), username: await usernameFor(caller.uid) }));
+      res.json(await statusOverviewCore(caller, activeCentreIds, { name: cleanStr(student.name, MAX_NAME_CHARS), username: await usernameFor(caller.uid), avatar: cleanStr(student.avatar, 400) }, { includeTos: true }));
     } catch (error: any) {
       handleRouteError(res, error, '[chat] status overview failed');
     }
@@ -969,11 +981,23 @@ export function registerChatRoutes(app: express.Express): void {
       const stuSnap = await getStudentDoc(caller.uid);
       if (!stuSnap) return res.status(403).json({ error: 'No student record is linked to this account.' });
       const student = stuSnap.data() as any;
-      const centreId = cleanStr(student.centreId, 120);
+      let centreId = cleanStr(student.centreId, 120);
       if (!centreId) return res.status(403).json({ error: 'No centre is linked to this account.' });
-      await requireMembership(caller, centreId);
-      const entitlements = await getCentreEntitlements(centreId);
-      if (entitlements.chat !== true) return res.status(403).json({ error: 'Chat is not part of your centre\u2019s plan yet.' });
+      // A status may live in any centre the caller belongs to, or in TOS's
+      // own feed; the request names the centre it came from.
+      const requestedCentre = cleanStr(String((req.query || {}).centreId || ''), 120);
+      if (requestedCentre && requestedCentre !== centreId) {
+        if (requestedCentre !== TOS_STATUS_CENTRE) {
+          await requireMembership(caller, requestedCentre);
+          const otherEnt = await getCentreEntitlements(requestedCentre);
+          if (otherEnt.chat !== true) return res.status(403).json({ error: 'Chat is not part of your centre\u2019s plan yet.' });
+        }
+        centreId = requestedCentre;
+      } else {
+        await requireMembership(caller, centreId);
+        const entitlements = await getCentreEntitlements(centreId);
+        if (entitlements.chat !== true) return res.status(403).json({ error: 'Chat is not part of your centre\u2019s plan yet.' });
+      }
       const ownerUid = cleanStr(req.params?.uid, 64);
       if (!ownerUid) return res.status(400).json({ error: 'Which status is this?' });
       res.json(await statusUserCore(caller, centreId, ownerUid, cleanStr(student.name, MAX_NAME_CHARS), await usernameFor(caller.uid)));
@@ -991,11 +1015,23 @@ export function registerChatRoutes(app: express.Express): void {
       const stuSnap = await getStudentDoc(caller.uid);
       if (!stuSnap) return res.status(403).json({ error: 'No student record is linked to this account.' });
       const student = stuSnap.data() as any;
-      const centreId = cleanStr(student.centreId, 120);
+      let centreId = cleanStr(student.centreId, 120);
       if (!centreId) return res.status(403).json({ error: 'No centre is linked to this account.' });
-      await requireMembership(caller, centreId);
-      const entitlements = await getCentreEntitlements(centreId);
-      if (entitlements.chat !== true) return res.status(403).json({ error: 'Chat is not part of your centre\u2019s plan yet.' });
+      // A status may live in any centre the caller belongs to, or in TOS's
+      // own feed; the request names the centre it came from.
+      const requestedCentre = cleanStr(String((req.query || {}).centreId || ''), 120);
+      if (requestedCentre && requestedCentre !== centreId) {
+        if (requestedCentre !== TOS_STATUS_CENTRE) {
+          await requireMembership(caller, requestedCentre);
+          const otherEnt = await getCentreEntitlements(requestedCentre);
+          if (otherEnt.chat !== true) return res.status(403).json({ error: 'Chat is not part of your centre\u2019s plan yet.' });
+        }
+        centreId = requestedCentre;
+      } else {
+        await requireMembership(caller, centreId);
+        const entitlements = await getCentreEntitlements(centreId);
+        if (entitlements.chat !== true) return res.status(403).json({ error: 'Chat is not part of your centre\u2019s plan yet.' });
+      }
       res.json(await statusSeenCore(caller, centreId, body));
     } catch (error: any) {
       handleRouteError(res, error, '[chat] status seen failed');
@@ -1014,14 +1050,108 @@ export function registerChatRoutes(app: express.Express): void {
       const stuSnap = await getStudentDoc(caller.uid);
       if (!stuSnap) return res.status(403).json({ error: 'No student record is linked to this account.' });
       const student = stuSnap.data() as any;
-      const centreId = cleanStr(student.centreId, 120);
+      let centreId = cleanStr(student.centreId, 120);
       if (!centreId) return res.status(403).json({ error: 'No centre is linked to this account.' });
-      await requireMembership(caller, centreId);
-      const entitlements = await getCentreEntitlements(centreId);
-      if (entitlements.chat !== true) return res.status(403).json({ error: 'Chat is not part of your centre\u2019s plan yet.' });
+      // A status may live in any centre the caller belongs to, or in TOS's
+      // own feed; the request names the centre it came from.
+      const requestedCentre = cleanStr(String((req.query || {}).centreId || ''), 120);
+      if (requestedCentre && requestedCentre !== centreId) {
+        if (requestedCentre !== TOS_STATUS_CENTRE) {
+          await requireMembership(caller, requestedCentre);
+          const otherEnt = await getCentreEntitlements(requestedCentre);
+          if (otherEnt.chat !== true) return res.status(403).json({ error: 'Chat is not part of your centre\u2019s plan yet.' });
+        }
+        centreId = requestedCentre;
+      } else {
+        await requireMembership(caller, centreId);
+        const entitlements = await getCentreEntitlements(centreId);
+        if (entitlements.chat !== true) return res.status(403).json({ error: 'Chat is not part of your centre\u2019s plan yet.' });
+      }
       res.json(await statusReplyCore(caller, centreId, body, { name: cleanStr(student.name, MAX_NAME_CHARS), username: await usernameFor(caller.uid) }));
     } catch (error: any) {
       handleRouteError(res, error, '[chat] status reply failed');
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // TOS status: the platform's own feed. It lives in the same status engine
+  // under the reserved centre id '__tos__', so the stored settings, the
+  // limits and expiry all apply unchanged. Only TOS staff may post here;
+  // every student's overview merges this feed into their centre feeds.
+  // ---------------------------------------------------------------------------
+
+  app.get('/api/tos/chat/status/overview', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      if (!caller.tos) throw httpError(403, 'TOS staff only.');
+      res.json(await statusOverviewCore(caller, [TOS_STATUS_CENTRE], { name: 'TOS', username: '' }));
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] tos status overview failed');
+    }
+  });
+
+  app.post('/api/tos/chat/status', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      if (!caller.tos) throw httpError(403, 'TOS staff only.');
+      res.json(await statusPostCore(caller, TOS_STATUS_CENTRE, req.body || {}));
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] tos status post failed');
+    }
+  });
+
+  app.post('/api/tos/chat/status/upload', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      if (!caller.tos) throw httpError(403, 'TOS staff only.');
+      res.json(await statusUploadCore(caller, TOS_STATUS_CENTRE, req.body || {}));
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] tos status upload failed');
+    }
+  });
+
+  app.get('/api/tos/chat/status/user/:uid', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      if (!caller.tos) throw httpError(403, 'TOS staff only.');
+      const ownerUid = cleanStr(req.params?.uid, 64);
+      if (!ownerUid) throw httpError(400, 'Which status is this?');
+      res.json(await statusUserCore(caller, TOS_STATUS_CENTRE, ownerUid, 'TOS', ''));
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] tos status user failed');
+    }
+  });
+
+  app.post('/api/tos/chat/status/seen', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      if (!caller.tos) throw httpError(403, 'TOS staff only.');
+      res.json(await statusSeenCore(caller, TOS_STATUS_CENTRE, req.body || {}));
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] tos status seen failed');
+    }
+  });
+
+  app.post('/api/tos/chat/status/reply', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      if (!caller.tos) throw httpError(403, 'TOS staff only.');
+      res.json(await statusReplyCore(caller, TOS_STATUS_CENTRE, req.body || {}, { name: 'TOS', username: '' }));
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] tos status reply failed');
+    }
+  });
+
+  app.post('/api/tos/chat/status/delete', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      if (!caller.tos) throw httpError(403, 'TOS staff only.');
+      const statusId = cleanStr(String((req.body || {}).statusId || ''), 64);
+      if (!statusId) throw httpError(400, 'Which status is this?');
+      await adminRtdb.ref(`chat/status/${TOS_STATUS_CENTRE}/${caller.uid}/${statusId}`).remove();
+      res.json({ ok: true });
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] tos status delete failed');
     }
   });
 
@@ -1037,7 +1167,7 @@ export function registerChatRoutes(app: express.Express): void {
       const caller = getCaller(req);
       const centreId = cleanStr(String(req.query.centreId || ''), 120);
       await staffStatusContext(caller, centreId);
-      res.json(await statusOverviewCore(caller, centreId, { name: await staffDisplayName(caller), username: '' }));
+      res.json(await statusOverviewCore(caller, [centreId], { name: await staffDisplayName(caller), username: '' }));
     } catch (error: any) {
       handleRouteError(res, error, '[chat] staff status overview failed');
     }
@@ -1685,6 +1815,13 @@ async function chatDirectoryFor(centreId: string, excludeUid: string): Promise<R
     const role = cleanStr(v?.role, 20);
     if (u && u !== excludeUid && ['owner', 'admin', 'tutor'].includes(role) && !staffUids.includes(u)) staffUids.push(u);
   });
+  // Tutors also live in the tutors collection; union it in so every tutor of
+  // this centre is reachable even without a membership document.
+  const tutSnap = await adminDb.collection('tutors').where('centreId', '==', centreId).limit(200).get();
+  tutSnap.forEach((d) => {
+    const u = cleanStr((d.data() as any)?.uid, 64);
+    if (u && u !== excludeUid && !staffUids.includes(u)) staffUids.push(u);
+  });
   const staffMap = await statusNamesFor(staffUids);
   const staff = staffUids
     .map((u) => ({ uid: u, name: personDisplayName({ isStudent: false, name: staffMap.get(u)?.name || '', username: '' }) }))
@@ -1693,45 +1830,57 @@ async function chatDirectoryFor(centreId: string, excludeUid: string): Promise<R
   return { ok: true, students, staff };
 }
 
-async function statusOverviewCore(caller: Caller, centreId: string, me: { name: string; username: string }): Promise<Record<string, unknown>> {
+// Reserved centre id for the platform's own status feed. TOS staff post
+// statuses here through /api/tos/chat/status/*; every student's overview
+// merges this feed in, so platform-wide updates reach everyone.
+const TOS_STATUS_CENTRE = '__tos__';
+
+async function statusOverviewCore(caller: Caller, centreIds: string[], me: { name: string; username: string; avatar?: string }, opts?: { includeTos?: boolean }): Promise<Record<string, unknown>> {
   const tosChat = await getTosChat();
   const st = tosChat.status;
   if (!st.enabled) return { ok: true, enabled: false };
 
-  const now = Date.now();
-  interface One { uid: string; statusId: string; kind: string; at: number; expiresAt: number; text: string; bg: string; photoUrl: string; videoUrl: string; audioUrl: string; durationSeconds: number; }
-  const latestByUid = new Map<string, One>();
-  const centreSnap = await adminRtdb.ref(`chat/status/${centreId}`).get();
-  centreSnap.forEach((c) => {
-    const uid = cleanStr(c.key as string, 64);
-    if (!uid) return;
-    c.forEach((s) => {
-      const v = s.val() || {};
-      const expiresAt = Number(v.expiresAt) || 0;
-      if (expiresAt <= now) return; // expired statuses vanish everywhere.
-      const item: One = {
-        uid,
-        statusId: cleanStr(s.key as string, 64),
-        kind: cleanStr(v.kind, 10) || 'text',
-        at: Number(v.at) || 0,
-        expiresAt,
-        text: cleanStr(v.text, 300),
-        bg: cleanStr(v.bg, 9),
-        photoUrl: cleanStr(v.photoUrl, 400),
-        videoUrl: cleanStr(v.videoUrl, 400),
-        audioUrl: cleanStr(v.audioUrl, 400),
-        durationSeconds: Number(v.durationSeconds) || 0,
-      };
-      const prev = latestByUid.get(uid);
-      if (!prev || item.at > prev.at) latestByUid.set(uid, item);
-    });
-  });
+  const ids = [...centreIds];
+  if (opts?.includeTos && !ids.includes(TOS_STATUS_CENTRE)) ids.push(TOS_STATUS_CENTRE);
 
-  const seen = new Set<string>();
-  const seenSnap = await adminRtdb.ref(`chat/statusViews/${centreId}/${caller.uid}`).get();
-  seenSnap.forEach((c) => {
-    if (c.val() !== null && c.val() !== undefined) seen.add(String(c.key));
-  });
+  const now = Date.now();
+  interface One { centreId: string; uid: string; statusId: string; kind: string; at: number; expiresAt: number; text: string; bg: string; photoUrl: string; videoUrl: string; audioUrl: string; durationSeconds: number; }
+  const latestByUid = new Map<string, One>();
+  // Seen marks are stored per centre, so keys carry the centre too and two
+  // feeds can never collapse one status into another.
+  const seenKeys = new Set<string>();
+  for (const centreId of ids) {
+    const centreSnap = await adminRtdb.ref(`chat/status/${centreId}`).get();
+    centreSnap.forEach((c) => {
+      const uid = cleanStr(c.key as string, 64);
+      if (!uid) return;
+      c.forEach((s) => {
+        const v = s.val() || {};
+        const expiresAt = Number(v.expiresAt) || 0;
+        if (expiresAt <= now) return; // expired statuses vanish everywhere.
+        const item: One = {
+          centreId,
+          uid,
+          statusId: cleanStr(s.key as string, 64),
+          kind: cleanStr(v.kind, 10) || 'text',
+          at: Number(v.at) || 0,
+          expiresAt,
+          text: cleanStr(v.text, 300),
+          bg: cleanStr(v.bg, 9),
+          photoUrl: cleanStr(v.photoUrl, 400),
+          videoUrl: cleanStr(v.videoUrl, 400),
+          audioUrl: cleanStr(v.audioUrl, 400),
+          durationSeconds: Number(v.durationSeconds) || 0,
+        };
+        const prev = latestByUid.get(uid);
+        if (!prev || item.at > prev.at) latestByUid.set(uid, item);
+      });
+    });
+    const seenSnap = await adminRtdb.ref(`chat/statusViews/${centreId}/${caller.uid}`).get();
+    seenSnap.forEach((c) => {
+      if (c.val() !== null && c.val() !== undefined) seenKeys.add(`${centreId}:${String(c.key)}`);
+    });
+  }
 
   const myLatest = latestByUid.get(caller.uid) || null;
   const others = [...latestByUid.values()]
@@ -1740,9 +1889,10 @@ async function statusOverviewCore(caller: Caller, centreId: string, me: { name: 
 
   const names = await statusNamesFor(others.map((o) => o.uid));
   const shape = (o: One) => ({
+    centreId: o.centreId,
     uid: o.uid,
-    name: names.get(o.uid)?.name || '',
-    username: names.get(o.uid)?.username || '',
+    name: o.centreId === TOS_STATUS_CENTRE ? 'TOS' : (names.get(o.uid)?.name || ''),
+    username: o.centreId === TOS_STATUS_CENTRE ? '' : (names.get(o.uid)?.username || ''),
     statusId: o.statusId,
     kind: o.kind,
     at: o.at,
@@ -1775,16 +1925,18 @@ async function statusOverviewCore(caller: Caller, centreId: string, me: { name: 
     me: {
       name: me.name,
       username: me.username,
+      avatar: me.avatar || '',
       latest: myLatest
         ? {
+            centreId: myLatest.centreId,
             statusId: myLatest.statusId, kind: myLatest.kind, at: myLatest.at, expiresAt: myLatest.expiresAt,
             text: myLatest.text, bg: myLatest.bg, photoUrl: myLatest.photoUrl, videoUrl: myLatest.videoUrl,
             audioUrl: myLatest.audioUrl, durationSeconds: myLatest.durationSeconds,
           }
         : null,
     },
-    recent: others.filter((o) => !seen.has(o.statusId)).map(shape),
-    viewed: others.filter((o) => seen.has(o.statusId)).map(shape),
+    recent: others.filter((o) => !seenKeys.has(`${o.centreId}:${o.statusId}`)).map(shape),
+    viewed: others.filter((o) => seenKeys.has(`${o.centreId}:${o.statusId}`)).map(shape),
   };
 }
 

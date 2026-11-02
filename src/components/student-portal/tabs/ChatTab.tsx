@@ -180,7 +180,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
   });
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
   const [starredOpen, setStarredOpen] = useState(false);
-  const [chatFilter, setChatFilter] = useState<'groups' | 'personal'>('groups');
+  const [chatFilter, setChatFilter] = useState<'groups' | 'personal'>('personal');
   const [pickerOpen, setPickerOpen] = useState(false);
 
   const load = useCallback(async () => {
@@ -349,19 +349,19 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
         <div className="flex gap-2" aria-label="Chats filter">
           <button
             type="button"
-            aria-pressed={chatFilter === 'groups'}
-            onClick={() => setChatFilter('groups')}
-            className={`px-4 py-2 rounded-full text-xs font-black shadow-sm transition ${chatFilter === 'groups' ? 'bg-[#EA580C] text-white' : 'bg-white border border-slate-200 text-slate-500'}`}
-          >
-            Groups
-          </button>
-          <button
-            type="button"
             aria-pressed={chatFilter === 'personal'}
             onClick={() => setChatFilter('personal')}
             className={`px-4 py-2 rounded-full text-xs font-black shadow-sm transition ${chatFilter === 'personal' ? 'bg-[#EA580C] text-white' : 'bg-white border border-slate-200 text-slate-500'}`}
           >
             Personal
+          </button>
+          <button
+            type="button"
+            aria-pressed={chatFilter === 'groups'}
+            onClick={() => setChatFilter('groups')}
+            className={`px-4 py-2 rounded-full text-xs font-black shadow-sm transition ${chatFilter === 'groups' ? 'bg-[#EA580C] text-white' : 'bg-white border border-slate-200 text-slate-500'}`}
+          >
+            Groups
           </button>
         </div>
       )}

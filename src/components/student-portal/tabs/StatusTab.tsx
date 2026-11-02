@@ -21,6 +21,7 @@ interface StatusEntry {
   uid: string;
   name: string;
   username: string;
+  centreId?: string;
   statusId: string;
   kind: string;
   at: number;
@@ -77,9 +78,11 @@ interface StatusOverview {
   me?: {
     name: string;
     username: string;
+    avatar?: string;
     latest: {
       statusId: string; kind: string; at: number; expiresAt: number; text: string;
       photoUrl?: string; videoUrl?: string; audioUrl?: string; durationSeconds?: number;
+      centreId?: string;
     } | null;
   };
   recent?: StatusEntry[];
@@ -138,7 +141,7 @@ function bgLuminance(hex: string): number {
   return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
 }
 
-const TextComposer: React.FC<{
+export const TextComposer: React.FC<{
   call: (path: string, opts?: any) => Promise<any>;
   settings: NonNullable<StatusOverview['settings']>;
   onClose: () => void;
@@ -237,7 +240,7 @@ const TextComposer: React.FC<{
 // the server sees and checks both steps.
 // ============================================================================
 
-const MediaComposer: React.FC<{
+export const MediaComposer: React.FC<{
   kind: 'photo' | 'video' | 'music';
   file: File;
   call: (path: string, opts?: any) => Promise<any>;
@@ -464,7 +467,7 @@ const MediaComposer: React.FC<{
 // ============================================================================
 
 const StatusViewer: React.FC<{
-  person: { uid: string; name: string; username: string };
+  person: { uid: string; name: string; username: string; avatar?: string; centreId?: string };
   mine: boolean;
   call: (path: string, opts?: any) => Promise<any>;
   settings: NonNullable<StatusOverview['settings']>;
@@ -482,7 +485,7 @@ const StatusViewer: React.FC<{
 
   useEffect(() => {
     let alive = true;
-    call(`/user/${encodeURIComponent(person.uid)}`)
+    call(`/user/${encodeURIComponent(person.uid)}${person.centreId ? `?centreId=${encodeURIComponent(person.centreId)}` : ''}`)
       .then((d: any) => {
         if (!alive) return;
         if (d && d.ok) setStatuses(Array.isArray(d.statuses) ? d.statuses : []);
@@ -560,12 +563,16 @@ const StatusViewer: React.FC<{
       <div className="p-4 space-y-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div
-              className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-black shrink-0"
-              style={{ color: dark ? '#FFFFFF' : '#0F172A', backgroundColor: dark ? 'rgba(255,255,255,0.2)' : 'rgba(15,23,42,0.08)' }}
-            >
-              {initials(person.name || person.username)}
-            </div>
+            {person.avatar ? (
+              <img src={person.avatar} alt="" className="w-9 h-9 rounded-full object-cover shrink-0" />
+            ) : (
+              <div
+                className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-black shrink-0"
+                style={{ color: dark ? '#FFFFFF' : '#0F172A', backgroundColor: dark ? 'rgba(255,255,255,0.2)' : 'rgba(15,23,42,0.08)' }}
+              >
+                {initials(person.name || person.username)}
+              </div>
+            )}
             <div className="min-w-0">
               <p className="text-sm font-black truncate" style={{ color: dark ? '#FFFFFF' : '#0F172A' }}>
                 {mine ? 'My status' : person.name || (person.username ? `@${person.username}` : 'Student')}
@@ -641,9 +648,16 @@ const StatusViewer: React.FC<{
           </>
         )}
         {!current && statuses && statuses.length === 0 && (
-          <p className="text-center text-sm font-bold" style={{ color: dark ? '#FFFFFF' : '#0F172A' }}>
-            This status is no longer available.
-          </p>
+          <div className="text-center space-y-2">
+            <p className="text-sm font-bold" style={{ color: dark ? '#FFFFFF' : '#0F172A' }}>
+              {mine ? 'You have no status up right now.' : 'This status is no longer available.'}
+            </p>
+            {mine && (
+              <p className="text-xs font-medium" style={{ color: dark ? 'rgba(255,255,255,0.7)' : 'rgba(15,23,42,0.55)' }}>
+                The orange + button below adds one.
+              </p>
+            )}
+          </div>
         )}
         {!statuses && !err && (
           <p className="text-center text-sm font-bold" style={{ color: dark ? 'rgba(255,255,255,0.7)' : 'rgba(15,23,42,0.5)' }}>
@@ -781,7 +795,7 @@ export const StatusScreenCore: React.FC<{ call: (path: string, opts?: any) => Pr
   );
   const [composing, setComposing] = useState(false);
   const [media, setMedia] = useState<{ kind: 'photo' | 'video' | 'music'; file: File } | null>(null);
-  const [viewer, setViewer] = useState<{ person: { uid: string; name: string; username: string }; mine: boolean } | null>(null);
+  const [viewer, setViewer] = useState<{ person: { uid: string; name: string; username: string; avatar?: string; centreId?: string }; mine: boolean } | null>(null);
 
   useEscape(() => setFanOpen(false));
 
@@ -875,23 +889,27 @@ export const StatusScreenCore: React.FC<{ call: (path: string, opts?: any) => Pr
 
       {data && data.enabled !== false && (
         <>
-          {/* My status row. With an update up, tapping opens my own viewer
-              with the seen count and replies; without one, it opens the
-              Add sheet. */}
+          {/* My status row. Tapping it always previews my own status (with
+              the seen count and replies when one is up); posting happens
+              through the orange + button in the corner, never here. */}
           <div
-            onClick={() => (me?.latest ? setViewer({ person: { uid, name: me.name || fallbackName, username: me.username || '' }, mine: true }) : setFanOpen(true))}
+            onClick={() => setViewer({ person: { uid, name: me?.name || fallbackName, username: me?.username || '', avatar: me?.avatar, centreId: me?.latest?.centreId }, mine: true })}
             role="button"
             className="w-full text-left bg-white rounded-3xl p-4 border border-slate-200/90 shadow-sm flex items-center gap-3 active:scale-[0.99] transition cursor-pointer"
           >
             <div className="relative shrink-0">
-              <div className="w-12 h-12 rounded-full bg-[#FFF7ED] border-2 border-[#EA580C] flex items-center justify-center text-[#C2410C] text-sm font-black">
-                {initials(me?.name || fallbackName)}
-              </div>
+              {me?.avatar ? (
+                <img src={me.avatar} alt="" className="w-12 h-12 rounded-full object-cover border-2 border-[#EA580C]" />
+              ) : (
+                <div className="w-12 h-12 rounded-full bg-[#FFF7ED] border-2 border-[#EA580C] flex items-center justify-center text-[#C2410C] text-sm font-black">
+                  {initials(me?.name || fallbackName)}
+                </div>
+              )}
             </div>
             <div className="min-w-0">
               <p className="text-sm font-black text-slate-900">My status</p>
               <p className="text-xs text-slate-500 font-medium truncate">
-                {me?.latest ? statusTimeLabel(me.latest.at) : 'Tap to add a photo or text update'}
+                {me?.latest ? statusTimeLabel(me.latest.at) : 'No status up right now'}
               </p>
             </div>
           </div>

@@ -332,6 +332,13 @@ export const StudentPortal: React.FC = () => {
     setChatFanOpen(false);
     setStatusScreenOpen(true);
   }, []);
+  // The orb is the way back to the fan. From the Status screen, tapping it
+  // closes Status first so the fan opens over the normal page.
+  const handleOrbClick = React.useCallback(() => {
+    if (chatFanOpen) { closeChatFan(); return; }
+    if (statusScreenOpen) setStatusScreenOpen(false);
+    openChatFan();
+  }, [chatFanOpen, statusScreenOpen, closeChatFan, openChatFan]);
 
   useEffect(() => {
     if (!chatFanOpen) return;
@@ -346,11 +353,13 @@ export const StudentPortal: React.FC = () => {
   // Bottom navigation handlers: Classes and CBT open bottom sheet
   const handleNavClassesClick = () => {
     if (hideBottomNav) return;
+    setStatusScreenOpen(false);
     setIsClassesSheetOpen(true);
   };
 
   const handleNavCbtClick = () => {
     if (hideBottomNav) return;
+    setStatusScreenOpen(false);
     setIsCbtSheetOpen(true);
   };
 
@@ -518,7 +527,7 @@ export const StudentPortal: React.FC = () => {
           {/* Late Notification Animation */}
           {isRunningLate && (
             <div
-              onClick={() => setActiveTab('home')}
+              onClick={() => { setStatusScreenOpen(false); setActiveTab('home'); }}
               className="absolute left-1/2 -translate-x-1/2 top-full bg-rose-600 px-4 py-2 rounded-b-2xl shadow-xl border border-white/10 animate-in slide-in-from-top-full duration-700 cursor-pointer flex items-center space-x-2 group active:scale-95"
             >
               <div className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
@@ -734,7 +743,7 @@ export const StudentPortal: React.FC = () => {
                 {/* 1: Home */}
                 <button
                   type="button"
-                  onClick={() => setActiveTab('home')}
+                  onClick={() => { setStatusScreenOpen(false); setActiveTab('home'); }}
                   className={`flex flex-col items-center justify-center py-1.5 px-1 rounded-2xl transition-all cursor-pointer ${
                     activeTab === 'home'
                       ? 'text-orange-400 font-black'
@@ -800,7 +809,7 @@ export const StudentPortal: React.FC = () => {
                 {/* 5: More */}
                 <button
                   type="button"
-                  onClick={() => setActiveTab('more')}
+                  onClick={() => { setStatusScreenOpen(false); setActiveTab('more'); }}
                   className={`flex flex-col items-center justify-center py-1.5 px-1 rounded-2xl transition-all cursor-pointer ${
                     activeTab === 'more'
                       ? 'text-orange-400 font-black'
@@ -821,7 +830,7 @@ export const StudentPortal: React.FC = () => {
                 <button
                   type="button"
                   ref={orbRef}
-                  onClick={() => (chatFanOpen ? closeChatFan() : openChatFan())}
+                  onClick={handleOrbClick}
                   aria-label={chatFanOpen ? 'Close chat menu' : `Open chat menu, ${orbUnread} unread`}
                   aria-haspopup="menu"
                   aria-expanded={chatFanOpen}
