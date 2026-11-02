@@ -136,109 +136,6 @@ function bgLuminance(hex: string): number {
   return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
 }
 
-const AddStatusSheet: React.FC<{
-  settings: NonNullable<StatusOverview['settings']>;
-  onClose: () => void;
-  onText: () => void;
-  onMediaPick: (kind: 'photo' | 'video' | 'music', file: File) => void;
-}> = ({ settings, onClose, onText, onMediaPick }) => {
-  useEscape(onClose);
-  const inputRefs = React.useRef<Record<string, HTMLInputElement | null>>({});
-  const pick = (kind: 'photo' | 'video' | 'music') => inputRefs.current[kind]?.click();
-  return (
-  <div
-    className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50"
-    role="dialog"
-    aria-modal="true"
-    aria-label="Add status"
-    onClick={onClose}
-  >
-    <div
-      className="w-full max-w-lg bg-white rounded-t-3xl p-5 pb-8 shadow-2xl animate-in slide-in-from-bottom duration-200"
-      onClick={(e) => e.stopPropagation()}
-    >
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-black text-slate-900 tracking-tight">Add status</h3>
-        <button
-          onClick={onClose}
-          className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 active:scale-95 transition"
-          aria-label="Close"
-        >
-          <X className="w-4 h-4" />
-        </button>
-      </div>
-      <p className="text-xs text-slate-500 font-medium">Choose what to share</p>
-      <div className="mt-4 space-y-2">
-        {settings.allowText && (
-          <button
-            onClick={onText}
-            className="w-full text-left rounded-2xl px-4 py-3 border border-slate-200 bg-white active:scale-[0.99] transition flex items-center gap-3"
-          >
-            <span className="w-10 h-10 rounded-xl bg-[#FFF7ED] text-[#C2410C] flex items-center justify-center font-black">Aa</span>
-            <span className="min-w-0">
-              <span className="block text-sm font-black text-slate-900">Text</span>
-              <span className="block text-xs text-slate-500 font-medium">Type an update on a colour background</span>
-            </span>
-          </button>
-        )}
-        {([
-          { kind: 'photo', label: 'Photo', note: 'From your gallery or camera', allowed: settings.allowPhoto, icon: <ImageIcon className="w-5 h-5" /> },
-          { kind: 'video', label: 'Video', note: `Up to ${settings.maxVideoSeconds} sec, set by Tutorial OS`, allowed: settings.allowVideo, icon: <Film className="w-5 h-5" /> },
-          { kind: 'music', label: 'Music', note: 'Share a track with your status', allowed: settings.allowMusic, icon: <Music className="w-5 h-5" /> },
-        ] as const).map((row) => (
-          <button
-            key={row.kind}
-            onClick={() => (row.allowed ? pick(row.kind) : undefined)}
-            disabled={!row.allowed}
-            className={`w-full text-left rounded-2xl px-4 py-3 border flex items-center gap-3 transition ${
-              row.allowed ? 'border-slate-200 bg-white active:scale-[0.99]' : 'border-slate-200 bg-slate-50 opacity-60'
-            }`}
-          >
-            <span className={`w-10 h-10 rounded-xl flex items-center justify-center font-black ${row.allowed ? 'bg-[#FFF7ED] text-[#C2410C]' : 'bg-slate-200 text-slate-500'}`}>
-              {row.icon}
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-sm font-black text-slate-900">{row.label}</span>
-              <span className="block text-xs text-slate-500 font-medium">{row.allowed ? row.note : 'Not available right now'}</span>
-            </span>
-            {!row.allowed && (
-              <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400 bg-white border border-slate-200 rounded-full px-2 py-1">off</span>
-            )}
-          </button>
-        ))}
-      </div>
-      {/* The file pickers live here so the sheet stays open while the picker
-          is up; picking hands the file to the screen, which closes the sheet
-          and opens the media composer. */}
-      <input
-        ref={(el) => { inputRefs.current.photo = el; }}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) onMediaPick('photo', f); }}
-      />
-      <input
-        ref={(el) => { inputRefs.current.video = el; }}
-        type="file"
-        accept="video/*"
-        className="hidden"
-        onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) onMediaPick('video', f); }}
-      />
-      <input
-        ref={(el) => { inputRefs.current.music = el; }}
-        type="file"
-        accept="audio/*"
-        className="hidden"
-        onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) onMediaPick('music', f); }}
-      />
-      <p className="mt-4 text-[11px] text-slate-400 font-medium text-center">
-        Your status disappears after {settings.lastsHours} hours. Limits are set by Tutorial OS.
-      </p>
-    </div>
-  </div>
-  );
-};
-
 const TextComposer: React.FC<{
   settings: NonNullable<StatusOverview['settings']>;
   onClose: () => void;
@@ -869,10 +766,19 @@ export const StatusScreen: React.FC<{ student: Student }> = ({ student }) => {
   const cacheKey = 'chat:status';
   const [data, setData] = useState<StatusOverview | null>(() => loadLastGood<StatusOverview>(cacheKey));
   const [failed, setFailed] = useState(false);
-  const [sheetOpen, setSheetOpen] = useState(false);
+  const [fanOpen, setFanOpen] = useState(false);
+  const photoInputRef = React.useRef<HTMLInputElement>(null);
+  const videoInputRef = React.useRef<HTMLInputElement>(null);
+  const musicInputRef = React.useRef<HTMLInputElement>(null);
+  const prefersReducedMotion = React.useMemo(
+    () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+    [],
+  );
   const [composing, setComposing] = useState(false);
   const [media, setMedia] = useState<{ kind: 'photo' | 'video' | 'music'; file: File } | null>(null);
   const [viewer, setViewer] = useState<{ person: { uid: string; name: string; username: string }; mine: boolean } | null>(null);
+
+  useEscape(() => setFanOpen(false));
 
   useEffect(() => {
     let alive = true;
@@ -905,7 +811,7 @@ export const StatusScreen: React.FC<{ student: Student }> = ({ student }) => {
   const applyPosted = (status: Record<string, any>) => {
     setComposing(false);
     setMedia(null);
-    setSheetOpen(false);
+    setFanOpen(false);
     setData((prev) => {
       if (!prev) return prev;
       const next: StatusOverview = {
@@ -968,7 +874,7 @@ export const StatusScreen: React.FC<{ student: Student }> = ({ student }) => {
               with the seen count and replies; without one, it opens the
               Add sheet. */}
           <div
-            onClick={() => (me?.latest ? setViewer({ person: { uid: student.uid || '', name: me.name || student.name, username: me.username || '' }, mine: true }) : setSheetOpen(true))}
+            onClick={() => (me?.latest ? setViewer({ person: { uid: student.uid || '', name: me.name || student.name, username: me.username || '' }, mine: true }) : setFanOpen(true))}
             role="button"
             className="w-full text-left bg-white rounded-3xl p-4 border border-slate-200/90 shadow-sm flex items-center gap-3 active:scale-[0.99] transition cursor-pointer"
           >
@@ -976,16 +882,6 @@ export const StatusScreen: React.FC<{ student: Student }> = ({ student }) => {
               <div className="w-12 h-12 rounded-full bg-[#FFF7ED] border-2 border-[#EA580C] flex items-center justify-center text-[#C2410C] text-sm font-black">
                 {initials(me?.name || student.name)}
               </div>
-              {(!me?.latest || (data?.settings && (data.settings.allowText || data.settings.allowPhoto || data.settings.allowVideo || data.settings.allowMusic))) && (
-                <button
-                  type="button"
-                  aria-label="Add another status"
-                  onClick={(e) => { e.stopPropagation(); setSheetOpen(true); }}
-                  className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-[#EA580C] text-white flex items-center justify-center border-2 border-white active:scale-90 transition"
-                >
-                  <Plus className="w-3 h-3" />
-                </button>
-              )}
             </div>
             <div className="min-w-0">
               <p className="text-sm font-black text-slate-900">My status</p>
@@ -1006,19 +902,80 @@ export const StatusScreen: React.FC<{ student: Student }> = ({ student }) => {
         </>
       )}
 
-      {sheetOpen && data?.settings && (
-        <AddStatusSheet
-          settings={data.settings}
-          onClose={() => setSheetOpen(false)}
-          onText={() => {
-            setSheetOpen(false);
-            setComposing(true);
-          }}
-          onMediaPick={(kind, file) => {
-            setSheetOpen(false);
-            setMedia({ kind, file });
-          }}
-        />
+      {/* Add button, bottom right corner. Tapping it fans out the four
+          status kinds from that same corner; each opens its own composer.
+          Kinds turned off in TOS settings show dimmed and do nothing. */}
+      {data?.settings && data.enabled !== false && (
+        <div className="fixed inset-0 z-50 pointer-events-none" aria-hidden={!fanOpen}>
+          {fanOpen && (
+            <div
+              className={`absolute inset-0 bg-slate-950/30 pointer-events-auto ${prefersReducedMotion ? '' : 'animate-in fade-in duration-200'}`}
+              onClick={() => setFanOpen(false)}
+            />
+          )}
+          {fanOpen && (
+            <div className="absolute bottom-[168px] right-4 flex flex-col items-center gap-3 pointer-events-auto">
+              {([
+                { key: 'text', label: 'Text', disabled: !data.settings.allowText, render: () => <span className="text-sm font-black leading-none">Aa</span>, onPick: () => { setFanOpen(false); setComposing(true); } },
+                { key: 'photo', label: 'Photo', disabled: !data.settings.allowPhoto, render: () => <ImageIcon className="w-5 h-5" />, onPick: () => { setFanOpen(false); photoInputRef.current?.click(); } },
+                { key: 'video', label: 'Video', disabled: !data.settings.allowVideo, render: () => <Film className="w-5 h-5" />, onPick: () => { setFanOpen(false); videoInputRef.current?.click(); } },
+                { key: 'music', label: 'Music', disabled: !data.settings.allowMusic, render: () => <Music className="w-5 h-5" />, onPick: () => { setFanOpen(false); musicInputRef.current?.click(); } },
+              ] as const).map((it, i) => (
+                <div key={it.key} className="flex items-center gap-2">
+                  <span className="text-[11px] font-bold text-white drop-shadow whitespace-nowrap">{it.label}</span>
+                  <button
+                    type="button"
+                    aria-label={`Add ${it.key} status`}
+                    disabled={it.disabled}
+                    title={it.disabled ? 'Off in TOS settings' : undefined}
+                    onClick={it.disabled ? undefined : it.onPick}
+                    className={`w-12 h-12 rounded-full bg-white text-slate-800 shadow-lg flex items-center justify-center cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 ${it.disabled ? 'opacity-40' : 'active:scale-95 transition'} ${prefersReducedMotion ? '' : 'animate-in fade-in zoom-in-95 duration-200'}`}
+                    style={prefersReducedMotion ? undefined : { animationDelay: `${i * 40}ms` }}
+                  >
+                    {it.render()}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <button
+            type="button"
+            aria-label={fanOpen ? 'Close add menu' : 'Add a status update'}
+            aria-expanded={fanOpen}
+            onClick={() => setFanOpen((o) => !o)}
+            className={`absolute bottom-24 right-4 w-14 h-14 rounded-full text-white flex items-center justify-center shadow-xl cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-200 pointer-events-auto active:scale-95 transition ${prefersReducedMotion ? '' : 'animate-in fade-in zoom-in-95 duration-200'}`}
+            style={{ background: 'linear-gradient(145deg, #EA580C, #9A3412)' }}
+          >
+            {fanOpen ? <X className="w-7 h-7" /> : <Plus className="w-7 h-7" />}
+          </button>
+        </div>
+      )}
+
+      {/* Hidden pickers the fan buttons open. */}
+      {data?.settings && data.enabled !== false && (
+        <>
+          <input
+            ref={photoInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) setMedia({ kind: 'photo', file: f }); }}
+          />
+          <input
+            ref={videoInputRef}
+            type="file"
+            accept="video/*"
+            className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) setMedia({ kind: 'video', file: f }); }}
+          />
+          <input
+            ref={musicInputRef}
+            type="file"
+            accept="audio/*"
+            className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) setMedia({ kind: 'music', file: f }); }}
+          />
+        </>
       )}
 
       {viewer && data?.settings && (
