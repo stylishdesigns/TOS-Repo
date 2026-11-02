@@ -689,11 +689,10 @@ interface ErrorBoundaryState {
   error: Error | null;
 }
 
-class ErrorBoundary extends React.Component<any, any> {
-  public state: any = {
-    hasError: false,
-    error: null
-  };
+class ErrorBoundary extends Component<any, any> {
+  public state: any = { hasError: false, error: null };
+  // The component stack from the last crash, read on the error screen.
+  crashInfo: any = null;
 
   static getDerivedStateFromError(error: any): any {
     return { hasError: true, error };
@@ -701,10 +700,33 @@ class ErrorBoundary extends React.Component<any, any> {
 
   componentDidCatch(error: any, errorInfo: any) {
     console.error("Uncaught error:", error, errorInfo);
+    this.crashInfo = errorInfo;
   }
 
+  // A crash page that hides the real error helped nobody: this shows the
+  // message on screen and copies the full details (time, page, stack) so a
+  // crash on a phone can be pasted into the chat and diagnosed.
   render() {
     if (this.state.hasError) {
+      const err: any = this.state.error;
+      const message = err?.message || String(err || 'Unknown error');
+      const parts = [
+        `Time: ${new Date().toLocaleString()}`,
+        `Page: ${typeof window !== 'undefined' ? window.location.href : ''}`,
+        `Error: ${err?.toString() || 'Unknown error'}`,
+        err?.stack ? `Stack:\n${err.stack}` : '',
+        this.crashInfo?.componentStack ? `Component stack:\n${this.crashInfo.componentStack}` : ''
+      ].filter(Boolean);
+      const details = parts.join('\n\n');
+      const copyDetails = () => {
+        const btn = document.getElementById('crashCopyBtn') as HTMLButtonElement | null;
+        const done = () => { if (btn) btn.textContent = 'Copied'; };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(details).then(done).catch(() => copyFallback(details, done));
+        } else {
+          copyFallback(details, done);
+        }
+      };
       return (
         <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-50 p-6 text-center">
           <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-2xl flex items-center justify-center mb-4">
@@ -713,26 +735,51 @@ class ErrorBoundary extends React.Component<any, any> {
             </svg>
           </div>
           <h2 className="text-xl font-bold text-slate-900 mb-2">Something went wrong</h2>
-          <p className="text-slate-500 text-sm max-w-md mb-6">
-            The application encountered an unexpected error. This has been logged for our engineers.
+          <p className="text-slate-500 text-sm max-w-md mb-3">
+            The application hit an unexpected error and stopped. The details below say exactly what broke. Copy them and send them over.
           </p>
-          <button
-            onClick={() => window.location.reload()}
-            className="px-6 py-2 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-slate-800 transition-all"
-          >
-            Reload Application
-          </button>
-          {import.meta.env.DEV && (
-            <pre className="mt-8 p-4 bg-slate-100 rounded-lg text-left text-[10px] text-rose-600 overflow-auto max-w-full">
-              {this.state.error?.toString()}
-            </pre>
-          )}
+          <pre className="mb-5 w-full max-w-md max-h-40 overflow-auto rounded-xl bg-slate-100 p-3 text-left text-[11px] text-rose-700 whitespace-pre-wrap break-words">
+            {message}
+          </pre>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <button
+              onClick={() => window.location.reload()}
+              className="px-6 py-2 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-slate-800 transition-all"
+            >
+              Reload Application
+            </button>
+            <button
+              id="crashCopyBtn"
+              onClick={copyDetails}
+              className="px-6 py-2 bg-white text-slate-800 border border-slate-300 rounded-xl font-bold text-sm hover:bg-slate-100 transition-all"
+            >
+              Copy details
+            </button>
+          </div>
         </div>
       );
     }
 
     return (this as any).props.children;
   }
+}
+
+
+function copyFallback(text: string, done: () => void) {
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+  } catch {
+    // best effort: the message itself is still on screen
+  }
+  done();
 }
 
 export default function App() {
