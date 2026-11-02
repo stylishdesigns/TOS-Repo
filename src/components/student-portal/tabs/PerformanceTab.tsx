@@ -105,7 +105,7 @@ export const PerformanceTab: React.FC<PerformanceTabProps> = ({
   }, [selectedResult, results]);
 
   return (
-    <div className="space-y-4 px-4 py-3 max-w-lg mx-auto pb-20">
+    <div className="space-y-4 px-4 py-3 max-w-lg mx-auto">
       {/* Eyebrow Header */}
       <div>
         <span className="text-[10px] font-extrabold uppercase text-[#C2410C] tracking-wider block">

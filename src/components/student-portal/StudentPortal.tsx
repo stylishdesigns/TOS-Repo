@@ -573,7 +573,7 @@ export const StudentPortal: React.FC = () => {
           )}
 
           {/* Scrollable Tab Content Container */}
-          <div className="flex-1 overflow-y-auto pb-24 relative">
+          <div className="flex-1 overflow-y-auto min-h-0 relative pb-2">
             {activeTab === 'home' && (
               <HomeTab
                 student={activeStudent}
@@ -737,7 +737,7 @@ export const StudentPortal: React.FC = () => {
           {!hideBottomNav && (
             <nav
               aria-label="Student Mobile Navigation"
-              className="fixed bottom-0 left-0 right-0 sm:absolute z-40 bg-slate-950/95 backdrop-blur-md border-t border-slate-800 py-1.5 px-2 shadow-2xl"
+              className="relative z-40 shrink-0 bg-slate-950/95 backdrop-blur-md border-t border-slate-800 py-1.5 px-2 shadow-2xl"
             >
               <div className="max-w-md mx-auto grid grid-cols-5 gap-1 items-center">
                 {/* 1: Home */}

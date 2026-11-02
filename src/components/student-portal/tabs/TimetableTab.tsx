@@ -216,7 +216,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({ student }) => {
   });
 
   return (
-    <div className="space-y-4 px-4 py-3 max-w-lg mx-auto pb-20 animate-in fade-in duration-300">
+    <div className="space-y-4 px-4 py-3 max-w-lg mx-auto animate-in fade-in duration-300">
       {/* 1. Switch at top: "Timetable | Study Materials" */}
       <div className="bg-white rounded-[14px] p-1 border border-[#E2E8F0] shadow-2xs grid grid-cols-2 gap-1">
         <button

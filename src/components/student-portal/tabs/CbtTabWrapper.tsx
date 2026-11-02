@@ -112,7 +112,7 @@ export const CbtTabWrapper: React.FC<CbtTabWrapperProps> = ({
         </div>
       </div>
 
-      <div className="p-4 sm:p-5 max-w-lg mx-auto space-y-4 animate-in fade-in duration-300 pb-20">
+      <div className="p-4 sm:p-5 max-w-lg mx-auto space-y-4 animate-in fade-in duration-300">
         {practiceView === 'practice' ? (
           <StudentPractice student={student} />
         ) : (

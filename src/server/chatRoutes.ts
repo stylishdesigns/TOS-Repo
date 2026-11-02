@@ -418,6 +418,36 @@ async function studentChatBase(caller: Caller): Promise<{ student: any; centreId
  *  Same centre: open to everyone, no request of any kind. Across centres:
  *  students only, and only when an accepted friend request links them. Staff
  *  callers never reach past their own centre. */
+/** ---------------------------------------------------------------------------
+ * Student chat privacy settings (the Friends and privacy screen). One doc per
+ * student in the chatSettings collection; the server reads them wherever a
+ * friend request is sent or a cross-centre chat is opened, so the choices are
+ * enforced here, never only in the screens.
+ * ------------------------------------------------------------------------- */
+const CHAT_SETTINGS_DEFAULTS = { friendRequests: 'everyone', messages: 'friends', autoAccept: 'ask' };
+const CHAT_FRIEND_REQUEST_CHOICES = ['everyone', 'centre', 'class', 'nobody'];
+const CHAT_MESSAGE_CHOICES = ['friends', 'friends_class', 'nobody'];
+const CHAT_AUTO_ACCEPT_CHOICES = ['ask', 'auto'];
+
+type ChatSettings = { friendRequests: string; messages: string; autoAccept: string };
+
+async function chatSettingsFor(uid: string): Promise<ChatSettings> {
+  try {
+    const snap = await adminDb.collection('chatSettings').doc(cleanStr(uid, 64)).get();
+    const v = (snap.data() || {}) as any;
+    const fr = cleanStr(v.friendRequests, 16);
+    const ms = cleanStr(v.messages, 16);
+    const aa = cleanStr(v.autoAccept, 16);
+    return {
+      friendRequests: CHAT_FRIEND_REQUEST_CHOICES.includes(fr) ? fr : CHAT_SETTINGS_DEFAULTS.friendRequests,
+      messages: CHAT_MESSAGE_CHOICES.includes(ms) ? ms : CHAT_SETTINGS_DEFAULTS.messages,
+      autoAccept: CHAT_AUTO_ACCEPT_CHOICES.includes(aa) ? aa : CHAT_SETTINGS_DEFAULTS.autoAccept,
+    };
+  } catch {
+    return { ...CHAT_SETTINGS_DEFAULTS };
+  }
+}
+
 async function openPersonalCore(caller: Caller, opts: { role: 'student' | 'staff'; centreId: string; targetUid: string }): Promise<Record<string, unknown>> {
   const targetUid = cleanStr(opts.targetUid, 64);
   if (!targetUid) throw httpError(400, 'Choose who you want to chat with.');
@@ -433,6 +463,12 @@ async function openPersonalCore(caller: Caller, opts: { role: 'student' | 'staff
     }
     if (!(await friendshipAccepted(caller.uid, targetUid))) {
       throw httpError(403, 'You can only chat with students from other centres after you become friends. Send a friend request from the leaderboard.');
+    }
+    // The target's own choice: "nobody" closes new cross-centre chats even
+    // for existing friends. Chats already opened are untouched.
+    const targetSettings = await chatSettingsFor(targetUid);
+    if (targetSettings.messages === 'nobody') {
+      throw httpError(403, `${target.username} is not opening new chats right now.`);
     }
   }
 
@@ -1271,6 +1307,46 @@ export function registerChatRoutes(app: express.Express): void {
     }
   });
 
+  app.get('/api/student/chat/settings', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      await studentChatBase(caller);
+      res.json({ ok: true, settings: await chatSettingsFor(caller.uid) });
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] settings read failed');
+    }
+  });
+
+  app.post('/api/student/chat/settings', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      await studentChatBase(caller);
+      const body = req.body || {};
+      const friendRequests = cleanStr(body.friendRequests, 16);
+      const messages = cleanStr(body.messages, 16);
+      const autoAccept = cleanStr(body.autoAccept, 16);
+      if (friendRequests && !CHAT_FRIEND_REQUEST_CHOICES.includes(friendRequests)) {
+        throw httpError(400, 'That friend-request choice is not one of the options.');
+      }
+      if (messages && !CHAT_MESSAGE_CHOICES.includes(messages)) {
+        throw httpError(400, 'That messaging choice is not one of the options.');
+      }
+      if (autoAccept && !CHAT_AUTO_ACCEPT_CHOICES.includes(autoAccept)) {
+        throw httpError(400, 'That request-handling choice is not one of the options.');
+      }
+      const current = await chatSettingsFor(caller.uid);
+      const next: ChatSettings = {
+        friendRequests: friendRequests || current.friendRequests,
+        messages: messages || current.messages,
+        autoAccept: autoAccept || current.autoAccept,
+      };
+      await adminDb.collection('chatSettings').doc(caller.uid).set({ ...next, updatedAt: new Date().toISOString() }, { merge: true });
+      res.json({ ok: true, settings: next });
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] settings save failed');
+    }
+  });
+
   app.post('/api/student/chat/friends/request', async (req, res) => {
     try {
       const caller = getCaller(req);
@@ -1289,6 +1365,14 @@ export function registerChatRoutes(app: express.Express): void {
       const targetCentre = target.centres[0] || '';
       if (!targetCentre || targetCentre === centreId) {
         throw httpError(400, 'You can already chat with students in your centre. Start a chat with them instead.');
+      }
+      // The target's own privacy choice decides whether this request may
+      // even be sent, checked here on the server.
+      const targetSettings = await chatSettingsFor(targetUid);
+      const acceptsRequests = targetSettings.friendRequests === 'everyone'
+        || (['centre', 'class'].includes(targetSettings.friendRequests) && targetCentre === centreId);
+      if (!acceptsRequests) {
+        throw httpError(403, `${target.username} is not accepting friend requests right now.`);
       }
       const docRef = adminDb.collection('chatFriendRequests').doc(pairId('fr', caller.uid, targetUid));
       const existing = await docRef.get();
@@ -1312,11 +1396,11 @@ export function registerChatRoutes(app: express.Express): void {
         toUid: targetUid,
         toCentreId: targetCentre,
         toUsername: target.username,
-        status: 'pending',
+        status: targetSettings.autoAccept === 'auto' ? 'accepted' : 'pending',
         createdAt: existing.exists ? cleanStr((existing.data() as any)?.createdAt, 40) || now : now,
-        respondedAt: null,
+        respondedAt: targetSettings.autoAccept === 'auto' ? now : null,
       }, { merge: true });
-      res.json({ ok: true, status: 'pending' });
+      res.json({ ok: true, status: targetSettings.autoAccept === 'auto' ? 'accepted' : 'pending' });
     } catch (error: any) {
       handleRouteError(res, error, '[chat] friend request failed');
     }
@@ -1739,8 +1823,16 @@ async function statusOwnerName(ownerUid: string): Promise<string> {
  *  stored name plus their chat handle; admins and tutors get their staff
  *  record's name with no handle (staff are shown by name, like their chat
  *  messages are). Batched the same way the overview did, 10 uids per query. */
-async function statusNamesFor(uids: string[]): Promise<Map<string, { name: string; username: string }>> {
-  const out = new Map<string, { name: string; username: string }>();
+function emailPrefixOf(email: unknown): string {
+  const raw = cleanStr(email, 120).toLowerCase();
+  return cleanStr(raw.split('@')[0], 40);
+}
+
+/** Names and usernames for a batch of uids, from the students, admins and
+ *  tutors collections. When a staff record carries no name, the email
+ *  prefix travels along so screens never fall back to a generic label. */
+async function statusNamesFor(uids: string[]): Promise<Map<string, { name: string; username: string; emailPrefix: string }>> {
+  const out = new Map<string, { name: string; username: string; emailPrefix: string }>();
   const unresolved = new Set<string>(uids.map((u) => cleanStr(u, 64)).filter(Boolean));
   const chunks: string[][] = [];
   const all = [...unresolved];
@@ -1750,7 +1842,7 @@ async function statusNamesFor(uids: string[]): Promise<Map<string, { name: strin
     stuList.forEach((d) => {
       const v = d.data() as any;
       const uid = cleanStr(v.uid, 64);
-      if (uid) { out.set(uid, { name: cleanStr(v.name, MAX_NAME_CHARS), username: '' }); unresolved.delete(uid); }
+      if (uid) { out.set(uid, { name: cleanStr(v.name, MAX_NAME_CHARS), username: '', emailPrefix: '' }); unresolved.delete(uid); }
     });
     const userList = await adminDb.collection('usernames').where('studentId', 'in', part).get();
     userList.forEach((d) => {
@@ -1767,8 +1859,11 @@ async function statusNamesFor(uids: string[]): Promise<Map<string, { name: strin
     const admList = await adminDb.collection('admins').where('uid', 'in', part).get();
     admList.forEach((d) => {
       const v = d.data() as any;
-      const uid = cleanStr(d.id, 64);
-      if (uid) { out.set(uid, { name: cleanStr(v.name || v.displayName || v.fullName, MAX_NAME_CHARS), username: '' }); unresolved.delete(uid); }
+      const uid = cleanStr(v.uid, 64) || cleanStr(d.id, 64);
+      if (uid) {
+        out.set(uid, { name: cleanStr(v.name || v.displayName || v.fullName, MAX_NAME_CHARS), username: '', emailPrefix: emailPrefixOf(v.email) });
+        unresolved.delete(uid);
+      }
     });
   }
   const rest2 = [...unresolved];
@@ -1776,8 +1871,10 @@ async function statusNamesFor(uids: string[]): Promise<Map<string, { name: strin
     const tutList = await adminDb.collection('tutors').where('uid', 'in', rest2).get();
     tutList.forEach((d) => {
       const v = d.data() as any;
-      const uid = cleanStr(d.id, 64);
-      if (uid) out.set(uid, { name: cleanStr(v.name || v.displayName || v.fullName, MAX_NAME_CHARS), username: '' });
+      // Tutor docs are keyed by their own id, so the uid comes from the
+      // document's field, never from the doc id alone.
+      const uid = cleanStr(v.uid, 64) || cleanStr(d.id, 64);
+      if (uid) out.set(uid, { name: cleanStr(v.name || v.displayName || v.fullName, MAX_NAME_CHARS), username: '', emailPrefix: emailPrefixOf(v.email) });
     });
   }
   return out;
@@ -1824,7 +1921,7 @@ async function chatDirectoryFor(centreId: string, excludeUid: string): Promise<R
   });
   const staffMap = await statusNamesFor(staffUids);
   const staff = staffUids
-    .map((u) => ({ uid: u, name: personDisplayName({ isStudent: false, name: staffMap.get(u)?.name || '', username: '' }) }))
+    .map((u) => ({ uid: u, name: personDisplayName({ isStudent: false, name: staffMap.get(u)?.name || staffMap.get(u)?.emailPrefix || '', username: '' }) }))
     .sort((a, b) => a.name.localeCompare(b.name))
     .slice(0, 50);
   return { ok: true, students, staff };
@@ -1891,7 +1988,7 @@ async function statusOverviewCore(caller: Caller, centreIds: string[], me: { nam
   const shape = (o: One) => ({
     centreId: o.centreId,
     uid: o.uid,
-    name: o.centreId === TOS_STATUS_CENTRE ? 'TOS' : (names.get(o.uid)?.name || ''),
+    name: o.centreId === TOS_STATUS_CENTRE ? 'TOS' : (names.get(o.uid)?.name || names.get(o.uid)?.emailPrefix || ''),
     username: o.centreId === TOS_STATUS_CENTRE ? '' : (names.get(o.uid)?.username || ''),
     statusId: o.statusId,
     kind: o.kind,

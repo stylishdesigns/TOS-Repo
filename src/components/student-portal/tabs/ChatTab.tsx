@@ -12,6 +12,7 @@ import {
   Plus,
   RefreshCw,
   Send,
+  Settings2,
   ShieldAlert,
   Star,
   User,
@@ -180,6 +181,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
   });
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
   const [starredOpen, setStarredOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [chatFilter, setChatFilter] = useState<'groups' | 'personal'>('personal');
   const [pickerOpen, setPickerOpen] = useState(false);
 
@@ -272,9 +274,13 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
     return <StarredScreen onBack={() => setStarredOpen(false)} />;
   }
 
+  if (settingsOpen) {
+    return <ChatSettingsSheet onClose={() => setSettingsOpen(false)} />;
+  }
+
   if (showRules) {
     return (
-      <div className="p-4 sm:p-5 max-w-lg mx-auto space-y-4 animate-in fade-in duration-300 pb-20">
+      <div className="p-4 sm:p-5 max-w-lg mx-auto space-y-4 animate-in fade-in duration-300">
         <div className="pt-1">
           <span className="text-[10px] font-extrabold uppercase text-[#C2410C] tracking-wider block">
             {student.name} · Communications
@@ -311,7 +317,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
   }
 
   return (
-    <div className="p-4 sm:p-5 max-w-lg mx-auto space-y-4 animate-in fade-in duration-300 pb-20">
+    <div className="p-4 sm:p-5 max-w-lg mx-auto space-y-4 animate-in fade-in duration-300">
       <div className="pt-1 flex items-end justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <div className="min-w-0">
@@ -327,6 +333,13 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
           </div>
         </div>
         <div className="flex gap-2">
+          <button
+            onClick={() => setSettingsOpen(true)}
+            className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-500 active:scale-95 transition"
+            aria-label="Chat settings"
+          >
+            <Settings2 className="w-4 h-4" />
+          </button>
           <button
             onClick={() => setStarredOpen(true)}
             className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-500 active:scale-95 transition"
@@ -799,7 +812,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
 
   if (loading) {
     return (
-      <div className="p-4 sm:p-5 max-w-lg mx-auto pb-20 animate-in fade-in duration-300">
+      <div className="p-4 sm:p-5 max-w-lg mx-auto animate-in fade-in duration-300">
         <button onClick={onBack} className="flex items-center gap-1 text-slate-500 text-xs font-bold mb-4">
           <ChevronLeft className="w-4 h-4" /> Back
         </button>
@@ -814,7 +827,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
 
   if (resp?.locked) {
     return (
-      <div className="p-4 sm:p-5 max-w-lg mx-auto pb-20 animate-in fade-in duration-300">
+      <div className="p-4 sm:p-5 max-w-lg mx-auto animate-in fade-in duration-300">
         <button onClick={onBack} className="flex items-center gap-1 text-slate-500 text-xs font-bold mb-4">
           <ChevronLeft className="w-4 h-4" /> Back
         </button>
@@ -1219,7 +1232,7 @@ const StarredScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   }, []);
 
   return (
-    <div className="p-4 sm:p-5 max-w-lg mx-auto space-y-4 animate-in fade-in duration-300 pb-20">
+    <div className="p-4 sm:p-5 max-w-lg mx-auto space-y-4 animate-in fade-in duration-300">
       <div className="pt-1 flex items-center gap-2">
         <button
           onClick={onBack}
@@ -1279,6 +1292,126 @@ const StarredScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
           ))}
         </div>
       )}
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// Chat settings (Friends and privacy). One screen, three choices, stored per
+// student on the server; the server checks them wherever a friend request is
+// sent or a cross-centre chat is opened, so these are real rules, not
+// decoration. Defaults come from the server, never from this screen.
+// ---------------------------------------------------------------------------
+
+type ChatSettingsValues = { friendRequests: string; messages: string; autoAccept: string };
+
+const FRIEND_REQUEST_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: 'everyone', label: 'Everyone on Tutorial OS' },
+  { value: 'centre', label: 'Students in my centre' },
+  { value: 'class', label: 'Students in my class' },
+  { value: 'nobody', label: 'Nobody' },
+];
+const MESSAGE_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: 'friends', label: 'Friends only' },
+  { value: 'friends_class', label: 'Friends and my class' },
+  { value: 'nobody', label: 'Nobody' },
+];
+const AUTO_ACCEPT_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: 'ask', label: 'Ask me each time' },
+  { value: 'auto', label: 'Accept automatically' },
+];
+
+const ChatSettingsSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+  const [values, setValues] = useState<ChatSettingsValues | null>(null);
+  const [err, setErr] = useState('');
+  const [note, setNote] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    api('/api/student/chat/settings')
+      .then((d: any) => {
+        if (d && d.ok) setValues(d.settings);
+        else setErr(String(d?.error || 'Your chat settings could not load.'));
+      })
+      .catch(() => setErr('Your chat settings could not load.'));
+  }, []);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const save = async (patch: Partial<ChatSettingsValues>) => {
+    if (!values) return;
+    const next = { ...values, ...patch };
+    setValues(next);
+    setSaving(true);
+    setErr('');
+    try {
+      const d = await api('/api/student/chat/settings', { method: 'POST', body: JSON.stringify(patch) });
+      if (d && d.ok) {
+        setValues(d.settings);
+        setNote('Saved');
+        window.setTimeout(() => setNote(''), 1800);
+      } else {
+        setErr(String(d?.error || 'That change could not be saved.'));
+      }
+    } catch (e: any) {
+      setErr(String(e?.message || 'That change could not be saved.'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const group = (title: string, hint: string, key: keyof ChatSettingsValues, options: Array<{ value: string; label: string }>) => (
+    <div className="bg-white rounded-3xl border border-slate-200/90 shadow-sm p-4 space-y-2">
+      <p className="text-sm font-black text-slate-900">{title}</p>
+      <p className="text-[11px] text-slate-500 font-medium">{hint}</p>
+      <div className="space-y-1 pt-1">
+        {options.map((o) => {
+          const active = (values as any)?.[key] === o.value;
+          return (
+            <button
+              key={o.value}
+              type="button"
+              disabled={!values || saving}
+              onClick={() => save({ [key]: o.value } as Partial<ChatSettingsValues>)}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-left text-sm font-semibold transition ${active ? 'bg-orange-50 border border-[#EA580C] text-[#C2410C]' : 'bg-slate-50 border border-transparent text-slate-600 hover:bg-slate-100'} ${values ? 'cursor-pointer' : 'opacity-60'}`}
+            >
+              <span className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${active ? 'border-[#EA580C]' : 'border-slate-300'}`}>
+                {active && <span className="w-2 h-2 rounded-full bg-[#EA580C]" />}
+              </span>
+              {o.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="fixed inset-0 z-50 bg-slate-50 overflow-y-auto animate-in fade-in duration-200">
+      <div className="p-4 sm:p-5 max-w-lg mx-auto pt-6 pb-10 space-y-4">
+        <div className="pt-1 flex items-start justify-between gap-2">
+          <div>
+            <span className="text-[10px] font-extrabold uppercase text-[#C2410C] tracking-wider block">Chat settings</span>
+            <h2 className="text-xl font-black text-[#0F172A] tracking-tight">Friends and privacy</h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-500 active:scale-95 transition shrink-0"
+            aria-label="Close chat settings"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        {note && <p className="text-[11px] text-emerald-600 font-bold">{note}</p>}
+        {err && <p className="text-[11px] text-red-600 font-bold">{err}</p>}
+        {group('Who can send me a friend request', 'Requests only come from students at other centres.', 'friendRequests', FRIEND_REQUEST_OPTIONS)}
+        {group('Who can message me', 'Students in your centre can always message you. This decides new chats from other centres.', 'messages', MESSAGE_OPTIONS)}
+        {group('When I get a friend request', 'Automatic acceptance still only accepts students at other centres.', 'autoAccept', AUTO_ACCEPT_OPTIONS)}
+      </div>
     </div>
   );
 };
