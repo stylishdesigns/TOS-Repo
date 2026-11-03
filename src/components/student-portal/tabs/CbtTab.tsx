@@ -741,7 +741,7 @@ export const CbtTab: React.FC<CbtTabProps> = ({
           {!showArchive ? (
             <div className={activeFrequency === 'Mock' ? 'text-white' : ''}>
               <h2 className="text-xl font-black tracking-tight">
-                 {activeFrequency === 'Mock' ? 'CBT Mock Exams' : 'CBT Assessment'}
+                 {activeFrequency === 'Mock' ? 'CBT Mock Exams' : 'Tutors Assessments'}
               </h2>
             </div>
           ) : (
@@ -912,7 +912,7 @@ export const CbtTab: React.FC<CbtTabProps> = ({
                               </span>
                             )}
                           </div>
-                      <h3 className="text-sm font-black text-slate-900">{exam.title.replace(/General Assessment/g, 'CBT Assessment').replace(/General/g, 'CBT')}</h3>
+                      <h3 className="text-sm font-black text-slate-900">{exam.title.replace(/General Assessment/g, 'Tutors Assessments').replace(/General/g, 'Tutors')}</h3>
                       <p className="text-[10px] text-slate-500 uppercase font-bold tracking-tight">
                         {exam.subjects.join(' • ')}
                       </p>
@@ -1039,7 +1039,7 @@ export const CbtTab: React.FC<CbtTabProps> = ({
               <Award className="w-8 h-8" />
             </div>
             <div>
-              <h2 className="text-xl font-black">{selectedExam.title.replace(/General Assessment/g, 'CBT Assessment').replace(/General/g, 'CBT')}</h2>
+              <h2 className="text-xl font-black">{selectedExam.title.replace(/General Assessment/g, 'Tutors Assessments').replace(/General/g, 'Tutors')}</h2>
               <p className="text-xs text-slate-400 mt-1 uppercase tracking-widest">Assessment Completed</p>
             </div>
             
@@ -1200,7 +1200,7 @@ export const CbtTab: React.FC<CbtTabProps> = ({
             </div>
             <div>
               <h2 className="text-sm font-black uppercase tracking-tight">Review Mode</h2>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{selectedExam.title.replace(/General Assessment/g, 'CBT Assessment').replace(/General/g, 'CBT')}</p>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{selectedExam.title.replace(/General Assessment/g, 'Tutors Assessments').replace(/General/g, 'Tutors')}</p>
             </div>
           </div>
         </div>
@@ -1342,7 +1342,7 @@ export const CbtTab: React.FC<CbtTabProps> = ({
             <Laptop className="w-5 h-5 text-white" />
           </div>
           <h2 className="text-sm font-black uppercase tracking-tight">
-            {selectedExam.frequency === 'Mock' ? 'CBT Mock' : 'CBT Assessment'}
+            {selectedExam.frequency === 'Mock' ? 'CBT Mock' : 'Tutors Assessments'}
           </h2>
         </div>
         <div className="flex items-center space-x-3">

@@ -637,7 +637,7 @@ export const StatusViewer: React.FC<{
     if (seenFired.current.has(current.statusId)) return;
     seenFired.current.add(current.statusId);
     onSeenUpdate(person.uid, current.statusId);
-    call('/seen', {
+    call(`/seen${person.centreId ? `?centreId=${encodeURIComponent(person.centreId)}` : ''}`, {
       method: 'POST',
       body: { ownerUid: person.uid, statusId: current.statusId },
     }).catch(() => undefined);
@@ -648,7 +648,7 @@ export const StatusViewer: React.FC<{
     setReplyBusy(true);
     setErr('');
     try {
-      const d = await call('/reply', {
+      const d = await call(`/reply${person.centreId ? `?centreId=${encodeURIComponent(person.centreId)}` : ''}`, {
         method: 'POST',
         body: { ownerUid: person.uid, statusId: current.statusId, text: replyText.trim() },
       });
@@ -1007,52 +1007,108 @@ export const StatusViewer: React.FC<{
   );
 };
 
-const StatusRow: React.FC<{ entry: StatusEntry; dimmed?: boolean; onPress?: () => void }> = ({ entry, dimmed, onPress }) => (
-  <button
-    onClick={onPress}
-    disabled={!onPress}
-    className={`bg-white rounded-2xl px-4 py-3 border border-slate-200/90 shadow-sm flex items-center gap-3 w-full text-left ${
-      dimmed ? 'opacity-60' : ''
-    } ${onPress ? 'active:scale-[0.99] transition' : ''}`}
-  >
-    <div
-      className={`w-11 h-11 rounded-full flex items-center justify-center text-sm font-black shrink-0 ${
-        dimmed
-          ? 'bg-slate-100 text-slate-400 border border-slate-200'
-          : 'bg-[#FFF7ED] text-[#C2410C] border-2 border-[#EA580C]'
-      }`}
-      aria-hidden="true"
-    >
-      {initials(entry.name || entry.username)}
-    </div>
-    <div className="min-w-0 flex-1">
-      <p className="text-sm font-black text-slate-900 truncate">{entry.name || (entry.username ? `@${entry.username}` : 'Student')}</p>
-      <p className="text-xs text-slate-500 font-medium truncate">
-        {entry.username ? `@${entry.username} · ` : ''}
-        {statusTimeLabel(entry.at)}
-      </p>
-    </div>
-    {(entry.count || 0) > 1 && (
-      <span
-        className="shrink-0 text-[10px] font-black text-[#C2410C] bg-[#FFF7ED] border border-[#EA580C]/40 rounded-full px-2 py-0.5"
-        title={`${entry.count} updates in this status`}
-      >
-        ×{entry.count}
-      </span>
-    )}
-  </button>
-);
+// A helper shared by the bubbles: how the ring splits spent vs remaining.
+const RING_C = 2 * Math.PI * 30;
 
-const StatusList: React.FC<{ label: string; items: StatusEntry[]; dimmed?: boolean; onOpen: (e: StatusEntry) => void }> = ({ label, items, dimmed, onOpen }) => (
-  <div className="space-y-2">
-    <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 px-1">{label}</p>
+const statusLeftLabel = (ms: number): string => {
+  const m = Math.max(0, Math.round(ms / 60000));
+  if (m < 1) return '<1m';
+  if (m < 90) return `${m}m`;
+  const h = Math.floor(m / 60);
+  return h >= 24 ? '1d+' : `${h}h`;
+};
+
+const StatusBubble: React.FC<{ entry: StatusEntry; dimmed?: boolean; now: number; onPress: () => void }> = ({ entry, dimmed, now, onPress }) => {
+  const life = Math.max(1, entry.expiresAt - entry.at);
+  const remain = Math.max(0, entry.expiresAt - now);
+  if (remain <= 0) return null; // the 24h window ran out: gone at once.
+  const f = Math.max(0, Math.min(1, remain / life));
+  const ring = dimmed ? '#CBD5E1' : '#EA580C';
+  const inside = entry.photoUrl
+    ? <img src={entry.photoUrl} alt="" className="w-full h-full object-cover rounded-full" />
+    : entry.videoUrl
+      ? <Film className="w-5 h-5" />
+      : entry.audioUrl
+        ? <Music className="w-5 h-5" />
+        : <span className="text-[11px] font-black leading-none">Aa</span>;
+  return (
+    <button
+      type="button"
+      onClick={onPress}
+      aria-label={`Status, ${statusLeftLabel(remain)} left`}
+      className="shrink-0 flex flex-col items-center gap-1 cursor-pointer active:scale-95 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 rounded-full"
+    >
+      <span className={`relative block w-14 h-14 ${dimmed ? 'opacity-70' : ''}`}>
+        <svg viewBox="0 0 64 64" className="w-14 h-14" aria-hidden="true">
+          <circle cx="32" cy="32" r="30" fill="none" stroke="#F1F5F9" strokeWidth="3.5" />
+          <circle
+            cx="32" cy="32" r="30" fill="none" stroke={ring} strokeWidth="3.5"
+            strokeLinecap="round" strokeDasharray={RING_C}
+            strokeDashoffset={RING_C * (1 - f)}
+            transform="rotate(-90 32 32)"
+          />
+        </svg>
+        <span className="absolute inset-[5px] rounded-full overflow-hidden bg-[#FFF7ED] text-[#C2410C] border border-[#EA580C]/30 flex items-center justify-center">
+          {inside}
+        </span>
+      </span>
+      <span className="text-[9px] font-black text-slate-500 leading-none">{statusLeftLabel(remain)}</span>
+    </button>
+  );
+};
+
+// One component per poster: their updates sit side by side as circles inside
+// the same card, the cards run horizontally, and more than fits scrolls
+// sideways so nothing is ever stacked vertically.
+const StatusRail: React.FC<{ label: string; items: StatusEntry[]; dimmed?: boolean; onOpen: (e: StatusEntry) => void }> = ({ label, items, dimmed, onOpen }) => {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 30000);
+    return () => clearInterval(t);
+  }, []);
+  const live = items.filter((it) => it.expiresAt > now);
+  if (!live.length) return null;
+  const groups: { key: string; name: string; username: string; centreId?: string; statuses: StatusEntry[] }[] = [];
+  const byKey = new Map<string, { key: string; name: string; username: string; centreId?: string; statuses: StatusEntry[] }>();
+  for (const it of live) {
+    const k = `${it.centreId || ''}:${it.uid}`;
+    let g = byKey.get(k);
+    if (!g) {
+      g = { key: k, name: it.name || (it.username ? `@${it.username}` : 'Student'), username: it.username, centreId: it.centreId, statuses: [] };
+      byKey.set(k, g);
+      groups.push(g);
+    }
+    g.statuses.push(it);
+  }
+  return (
     <div className="space-y-2">
-      {items.map((it) => (
-        <StatusRow key={it.statusId} entry={it} dimmed={dimmed} onPress={() => onOpen(it)} />
-      ))}
+      <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 px-1">{label}</p>
+      <div className="flex gap-3 overflow-x-auto no-scrollbar -mx-4 px-4 pb-1">
+        {groups.map((g) => (
+          <div
+            key={g.key}
+            className={`shrink-0 bg-white rounded-2xl border border-slate-200/90 shadow-sm p-3 ${dimmed ? 'opacity-75' : ''}`}
+          >
+            <div className="flex items-center gap-2 max-w-[168px]">
+              <div
+                className={`w-7 h-7 rounded-full text-[10px] font-black flex items-center justify-center shrink-0 ${dimmed ? 'bg-slate-100 text-slate-400 border border-slate-200' : 'bg-[#FFF7ED] text-[#C2410C] border border-[#EA580C]/40'}`}
+                aria-hidden="true"
+              >
+                {initials(g.name)}
+              </div>
+              <p className="text-[11px] font-black text-slate-900 truncate">{g.name}</p>
+            </div>
+            <div className="flex gap-2 mt-2.5">
+              {g.statuses.map((st) => (
+                <StatusBubble key={st.statusId} entry={st} dimmed={dimmed} now={now} onPress={() => onOpen(st)} />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 export const StatusScreenCore: React.FC<{ call: (path: string, opts?: any) => Promise<any>; uid: string; cacheKey?: string; fallbackName?: string }> =
 ({ call, uid, cacheKey = 'chat:status', fallbackName = '' }) => {
@@ -1122,7 +1178,11 @@ export const StatusScreenCore: React.FC<{ call: (path: string, opts?: any) => Pr
 
   // Viewing a status moves its row to VIEWED straight away, and closing the
   // viewer re-syncs once so the counts and lists come back from the server.
-  const openViewer = (entry: { uid: string; name: string; username: string }) => setViewer({ person: entry, mine: false });
+  const openViewer = (entry: StatusEntry) => setViewer({
+    person: { uid: entry.uid, name: entry.name, username: entry.username, centreId: entry.centreId },
+    mine: false,
+    startStatusId: entry.statusId,
+  });
   const closeViewer = () => {
     setViewer(null);
     call('/overview')
@@ -1215,8 +1275,8 @@ export const StatusScreenCore: React.FC<{ call: (path: string, opts?: any) => Pr
             </div>
           )}
 
-          {recent.length > 0 && <StatusList label="RECENT UPDATES" items={recent} onOpen={openViewer} />}
-          {viewed.length > 0 && <StatusList label="VIEWED" items={viewed} dimmed onOpen={openViewer} />}
+          {recent.length > 0 && <StatusRail label="RECENT UPDATES" items={recent} onOpen={openViewer} />}
+          {viewed.length > 0 && <StatusRail label="VIEWED" items={viewed} dimmed onOpen={openViewer} />}
         </>
       )}
 

@@ -182,7 +182,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
   const [starredOpen, setStarredOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [chatFilter, setChatFilter] = useState<'groups' | 'personal'>('personal');
+  const [chatFilter, setChatFilter] = useState<'groups' | 'personal' | 'channels'>('personal');
   const [pickerOpen, setPickerOpen] = useState(false);
 
   const load = useCallback(async () => {
@@ -246,7 +246,10 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
   // 'tos_channel'. The split never drops or duplicates a group.
   const overviewGroups: ChatGroupSummary[] = overview?.groups ?? [];
   const splitLists = splitGroupsAndChannels(overviewGroups);
-  const listForView = view === 'channels'
+  // Channels merged under Chats: the same screen lists Personal, Groups and
+  // TOS-owned Channels as three filters, so the fan no longer needs its own
+  // Channels entry.
+  const listForView = view === 'channels' || chatFilter === 'channels'
     ? splitLists.channels
     : chatFilter === 'personal'
       ? splitLists.groups.filter((g) => g.kind === 'personal')
@@ -325,7 +328,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
               {student.name} · Communications
             </span>
             <h2 className="text-xl font-black text-[#0F172A] tracking-tight">
-              {view === 'channels' ? 'Channels' : 'Chats'}
+              {'Chats'}
             </h2>
             {view === 'channels' && (
               <p className="text-[11px] text-slate-500 font-medium">Run by Tutorial OS</p>
@@ -376,6 +379,14 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
           >
             Groups
           </button>
+          <button
+            type="button"
+            aria-pressed={chatFilter === 'channels'}
+            onClick={() => setChatFilter('channels')}
+            className={`px-4 py-2 rounded-full text-xs font-black shadow-sm transition ${chatFilter === 'channels' ? 'bg-[#EA580C] text-white' : 'bg-white border border-slate-200 text-slate-500'}`}
+          >
+            Channels
+          </button>
         </div>
       )}
 
@@ -414,7 +425,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
         </div>
       )}
 
-      {!error && overview && view !== 'channels' && listForView.length === 0 && (
+      {!error && overview && view !== 'channels' && chatFilter !== 'channels' && listForView.length === 0 && (
         <div className="bg-white rounded-3xl p-8 border border-slate-200/90 shadow-sm text-center space-y-2">
           <div className="w-14 h-14 rounded-2xl bg-orange-50 border border-orange-100 text-[#EA580C] flex items-center justify-center mx-auto">
             <MessageSquare className="w-7 h-7" />
@@ -426,7 +437,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
         </div>
       )}
 
-      {!error && overview && view === 'channels' && listForView.length === 0 && (
+      {!error && overview && (view === 'channels' || chatFilter === 'channels') && listForView.length === 0 && (
         <div className="bg-white rounded-3xl p-8 border border-slate-200/90 shadow-sm text-center space-y-2">
           <div className="w-14 h-14 rounded-2xl bg-violet-50 border border-violet-100 text-violet-600 flex items-center justify-center mx-auto">
             <Zap className="w-7 h-7" />
