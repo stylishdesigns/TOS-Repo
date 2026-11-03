@@ -93,7 +93,7 @@ export const ClassesTabWrapper: React.FC<ClassesTabWrapperProps> = ({
       <div className="px-4 pt-4 space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-black tracking-tight text-[#0F172A]">
-            Academic Performance
+            Assessment Performance
           </h2>
         </div>
         {renderToggle()}

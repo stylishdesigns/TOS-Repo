@@ -3,6 +3,7 @@ import {
   AlertTriangle,
   BookOpen,
   ChevronLeft,
+  ExternalLink,
   Flag,
   Info,
   Loader2,
@@ -69,6 +70,10 @@ interface ChatMessage {
   role: string;
   text: string;
   photoUrl: string | null;
+  fileUrl?: string | null;
+  fileName?: string | null;
+  fileKind?: string | null;
+  fileSize?: number | null;
   at: number;
   removed: boolean;
   mine: boolean;
@@ -183,6 +188,9 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [chatFilter, setChatFilter] = useState<'groups' | 'personal' | 'channels'>('personal');
   const [pickerOpen, setPickerOpen] = useState(false);
+  // Channel follows: channelId -> followedAt. Fetched with the overview and
+  // flipped locally when the student taps Follow; the server keeps the truth.
+  const [follows, setFollows] = useState<Record<string, number>>({});
 
   const load = useCallback(async () => {
     try {
@@ -200,6 +208,9 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
 
   useEffect(() => {
     load();
+    api('/api/student/chat/channel-follows')
+      .then((res) => setFollows((res as any)?.follows || {}))
+      .catch(() => undefined);
     const t = setInterval(load, 45000);
     return () => clearInterval(t);
   }, [load]);
@@ -248,11 +259,36 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
   // Channels merged under Chats: the same screen lists Personal, Groups and
   // TOS-owned Channels as three filters, so the fan no longer needs its own
   // Channels entry.
-  const listForView = view === 'channels' || chatFilter === 'channels'
-    ? splitLists.channels
+  const isChannelsView = view === 'channels' || chatFilter === 'channels';
+  const listForView = isChannelsView
+    // Followed channels rise to the top, newest follow first; channels the
+    // student has not followed sit at the bottom in their original order.
+    ? [...splitLists.channels].sort((a, b) => {
+        const fa = follows[a.id] || 0;
+        const fb = follows[b.id] || 0;
+        if ((fa > 0) !== (fb > 0)) return fb > 0 ? 1 : -1;
+        return fb - fa;
+      })
     : chatFilter === 'personal'
       ? splitLists.groups.filter((g) => g.kind === 'personal')
       : splitLists.groups.filter((g) => g.kind !== 'personal');
+
+  const toggleFollow = useCallback(async (channelId: string) => {
+    const next = !follows[channelId];
+    setFollows((prev) => {
+      const copy = { ...prev };
+      if (next) copy[channelId] = Date.now();
+      else delete copy[channelId];
+      return copy;
+    });
+    try {
+      const res = await api('/api/student/chat/channel-follows', { method: 'POST', body: { channelId, follow: next } });
+      setFollows((res as any)?.follows || {});
+    } catch {
+      // The server keeps the truth; leave the row as it was and let the next
+      // overview refresh settle it.
+    }
+  }, [follows]);
 
   if (activeGroupId) {
     return (
@@ -447,6 +483,56 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
       )}
 
       {!error && overview && listForView.map((g) => (
+        g.kind === 'tos_channel' && isChannelsView ? (
+          <div
+            key={g.id}
+            role="button"
+            tabIndex={0}
+            onClick={() => setActiveGroupId(g.id)}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActiveGroupId(g.id); } }}
+            className={`w-full text-left rounded-2xl p-3.5 shadow-sm flex items-center gap-3 active:scale-[0.99] transition cursor-pointer ${
+              follows[g.id]
+                ? 'bg-white border border-slate-200/90'
+                : 'bg-violet-50/50 border border-dashed border-violet-300'
+            }`}
+          >
+            <div className="w-11 h-11 rounded-2xl bg-violet-50 border border-violet-100 text-violet-600 flex items-center justify-center shrink-0">
+              {groupIcon(g.kind, 'w-5 h-5')}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5">
+                <p className="text-sm font-black text-slate-900 truncate">{g.name}</p>
+                <span className="text-[9px] font-black uppercase tracking-wider text-violet-700 bg-violet-50 px-1.5 py-0.5 rounded-full shrink-0">Channel</span>
+              </div>
+              <p className="text-[11px] text-slate-500 font-medium truncate">
+                {g.lastMessage
+                  ? g.lastMessage.removed
+                    ? 'Message removed'
+                    : g.lastMessage.text || 'Photo'
+                  : 'No messages yet'}
+              </p>
+            </div>
+            <div className="flex flex-col items-end gap-1 shrink-0">
+              <span className="text-[10px] text-slate-400 font-bold">{g.lastMessage ? fmtListTime(g.lastMessage.at) : ''}</span>
+              <button
+                onClick={(e) => { e.stopPropagation(); toggleFollow(g.id); }}
+                className={`px-3 py-1.5 rounded-full text-[10px] font-black transition active:scale-95 ${
+                  follows[g.id]
+                    ? 'bg-violet-50 text-violet-700 border border-violet-200'
+                    : 'bg-violet-600 text-white hover:bg-violet-700'
+                }`}
+                aria-label={follows[g.id] ? `Unfollow ${g.name}` : `Follow ${g.name}`}
+              >
+                {follows[g.id] ? 'Following' : 'Follow'}
+              </button>
+              {g.unread > 0 && (
+                <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-[#EA580C] text-white text-[10px] font-black flex items-center justify-center">
+                  {g.unread > 99 ? '99+' : g.unread}
+                </span>
+              )}
+            </div>
+          </div>
+        ) : (
         <button
           key={g.id}
           onClick={() => setActiveGroupId(g.id)}
@@ -491,6 +577,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
             )}
           </div>
         </button>
+        )
       ))}
 
       {loading && !overview && !error && (
@@ -541,6 +628,8 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
   const [showInfo, setShowInfo] = useState(false);
   const [attaching, setAttaching] = useState(false);
   const [attachPreview, setAttachPreview] = useState('');
+  const [attachFile, setAttachFile] = useState<File | null>(null);
+  const [attachProgress, setAttachProgress] = useState(0);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [toast, setToast] = useState('');
   const [actionMsg, setActionMsg] = useState<ChatMessage | null>(null);
@@ -681,9 +770,75 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
     reader.readAsDataURL(file);
   }, [showToast]);
 
+  // Any other file (video, PDF, audio, anything): it is handed to the host
+  // directly from the browser and travels with the message as a URL plus its
+  // name, kind and size, which the server re-checks before the message lands.
+  const kindOf = (file: File): string => {
+    if (/^video\//.test(file.type || '')) return 'video';
+    if (/^image\//.test(file.type || '')) return 'image';
+    if (/^audio\//.test(file.type || '')) return 'audio';
+    if (/pdf/i.test(file.type || '')) return 'pdf';
+    return 'file';
+  };
+
+  const onFileChosen = useCallback((file: File | null | undefined) => {
+    if (!file) return;
+    if (/^image\//.test(file.type || '')) {
+      if (resp && resp.photosAllowed === false) { showToast('Photos are turned off in your centre.'); return; }
+      onPhotoPicked(file);
+      return;
+    }
+    const cap = resp?.filesMaxMb || 0;
+    if (cap && file.size > cap * 1024 * 1024) {
+      showToast(`Files can be up to ${cap} MB.`);
+      return;
+    }
+    if (file.size > 200 * 1024 * 1024) { showToast('That file is too large. Choose a smaller one.'); return; }
+    setAttachFile(file);
+  }, [resp, showToast, onPhotoPicked]);
+
+  const uploadChatFile = useCallback(async (file: File): Promise<string> => {
+    const cfg = await api('/api/student/chat/upload-config');
+    const cloud = String((cfg as any)?.cloud || '');
+    const preset = String((cfg as any)?.preset || '');
+    const folder = String((cfg as any)?.folder || 'tos/chat');
+    if (!cloud || !preset) throw new Error('File hosting is not configured. Try again later.');
+    const endpoint = kindOf(file) === 'image' ? 'image' : kindOf(file) === 'video' || kindOf(file) === 'audio' ? 'video' : 'raw';
+    const form = new FormData();
+    form.append('upload_preset', preset);
+    form.append('folder', folder);
+    form.append('file', file);
+    setAttachProgress(1);
+    const url = await new Promise<string>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `https://api.cloudinary.com/v1_1/${cloud}/${endpoint}/upload`);
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) setAttachProgress(Math.max(1, Math.round((e.loaded / e.total) * 100)));
+      };
+      xhr.onload = () => {
+        try {
+          const data = JSON.parse(xhr.responseText || '{}');
+          if (xhr.status >= 200 && xhr.status < 300 && data.secure_url) resolve(String(data.secure_url));
+          else reject(new Error(data?.error?.message || 'The file could not be uploaded. Try again.'));
+        } catch { reject(new Error('The file could not be uploaded. Try again.')); }
+      };
+      xhr.onerror = () => reject(new Error('The file could not be uploaded. Try again.'));
+      xhr.send(form);
+    });
+    setAttachProgress(100);
+    return url;
+  }, []);
+
+  const fmtSize = (n: number): string => {
+    if (!n) return '';
+    if (n >= 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(n >= 10 * 1024 * 1024 ? 0 : 1)} MB`;
+    if (n >= 1024) return `${Math.round(n / 1024)} KB`;
+    return `${n} B`;
+  };
+
   const send = useCallback(async () => {
     const t = text.trim();
-    if (!t || sending) return;
+    if ((!t && !attachPreview && !attachFile) || sending) return;
     setSending(true);
     try {
       let photoUrl: string | undefined;
@@ -692,18 +847,36 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
         photoUrl = String(res?.url || '');
         if (!photoUrl) throw new Error('The photo could not be uploaded. Try again.');
       }
-      await api(`/api/student/chat/groups/${groupId}/messages`, { method: 'POST', body: { text: t, photoUrl, replyTo: replyTo ? replyTo.id : undefined } });
+      let fileUrl: string | undefined;
+      if (attachFile) {
+        fileUrl = await uploadChatFile(attachFile);
+      }
+      await api(`/api/student/chat/groups/${groupId}/messages`, {
+        method: 'POST',
+        body: {
+          text: t,
+          photoUrl,
+          fileUrl,
+          fileName: attachFile ? attachFile.name : undefined,
+          fileSize: attachFile ? attachFile.size : undefined,
+          fileKind: attachFile ? kindOf(attachFile) : undefined,
+          replyTo: replyTo ? replyTo.id : undefined,
+        },
+      });
       setText('');
       setAttachPreview('');
+      setAttachFile(null);
+      setAttachProgress(0);
       setReplyTo(null);
       await loadLatest();
       scrollToBottom();
     } catch (e: any) {
       showToast(String(e?.message || 'Your message could not be sent. Try again.'));
     } finally {
+      setAttachProgress(0);
       setSending(false);
     }
-  }, [groupId, text, sending, replyTo, attachPreview, loadLatest, scrollToBottom, showToast]);
+  }, [groupId, text, sending, replyTo, attachPreview, attachFile, loadLatest, scrollToBottom, showToast]);
 
   const myUid = messages.find((m) => m.mine)?.uid || '';
 
@@ -925,6 +1098,18 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
           ) : m.photoUrl ? (
             <img src={m.photoUrl} alt="Shared photo" className="rounded-xl max-h-60 w-auto" />
           ) : null}
+          {!m.removed && m.fileUrl && (m.fileKind === 'video' ? (
+            <video src={m.fileUrl} controls preload="metadata" className="rounded-xl max-h-60 w-auto" />
+          ) : (
+            <a href={m.fileUrl} target="_blank" rel="noreferrer" className="flex items-center gap-2.5 rounded-xl px-3 py-2 max-w-[250px] bg-white/10 border border-white/20">
+              <span className="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center shrink-0 text-white font-black text-[10px] uppercase">{(m.fileName || 'file').split('.').pop()?.slice(0, 4)}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[12px] font-bold text-white truncate">{m.fileName || 'File'}</span>
+                <span className="block text-[10px] font-medium text-white/70">{m.fileSize ? fmtSize(m.fileSize) : 'Tap to open'}</span>
+              </span>
+              <ExternalLink className="w-4 h-4 text-white/80 shrink-0" />
+            </a>
+          ))}
           <p className={`text-[9px] mt-1 text-right font-bold ${m.mine ? 'text-orange-100' : 'text-slate-400'}`}>
             {fmtTime(m.at)}
           </p>
@@ -1005,6 +1190,17 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
             </button>
           </div>
         )}
+        {attachFile && (
+          <div className="flex items-center gap-2 mb-2 rounded-xl bg-slate-50 border border-slate-200 px-2 py-1.5">
+            <span className="w-10 h-10 rounded-lg bg-slate-200 text-slate-500 flex items-center justify-center text-[10px] font-black uppercase shrink-0">{attachFile.name.split('.').pop()?.slice(0, 4)}</span>
+            <p className="text-[11px] font-bold text-slate-600 flex-1 min-w-0 truncate">
+              {sending && attachProgress > 0 && attachProgress < 100 ? `Uploading ${attachProgress}%` : `${attachFile.name}${attachFile.size ? ` · ${fmtSize(attachFile.size)}` : ''}`}
+            </p>
+            <button onClick={() => { setAttachFile(null); setAttachProgress(0); }} className="rounded-full p-1 text-slate-400 hover:bg-slate-100" aria-label="Remove file">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
         {canPost ? (
           <div className="flex items-end gap-2">
             {replyTo && (
@@ -1022,24 +1218,19 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
                 </button>
               </div>
             )}
-            {resp?.photosAllowed !== false && (
-              <>
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => { onPhotoPicked(e.target.files && e.target.files[0]); e.target.value = ''; }}
-                />
-                <button
-                  onClick={() => fileRef.current?.click()}
-                  className="w-11 h-11 rounded-2xl bg-slate-100 border border-slate-200 text-slate-600 flex items-center justify-center active:scale-95 transition shrink-0"
-                  aria-label="Attach a photo"
-                >
-                  <Plus className="w-5 h-5" />
-                </button>
-              </>
-            )}
+            <input
+              ref={fileRef}
+              type="file"
+              className="hidden"
+              onChange={(e) => { onFileChosen(e.target.files && e.target.files[0]); e.target.value = ''; }}
+            />
+            <button
+              onClick={() => fileRef.current?.click()}
+              className="w-11 h-11 rounded-2xl bg-slate-100 border border-slate-200 text-slate-600 flex items-center justify-center active:scale-95 transition shrink-0"
+              aria-label="Attach a file"
+            >
+              <Plus className="w-5 h-5" />
+            </button>
             <input
               value={text}
               onChange={(e) => setText(e.target.value)}

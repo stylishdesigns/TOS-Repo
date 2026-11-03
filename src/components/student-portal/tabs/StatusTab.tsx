@@ -1139,7 +1139,6 @@ export const StatusScreenCore: React.FC<{ call: (path: string, opts?: any) => Pr
   const [fanOpen, setFanOpen] = useState(false);
   const photoInputRef = React.useRef<HTMLInputElement>(null);
   const videoInputRef = React.useRef<HTMLInputElement>(null);
-  const musicInputRef = React.useRef<HTMLInputElement>(null);
   const prefersReducedMotion = React.useMemo(
     () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
     [],
@@ -1318,7 +1317,6 @@ export const StatusScreenCore: React.FC<{ call: (path: string, opts?: any) => Pr
                 { key: 'text', label: 'Text', disabled: !data.settings.allowText, render: () => <span className="text-sm font-black leading-none">Aa</span>, onPick: () => { setFanOpen(false); setComposing(true); } },
                 { key: 'photo', label: 'Photo', disabled: !data.settings.allowPhoto, render: () => <ImageIcon className="w-5 h-5" />, onPick: () => { setFanOpen(false); photoInputRef.current?.click(); } },
                 { key: 'video', label: 'Video', disabled: !data.settings.allowVideo, render: () => <Film className="w-5 h-5" />, onPick: () => { setFanOpen(false); videoInputRef.current?.click(); } },
-                { key: 'music', label: 'Music', disabled: !data.settings.allowMusic, render: () => <Music className="w-5 h-5" />, onPick: () => { setFanOpen(false); musicInputRef.current?.click(); } },
               ] as const).map((it, i) => (
                 <div key={it.key} className="flex items-center gap-2">
                   <span className="text-[11px] font-bold text-white drop-shadow whitespace-nowrap">{it.label}</span>
@@ -1366,13 +1364,6 @@ export const StatusScreenCore: React.FC<{ call: (path: string, opts?: any) => Pr
             accept="video/*"
             className="hidden"
             onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) setMedia({ kind: 'video', file: f }); }}
-          />
-          <input
-            ref={musicInputRef}
-            type="file"
-            accept="audio/*"
-            className="hidden"
-            onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) setMedia({ kind: 'music', file: f }); }}
           />
         </>
       )}

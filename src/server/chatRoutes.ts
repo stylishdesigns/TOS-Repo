@@ -72,6 +72,9 @@ const START_CENTRE_CHAT: CentreChatSettings = {
   tutorsCanRemove: true,
   paused: false,
   muteDayOptions: [1, 3, 7],
+  // The cap for generic chat attachments (video, PDF, anything a photo is
+  // not). Stored, not hard-coded, like every other chat cap.
+  filesMaxMb: 25,
   updatedAt: null,
 };
 
@@ -173,6 +176,7 @@ function mergeCentreChat(raw: any): CentreChatSettings {
   s.photosAllowed = raw.photosAllowed === true;
   s.tutorsCanRemove = raw.tutorsCanRemove !== false;
   s.paused = raw.paused === true;
+  s.filesMaxMb = clampInt(raw.filesMaxMb, 1, 200, s.filesMaxMb);
   if (Array.isArray(raw.muteDayOptions)) {
     const rawList: number[] = raw.muteDayOptions.map((x: unknown) => clampInt(x, 1, 365, 0));
     const opts: number[] = Array.from(new Set<number>(rawList.filter((n: number) => n > 0))).sort((a: number, b: number) => a - b);
@@ -1491,6 +1495,45 @@ export function registerChatRoutes(app: express.Express): void {
     }
   });
 
+  // Channel follows: which platform channels this student follows. One doc
+  // per student, map of channelId -> followedAt; only the server touches it.
+  app.get('/api/student/chat/channel-follows', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      await studentChatBase(caller);
+      const doc = await adminDb.collection('chatFollows').doc(caller.uid).get();
+      const channels = (doc.exists && (doc.data() as any)?.channels && typeof (doc.data() as any).channels === 'object')
+        ? (doc.data() as any).channels
+        : {};
+      res.json({ ok: true, follows: channels });
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] channel follows read failed');
+    }
+  });
+
+  app.post('/api/student/chat/channel-follows', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      await studentChatBase(caller);
+      const channelId = cleanStr(String(req.body?.channelId ?? ''), 64);
+      if (!channelId) throw httpError(400, 'Which channel?');
+      const doc = await adminDb.collection('chatGroups').doc(channelId).get();
+      if (!doc.exists || (doc.data() as any)?.kind !== 'tos_channel') throw httpError(404, 'Channel not found.');
+      const follow = req.body?.follow !== false;
+      const ref = adminDb.collection('chatFollows').doc(caller.uid);
+      const cur = await ref.get();
+      const channels = (cur.exists && (cur.data() as any)?.channels && typeof (cur.data() as any).channels === 'object')
+        ? { ...(cur.data() as any).channels }
+        : {};
+      if (follow) channels[channelId] = Date.now();
+      else delete channels[channelId];
+      await ref.set({ channels, updatedAt: new Date().toISOString() }, { merge: true });
+      res.json({ ok: true, follows: channels });
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] channel follow failed');
+    }
+  });
+
   app.get('/api/centre/chat/directory', async (req, res) => {
     try {
       const caller = getCaller(req);
@@ -1540,6 +1583,10 @@ export function registerChatRoutes(app: express.Express): void {
           role: cleanStr(v.role, 20),
           text: String(v.text ?? '').slice(0, tosChat.messageMaxChars),
           photoUrl: typeof v.photoUrl === 'string' ? v.photoUrl.slice(0, MAX_PHOTO_URL_CHARS) : null,
+          fileUrl: typeof v.fileUrl === 'string' ? v.fileUrl.slice(0, MAX_PHOTO_URL_CHARS) : null,
+          fileName: typeof v.fileName === 'string' ? cleanStr(v.fileName, 120) : null,
+          fileKind: typeof v.fileKind === 'string' ? cleanStr(v.fileKind, 20) : null,
+          fileSize: Math.max(0, Math.round(Number(v.fileSize) || 0)) || null,
           at: Number(v.at) || 0,
           removed: Boolean(v.removed),
           forwardedFrom: typeof v.forwardedFrom === 'string' ? cleanStr(v.forwardedFrom, 80) : null,
@@ -1559,6 +1606,7 @@ export function registerChatRoutes(app: express.Express): void {
         canPost: ctx.group.kind !== 'announcements' && ctx.group.kind !== 'tos_channel',
         photosAllowed: ctx.isTosChannel ? false : ctx.centreChat.photosAllowed,
         photoMaxKb: tosChat.photoMaxKb,
+        filesMaxMb: ctx.isTosChannel ? 0 : ctx.centreChat.filesMaxMb,
         messageMaxChars: tosChat.messageMaxChars,
         messages,
         unread: Math.max(0, meta.msgCount - meta.pruned - read),
@@ -1595,11 +1643,30 @@ export function registerChatRoutes(app: express.Express): void {
       const photoUrl = ctx.centreChat.photosAllowed && typeof body.photoUrl === 'string' && body.photoUrl.trim()
         ? body.photoUrl.trim().slice(0, MAX_PHOTO_URL_CHARS)
         : null;
-      if (!text && !photoUrl) throw httpError(400, 'Write a message first.');
+      // A generic attachment (video, PDF, anything a photo is not). It is
+      // uploaded straight to hosting by the browser; the server checks where
+      // the URL points and its real size before the message goes out.
+      let fileUrl: string | null = null;
+      let fileName: string | null = null;
+      let fileKind: string | null = null;
+      let fileSize: number | null = null;
+      if (typeof body.fileUrl === 'string' && body.fileUrl.trim()) {
+        const url = body.fileUrl.trim().slice(0, MAX_PHOTO_URL_CHARS);
+        const cloud = String(process.env.CLOUDINARY_CLOUD_NAME || '');
+        if (!cloud || !url.startsWith(`https://res.cloudinary.com/${cloud}/`)) throw httpError(400, 'Upload the file through this app first.');
+        await verifyChatFileSize(url, ctx.centreChat.filesMaxMb);
+        fileUrl = url;
+        fileName = cleanStr(String(body.fileName ?? ''), 120) || 'File';
+        fileKind = cleanStr(String(body.fileKind ?? ''), 20) || 'file';
+        fileSize = Math.max(0, Math.round(Number(body.fileSize) || 0)) || null;
+      }
+      if (!text && !photoUrl && !fileUrl) throw httpError(400, 'Write a message first.');
       if (text.length > tosChat.messageMaxChars) throw httpError(400, `Messages can be up to ${tosChat.messageMaxChars} characters.`);
       await consumePostRateLimit(caller.uid, tosChat.postRateLimitPerDay);
       const replyTo = await buildReplyTo(ctx.group.id, body.replyTo);
-      await writeMessage(ctx.group, { uid: caller.uid, username, role: 'student' }, text.slice(0, tosChat.messageMaxChars), photoUrl, replyTo ? { replyTo } : undefined);
+      const extras = replyTo ? { replyTo } : undefined;
+      const fileExtras = fileUrl ? { fileUrl, fileName, fileKind, fileSize } : {};
+      await writeMessage(ctx.group, { uid: caller.uid, username, role: 'student' }, text.slice(0, tosChat.messageMaxChars), photoUrl, { ...(extras || {}), ...fileExtras });
       const meta = await readMeta(ctx.group.id);
       res.json({ ok: true, meta });
     } catch (error: any) {
@@ -1946,27 +2013,42 @@ async function chatDirectoryFor(centreId: string, excludeUid: string): Promise<R
   const studentMap = await statusNamesFor(uids);
   const students = uids
     .filter((u) => u !== excludeUid && (studentMap.get(u)?.username || '') !== '')
-    .map((u) => ({ uid: u, username: (studentMap.get(u) as { username: string }).username }))
-    .sort((a, b) => a.username.localeCompare(b.username))
+    .map((u) => {
+      const info = studentMap.get(u) as { name: string; username: string };
+      const real = cleanStr(info.name, MAX_NAME_CHARS);
+      return { uid: u, name: real || info.username, username: info.username };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name))
     .slice(0, 100);
   const memSnap = await adminDb.collection('memberships').where('centreId', '==', centreId).limit(200).get();
   const staffUids: string[] = [];
+  const staffRoles = new Map<string, string>();
   memSnap.forEach((d) => {
     const v = d.data() as any;
     const u = cleanStr(v?.uid, 64);
     const role = cleanStr(v?.role, 20);
-    if (u && u !== excludeUid && ['owner', 'admin', 'tutor'].includes(role) && !staffUids.includes(u)) staffUids.push(u);
+    if (u && u !== excludeUid && ['owner', 'admin', 'tutor'].includes(role) && !staffUids.includes(u)) {
+      staffUids.push(u);
+      staffRoles.set(u, role === 'tutor' ? 'tutor' : 'admin');
+    }
   });
   // Tutors also live in the tutors collection; union it in so every tutor of
   // this centre is reachable even without a membership document.
   const tutSnap = await adminDb.collection('tutors').where('centreId', '==', centreId).limit(200).get();
   tutSnap.forEach((d) => {
     const u = cleanStr((d.data() as any)?.uid, 64);
-    if (u && u !== excludeUid && !staffUids.includes(u)) staffUids.push(u);
+    if (u && u !== excludeUid && !staffUids.includes(u)) {
+      staffUids.push(u);
+      staffRoles.set(u, 'tutor');
+    }
   });
   const staffMap = await statusNamesFor(staffUids);
   const staff = staffUids
-    .map((u) => ({ uid: u, name: personDisplayName({ isStudent: false, name: staffMap.get(u)?.name || staffMap.get(u)?.emailPrefix || '', username: '' }) }))
+    .map((u) => ({
+      uid: u,
+      name: personDisplayName({ isStudent: false, name: staffMap.get(u)?.name || staffMap.get(u)?.emailPrefix || '', username: '' }),
+      role: staffRoles.get(u) || 'tutor',
+    }))
     .sort((a, b) => a.name.localeCompare(b.name))
     .slice(0, 50);
   return { ok: true, students, staff };
@@ -2200,10 +2282,11 @@ async function statusPostCore(caller: Caller, centreId: string, body: Record<str
   if (kind === 'text') {
     if (!st.allowText) throw httpError(403, 'Text updates are turned off.');
     if (!text) throw httpError(400, 'Type your update first.');
-  } else if (kind === 'photo' || kind === 'video' || kind === 'music') {
+  } else if (kind === 'music') {
+    throw httpError(403, 'Music updates are no longer available.');
+  } else if (kind === 'photo' || kind === 'video') {
     if (kind === 'photo' && !st.allowPhoto) throw httpError(403, 'Photo updates are turned off.');
     if (kind === 'video' && !st.allowVideo) throw httpError(403, 'Video updates are turned off.');
-    if (kind === 'music' && !st.allowMusic) throw httpError(403, 'Music updates are turned off.');
     if (kind === 'video') {
       const dur = Math.round(Number(body.durationSeconds) || 0);
       if (dur <= 0 || dur > st.maxVideoSeconds) {
@@ -2248,11 +2331,6 @@ async function statusPostCore(caller: Caller, centreId: string, body: Record<str
       status.videoUrl = url;
       status.durationSeconds = Math.round(Number(body.durationSeconds) || 0);
     }
-    if (kind === 'music') {
-      status.audioUrl = url;
-      const bg = cleanStr(body.bg, 9);
-      status.bg = /^#[0-9a-fA-F]{6}$/.test(bg) ? bg : '#7C3AED';
-    }
   }
   await ref.set(status);
   return {
@@ -2267,10 +2345,10 @@ async function statusUploadCore(caller: Caller, centreId: string, body: Record<s
   const st = tosChat.status;
   if (!st.enabled) throw httpError(403, 'Status is not turned on.');
   const kind = cleanStr(body.kind, 10);
-  if (kind !== 'photo' && kind !== 'video' && kind !== 'music') throw httpError(400, 'Which kind of update is this?');
+  if (kind === 'music') throw httpError(403, 'Music updates are no longer available.');
+  if (kind !== 'photo' && kind !== 'video') throw httpError(400, 'Which kind of update is this?');
   if (kind === 'photo' && !st.allowPhoto) throw httpError(403, 'Photo updates are turned off.');
   if (kind === 'video' && !st.allowVideo) throw httpError(403, 'Video updates are turned off.');
-  if (kind === 'music' && !st.allowMusic) throw httpError(403, 'Music updates are turned off.');
   if (kind === 'video') {
     const dur = Math.round(Number(body.durationSeconds) || 0);
     if (dur <= 0 || dur > st.maxVideoSeconds) {
@@ -2293,10 +2371,10 @@ async function statusUploadConfigCore(caller: Caller, centreId: string, body: Re
   const st = tosChat.status;
   if (!st.enabled) throw httpError(403, 'Status is not turned on.');
   const kind = cleanStr(body.kind, 10);
-  if (kind !== 'photo' && kind !== 'video' && kind !== 'music') throw httpError(400, 'Which kind of update is this?');
+  if (kind === 'music') throw httpError(403, 'Music updates are no longer available.');
+  if (kind !== 'photo' && kind !== 'video') throw httpError(400, 'Which kind of update is this?');
   if (kind === 'photo' && !st.allowPhoto) throw httpError(403, 'Photo updates are turned off.');
   if (kind === 'video' && !st.allowVideo) throw httpError(403, 'Video updates are turned off.');
-  if (kind === 'music' && !st.allowMusic) throw httpError(403, 'Music updates are turned off.');
   const sizeBytes = Math.floor(Number(body.sizeBytes) || 0);
   if (sizeBytes <= 0) throw httpError(400, 'Choose the file first.');
   if (kind === 'photo' && sizeBytes > Math.max(10, tosChat.photoMaxKb) * 1024) {
@@ -2308,9 +2386,6 @@ async function statusUploadConfigCore(caller: Caller, centreId: string, body: Re
     if (dur <= 0 || dur > st.maxVideoSeconds) {
       throw httpError(400, `Videos can be up to ${st.maxVideoSeconds} seconds.`);
     }
-  }
-  if (kind === 'music' && sizeBytes > st.maxAudioMb * 1024 * 1024) {
-    throw httpError(413, `Music files can be up to ${st.maxAudioMb} MB.`);
   }
   const cloud = String(process.env.CLOUDINARY_CLOUD_NAME || '');
   const preset = String(process.env.CLOUDINARY_UPLOAD_PRESET || '');
@@ -2343,6 +2418,22 @@ async function verifyStatusMediaSize(kind: 'photo' | 'video' | 'music', url: str
   } catch (e: any) {
     if (e && typeof e.status === 'number') throw e; // our own limit error
     // A network hiccup reading the size must not block a legitimate post.
+  }
+}
+
+// Server-side size enforcement for chat attachments: the URL a message
+// points at is HEADed and checked against the centre's stored file cap.
+async function verifyChatFileSize(url: string, filesMaxMb: number): Promise<void> {
+  try {
+    const head = await fetch(url, { method: 'HEAD' });
+    const len = Number(head.headers.get('content-length') || 0);
+    if (!head.ok || !len) return;
+    if (len > filesMaxMb * 1024 * 1024) {
+      throw httpError(413, `Files can be up to ${filesMaxMb} MB.`);
+    }
+  } catch (e: any) {
+    if (e && typeof e.status === 'number') throw e; // our own limit error
+    // A network hiccup reading the size must not block a legitimate message.
   }
 }
 
@@ -2578,6 +2669,21 @@ async function staffStatusContext(caller: Caller, centreId: string) {
 
   // Photo upload for student posts. The centre's own photo settings decide
   // whether photos are allowed at all and how big one may be.
+  // Direct-upload details for chat attachments: the browser uploads to
+  // hosting itself (any file type) and the message route checks the URL.
+  app.get('/api/student/chat/upload-config', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      await studentChatBase(caller);
+      const cloud = String(process.env.CLOUDINARY_CLOUD_NAME || '');
+      const preset = String(process.env.CLOUDINARY_UPLOAD_PRESET || '');
+      if (!cloud || !preset) throw httpError(500, 'File hosting is not configured on this deployment.');
+      res.json({ ok: true, cloud, preset, folder: 'tos/chat' });
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] upload config failed');
+    }
+  });
+
   app.post('/api/student/chat/photo', async (req, res) => {
     try {
       const caller = getCaller(req);
@@ -2875,15 +2981,12 @@ async function staffStatusContext(caller: Caller, centreId: string) {
     try {
       const caller = getCaller(req);
       if (!caller.tos) throw httpError(403, 'Not allowed.');
-      const existing = await adminDb.collection('chatGroups').where('kind', '==', 'tos_channel').limit(1).get();
-      if (!existing.empty) {
-        return res.json({ ok: true, groupId: existing.docs[0].id, alreadyExists: true });
-      }
-      const tosChat = await getTosChat();
+      const name = cleanStr(String(req.body?.name ?? ''), 60);
+      if (!name) throw httpError(400, 'Name the channel first.');
       const now = new Date().toISOString();
       const ref = await adminDb.collection('chatGroups').add({
         centreId: null,
-        name: tosChat.mockPracticeChannelName,
+        name,
         kind: 'tos_channel',
         subject: null,
         access: { mode: 'centre_default', thresholdPercent: null },
@@ -2899,13 +3002,37 @@ async function staffStatusContext(caller: Caller, centreId: string) {
     }
   });
 
+  app.get('/api/tos/chat/channel/list', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      if (!caller.tos) throw httpError(403, 'Not allowed.');
+      const snap = await adminDb.collection('chatGroups').where('kind', '==', 'tos_channel').orderBy('createdAt', 'desc').limit(100).get();
+      const channels: Record<string, unknown>[] = [];
+      snap.forEach((d) => {
+        const v = d.data() as any;
+        channels.push({ id: d.id, name: cleanStr(v?.name, 60), createdAt: cleanStr(v?.createdAt, 40) });
+      });
+      res.json({ ok: true, channels });
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] channel list failed');
+    }
+  });
+
   app.get('/api/tos/chat/channel', async (req, res) => {
     try {
       const caller = getCaller(req);
       if (!caller.tos) throw httpError(403, 'Not allowed.');
-      const snap = await adminDb.collection('chatGroups').where('kind', '==', 'tos_channel').limit(1).get();
+      const wanted = cleanStr(String((req.query || {}).channelId || ''), 64);
+      let snap: { empty: boolean; docs: { id: string; data: () => unknown }[] };
+      if (wanted) {
+        const doc = await adminDb.collection('chatGroups').doc(wanted).get();
+        if (!doc.exists || (doc.data() as any)?.kind !== 'tos_channel') throw httpError(404, 'Channel not found.');
+        snap = { empty: false, docs: [doc as unknown as { id: string; data: () => unknown }] };
+      } else {
+        snap = await adminDb.collection('chatGroups').where('kind', '==', 'tos_channel').orderBy('createdAt', 'desc').limit(1).get() as unknown as { empty: boolean; docs: { id: string; data: () => unknown }[] };
+      }
       if (snap.empty) return res.json({ ok: true, channel: null, messages: [] });
-      const group = loadGroupFromDoc(snap.docs[0]);
+      const group = loadGroupFromDoc(snap.docs[0] as any);
       const tosChat = await getTosChat();
       const limit = clampInt(req.query.limit, 1, MAX_PAGE, MAX_PAGE);
       await pruneOld(group, tosChat.retentionDays);
@@ -2937,9 +3064,17 @@ async function staffStatusContext(caller: Caller, centreId: string) {
     try {
       const caller = getCaller(req);
       if (!caller.tos) throw httpError(403, 'Not allowed.');
-      const snap = await adminDb.collection('chatGroups').where('kind', '==', 'tos_channel').limit(1).get();
-      if (snap.empty) throw httpError(404, 'Create the channel first.');
-      const group = loadGroupFromDoc(snap.docs[0]);
+      const wantedId = cleanStr(String(req.body?.channelId ?? ''), 64);
+      let group;
+      if (wantedId) {
+        const doc = await adminDb.collection('chatGroups').doc(wantedId).get();
+        if (!doc.exists || (doc.data() as any)?.kind !== 'tos_channel') throw httpError(404, 'Channel not found.');
+        group = loadGroupFromDoc(doc);
+      } else {
+        const snap = await adminDb.collection('chatGroups').where('kind', '==', 'tos_channel').orderBy('createdAt', 'desc').limit(1).get();
+        if (snap.empty) throw httpError(404, 'Create the channel first.');
+        group = loadGroupFromDoc(snap.docs[0]);
+      }
       const tosChat = await getTosChat();
       const text = String(req.body?.text ?? '').replace(/\s+$/g, '');
       if (!text) throw httpError(400, 'Write a message first.');

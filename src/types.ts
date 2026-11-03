@@ -601,6 +601,8 @@ export interface CentreChatSettings {
   tutorsCanRemove: boolean;
   paused: boolean;
   muteDayOptions: number[];
+  /** Cap for generic chat attachments (video, PDF, anything a photo is not), stored in MB. */
+  filesMaxMb: number;
   updatedAt?: string | null;
 }
 

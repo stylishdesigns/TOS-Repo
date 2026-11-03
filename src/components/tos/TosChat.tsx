@@ -111,10 +111,14 @@ const ChannelTab: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
   const [actionMsg, setActionMsg] = useState<ChannelMessage | null>(null);
   const [replyTo, setReplyTo] = useState<ChannelMessage | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
+  const [channels, setChannels] = useState<{ id: string; name: string }[]>([]);
+  const [newName, setNewName] = useState('');
 
-  const load = useCallback(async () => {
+  const loadChannel = useCallback(async (channelId?: string) => {
     try {
-      const r: Json = await api('/api/tos/chat/channel');
+      const r: Json = channelId
+        ? await api(`/api/tos/chat/channel?channelId=${encodeURIComponent(channelId)}`)
+        : await api('/api/tos/chat/channel');
       if (r && r.ok) {
         lastChannelState = r as unknown as ChannelState;
         saveLastGood('tos:chat:state', lastChannelState);
@@ -126,6 +130,26 @@ const ChannelTab: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
       setLoading(false);
     }
   }, []);
+
+  const load = useCallback(async () => {
+    try {
+      const list: Json = await api('/api/tos/chat/channel/list');
+      const chans = list && (list as any).ok ? ((list as any).channels as { id: string; name: string }[]) : [];
+      setChannels(chans);
+      const cachedId = lastChannelState?.channel?.id;
+      const wanted = (cachedId && chans.some((c) => c.id === cachedId)) ? cachedId : (chans[0]?.id || '');
+      if (wanted) await loadChannel(wanted);
+      else { lastChannelState = null; saveLastGood('tos:chat:state', null); setState({ channel: null, messages: [] }); }
+    } catch (e: any) {
+      setError(e?.message || 'Could not load the channels.');
+    } finally {
+      setLoading(false);
+    }
+  }, [loadChannel]);
+
+  const selectChannel = async (channelId: string) => {
+    await loadChannel(channelId);
+  };
 
   useEffect(() => { load(); }, [load]);
 
@@ -142,8 +166,10 @@ const ChannelTab: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
     setBusy(true);
     setError('');
     try {
-      const r: Json = await api('/api/tos/chat/channel/create', { method: 'POST' });
-      if (r && r.ok) { await load(); onChanged(); }
+      const name = newName.trim();
+      if (!name) { setError('Type a channel name first.'); return; }
+      const r: Json = await api('/api/tos/chat/channel/create', { method: 'POST', body: { name } });
+      if (r && r.ok) { setNewName(''); await load(); onChanged(); }
       else setError((r && (r as any).error) || 'Could not create the channel.');
     } catch (e: any) {
       setError(e?.message || 'Could not create the channel.');
@@ -156,7 +182,7 @@ const ChannelTab: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
     setPosting(true);
     setError('');
     try {
-      const r: Json = await api('/api/tos/chat/channel/messages', { method: 'POST', body: { text, replyTo: replyTo ? replyTo.id : undefined } });
+      const r: Json = await api('/api/tos/chat/channel/messages', { method: 'POST', body: { text, channelId: state?.channel?.id, replyTo: replyTo ? replyTo.id : undefined } });
       if (r && r.ok) { setDraft(''); setReplyTo(null); await load(); }
       else setError((r && (r as any).error) || 'Could not post.');
     } catch (e: any) {
@@ -216,12 +242,15 @@ const ChannelTab: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
       <Card>
         <div className="flex items-start gap-3">
           <div className="w-9 h-9 rounded-xl bg-orange-500/15 flex items-center justify-center shrink-0"><Megaphone className="w-4.5 h-4.5 text-orange-300" /></div>
-          <div className="min-w-0">
-            <p className="text-sm font-bold text-slate-100">The platform channel is not created yet</p>
-            <p className="text-xs text-slate-400 mt-1">The channel reaches every centre's students and admins. Students see it read-only, and only TOS and centre admins can post in it. Create it once here.</p>
-            <button onClick={createChannel} disabled={busy} className="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-50">
-              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Create the channel
-            </button>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-bold text-slate-100">No channels yet</p>
+            <p className="text-xs text-slate-400 mt-1">Channels reach every centre's students and admins. Students read only. Create as many as you need, each with its own name.</p>
+            <div className="mt-3 flex gap-2">
+              <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Channel name, e.g. Mock and Practice" className="flex-1 min-w-0 bg-slate-950/60 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:border-orange-400/60 focus:outline-none" />
+              <button onClick={createChannel} disabled={busy} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-50 shrink-0">
+                {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Create
+              </button>
+            </div>
             {error && <p className="mt-2 text-xs text-red-300">{error}</p>}
           </div>
         </div>
@@ -232,12 +261,30 @@ const ChannelTab: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
   return (
     <div className="space-y-4">
       <Card>
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div>
+        <div className="space-y-2.5">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
             <p className="text-sm font-bold text-slate-100">{state.channel.name}</p>
-            <p className="text-xs text-slate-400">Platform channel, visible to every centre. Students read only.</p>
+            <button onClick={load} className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold text-slate-300 border border-white/10 hover:border-white/25"><RefreshCw className="w-3.5 h-3.5" /> Refresh</button>
           </div>
-          <button onClick={load} className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold text-slate-300 border border-white/10 hover:border-white/25"><RefreshCw className="w-3.5 h-3.5" /> Refresh</button>
+          <p className="text-xs text-slate-400">Channels are visible to every centre; students read only.</p>
+          {channels.length > 0 && (
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {channels.map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => selectChannel(c.id)}
+                  className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-bold border ${state.channel && state.channel.id === c.id ? 'bg-orange-500 text-white border-orange-500' : 'text-slate-300 border-white/10 hover:border-white/25'}`}
+                >{c.name}</button>
+              ))}
+            </div>
+          )}
+          <div className="flex gap-2">
+            <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="New channel name" className="flex-1 min-w-0 bg-slate-950/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder:text-slate-500 focus:border-orange-400/60 focus:outline-none" />
+            <button onClick={createChannel} disabled={busy || !newName.trim()} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-orange-500 text-white disabled:opacity-50 shrink-0">
+              {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />} Add channel
+            </button>
+          </div>
+          {error && <p className="text-xs text-red-300">{error}</p>}
         </div>
       </Card>
       <Card>
