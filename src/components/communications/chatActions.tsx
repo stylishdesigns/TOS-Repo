@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Copy, Forward, Reply, Star, Trash2, X } from 'lucide-react';
+import { Copy, Flag, Forward, Reply, Star, Trash2, X } from 'lucide-react';
 
 // ============================================================================
 // Shared message actions for CH1 chat (Step 8b). Long-press any message to get
@@ -202,6 +202,7 @@ export function MessageActionSheet({
   onDelete,
   onCopy,
   onForward,
+  onReport,
   starred,
   busy,
 }: {
@@ -213,6 +214,7 @@ export function MessageActionSheet({
   onDelete?: () => void;
   onCopy?: () => void;
   onForward?: () => void;
+  onReport?: () => void;
   starred?: boolean;
   busy?: boolean;
 }) {
@@ -234,6 +236,7 @@ export function MessageActionSheet({
   if (onDelete) acts.push({ icon: <Trash2 className="h-5 w-5" />, label: 'Delete', run: onDelete });
   if (onCopy) acts.push({ icon: <Copy className="h-5 w-5" />, label: 'Copy', run: onCopy });
   if (onForward) acts.push({ icon: <Forward className="h-5 w-5" />, label: 'Forward', run: onForward });
+  if (onReport) acts.push({ icon: <Flag className="h-5 w-5" />, label: 'Flag', run: onReport });
   return (
     <div className="fixed inset-0 z-50 flex items-end" onClick={onClose}>
       <div className="absolute inset-0 bg-black/40" />

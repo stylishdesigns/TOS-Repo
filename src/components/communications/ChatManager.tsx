@@ -894,6 +894,9 @@ const ThreadPanel: React.FC<{
   const [loadErr, setLoadErr] = useState('');
   const [actionMsg, setActionMsg] = useState<ThreadMsg | null>(null);
   const [replyTo, setReplyTo] = useState<ThreadMsg | null>(null);
+  const [flagTarget, setFlagTarget] = useState<ThreadMsg | null>(null);
+  const [flagReason, setFlagReason] = useState('');
+  const [sendingFlag, setSendingFlag] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -1145,7 +1148,62 @@ const ThreadPanel: React.FC<{
           onReply={() => setReplyTo(actionMsg)}
           onDelete={() => doDelete(actionMsg)}
           onCopy={actionMsg.text ? () => doCopy(actionMsg) : undefined}
+          onReport={!actionMsg.removed && !actionMsg.mine ? () => setFlagTarget(actionMsg) : undefined}
         />
+      )}
+
+      {flagTarget && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-end justify-center" onClick={() => { if (!sendingFlag) setFlagTarget(null); }}>
+          <div className="w-full max-w-lg bg-white rounded-t-3xl p-5 space-y-3" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-rose-600">
+                <Flag className="w-4 h-4" />
+                <span className="text-sm font-black">Flag message</span>
+              </div>
+              <button onClick={() => setFlagTarget(null)} className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500" aria-label="Close">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="bg-slate-50 rounded-2xl p-3">
+              <p className="text-[10px] font-black text-slate-500">{flagTarget.username}</p>
+              <p className="text-xs text-slate-700 font-medium line-clamp-3">{flagTarget.text}</p>
+            </div>
+            <textarea
+              value={flagReason}
+              onChange={(e) => setFlagReason(e.target.value)}
+              rows={3}
+              maxLength={500}
+              placeholder="Why are you flagging this message? (optional)"
+              className="w-full px-4 py-3 rounded-2xl bg-white border border-slate-200 text-sm font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-rose-300 resize-none"
+            />
+            <div className="flex gap-2">
+              <button onClick={() => setFlagTarget(null)} className="flex-1 py-3 rounded-2xl bg-slate-100 text-slate-600 text-sm font-black active:scale-[0.99] transition">Cancel</button>
+              <button
+                onClick={async () => {
+                  if (sendingFlag) return;
+                  setSendingFlag(true);
+                  try {
+                    await api(`/api/centre/chat/groups/${group.id}/report?centreId=${encodeURIComponent(centreId)}`, {
+                      method: 'POST',
+                      body: { messageId: flagTarget.id, reason: flagReason },
+                    });
+                    setFlagTarget(null);
+                    setFlagReason('');
+                    addToast('Flagged. It is now in your Reports list.');
+                  } catch (e: any) {
+                    addToast(String(e?.message || 'The flag could not be sent. Try again.'));
+                  } finally {
+                    setSendingFlag(false);
+                  }
+                }}
+                disabled={sendingFlag}
+                className="flex-1 py-3 rounded-2xl bg-rose-600 text-white text-sm font-black active:scale-[0.99] transition disabled:opacity-60 flex items-center justify-center gap-2"
+              >
+                {sendingFlag && <Loader2 className="w-4 h-4 animate-spin" />} Send flag
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

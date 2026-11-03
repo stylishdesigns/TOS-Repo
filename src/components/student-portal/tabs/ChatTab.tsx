@@ -4,12 +4,13 @@ import {
   BookOpen,
   ChevronLeft,
   ExternalLink,
-  Flag,
+  Image as ImageIcon,
   Info,
   Loader2,
   Lock,
   Megaphone,
   MessageSquare,
+  Play,
   Plus,
   Send,
   Settings2,
@@ -77,9 +78,20 @@ interface ChatMessage {
   at: number;
   removed: boolean;
   mine: boolean;
+  commentCount?: number;
   forwardedFrom?: string | null;
   replyTo?: { id: string; username: string; excerpt: string } | null;
   reactions?: Record<string, string> | null;
+}
+
+interface ChatComment {
+  id: string;
+  uid: string;
+  name: string;
+  role: string;
+  text: string;
+  at: number;
+  mine: boolean;
 }
 
 interface StarredItem {
@@ -380,12 +392,12 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
 
 
       {view !== 'channels' && (
-        <div className="flex gap-2" aria-label="Chats filter">
+        <div className="flex gap-2 w-full" aria-label="Chats filter">
           <button
             type="button"
             aria-pressed={chatFilter === 'personal'}
             onClick={() => setChatFilter('personal')}
-            className={`px-4 py-2 rounded-full text-xs font-black shadow-sm transition ${chatFilter === 'personal' ? 'bg-[#EA580C] text-white' : 'bg-white border border-slate-200 text-slate-500'}`}
+            className={`flex-1 py-2 rounded-full text-xs font-black shadow-sm transition ${chatFilter === 'personal' ? 'bg-[#EA580C] text-white' : 'bg-white border border-slate-200 text-slate-500'}`}
           >
             Personal
           </button>
@@ -393,7 +405,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
             type="button"
             aria-pressed={chatFilter === 'groups'}
             onClick={() => setChatFilter('groups')}
-            className={`px-4 py-2 rounded-full text-xs font-black shadow-sm transition ${chatFilter === 'groups' ? 'bg-[#EA580C] text-white' : 'bg-white border border-slate-200 text-slate-500'}`}
+            className={`flex-1 py-2 rounded-full text-xs font-black shadow-sm transition ${chatFilter === 'groups' ? 'bg-[#EA580C] text-white' : 'bg-white border border-slate-200 text-slate-500'}`}
           >
             Groups
           </button>
@@ -401,7 +413,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
             type="button"
             aria-pressed={chatFilter === 'channels'}
             onClick={() => setChatFilter('channels')}
-            className={`px-4 py-2 rounded-full text-xs font-black shadow-sm transition ${chatFilter === 'channels' ? 'bg-[#EA580C] text-white' : 'bg-white border border-slate-200 text-slate-500'}`}
+            className={`flex-1 py-2 rounded-full text-xs font-black shadow-sm transition ${chatFilter === 'channels' ? 'bg-[#EA580C] text-white' : 'bg-white border border-slate-200 text-slate-500'}`}
           >
             Channels
           </button>
@@ -622,15 +634,19 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
   const [error, setError] = useState('');
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
-  const [reportTarget, setReportTarget] = useState<ChatMessage | null>(null);
-  const [reportReason, setReportReason] = useState('');
-  const [sendingReport, setSendingReport] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
   const [attaching, setAttaching] = useState(false);
-  const [attachPreview, setAttachPreview] = useState('');
   const [attachFile, setAttachFile] = useState<File | null>(null);
   const [attachProgress, setAttachProgress] = useState(0);
-  const fileRef = useRef<HTMLInputElement | null>(null);
+  const [attachSheet, setAttachSheet] = useState(false);
+  const photoRef = useRef<HTMLInputElement | null>(null);
+  const videoRef = useRef<HTMLInputElement | null>(null);
+  const docRef = useRef<HTMLInputElement | null>(null);
+  const [videoUrl, setVideoUrl] = useState('');
+  const [commentsFor, setCommentsFor] = useState<ChatMessage | null>(null);
+  const [comments, setComments] = useState<ChatComment[] | null>(null);
+  const [commentText, setCommentText] = useState('');
+  const [postingComment, setPostingComment] = useState(false);
   const [toast, setToast] = useState('');
   const [actionMsg, setActionMsg] = useState<ChatMessage | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
@@ -742,34 +758,6 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
 
   // A photo is compressed on the device first, then hosted when the message
   // goes out. The centre's own photo setting decides the size cap.
-  const onPhotoPicked = useCallback((file: File | null | undefined) => {
-    if (!file) return;
-    if (!/^image\//.test(file.type || '')) { showToast('Only photos can be attached here.'); return; }
-    if (file.size > 12 * 1024 * 1024) { showToast('That photo is too large. Choose a smaller one.'); return; }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const img = new Image();
-      img.onload = () => {
-        const max = 1400;
-        const scale = Math.min(1, max / Math.max(img.width || 1, img.height || 1));
-        const w = Math.max(1, Math.round((img.width || max) * scale));
-        const h = Math.max(1, Math.round((img.height || max) * scale));
-        const canvas = document.createElement('canvas');
-        canvas.width = w; canvas.height = h;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) { showToast('That photo could not be read. Try another.'); return; }
-        ctx.drawImage(img, 0, 0, w, h);
-        let out = canvas.toDataURL('image/jpeg', 0.82);
-        let q = 0.82;
-        while (out.length * 0.75 > 900 * 1024 && q > 0.35) { q -= 0.15; out = canvas.toDataURL('image/jpeg', q); }
-        setAttachPreview(out);
-      };
-      img.onerror = () => showToast('That photo could not be read. Try another.');
-      img.src = String(reader.result || '');
-    };
-    reader.readAsDataURL(file);
-  }, [showToast]);
-
   // Any other file (video, PDF, audio, anything): it is handed to the host
   // directly from the browser and travels with the message as a URL plus its
   // name, kind and size, which the server re-checks before the message lands.
@@ -783,11 +771,6 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
 
   const onFileChosen = useCallback((file: File | null | undefined) => {
     if (!file) return;
-    if (/^image\//.test(file.type || '')) {
-      if (resp && resp.photosAllowed === false) { showToast('Photos are turned off in your centre.'); return; }
-      onPhotoPicked(file);
-      return;
-    }
     const cap = resp?.filesMaxMb || 0;
     if (cap && file.size > cap * 1024 * 1024) {
       showToast(`Files can be up to ${cap} MB.`);
@@ -795,7 +778,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
     }
     if (file.size > 200 * 1024 * 1024) { showToast('That file is too large. Choose a smaller one.'); return; }
     setAttachFile(file);
-  }, [resp, showToast, onPhotoPicked]);
+  }, [resp, showToast]);
 
   const uploadChatFile = useCallback(async (file: File): Promise<string> => {
     const cfg = await api('/api/student/chat/upload-config');
@@ -838,15 +821,9 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
 
   const send = useCallback(async () => {
     const t = text.trim();
-    if ((!t && !attachPreview && !attachFile) || sending) return;
+    if ((!t && !attachFile) || sending) return;
     setSending(true);
     try {
-      let photoUrl: string | undefined;
-      if (attachPreview) {
-        const res = await api('/api/student/chat/photo', { method: 'POST', body: { dataUrl: attachPreview } });
-        photoUrl = String(res?.url || '');
-        if (!photoUrl) throw new Error('The photo could not be uploaded. Try again.');
-      }
       let fileUrl: string | undefined;
       if (attachFile) {
         fileUrl = await uploadChatFile(attachFile);
@@ -855,7 +832,6 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
         method: 'POST',
         body: {
           text: t,
-          photoUrl,
           fileUrl,
           fileName: attachFile ? attachFile.name : undefined,
           fileSize: attachFile ? attachFile.size : undefined,
@@ -864,7 +840,6 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
         },
       });
       setText('');
-      setAttachPreview('');
       setAttachFile(null);
       setAttachProgress(0);
       setReplyTo(null);
@@ -876,7 +851,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
       setAttachProgress(0);
       setSending(false);
     }
-  }, [groupId, text, sending, replyTo, attachPreview, attachFile, loadLatest, scrollToBottom, showToast]);
+  }, [groupId, text, sending, replyTo, attachFile, loadLatest, scrollToBottom, showToast]);
 
   const myUid = messages.find((m) => m.mine)?.uid || '';
 
@@ -960,23 +935,35 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
     }
   }, [groupId, loadLatest, showToast]);
 
-  const submitReport = useCallback(async () => {
-    if (!reportTarget || sendingReport) return;
-    setSendingReport(true);
+  const openComments = useCallback(async (m: ChatMessage) => {
+    setCommentsFor(m);
+    setComments(null);
+    setCommentText('');
     try {
-      await api(`/api/student/chat/groups/${groupId}/report`, {
-        method: 'POST',
-        body: { messageId: reportTarget.id, reason: reportReason },
-      });
-      setReportTarget(null);
-      setReportReason('');
-      showToast('Report sent. Your centre will review it privately.');
+      const d = await api(`/api/student/chat/channel-comments?groupId=${groupId}&messageId=${m.id}`);
+      setComments((d.comments || []) as ChatComment[]);
     } catch (e: any) {
-      showToast(String(e?.message || 'Your report could not be sent. Try again.'));
-    } finally {
-      setSendingReport(false);
+      showToast(String(e?.message || 'Comments could not load.'));
+      setComments([]);
     }
-  }, [groupId, reportTarget, reportReason, sendingReport, showToast]);
+  }, [groupId, showToast]);
+
+  const postComment = useCallback(async () => {
+    if (!commentsFor || postingComment) return;
+    const t = commentText.trim();
+    if (!t) return;
+    setPostingComment(true);
+    try {
+      await api('/api/student/chat/channel-comments', { method: 'POST', body: { groupId, messageId: commentsFor.id, text: t } });
+      const d = await api(`/api/student/chat/channel-comments?groupId=${groupId}&messageId=${commentsFor.id}`);
+      setComments((d.comments || []) as ChatComment[]);
+      setCommentText('');
+    } catch (e: any) {
+      showToast(String(e?.message || 'Your comment could not be sent. Try again.'));
+    } finally {
+      setPostingComment(false);
+    }
+  }, [commentsFor, commentText, postingComment, groupId, showToast]);
 
   if (loading) {
     return (
@@ -1057,12 +1044,11 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
       <div key={m.id} className={`flex flex-col ${m.mine ? 'items-end' : 'items-start'} px-1`}>
         <div
           {...press}
-          onClick={() => { if (!m.mine && !m.removed) setReportTarget(m); }}
           className={`max-w-[82%] select-none rounded-2xl px-3.5 py-2.5 ${
             m.mine && !emojiOnly
               ? 'bg-[#EA580C] text-white rounded-br-md'
               : 'bg-white text-slate-800 border border-slate-200/90 rounded-bl-md shadow-sm'
-          } ${!m.mine && !m.removed ? 'cursor-pointer active:scale-[0.99] transition' : 'cursor-pointer'}`}
+          }`}
         >
           {m.forwardedFrom && (
             <p className={`text-[9px] font-bold italic mb-0.5 ${m.mine ? 'text-orange-100' : 'text-slate-400'}`}>
@@ -1098,8 +1084,19 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
           ) : m.photoUrl ? (
             <img src={m.photoUrl} alt="Shared photo" className="rounded-xl max-h-60 w-auto" />
           ) : null}
-          {!m.removed && m.fileUrl && (m.fileKind === 'video' ? (
-            <video src={m.fileUrl} controls preload="metadata" className="rounded-xl max-h-60 w-auto" />
+          {!m.removed && m.fileUrl && (m.fileKind === 'image' ? (
+            <img src={m.fileUrl} alt="Shared photo" className="rounded-xl max-h-60 w-auto" />
+          ) : m.fileKind === 'video' ? (
+            <button
+              onClick={() => setVideoUrl(m.fileUrl as string)}
+              className="relative rounded-xl overflow-hidden w-44 h-44 bg-slate-900 flex items-center justify-center"
+              aria-label="Play video"
+            >
+              <span className="w-12 h-12 rounded-full bg-white/20 border border-white/30 flex items-center justify-center">
+                <Play className="w-5 h-5 text-white ml-0.5" fill="currentColor" />
+              </span>
+              <span className="absolute bottom-1.5 right-2 text-[9px] font-bold text-white/70">{m.fileSize ? fmtSize(m.fileSize) : 'Video'}</span>
+            </button>
           ) : (
             <a href={m.fileUrl} target="_blank" rel="noreferrer" className="flex items-center gap-2.5 rounded-xl px-3 py-2 max-w-[250px] bg-white/10 border border-white/20">
               <span className="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center shrink-0 text-white font-black text-[10px] uppercase">{(m.fileName || 'file').split('.').pop()?.slice(0, 4)}</span>
@@ -1118,6 +1115,16 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
           <div className="max-w-[82%]">
             <ReactionChips reactions={m.reactions} mineUid={myUid} onToggle={(emoji) => doReact(m, emoji)} />
           </div>
+        )}
+        {!m.removed && resp?.kind === 'tos_channel' && resp.commentsEnabled === true && (
+          <button
+            onClick={() => openComments(m)}
+            className="mt-1 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-orange-50 border border-orange-100 text-[10px] font-black text-[#C2410C] active:scale-95 transition"
+            aria-label="Comments"
+          >
+            <MessageSquare className="w-3 h-3" />
+            {typeof m.commentCount === 'number' ? `Comments (${m.commentCount})` : 'Comments'}
+          </button>
         )}
       </div>
     );
@@ -1181,15 +1188,6 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
       </div>
 
       <div className="relative shrink-0 bg-white border-t border-slate-200 px-3 sm:px-4 pt-2 pb-2">
-        {attachPreview && (
-          <div className="flex items-center gap-2 mb-2 rounded-xl bg-slate-50 border border-slate-200 px-2 py-1.5">
-            <img src={attachPreview} alt="Photo to send" className="w-10 h-10 rounded-lg object-cover" />
-            <p className="text-[11px] font-bold text-slate-600 flex-1">Photo ready to send</p>
-            <button onClick={() => setAttachPreview('')} className="rounded-full p-1 text-slate-400 hover:bg-slate-100" aria-label="Remove photo">
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        )}
         {attachFile && (
           <div className="flex items-center gap-2 mb-2 rounded-xl bg-slate-50 border border-slate-200 px-2 py-1.5">
             <span className="w-10 h-10 rounded-lg bg-slate-200 text-slate-500 flex items-center justify-center text-[10px] font-black uppercase shrink-0">{attachFile.name.split('.').pop()?.slice(0, 4)}</span>
@@ -1218,14 +1216,11 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
                 </button>
               </div>
             )}
-            <input
-              ref={fileRef}
-              type="file"
-              className="hidden"
-              onChange={(e) => { onFileChosen(e.target.files && e.target.files[0]); e.target.value = ''; }}
-            />
+            <input ref={photoRef} type="file" accept="image/*" className="hidden" onChange={(e) => { setAttachSheet(false); onFileChosen(e.target.files && e.target.files[0]); e.target.value = ''; }} />
+            <input ref={videoRef} type="file" accept="video/*" className="hidden" onChange={(e) => { setAttachSheet(false); onFileChosen(e.target.files && e.target.files[0]); e.target.value = ''; }} />
+            <input ref={docRef} type="file" className="hidden" onChange={(e) => { setAttachSheet(false); onFileChosen(e.target.files && e.target.files[0]); e.target.value = ''; }} />
             <button
-              onClick={() => fileRef.current?.click()}
+              onClick={() => setAttachSheet(true)}
               className="w-11 h-11 rounded-2xl bg-slate-100 border border-slate-200 text-slate-600 flex items-center justify-center active:scale-95 transition shrink-0"
               aria-label="Attach a file"
             >
@@ -1266,7 +1261,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
           onStar={() => doStar(actionMsg)}
           onDelete={actionMsg.mine && !actionMsg.removed ? () => doDelete(actionMsg) : undefined}
           onCopy={actionMsg.text ? () => doCopy(actionMsg) : undefined}
-          onForward={canPost && !actionMsg.removed && postableGroups.length > 0 ? () => setForwardMsg(actionMsg) : undefined}
+          onForward={!actionMsg.removed && postableGroups.length > 0 ? () => setForwardMsg(actionMsg) : undefined}
         />
       )}
 
@@ -1299,50 +1294,6 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
         </div>
       )}
 
-      {reportTarget && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-end justify-center" onClick={() => { if (!sendingReport) setReportTarget(null); }}>
-          <div className="w-full max-w-lg bg-white rounded-t-3xl p-5 space-y-3" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-rose-600">
-                <Flag className="w-4 h-4" />
-                <span className="text-sm font-black">Report message</span>
-              </div>
-              <button onClick={() => setReportTarget(null)} className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500" aria-label="Close">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="bg-slate-50 rounded-2xl p-3">
-              <p className="text-[10px] font-black text-slate-500">{reportTarget.username}</p>
-              <p className="text-xs text-slate-700 font-medium line-clamp-3">{reportTarget.text}</p>
-            </div>
-            <textarea
-              value={reportReason}
-              onChange={(e) => setReportReason(e.target.value)}
-              rows={3}
-              maxLength={500}
-              placeholder="What is wrong with this message? (optional)"
-              className="w-full px-4 py-3 rounded-2xl bg-white border border-slate-200 text-sm font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-rose-300 resize-none"
-            />
-            <div className="flex gap-2">
-              <button
-                onClick={() => setReportTarget(null)}
-                className="flex-1 py-3 rounded-2xl bg-slate-100 text-slate-600 text-sm font-black active:scale-[0.99] transition"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={submitReport}
-                disabled={sendingReport}
-                className="flex-1 py-3 rounded-2xl bg-rose-600 text-white text-sm font-black active:scale-[0.99] transition disabled:opacity-60 flex items-center justify-center gap-2"
-              >
-                {sendingReport && <Loader2 className="w-4 h-4 animate-spin" />} Send report
-              </button>
-            </div>
-            <p className="text-[10px] text-slate-400 text-center font-medium">Reports go privately to your centre. The person you report is never told who reported them.</p>
-          </div>
-        </div>
-      )}
-
       {showInfo && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-end justify-center" onClick={() => setShowInfo(false)}>
           <div className="w-full max-w-lg bg-white rounded-t-3xl p-5 space-y-3" onClick={(e) => e.stopPropagation()}>
@@ -1371,6 +1322,85 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
                 <p>• A score starts counting from {group.minAnswers} answered questions in the last 7 days.</p>
               )}
               <p>• Your centre can remove messages and mute accounts that break the house rules.</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {attachSheet && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-end justify-center" onClick={() => setAttachSheet(false)}>
+          <div className="w-full max-w-lg bg-white rounded-t-3xl p-5 space-y-2" onClick={(e) => e.stopPropagation()}>
+            <p className="text-sm font-black text-slate-900 mb-1">Attach</p>
+            <button onClick={() => photoRef.current?.click()} className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-left active:scale-[0.99] transition">
+              <span className="w-9 h-9 rounded-xl bg-orange-50 flex items-center justify-center text-[#C2410C]"><ImageIcon className="w-4 h-4" /></span>
+              <span className="text-sm font-bold text-slate-800">Photo</span>
+            </button>
+            <button onClick={() => videoRef.current?.click()} className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-left active:scale-[0.99] transition">
+              <span className="w-9 h-9 rounded-xl bg-orange-50 flex items-center justify-center text-[#C2410C]"><Play className="w-4 h-4" /></span>
+              <span className="text-sm font-bold text-slate-800">Video</span>
+            </button>
+            <button onClick={() => docRef.current?.click()} className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-left active:scale-[0.99] transition">
+              <span className="w-9 h-9 rounded-xl bg-orange-50 flex items-center justify-center text-[#C2410C]"><Plus className="w-4 h-4" /></span>
+              <span className="text-sm font-bold text-slate-800">Document</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {videoUrl && (
+        <div className="fixed inset-0 z-[60] bg-black flex flex-col">
+          <button onClick={() => setVideoUrl('')} className="absolute top-3 left-3 z-10 w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center text-white active:scale-95 transition" aria-label="Back">
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <video src={videoUrl} controls autoPlay playsInline className="flex-1 w-full object-contain" />
+        </div>
+      )}
+
+      {commentsFor && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-end justify-center" onClick={() => setCommentsFor(null)}>
+          <div className="w-full max-w-lg bg-white rounded-t-3xl flex flex-col max-h-[80vh]" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 pt-4 pb-2">
+              <p className="text-sm font-black text-slate-900">Comments</p>
+              <button onClick={() => setCommentsFor(null)} className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500" aria-label="Close">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="flex-1 min-h-0 overflow-y-auto px-5 py-2 space-y-3">
+              {comments === null && (
+                <div className="flex items-center justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-[#EA580C]" /></div>
+              )}
+              {comments !== null && comments.length === 0 && (
+                <p className="text-xs text-slate-400 font-medium py-4 text-center">No comments yet. Be the first.</p>
+              )}
+              {comments !== null && comments.map((c) => (
+                <div key={c.id} className="flex items-start gap-2">
+                  <span className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full shrink-0 mt-0.5 ${c.role === 'tutor' ? 'bg-amber-100 text-amber-700' : c.role === 'centre_admin' ? 'bg-sky-100 text-sky-700' : 'bg-slate-100 text-slate-500'}`}>
+                    {c.role === 'tutor' ? 'Tutor' : c.role === 'centre_admin' ? 'Admin' : c.role === 'tos' ? 'TOS' : c.mine ? 'You' : ''}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10px] font-black text-slate-500">{c.name}</p>
+                    <p className="text-xs text-slate-800 font-medium whitespace-pre-wrap break-words">{c.text}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="px-4 pb-4 pt-2 flex items-end gap-2">
+              <input
+                value={commentText}
+                onChange={(e) => setCommentText(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); postComment(); } }}
+                placeholder="Join the conversation"
+                maxLength={500}
+                className="flex-1 px-4 py-3 rounded-2xl bg-white border border-slate-200 text-sm font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-orange-300"
+              />
+              <button
+                onClick={postComment}
+                disabled={!commentText.trim() || postingComment}
+                className="w-11 h-11 rounded-2xl bg-[#EA580C] text-white flex items-center justify-center active:scale-95 transition disabled:opacity-50 shrink-0"
+                aria-label="Send comment"
+              >
+                {postingComment ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              </button>
             </div>
           </div>
         </div>

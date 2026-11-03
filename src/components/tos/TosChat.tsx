@@ -111,8 +111,12 @@ const ChannelTab: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
   const [actionMsg, setActionMsg] = useState<ChannelMessage | null>(null);
   const [replyTo, setReplyTo] = useState<ChannelMessage | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
-  const [channels, setChannels] = useState<{ id: string; name: string }[]>([]);
+  const [channels, setChannels] = useState<{ id: string; name: string; commentsEnabled?: boolean }[]>([]);
   const [newName, setNewName] = useState('');
+  const [createComments, setCreateComments] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editComments, setEditComments] = useState(false);
+  const [savingChannel, setSavingChannel] = useState(false);
 
   const loadChannel = useCallback(async (channelId?: string) => {
     try {
@@ -134,7 +138,7 @@ const ChannelTab: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
   const load = useCallback(async () => {
     try {
       const list: Json = await api('/api/tos/chat/channel/list');
-      const chans = list && (list as any).ok ? ((list as any).channels as { id: string; name: string }[]) : [];
+      const chans = list && (list as any).ok ? ((list as any).channels as { id: string; name: string; commentsEnabled?: boolean }[]) : [];
       setChannels(chans);
       const cachedId = lastChannelState?.channel?.id;
       const wanted = (cachedId && chans.some((c) => c.id === cachedId)) ? cachedId : (chans[0]?.id || '');
@@ -149,6 +153,29 @@ const ChannelTab: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
 
   const selectChannel = async (channelId: string) => {
     await loadChannel(channelId);
+  };
+
+  // Keep the edit form in step with whichever channel is open.
+  useEffect(() => {
+    const ch = (state?.channel as any) || null;
+    setEditName(ch ? String(ch.name || '') : '');
+    setEditComments(ch ? ch.commentsEnabled === true : false);
+  }, [state?.channel?.id, (state?.channel as any)?.commentsEnabled]);
+
+  const saveChannel = async () => {
+    const id = state?.channel?.id;
+    if (!id || savingChannel) return;
+    const name = editName.trim();
+    if (!name) { setError('Name the channel first.'); return; }
+    setSavingChannel(true);
+    setError('');
+    try {
+      const r: Json = await api('/api/tos/chat/channel/update', { method: 'POST', body: { channelId: id, name, commentsEnabled: editComments } });
+      if (r && r.ok) { await load(); onChanged(); }
+      else setError((r && (r as any).error) || 'Could not save the channel.');
+    } catch (e: any) {
+      setError(e?.message || 'Could not save the channel.');
+    } finally { setSavingChannel(false); }
   };
 
   useEffect(() => { load(); }, [load]);
@@ -168,8 +195,8 @@ const ChannelTab: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
     try {
       const name = newName.trim();
       if (!name) { setError('Type a channel name first.'); return; }
-      const r: Json = await api('/api/tos/chat/channel/create', { method: 'POST', body: { name } });
-      if (r && r.ok) { setNewName(''); await load(); onChanged(); }
+      const r: Json = await api('/api/tos/chat/channel/create', { method: 'POST', body: { name, commentsEnabled: createComments } });
+      if (r && r.ok) { setNewName(''); setCreateComments(false); await load(); onChanged(); }
       else setError((r && (r as any).error) || 'Could not create the channel.');
     } catch (e: any) {
       setError(e?.message || 'Could not create the channel.');
@@ -283,6 +310,24 @@ const ChannelTab: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
             <button onClick={createChannel} disabled={busy || !newName.trim()} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-orange-500 text-white disabled:opacity-50 shrink-0">
               {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />} Add channel
             </button>
+          </div>
+          <label className="flex items-center gap-2 text-xs text-slate-300 font-medium cursor-pointer select-none w-fit">
+            <input type="checkbox" checked={createComments} onChange={(e) => setCreateComments(e.target.checked)} className="accent-orange-500 w-4 h-4" />
+            Allow comments (students can reply to posts in this channel)
+          </label>
+
+          <div className="rounded-xl border border-white/10 bg-slate-950/40 p-3 space-y-2">
+            <p className="text-xs font-bold text-slate-200">Edit this channel</p>
+            <div className="flex gap-2">
+              <input value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="Channel name" className="flex-1 min-w-0 bg-slate-950/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder:text-slate-500 focus:border-orange-400/60 focus:outline-none" />
+              <button onClick={saveChannel} disabled={savingChannel} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-orange-500 text-white disabled:opacity-50 shrink-0">
+                {savingChannel ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null} Save
+              </button>
+            </div>
+            <label className="flex items-center gap-2 text-xs text-slate-300 font-medium cursor-pointer select-none w-fit">
+              <input type="checkbox" checked={editComments} onChange={(e) => setEditComments(e.target.checked)} className="accent-orange-500 w-4 h-4" />
+              Allow comments on posts
+            </label>
           </div>
           {error && <p className="text-xs text-red-300">{error}</p>}
         </div>

@@ -81,6 +81,7 @@ const START_CENTRE_CHAT: CentreChatSettings = {
 interface GroupDoc {
   id: string;
   centreId: string | null;
+  commentsEnabled?: boolean;
   name: string;
   kind: 'subject' | 'announcements' | 'custom' | 'tos_channel' | 'personal';
   subject: string | null;
@@ -218,6 +219,7 @@ async function loadGroup(groupId: string): Promise<GroupDoc> {
     kind: d.kind,
     subject: d.subject ? cleanStr(d.subject, MAX_SUBJECT_CHARS) : null,
     access: d.access && typeof d.access === 'object' ? d.access : { mode: 'centre_default' },
+    commentsEnabled: d.commentsEnabled === true,
     createdBy: cleanStr(d.createdBy, 64),
     createdByRole: cleanStr(d.createdByRole, 20),
     createdAt: cleanStr(d.createdAt, 40),
@@ -1596,6 +1598,20 @@ export function registerChatRoutes(app: express.Express): void {
         });
       });
       messages.reverse(); // oldest first for a chat timeline
+      // Channel posts show a Comments button with a live count, so count the
+      // stored comments per post in one read.
+      if (ctx.group.kind === 'tos_channel') {
+        try {
+          const all = await adminRtdb.ref(`chat/channelComments/${ctx.group.id}`).get();
+          const counts = new Map<string, number>();
+          all.forEach((post) => {
+            let n = 0;
+            post.forEach(() => { n += 1; });
+            counts.set(post.key as string, n);
+          });
+          for (const m of messages) (m as any).commentCount = counts.get(m.id) || 0;
+        } catch { /* counts stay blank rather than breaking the read */ }
+      }
       const meta = await readMeta(ctx.group.id);
       const read = await lastReadCount(ctx.group.id, caller.uid);
       res.json({
@@ -1607,6 +1623,7 @@ export function registerChatRoutes(app: express.Express): void {
         photosAllowed: ctx.isTosChannel ? false : ctx.centreChat.photosAllowed,
         photoMaxKb: tosChat.photoMaxKb,
         filesMaxMb: ctx.isTosChannel ? 0 : ctx.centreChat.filesMaxMb,
+        commentsEnabled: ctx.isTosChannel ? (ctx.group as any).commentsEnabled === true : false,
         messageMaxChars: tosChat.messageMaxChars,
         messages,
         unread: Math.max(0, meta.msgCount - meta.pruned - read),
@@ -1926,6 +1943,12 @@ async function statusOwnerName(ownerUid: string): Promise<string> {
       const snap = await adminDb.collection(col).where('uid', '==', uid).limit(1).get();
       const nm = cleanStr(snap.docs[0]?.data()?.name || snap.docs[0]?.data()?.displayName || snap.docs[0]?.data()?.fullName, MAX_NAME_CHARS);
       if (nm) return nm;
+      // Staff docs are usually keyed by uid as the document id.
+      const byId = await adminDb.collection(col).doc(uid).get();
+      if (byId.exists) {
+        const nm2 = cleanStr((byId.data() as any)?.name || (byId.data() as any)?.displayName || (byId.data() as any)?.fullName, MAX_NAME_CHARS);
+        if (nm2) return nm2;
+      }
     } catch { /* keep looking */ }
   }
   return '';
@@ -1977,17 +2000,42 @@ async function statusNamesFor(uids: string[]): Promise<Map<string, { name: strin
         unresolved.delete(uid);
       }
     });
+    // Most admin documents are keyed by uid as the document id, so the id
+    // lookup is the reliable path; the field query above catches the rest.
+    for (const uid of part) {
+      if (!unresolved.has(uid)) continue;
+      try {
+        const doc = await adminDb.collection('admins').doc(uid).get();
+        if (doc.exists) {
+          const v = doc.data() as any;
+          out.set(uid, { name: cleanStr(v?.name || v?.displayName || v?.fullName, MAX_NAME_CHARS), username: '', emailPrefix: emailPrefixOf(v?.email) });
+          unresolved.delete(uid);
+        }
+      } catch { /* keep looking */ }
+    }
   }
   const rest2 = [...unresolved];
   if (rest2.length) {
     const tutList = await adminDb.collection('tutors').where('uid', 'in', rest2).get();
     tutList.forEach((d) => {
       const v = d.data() as any;
-      // Tutor docs are keyed by their own id, so the uid comes from the
-      // document's field, never from the doc id alone.
       const uid = cleanStr(v.uid, 64) || cleanStr(d.id, 64);
-      if (uid) out.set(uid, { name: cleanStr(v.name || v.displayName || v.fullName, MAX_NAME_CHARS), username: '', emailPrefix: emailPrefixOf(v.email) });
+      if (uid) {
+        out.set(uid, { name: cleanStr(v.name || v.displayName || v.fullName, MAX_NAME_CHARS), username: '', emailPrefix: emailPrefixOf(v.email) });
+        unresolved.delete(uid);
+      }
     });
+    for (const uid of rest2) {
+      if (!unresolved.has(uid)) continue;
+      try {
+        const doc = await adminDb.collection('tutors').doc(uid).get();
+        if (doc.exists) {
+          const v = doc.data() as any;
+          out.set(uid, { name: cleanStr(v?.name || v?.displayName || v?.fullName, MAX_NAME_CHARS), username: '', emailPrefix: emailPrefixOf(v?.email) });
+          unresolved.delete(uid);
+        }
+      } catch { /* keep looking */ }
+    }
   }
   return out;
 }
@@ -2049,6 +2097,8 @@ async function chatDirectoryFor(centreId: string, excludeUid: string): Promise<R
       name: personDisplayName({ isStudent: false, name: staffMap.get(u)?.name || staffMap.get(u)?.emailPrefix || '', username: '' }),
       role: staffRoles.get(u) || 'tutor',
     }))
+    // A person is shown by their real name; never a bare 'Staff'.
+    .map((x) => (x.name === 'Staff' ? { ...x, name: 'Staff member' } : x))
     .sort((a, b) => a.name.localeCompare(b.name))
     .slice(0, 50);
   return { ok: true, students, staff };
@@ -2555,6 +2605,43 @@ async function staffStatusContext(caller: Caller, centreId: string) {
 
   // Staff thread read. Owner/admin/tutor of the group's centre; same shape as
   // the student read minus the student gate.
+  // Staff flag: admins and tutors report a message from their own portal.
+  // Same chatReports shape as the student report, so one review list serves
+  // both, with the reporter's real name recorded.
+  app.post('/api/centre/chat/groups/:id/report', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const centreId = cleanStr(String(req.query.centreId || ''), 120);
+      const ctx = await staffGroupContext(caller, centreId, String(req.params.id || ''));
+      const messageId = cleanStr(req.body?.messageId, 200);
+      if (!messageId) throw httpError(400, 'Which message are you flagging?');
+      const snap = await adminRtdb.ref(`chat/groups/${ctx.group.id}/messages/${messageId}`).get();
+      const msg = snap.val();
+      if (!msg || msg.removed) throw httpError(404, 'That message is no longer available.');
+      if (msg.uid === caller.uid) throw httpError(400, 'You cannot flag your own message.');
+      const reporterUsername = await staffDisplayName(caller);
+      const mem = await requireMembership(caller, centreId);
+      await adminDb.collection('chatReports').add({
+        centreId: ctx.group.centreId,
+        groupId: ctx.group.id,
+        messageId,
+        offenderUid: cleanStr(msg.uid, 64),
+        offenderUsername: cleanStr(msg.username, 16),
+        offenderRole: cleanStr(msg.role, 20),
+        messageExcerpt: String(msg.text ?? '').slice(0, MAX_EXCERPT_CHARS),
+        reporterUid: caller.uid,
+        reporterUsername,
+        reporterRole: cleanStr(mem?.role, 20),
+        reason: cleanStr(req.body?.reason, MAX_REASON_CHARS) || 'No reason given',
+        status: 'pending',
+        createdAt: new Date().toISOString(),
+      });
+      res.json({ ok: true });
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] staff flag failed');
+    }
+  });
+
   app.get('/api/centre/chat/groups/:id/messages', async (req, res) => {
     try {
       const caller = getCaller(req);
@@ -2669,6 +2756,75 @@ async function staffStatusContext(caller: Caller, centreId: string) {
 
   // Photo upload for student posts. The centre's own photo settings decide
   // whether photos are allowed at all and how big one may be.
+  // Comments on TOS channel posts. Read: any member who can open the channel.
+  // Write: students (and staff through their own portal), only when the
+  // channel's comments toggle is on.
+  app.get('/api/student/chat/channel-comments', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const groupId = cleanStr(String((req.query || {}).groupId || ''), 64);
+      const messageId = cleanStr(String((req.query || {}).messageId || ''), 128);
+      if (!groupId || !messageId) throw httpError(400, 'Which post?');
+      const ctx = await studentGroupContext(caller, groupId, false);
+      if (ctx.group.kind !== 'tos_channel') throw httpError(403, 'Comments live on channels only.');
+      const snap = await adminRtdb.ref(`chat/channelComments/${groupId}/${messageId}`).limitToLast(200).get();
+      const comments: Record<string, unknown>[] = [];
+      snap.forEach((c) => {
+        const v = c.val() || {};
+        comments.push({
+          id: c.key,
+          uid: cleanStr(v.uid, 64),
+          name: cleanStr(v.name, 60),
+          role: cleanStr(v.role, 20),
+          text: String(v.text ?? '').slice(0, 500),
+          at: Number(v.at) || 0,
+          mine: v.uid === caller.uid,
+        });
+      });
+      res.json({ ok: true, comments });
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] comments read failed');
+    }
+  });
+
+  app.post('/api/student/chat/channel-comments', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const groupId = cleanStr(String(req.body?.groupId ?? ''), 64);
+      const messageId = cleanStr(String(req.body?.messageId ?? ''), 128);
+      if (!groupId || !messageId) throw httpError(400, 'Which post?');
+      const ctx = await studentGroupContext(caller, groupId, false);
+      if (ctx.group.kind !== 'tos_channel') throw httpError(403, 'Comments live on channels only.');
+      if (ctx.group.commentsEnabled !== true) throw httpError(403, 'Comments are turned off in this channel.');
+      const tosChat = await getTosChat();
+      const text = String(req.body?.text ?? '').replace(/\s+$/g, '');
+      if (!text) throw httpError(400, 'Type a comment first.');
+      if (text.length > 500) throw httpError(400, 'Comments can be up to 500 characters.');
+      await consumePostRateLimit(caller.uid, tosChat.postRateLimitPerDay);
+      // Who is talking: students by their chat handle, staff by their name.
+      let name = await usernameFor(caller.uid);
+      let role = 'student';
+      if (!name) {
+        name = await staffDisplayName(caller);
+        if (name) {
+          const adm = await adminDb.collection('admins').doc(caller.uid).get().catch(() => null);
+          role = adm && adm.exists && (adm.data() as any)?.role === 'tutor' ? 'tutor' : 'centre_admin';
+          if (!adm || !adm.exists) {
+            const tut = await adminDb.collection('tutors').doc(caller.uid).get().catch(() => null);
+            if (tut && tut.exists) role = 'tutor';
+          }
+        }
+      }
+      if (!name) throw httpError(403, 'Set your username in your profile before commenting.');
+      const ref = adminRtdb.ref(`chat/channelComments/${groupId}/${messageId}`).push();
+      await ref.set({ uid: caller.uid, name: cleanStr(name, 60), role, text, at: ServerValue.TIMESTAMP });
+      const countSnap = await adminRtdb.ref(`chat/channelComments/${groupId}/${messageId}`).get();
+      res.json({ ok: true, commentId: ref.key, count: countSnap.numChildren() });
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] comment failed');
+    }
+  });
+
   // Direct-upload details for chat attachments: the browser uploads to
   // hosting itself (any file type) and the message route checks the URL.
   app.get('/api/student/chat/upload-config', async (req, res) => {
@@ -2983,11 +3139,14 @@ async function staffStatusContext(caller: Caller, centreId: string) {
       if (!caller.tos) throw httpError(403, 'Not allowed.');
       const name = cleanStr(String(req.body?.name ?? ''), 60);
       if (!name) throw httpError(400, 'Name the channel first.');
+      const commentsEnabled = req.body?.commentsEnabled === true;
       const now = new Date().toISOString();
       const ref = await adminDb.collection('chatGroups').add({
         centreId: null,
         name,
         kind: 'tos_channel',
+        // Announcement-only by default; TOS opts a channel into comments.
+        commentsEnabled,
         subject: null,
         access: { mode: 'centre_default', thresholdPercent: null },
         createdBy: caller.uid,
@@ -3002,6 +3161,27 @@ async function staffStatusContext(caller: Caller, centreId: string) {
     }
   });
 
+  // TOS channel management: rename an existing channel or flip its comments
+  // toggle (announcement-only versus open to comments).
+  app.post('/api/tos/chat/channel/update', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      if (!caller.tos) throw httpError(403, 'Not allowed.');
+      const channelId = cleanStr(String(req.body?.channelId ?? ''), 64);
+      if (!channelId) throw httpError(400, 'Which channel?');
+      const ref = adminDb.collection('chatGroups').doc(channelId);
+      const doc = await ref.get();
+      if (!doc.exists || (doc.data() as any)?.kind !== 'tos_channel') throw httpError(404, 'Channel not found.');
+      const patch: Record<string, unknown> = { updatedAt: new Date().toISOString() };
+      if (typeof req.body?.name === 'string' && cleanStr(req.body.name, 60)) patch.name = cleanStr(req.body.name, 60);
+      if (req.body?.commentsEnabled !== undefined) patch.commentsEnabled = req.body.commentsEnabled === true;
+      await ref.set(patch, { merge: true });
+      res.json({ ok: true });
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] channel update failed');
+    }
+  });
+
   app.get('/api/tos/chat/channel/list', async (req, res) => {
     try {
       const caller = getCaller(req);
@@ -3010,7 +3190,7 @@ async function staffStatusContext(caller: Caller, centreId: string) {
       const channels: Record<string, unknown>[] = [];
       snap.forEach((d) => {
         const v = d.data() as any;
-        channels.push({ id: d.id, name: cleanStr(v?.name, 60), createdAt: cleanStr(v?.createdAt, 40) });
+        channels.push({ id: d.id, name: cleanStr(v?.name, 60), createdAt: cleanStr(v?.createdAt, 40), commentsEnabled: v?.commentsEnabled === true });
       });
       res.json({ ok: true, channels });
     } catch (error: any) {
