@@ -1956,6 +1956,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateStudent = async (id: string, studentData: Partial<Student>) => {
     try {
       await updateDoc(doc(db, 'students', id), studentData);
+      // Refresh the in-app copy too: the menu header, tabs and chat read this
+      // list, so a saved change (a new profile picture, for instance) shows
+      // everywhere at once instead of only after a reload.
+      setStudents((prev) => prev.map((st) => (st.id === id ? { ...st, ...studentData } : st)));
       addToast({
         type: 'success',
         title: 'Student Record Updated',

@@ -270,3 +270,52 @@ span.text-slate-600:not(.dark-bg-mode *) {
 .tos-student-dark .bg-\[\#FFF7ED\] { background-color: #3a1a07; }
 .tos-student-dark .bg-\[\#F1F5F9\] { background-color: #1a2438; }
 .tos-student-dark .bg-\[\#F8FAFC\] { background-color: #0d1526; }
+
+/* Second wave: coloured texts that went murky on dark surfaces, the dark
+   buttons that looked faded on dark cards, and the remaining tinted
+   backgrounds and borders. */
+.tos-student-dark .text-emerald-700 { color: #6ee7b7; }
+.tos-student-dark .text-emerald-600 { color: #34d399; }
+.tos-student-dark .text-emerald-800 { color: #a7f3d0; }
+.tos-student-dark .text-rose-600 { color: #fb7185; }
+.tos-student-dark .text-rose-700 { color: #fda4af; }
+.tos-student-dark .text-rose-500 { color: #fb7185; }
+.tos-student-dark .text-orange-600 { color: #fb923c; }
+.tos-student-dark .text-orange-500 { color: #fb923c; }
+.tos-student-dark .text-amber-800 { color: #fcd34d; }
+.tos-student-dark .text-amber-600 { color: #fbbf24; }
+.tos-student-dark .text-amber-700 { color: #fcd34d; }
+.tos-student-dark .text-blue-700 { color: #93c5fd; }
+.tos-student-dark .text-blue-600 { color: #60a5fa; }
+.tos-student-dark .text-purple-600 { color: #c084fc; }
+.tos-student-dark .text-indigo-600 { color: #a5b4fc; }
+.tos-student-dark .text-sky-600 { color: #7dd3fc; }
+.tos-student-dark .bg-slate-900 { background-color: #334155; }
+.tos-student-dark .hover\:bg-slate-900:hover { background-color: #3f4d63; }
+.tos-student-dark .hover\:bg-slate-900\/80:hover { background-color: #3f4d63cc; }
+.tos-student-dark .bg-slate-800 { background-color: #1e293b; }
+.tos-student-dark .border-slate-800 { border-color: #3b4a63; }
+.tos-student-dark .bg-slate-50\/70 { background-color: #0d1526b3; }
+.tos-student-dark .bg-emerald-600 { background-color: #059669; }
+.tos-student-dark .bg-emerald-500 { background-color: #059669; }
+.tos-student-dark .bg-emerald-100 { background-color: #064e3b; }
+.tos-student-dark .bg-rose-100 { background-color: #4c0519; }
+.tos-student-dark .bg-amber-100 { background-color: #451a03; }
+.tos-student-dark .bg-blue-100 { background-color: #1e3a8a; }
+.tos-student-dark .bg-purple-100 { background-color: #3b0764; }
+.tos-student-dark .bg-indigo-100 { background-color: #1e1b4b; }
+.tos-student-dark .bg-sky-100 { background-color: #082f49; }
+.tos-student-dark .bg-orange-500\/10 { background-color: #7c2d1219; }
+.tos-student-dark .bg-orange-500\/15 { background-color: #7c2d1226; }
+.tos-student-dark .bg-orange-500\/20 { background-color: #7c2d1233; }
+.tos-student-dark .border-orange-100 { border-color: #7c2d12; }
+.tos-student-dark .border-orange-200 { border-color: #9a3412; }
+.tos-student-dark .border-emerald-200 { border-color: #065f46; }
+.tos-student-dark .border-emerald-100 { border-color: #064e3b; }
+.tos-student-dark .border-rose-200 { border-color: #9f1239; }
+.tos-student-dark .border-amber-200 { border-color: #92400e; }
+.tos-student-dark .border-blue-200 { border-color: #1e40af; }
+.tos-student-dark .border-purple-200 { border-color: #6b21a8; }
+.tos-student-dark .border-indigo-200 { border-color: #3730a3; }
+.tos-student-dark .border-sky-200 { border-color: #0c4a6e; }
+.tos-student-dark .text-\[\#1E293B\] { color: #e2e8f0; }

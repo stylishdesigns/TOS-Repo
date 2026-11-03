@@ -84,6 +84,136 @@ async function shrinkImage(file: File, maxEdge: number): Promise<string> {
   });
 }
 
+/** Small deterministic hash of a string, for the card's barcode and logo
+ *  mark: the same student always renders the same card. */
+function cardSeed(seed: string): () => number {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) | 0;
+  return () => {
+    h = (h * 1103515245 + 12345) | 0;
+    return ((h >>> 16) & 0x7fff) / 0x7fff;
+  };
+}
+
+function cardBars(seed: string): { x: number; w: number }[] {
+  const rand = cardSeed(seed);
+  const bars: { x: number; w: number }[] = [];
+  let x = 0;
+  while (x < 150) {
+    const w = 2 + Math.floor(rand() * 4);
+    bars.push({ x, w });
+    x += w + 2 + Math.floor(rand() * 2);
+  }
+  return bars;
+}
+
+function cardEsc(value: string): string {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+/** The ID card, drawn as an SVG. The same design is shown in the popup and
+ *  downloaded as a picture, so the saved copy always matches what the
+ *  student sees. Every word comes from the student's own record. */
+function buildCardSvg(opts: {
+  centreName: string;
+  name: string;
+  programme: string;
+  department: string;
+  session: string;
+  studentId: string;
+  subjects: string[];
+  avatarDataUrl: string | null;
+  initials: string;
+  status: string;
+}): string {
+  const { centreName, name, programme, department, session, studentId, subjects, avatarDataUrl, initials, status } = opts;
+  const markWords = centreName.trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() || '').join('') || 'TC';
+  const centreShort = centreName.toUpperCase();
+  const centreSize = centreShort.length > 26 ? 12 : 15;
+  const nameSize = name.length > 16 ? 17 : name.length > 12 ? 20 : 24;
+  const active = String(status).toLowerCase() === 'active';
+  const chipWord = `${String(status).toUpperCase()}${session ? ` \u00b7 ${session}` : ''}`;
+  const chipW = Math.max(150, chipWord.length * 7 + 44);
+  const rand = cardSeed(studentId);
+  const bars: string[] = [];
+  let bx = 0;
+  while (bx < 150) {
+    const w = 2 + Math.floor(rand() * 4);
+    bars.push(`<rect x="${(390 + bx).toFixed(1)}" y="356" width="${w}" height="34" rx="1" fill="#E2E8F0"/>`);
+    bx += w + 2 + Math.floor(rand() * 2);
+  }
+  const dots: string[] = [];
+  for (let cx = 30; cx < 690; cx += 44) {
+    for (let cy = 30; cy < 430; cy += 44) {
+      dots.push(`<circle cx="${cx}" cy="${cy}" r="1.3" fill="#FFFFFF" opacity="0.045"/>`);
+    }
+  }
+  const photo = avatarDataUrl
+    ? `<image x="34" y="112" width="132" height="164" preserveAspectRatio="xMidYMid slice" clip-path="url(#photoRound)" href="${avatarDataUrl}"/>`
+    : `<circle cx="100" cy="172" r="34" fill="#334155"/><circle cx="100" cy="164" r="20" fill="#94A3B8"/><path d="M 62 240 Q 100 196 138 240 L 138 250 Q 100 262 62 250 Z" fill="#94A3B8"/>`;
+  const chips: string[] = [];
+  let chipX = 196;
+  const shown = subjects.slice(0, 4);
+  for (const sub of shown) {
+    const w = Math.min(150, sub.length * 6.4 + 26);
+    chips.push(`<rect x="${chipX}" y="318" width="${w.toFixed(0)}" height="22" rx="11" fill="#FFFFFF" fill-opacity="0.08"/>`);
+    chips.push(`<text x="${(chipX + w / 2).toFixed(0)}" y="333" font-family="Arial, sans-serif" font-size="10.5" font-weight="bold" fill="#E2E8F0" text-anchor="middle">${cardEsc(sub)}</text>`);
+    chipX += w + 8;
+  }
+  if (subjects.length > 4) {
+    chips.push(`<text x="${chipX + 2}" y="333" font-family="Arial, sans-serif" font-size="10.5" font-weight="bold" fill="#94A3B8">+${subjects.length - 4} more</text>`);
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="700" height="440" viewBox="0 0 700 440">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0A1020"/><stop offset="0.55" stop-color="#111C33"/><stop offset="1" stop-color="#1B2540"/>
+    </linearGradient>
+    <linearGradient id="mark" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#F97316"/><stop offset="1" stop-color="#EA580C"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.85" cy="0.05" r="0.9">
+      <stop offset="0" stop-color="#EA580C" stop-opacity="0.28"/><stop offset="0.55" stop-color="#EA580C" stop-opacity="0.06"/><stop offset="1" stop-color="#EA580C" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="round"><rect x="10" y="10" width="680" height="420" rx="30"/></clipPath>
+    <clipPath id="photoRound"><rect x="34" y="112" width="132" height="164" rx="16"/></clipPath>
+  </defs>
+  <g clip-path="url(#round)">
+    <rect x="0" y="0" width="700" height="440" fill="url(#bg)"/>
+    <rect x="0" y="0" width="700" height="440" fill="url(#glow)"/>
+    ${dots.join('')}
+    <rect x="34" y="34" width="46" height="46" rx="13" fill="url(#mark)"/>
+    <text x="57" y="64" font-family="Arial, sans-serif" font-size="19" font-weight="bold" fill="#FFFFFF" text-anchor="middle">${cardEsc(markWords)}</text>
+    <text x="94" y="53" font-family="Arial, sans-serif" font-size="${centreSize}" font-weight="bold" fill="#F8FAFC" letter-spacing="1.2">${cardEsc(centreShort)}</text>
+    <text x="94" y="71" font-family="Arial, sans-serif" font-size="10.5" fill="#94A3B8" letter-spacing="2.5">STUDENT IDENTITY CARD</text>
+    <rect x="${(666 - chipW).toFixed(0)}" y="42" width="${chipW.toFixed(0)}" height="30" rx="15" fill="none" stroke="#EA580C" stroke-opacity="0.55" stroke-width="1.4"/>
+    <circle cx="${(666 - chipW + 20).toFixed(0)}" cy="57" r="4.5" fill="${active ? '#22C55E' : '#F59E0B'}"/>
+    <text x="${(666 - chipW + 32).toFixed(0)}" y="61" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#FDBA74" letter-spacing="1">${cardEsc(chipWord)}</text>
+    <rect x="34" y="112" width="132" height="164" rx="16" fill="#1B2540"/>
+    ${photo}
+    <rect x="34" y="112" width="132" height="164" rx="16" fill="none" stroke="#EA580C" stroke-opacity="0.7" stroke-width="2"/>
+    <text x="196" y="152" font-family="Arial, sans-serif" font-size="10" fill="#94A3B8" letter-spacing="2">CANDIDATE NAME</text>
+    <text x="196" y="176" font-family="Arial, sans-serif" font-size="${nameSize}" font-weight="bold" fill="#F8FAFC">${cardEsc(name)}</text>
+    <text x="196" y="206" font-family="Arial, sans-serif" font-size="10" fill="#94A3B8" letter-spacing="2">PROGRAMME</text>
+    <text x="196" y="226" font-family="Arial, sans-serif" font-size="15" font-weight="bold" fill="#E2E8F0">${cardEsc(programme || '\u2014')}</text>
+    <text x="196" y="254" font-family="Arial, sans-serif" font-size="10" fill="#94A3B8" letter-spacing="2">DEPARTMENT</text>
+    <text x="196" y="274" font-family="Arial, sans-serif" font-size="15" font-weight="bold" fill="#E2E8F0">${cardEsc(department || '\u2014')}</text>
+    <text x="470" y="152" font-family="Arial, sans-serif" font-size="10" fill="#94A3B8" letter-spacing="2">SESSION</text>
+    <text x="470" y="176" font-family="Arial, sans-serif" font-size="17" font-weight="bold" fill="#E2E8F0">${cardEsc(session || '\u2014')}</text>
+    <text x="470" y="206" font-family="Arial, sans-serif" font-size="10" fill="#94A3B8" letter-spacing="2">STUDENT ID</text>
+    <text x="470" y="230" font-family="Courier New, monospace" font-size="${studentId.length > 14 ? 12 : 16}" font-weight="bold" fill="#FDBA74">${cardEsc(studentId)}</text>
+    <text x="196" y="308" font-family="Arial, sans-serif" font-size="10" fill="#94A3B8" letter-spacing="2">REGISTERED SUBJECTS</text>
+    ${subjects.length === 0 ? '<text x="196" y="333" font-family="Arial, sans-serif" font-size="11" fill="#94A3B8">None registered yet</text>' : chips.join('')}
+    <rect x="34" y="368" width="632" height="1" fill="#FFFFFF" fill-opacity="0.08"/>
+    ${bars.join('')}
+    <text x="390" y="408" font-family="Courier New, monospace" font-size="10" fill="#94A3B8" letter-spacing="3">${cardEsc(studentId)}</text>
+    <text x="34" y="404" font-family="Arial, sans-serif" font-size="10" fill="#64748B">Issued by the centre · Verify with the centre office</text>
+  </g>
+</svg>`;
+}
+
 interface MoreTabProps {
   student: Student;
 }
@@ -339,6 +469,71 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
     }
   };
 
+  // ID card download: the card is drawn as a picture (the student's own
+  // photo embedded when they have one) and saved straight to the device.
+  const [cardBusy, setCardBusy] = useState(false);
+  const downloadIdCard = async () => {
+    setCardBusy(true);
+    try {
+      let photo: string | null = null;
+      const av = realAvatar(student.avatar);
+      if (av) {
+        try {
+          const r = await fetch(av, { mode: 'cors' });
+          const blob = await r.blob();
+          photo = await new Promise<string>((resolve, reject) => {
+            const fr = new FileReader();
+            fr.onload = () => resolve(String(fr.result));
+            fr.onerror = () => reject(new Error('read failed'));
+            fr.readAsDataURL(blob);
+          });
+        } catch {
+          photo = null; // The card falls back to the initials mark.
+        }
+      }
+      const initials =
+        student.name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase() || '').join('') || '?';
+      const svg = buildCardSvg({
+        centreName: centreName || 'Tutorial Centre',
+        name: student.name,
+        programme: student.programmeName || '',
+        department: student.department || '',
+        session: settings.academicSession || '',
+        studentId: student.id.toUpperCase(),
+        subjects: student.subjects || [],
+        avatarDataUrl: photo,
+        initials,
+        status: student.status || 'Active',
+      });
+      const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const img = new Image();
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error('The card could not be rendered. Try again.'));
+        img.src = url;
+      });
+      const canvas = document.createElement('canvas');
+      canvas.width = 1400;
+      canvas.height = 880;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Your browser could not render the card. Try again.');
+      ctx.drawImage(img, 0, 0, 1400, 880);
+      URL.revokeObjectURL(url);
+      const a = document.createElement('a');
+      a.href = canvas.toDataURL('image/png');
+      a.download = `${student.name} - ID card.png`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      addToast({ type: 'success', title: 'ID Card Saved', description: 'The ID card picture was downloaded to your device.' });
+    } catch (e: any) {
+      addToast({ type: 'error', title: 'Download Failed', description: String(e?.message || 'The card could not be downloaded. Try again.') });
+    } finally {
+      setCardBusy(false);
+    }
+  };
+
   const handleSavePersonalDetails = (e: React.FormEvent) => {
     e.preventDefault();
     const updatedFullName = `${firstName} ${lastName}`.trim();
@@ -517,14 +712,8 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
     'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?auto=format&fit=crop&w=500&q=80';
 
   const studentAvatar =
-    MALE_NIGERIAN_STUDENT_AVATAR ||
-    (student.avatar &&
-    !student.avatar.includes('photo-1534528741775') &&
-    !student.avatar.includes('photo-1517841905240')
-      ? student.avatar
-      : student.gender === 'Female'
-      ? FEMALE_NIGERIAN_STUDENT_AVATAR
-      : MALE_NIGERIAN_STUDENT_AVATAR);
+    realAvatar(student.avatar) ||
+    (student.gender === 'Female' ? FEMALE_NIGERIAN_STUDENT_AVATAR : MALE_NIGERIAN_STUDENT_AVATAR);
 
   return (
     <div className="min-h-full bg-slate-50/70 pb-16 px-4 pt-6 max-w-lg mx-auto">
@@ -544,75 +733,6 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
         <h2 className="text-xl font-bold text-slate-900 mt-3.5 tracking-tight">
           {student.name}
         </h2>
-      </div>
-
-      {/* 1a-bis. SECTION: Username (CH1 Step 1). The single place a username
-          is set: chat and the mock leaderboard read it from here. */}
-      <div className="mt-7">
-        <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-1 mb-2">
-          Username
-        </div>
-        <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-4 space-y-3">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center space-x-3 min-w-0">
-              <div className="w-9 h-9 rounded-full bg-orange-50 text-[#EA580C] flex items-center justify-center shrink-0">
-                <User className="w-4.5 h-4.5" />
-              </div>
-              <div className="min-w-0">
-                <span className="text-sm font-semibold text-slate-800 block truncate">
-                  {usernameInfo?.username ? `@${usernameInfo.username}` : 'No username yet'}
-                </span>
-                <span className="text-[11px] text-slate-400 font-medium">
-                  Shown on chat and the mock leaderboard. Never your real name.
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {usernameInfo && !usernameInfo.mine ? (
-            <p className="text-xs text-slate-400 font-medium leading-relaxed">
-              Usernames are set by each student from their own profile.
-            </p>
-          ) : (
-            <>
-              {!usernameInfo?.canChange && usernameInfo?.canChangeAt ? (
-                <p className="text-xs text-amber-600 font-semibold leading-relaxed">
-                  You can change your username again on {new Date(usernameInfo.canChangeAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}.
-                </p>
-              ) : (
-                <>
-                  <input
-                    value={usernameDraft}
-                    onChange={(e) => { setUsernameDraft(e.target.value); setUsernameError(''); }}
-                    maxLength={16}
-                    placeholder="e.g. swift_lion"
-                    autoComplete="off"
-                    className="w-full min-h-[46px] px-4 rounded-xl border-2 border-slate-200 focus:border-[#EA580C] outline-none text-base font-bold text-slate-900 placeholder:text-slate-300 placeholder:font-medium"
-                  />
-                  {usernameDraft.trim().length >= 4 && usernameCheck && (
-                    <p className={`text-xs font-bold ${usernameCheck.valid && usernameCheck.available ? 'text-emerald-600' : 'text-rose-600'}`}>
-                      {usernameCheck.valid
-                        ? (usernameCheck.available ? `${usernameDraft.trim()} is available.` : (usernameCheck.reason || 'That username is taken.'))
-                        : (usernameCheck.reason || 'Not a valid username.')}
-                    </p>
-                  )}
-                  {usernameDraft.trim().length > 0 && usernameDraft.trim().length < 4 && (
-                    <p className="text-xs text-slate-400 font-medium">At least 4 characters: letters, numbers or underscores.</p>
-                  )}
-                  {usernameError && <p className="text-xs font-bold text-rose-600">{usernameError}</p>}
-                  <button
-                    type="button"
-                    disabled={usernameBusy || usernameDraft.trim() === usernameInfo?.username || !(usernameCheck?.valid && usernameCheck?.available)}
-                    onClick={saveUsername}
-                    className="w-full min-h-[44px] rounded-xl bg-[#EA580C] text-white text-sm font-black tracking-wide disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    {usernameBusy ? 'Saving…' : usernameInfo?.username ? 'Save new username' : 'Set username'}
-                  </button>
-                </>
-              )}
-            </>
-          )}
-        </div>
       </div>
 
       {/* 2. SECTION: Account */}
@@ -1036,6 +1156,59 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                     />
                   </div>
 
+                  {/* Username: lives here with the rest of the personal
+                      details. Same server-checked register as before. */}
+                  <div className="pt-1 space-y-1.5 border-t border-slate-100 pt-3">
+                    <label className="text-xs font-bold text-slate-700 block">Username</label>
+                    <p className="text-[11px] text-slate-500 font-medium">
+                      Shown on chat and the mock leaderboard. Never your real name.
+                    </p>
+                    {usernameInfo && !usernameInfo.mine ? (
+                      <p className="text-xs text-slate-400 font-medium leading-relaxed">
+                        Usernames are set by each student from their own profile.
+                      </p>
+                    ) : (
+                      <>
+                        {!usernameInfo?.canChange && usernameInfo?.canChangeAt ? (
+                          <p className="text-xs text-amber-600 font-semibold leading-relaxed">
+                            You can change your username again on {new Date(usernameInfo.canChangeAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}.
+                          </p>
+                        ) : (
+                          <>
+                            <input
+                              value={usernameDraft}
+                              onChange={(e) => { setUsernameDraft(e.target.value); setUsernameError(''); }}
+                              onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
+                              maxLength={16}
+                              placeholder="e.g. swift_lion"
+                              autoComplete="off"
+                              className="w-full min-h-[46px] px-4 rounded-xl border-2 border-slate-200 focus:border-[#EA580C] outline-none text-base font-bold text-slate-900 placeholder:text-slate-300 placeholder:font-medium"
+                            />
+                            {usernameDraft.trim().length >= 4 && usernameCheck && (
+                              <p className={`text-xs font-bold ${usernameCheck.valid && usernameCheck.available ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                {usernameCheck.valid
+                                  ? (usernameCheck.available ? `${usernameDraft.trim()} is available.` : (usernameCheck.reason || 'That username is taken.'))
+                                  : (usernameCheck.reason || 'Not a valid username.')}
+                              </p>
+                            )}
+                            {usernameDraft.trim().length > 0 && usernameDraft.trim().length < 4 && (
+                              <p className="text-xs text-slate-400 font-medium">At least 4 characters: letters, numbers or underscores.</p>
+                            )}
+                            {usernameError && <p className="text-xs font-bold text-rose-600">{usernameError}</p>}
+                            <button
+                              type="button"
+                              disabled={usernameBusy || usernameDraft.trim() === usernameInfo?.username || !(usernameCheck?.valid && usernameCheck?.available)}
+                              onClick={saveUsername}
+                              className="w-full min-h-[44px] rounded-xl bg-[#EA580C] text-white text-sm font-black tracking-wide disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                            >
+                              {usernameBusy ? 'Saving…' : usernameInfo?.username ? 'Save new username' : 'Set username'}
+                            </button>
+                          </>
+                        )}
+                      </>
+                    )}
+                  </div>
+
                   <div className="pt-3">
                     <button
                       type="submit"
@@ -1238,108 +1411,134 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
               </div>
             )}
 
-            {/* MODAL 3: ID Card */}
+            {/* MODAL 3: ID Card - the student's real record, their own photo
+                when they have one, and a Download button that saves the card
+                as a picture. */}
             {activeModal === 'id_card' && (
               <div className="p-6 overflow-y-auto space-y-4">
                 <div className="flex items-start justify-between">
                   <div>
                     <h3 className="text-lg font-black text-slate-900">ID Card</h3>
                     <p className="text-xs text-slate-500 mt-0.5">
-                      Official digital candidate card with access barcode
+                      Your centre's official student card, from your own record
                     </p>
                   </div>
                   <button
                     onClick={() => setActiveModal(null)}
-                    className="p-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500"
+                    className="p-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 cursor-pointer"
                   >
                     <X className="w-4 h-4" />
                   </button>
                 </div>
 
-                {/* ID Badge Card */}
-                <div className="relative rounded-3xl overflow-hidden shadow-xl border border-slate-800 bg-gradient-to-br from-slate-950 via-[#070F1E] to-slate-900 text-white p-5 space-y-4">
-                  <div className="absolute top-0 right-0 w-48 h-48 bg-orange-500/15 rounded-full blur-3xl pointer-events-none" />
+                {(() => {
+                  const logoInitials = (centreName || 'Tutorial Centre').trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() || '').join('') || 'TC';
+                  const cardPhoto = realAvatar(student.avatar);
+                  const active = String(student.status || 'Active').toLowerCase() === 'active';
+                  const chips = student.subjects || [];
+                  return (
+                    <div
+                      className="rounded-3xl overflow-hidden shadow-xl text-white"
+                      style={{ background: 'linear-gradient(135deg,#0A1020 0%,#111C33 55%,#1B2540 100%)' }}
+                    >
+                      <div className="p-5">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-orange-500 to-[#EA580C] flex items-center justify-center text-sm font-black shrink-0">
+                              {logoInitials}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-[15px] font-bold tracking-wide leading-tight truncate">{centreName}</p>
+                              <p className="text-[10px] text-slate-400 tracking-[0.2em]">STUDENT IDENTITY CARD</p>
+                            </div>
+                          </div>
+                          <div className="rounded-full border border-[#EA580C]/60 pl-2.5 pr-3 py-1.5 flex items-center gap-1.5 shrink-0">
+                            <span className={`w-2 h-2 rounded-full ${active ? 'bg-emerald-500' : 'bg-amber-400'}`} />
+                            <span className="text-[10px] font-bold text-orange-300 tracking-wide whitespace-nowrap">
+                              {String(student.status || 'Active').toUpperCase()}
+                              {settings.academicSession ? ` \u00b7 ${settings.academicSession}` : ''}
+                            </span>
+                          </div>
+                        </div>
 
-                  {/* Card Header */}
-                  <div className="flex items-center justify-between border-b border-slate-800 pb-3 relative z-10">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-7 h-7 rounded-lg bg-[#EA580C] text-white flex items-center justify-center font-black text-xs">
-                        EX
-                      </div>
-                      <div>
-                        <span className="text-xs font-black tracking-wider uppercase block leading-none">
-                          {centreName}
-                        </span>
-                        <span className="text-[9px] text-orange-400 font-semibold tracking-wider uppercase">
-                          Official ID Card
-                        </span>
+                        <div className="flex gap-4 mt-5">
+                          <div className="w-24 h-32 sm:w-[104px] sm:h-[132px] rounded-2xl border-2 border-[#EA580C]/70 bg-[#1B2540] overflow-hidden shrink-0 flex items-center justify-center">
+                            {cardPhoto ? (
+                              <img src={cardPhoto} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-14 h-14 rounded-full bg-slate-600 flex items-center justify-center text-lg font-black text-slate-300">
+                                {student.name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase() || '').join('') || '?'}
+                              </div>
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[9px] text-slate-400 tracking-[0.15em] font-semibold">CANDIDATE NAME</p>
+                            <p className="text-xl font-bold text-slate-50 leading-tight truncate">{student.name}</p>
+                            <div className="grid grid-cols-2 gap-x-3 gap-y-2 mt-2.5">
+                              <div>
+                                <p className="text-[9px] text-slate-400 tracking-[0.15em] font-semibold">PROGRAMME</p>
+                                <p className="text-[13px] font-bold text-slate-200 truncate">{student.programmeName || '\u2014'}</p>
+                              </div>
+                              <div>
+                                <p className="text-[9px] text-slate-400 tracking-[0.15em] font-semibold">SESSION</p>
+                                <p className="text-[13px] font-bold text-slate-200 truncate">{settings.academicSession || '\u2014'}</p>
+                              </div>
+                              <div>
+                                <p className="text-[9px] text-slate-400 tracking-[0.15em] font-semibold">DEPARTMENT</p>
+                                <p className="text-[13px] font-bold text-slate-200 truncate">{student.department || '\u2014'}</p>
+                              </div>
+                              <div>
+                                <p className="text-[9px] text-slate-400 tracking-[0.15em] font-semibold">STUDENT ID</p>
+                                <p className="text-[12px] font-bold text-orange-300 font-mono truncate">{student.id.toUpperCase()}</p>
+                              </div>
+                            </div>
+                            {chips.length > 0 && (
+                              <div className="mt-2.5">
+                                <p className="text-[9px] text-slate-400 tracking-[0.15em] font-semibold mb-1">REGISTERED SUBJECTS</p>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {chips.slice(0, 4).map((sub) => (
+                                    <span key={sub} className="px-2.5 py-1 rounded-full bg-white/10 text-[10px] font-bold text-slate-200">{sub}</span>
+                                  ))}
+                                  {chips.length > 4 && (
+                                    <span className="px-2.5 py-1 rounded-full text-[10px] font-bold text-slate-400">+{chips.length - 4} more</span>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="mt-4 pt-3 border-t border-white/10 flex items-end justify-between gap-3">
+                          <p className="text-[10px] text-slate-500">Issued by the centre · Verify with the centre office</p>
+                          <div className="text-right shrink-0">
+                            <div className="flex items-end justify-end gap-[2px] h-8">
+                              {cardBars(student.id).map((bar, i) => (
+                                <span key={i} className="inline-block bg-slate-200" style={{ width: bar.w, height: 30 + ((i % 3) * 2) }} />
+                              ))}
+                            </div>
+                            <p className="font-mono text-[9px] text-slate-400 tracking-[0.25em] mt-1">{student.id.toUpperCase()}</p>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                    <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
-                      Active 2026
-                    </span>
-                  </div>
+                  );
+                })()}
 
-                  {/* Card Body */}
-                  <div className="flex items-start gap-4 relative z-10">
-                    <div className="relative shrink-0">
-                      <img
-                        src={studentAvatar}
-                        alt={student.name}
-                        className="w-20 h-24 rounded-2xl object-cover border-2 border-orange-500/80 shadow-lg"
-                      />
-                      <span className="absolute -bottom-1 -right-1 px-1.5 py-0.5 bg-slate-900 text-orange-300 font-mono text-[8px] font-bold rounded border border-orange-500/40">
-                        VERIFIED
-                      </span>
-                    </div>
-
-                    <div className="space-y-1.5 flex-1 min-w-0">
-                      <div>
-                        <span className="text-[9px] text-slate-400 uppercase font-semibold block">
-                          Candidate Name
-                        </span>
-                        <h4 className="text-sm font-black text-white truncate">{student.name}</h4>
-                      </div>
-
-                      <div>
-                        <span className="text-[9px] text-slate-400 uppercase font-semibold block">
-                          Target Programme
-                        </span>
-                        <span className="text-[11px] font-medium text-slate-300 line-clamp-1">
-                          {student.programmeName}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Card Footer with Access Barcode */}
-                  <div className="pt-3 border-t border-slate-800 flex items-center justify-between relative z-10">
-                    <div className="space-y-0.5">
-                      <span className="text-[8px] text-slate-400 uppercase font-mono tracking-wider block">
-                        Access Barcode
-                      </span>
-                      <div className="flex items-center space-x-0.5 h-6 opacity-85">
-                        {[3, 1, 2, 4, 1, 3, 2, 1, 4, 2, 1, 3, 4, 1, 2, 3, 1, 2, 4, 1, 3, 2].map(
-                          (w, i) => (
-                            <span
-                              key={i}
-                              style={{ width: `${w}px` }}
-                              className="h-full bg-slate-200 inline-block"
-                            />
-                          )
-                        )}
-                      </div>
-                    </div>
-
-                    <span className="font-mono text-[9px] text-slate-400">
-                      SEC-ID-{student.id}
-                    </span>
-                  </div>
-                </div>
+                <button
+                  type="button"
+                  onClick={downloadIdCard}
+                  disabled={cardBusy}
+                  className="w-full py-3.5 px-4 rounded-xl bg-[#EA580C] hover:bg-[#C2410C] text-white font-bold text-sm shadow-md active:scale-98 transition-all cursor-pointer disabled:opacity-60"
+                >
+                  {cardBusy ? 'Preparing the picture…' : 'Download ID Card'}
+                </button>
+                <p className="text-center text-[11px] text-slate-400 font-medium -mt-2">
+                  Saved as a picture in your downloads, your own photo included.
+                </p>
               </div>
             )}
 
-            {/* MODAL 4: Fees and Payments */}
+                        {/* MODAL 4: Fees and Payments */}
             {activeModal === 'tuition_statement' && (
               <div className="p-6 overflow-y-auto space-y-4 max-h-[85vh]">
                 <div className="flex items-start justify-between">
