@@ -737,6 +737,14 @@ export const StatusViewer: React.FC<{
       pausedRef.current = false;
     }
   };
+  // Video and music carry their own clock: every playback tick moves the
+  // white line by how far the media actually is, instead of the line
+  // standing still while the media plays.
+  const mediaTime = (e: React.SyntheticEvent<HTMLMediaElement>) => {
+    const el = e.currentTarget;
+    if (!el || !Number.isFinite(el.duration) || el.duration <= 0) return;
+    setTick(Math.min(1000, Math.round((el.currentTime / el.duration) * 1000)));
+  };
   const displayMs = (st: ViewerStatus | null): number => {
     if (!st) return 5000;
     if (st.kind === 'text') return Math.min(9000, Math.max(4000, 2200 + (st.text || '').length * 45));
@@ -767,11 +775,12 @@ export const StatusViewer: React.FC<{
 
   return (
     <div
-      className="fixed inset-0 z-50 flex flex-col"
-      style={{ backgroundColor: bg }}
+      className="fixed inset-0 z-50 flex flex-col select-none"
+      style={{ backgroundColor: bg, userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none' }}
       role="dialog"
       aria-modal="true"
       aria-label={`${person.name || person.username}'s status`}
+      onContextMenu={(e) => e.preventDefault()}
     >
       {/* Top bar: close, who, when, and the tap-through dots. */}
       <div className="p-4 space-y-2">
@@ -843,10 +852,22 @@ export const StatusViewer: React.FC<{
           Holding a finger on it pauses the progress line until it lifts. */}
       <div
         className="flex-1 flex items-center justify-center px-8 relative"
-        onPointerDown={() => { pausedRef.current = true; }}
-        onPointerUp={() => { pausedRef.current = false; }}
-        onPointerLeave={() => { pausedRef.current = false; }}
-        onPointerCancel={() => { pausedRef.current = false; }}
+        onPointerDown={() => {
+          pausedRef.current = true;
+          if (current?.kind === 'video' && videoRef.current) videoRef.current.pause();
+        }}
+        onPointerUp={() => {
+          pausedRef.current = false;
+          if (current?.kind === 'video') playVideo();
+        }}
+        onPointerLeave={() => {
+          pausedRef.current = false;
+          if (current?.kind === 'video') playVideo();
+        }}
+        onPointerCancel={() => {
+          pausedRef.current = false;
+          if (current?.kind === 'video') playVideo();
+        }}
         onTouchStart={(e) => {
           swipeStartY.current = e.touches[0]?.clientY || 0;
           swipeFired.current = false;
@@ -868,7 +889,7 @@ export const StatusViewer: React.FC<{
           </p>
         )}
         {current && current.kind === 'photo' && current.photoUrl && (
-          <img src={current.photoUrl} alt="Status" className="absolute inset-0 w-full h-full object-contain" />
+          <img src={current.photoUrl} alt="Status" draggable={false} className="absolute inset-0 w-full h-full object-contain pointer-events-none" />
         )}
         {current && current.kind === 'video' && current.videoUrl && (
           <video
@@ -880,6 +901,7 @@ export const StatusViewer: React.FC<{
             muted={vidMuted}
             className="absolute inset-0 w-full h-full object-cover"
             onLoadedMetadata={playVideo}
+            onTimeUpdate={mediaTime}
             onEnded={() => advance(1)}
           />
         )}
@@ -1213,7 +1235,6 @@ export const StatusScreenCore: React.FC<{ call: (path: string, opts?: any) => Pr
     <div className="space-y-5 animate-in fade-in duration-300">
       <div>
         <h2 className="text-2xl font-black text-slate-900 tracking-tight">Status</h2>
-        <p className="text-[11px] text-slate-500 font-medium">Updates from your centre</p>
       </div>
 
       {data && data.enabled === false && (
@@ -1260,7 +1281,7 @@ export const StatusScreenCore: React.FC<{ call: (path: string, opts?: any) => Pr
                       {m.kind === 'text' && m.text ? m.text : 'My status'}
                     </p>
                     <p className="text-xs text-slate-500 font-medium truncate">
-                      {statusKindWord(m.kind)} · {statusTimeLabel(m.at)}
+                      {statusKindWord(m.kind)} · {statusTimeLabel(m.at)} · {statusLeftLabel(m.expiresAt - Date.now())} left
                       {typeof m.views === 'number' ? ` · ${m.views} seen · ${m.replyCount || 0} replies` : ''}
                     </p>
                   </div>

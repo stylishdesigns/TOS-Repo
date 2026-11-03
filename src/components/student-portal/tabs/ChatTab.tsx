@@ -10,7 +10,6 @@ import {
   Megaphone,
   MessageSquare,
   Plus,
-  RefreshCw,
   Send,
   Settings2,
   ShieldAlert,
@@ -277,17 +276,10 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
     return <StarredScreen onBack={() => setStarredOpen(false)} />;
   }
 
-  if (settingsOpen) {
-    return <ChatSettingsSheet onClose={() => setSettingsOpen(false)} />;
-  }
-
   if (showRules) {
     return (
       <div className="p-4 sm:p-5 max-w-lg mx-auto space-y-4 animate-in fade-in duration-300">
         <div className="pt-1">
-          <span className="text-[10px] font-extrabold uppercase text-[#C2410C] tracking-wider block">
-            {student.name} · Communications
-          </span>
           <h2 className="text-xl font-black text-[#0F172A] tracking-tight">Student Chat</h2>
         </div>
         <div className="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-sm space-y-4">
@@ -324,9 +316,6 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
       <div className="pt-1 flex items-end justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <div className="min-w-0">
-            <span className="text-[10px] font-extrabold uppercase text-[#C2410C] tracking-wider block">
-              {student.name} · Communications
-            </span>
             <h2 className="text-xl font-black text-[#0F172A] tracking-tight">
               {'Chats'}
             </h2>
@@ -337,13 +326,6 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
         </div>
         <div className="flex gap-2">
           <button
-            onClick={() => setSettingsOpen(true)}
-            className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-500 active:scale-95 transition"
-            aria-label="Chat settings"
-          >
-            <Settings2 className="w-4 h-4" />
-          </button>
-          <button
             onClick={() => setStarredOpen(true)}
             className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-500 active:scale-95 transition"
             aria-label="Favourites"
@@ -351,11 +333,11 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
             <Star className="w-4 h-4" />
           </button>
           <button
-            onClick={load}
+            onClick={() => setSettingsOpen(true)}
             className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-500 active:scale-95 transition"
-            aria-label="Refresh"
+            aria-label="Chat settings"
           >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+            <Settings2 className="w-4 h-4" />
           </button>
         </div>
       </div>
@@ -519,6 +501,8 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
       {pickerOpen && (
         <PersonalNewChatSheet onClose={() => setPickerOpen(false)} onOpenChat={openPersonalChat} />
       )}
+
+      {settingsOpen && <ChatSettingsSheet onClose={() => setSettingsOpen(false)} />}
     </div>
   );
 };
@@ -1206,6 +1190,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
           <div className="bg-slate-900 text-white text-xs font-bold px-4 py-2.5 rounded-full shadow-lg max-w-[85%] text-center">{toast}</div>
         </div>
       )}
+
     </div>
   );
 };
@@ -1334,15 +1319,17 @@ const AUTO_ACCEPT_OPTIONS: Array<{ value: string; label: string }> = [
 
 const ChatSettingsSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const [values, setValues] = useState<ChatSettingsValues | null>(null);
+  const [saved, setSaved] = useState<ChatSettingsValues | null>(null);
   const [err, setErr] = useState('');
-  const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     api('/api/student/chat/settings')
       .then((d: any) => {
-        if (d && d.ok) setValues(d.settings);
-        else setErr(String(d?.error || 'Your chat settings could not load.'));
+        if (d && d.ok) {
+          setValues(d.settings);
+          setSaved(d.settings);
+        } else setErr(String(d?.error || 'Your chat settings could not load.'));
       })
       .catch(() => setErr('Your chat settings could not load.'));
   }, []);
@@ -1353,18 +1340,30 @@ const ChatSettingsSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  const save = async (patch: Partial<ChatSettingsValues>) => {
+  // Choices wait on the phone; nothing is sent until Save is pressed.
+  const pick = (key: keyof ChatSettingsValues, value: string) => {
     if (!values) return;
-    const next = { ...values, ...patch };
-    setValues(next);
+    setValues({ ...values, [key]: value });
+  };
+  const changedKeys = (): Array<keyof ChatSettingsValues> => {
+    if (!values || !saved) return [];
+    return (['friendRequests', 'messages', 'autoAccept'] as Array<keyof ChatSettingsValues>).filter((k) => values[k] !== saved[k]);
+  };
+  const dirty = changedKeys().length > 0;
+
+  const save = async () => {
+    if (!values) return;
+    const patch: Partial<ChatSettingsValues> = {};
+    for (const k of changedKeys()) patch[k] = values[k];
+    if (Object.keys(patch).length === 0) { onClose(); return; }
     setSaving(true);
     setErr('');
     try {
       const d = await api('/api/student/chat/settings', { method: 'POST', body: JSON.stringify(patch) });
       if (d && d.ok) {
+        setSaved(d.settings);
         setValues(d.settings);
-        setNote('Saved');
-        window.setTimeout(() => setNote(''), 1800);
+        onClose();
       } else {
         setErr(String(d?.error || 'That change could not be saved.'));
       }
@@ -1376,23 +1375,20 @@ const ChatSettingsSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   };
 
   const group = (title: string, hint: string, key: keyof ChatSettingsValues, options: Array<{ value: string; label: string }>) => (
-    <div className="bg-white rounded-3xl border border-slate-200/90 shadow-sm p-4 space-y-2">
-      <p className="text-sm font-black text-slate-900">{title}</p>
-      <p className="text-[11px] text-slate-500 font-medium">{hint}</p>
-      <div className="space-y-1 pt-1">
+    <div className="space-y-1">
+      <p className="text-xs font-black text-slate-900">{title}</p>
+      <p className="text-[10px] text-slate-500 font-medium">{hint}</p>
+      <div className="flex flex-wrap gap-2 pt-0.5">
         {options.map((o) => {
-          const active = (values as any)?.[key] === o.value;
+          const active = values?.[key] === o.value;
           return (
             <button
               key={o.value}
               type="button"
               disabled={!values || saving}
-              onClick={() => save({ [key]: o.value } as Partial<ChatSettingsValues>)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-left text-sm font-semibold transition ${active ? 'bg-orange-50 border border-[#EA580C] text-[#C2410C]' : 'bg-slate-50 border border-transparent text-slate-600 hover:bg-slate-100'} ${values ? 'cursor-pointer' : 'opacity-60'}`}
+              onClick={() => pick(key, o.value)}
+              className={`px-3.5 min-h-[40px] rounded-full text-xs font-black transition ${active ? 'bg-[#EA580C] text-white' : 'bg-white border border-slate-200 text-slate-600'} ${values && !saving ? 'cursor-pointer' : 'opacity-60'}`}
             >
-              <span className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${active ? 'border-[#EA580C]' : 'border-slate-300'}`}>
-                {active && <span className="w-2 h-2 rounded-full bg-[#EA580C]" />}
-              </span>
               {o.label}
             </button>
           );
@@ -1402,12 +1398,14 @@ const ChatSettingsSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   );
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-50 overflow-y-auto animate-in fade-in duration-200">
-      <div className="p-4 sm:p-5 max-w-lg mx-auto pt-6 pb-10 space-y-4">
-        <div className="pt-1 flex items-start justify-between gap-2">
+    <div className="fixed inset-0 z-50 flex items-end justify-center" role="dialog" aria-modal="true" aria-label="Chat settings">
+      <div className="absolute inset-0 bg-slate-950/50 animate-in fade-in duration-200" onClick={onClose} aria-hidden="true" />
+      <div className="relative w-full max-w-lg bg-slate-50 rounded-t-3xl shadow-2xl max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom-4 fade-in duration-300 p-5 pb-8 space-y-4">
+        <div className="w-10 h-1.5 rounded-full bg-slate-300 mx-auto" />
+        <div className="flex items-start justify-between gap-2">
           <div>
-            <span className="text-[10px] font-extrabold uppercase text-[#C2410C] tracking-wider block">Chat settings</span>
-            <h2 className="text-xl font-black text-[#0F172A] tracking-tight">Friends and privacy</h2>
+            <h3 className="text-lg font-black text-[#0F172A] tracking-tight">Chat settings</h3>
+            <p className="text-[11px] text-slate-500 font-medium">Friends and privacy</p>
           </div>
           <button
             onClick={onClose}
@@ -1417,11 +1415,23 @@ const ChatSettingsSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             <X className="w-4 h-4" />
           </button>
         </div>
-        {note && <p className="text-[11px] text-emerald-600 font-bold">{note}</p>}
         {err && <p className="text-[11px] text-red-600 font-bold">{err}</p>}
-        {group('Who can send me a friend request', 'Requests only come from students at other centres.', 'friendRequests', FRIEND_REQUEST_OPTIONS)}
-        {group('Who can message me', 'Students in your centre can always message you. This decides new chats from other centres.', 'messages', MESSAGE_OPTIONS)}
-        {group('When I get a friend request', 'Automatic acceptance still only accepts students at other centres.', 'autoAccept', AUTO_ACCEPT_OPTIONS)}
+        {values ? (
+          <>
+            {group('Who can send me a friend request', 'Requests only come from students at other centres.', 'friendRequests', FRIEND_REQUEST_OPTIONS)}
+            {group('Who can message me', 'Students in your centre can always message you. This decides new chats from other centres.', 'messages', MESSAGE_OPTIONS)}
+            {group('When I get a friend request', 'Automatic acceptance still only accepts students at other centres.', 'autoAccept', AUTO_ACCEPT_OPTIONS)}
+            <button
+              onClick={save}
+              disabled={!dirty || saving}
+              className={`w-full py-3.5 rounded-2xl text-sm font-black tracking-wide shadow-sm transition ${dirty && !saving ? 'bg-[#EA580C] text-white cursor-pointer active:scale-[0.99]' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
+            >
+              {saving ? 'Saving…' : dirty ? 'Save changes' : 'Saved'}
+            </button>
+          </>
+        ) : (
+          !err && <p className="text-xs text-slate-400 font-medium">Loading your settings…</p>
+        )}
       </div>
     </div>
   );

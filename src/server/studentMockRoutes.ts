@@ -67,7 +67,6 @@ const CHOICES = ['A', 'B', 'C', 'D'] as const;
 const SAVE_BATCH_MAX = 50;
 const SAVE_PAYLOAD_MAX = 64 * 1024;
 const SAVE_PER_MINUTE = 30; // per server instance; the payload cap is the real guard
-const USERNAME_CHANGE_COOLDOWN_MS = 30 * 24 * 60 * 60 * 1000;
 const STATUS_CACHE_TTL_MS = 60 * 1000;
 const STATUS_CACHE_MAX = 500;
 
@@ -180,18 +179,14 @@ async function usernameStatusFor(ctx: UsernameCtx) {
   const doc = await findUsernameByUid(ctx.caller.uid);
   const username = doc ? String((doc.data() as any).username || '') : '';
   const lastChangedAt = doc ? String((doc.data() as any).lastChangedAt || (doc.data() as any).updatedAt || '') : '';
-  const parsed = Date.parse(lastChangedAt);
-  const canChangeAt = doc && Number.isFinite(parsed)
-    ? new Date(parsed + USERNAME_CHANGE_COOLDOWN_MS).toISOString()
-    : null;
-  const canChange = !doc || !Number.isFinite(parsed) || Date.now() - parsed >= USERNAME_CHANGE_COOLDOWN_MS;
-  return { username, lastChangedAt: lastChangedAt || null, canChangeAt, canChange, studentId: ctx.studentId };
+  // Usernames are changeable at any time: no cooldown, nothing to wait for.
+  return { username, lastChangedAt: lastChangedAt || null, canChangeAt: null, canChange: true, studentId: ctx.studentId };
 }
 
 /** Claim or change the caller's username: one transaction so two students can
  * never hold one name. Shared by the mock gate and the Profile screen. */
 async function claimStudentUsername(ctx: UsernameCtx, name: string): Promise<{ username: string; changed: boolean }> {
-  if (!/^[A-Za-z0-9_]{4,16}$/.test(name)) throw httpError(400, 'Usernames are 4 to 16 letters, numbers or underscores.');
+  if (!/^[A-Za-z0-9_-]{4,16}$/.test(name)) throw httpError(400, 'Usernames are 4 to 16 letters, numbers, underscores or dashes.');
   const lower = name.toLowerCase();
   if (USERNAME_BLOCKED.some((w) => lower.includes(w))) throw httpError(400, 'That name is not allowed. Pick another.');
   const nowIso = new Date().toISOString();
@@ -200,10 +195,6 @@ async function claimStudentUsername(ctx: UsernameCtx, name: string): Promise<{ u
     const mine = await tx.get(adminDb.collection(USERNAMES).where('studentId', '==', ctx.studentId));
     const current = mine.docs[0] || null;
     if (current) {
-      const lastChange = Date.parse(String((current.data() as any).lastChangedAt || (current.data() as any).updatedAt || ''));
-      if (Number.isFinite(lastChange) && Date.now() - lastChange < USERNAME_CHANGE_COOLDOWN_MS) {
-        throw httpError(409, 'You can change your username once a month.');
-      }
       if (current.id === lower) {
         // Same name, nothing to do.
         return;
@@ -512,8 +503,8 @@ export function registerStudentMockRoutes(app: express.Express): void {
     try {
       await requireStudent(req);
       const name = String(req.query.name || '').trim();
-      if (!/^[A-Za-z0-9_]{4,16}$/.test(name)) {
-        return res.json({ ok: true, name, valid: false, available: false, reason: 'Usernames are 4 to 16 letters, numbers or underscores.' });
+      if (!/^[A-Za-z0-9_-]{4,16}$/.test(name)) {
+        return res.json({ ok: true, name, valid: false, available: false, reason: 'Usernames are 4 to 16 letters, numbers, underscores or dashes.' });
       }
       const lower = name.toLowerCase();
       if (USERNAME_BLOCKED.some((w) => lower.includes(w))) {
@@ -563,8 +554,8 @@ export function registerStudentMockRoutes(app: express.Express): void {
     try {
       await requireStudent(req);
       const name = String(req.query.name || '').trim();
-      if (!/^[A-Za-z0-9_]{4,16}$/.test(name)) {
-        return res.json({ ok: true, name, valid: false, available: false, reason: 'Usernames are 4 to 16 letters, numbers or underscores.' });
+      if (!/^[A-Za-z0-9_-]{4,16}$/.test(name)) {
+        return res.json({ ok: true, name, valid: false, available: false, reason: 'Usernames are 4 to 16 letters, numbers, underscores or dashes.' });
       }
       const lower = name.toLowerCase();
       if (USERNAME_BLOCKED.some((w) => lower.includes(w))) {

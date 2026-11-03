@@ -921,35 +921,35 @@ export const StudentPortal: React.FC = () => {
                   aria-label="Chat menu"
                   className="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2"
                 >
-                  {/* Status (centre of the arc, largest, filled orange) */}
+                  {/* Status (first on the arc, left wing) */}
                   <button
                     type="button"
                     role="menuitem"
                     onClick={openStatusScreen}
                     aria-label="Status"
-                    className={`absolute w-14 h-14 rounded-full text-white flex items-center justify-center shadow-xl cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-200 ${prefersReducedMotion ? '' : 'animate-in fade-in zoom-in-95 duration-200'}`}
-                    style={{ left: 0, top: -84, transform: 'translate(-50%, -50%)', background: 'linear-gradient(145deg, #EA580C, #9A3412)' }}
+                    className={`absolute w-12 h-12 rounded-full bg-white text-[#EA580C] flex items-center justify-center shadow-lg cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 ${prefersReducedMotion ? '' : 'animate-in fade-in zoom-in-95 duration-200'}`}
+                    style={{ left: -72, top: -42, transform: 'translate(-50%, -50%)' }}
                   >
-                    <svg viewBox="0 0 24 24" className="w-7 h-7" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden="true">
                       <circle cx="12" cy="12" r="9" strokeDasharray="3.5 3.5" />
                       <path d="M12 8.5v7M8.5 12h7" />
                     </svg>
-                    <span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 whitespace-nowrap text-[11px] font-bold text-white pointer-events-none">
+                    <span className="absolute top-full mt-2 left-1/2 -translate-x-1/2 whitespace-nowrap text-[11px] font-bold text-white pointer-events-none">
                       Status
                     </span>
                   </button>
-                  {/* Chats (left of the arc) */}
+                  {/* Chats (centre of the arc, largest, filled orange) */}
                   <button
                     type="button"
                     ref={fanChatsRef}
                     role="menuitem"
                     onClick={() => openChatSection('chats')}
                     aria-label="Chats"
-                    className={`absolute w-12 h-12 rounded-full bg-white text-[#EA580C] flex items-center justify-center shadow-lg cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 ${prefersReducedMotion ? '' : 'animate-in fade-in zoom-in-95 duration-200'}`}
-                    style={{ left: -72, top: -42, transform: 'translate(-50%, -50%)' }}
+                    className={`absolute w-14 h-14 rounded-full text-white flex items-center justify-center shadow-xl cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-200 ${prefersReducedMotion ? '' : 'animate-in fade-in zoom-in-95 duration-200'}`}
+                    style={{ left: 0, top: -84, transform: 'translate(-50%, -50%)', background: 'linear-gradient(145deg, #EA580C, #9A3412)' }}
                   >
-                    <MessageCircle className="w-6 h-6" />
-                    <span className="absolute top-full mt-2 left-1/2 -translate-x-1/2 whitespace-nowrap text-[11px] font-bold text-white pointer-events-none">
+                    <MessageCircle className="w-7 h-7" />
+                    <span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 whitespace-nowrap text-[11px] font-bold text-white pointer-events-none">
                       Chats
                     </span>
                   </button>

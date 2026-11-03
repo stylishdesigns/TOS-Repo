@@ -373,13 +373,12 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
   }, [usernameDraft, usernameInfo?.mine, usernameInfo?.username]);
 
   const saveUsername = async () => {
-    if (!usernameInfo?.mine || !usernameInfo.canChange) return;
+    if (!usernameInfo?.mine) return;
     setUsernameBusy(true);
     setUsernameError('');
     try {
       const r = await api('/api/student/profile/username', { method: 'POST', body: { name: usernameDraft.trim() } });
-      const nextCanChangeAt = r?.changed ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() : usernameInfo.canChangeAt;
-      setUsernameInfo({ username: String(r?.username || ''), lastChangedAt: new Date().toISOString(), canChangeAt: nextCanChangeAt, canChange: !r?.changed, mine: true });
+      setUsernameInfo({ username: String(r?.username || ''), lastChangedAt: new Date().toISOString(), canChangeAt: null, canChange: true, mine: true });
       setUsernameCheck(null);
       addToast({ type: 'success', title: 'Username Saved', description: `${String(r?.username || '')} now shows on chat and the mock leaderboard.` });
     } catch (e: any) {
@@ -1019,13 +1018,13 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                   </button>
                 </div>
 
-                {/* Profile picture: view it and change it right here. */}
-                <div className="flex items-center gap-4 pb-1">
-                  <div className="relative shrink-0">
+                {/* Profile picture: view it and change it right here, centred. */}
+                <div className="flex flex-col items-center text-center pb-1">
+                  <div className="relative">
                     {avatarPreview ? (
-                      <img src={avatarPreview} alt="" className="w-16 h-16 rounded-full object-cover border-2 border-[#EA580C]" />
+                      <img src={avatarPreview} alt="" className="w-24 h-24 rounded-full object-cover border-2 border-[#EA580C]" />
                     ) : (
-                      <div className="w-16 h-16 rounded-full bg-orange-50 border-2 border-[#EA580C] flex items-center justify-center text-[#C2410C] text-base font-black">
+                      <div className="w-24 h-24 rounded-full bg-orange-50 border-2 border-[#EA580C] flex items-center justify-center text-[#C2410C] text-xl font-black">
                         {student.name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase() || '').join('') || '?'}
                       </div>
                     )}
@@ -1033,24 +1032,22 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                       type="button"
                       onClick={() => photoInputRef.current?.click()}
                       disabled={photoBusy}
-                      className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-[#EA580C] text-white flex items-center justify-center shadow-md active:scale-95 transition disabled:opacity-60 cursor-pointer"
+                      className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-[#EA580C] text-white flex items-center justify-center shadow-md active:scale-95 transition disabled:opacity-60 cursor-pointer"
                       aria-label="Change profile picture"
                     >
-                      <Camera className="w-3.5 h-3.5" />
+                      <Camera className="w-4 h-4" />
                     </button>
                   </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-black text-slate-900">Profile picture</p>
-                    <button
-                      type="button"
-                      onClick={() => photoInputRef.current?.click()}
-                      disabled={photoBusy}
-                      className="text-xs font-bold text-[#EA580C] cursor-pointer disabled:opacity-60"
-                    >
-                      {photoBusy ? 'Uploading…' : avatarPreview ? 'Change picture' : 'Add a picture'}
-                    </button>
-                    {photoError ? <p className="text-xs font-bold text-rose-600 mt-0.5">{photoError}</p> : null}
-                  </div>
+                  <p className="text-sm font-black text-slate-900 mt-2">Profile picture</p>
+                  <button
+                    type="button"
+                    onClick={() => photoInputRef.current?.click()}
+                    disabled={photoBusy}
+                    className="text-xs font-bold text-[#EA580C] cursor-pointer disabled:opacity-60"
+                  >
+                    {photoBusy ? 'Uploading…' : avatarPreview ? 'Change picture' : 'Add a picture'}
+                  </button>
+                  {photoError ? <p className="text-xs font-bold text-rose-600 mt-0.5">{photoError}</p> : null}
                   <input
                     ref={photoInputRef}
                     type="file"
@@ -1099,10 +1096,12 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                     <input
                       type="email"
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm font-medium focus:border-orange-500 outline-none"
+                      readOnly
+                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm font-medium text-slate-500 outline-none cursor-not-allowed"
                     />
+                    <p className="text-[11px] text-slate-400 font-medium mt-1">
+                      Your email cannot be changed.
+                    </p>
                   </div>
 
                   <div>
@@ -1169,11 +1168,6 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                       </p>
                     ) : (
                       <>
-                        {!usernameInfo?.canChange && usernameInfo?.canChangeAt ? (
-                          <p className="text-xs text-amber-600 font-semibold leading-relaxed">
-                            You can change your username again on {new Date(usernameInfo.canChangeAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}.
-                          </p>
-                        ) : (
                           <>
                             <input
                               value={usernameDraft}
@@ -1192,7 +1186,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                               </p>
                             )}
                             {usernameDraft.trim().length > 0 && usernameDraft.trim().length < 4 && (
-                              <p className="text-xs text-slate-400 font-medium">At least 4 characters: letters, numbers or underscores.</p>
+                              <p className="text-xs text-slate-400 font-medium">At least 4 characters: letters, numbers, underscores or dashes.</p>
                             )}
                             {usernameError && <p className="text-xs font-bold text-rose-600">{usernameError}</p>}
                             <button
@@ -1204,7 +1198,6 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                               {usernameBusy ? 'Saving…' : usernameInfo?.username ? 'Save new username' : 'Set username'}
                             </button>
                           </>
-                        )}
                       </>
                     )}
                   </div>
