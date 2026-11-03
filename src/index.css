@@ -319,3 +319,16 @@ span.text-slate-600:not(.dark-bg-mode *) {
 .tos-student-dark .border-indigo-200 { border-color: #3730a3; }
 .tos-student-dark .border-sky-200 { border-color: #0c4a6e; }
 .tos-student-dark .text-\[\#1E293B\] { color: #e2e8f0; }
+
+/* Third wave: segmented toggles and pill pickers. In dark mode the active
+   pill was dark-on-dark and unreadable; it now carries the centre's orange
+   with a soft glow, and hover states stay light. */
+.tos-student-dark .bg-\[\#0F172A\].text-white.rounded-\[10px\],
+.tos-student-dark .bg-\[\#0F172A\].text-white.rounded-full {
+  background-image: linear-gradient(135deg, #C2410C, #EA580C);
+  box-shadow: 0 2px 8px rgba(234, 88, 12, 0.35);
+}
+.tos-student-dark .hover\:text-\[\#0F172A\]:hover { color: #f1f5f9; }
+.tos-student-dark .hover\:text-\[\#EA580C\]:hover { color: #fb923c; }
+.tos-student-dark .hover\:border-\[\#CBD5E1\]:hover { border-color: #2d3c5a; }
+.tos-student-dark .hover\:bg-\[\#FFF7ED\]:hover { background-color: #3a1a07; }
