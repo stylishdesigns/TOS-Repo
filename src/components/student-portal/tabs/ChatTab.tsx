@@ -1238,7 +1238,6 @@ const StarredScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
           <ChevronLeft className="w-4 h-4" />
         </button>
         <div>
-          <span className="text-[10px] font-extrabold uppercase text-[#C2410C] tracking-wider block">Communications</span>
           <h2 className="text-xl font-black text-[#0F172A] tracking-tight">Favourites</h2>
         </div>
       </div>
