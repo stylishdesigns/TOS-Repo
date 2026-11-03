@@ -251,16 +251,6 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({ student }) => {
         />
       ) : (
         <>
-          {/* Header Banner */}
-          <div className="pt-1">
-            <span className="text-[10px] font-extrabold uppercase text-[#C2410C] tracking-wider block">
-              {student.name} · {student.programmeName || 'Academic Schedule'}
-            </span>
-            <h2 className="text-xl font-black text-[#0F172A] tracking-tight">
-              Classes & Lectures
-            </h2>
-          </div>
-
           {/* 2. Week Strip: 7 days Mon - Sun */}
           <div className="grid grid-cols-7 gap-1.5 pb-1">
             {DAYS.map((day) => {

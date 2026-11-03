@@ -54,7 +54,7 @@ const ChatOrbIcon: React.FC<{ className?: string }> = ({ className }) => (
 export type TabType = 'home' | 'classes' | 'chat' | 'cbt' | 'results' | 'more';
 
 export const StudentPortal: React.FC = () => {
-  const { students, settings, isAdmin, attendanceSettings, attendanceLogs, entitlements, centreName } = useApp();
+  const { students, settings, isAdmin, attendanceSettings, attendanceLogs, entitlements, centreName, bgTheme } = useApp();
 
   const { user, loading: authLoading } = useFirebase();
   const [profileLoading, setProfileLoading] = useState(true);
@@ -499,6 +499,16 @@ export const StudentPortal: React.FC = () => {
       document.body.style.backgroundColor = prev;
     };
   }, []);
+
+  // Appearance: the student's Light / Dark pick in More. The screens stay as
+  // written; a scoped stylesheet flips their light surfaces while the body
+  // carries the marker class. Chat and status portals attach to the body
+  // too, so they follow along.
+  React.useEffect(() => {
+    if (bgTheme === 'dark') document.body.classList.add('tos-student-dark');
+    else document.body.classList.remove('tos-student-dark');
+    return () => document.body.classList.remove('tos-student-dark');
+  }, [bgTheme]);
 
   if (!isAdmin && (authLoading || profileLoading)) {
     return (

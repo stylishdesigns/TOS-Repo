@@ -593,6 +593,29 @@ export function registerStudentMockRoutes(app: express.Express): void {
   });
 
   // -----------------------------------------------------------------------
+  // Profile picture hosting: the signed-in caller must be an active student
+  // of a real centre, and the media host details come from this
+  // deployment's own environment, never from the client.
+  // -----------------------------------------------------------------------
+  app.post('/api/student/profile/upload-config', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const memberships = await listActiveMembershipsForUser(caller.uid, caller.email);
+      if (!memberships || memberships.length === 0) {
+        throw httpError(403, 'You are not an active student of any centre.');
+      }
+      const cloud = String(process.env.CLOUDINARY_CLOUD_NAME || '');
+      const preset = String(process.env.CLOUDINARY_UPLOAD_PRESET || '');
+      if (!cloud || !preset) throw httpError(500, 'Media hosting is not configured on this deployment.');
+      res.json({ ok: true, cloud, preset, folder: 'tos/avatar' });
+    } catch (error: any) {
+      if (error?.status) return res.status(error.status).json({ error: error.message });
+      console.error('[student-mock] profile upload config failed:', error?.message || error);
+      res.status(500).json({ error: 'Could not start your picture upload.' });
+    }
+  });
+
+  // -----------------------------------------------------------------------
   // POST start: one attempt, idempotent, the clock set on the server.
   // -----------------------------------------------------------------------
   // ---------------------------------------------------------------------------
