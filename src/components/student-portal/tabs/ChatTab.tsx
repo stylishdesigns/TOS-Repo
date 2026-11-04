@@ -1501,7 +1501,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
                     </p>
                   </div>
                 </div>
-                <p className="text-[11px] text-slate-400 font-medium">Private one-to-one chat inside your centre. Only the two of you can read it.</p>
+                <p className="text-[11px] text-slate-400 font-medium">Only the two of you can read this conversation.</p>
               </div>
             ) : (
               <div className="bg-slate-50 rounded-2xl p-3.5 space-y-2">

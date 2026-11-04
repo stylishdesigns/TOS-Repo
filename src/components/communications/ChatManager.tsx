@@ -485,15 +485,11 @@ const GroupsSection: React.FC<SectionProps> = ({ data, isAdmin, reload, addToast
       {staffFilter === 'personal' && !openGroup && (
         <button
           onClick={() => setPickerOpen(true)}
-          className="w-full flex items-center gap-3 bg-white rounded-2xl p-3.5 border border-dashed border-[#EA580C]/50 shadow-sm active:scale-[0.99] transition"
+          className="fixed bottom-24 right-4 z-30 w-14 h-14 rounded-full text-white flex items-center justify-center shadow-xl active:scale-95 transition"
+          style={{ background: 'linear-gradient(145deg, #EA580C, #9A3412)' }}
+          aria-label="Start a new chat"
         >
-          <div className="w-10 h-10 rounded-xl bg-orange-50 border border-orange-100 text-[#EA580C] flex items-center justify-center shrink-0">
-            <UserPlus className="w-4 h-4" />
-          </div>
-          <div className="flex-1 text-left">
-            <p className="text-sm font-black text-slate-900">New chat</p>
-            <p className="text-[11px] text-slate-500 font-medium">Message anyone in your centre.</p>
-          </div>
+          <UserPlus className="w-6 h-6" />
         </button>
       )}
 
@@ -578,20 +574,32 @@ const GroupsSection: React.FC<SectionProps> = ({ data, isAdmin, reload, addToast
             </div>
           ) : (
             <div className="flex items-start gap-3">
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${
-                g.kind === 'announcements' ? 'bg-amber-50 border-amber-100 text-amber-600' : 'bg-orange-50 border-orange-100 text-[#EA580C]'
-              }`}>
-                {g.kind === 'personal' ? <User className="w-4 h-4" /> : g.kind === 'announcements' ? <Megaphone className="w-4 h-4" /> : <MessageSquare className="w-4 h-4" />}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <p className="text-sm font-black text-slate-900">{g.name}</p>
-                  <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500">{kindLabel(g.kind)}</span>
+              {g.kind === 'personal' ? (
+                <span className="w-10 h-10 rounded-full bg-orange-50 border border-orange-100 text-[#EA580C] flex items-center justify-center text-xs font-black overflow-hidden shrink-0">
+                  {g.peerAvatar ? <img src={g.peerAvatar} alt="" className="w-full h-full object-cover" /> : initialsOf(g.name)}
+                </span>
+              ) : (
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${
+                  g.kind === 'announcements' ? 'bg-amber-50 border-amber-100 text-amber-600' : 'bg-orange-50 border-orange-100 text-[#EA580C]'
+                }`}>
+                  {g.kind === 'announcements' ? <Megaphone className="w-4 h-4" /> : <MessageSquare className="w-4 h-4" />}
                 </div>
-                <p className="text-[11px] text-slate-500 font-medium mt-0.5">
-                  {g.subject ? `Subject: ${g.subject} · ` : ''}{accessLabel(g)}
-                </p>
-                <p className="text-[10px] text-slate-400 font-medium mt-0.5">{g.kind !== 'personal' && `Created ${fmtDate(g.createdAt)}`}</p>
+              )}
+              <div className="flex-1 min-w-0">
+                {g.kind === 'personal' ? (
+                  <p className="text-sm font-black text-slate-900 truncate">{g.name}</p>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm font-black text-slate-900">{g.name}</p>
+                      <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500">{kindLabel(g.kind)}</span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                      {g.subject ? `Subject: ${g.subject} · ` : ''}{accessLabel(g)}
+                    </p>
+                    <p className="text-[10px] text-slate-400 font-medium mt-0.5">Created {fmtDate(g.createdAt)}</p>
+                  </>
+                )}
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
                 {isAdmin && g.kind !== 'personal' && (
@@ -1558,7 +1566,7 @@ const ThreadPanel: React.FC<{
                       </p>
                     </div>
                   </div>
-                  <p className="text-[11px] text-slate-400 font-medium">Private one-to-one chat inside your centre. Only the two of you can read it.</p>
+                  <p className="text-[11px] text-slate-400 font-medium">Only the two of you can read this conversation.</p>
                 </>
               ) : (
                 <>
