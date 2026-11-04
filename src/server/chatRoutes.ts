@@ -1098,7 +1098,7 @@ export function registerChatRoutes(app: express.Express): void {
         const entitlements = await getCentreEntitlements(centreId);
         if (entitlements.chat !== true) return res.status(403).json({ error: 'Chat is not part of your centre\u2019s plan yet.' });
       }
-      res.json(await statusSeenCore(caller, centreId, body));
+      res.json(await statusSeenCore(caller, centreId, body, { name: cleanStr(student.name, MAX_NAME_CHARS), username: await usernameFor(caller.uid) }));
     } catch (error: any) {
       handleRouteError(res, error, '[chat] status seen failed');
     }
@@ -1136,6 +1136,36 @@ export function registerChatRoutes(app: express.Express): void {
       res.json(await statusReplyCore(caller, centreId, body, { name: cleanStr(student.name, MAX_NAME_CHARS), username: await usernameFor(caller.uid), role: 'student' }));
     } catch (error: any) {
       handleRouteError(res, error, '[chat] status reply failed');
+    }
+  });
+
+  // Loving a status: one tap on, one tap off, stored per person with the
+  // status so the owner sees who loved it.
+  app.post('/api/student/chat/status/love', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const body = req.body || {};
+      const stuSnap = await getStudentDoc(caller.uid);
+      if (!stuSnap) return res.status(403).json({ error: 'No student record is linked to this account.' });
+      const student = stuSnap.data() as any;
+      let centreId = cleanStr(student.centreId, 120);
+      if (!centreId) return res.status(403).json({ error: 'No centre is linked to this account.' });
+      const requestedCentre = cleanStr(String((req.query || {}).centreId || ''), 120);
+      if (requestedCentre && requestedCentre !== centreId) {
+        if (requestedCentre !== TOS_STATUS_CENTRE) {
+          await requireMembership(caller, requestedCentre);
+          const otherEnt = await getCentreEntitlements(requestedCentre);
+          if (otherEnt.chat !== true) return res.status(403).json({ error: 'Chat is not part of your centre\u2019s plan yet.' });
+        }
+        centreId = requestedCentre;
+      } else {
+        await requireMembership(caller, centreId);
+        const entitlements = await getCentreEntitlements(centreId);
+        if (entitlements.chat !== true) return res.status(403).json({ error: 'Chat is not part of your centre\u2019s plan yet.' });
+      }
+      res.json(await statusLoveCore(caller, centreId, body, { name: cleanStr(student.name, MAX_NAME_CHARS), username: await usernameFor(caller.uid) }));
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] status love failed');
     }
   });
 
@@ -1202,7 +1232,7 @@ export function registerChatRoutes(app: express.Express): void {
     try {
       const caller = getCaller(req);
       if (!caller.tos) throw httpError(403, 'TOS staff only.');
-      res.json(await statusSeenCore(caller, TOS_STATUS_CENTRE, req.body || {}));
+      res.json(await statusSeenCore(caller, TOS_STATUS_CENTRE, req.body || {}, { name: 'TOS', username: '' }));
     } catch (error: any) {
       handleRouteError(res, error, '[chat] tos status seen failed');
     }
@@ -1215,6 +1245,16 @@ export function registerChatRoutes(app: express.Express): void {
       res.json(await statusReplyCore(caller, TOS_STATUS_CENTRE, req.body || {}, { name: 'TOS', username: '' }));
     } catch (error: any) {
       handleRouteError(res, error, '[chat] tos status reply failed');
+    }
+  });
+
+  app.post('/api/tos/chat/status/love', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      if (!caller.tos) throw httpError(403, 'TOS staff only.');
+      res.json(await statusLoveCore(caller, TOS_STATUS_CENTRE, req.body || {}, { name: 'TOS', username: '' }));
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] tos status love failed');
     }
   });
 
@@ -1300,7 +1340,7 @@ export function registerChatRoutes(app: express.Express): void {
       const caller = getCaller(req);
       const centreId = cleanStr(String(req.query.centreId || ''), 120);
       await staffStatusContext(caller, centreId);
-      res.json(await statusSeenCore(caller, centreId, req.body || {}));
+      res.json(await statusSeenCore(caller, centreId, req.body || {}, { name: await staffDisplayName(caller), username: '' }));
     } catch (error: any) {
       handleRouteError(res, error, '[chat] staff status seen failed');
     }
@@ -1314,6 +1354,17 @@ export function registerChatRoutes(app: express.Express): void {
       res.json(await statusReplyCore(caller, centreId, req.body || {}, { name: await staffDisplayName(caller), username: '', role: staffCtx.role }));
     } catch (error: any) {
       handleRouteError(res, error, '[chat] staff status reply failed');
+    }
+  });
+
+  app.post('/api/centre/chat/status/love', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const centreId = cleanStr(String(req.query.centreId || ''), 120);
+      const staffCtx = await staffStatusContext(caller, centreId);
+      res.json(await statusLoveCore(caller, centreId, req.body || {}, { name: await staffDisplayName(caller), username: '', role: staffCtx.role }));
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] staff status love failed');
     }
   });
 
@@ -1845,7 +1896,11 @@ export function registerChatRoutes(app: express.Express): void {
       if (!v) throw httpError(404, 'That message is no longer available.');
       if (v.uid !== caller.uid) throw httpError(403, 'You can only delete your own messages.');
       if (v.removed) return res.json({ ok: true });
-      await msgRef.set({ ...v, removed: { by: caller.uid, byRole: 'student', at: ServerValue.TIMESTAMP } });
+      // Total removal: the message disappears for everyone, sender and
+      // receivers alike, instead of leaving a "removed" placeholder.
+      await msgRef.remove();
+      const metaRef = adminRtdb.ref(`chat/groups/${ctx.group.id}/meta`);
+      await metaRef.transaction((m: any) => ({ ...(m || {}), msgCount: Math.max(0, (Number(m?.msgCount) || 0) - 1) }));
       res.json({ ok: true });
     } catch (error: any) {
       handleRouteError(res, error, '[chat] student remove failed');
@@ -2302,9 +2357,25 @@ async function statusUserCore(caller: Caller, centreId: string, ownerUid: string
 
   if (ownerUid === caller.uid) {
     for (const s of statuses) {
-      const viewsSnap = await adminRtdb.ref(`chat/statusSeenCount/${centreId}/${s.statusId}`).get();
+      const [viewsSnap, seenBySnap, repliesSnap, lovesSnap] = await Promise.all([
+        adminRtdb.ref(`chat/statusSeenCount/${centreId}/${s.statusId}`).get(),
+        adminRtdb.ref(`chat/statusSeenBy/${centreId}/${s.statusId}`).get(),
+        adminRtdb.ref(`chat/statusReplies/${centreId}/${s.statusId}`).get(),
+        adminRtdb.ref(`chat/statusLoves/${centreId}/${s.statusId}`).get(),
+      ]);
       s.views = Number(viewsSnap.val()) || 0;
-      const repliesSnap = await adminRtdb.ref(`chat/statusReplies/${centreId}/${s.statusId}`).get();
+      const seenBy: any[] = [];
+      seenBySnap.forEach((c) => {
+        const v = c.val() || {};
+        seenBy.push({
+          uid: cleanStr(c.key as string, 64),
+          name: cleanStr(v.name, MAX_NAME_CHARS),
+          username: cleanStr(v.username, 16),
+          at: Number(v.at) || 0,
+        });
+      });
+      seenBy.sort((a, b) => b.at - a.at);
+      s.viewers = seenBy.slice(0, 100);
       const replies: any[] = [];
       repliesSnap.forEach((c) => {
         const v = c.val() || {};
@@ -2318,6 +2389,23 @@ async function statusUserCore(caller: Caller, centreId: string, ownerUid: string
       });
       replies.sort((a, b) => b.at - a.at);
       s.replies = replies.slice(0, 50);
+      const loves: any[] = [];
+      lovesSnap.forEach((c) => {
+        const v = c.val() || {};
+        loves.push({
+          uid: cleanStr(c.key as string, 64),
+          name: cleanStr(v.name, MAX_NAME_CHARS),
+          username: cleanStr(v.username, 16),
+          at: Number(v.at) || 0,
+        });
+      });
+      loves.sort((a, b) => b.at - a.at);
+      s.loves = loves.slice(0, 100);
+    }
+  } else {
+    for (const s of statuses) {
+      const loved = await adminRtdb.ref(`chat/statusLoves/${centreId}/${s.statusId}/${caller.uid}`).get();
+      if (loved.exists()) s.lovedByMe = true;
     }
   }
 
@@ -2494,7 +2582,7 @@ async function verifyChatFileSize(url: string, filesMaxMb: number): Promise<void
   }
 }
 
-async function statusSeenCore(caller: Caller, centreId: string, body: Record<string, unknown>): Promise<Record<string, unknown>> {
+async function statusSeenCore(caller: Caller, centreId: string, body: Record<string, unknown>, identity?: { name: string; username: string }): Promise<Record<string, unknown>> {
   const st = (await getTosChat()).status;
   if (!st.enabled) return { ok: true };
 
@@ -2516,6 +2604,16 @@ async function statusSeenCore(caller: Caller, centreId: string, body: Record<str
     await seenRef.set({ at: now });
     const countRef = adminRtdb.ref(`chat/statusSeenCount/${centreId}/${statusId}`);
     await countRef.set(ServerValue.increment(1));
+    if (identity) {
+      // The owner's viewer lists people by name, so remember the viewer's
+      // name alongside the count. Statuses expire in a day, so this node
+      // goes with them.
+      await adminRtdb.ref(`chat/statusSeenBy/${centreId}/${statusId}/${caller.uid}`).set({
+        at: now,
+        name: cleanStr(identity.name, MAX_NAME_CHARS),
+        username: cleanStr(identity.username, 16),
+      });
+    }
   }
   return { ok: true };
 }
@@ -2595,6 +2693,40 @@ async function statusReplyCore(caller: Caller, centreId: string, body: Record<st
     }
   }
   return { ok: true, reply: { ...reply, replyId: ref.key } };
+}
+
+/** Loving a status: one toggle per person, stored with the status. The
+ *  owner reads the lovers back with names so replies and loves show
+ *  together in their viewer. */
+async function statusLoveCore(caller: Caller, centreId: string, body: Record<string, unknown>, identity: { name: string; username: string }): Promise<Record<string, unknown>> {
+  const tosChat = await getTosChat();
+  const st = tosChat.status;
+  if (!st.enabled) throw httpError(403, 'Status is not turned on.');
+
+  const ownerUid = cleanStr(body.ownerUid, 64);
+  const statusId = cleanStr(body.statusId, 64);
+  if (!ownerUid || !statusId) throw httpError(400, 'Which status is this?');
+  if (ownerUid === caller.uid) throw httpError(400, 'You cannot love your own status.');
+
+  const now = Date.now();
+  const statusSnap = await adminRtdb.ref(`chat/status/${centreId}/${ownerUid}/${statusId}`).get();
+  const sv = statusSnap.val() || {};
+  if (!statusSnap.exists() || (Number(sv.expiresAt) || 0) <= now) {
+    throw httpError(404, 'That status is gone.');
+  }
+
+  const loveRef = adminRtdb.ref(`chat/statusLoves/${centreId}/${statusId}/${caller.uid}`);
+  const already = await loveRef.get();
+  if (already.exists()) {
+    await loveRef.remove();
+    return { ok: true, loved: false };
+  }
+  await loveRef.set({
+    at: now,
+    name: cleanStr(identity.name, MAX_NAME_CHARS),
+    username: cleanStr(identity.username, 16),
+  });
+  return { ok: true, loved: true };
 }
 
 /** Staff status gate: a centre membership with a staff role plus the chat
@@ -2754,7 +2886,10 @@ async function staffStatusContext(caller: Caller, centreId: string) {
       const v = snap.val();
       if (!v) throw httpError(404, 'That message is no longer available.');
       if (v.removed) return res.json({ ok: true });
-      await msgRef.set({ ...v, removed: { by: caller.uid, byRole: ctx.membership.role, at: ServerValue.TIMESTAMP } });
+      // Total removal for everyone, not a placeholder.
+      await msgRef.remove();
+      const metaRef = adminRtdb.ref(`chat/groups/${ctx.group.id}/meta`);
+      await metaRef.transaction((m: any) => ({ ...(m || {}), msgCount: Math.max(0, (Number(m?.msgCount) || 0) - 1) }));
       res.json({ ok: true });
     } catch (error: any) {
       handleRouteError(res, error, '[chat] staff remove failed');
@@ -3303,7 +3438,10 @@ async function staffStatusContext(caller: Caller, centreId: string) {
       const v = m.val();
       if (!v) throw httpError(404, 'That message is no longer available.');
       if (v.removed) return res.json({ ok: true });
-      await msgRef.set({ ...v, removed: { by: caller.uid, byRole: 'tos', at: ServerValue.TIMESTAMP } });
+      // Total removal for everyone, not a placeholder.
+      await msgRef.remove();
+      const metaRef = adminRtdb.ref(`chat/groups/${group.id}/meta`);
+      await metaRef.transaction((m: any) => ({ ...(m || {}), msgCount: Math.max(0, (Number(m?.msgCount) || 0) - 1) }));
       res.json({ ok: true });
     } catch (error: any) {
       handleRouteError(res, error, '[chat] tos remove failed');

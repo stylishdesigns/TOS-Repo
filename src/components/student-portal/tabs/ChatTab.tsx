@@ -79,10 +79,17 @@ interface ChatMessage {
   removed: boolean;
   mine: boolean;
   commentCount?: number;
+  // An optimistic message the sender is still uploading: it shows in the
+  // room right away with its progress on the media itself.
+  pending?: boolean;
+  progress?: number;
+  localUrl?: string;
   forwardedFrom?: string | null;
   replyTo?: { id: string; username: string; excerpt: string } | null;
   reactions?: Record<string, string> | null;
 }
+
+let chatUploadCfg: { cloud: string; preset: string; folder: string; at: number } | null = null;
 
 interface ChatComment {
   id: string;
@@ -673,6 +680,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
   const [postingComment, setPostingComment] = useState(false);
   const [toast, setToast] = useState('');
   const [actionMsg, setActionMsg] = useState<ChatMessage | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<ChatMessage | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [forwardMsg, setForwardMsg] = useState<ChatMessage | null>(null);
@@ -804,11 +812,19 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
     setAttachFile(file);
   }, [resp, showToast]);
 
-  const uploadChatFile = useCallback(async (file: File): Promise<string> => {
-    const cfg = await api('/api/student/chat/upload-config');
-    const cloud = String((cfg as any)?.cloud || '');
-    const preset = String((cfg as any)?.preset || '');
-    const folder = String((cfg as any)?.folder || 'tos/chat');
+  const uploadChatFile = useCallback(async (file: File, onProgress?: (pct: number) => void): Promise<string> => {
+    let cached = chatUploadCfg && Date.now() - chatUploadCfg.at < 10 * 60 * 1000 ? chatUploadCfg : null;
+    if (!cached) {
+      const cfg = await api('/api/student/chat/upload-config');
+      cached = {
+        cloud: String((cfg as any)?.cloud || ''),
+        preset: String((cfg as any)?.preset || ''),
+        folder: String((cfg as any)?.folder || 'tos/chat'),
+        at: Date.now(),
+      };
+      chatUploadCfg = cached;
+    }
+    const { cloud, preset, folder } = cached;
     if (!cloud || !preset) throw new Error('File hosting is not configured. Try again later.');
     const endpoint = kindOf(file) === 'image' ? 'image' : kindOf(file) === 'video' || kindOf(file) === 'audio' ? 'video' : 'raw';
     const form = new FormData();
@@ -820,7 +836,11 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
       const xhr = new XMLHttpRequest();
       xhr.open('POST', `https://api.cloudinary.com/v1_1/${cloud}/${endpoint}/upload`);
       xhr.upload.onprogress = (e) => {
-        if (e.lengthComputable) setAttachProgress(Math.max(1, Math.round((e.loaded / e.total) * 100)));
+        if (e.lengthComputable) {
+          const pct = Math.max(1, Math.round((e.loaded / e.total) * 100));
+          setAttachProgress(pct);
+          if (onProgress) onProgress(pct);
+        }
       };
       xhr.onload = () => {
         try {
@@ -833,6 +853,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
       xhr.send(form);
     });
     setAttachProgress(100);
+    if (onProgress) onProgress(100);
     return url;
   }, []);
 
@@ -847,29 +868,60 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
     const t = text.trim();
     if ((!t && !attachFile) || sending) return;
     setSending(true);
+    const file = attachFile;
+    const rt = replyTo;
+    // The message shows in the room straight away, media included, with the
+    // upload percentage on the media itself instead of a loading screen.
+    const penId = `pending-${Date.now()}`;
+    const localUrl = file && (kindOf(file) === 'image' || kindOf(file) === 'video') ? URL.createObjectURL(file) : undefined;
+    const pen: ChatMessage = {
+      id: penId,
+      uid: '',
+      username: '',
+      role: '',
+      text: t,
+      photoUrl: null,
+      fileUrl: null,
+      fileName: file ? file.name : null,
+      fileKind: file ? kindOf(file) : null,
+      fileSize: file ? file.size : null,
+      at: Date.now(),
+      removed: false,
+      mine: true,
+      pending: true,
+      progress: 0,
+      localUrl,
+      replyTo: rt ? { id: rt.id, username: rt.username, excerpt: rt.text || (rt.fileKind === 'image' ? 'Photo' : rt.fileName || 'File') } : null,
+    };
+    setMessages((prev) => [...prev, pen]);
+    setText('');
+    setAttachFile(null);
+    setAttachProgress(0);
+    setReplyTo(null);
+    scrollToBottom();
     try {
       let fileUrl: string | undefined;
-      if (attachFile) {
-        fileUrl = await uploadChatFile(attachFile);
+      if (file) {
+        fileUrl = await uploadChatFile(file, (pct) => {
+          setMessages((prev) => prev.map((x) => (x.id === penId && x.pending ? { ...x, progress: pct } : x)));
+        });
       }
       await api(`/api/student/chat/groups/${groupId}/messages`, {
         method: 'POST',
         body: {
           text: t,
           fileUrl,
-          fileName: attachFile ? attachFile.name : undefined,
-          fileSize: attachFile ? attachFile.size : undefined,
-          fileKind: attachFile ? kindOf(attachFile) : undefined,
-          replyTo: replyTo ? replyTo.id : undefined,
+          fileName: file ? file.name : undefined,
+          fileSize: file ? file.size : undefined,
+          fileKind: file ? kindOf(file) : undefined,
+          replyTo: rt ? rt.id : undefined,
         },
       });
-      setText('');
-      setAttachFile(null);
-      setAttachProgress(0);
-      setReplyTo(null);
+      setMessages((prev) => prev.filter((x) => x.id !== penId));
       await loadLatest();
       scrollToBottom();
     } catch (e: any) {
+      setMessages((prev) => prev.filter((x) => x.id !== penId));
       showToast(String(e?.message || 'Your message could not be sent. Try again.'));
     } finally {
       setAttachProgress(0);
@@ -930,8 +982,8 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
     setActionBusy(true);
     try {
       await api(`/api/student/chat/groups/${groupId}/messages/${m.id}/remove`, { method: 'POST', body: {} });
-      setMessages((prev) => prev.map((x) => (x.id === m.id ? { ...x, removed: true } : x)));
-      roomCache.set(groupId, messages.slice(-200));
+      setMessages((prev) => prev.filter((x) => x.id !== m.id));
+      roomCache.set(groupId, messages.filter((x) => x.id !== m.id).slice(-200));
       showToast('Message deleted');
     } catch (e: any) {
       showToast(String(e?.message || 'Could not delete the message. Try again.'));
@@ -1060,10 +1112,31 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
         ? 'bg-sky-100 text-sky-700'
         : 'bg-violet-100 text-violet-700';
 
+  const dayKey = (at: number): string => {
+    const d = new Date(at);
+    return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+  };
+  const daySeparatorLabel = (at: number, prevAt: number | null): string | null => {
+    if (prevAt != null && dayKey(at) === dayKey(prevAt)) return null;
+    const d = new Date(at);
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const that = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    const diffDays = Math.round((today - that) / 86400000);
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
+    return d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  };
+
   const bubble = (m: ChatMessage) => {
     const chip = roleChip(m);
     const emojiOnly = !m.removed && !!m.text && isEmojiOnly(m.text);
     const press = makeLongPress(() => { if (!m.removed) setActionMsg(m); });
+    // A message still uploading shows the file it will become, straight from
+    // the phone, with its percentage on top.
+    const mediaUrl = m.localUrl || m.fileUrl || m.photoUrl || null;
+    const mediaKind = m.fileKind || (m.photoUrl ? 'image' : null);
+    const uploading = !!m.pending && (m.progress ?? 0) < 100;
     return (
       <div key={m.id} className={`flex flex-col ${m.mine ? 'items-end' : 'items-start'} px-1`}>
         <div
@@ -1105,33 +1178,50 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
               mine={m.mine && !emojiOnly}
               className={`text-[13px] leading-relaxed font-medium whitespace-pre-wrap break-words ${m.mine ? 'text-white' : 'text-slate-800'}`}
             />
-          ) : m.photoUrl ? (
-            <img src={m.photoUrl} alt="Shared photo" onClick={() => setImageViewerUrl(m.photoUrl as string)} className="rounded-xl max-h-60 w-auto cursor-pointer" />
           ) : null}
-          {!m.removed && m.fileUrl && (m.fileKind === 'image' ? (
-            <img src={m.fileUrl} alt="Shared photo" onClick={() => setImageViewerUrl(m.fileUrl as string)} className="rounded-xl max-h-60 w-auto cursor-pointer" />
-          ) : m.fileKind === 'video' ? (
-            <button
-              onClick={() => openVideo(m.fileUrl as string)}
-              className="relative rounded-xl overflow-hidden w-44 h-44 bg-slate-900 flex items-center justify-center"
-              aria-label="Play video"
-            >
-              <video src={m.fileUrl} preload="metadata" muted playsInline tabIndex={-1} aria-hidden="true" className="absolute inset-0 w-full h-full object-cover" />
-              <span className="relative w-12 h-12 rounded-full bg-black/40 border border-white/50 flex items-center justify-center">
-                <Play className="w-5 h-5 text-white ml-0.5" fill="currentColor" />
-              </span>
-              <span className="absolute bottom-1.5 right-2 text-[9px] font-bold text-white/90 bg-black/50 rounded px-1">{m.fileSize ? fmtSize(m.fileSize) : 'Video'}</span>
-            </button>
-          ) : (
-            <a href={m.fileUrl} target="_blank" rel="noreferrer" className="flex items-center gap-2.5 rounded-xl px-3 py-2 max-w-[250px] bg-white/10 border border-white/20">
-              <span className="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center shrink-0 text-white font-black text-[10px] uppercase">{(m.fileName || 'file').split('.').pop()?.slice(0, 4)}</span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-[12px] font-bold text-white truncate">{m.fileName || 'File'}</span>
-                <span className="block text-[10px] font-medium text-white/70">{m.fileSize ? fmtSize(m.fileSize) : 'Tap to open'}</span>
-              </span>
-              <ExternalLink className="w-4 h-4 text-white/80 shrink-0" />
-            </a>
-          ))}
+          {!m.removed && mediaUrl && mediaKind === 'image' && (
+            <span className="relative block rounded-xl overflow-hidden w-44 h-64">
+              <img
+                src={mediaUrl}
+                alt="Shared photo"
+                onClick={() => { if (!m.pending) setImageViewerUrl(mediaUrl as string); }}
+                className="w-full h-full object-cover cursor-pointer block"
+              />
+              {uploading && (
+                <span className="absolute inset-0 bg-black/45 flex items-center justify-center text-white text-xs font-black">{m.progress ?? 0}%</span>
+              )}
+            </span>
+          )}
+          {!m.removed && mediaUrl && mediaKind === 'video' && (
+            <span className="relative block">
+              <button
+                onClick={() => { if (!m.pending) openVideo(mediaUrl as string); }}
+                className="relative rounded-xl overflow-hidden w-44 h-64 bg-slate-900 flex items-center justify-center"
+                aria-label="Play video"
+              >
+                <video src={mediaUrl} preload="metadata" muted playsInline tabIndex={-1} aria-hidden="true" className="absolute inset-0 w-full h-full object-cover" />
+                <span className="relative w-12 h-12 rounded-full bg-black/40 border border-white/50 flex items-center justify-center">
+                  <Play className="w-5 h-5 text-white ml-0.5" fill="currentColor" />
+                </span>
+                <span className="absolute bottom-1.5 right-2 text-[9px] font-bold text-white/90 bg-black/50 rounded px-1">{m.fileSize ? fmtSize(m.fileSize) : 'Video'}</span>
+              </button>
+              {uploading && (
+                <span className="absolute inset-0 rounded-xl bg-black/45 flex items-center justify-center text-white text-xs font-black pointer-events-none">{m.progress ?? 0}%</span>
+              )}
+            </span>
+          )}
+          {!m.removed && mediaUrl && mediaKind !== 'image' && mediaKind !== 'video' && (
+            <span className="relative block">
+              <a href={mediaUrl} target="_blank" rel="noreferrer" className="flex items-center gap-2.5 rounded-xl px-3 py-2 max-w-[250px] bg-white/10 border border-white/20">
+                <span className="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center shrink-0 text-white font-black text-[10px] uppercase">{(m.fileName || 'file').split('.').pop()?.slice(0, 4)}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[12px] font-bold text-white truncate">{m.fileName || 'File'}</span>
+                  <span className="block text-[10px] font-medium text-white/70">{uploading ? `Uploading ${m.progress ?? 0}%` : m.fileSize ? fmtSize(m.fileSize) : 'Tap to open'}</span>
+                </span>
+                <ExternalLink className="w-4 h-4 text-white/80 shrink-0" />
+              </a>
+            </span>
+          )}
           <p className={`text-[9px] mt-1 text-right font-bold ${m.mine ? 'text-orange-100' : 'text-slate-400'}`}>
             {fmtTime(m.at)}
           </p>
@@ -1209,7 +1299,21 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
             <p className="text-xs text-slate-400 font-medium">No messages yet. Say hello.</p>
           </div>
         )}
-        {messages.map(bubble)}
+        {messages.map((m, i) => {
+          const label = daySeparatorLabel(m.at, i > 0 ? messages[i - 1].at : null);
+          return (
+            <React.Fragment key={m.id}>
+              {label && (
+                <div className="sticky top-0 z-20 flex justify-center py-1">
+                  <span className="bg-slate-900/85 text-white text-[10px] font-bold px-3 py-1 rounded-full shadow">
+                    {label}
+                  </span>
+                </div>
+              )}
+              {bubble(m)}
+            </React.Fragment>
+          );
+        })}
       </div>
 
       <div className="relative shrink-0 bg-white border-t border-slate-200 px-3 sm:px-4 pt-2 pb-2">
@@ -1284,7 +1388,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
           onReact={(emoji) => doReact(actionMsg, emoji)}
           onReply={canPost ? () => setReplyTo(actionMsg) : undefined}
           onStar={() => doStar(actionMsg)}
-          onDelete={actionMsg.mine && !actionMsg.removed ? () => doDelete(actionMsg) : undefined}
+          onDelete={actionMsg.mine && !actionMsg.removed ? () => setConfirmDelete(actionMsg) : undefined}
           onCopy={actionMsg.text ? () => doCopy(actionMsg) : undefined}
           onForward={!actionMsg.removed && postableGroups.length > 0 ? () => setForwardMsg(actionMsg) : undefined}
         />
@@ -1471,6 +1575,30 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
                 aria-label="Send comment"
               >
                 {postingComment ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmDelete && (
+        <div className="fixed inset-0 z-[60] bg-slate-950/50 flex items-center justify-center p-6" onClick={() => { if (!actionBusy) setConfirmDelete(null); }}>
+          <div className="w-full max-w-xs bg-white rounded-3xl p-5 space-y-3 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <p className="text-sm font-black text-slate-900">Delete this message?</p>
+            <p className="text-xs text-slate-500 font-medium leading-relaxed">It will be removed for everyone in this chat, you and them. This cannot be undone.</p>
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={() => setConfirmDelete(null)}
+                className="flex-1 h-10 rounded-xl bg-slate-100 text-slate-700 text-xs font-black active:scale-95 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => { const m = confirmDelete; setConfirmDelete(null); if (m) doDelete(m); }}
+                disabled={actionBusy}
+                className="flex-1 h-10 rounded-xl bg-red-600 text-white text-xs font-black active:scale-95 transition disabled:opacity-50"
+              >
+                {actionBusy ? 'Deleting...' : 'Delete'}
               </button>
             </div>
           </div>

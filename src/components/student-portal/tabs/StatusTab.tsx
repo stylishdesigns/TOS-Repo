@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, X, Image as ImageIcon, Film, Music, Volume2, VolumeX } from 'lucide-react';
+import { Plus, X, Eye, Heart, Loader2, MessageCircle, Image as ImageIcon, Film, Music, Volume2, VolumeX } from 'lucide-react';
 import { Student } from '../../../types';
 import { api } from '../../tos/tosShared';
 import { loadLastGood, saveLastGood } from '../../../lib/lastGood';
@@ -47,6 +47,13 @@ interface StatusReply {
   replyId?: string;
 }
 
+interface ViewerPerson {
+  uid: string;
+  name: string;
+  username: string;
+  at: number;
+}
+
 interface ViewerStatus {
   statusId: string;
   kind: string;
@@ -60,6 +67,9 @@ interface ViewerStatus {
   durationSeconds?: number;
   views?: number;
   replies?: StatusReply[];
+  viewers?: ViewerPerson[];
+  loves?: ViewerPerson[];
+  lovedByMe?: boolean;
 }
 
 interface StatusOverview {
@@ -179,6 +189,29 @@ const STATUS_BG = [
   '#0F172A', '#7C3AED', '#2563EB', '#059669',
   '#CA8A04', '#DB2777', '#EA580C', '#0F766E',
 ];
+
+/** A small preview of what an update holds, for the circles and the My
+ *  status rows: the photo itself, a video frame, or the words for text. */
+const StatusThumb: React.FC<{ kind: string; photoUrl?: string; videoUrl?: string }> = ({ kind, photoUrl, videoUrl }) => {
+  if (kind === 'photo' && photoUrl) {
+    return <img src={photoUrl} alt="" loading="lazy" className="w-full h-full object-cover" />;
+  }
+  if (kind === 'video' && videoUrl) {
+    return (
+      <video
+        src={videoUrl.includes('#') ? videoUrl : `${videoUrl}#t=0.1`}
+        preload="metadata"
+        muted
+        playsInline
+        tabIndex={-1}
+        aria-hidden="true"
+        className="w-full h-full object-cover pointer-events-none"
+      />
+    );
+  }
+  if (kind === 'music') return <Music className="w-5 h-5" />;
+  return <span className="text-[11px] font-black leading-none">Aa</span>;
+};
 
 /** The short word for an update's kind on the My status rows. Text rows
  *  show a snippet of the words instead. */
@@ -594,16 +627,26 @@ export const StatusViewer: React.FC<{
   // When the owner opens one specific update of theirs from the My status
   // list, the viewer starts on that update instead of the first one.
   startStatusId?: string;
-}> = ({ person, mine, call, settings, onClose, onSeenUpdate, startStatusId }) => {
+  // The updates as the status page already holds them, so the viewer paints
+  // the moment it is tapped instead of waiting on the network.
+  seed?: ViewerStatus[];
+}> = ({ person, mine, call, settings, onClose, onSeenUpdate, startStatusId, seed }) => {
   useEscape(onClose);
   useLockBodyScroll();
-  const [statuses, setStatuses] = useState<ViewerStatus[] | null>(null);
-  const [idx, setIdx] = useState(0);
+  const [statuses, setStatuses] = useState<ViewerStatus[] | null>(seed && seed.length ? seed : null);
+  const [idx, setIdx] = useState(() => {
+    if (startStatusId && seed && seed.length) {
+      const at = seed.findIndex((x: ViewerStatus) => x.statusId === startStatusId);
+      if (at >= 0) return at;
+    }
+    return 0;
+  });
   const [err, setErr] = useState('');
   const [replyText, setReplyText] = useState('');
   const [replyBusy, setReplyBusy] = useState(false);
   const [replyNote, setReplyNote] = useState('');
   const seenFired = React.useRef<Set<string>>(new Set());
+  const [ownerSheet, setOwnerSheet] = useState<'viewers' | 'replies' | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -642,6 +685,36 @@ export const StatusViewer: React.FC<{
       body: { ownerUid: person.uid, statusId: current.statusId },
     }).catch(() => undefined);
   }, [current, mine, person.uid, onSeenUpdate]);
+
+  const [lovingBusy, setLovingBusy] = useState(false);
+  const toggleLove = async () => {
+    if (!current || lovingBusy) return;
+    const wasLoved = !!current.lovedByMe;
+    setLovingBusy(true);
+    setStatuses((prev) => {
+      if (!prev) return prev;
+      const next = [...prev];
+      next[idx] = { ...next[idx], lovedByMe: !wasLoved };
+      return next;
+    });
+    try {
+      const d = await call(`/love${person.centreId ? `?centreId=${encodeURIComponent(person.centreId)}` : ''}`, {
+        method: 'POST',
+        body: { ownerUid: person.uid, statusId: current.statusId },
+      });
+      if (!(d && d.ok)) throw new Error(String(d?.error || 'Could not love that. Try again.'));
+    } catch (e: any) {
+      setStatuses((prev) => {
+        if (!prev) return prev;
+        const next = [...prev];
+        next[idx] = { ...next[idx], lovedByMe: wasLoved };
+        return next;
+      });
+      setErr(String(e?.message || 'Could not love that. Try again.'));
+    } finally {
+      setLovingBusy(false);
+    }
+  };
 
   const sendReply = async () => {
     if (!replyText.trim() || replyBusy || !current) return;
@@ -693,9 +766,19 @@ export const StatusViewer: React.FC<{
   // sound button in the corner brings the sound back with one tap.
   const videoRef = React.useRef<HTMLVideoElement>(null);
   const [vidMuted, setVidMuted] = useState(false);
+  const [mediaLoaded, setMediaLoaded] = useState(false);
   React.useEffect(() => {
     setVidMuted(false);
+    setMediaLoaded(false);
   }, [current?.statusId]);
+  const mediaUrl = current
+    ? current.kind === 'photo'
+      ? current.photoUrl
+      : current.kind === 'video'
+        ? current.videoUrl
+        : null
+    : null;
+  const mediaReady = !mediaUrl || mediaLoaded;
   const playVideo = () => {
     const el = videoRef.current;
     if (!el) return;
@@ -889,7 +972,21 @@ export const StatusViewer: React.FC<{
           </p>
         )}
         {current && current.kind === 'photo' && current.photoUrl && (
-          <img src={current.photoUrl} alt="Status" draggable={false} className="absolute inset-0 w-full h-full object-contain pointer-events-none" />
+          <>
+            <img
+              src={current.photoUrl}
+              alt="Status"
+              draggable={false}
+              onLoad={() => setMediaLoaded(true)}
+              onError={() => setMediaLoaded(true)}
+              className="absolute inset-0 w-full h-full object-contain pointer-events-none"
+            />
+            {!mediaReady && (
+              <span className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <Loader2 className="w-6 h-6 animate-spin" style={{ color: dark ? 'rgba(255,255,255,0.8)' : 'rgba(15,23,42,0.6)' }} />
+              </span>
+            )}
+          </>
         )}
         {current && current.kind === 'video' && current.videoUrl && (
           <video
@@ -901,9 +998,15 @@ export const StatusViewer: React.FC<{
             muted={vidMuted}
             className="absolute inset-0 w-full h-full object-cover"
             onLoadedMetadata={playVideo}
+            onLoadedData={() => setMediaLoaded(true)}
             onTimeUpdate={mediaTime}
             onEnded={() => advance(1)}
           />
+        )}
+        {current && current.kind === 'video' && current.videoUrl && !mediaReady && (
+          <span className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <Loader2 className="w-6 h-6 animate-spin text-white/80" />
+          </span>
         )}
         {current && current.kind === 'music' && current.audioUrl && (
           <div className="w-full max-w-sm rounded-3xl p-6 space-y-4" style={{ backgroundColor: 'rgba(255,255,255,0.12)' }}>
@@ -968,32 +1071,41 @@ export const StatusViewer: React.FC<{
         <p className="px-6 pb-2 text-xs font-bold text-center" style={{ color: dark ? '#FFFFFF' : '#B91C1C' }}>{err}</p>
       )}
       {mine && current && (
-        <div className="px-4 pb-8 space-y-2">
-          <p className="text-xs font-bold" style={{ color: dark ? 'rgba(255,255,255,0.85)' : 'rgba(15,23,42,0.7)' }}>
-            Seen by {current.views || 0}
-          </p>
-          {(current.replies || []).length > 0 && (
-            <div className="max-h-40 overflow-y-auto space-y-1.5 rounded-2xl p-3"
-              style={{ backgroundColor: dark ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.06)' }}>
-              {current.replies!.map((rp, i) => (
-                <div key={rp.replyId || `${rp.uid}-${rp.at}-${i}`} className="text-xs">
-                  <span className="font-black" style={{ color: dark ? '#FFFFFF' : '#0F172A' }}>
-                    {rp.name || (rp.username ? `@${rp.username}` : 'Student')}
-                  </span>
-                  <span style={{ color: dark ? 'rgba(255,255,255,0.85)' : 'rgba(15,23,42,0.8)' }}> {rp.text}</span>
-                </div>
-              ))}
-            </div>
-          )}
-          {(current.replies || []).length === 0 && (
-            <p className="text-[11px] font-medium" style={{ color: dark ? 'rgba(255,255,255,0.6)' : 'rgba(15,23,42,0.5)' }}>
-              No replies yet.
-            </p>
-          )}
-        </div>
+        <>
+          <button
+            onClick={() => setOwnerSheet('viewers')}
+            aria-label="People who have seen this update"
+            className="absolute bottom-7 left-4 w-12 h-12 rounded-full bg-white text-[#0F172A] shadow-xl flex items-center justify-center active:scale-95 transition z-10"
+          >
+            <Eye className="w-5 h-5" />
+            <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#EA580C] text-white text-[9px] font-black flex items-center justify-center">
+              {current.views || 0}
+            </span>
+          </button>
+          <button
+            onClick={() => setOwnerSheet('replies')}
+            aria-label="Replies and loves on this update"
+            className="absolute bottom-7 right-4 w-12 h-12 rounded-full bg-white text-[#0F172A] shadow-xl flex items-center justify-center active:scale-95 transition z-10"
+          >
+            <MessageCircle className="w-5 h-5" />
+            <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#EA580C] text-white text-[9px] font-black flex items-center justify-center">
+              {(current.replies || []).length + (current.loves || []).length}
+            </span>
+          </button>
+        </>
       )}
       {!mine && current && settings.allowReplies && (
-        <div className="p-4 pb-8 space-y-2">
+        <div className="p-4 pb-8 space-y-2 flex items-center gap-2">
+          <button
+            onClick={toggleLove}
+            disabled={lovingBusy}
+            aria-label={current.lovedByMe ? 'Remove your love' : 'Love this update'}
+            className="w-11 h-11 rounded-full flex items-center justify-center active:scale-95 transition shrink-0 disabled:opacity-50"
+            style={{ backgroundColor: current.lovedByMe ? '#FEE2E2' : (dark ? 'rgba(255,255,255,0.15)' : 'rgba(15,23,42,0.06)') }}
+          >
+            <Heart className={`w-5 h-5 ${current.lovedByMe ? 'text-red-500 fill-red-500' : (dark ? 'text-white' : 'text-[#0F172A]')}`} />
+          </button>
+          <div className="flex-1 space-y-2 min-w-0">
           {replyNote && (
             <p className="text-[11px] font-bold text-center" style={{ color: dark ? '#FFFFFF' : '#0F172A' }}>{replyNote}</p>
           )}
@@ -1023,6 +1135,74 @@ export const StatusViewer: React.FC<{
               {replyBusy ? 'Sending...' : 'Send'}
             </button>
           </div>
+          </div>
+        </div>
+      )}
+      {ownerSheet && mine && current && (
+        <div className="fixed inset-0 z-[60] bg-slate-950/50 flex items-end justify-center" onClick={() => setOwnerSheet(null)}>
+          <div className="w-full max-w-lg bg-white rounded-t-3xl p-5 space-y-3 max-h-[70vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between shrink-0">
+              <p className="text-sm font-black text-slate-900">
+                {ownerSheet === 'viewers' ? `Seen by ${current.views || 0}` : 'Replies and loves'}
+              </p>
+              <button onClick={() => setOwnerSheet(null)} className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500" aria-label="Close">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="overflow-y-auto space-y-2 min-h-0">
+              {ownerSheet === 'viewers' && (current.viewers || []).length === 0 && (
+                <p className="text-xs text-slate-500 font-medium py-4 text-center">No one has seen it yet.</p>
+              )}
+              {ownerSheet === 'viewers' && (current.viewers || []).map((vp) => (
+                <div key={vp.uid} className="flex items-center gap-3 py-1">
+                  <div className="w-9 h-9 rounded-full bg-[#FFF7ED] text-[#C2410C] border border-[#EA580C]/30 flex items-center justify-center text-[10px] font-black shrink-0">
+                    {initials(vp.name || (vp.username ? `@${vp.username}` : 'Student'))}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-black text-slate-900 truncate">{vp.name || (vp.username ? `@${vp.username}` : 'Student')}</p>
+                    {vp.username && <p className="text-[10px] text-slate-500 font-medium truncate">@{vp.username}</p>}
+                  </div>
+                  <p className="text-[10px] text-slate-400 font-bold shrink-0">{statusTimeLabel(vp.at)}</p>
+                </div>
+              ))}
+              {ownerSheet === 'replies' && (() => {
+                const lovedUids = new Set((current.loves || []).map((l) => l.uid));
+                const rows: { key: string; name: string; username: string; text: string; at: number; loved: boolean }[] = [
+                  ...(current.replies || []).map((rp, i) => ({ key: `r-${rp.replyId || i}`, name: rp.name, username: rp.username, text: rp.text, at: rp.at, loved: lovedUids.has(rp.uid) })),
+                  ...(current.loves || []).filter((l) => !lovedUids.has(l.uid) && !(current.replies || []).some((rp) => rp.uid === l.uid)).map((l) => ({ key: `l-${l.uid}`, name: l.name, username: l.username, text: '', at: l.at, loved: true })),
+                ];
+                rows.sort((a, b) => b.at - a.at);
+                if (rows.length === 0) {
+                  return <p className="text-xs text-slate-500 font-medium py-4 text-center">No replies or loves yet.</p>;
+                }
+                return rows.map((row) => (
+                  <div key={row.key} className="flex items-start gap-3 py-1.5">
+                    <div className="w-9 h-9 rounded-full bg-[#FFF7ED] text-[#C2410C] border border-[#EA580C]/30 flex items-center justify-center text-[10px] font-black shrink-0">
+                      {initials(row.name || (row.username ? `@${row.username}` : 'Student'))}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-black text-slate-900">{row.name || (row.username ? `@${row.username}` : 'Student')}</p>
+                      {row.text && <p className="text-xs text-slate-600 font-medium break-words">{row.text}</p>}
+                    </div>
+                    {row.loved && <Heart className="w-4 h-4 text-red-500 fill-red-500 shrink-0 mt-0.5" />}
+                    <p className="text-[10px] text-slate-400 font-bold shrink-0 mt-0.5">{statusTimeLabel(row.at)}</p>
+                  </div>
+                ));
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
+      {!mine && current && !settings.allowReplies && (
+        <div className="p-4 pb-8 flex justify-center">
+          <button
+            onClick={toggleLove}
+            disabled={lovingBusy}
+            aria-label={current.lovedByMe ? 'Remove your love' : 'Love this update'}
+            className="w-12 h-12 rounded-full bg-white shadow-xl flex items-center justify-center active:scale-95 transition disabled:opacity-50"
+          >
+            <Heart className={`w-5 h-5 ${current.lovedByMe ? 'text-red-500 fill-red-500' : 'text-[#0F172A]'}`} />
+          </button>
         </div>
       )}
     </div>
@@ -1046,13 +1226,11 @@ const StatusBubble: React.FC<{ entry: StatusEntry; dimmed?: boolean; now: number
   if (remain <= 0) return null; // the 24h window ran out: gone at once.
   const f = Math.max(0, Math.min(1, remain / life));
   const ring = dimmed ? '#CBD5E1' : '#EA580C';
-  const inside = entry.photoUrl
-    ? <img src={entry.photoUrl} alt="" className="w-full h-full object-cover rounded-full" />
-    : entry.videoUrl
-      ? <Film className="w-5 h-5" />
-      : entry.audioUrl
-        ? <Music className="w-5 h-5" />
-        : <span className="text-[11px] font-black leading-none">Aa</span>;
+  const inside = (
+    <span className="w-full h-full flex items-center justify-center overflow-hidden rounded-full">
+      <StatusThumb kind={entry.kind} photoUrl={entry.photoUrl} videoUrl={entry.videoUrl} />
+    </span>
+  );
   return (
     <button
       type="button"
@@ -1199,10 +1377,25 @@ export const StatusScreenCore: React.FC<{ call: (path: string, opts?: any) => Pr
 
   // Viewing a status moves its row to VIEWED straight away, and closing the
   // viewer re-syncs once so the counts and lists come back from the server.
+  const toViewerStatus = (e: StatusEntry | MineEntry): ViewerStatus => ({
+    statusId: e.statusId,
+    kind: e.kind,
+    at: e.at,
+    expiresAt: e.expiresAt,
+    text: e.text,
+    bg: e.bg,
+    photoUrl: e.photoUrl,
+    videoUrl: e.videoUrl,
+    audioUrl: e.audioUrl,
+    durationSeconds: e.durationSeconds,
+  });
   const openViewer = (entry: StatusEntry) => setViewer({
     person: { uid: entry.uid, name: entry.name, username: entry.username, centreId: entry.centreId },
     mine: false,
     startStatusId: entry.statusId,
+    seed: [...recent, ...viewed]
+      .filter((o) => o.uid === entry.uid && (o.centreId || '') === (entry.centreId || ''))
+      .map(toViewerStatus),
   });
   const closeViewer = () => {
     setViewer(null);
@@ -1265,15 +1458,12 @@ export const StatusScreenCore: React.FC<{ call: (path: string, opts?: any) => Pr
               {mineRows.map((m) => (
                 <div
                   key={m.statusId}
-                  onClick={() => setViewer({ person: { uid, name: me?.name || fallbackName, username: me?.username || '', avatar: me?.avatar, centreId: m.centreId }, mine: true, startStatusId: m.statusId })}
+                  onClick={() => setViewer({ person: { uid, name: me?.name || fallbackName, username: me?.username || '', avatar: me?.avatar, centreId: m.centreId }, mine: true, startStatusId: m.statusId, seed: mineRows.map(toViewerStatus) })}
                   role="button"
                   className="w-full text-left bg-white rounded-3xl p-4 border border-slate-200/90 shadow-sm flex items-center gap-3 active:scale-[0.99] transition cursor-pointer"
                 >
-                  <div className="w-12 h-12 rounded-full bg-[#FFF7ED] border-2 border-[#EA580C] flex items-center justify-center text-[#C2410C] shrink-0">
-                    {m.kind === 'photo' ? <ImageIcon className="w-5 h-5" />
-                      : m.kind === 'video' ? <Film className="w-5 h-5" />
-                      : m.kind === 'music' ? <Music className="w-5 h-5" />
-                      : <span className="text-sm font-black">Aa</span>}
+                  <div className="w-12 h-12 rounded-full bg-[#FFF7ED] border-2 border-[#EA580C] flex items-center justify-center text-[#C2410C] shrink-0 overflow-hidden">
+                    <StatusThumb kind={m.kind} photoUrl={m.photoUrl} videoUrl={m.videoUrl} />
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-black text-slate-900 truncate">
