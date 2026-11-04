@@ -2,7 +2,10 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AlertTriangle,
   BookOpen,
+  Check,
+  CheckCheck,
   ChevronLeft,
+  ChevronRight,
   ExternalLink,
   Image as ImageIcon,
   Info,
@@ -41,6 +44,9 @@ interface ChatGroupSummary {
   kind: 'subject' | 'announcements' | 'custom' | 'tos_channel' | 'personal';
   peerUid?: string;
   peerUsername?: string;
+  peerName?: string;
+  peerAvatar?: string;
+  peerRole?: string;
   subject: string | null;
   unread: number;
   locked: boolean;
@@ -78,6 +84,7 @@ interface ChatMessage {
   at: number;
   removed: boolean;
   mine: boolean;
+  status?: 'sent' | 'delivered' | 'seen';
   commentCount?: number;
   // An optimistic message the sender is still uploading: it shows in the
   // room right away with its progress on the media itself.
@@ -477,15 +484,11 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
       {!error && view !== 'channels' && chatFilter === 'personal' && (
         <button
           onClick={() => setPickerOpen(true)}
-          className="w-full flex items-center gap-3 bg-white rounded-2xl p-3.5 border border-dashed border-[#EA580C]/50 shadow-sm active:scale-[0.99] transition"
+          className="fixed bottom-24 right-4 z-40 w-14 h-14 rounded-full text-white flex items-center justify-center shadow-xl active:scale-95 transition"
+          style={{ background: 'linear-gradient(145deg, #EA580C, #9A3412)' }}
+          aria-label="Start a new chat"
         >
-          <div className="w-11 h-11 rounded-2xl bg-orange-50 border border-orange-100 text-[#EA580C] flex items-center justify-center shrink-0">
-            <UserPlus className="w-5 h-5" />
-          </div>
-          <div className="flex-1 text-left">
-            <p className="text-sm font-black text-slate-900">New chat</p>
-            <p className="text-[11px] text-slate-500 font-medium">Pick someone in your centre, or add a friend by username.</p>
-          </div>
+          <UserPlus className="w-6 h-6" />
         </button>
       )}
 
@@ -538,6 +541,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
                 </span>
               )}
             </div>
+            <ChevronRight className="w-4 h-4 text-slate-300 shrink-0" />
           </div>
         ) : (
         <button
@@ -583,6 +587,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
               </span>
             )}
           </div>
+          <ChevronRight className="w-4 h-4 text-slate-300 shrink-0" />
         </button>
         )
       ))}
@@ -610,6 +615,17 @@ const PAGE_SIZE = 20; // how many messages one page of the chat history holds
 // The last thread each group showed, kept in memory so reopening a chat puts the
 // conversation on screen straight away while a fresh sync runs behind it.
 const roomCache = new Map<string, ChatMessage[]>();
+// The cache also survives a full app reload, so a chat the student has seen
+// once reopens with its messages on screen instead of a spinner.
+const roomCacheGet = (gid: string): ChatMessage[] =>
+  roomCache.get(gid) || loadLastGood<ChatMessage[]>(`chat:room:${gid}`) || [];
+const roomCacheHas = (gid: string): boolean =>
+  roomCache.has(gid) || !!loadLastGood<ChatMessage[]>(`chat:room:${gid}`);
+const initialsOf = (name: string): string => {
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return '?';
+  return parts.slice(0, 2).map((w) => (w[0] || '').toUpperCase()).join('');
+};
 
 interface GroupRoomProps {
   groupId: string;
@@ -622,8 +638,8 @@ interface GroupRoomProps {
 
 const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPractice, onHideBottomNav, postableGroups }) => {
   const [resp, setResp] = useState<MessagesResp | null>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>(() => roomCache.get(groupId) || []);
-  const [loading, setLoading] = useState(() => !roomCache.has(groupId));
+  const [messages, setMessages] = useState<ChatMessage[]>(() => roomCacheGet(groupId));
+  const [loading, setLoading] = useState(() => !roomCacheHas(groupId));
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [hasOlder, setHasOlder] = useState(false);
   const [error, setError] = useState('');
@@ -704,6 +720,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
       page.forEach((m) => byId.set(m.id, m));
       const merged = Array.from(byId.values()).sort((a, b) => a.at - b.at);
       roomCache.set(groupId, merged.slice(-200));
+      saveLastGood(`chat:room:${groupId}`, merged.slice(-200));
       return merged;
     });
   }, [groupId]);
@@ -894,7 +911,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
           setMessages((prev) => prev.map((x) => (x.id === penId && x.pending ? { ...x, progress: pct } : x)));
         });
       }
-      await api(`/api/student/chat/groups/${groupId}/messages`, {
+      const res = await api(`/api/student/chat/groups/${groupId}/messages`, {
         method: 'POST',
         body: {
           text: t,
@@ -905,9 +922,19 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
           replyTo: rt ? rt.id : undefined,
         },
       });
-      setMessages((prev) => prev.filter((x) => x.id !== penId));
-      await loadLatest();
-      scrollToBottom();
+      const saved = (res as any)?.message as ChatMessage | undefined;
+      if (saved) {
+        setMessages((prev) => {
+          const next = prev.map((x) => (x.id === penId ? saved : x));
+          roomCache.set(groupId, next.slice(-200));
+          saveLastGood(`chat:room:${groupId}`, next.slice(-200));
+          return next;
+        });
+        scrollToBottom();
+      } else {
+        await loadLatest();
+        scrollToBottom();
+      }
     } catch (e: any) {
       setMessages((prev) => prev.filter((x) => x.id !== penId));
       showToast(String(e?.message || 'Your message could not be sent. Try again.'));
@@ -1050,6 +1077,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
   }
 
   const kindLabel = resp?.kind === 'personal' ? 'Personal' : resp?.kind === 'announcements' ? 'Announcements' : resp?.kind === 'tos_channel' ? 'TOS channel' : resp?.kind === 'subject' ? 'Subject group' : 'Group';
+  const isPersonal = resp?.kind === 'personal' || group?.kind === 'personal';
 
   if (resp?.locked) {
     return (
@@ -1232,9 +1260,18 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
               </a>
             </span>
           )}
-          <p className={`text-[9px] mt-1 text-right font-bold ${m.mine ? 'text-orange-100' : 'text-slate-400'}`}>
-            {fmtTime(m.at)}
-          </p>
+          <div className={`flex items-center justify-end gap-1 mt-1 ${m.mine ? 'text-orange-100' : 'text-slate-400'}`}>
+            <span className="text-[9px] font-bold">{fmtTime(m.at)}</span>
+            {m.mine && !m.removed && (
+              m.pending ? (
+                <Loader2 className="w-3 h-3 animate-spin" />
+              ) : m.status === 'sent' ? (
+                <Check className="w-3.5 h-3.5" />
+              ) : (
+                <CheckCheck className={`w-3.5 h-3.5 ${m.status === 'seen' ? 'text-amber-300' : ''}`} />
+              )
+            )}
+          </div>
         </div>
         {!m.removed && (
           <div className="max-w-[82%]">
@@ -1267,9 +1304,14 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
         >
           <ChevronLeft className="w-4 h-4" />
         </button>
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 flex items-center gap-2.5">
+          {isPersonal && (
+            <span className="w-8 h-8 rounded-full bg-white/20 text-white flex items-center justify-center text-[11px] font-black overflow-hidden shrink-0">
+              {(resp as any)?.peerAvatar || group?.peerAvatar ? <img src={((resp as any)?.peerAvatar || group?.peerAvatar) as string} alt="" className="w-full h-full object-cover" /> : initialsOf(resp?.groupName || group?.name || '')}
+            </span>
+          )}
           <p className="text-sm font-black text-white truncate">{resp?.groupName || group?.name}</p>
-          <p className="text-[10px] font-bold uppercase tracking-wider text-orange-100">{kindLabel}</p>
+          {!isPersonal && <p className="text-[10px] font-bold uppercase tracking-wider text-orange-100">{kindLabel}</p>}
         </div>
         <button
           onClick={() => setShowInfo(true)}
@@ -1439,19 +1481,37 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-slate-800">
                 <Info className="w-4 h-4 text-[#EA580C]" />
-                <span className="text-sm font-black">About this group</span>
+                <span className="text-sm font-black">{isPersonal ? 'Contact info' : 'About this group'}</span>
               </div>
               <button onClick={() => setShowInfo(false)} className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500" aria-label="Close">
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="bg-slate-50 rounded-2xl p-3.5 space-y-2">
-              <div className="flex items-center gap-2">
-                {groupIcon(resp?.kind || 'custom', 'w-4 h-4 text-[#EA580C]')}
-                <p className="text-sm font-black text-slate-900">{resp?.groupName || group?.name}</p>
+            {isPersonal ? (
+              <div className="bg-slate-50 rounded-2xl p-3.5 space-y-2">
+                <div className="flex items-center gap-3">
+                  <span className="w-12 h-12 rounded-full bg-orange-50 border border-orange-100 text-[#EA580C] flex items-center justify-center text-sm font-black overflow-hidden shrink-0">
+                    {((resp as any)?.peerAvatar || group?.peerAvatar) ? <img src={((resp as any)?.peerAvatar || group?.peerAvatar) as string} alt="" className="w-full h-full object-cover" /> : initialsOf(resp?.groupName || group?.name || '')}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-black text-slate-900 truncate">{(resp as any)?.peerName || group?.peerName || resp?.groupName || group?.name}</p>
+                    <p className="text-[11px] text-slate-500 font-medium">
+                      {group?.peerRole === 'tutor' ? 'Tutor' : group?.peerRole === 'admin' ? 'Centre admin' : 'Student'}
+                      {group?.peerUsername ? ` · @${group.peerUsername}` : ''}
+                    </p>
+                  </div>
+                </div>
+                <p className="text-[11px] text-slate-400 font-medium">Private one-to-one chat inside your centre. Only the two of you can read it.</p>
               </div>
-              <p className="text-[11px] text-slate-500 font-medium">{kindLabel}{group?.subject ? ` · ${group.subject}` : ''}</p>
-            </div>
+            ) : (
+              <div className="bg-slate-50 rounded-2xl p-3.5 space-y-2">
+                <div className="flex items-center gap-2">
+                  {groupIcon(resp?.kind || 'custom', 'w-4 h-4 text-[#EA580C]')}
+                  <p className="text-sm font-black text-slate-900">{resp?.groupName || group?.name}</p>
+                </div>
+                <p className="text-[11px] text-slate-500 font-medium">{kindLabel}{group?.subject ? ` · ${group.subject}` : ''}</p>
+              </div>
+            )}
             <div className="space-y-1.5 text-[11px] text-slate-600 font-medium">
               <p>• {resp?.kind === 'announcements' ? 'Only your centre can post here. Everyone can read.' : resp?.kind === 'tos_channel' ? 'Only TOS can post here. Everyone can read.' : 'Everyone in this group can post.'}</p>
               {group && !group.locked && typeof group.thresholdPercent === 'number' && (

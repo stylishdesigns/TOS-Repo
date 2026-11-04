@@ -626,20 +626,64 @@ async function consumePostRateLimit(uid: string, maxPerDay: number): Promise<voi
   });
 }
 
-async function writeMessage(group: GroupDoc, sender: { uid: string; username: string; role: string }, text: string, photoUrl: string | null, extras?: Record<string, unknown>): Promise<void> {
+async function writeMessage(group: GroupDoc, sender: { uid: string; username: string; role: string }, text: string, photoUrl: string | null, extras?: Record<string, unknown>): Promise<{ id: string; at: number }> {
   const msgRef = adminRtdb.ref(`chat/groups/${group.id}/messages`).push();
+  const at = Date.now();
   await msgRef.set({
     uid: sender.uid,
     username: sender.username,
     role: sender.role,
     text,
     photoUrl: photoUrl || null,
-    at: ServerValue.TIMESTAMP,
+    at,
     removed: null,
     ...(extras || {}),
   });
   const metaRef = adminRtdb.ref(`chat/groups/${group.id}/meta`);
   await metaRef.transaction((m: any) => ({ ...(m || {}), msgCount: (Number(m?.msgCount) || 0) + 1 }));
+  return { id: msgRef.key as string, at };
+}
+
+/** Read receipts: per group, the platform records when each member's app
+ *  pulled the thread (delivered) and when their room was open on screen
+ *  (seen). Senders read these back as the ticks on their own messages. */
+async function markReadState(gid: string, uid: string, level: 'delivered' | 'seen'): Promise<void> {
+  if (!gid || !uid) return;
+  const now = Date.now();
+  try {
+    if (level === 'seen') await adminRtdb.ref(`chat/groups/${gid}/readState/${uid}`).update({ deliveredAt: now, seenAt: now });
+    else await adminRtdb.ref(`chat/groups/${gid}/readState/${uid}`).update({ deliveredAt: now });
+  } catch { /* a missed receipt only means the tick waits for the next sync */ }
+}
+
+async function loadReadStates(gid: string): Promise<Record<string, { deliveredAt?: number; seenAt?: number }>> {
+  try {
+    const snap = await adminRtdb.ref(`chat/groups/${gid}/readState`).get();
+    return (snap.val() || {}) as Record<string, { deliveredAt?: number; seenAt?: number }>;
+  } catch { return {}; }
+}
+
+/** One of the caller's own messages: seen when someone else had the room open
+ *  after it was written, delivered when their app pulled the thread, sent
+ *  otherwise. */
+function tickFor(at: number, states: Record<string, { deliveredAt?: number; seenAt?: number }>, callerUid: string): 'sent' | 'delivered' | 'seen' {
+  let delivered = false;
+  for (const [uid, st] of Object.entries(states || {})) {
+    if (!st || uid === callerUid) continue;
+    if (Number(st.seenAt) >= at) return 'seen';
+    if (Number(st.deliveredAt) >= at) delivered = true;
+  }
+  return delivered ? 'delivered' : 'sent';
+}
+
+/** Messages stored before file kinds existed still read as videos when the
+ *  URL itself is one. */
+const VIDEO_URL_RE = /\.(mp4|mov|webm|m4v|3gp|avi|mkv)(\?|#|$)/i;
+function effectiveFileKind(kind: unknown, url: unknown): string | null {
+  const k = typeof kind === 'string' && kind.trim() ? kind.trim().slice(0, 20) : null;
+  if (k) return k;
+  if (typeof url === 'string' && VIDEO_URL_RE.test(url)) return 'video';
+  return null;
 }
 
 /** Retention: messages past the setting are deleted in small batches on group
@@ -929,6 +973,9 @@ export function registerChatRoutes(app: express.Express): void {
           canPost: true,
           peerUid: p.other,
           peerUsername: info?.username || '',
+          peerName: info?.name || '',
+          peerAvatar: info?.avatar || '',
+          peerRole: info?.role || '',
         });
       }
       groups.sort((a, b) => {
@@ -3193,6 +3240,9 @@ async function staffStatusContext(caller: Caller, centreId: string) {
           createdAt: '',
           peerUid: p.other,
           peerUsername: info?.username || '',
+          peerName: info?.name || '',
+          peerAvatar: info?.avatar || '',
+          peerRole: info?.role || '',
         } as any);
       }
       const reportsSnap = await adminDb.collection('chatReports')

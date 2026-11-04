@@ -2,7 +2,9 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   BookOpen,
   Check,
+  CheckCheck,
   ChevronLeft,
+  ChevronRight,
   ExternalLink,
   FileText,
   Flag,
@@ -225,6 +227,7 @@ export const ChatManager: React.FC<{ onThreadOpenChange?: (open: boolean) => voi
           <p className="text-xs text-slate-500 font-medium mt-0.5">Your centre’s group conversations.</p>
         </div>
 
+        {tabs.length > 1 && (
         <div className="flex gap-2">
           {tabs.map((t) => (
             <button
@@ -243,6 +246,7 @@ export const ChatManager: React.FC<{ onThreadOpenChange?: (open: boolean) => voi
             </button>
           ))}
         </div>
+        )}
 
         {tab === 'groups' && data && <GroupsSection data={data} isAdmin={isAdmin} reload={load} addToast={addToast} centreId={activeCentreId || ''} onThreadOpenChange={onThreadOpenChange} />}
         {tab === 'settings' && data && <SettingsSection data={data} isAdmin={isAdmin} reload={load} addToast={addToast} centreId={activeCentreId || ''} />}
@@ -275,6 +279,10 @@ const GroupsSection: React.FC<SectionProps> = ({ data, isAdmin, reload, addToast
   const [threshold, setThreshold] = useState('70');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [staffFilter, setStaffFilter] = useState<'personal' | 'groups' | 'channels'>('personal');
+  // One-to-one chats live in the same groups list the server returns; the
+  // Personal tab shows exactly those, so a chat opened from a student lands
+  // under Personal and stays there.
+  const personalChats = (data.groups || []).filter((g) => g.kind === 'personal');
   const [pickerOpen, setPickerOpen] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const openGroup = openId ? (data.groups.find((g) => g.id === openId) || data.personalChats?.find((g) => g.id === openId)) || null : null;
@@ -358,7 +366,7 @@ const GroupsSection: React.FC<SectionProps> = ({ data, isAdmin, reload, addToast
           photosAllowed={data.settings.photosAllowed}
           forwardOptions={[
             ...data.groups.filter((g) => g.id !== openGroup.id && g.kind !== 'tos_channel'),
-            ...(data.personalChats || []),
+            ...personalChats,
           ].map((g) => ({ id: g.id, name: g.name, kind: g.kind }))}
           addToast={addToast}
           onBack={() => setOpenId(null)}
@@ -489,7 +497,7 @@ const GroupsSection: React.FC<SectionProps> = ({ data, isAdmin, reload, addToast
         </button>
       )}
 
-      {staffFilter === 'personal' && !openGroup && (data.personalChats || []).length === 0 && (
+      {staffFilter === 'personal' && !openGroup && personalChats.length === 0 && (
         <div className="bg-white rounded-2xl p-8 border border-slate-200 text-center space-y-1.5">
           <User className="w-7 h-7 text-slate-300 mx-auto" />
           <p className="text-sm font-black text-slate-800">No personal chats yet</p>
@@ -519,7 +527,7 @@ const GroupsSection: React.FC<SectionProps> = ({ data, isAdmin, reload, addToast
         ? data.groups.filter((g) => g.kind === 'tos_channel')
         : staffFilter === 'groups'
         ? data.groups.filter((g) => g.kind !== 'personal' && g.kind !== 'tos_channel')
-        : data.personalChats || []
+        : personalChats
       ).map((g) => (
         <div
           key={g.id}
@@ -595,6 +603,7 @@ const GroupsSection: React.FC<SectionProps> = ({ data, isAdmin, reload, addToast
                   </button>
                 )}
               </div>
+              <ChevronRight className="w-4 h-4 text-slate-300 shrink-0" />
             </div>
           )}
         </div>
@@ -888,6 +897,12 @@ interface ThreadMsg {
 }
 
 /** What a chat attachment is, from its file type: image, video or document. */
+function initialsOf(name: string): string {
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return '?';
+  return parts.slice(0, 2).map((w) => (w[0] || '').toUpperCase()).join('');
+}
+
 function kindOf(file: File): string {
   const t = (file as any).type || '';
   if (t.startsWith('image/')) return 'image';
@@ -942,6 +957,7 @@ const ThreadPanel: React.FC<{
   const [canLoadEarlier, setCanLoadEarlier] = useState(true);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const videoRef = useRef<HTMLInputElement | null>(null);
+  const viewerVideoRef = useRef<HTMLVideoElement | null>(null);
   const docRef = useRef<HTMLInputElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const uploadCfgRef = useRef<{ cloud: string; preset: string; folder: string } | null>(null);
@@ -1117,7 +1133,7 @@ const ThreadPanel: React.FC<{
           setAttachProgress(pct);
         });
       }
-      await api(`/api/centre/chat/groups/${group.id}/messages?centreId=${encodeURIComponent(centreId)}`, {
+      const res = await api(`/api/centre/chat/groups/${group.id}/messages?centreId=${encodeURIComponent(centreId)}`, {
         method: 'POST',
         body: {
           text: value,
@@ -1129,8 +1145,16 @@ const ThreadPanel: React.FC<{
           replyTo: rt ? rt.id : undefined,
         },
       });
-      setMessages((prev) => (prev || []).filter((x) => x.id !== penId));
-      await load();
+      const saved = (res as any)?.message as ThreadMsg | undefined;
+      if (saved) {
+        setMessages((prev) => {
+          const next = (prev || []).map((x) => (x.id === penId ? saved : x));
+          threadCache.set(group.id, next);
+          return next;
+        });
+      } else {
+        await load();
+      }
     } catch (e: any) {
       setMessages((prev) => (prev || []).filter((x) => x.id !== penId));
       addToast(String(e?.message || 'The message could not be sent.'), 'error');
@@ -1243,9 +1267,13 @@ const ThreadPanel: React.FC<{
         <button onClick={onBack} className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center text-white active:scale-95 transition shrink-0" aria-label="Back to groups">
           <ChevronLeft className="w-4 h-4" />
         </button>
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 flex items-center gap-2.5">
+          {group.kind === 'personal' && (
+            <span className="w-8 h-8 rounded-full bg-white/20 text-white flex items-center justify-center text-[11px] font-black overflow-hidden shrink-0">
+              {group.peerAvatar ? <img src={group.peerAvatar} alt="" className="w-full h-full object-cover" /> : initialsOf(group.name)}
+            </span>
+          )}
           <p className="text-sm font-black text-white truncate">{group.name}</p>
-          <p className="text-[10px] font-bold uppercase tracking-wider text-orange-100">{kindLabel(group.kind)}</p>
         </div>
         <button
           onClick={() => setInfoOpen(true)}
@@ -1301,7 +1329,7 @@ const ThreadPanel: React.FC<{
           <div key={m.id} className={`flex flex-col ${m.mine ? 'items-end' : 'items-start'} px-1`}>
             <div className="flex items-center gap-1.5 mb-0.5">
               <span className="text-[10px] font-black text-slate-500">{m.mine ? 'You' : m.username}</span>
-              {m.role && m.role !== 'student' && (
+              {!m.mine && m.role && m.role !== 'student' && (
                 <span className={`text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full ${roleChipClass(m.role)}`}>{roleChip(m.role)}</span>
               )}
               <span className="text-[9px] text-slate-400">{m.at ? fmtDateTime(new Date(m.at).toISOString()) : ''}</span>
@@ -1372,11 +1400,16 @@ const ThreadPanel: React.FC<{
                 </div>
               )}
               {m.removed ? <span className="italic opacity-70">Message removed</span> : emojiOnly ? <span className="block text-3xl leading-snug whitespace-pre-wrap break-words">{m.text}</span> : <EmojiText text={m.text} mine={m.mine && !emojiOnly} className="whitespace-pre-wrap break-words" />}
-              {m.pending && (
-                <span className="flex items-center gap-1 justify-end mt-0.5">
-                  <Loader2 className="w-3 h-3 animate-spin opacity-70" />
-                  <span className={`text-[9px] font-bold ${m.mine ? 'text-orange-100' : 'text-slate-400'}`}>Sending</span>
-                </span>
+              {m.mine && (
+                m.pending ? (
+                  <span className="flex items-center justify-end mt-0.5">
+                    <Loader2 className="w-3 h-3 animate-spin opacity-70" />
+                  </span>
+                ) : (
+                  <span className={`flex items-center justify-end mt-0.5 ${m.status === 'seen' ? 'text-amber-300' : 'text-orange-100/70'}`}>
+                    {m.status === 'sent' ? <Check className="w-3.5 h-3.5" /> : <CheckCheck className="w-3.5 h-3.5" />}
+                  </span>
+                )
               )}
             </div>
             {!m.removed && (
@@ -1505,22 +1538,42 @@ const ThreadPanel: React.FC<{
         <div className="fixed inset-0 z-50 bg-black/40 flex items-end justify-center" onClick={() => setInfoOpen(false)}>
           <div className="bg-white rounded-t-3xl w-full max-w-md p-5 space-y-3 animate-in slide-in-from-bottom duration-300" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
-              <p className="text-sm font-black text-slate-900">Group info</p>
+              <p className="text-sm font-black text-slate-900">{group.kind === 'personal' ? 'Contact info' : 'Group info'}</p>
               <button onClick={() => setInfoOpen(false)} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500" aria-label="Close">
                 <X className="w-4 h-4" />
               </button>
             </div>
             <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4 space-y-2">
-              <p className="text-sm font-black text-slate-900 break-words">{group.name}</p>
-              <p className="text-[11px] text-slate-500 font-medium">{kindLabel(group.kind)}{group.subject ? ` · Subject: ${group.subject}` : ''}</p>
-              <p className="text-[11px] text-slate-500 font-medium">{accessLabel(group)}</p>
-              <p className="text-[11px] text-slate-400 font-medium">
-                {group.kind === 'tos_channel'
-                  ? 'This channel is posted by TOS. You can read and react, but only TOS posts.'
-                  : group.kind === 'announcements'
-                  ? 'Only your centre can post in Announcements. Everyone can read.'
-                  : 'Everyone in this chat can post.'}
-              </p>
+              {group.kind === 'personal' ? (
+                <>
+                  <div className="flex items-center gap-3">
+                    <span className="w-12 h-12 rounded-full bg-orange-50 border border-orange-100 text-[#EA580C] flex items-center justify-center text-sm font-black overflow-hidden shrink-0">
+                      {group.peerAvatar ? <img src={group.peerAvatar} alt="" className="w-full h-full object-cover" /> : initialsOf(group.name)}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-black text-slate-900 truncate">{group.name}</p>
+                      <p className="text-[11px] text-slate-500 font-medium">
+                        {group.peerRole === 'tutor' ? 'Tutor' : group.peerRole === 'admin' ? 'Centre admin' : group.peerRole === 'student' ? 'Student' : ''}
+                        {group.peerUsername ? ` · @${group.peerUsername}` : ''}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-slate-400 font-medium">Private one-to-one chat inside your centre. Only the two of you can read it.</p>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm font-black text-slate-900 break-words">{group.name}</p>
+                  <p className="text-[11px] text-slate-500 font-medium">{kindLabel(group.kind)}{group.subject ? ` · Subject: ${group.subject}` : ''}</p>
+                  <p className="text-[11px] text-slate-500 font-medium">{accessLabel(group)}</p>
+                  <p className="text-[11px] text-slate-400 font-medium">
+                    {group.kind === 'tos_channel'
+                      ? 'This channel is posted by TOS. You can read and react, but only TOS posts.'
+                      : group.kind === 'announcements'
+                      ? 'Only your centre can post in Announcements. Everyone can read.'
+                      : 'Everyone in this chat can post.'}
+                  </p>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -1531,10 +1584,18 @@ const ThreadPanel: React.FC<{
           <button onClick={() => setVideoViewerUrl('')} className="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/15 flex items-center justify-center text-white active:scale-95 transition" aria-label="Close video">
             <X className="w-4 h-4" />
           </button>
-          <video src={videoViewerUrl} controls={false} playsInline className="max-h-[70vh] max-w-full rounded-xl" />
+          <video
+            ref={viewerVideoRef}
+            src={videoViewerUrl}
+            controls={false}
+            playsInline
+            autoPlay
+            onCanPlay={() => { const v = viewerVideoRef.current; if (v && v.paused) v.play().catch(() => undefined); }}
+            className="max-h-[70vh] max-w-full rounded-xl"
+          />
           <button
             onClick={() => {
-              const v = document.querySelector('video');
+              const v = viewerVideoRef.current;
               if (v) { if (v.paused) { v.play().catch(() => {}); } else { v.pause(); } }
             }}
             className="mt-4 px-5 py-2.5 rounded-xl bg-white/15 text-white text-xs font-black active:scale-95 transition"
@@ -1685,7 +1746,7 @@ const StaffNewChatSheet: React.FC<{
   onOpenChat: (chatId: string, name: string) => Promise<void> | void;
 }> = ({ centreId, onClose, onOpenChat }) => {
   const [directory, setDirectory] = useState<{ students: StaffDirectoryEntry[]; staff: StaffDirectoryEntry[] } | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [busyUid, setBusyUid] = useState('');
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
 
@@ -1711,8 +1772,8 @@ const StaffNewChatSheet: React.FC<{
   }, [centreId]);
 
   const openWith = async (uid: string) => {
-    if (busy) return;
-    setBusy(true);
+    if (busyUid) return;
+    setBusyUid(uid);
     setError('');
     try {
       const res: any = await api('/api/centre/chat/personal', {
@@ -1723,7 +1784,7 @@ const StaffNewChatSheet: React.FC<{
     } catch (e: any) {
       setError(String(e?.message || 'That chat could not be opened.'));
     } finally {
-      setBusy(false);
+      setBusyUid('');
     }
   };
 
@@ -1763,11 +1824,11 @@ const StaffNewChatSheet: React.FC<{
                         </span>
                         <button
                           onClick={() => openWith(s.uid)}
-                          disabled={busy}
+                          disabled={busyUid === s.uid}
                           className="shrink-0 px-3.5 py-2 rounded-xl bg-[#EA580C] text-white text-[11px] font-black flex items-center gap-1.5 active:scale-95 transition disabled:opacity-50"
                           aria-label={`Chat with ${s.name || s.username}`}
                         >
-                          Chat
+                          {busyUid === s.uid && <Loader2 className="w-3.5 h-3.5 animate-spin" />} Chat
                         </button>
                       </div>
                     ))}
@@ -1787,11 +1848,11 @@ const StaffNewChatSheet: React.FC<{
                         </span>
                         <button
                           onClick={() => openWith(st.uid)}
-                          disabled={busy}
+                          disabled={busyUid === st.uid}
                           className="shrink-0 px-3.5 py-2 rounded-xl bg-[#EA580C] text-white text-[11px] font-black flex items-center gap-1.5 active:scale-95 transition disabled:opacity-50"
                           aria-label={`Chat with ${st.name}`}
                         >
-                          Chat
+                          {busyUid === st.uid && <Loader2 className="w-3.5 h-3.5 animate-spin" />} Chat
                         </button>
                       </div>
                     ))}

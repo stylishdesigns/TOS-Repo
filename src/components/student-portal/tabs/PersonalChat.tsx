@@ -15,7 +15,7 @@ export const PersonalNewChatSheet: React.FC<{
   onOpenChat: (chatId: string, name: string) => void;
 }> = ({ onClose, onOpenChat }) => {
   const [directory, setDirectory] = useState<{ students: StudentEntry[]; staff: StaffEntry[] } | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [busyUid, setBusyUid] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -32,8 +32,8 @@ export const PersonalNewChatSheet: React.FC<{
   }, []);
 
   const openWith = async (uid: string) => {
-    if (busy) return;
-    setBusy(true);
+    if (busyUid) return;
+    setBusyUid(uid);
     setError('');
     try {
       const res: any = await api('/api/student/chat/personal', { method: 'POST', body: { uid } });
@@ -41,7 +41,7 @@ export const PersonalNewChatSheet: React.FC<{
     } catch (e: any) {
       setError(String(e?.message || 'That chat could not be opened.'));
     } finally {
-      setBusy(false);
+      setBusyUid('');
     }
   };
 
@@ -83,11 +83,11 @@ export const PersonalNewChatSheet: React.FC<{
                   </div>
                   <button
                     onClick={() => openWith(s.uid)}
-                    disabled={busy}
+                    disabled={busyUid === s.uid}
                     className="shrink-0 px-3.5 py-2 rounded-xl bg-[#EA580C] text-white text-[11px] font-black flex items-center gap-1.5 active:scale-95 transition disabled:opacity-50"
                     aria-label={`Chat with ${s.name}`}
                   >
-                    <MessageCircle className="w-3.5 h-3.5" /> Chat
+                    {busyUid === s.uid ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <MessageCircle className="w-3.5 h-3.5" />} Chat
                   </button>
                 </div>
               ))}
@@ -107,11 +107,11 @@ export const PersonalNewChatSheet: React.FC<{
                   </div>
                   <button
                     onClick={() => openWith(s.uid)}
-                    disabled={busy}
+                    disabled={busyUid === s.uid}
                     className="shrink-0 px-3.5 py-2 rounded-xl bg-[#EA580C] text-white text-[11px] font-black flex items-center gap-1.5 active:scale-95 transition disabled:opacity-50"
                     aria-label={`Chat with ${s.name}`}
                   >
-                    <MessageCircle className="w-3.5 h-3.5" /> Chat
+                    {busyUid === s.uid ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <MessageCircle className="w-3.5 h-3.5" />} Chat
                   </button>
                 </div>
               ))}

@@ -670,10 +670,29 @@ export const StatusViewer: React.FC<{
         if (!alive) return;
         if (d && d.ok) {
           const list = Array.isArray(d.statuses) ? d.statuses : [];
-          setStatuses(list);
-          if (startStatusId) {
-            const at = list.findIndex((x: ViewerStatus) => x.statusId === startStatusId);
-            if (at >= 0) setIdx(at);
+          if (seed && seed.length) {
+            // Merge into what is already on screen instead of replacing it:
+            // the viewer never jumps back or re-shuffles while the replies
+            // and seen counts finish loading.
+            setStatuses((prev) => {
+              if (!prev || prev.length === 0) return list;
+              const byId = new Map<string, ViewerStatus>(
+                list.map((x: ViewerStatus): [string, ViewerStatus] => [x.statusId, x]),
+              );
+              const known = new Set(prev.map((st) => st.statusId));
+              const merged = prev.map((st) => {
+                const upd = byId.get(st.statusId);
+                return upd ? { ...st, ...upd } : st;
+              });
+              for (const st of list) if (!known.has(st.statusId)) merged.push(st);
+              return merged;
+            });
+          } else {
+            setStatuses(list);
+            if (startStatusId) {
+              const at = list.findIndex((x: ViewerStatus) => x.statusId === startStatusId);
+              if (at >= 0) setIdx(at);
+            }
           }
         } else setErr(String(d?.error || 'The status could not load. Try again.'));
       })
@@ -1336,8 +1355,8 @@ const StatusRail: React.FC<{ label: string; items: StatusEntry[]; dimmed?: boole
   );
 };
 
-export const StatusScreenCore: React.FC<{ call: (path: string, opts?: any) => Promise<any>; uid: string; cacheKey?: string; fallbackName?: string }> =
-({ call, uid, cacheKey = 'chat:status', fallbackName = '' }) => {
+export const StatusScreenCore: React.FC<{ call: (path: string, opts?: any) => Promise<any>; uid: string; cacheKey?: string; fallbackName?: string; variant?: 'student' | 'staff' }> =
+({ call, uid, cacheKey = 'chat:status', fallbackName = '', variant = 'student' }) => {
   const [data, setData] = useState<StatusOverview | null>(() => loadLastGood<StatusOverview>(cacheKey));
   const [failed, setFailed] = useState(false);
   const [fanOpen, setFanOpen] = useState(false);
@@ -1451,11 +1470,44 @@ export const StatusScreenCore: React.FC<{ call: (path: string, opts?: any) => Pr
     });
   };
 
+  const staff = variant === 'staff';
   return (
-    <div className="space-y-5 animate-in fade-in duration-300">
-      <div>
+    <div className={staff ? 'space-y-5 px-4 sm:px-5 animate-in fade-in duration-300' : 'space-y-5 animate-in fade-in duration-300'}>
+      <div className="flex items-center justify-between">
         <h2 className="text-2xl font-black text-slate-900 tracking-tight">Status</h2>
+        {staff && data?.settings && data.enabled !== false && (
+          <button
+            type="button"
+            aria-label={fanOpen ? 'Close add menu' : 'Add a status update'}
+            aria-expanded={fanOpen}
+            onClick={() => setFanOpen((o) => !o)}
+            className="w-9 h-9 rounded-xl bg-[#EA580C] text-white flex items-center justify-center shadow-sm active:scale-95 transition"
+          >
+            {fanOpen ? <X className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
+          </button>
+        )}
       </div>
+
+      {staff && fanOpen && data?.settings && data.enabled !== false && (
+        <div className="flex justify-end gap-2">
+          {([
+            { key: 'text', label: 'Text', disabled: !data.settings.allowText, onPick: () => { setFanOpen(false); setComposing(true); } },
+            { key: 'photo', label: 'Photo', disabled: !data.settings.allowPhoto, onPick: () => { setFanOpen(false); photoInputRef.current?.click(); } },
+            { key: 'video', label: 'Video', disabled: !data.settings.allowVideo, onPick: () => { setFanOpen(false); videoInputRef.current?.click(); } },
+          ] as const).map((it) => (
+            <button
+              key={it.key}
+              type="button"
+              disabled={it.disabled}
+              onClick={it.disabled ? undefined : it.onPick}
+              className={`px-3.5 py-2.5 rounded-2xl bg-white border border-slate-200 shadow-sm text-xs font-black text-slate-700 flex items-center gap-1.5 active:scale-95 transition ${it.disabled ? 'opacity-40' : ''}`}
+            >
+              {it.key === 'text' ? <span className="text-sm font-black leading-none">Aa</span> : it.key === 'photo' ? <ImageIcon className="w-4 h-4" /> : <Film className="w-4 h-4" />}
+              {it.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {data && data.enabled === false && (
         <div className="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-sm text-center space-y-2">
@@ -1521,7 +1573,7 @@ export const StatusScreenCore: React.FC<{ call: (path: string, opts?: any) => Pr
       {/* Add button, bottom right corner. Tapping it fans out the four
           status kinds from that same corner; each opens its own composer.
           Kinds turned off in TOS settings show dimmed and do nothing. */}
-      {data?.settings && data.enabled !== false && (
+      {!staff && data?.settings && data.enabled !== false && (
         <div className="fixed inset-0 z-50 pointer-events-none" aria-hidden={!fanOpen}>
           {fanOpen && (
             <div
@@ -1649,5 +1701,5 @@ export const StaffStatusScreen: React.FC = () => {
     },
     [activeCentreId],
   );
-  return <StatusScreenCore call={call} uid={myUid} cacheKey="chat:staff-status" />;
+  return <StatusScreenCore call={call} uid={myUid} cacheKey="chat:staff-status" variant="staff" />;
 };
