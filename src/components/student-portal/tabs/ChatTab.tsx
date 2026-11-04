@@ -1100,7 +1100,9 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
   const readOnlyBanner =
     resp?.kind === 'announcements'
       ? 'Only your centre can post in Announcements.'
-      : 'Only TOS can post in this group.';
+      : resp?.kind === 'tos_channel' && resp.commentsEnabled === true
+        ? 'Only TOS can post here. Tap Comment under any post to join in.'
+        : 'Only TOS can post in this group.';
 
   const roleChip = (m: ChatMessage) =>
     m.role === 'tutor' ? 'Tutor' : m.role === 'centre_admin' ? 'Admin' : m.role === 'tos' ? 'TOS' : '';
@@ -1126,6 +1128,19 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
     if (diffDays === 0) return 'Today';
     if (diffDays === 1) return 'Yesterday';
     return d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  };
+
+  // Messages grouped per day so each date separator sticks inside its own
+  // day block instead of the whole scroll area.
+  const dayGroups = (list: ChatMessage[]): Array<{ key: string; label: string | null; msgs: ChatMessage[] }> => {
+    const groups: Array<{ key: string; label: string | null; msgs: ChatMessage[] }> = [];
+    list.forEach((m, i) => {
+      const label = daySeparatorLabel(m.at, i > 0 ? list[i - 1].at : null);
+      if (label) groups.push({ key: label + '-' + i, label, msgs: [] });
+      if (groups.length) groups[groups.length - 1].msgs.push(m);
+      else groups.push({ key: 'open', label: null, msgs: [m] });
+    });
+    return groups;
   };
 
   const bubble = (m: ChatMessage) => {
@@ -1299,21 +1314,21 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
             <p className="text-xs text-slate-400 font-medium">No messages yet. Say hello.</p>
           </div>
         )}
-        {messages.map((m, i) => {
-          const label = daySeparatorLabel(m.at, i > 0 ? messages[i - 1].at : null);
-          return (
-            <React.Fragment key={m.id}>
-              {label && (
-                <div className="sticky top-0 z-20 flex justify-center py-1">
-                  <span className="bg-slate-900/85 text-white text-[10px] font-bold px-3 py-1 rounded-full shadow">
-                    {label}
-                  </span>
-                </div>
-              )}
-              {bubble(m)}
-            </React.Fragment>
-          );
-        })}
+        {/* Each day gets its own wrapper so its sticky separator releases
+            when the next day scrolls up; without the wrapper every separator
+            stuck to the top of the whole thread and stacked. */}
+        {dayGroups(messages).map((g) => (
+          <div key={g.key}>
+            {g.label && (
+              <div className="sticky top-0 z-20 flex justify-center py-1">
+                <span className="bg-slate-900/85 text-white text-[10px] font-bold px-3 py-1 rounded-full shadow">
+                  {g.label}
+                </span>
+              </div>
+            )}
+            {g.msgs.map((m) => bubble(m))}
+          </div>
+        ))}
       </div>
 
       <div className="relative shrink-0 bg-white border-t border-slate-200 px-3 sm:px-4 pt-2 pb-2">

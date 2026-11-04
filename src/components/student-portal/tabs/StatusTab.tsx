@@ -648,6 +648,20 @@ export const StatusViewer: React.FC<{
   const seenFired = React.useRef<Set<string>>(new Set());
   const [ownerSheet, setOwnerSheet] = useState<'viewers' | 'replies' | null>(null);
 
+  // While an owner sheet (who saw it / replies and loves) is open, the
+  // update holds still: the white progress line stops and a playing video
+  // pauses, and both resume when the sheet closes.
+  React.useEffect(() => {
+    if (ownerSheet) {
+      pausedRef.current = true;
+      videoRef.current?.pause();
+    } else {
+      pausedRef.current = false;
+      if (current?.kind === 'video') playVideo();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ownerSheet]);
+
   useEffect(() => {
     let alive = true;
     call(`/user/${encodeURIComponent(person.uid)}${person.centreId ? `?centreId=${encodeURIComponent(person.centreId)}` : ''}`)
@@ -1323,7 +1337,7 @@ export const StatusScreenCore: React.FC<{ call: (path: string, opts?: any) => Pr
   );
   const [composing, setComposing] = useState(false);
   const [media, setMedia] = useState<{ kind: 'photo' | 'video' | 'music'; file: File } | null>(null);
-  const [viewer, setViewer] = useState<{ person: { uid: string; name: string; username: string; avatar?: string; centreId?: string }; mine: boolean; startStatusId?: string } | null>(null);
+  const [viewer, setViewer] = useState<{ person: { uid: string; name: string; username: string; avatar?: string; centreId?: string }; mine: boolean; startStatusId?: string; seed?: ViewerStatus[] } | null>(null);
 
   useEscape(() => setFanOpen(false));
 
@@ -1564,6 +1578,7 @@ export const StatusScreenCore: React.FC<{ call: (path: string, opts?: any) => Pr
             person={viewer.person}
             mine={viewer.mine}
             startStatusId={viewer.startStatusId}
+            seed={viewer.seed}
             call={call}
             settings={data.settings}
             onClose={closeViewer}

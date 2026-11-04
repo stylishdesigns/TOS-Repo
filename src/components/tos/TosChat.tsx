@@ -313,7 +313,7 @@ const ChannelTab: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
           </div>
           <label className="flex items-center gap-2 text-xs text-slate-300 font-medium cursor-pointer select-none w-fit">
             <input type="checkbox" checked={createComments} onChange={(e) => setCreateComments(e.target.checked)} className="accent-orange-500 w-4 h-4" />
-            Allow comments (students can reply to posts in this channel)
+            New channel: allow comments (students can reply to posts)
           </label>
 
           <div className="rounded-xl border border-white/10 bg-slate-950/40 p-3 space-y-2">
@@ -326,7 +326,7 @@ const ChannelTab: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
             </div>
             <label className="flex items-center gap-2 text-xs text-slate-300 font-medium cursor-pointer select-none w-fit">
               <input type="checkbox" checked={editComments} onChange={(e) => setEditComments(e.target.checked)} className="accent-orange-500 w-4 h-4" />
-              Allow comments on posts
+              Selected channel: allow comments on posts
             </label>
           </div>
           {error && <p className="text-xs text-red-300">{error}</p>}
@@ -865,6 +865,18 @@ const TosStatusTab: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
           <StatusViewer
             person={{ uid: myUid, name: 'TOS', username: '' }}
             mine={true}
+            seed={latest ? [{
+              statusId: latest.statusId,
+              kind: latest.kind,
+              at: latest.at,
+              expiresAt: latest.expiresAt,
+              text: latest.text,
+              bg: latest.bg,
+              photoUrl: latest.photoUrl,
+              videoUrl: latest.videoUrl,
+              audioUrl: latest.audioUrl,
+              durationSeconds: latest.durationSeconds,
+            }] : undefined}
             call={call}
             settings={settings}
             onClose={() => setViewing(false)}

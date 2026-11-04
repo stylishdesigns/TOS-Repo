@@ -310,6 +310,11 @@ export const StudentPortal: React.FC = () => {
   const [chatView, setChatView] = useState<'chats' | 'channels'>('chats');
   const [statusScreenOpen, setStatusScreenOpen] = useState(false);
   const [titoOpen, setTitoOpen] = useState(false);
+  const fanOpenedAtRef = React.useRef(0);
+  const fanWing = (open: () => void) => () => {
+    if (Date.now() - fanOpenedAtRef.current < 350) return;
+    open();
+  };
   const orbRef = React.useRef<HTMLButtonElement>(null);
   const fanChatsRef = React.useRef<HTMLButtonElement>(null);
   const prefersReducedMotion = React.useMemo(
@@ -317,6 +322,7 @@ export const StudentPortal: React.FC = () => {
     [],
   );
   const openChatFan = React.useCallback(() => {
+    fanOpenedAtRef.current = Date.now();
     setChatFanOpen(true);
   }, []);
   const closeChatFan = React.useCallback(() => {
@@ -342,14 +348,14 @@ export const StudentPortal: React.FC = () => {
     setStatusScreenOpen(false);
     setTitoOpen(true);
   }, []);
-  // The orb is the way back to the fan. From the Status screen, tapping it
-  // closes Status first so the fan opens over the normal page.
+  // The orb is the way back to the fan. Whatever page is on screen (the
+  // Status screen included) stays visible under the fan; the fan opens over
+  // it. fanOpenedAt guards against a stray second tap landing on a wing
+  // button in the same breath the fan opens.
   const handleOrbClick = React.useCallback(() => {
     if (chatFanOpen) { closeChatFan(); return; }
-    if (statusScreenOpen) setStatusScreenOpen(false);
-    if (titoOpen) setTitoOpen(false);
     openChatFan();
-  }, [chatFanOpen, statusScreenOpen, titoOpen, closeChatFan, openChatFan]);
+  }, [chatFanOpen, closeChatFan]);
 
   useEffect(() => {
     if (!chatFanOpen) return;
@@ -752,15 +758,6 @@ export const StudentPortal: React.FC = () => {
             {activeTab === 'more' && <MoreTab student={activeStudent} />}
           </div>
 
-          {/* Phase 1 B: dims the page behind the fan (the bar stays bright). */}
-          {chatFanOpen && !hideBottomNav && (
-            <div
-              className="fixed inset-0 z-40 bg-slate-950/60"
-              onClick={closeChatFan}
-              aria-hidden="true"
-            />
-          )}
-
           {/* Phase 2 S1: the read-only Status screen, wired to the stored
               allow-status flag and status limits. No back control: the chat
               orb is the way back to the fan. */}
@@ -781,6 +778,17 @@ export const StudentPortal: React.FC = () => {
                 <TitoAiScreen />
               </div>
             </div>
+          )}
+
+          {/* Phase 1 B: dims the page behind the fan (the bar stays bright).
+              It sits after the Status and Tutor AI screens in the layer order
+              so it covers whichever of them is open under the fan. */}
+          {chatFanOpen && !hideBottomNav && (
+            <div
+              className="fixed inset-0 z-40 bg-slate-950/60"
+              onClick={closeChatFan}
+              aria-hidden="true"
+            />
           )}
 
           {/* 3. Persistent Mobile Bottom Navigation Bar (5 Items: Home · Classes · Chat · CBT · More) */}
@@ -925,7 +933,7 @@ export const StudentPortal: React.FC = () => {
                   <button
                     type="button"
                     role="menuitem"
-                    onClick={openStatusScreen}
+                    onClick={fanWing(openStatusScreen)}
                     aria-label="Status"
                     className={`absolute w-12 h-12 rounded-full bg-white text-[#EA580C] flex items-center justify-center shadow-lg cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 ${prefersReducedMotion ? '' : 'animate-in fade-in zoom-in-95 duration-200'}`}
                     style={{ left: -72, top: -42, transform: 'translate(-50%, -50%)' }}
@@ -943,7 +951,7 @@ export const StudentPortal: React.FC = () => {
                     type="button"
                     ref={fanChatsRef}
                     role="menuitem"
-                    onClick={() => openChatSection('chats')}
+                    onClick={fanWing(() => openChatSection('chats'))}
                     aria-label="Chats"
                     className={`absolute w-14 h-14 rounded-full text-white flex items-center justify-center shadow-xl cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-200 ${prefersReducedMotion ? '' : 'animate-in fade-in zoom-in-95 duration-200'}`}
                     style={{ left: 0, top: -84, transform: 'translate(-50%, -50%)', background: 'linear-gradient(145deg, #EA580C, #9A3412)' }}
@@ -957,7 +965,7 @@ export const StudentPortal: React.FC = () => {
                   <button
                     type="button"
                     role="menuitem"
-                    onClick={openTito}
+                    onClick={fanWing(openTito)}
                     aria-label="Tutor AI"
                     className={`absolute w-12 h-12 rounded-full bg-white text-violet-600 flex items-center justify-center shadow-lg cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 ${prefersReducedMotion ? '' : 'animate-in fade-in zoom-in-95 duration-200'}`}
                     style={{ left: 72, top: -42, transform: 'translate(-50%, -50%)' }}

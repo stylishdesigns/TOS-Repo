@@ -68,50 +68,66 @@ export function useLongPress(onLongPress: () => void, ms = 450) {
 }
 
 /** Same detector as useLongPress, but as plain closures so it can be built
- *  inline for each bubble in a list render. */
-export function makeLongPress(onLongPress: () => void, ms = 450) {
-  let timer: ReturnType<typeof setTimeout> | null = null;
-  let start: { x: number; y: number } | null = null;
-  let fired = false;
-  const clear = () => {
-    if (timer) {
-      clearTimeout(timer);
-      timer = null;
+ *  inline for each bubble in a list render. The hold state lives on the DOM
+ *  element itself, not in this closure: a re-render between touchstart and
+ *  touchend swaps in fresh closures, and a closure-held timer would survive
+ *  the swap with nothing left able to cancel it, which used to pop the sheet
+ *  open during a plain scroll. */
+export function makeLongPress(onLongPress: () => void, ms = 500) {
+  type Hold = { timer: ReturnType<typeof setTimeout> | null; x: number; y: number; fired: boolean };
+  const holdOf = (el: EventTarget | null): Hold => {
+    if (!el || typeof el !== 'object') return { timer: null, x: 0, y: 0, fired: false };
+    const anyEl = el as { __lpHold?: Hold };
+    if (!anyEl.__lpHold) anyEl.__lpHold = { timer: null, x: 0, y: 0, fired: false };
+    return anyEl.__lpHold;
+  };
+  const clearEl = (e: { currentTarget: EventTarget | null }) => {
+    const hold = holdOf(e.currentTarget);
+    if (hold.timer) {
+      clearTimeout(hold.timer);
+      hold.timer = null;
     }
   };
-  const begin = (x: number, y: number) => {
-    fired = false;
-    start = { x, y };
-    clear();
-    timer = setTimeout(() => {
-      fired = true;
+  const pointOf = (e: React.TouchEvent | React.MouseEvent): { x: number; y: number } | null => {
+    if ('touches' in e) return e.touches[0] ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : null;
+    return { x: e.clientX, y: e.clientY };
+  };
+  const begin = (e: React.TouchEvent | React.MouseEvent) => {
+    const hold = holdOf(e.currentTarget);
+    const t = pointOf(e);
+    if (!t) return;
+    clearEl(e);
+    hold.fired = false;
+    hold.x = t.x;
+    hold.y = t.y;
+    hold.timer = setTimeout(() => {
+      hold.timer = null;
+      hold.fired = true;
       onLongPress();
     }, ms);
   };
-  const moved = (x: number, y: number) => {
-    if (!start) return;
-    if (Math.abs(x - start.x) > 10 || Math.abs(y - start.y) > 10) {
-      clear();
-      start = null;
-    }
+  const moved = (e: React.TouchEvent | React.MouseEvent) => {
+    const hold = holdOf(e.currentTarget);
+    if (!hold.timer) return;
+    const t = pointOf(e);
+    if (!t) return;
+    if (Math.abs(t.x - hold.x) > 10 || Math.abs(t.y - hold.y) > 10) clearEl(e);
   };
   return {
-    onTouchStart: (e: React.TouchEvent) => {
-      const t = e.touches[0];
-      if (t) begin(t.clientX, t.clientY);
-    },
-    onTouchMove: (e: React.TouchEvent) => {
-      const t = e.touches[0];
-      if (t) moved(t.clientX, t.clientY);
-    },
-    onTouchEnd: clear,
-    onTouchCancel: clear,
-    onMouseDown: (e: React.MouseEvent) => begin(e.clientX, e.clientY),
-    onMouseUp: clear,
-    onMouseLeave: clear,
+    onTouchStart: (e: React.TouchEvent) => begin(e),
+    onTouchMove: (e: React.TouchEvent) => moved(e),
+    onTouchEnd: clearEl,
+    onTouchCancel: clearEl,
+    onMouseDown: (e: React.MouseEvent) => begin(e),
+    onMouseUp: clearEl,
+    onMouseLeave: clearEl,
     onContextMenu: (e: React.MouseEvent) => {
       e.preventDefault();
-      if (!fired) onLongPress();
+      const hold = holdOf(e.currentTarget);
+      if (!hold.fired) {
+        hold.fired = true;
+        onLongPress();
+      }
     },
     style: { WebkitTouchCallout: 'none' as const } as React.CSSProperties,
   };

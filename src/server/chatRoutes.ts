@@ -2698,7 +2698,7 @@ async function statusReplyCore(caller: Caller, centreId: string, body: Record<st
 /** Loving a status: one toggle per person, stored with the status. The
  *  owner reads the lovers back with names so replies and loves show
  *  together in their viewer. */
-async function statusLoveCore(caller: Caller, centreId: string, body: Record<string, unknown>, identity: { name: string; username: string }): Promise<Record<string, unknown>> {
+async function statusLoveCore(caller: Caller, centreId: string, body: Record<string, unknown>, identity: { name: string; username: string; role?: string }): Promise<Record<string, unknown>> {
   const tosChat = await getTosChat();
   const st = tosChat.status;
   if (!st.enabled) throw httpError(403, 'Status is not turned on.');
