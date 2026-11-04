@@ -75,6 +75,7 @@ const START_CENTRE_CHAT: CentreChatSettings = {
   // The cap for generic chat attachments (video, PDF, anything a photo is
   // not). Stored, not hard-coded, like every other chat cap.
   filesMaxMb: 25,
+  studentsCanChatStudents: true,
   updatedAt: null,
 };
 
@@ -187,6 +188,7 @@ function mergeCentreChat(raw: any): CentreChatSettings {
   s.tutorsCanRemove = raw.tutorsCanRemove !== false;
   s.paused = raw.paused === true;
   s.filesMaxMb = clampInt(raw.filesMaxMb, 1, 200, s.filesMaxMb);
+  s.studentsCanChatStudents = raw.studentsCanChatStudents !== false;
   if (Array.isArray(raw.muteDayOptions)) {
     const rawList: number[] = raw.muteDayOptions.map((x: unknown) => clampInt(x, 1, 365, 0));
     const opts: number[] = Array.from(new Set<number>(rawList.filter((n: number) => n > 0))).sort((a: number, b: number) => a - b);
@@ -383,6 +385,17 @@ async function chatTargetInfo(uid: string): Promise<{ uid: string; isStudent: bo
     const c = cleanStr(v?.centreId, 120);
     if (c && ['owner', 'admin', 'tutor'].includes(role)) centres.add(c);
   });
+  // A tutor may live only in the tutors collection (no membership doc), so
+  // the tutors row unions in both the centre and the name for every target.
+  try {
+    const tut = await adminDb.collection('tutors').where('uid', '==', id).limit(1).get();
+    if (!tut.empty) {
+      const v = tut.docs[0].data() as any;
+      const c = cleanStr(v?.centreId, 120);
+      if (c) centres.add(c);
+      name = cleanStr(v?.name, MAX_NAME_CHARS) || name;
+    }
+  } catch { /* keep what we have */ }
   if (centres.size === 0 && !isStudent) return null;
   try {
     const adm = await adminDb.collection('admins').doc(id).get();
@@ -391,12 +404,6 @@ async function chatTargetInfo(uid: string): Promise<{ uid: string; isStudent: bo
       name = cleanStr(v?.name || v?.displayName || v?.fullName, MAX_NAME_CHARS) || name;
     }
   } catch { /* the student name stands */ }
-  if (!name) {
-    try {
-      const tut = await adminDb.collection('tutors').where('uid', '==', id).limit(1).get();
-      if (!tut.empty) name = cleanStr(tut.docs[0].data()?.name, MAX_NAME_CHARS) || name;
-    } catch { /* keep what we have */ }
-  }
   const username = await usernameFor(id);
   return { uid: id, isStudent, centres: [...centres], name, username };
 }
@@ -488,6 +495,13 @@ async function openPersonalCore(caller: Caller, opts: { role: 'student' | 'staff
     const targetSettings = await chatSettingsFor(targetUid);
     if (targetSettings.messages === 'nobody') {
       throw httpError(403, `${target.username} is not opening new chats right now.`);
+    }
+  }
+
+  if (!staffRole && target.isStudent && sameCentre) {
+    const centreChat = await getCentreChat(opts.centreId);
+    if (centreChat.studentsCanChatStudents === false) {
+      throw httpError(403, 'Your centre has turned student-to-student chats off. Ask your centre admin.');
     }
   }
 
@@ -1554,7 +1568,12 @@ export function registerChatRoutes(app: express.Express): void {
     try {
       const caller = getCaller(req);
       const { centreId } = await studentChatBase(caller);
-      res.json(await chatDirectoryFor(centreId, caller.uid));
+      const dir = await chatDirectoryFor(centreId, caller.uid);
+      // The centre admin's switch: off means the student list collapses and
+      // only tutors and admins stay reachable for new chats.
+      const centreChat = await getCentreChat(centreId);
+      if (centreChat.studentsCanChatStudents === false) (dir as any).students = [];
+      res.json(dir);
     } catch (error: any) {
       handleRouteError(res, error, '[chat] student directory failed');
     }
@@ -1596,6 +1615,27 @@ export function registerChatRoutes(app: express.Express): void {
       res.json({ ok: true, follows: channels });
     } catch (error: any) {
       handleRouteError(res, error, '[chat] channel follow failed');
+    }
+  });
+
+  // The Cloudinary upload config for staff chat attachments. Same folder and
+  // caps as the student route; the entitlements and membership checks apply.
+  app.get('/api/centre/chat/upload-config', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const centreId = cleanStr(String(req.query.centreId || ''), 120);
+      if (!centreId) throw httpError(400, 'centreId is required.');
+      await requireMembership(caller, centreId, ['owner', 'admin', 'tutor']);
+      const entitlements = await getCentreEntitlements(centreId);
+      if (entitlements.chat !== true) {
+        throw httpError(403, 'Chat is not part of your centre\u2019s plan yet.');
+      }
+      const cloud = String(process.env.CLOUDINARY_CLOUD_NAME || '');
+      const preset = String(process.env.CLOUDINARY_UPLOAD_PRESET || '');
+      if (!cloud || !preset) throw httpError(503, 'File sharing is not configured yet.');
+      res.json({ ok: true, cloud, preset, folder: 'tos/chat' });
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] staff upload config failed');
     }
   });
 
@@ -2821,6 +2861,10 @@ async function staffStatusContext(caller: Caller, centreId: string) {
           role: cleanStr(v.role, 20),
           text: String(v.text ?? '').slice(0, tosChat.messageMaxChars),
           photoUrl: typeof v.photoUrl === 'string' ? v.photoUrl.slice(0, MAX_PHOTO_URL_CHARS) : null,
+          fileUrl: typeof v.fileUrl === 'string' ? v.fileUrl.slice(0, MAX_PHOTO_URL_CHARS) : null,
+          fileName: typeof v.fileName === 'string' ? cleanStr(v.fileName, 120) : null,
+          fileKind: typeof v.fileKind === 'string' ? cleanStr(v.fileKind, 20) : null,
+          fileSize: Math.max(0, Math.round(Number(v.fileSize) || 0)) || null,
           at: Number(v.at) || 0,
           removed: Boolean(v.removed),
           forwardedFrom: typeof v.forwardedFrom === 'string' ? cleanStr(v.forwardedFrom, 80) : null,
@@ -2839,6 +2883,7 @@ async function staffStatusContext(caller: Caller, centreId: string) {
         canPost: !isChannel,
         photosAllowed: isChannel ? false : ctx.centreChat.photosAllowed,
         photoMaxKb: tosChat.photoMaxKb,
+        filesMaxMb: isChannel ? 0 : ctx.centreChat.filesMaxMb,
         messageMaxChars: tosChat.messageMaxChars,
         messages,
       });
@@ -2867,13 +2912,30 @@ async function staffStatusContext(caller: Caller, centreId: string) {
       const photoUrl = ctx.centreChat.photosAllowed && typeof body.photoUrl === 'string' && body.photoUrl.trim()
         ? body.photoUrl.trim().slice(0, MAX_PHOTO_URL_CHARS)
         : null;
-      if (!text && !photoUrl) throw httpError(400, 'Write a message first.');
+      // A generic attachment (video, document, anything a photo is not), the
+      // same checks the student post route applies.
+      let fileUrl: string | null = null;
+      let fileName: string | null = null;
+      let fileKind: string | null = null;
+      let fileSize: number | null = null;
+      if (typeof body.fileUrl === 'string' && body.fileUrl.trim()) {
+        const url = body.fileUrl.trim().slice(0, MAX_PHOTO_URL_CHARS);
+        const cloud = String(process.env.CLOUDINARY_CLOUD_NAME || '');
+        if (!cloud || !url.startsWith(`https://res.cloudinary.com/${cloud}/`)) throw httpError(400, 'Upload the file through this app first.');
+        await verifyChatFileSize(url, ctx.centreChat.filesMaxMb);
+        fileUrl = url;
+        fileName = cleanStr(String(body.fileName ?? ''), 120) || 'File';
+        fileKind = cleanStr(String(body.fileKind ?? ''), 20) || 'file';
+        fileSize = Math.max(0, Math.round(Number(body.fileSize) || 0)) || null;
+      }
+      if (!text && !photoUrl && !fileUrl) throw httpError(400, 'Write a message first.');
       if (text.length > tosChat.messageMaxChars) throw httpError(400, `Messages can be up to ${tosChat.messageMaxChars} characters.`);
       await consumePostRateLimit(caller.uid, tosChat.postRateLimitPerDay);
       const username = (await staffDisplayName(caller)).slice(0, 16);
       const role = ctx.membership.role === 'tutor' ? 'tutor' : 'admin';
       const replyTo = await buildReplyTo(ctx.group.id, body.replyTo);
-      await writeMessage(ctx.group, { uid: caller.uid, username, role }, text.slice(0, tosChat.messageMaxChars), photoUrl, replyTo ? { replyTo } : undefined);
+      const fileExtras = fileUrl ? { fileUrl, fileName, fileKind, fileSize } : {};
+      await writeMessage(ctx.group, { uid: caller.uid, username, role }, text.slice(0, tosChat.messageMaxChars), photoUrl, { ...(replyTo ? { replyTo } : {}), ...fileExtras });
       const meta = await readMeta(ctx.group.id);
       res.json({ ok: true, meta });
     } catch (error: any) {
@@ -3620,6 +3682,7 @@ function loadGroupFromDoc(doc: QueryDocumentSnapshot<DocumentData>): GroupDoc {
     kind: d.kind,
     subject: d.subject ? cleanStr(d.subject, MAX_SUBJECT_CHARS) : null,
     access: d.access && typeof d.access === 'object' ? d.access : { mode: 'centre_default' },
+    audience: channelAudienceOf(d.audience),
     createdBy: cleanStr(d.createdBy, 64),
     createdByRole: cleanStr(d.createdByRole, 20),
     createdAt: cleanStr(d.createdAt, 40),

@@ -3,12 +3,15 @@ import {
   BookOpen,
   Check,
   ChevronLeft,
+  ExternalLink,
+  FileText,
   Flag,
+  Film,
   Info,
   Loader2,
-  Lock,
   Megaphone,
   MessageSquare,
+  Play,
   Plus,
   Send,
   ShieldAlert,
@@ -53,6 +56,7 @@ interface ChatSettings {
   tutorsCanRemove: boolean;
   paused: boolean;
   muteDayOptions: number[];
+  studentsCanChatStudents: boolean;
   updatedAt?: string | null;
 }
 
@@ -361,13 +365,6 @@ const GroupsSection: React.FC<SectionProps> = ({ data, isAdmin, reload, addToast
         />
       ) : (
       <>
-      <div className="bg-violet-50 rounded-2xl p-4 border border-violet-100 flex items-start gap-3">
-        <Lock className="w-4 h-4 text-violet-600 shrink-0 mt-0.5" />
-        <p className="text-[11px] text-violet-900 font-medium leading-relaxed">
-          The <span className="font-black">{data.platform.mockPracticeChannelName}</span> channel is managed by TOS and appears in every centre's student chat automatically. It opens at {data.platform.mockPracticeThresholdPercent}% practice.
-        </p>
-      </div>
-
       {isAdmin && (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <button
@@ -698,6 +695,7 @@ const SettingsSection: React.FC<SectionProps> = ({ data, isAdmin, reload, addToa
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-1">
         <p className="text-xs font-black text-slate-800 uppercase tracking-wider mb-1">Safety</p>
         <Toggle on={s.photosAllowed} onChange={(v) => setS({ ...s, photosAllowed: v })} label="Students can share photos" />
+        <Toggle on={s.studentsCanChatStudents !== false} onChange={(v) => setS({ ...s, studentsCanChatStudents: v })} label="Students can chat each other privately" />
         <Toggle on={s.tutorsCanRemove} onChange={(v) => setS({ ...s, tutorsCanRemove: v })} label="Tutors can remove reported messages" />
         <Toggle on={s.paused} onChange={(v) => setS({ ...s, paused: v })} label="Pause chat for the whole centre" />
         <div className="pt-2">
@@ -874,6 +872,10 @@ interface ThreadMsg {
   role: string;
   text: string;
   photoUrl: string | null;
+  fileUrl?: string | null;
+  fileName?: string | null;
+  fileKind?: string | null;
+  fileSize?: number | null;
   at: number;
   removed: boolean;
   mine: boolean;
@@ -882,6 +884,23 @@ interface ThreadMsg {
   reactions?: Record<string, string> | null;
   pending?: boolean;
   localUrl?: string;
+  progress?: number;
+}
+
+/** What a chat attachment is, from its file type: image, video or document. */
+function kindOf(file: File): string {
+  const t = (file as any).type || '';
+  if (t.startsWith('image/')) return 'image';
+  if (t.startsWith('video/')) return 'video';
+  if (t.startsWith('audio/')) return 'audio';
+  return 'file';
+}
+
+function fmtSize(bytes: number): string {
+  if (!bytes || bytes <= 0) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function roleChip(role: string): string {
@@ -914,8 +933,18 @@ const ThreadPanel: React.FC<{
   const [messages, setMessages] = useState<ThreadMsg[] | null>(() => threadCache.get(group.id) || null);
   const [text, setText] = useState('');
   const [attachPreview, setAttachPreview] = useState('');
+  const [attachFile, setAttachFile] = useState<File | null>(null);
+  const [attachProgress, setAttachProgress] = useState(0);
+  const [attachSheet, setAttachSheet] = useState(false);
+  const [videoViewerUrl, setVideoViewerUrl] = useState('');
+  const [infoOpen, setInfoOpen] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const [canLoadEarlier, setCanLoadEarlier] = useState(true);
   const fileRef = useRef<HTMLInputElement | null>(null);
+  const videoRef = useRef<HTMLInputElement | null>(null);
+  const docRef = useRef<HTMLInputElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const uploadCfgRef = useRef<{ cloud: string; preset: string; folder: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [loadErr, setLoadErr] = useState('');
   const [actionMsg, setActionMsg] = useState<ThreadMsg | null>(null);
@@ -947,6 +976,29 @@ const ThreadPanel: React.FC<{
     const t = setInterval(load, 15000);
     return () => clearInterval(t);
   }, [load]);
+
+  // Older pages load behind the current view with the same before-cursor the
+  // student room uses, so nothing in a long centre group is out of reach.
+  const loadEarlier = async () => {
+    const list = messages || [];
+    if (loadingOlder || list.length === 0 || !canLoadEarlier) return;
+    const oldest = Math.min(...list.map((m) => m.at || 0));
+    if (!oldest) { setCanLoadEarlier(false); return; }
+    setLoadingOlder(true);
+    try {
+      const res = await api(`/api/centre/chat/groups/${group.id}/messages?centreId=${encodeURIComponent(centreId)}&before=${oldest}&limit=50`);
+      const older: ThreadMsg[] = (res as any)?.messages || [];
+      const known = new Set(list.map((m) => m.id));
+      const fresh = older.filter((m) => !known.has(m.id));
+      if (older.length < 50) setCanLoadEarlier(false);
+      if (fresh.length > 0) {
+        const next = [...[...fresh].sort((a, b) => a.at - b.at), ...list];
+        setMessages(next);
+        threadCache.set(group.id, next);
+      }
+    } catch { /* the current view stays; the button can be pressed again */ }
+    finally { setLoadingOlder(false); }
+  };
 
   // Newest message sits at the bottom of the conversation, like any chat app.
   const shown = [...(messages || [])].sort((a, b) => a.at - b.at);
@@ -983,16 +1035,51 @@ const ThreadPanel: React.FC<{
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages]);
 
+  // The upload config comes from the centre's own chat settings, cached for
+  // the session so every attachment after the first starts instantly.
+  const uploadStaffFile = async (file: File, onProgress: (pct: number) => void): Promise<string> => {
+    let cfg = uploadCfgRef.current;
+    if (!cfg) {
+      const res = await api(`/api/centre/chat/upload-config?centreId=${encodeURIComponent(centreId)}`);
+      cfg = { cloud: String(res?.cloud || ''), preset: String(res?.preset || ''), folder: String(res?.folder || 'tos/chat') };
+      if (!cfg.cloud || !cfg.preset) throw new Error('File sharing is not configured yet.');
+      uploadCfgRef.current = cfg;
+    }
+    const kind = kindOf(file);
+    const resource = kind === 'image' ? 'image' : kind === 'video' ? 'video' : 'raw';
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('upload_preset', cfg.preset);
+    fd.append('folder', cfg.folder);
+    return await new Promise<string>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `https://api.cloudinary.com/v1_1/${cfg!.cloud}/${resource}/upload`);
+      xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100)); };
+      xhr.onload = () => {
+        try {
+          const data = JSON.parse(xhr.responseText);
+          if (xhr.status >= 200 && xhr.status < 300 && data.secure_url) resolve(String(data.secure_url));
+          else reject(new Error(String(data?.error?.message || 'The file could not be uploaded.')));
+        } catch { reject(new Error('The file could not be uploaded.')); }
+      };
+      xhr.onerror = () => reject(new Error('The file could not be uploaded. Check your connection.'));
+      xhr.send(fd);
+    });
+  };
+
   const send = async () => {
     if (busy) return;
     const value = text.trim();
     const preview = attachPreview;
+    const file = attachFile;
     const rt = replyTo;
-    if (!value && !preview) return;
+    if (!value && !preview && !file) return;
     setBusy(true);
-    // The message shows in the room straight away, photo included, and the
-    // upload happens behind its pending bubble.
+    // The message shows in the room straight away, media included, with the
+    // upload percentage on the media itself instead of a loading screen.
     const penId = `pending-${Date.now()}`;
+    const kind = file ? kindOf(file) : null;
+    const localUrl = file && (kind === 'image' || kind === 'video') ? URL.createObjectURL(file) : preview || undefined;
     const pen: ThreadMsg = {
       id: penId,
       uid: '',
@@ -1000,26 +1087,47 @@ const ThreadPanel: React.FC<{
       role: '',
       text: value,
       photoUrl: preview || null,
+      fileUrl: file ? 'pending' : null,
+      fileName: file ? file.name : null,
+      fileKind: kind,
+      fileSize: file ? file.size : null,
       at: Date.now(),
       removed: false,
       mine: true,
       pending: true,
-      localUrl: preview || undefined,
+      progress: 0,
+      localUrl,
     };
     setMessages((prev) => [...(prev || []), pen]);
     setText('');
     setAttachPreview('');
+    setAttachFile(null);
+    setAttachProgress(0);
     setReplyTo(null);
     try {
       let photoUrl: string | undefined;
+      let fileUrl: string | undefined;
       if (preview) {
         const res = await api(`/api/centre/chat/photo?centreId=${encodeURIComponent(centreId)}`, { method: 'POST', body: { dataUrl: preview } });
         photoUrl = String(res?.url || '');
         if (!photoUrl) throw new Error('The photo could not be uploaded.');
+      } else if (file) {
+        fileUrl = await uploadStaffFile(file, (pct) => {
+          setMessages((prev) => (prev || []).map((x) => (x.id === penId && x.pending ? { ...x, progress: pct } : x)));
+          setAttachProgress(pct);
+        });
       }
       await api(`/api/centre/chat/groups/${group.id}/messages?centreId=${encodeURIComponent(centreId)}`, {
         method: 'POST',
-        body: { text: value, photoUrl, replyTo: rt ? rt.id : undefined },
+        body: {
+          text: value,
+          photoUrl,
+          fileUrl,
+          fileName: file ? file.name : undefined,
+          fileSize: file ? file.size : undefined,
+          fileKind: file ? kindOf(file) : undefined,
+          replyTo: rt ? rt.id : undefined,
+        },
       });
       setMessages((prev) => (prev || []).filter((x) => x.id !== penId));
       await load();
@@ -1027,6 +1135,7 @@ const ThreadPanel: React.FC<{
       setMessages((prev) => (prev || []).filter((x) => x.id !== penId));
       addToast(String(e?.message || 'The message could not be sent.'), 'error');
     } finally {
+      setAttachProgress(0);
       setBusy(false);
     }
   };
@@ -1057,6 +1166,13 @@ const ThreadPanel: React.FC<{
       img.src = String(reader.result || '');
     };
     reader.readAsDataURL(file);
+  };
+
+  const onFilePicked = (file: File | null | undefined) => {
+    if (!file) return;
+    if (kindOf(file) === 'image') { onPhotoPicked(file); return; }
+    if (file.size > 200 * 1024 * 1024) { addToast('That file is too large. Choose a smaller one.'); return; }
+    setAttachFile(file);
   };
 
   const myUid = (messages || []).find((m) => m.mine)?.uid || '';
@@ -1131,6 +1247,13 @@ const ThreadPanel: React.FC<{
           <p className="text-sm font-black text-white truncate">{group.name}</p>
           <p className="text-[10px] font-bold uppercase tracking-wider text-orange-100">{kindLabel(group.kind)}</p>
         </div>
+        <button
+          onClick={() => setInfoOpen(true)}
+          className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center text-white active:scale-95 transition shrink-0"
+          aria-label="Group info"
+        >
+          <Info className="w-4 h-4" />
+        </button>
       </div>
 
       {loadErr && (
@@ -1146,10 +1269,21 @@ const ThreadPanel: React.FC<{
         {messages !== null && messages.length === 0 && (
           <p className="text-center text-xs text-slate-400 font-medium py-8">No messages yet. Send the first one.</p>
         )}
+        {messages !== null && canLoadEarlier && messages.length >= 20 && (
+          <div className="flex justify-center py-1">
+            <button
+              onClick={loadEarlier}
+              disabled={loadingOlder}
+              className="px-4 py-1.5 rounded-full bg-white border border-slate-200 text-[11px] font-bold text-slate-500 active:scale-95 transition disabled:opacity-60"
+            >
+              {loadingOlder ? 'Loading…' : 'Load earlier messages'}
+            </button>
+          </div>
+        )}
         {/* Each day gets its own wrapper so its sticky separator releases
             when the next day scrolls up, exactly like the student chat. */}
         {dayGroups(shown).map((g) => (
-          <div key={g.key}>
+          <div key={g.key} className="space-y-2.5">
             {g.label && (
               <div className="sticky top-0 z-20 flex justify-center py-1">
                 <span className="bg-slate-900/85 text-white text-[10px] font-bold px-3 py-1 rounded-full shadow">
@@ -1160,19 +1294,22 @@ const ThreadPanel: React.FC<{
             {g.msgs.map((m) => {
           const press = makeLongPress(() => { if (!m.removed) setActionMsg(m); });
           const emojiOnly = !m.removed && !!m.text && isEmojiOnly(m.text);
-          const mediaUrl = m.localUrl || m.photoUrl || null;
-          const uploading = !!m.pending && !mediaUrl?.startsWith('data:');
+          const mediaUrl = m.localUrl || m.photoUrl || m.fileUrl || null;
+          const mediaKind = m.fileKind || (m.photoUrl ? 'image' : null);
+          const uploading = !!m.pending && (m.progress ?? 0) < 100;
           return (
-          <div key={m.id} className={`flex flex-col ${m.mine ? 'items-end' : 'items-start'}`}>
+          <div key={m.id} className={`flex flex-col ${m.mine ? 'items-end' : 'items-start'} px-1`}>
             <div className="flex items-center gap-1.5 mb-0.5">
               <span className="text-[10px] font-black text-slate-500">{m.mine ? 'You' : m.username}</span>
-              <span className={`text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full ${roleChipClass(m.role)}`}>{roleChip(m.role)}</span>
+              {m.role && m.role !== 'student' && (
+                <span className={`text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full ${roleChipClass(m.role)}`}>{roleChip(m.role)}</span>
+              )}
               <span className="text-[9px] text-slate-400">{m.at ? fmtDateTime(new Date(m.at).toISOString()) : ''}</span>
             </div>
             {m.forwardedFrom && (
               <p className={`text-[9px] font-bold italic ${m.mine ? 'text-orange-100' : 'text-slate-400'}`}>Forwarded from {m.forwardedFrom}</p>
             )}
-            {!m.removed && mediaUrl && (
+            {!m.removed && mediaUrl && mediaKind === 'image' && (
               <span
                 {...press}
                 className="relative block rounded-xl overflow-hidden w-44 h-64 bg-slate-100 cursor-pointer"
@@ -1180,10 +1317,48 @@ const ThreadPanel: React.FC<{
               >
                 <img src={mediaUrl as string} alt="Shared photo" className={`w-full h-full object-cover block ${m.pending ? 'opacity-70' : ''}`} />
                 {uploading && (
-                  <span className="absolute inset-0 bg-black/45 flex items-center justify-center">
-                    <Loader2 className="w-6 h-6 animate-spin text-white" />
-                  </span>
+                  <span className="absolute inset-0 bg-black/45 flex items-center justify-center text-white text-xs font-black">{m.progress ?? 0}%</span>
                 )}
+              </span>
+            )}
+            {!m.removed && mediaUrl && mediaKind === 'video' && (
+              <span className="relative block">
+                <button
+                  {...press}
+                  onClick={() => { if (!m.pending) setVideoViewerUrl(mediaUrl as string); }}
+                  className="relative rounded-xl overflow-hidden w-44 h-64 bg-slate-900 flex items-center justify-center"
+                  aria-label="Play video"
+                >
+                  <video src={mediaUrl as string} preload="metadata" muted playsInline tabIndex={-1} aria-hidden="true" className="absolute inset-0 w-full h-full object-cover" />
+                  <span className="relative w-12 h-12 rounded-full bg-black/40 border border-white/50 flex items-center justify-center">
+                    <Play className="w-5 h-5 text-white ml-0.5" fill="currentColor" />
+                  </span>
+                  <span className="absolute bottom-1.5 right-2 text-[9px] font-bold text-white/90 bg-black/50 rounded px-1">{m.fileSize ? fmtSize(m.fileSize) : 'Video'}</span>
+                </button>
+                {uploading && (
+                  <span className="absolute inset-0 rounded-xl bg-black/45 flex items-center justify-center text-white text-xs font-black pointer-events-none">{m.progress ?? 0}%</span>
+                )}
+              </span>
+            )}
+            {!m.removed && mediaUrl && mediaKind !== 'image' && mediaKind !== 'video' && (
+              <span
+                {...press}
+                className="relative block"
+              >
+                <a
+                  href={mediaUrl as string}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={(e) => { if (m.pending) e.preventDefault(); }}
+                  className={`flex items-center gap-2.5 rounded-xl px-3 py-2.5 max-w-[250px] border ${m.mine ? 'bg-white/10 border-white/20' : 'bg-white border-slate-200 shadow-sm'}`}
+                >
+                  <span className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 text-[10px] font-black uppercase ${m.mine ? 'bg-white/15 text-white' : 'bg-slate-100 text-slate-500'}`}>{(m.fileName || 'file').split('.').pop()?.slice(0, 4)}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className={`block text-[12px] font-bold truncate ${m.mine ? 'text-white' : 'text-slate-800'}`}>{m.fileName || 'File'}</span>
+                    <span className={`block text-[10px] font-medium ${m.mine ? 'text-white/70' : 'text-slate-400'}`}>{uploading ? `Uploading ${m.progress ?? 0}%` : m.fileSize ? fmtSize(m.fileSize) : 'Tap to open'}</span>
+                  </span>
+                  <FileText className={`w-4 h-4 shrink-0 ${m.mine ? 'text-white/80' : 'text-slate-400'}`} />
+                </a>
               </span>
             )}
             <div
@@ -1214,11 +1389,6 @@ const ThreadPanel: React.FC<{
         ))}
       </div>
 
-      {group.kind === 'tos_channel' && (
-        <div className="shrink-0 px-4 py-3 bg-amber-50 border-t border-amber-100">
-          <p className="text-[11px] font-bold text-amber-800">Only TOS can post in this channel. Long-press any post to react or reply.</p>
-        </div>
-      )}
       <div className={`relative shrink-0 bg-white border-t border-slate-200 p-3 items-end gap-2 ${group.kind === 'tos_channel' ? 'hidden' : 'flex'}`}>
         {attachPreview && (
           <div className="absolute bottom-full left-3 right-3 mb-1 flex items-center gap-2 rounded-xl bg-slate-50 border border-slate-200 px-2 py-1.5">
@@ -1229,7 +1399,18 @@ const ThreadPanel: React.FC<{
             </button>
           </div>
         )}
-        {replyTo && !attachPreview && (
+        {attachFile && !attachPreview && (
+          <div className="absolute bottom-full left-3 right-3 mb-1 flex items-center gap-2 rounded-xl bg-slate-50 border border-slate-200 px-2 py-1.5">
+            <span className="w-10 h-10 rounded-lg bg-slate-200 text-slate-500 flex items-center justify-center text-[10px] font-black uppercase shrink-0">{(attachFile.name.split('.').pop() || 'file').slice(0, 4)}</span>
+            <p className="text-[11px] font-bold text-slate-600 flex-1 min-w-0 truncate">
+              {attachProgress > 0 && attachProgress < 100 ? `Uploading ${attachProgress}%` : `${attachFile.name}${attachFile.size ? ` · ${fmtSize(attachFile.size)}` : ''}`}
+            </p>
+            <button onClick={() => { setAttachFile(null); setAttachProgress(0); }} className="rounded-full p-1 text-slate-400 hover:bg-slate-100" aria-label="Remove file">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+        {replyTo && !attachPreview && !attachFile && (
           <div className="absolute bottom-full left-3 right-3 mb-1 flex items-start gap-2 rounded-xl bg-orange-50 border border-orange-100 px-3 py-2">
             <div className="min-w-0 flex-1">
               <p className="text-[10px] font-black text-[#C2410C]">Replying to {replyTo.username}</p>
@@ -1240,24 +1421,33 @@ const ThreadPanel: React.FC<{
             </button>
           </div>
         )}
-        {photosAllowed && (
-          <>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => { onPhotoPicked(e.target.files && e.target.files[0]); e.target.value = ''; }}
-            />
-            <button
-              onClick={() => fileRef.current?.click()}
-              className="w-11 h-11 rounded-2xl bg-slate-100 border border-slate-200 text-slate-600 flex items-center justify-center active:scale-95 transition shrink-0"
-              aria-label="Attach a photo"
-            >
-              <Plus className="w-5 h-5" />
-            </button>
-          </>
-        )}
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => { setAttachSheet(false); onPhotoPicked(e.target.files && e.target.files[0]); e.target.value = ''; }}
+        />
+        <input
+          ref={videoRef}
+          type="file"
+          accept="video/*"
+          className="hidden"
+          onChange={(e) => { setAttachSheet(false); onFilePicked(e.target.files && e.target.files[0]); e.target.value = ''; }}
+        />
+        <input
+          ref={docRef}
+          type="file"
+          className="hidden"
+          onChange={(e) => { setAttachSheet(false); onFilePicked(e.target.files && e.target.files[0]); e.target.value = ''; }}
+        />
+        <button
+          onClick={() => setAttachSheet(true)}
+          className="w-11 h-11 rounded-2xl bg-slate-100 border border-slate-200 text-slate-600 flex items-center justify-center active:scale-95 transition shrink-0"
+          aria-label="Attach a photo, video or document"
+        >
+          <Plus className="w-5 h-5" />
+        </button>
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -1268,12 +1458,91 @@ const ThreadPanel: React.FC<{
         />
         <button
           onClick={send}
-          disabled={busy || !text.trim()}
+          disabled={busy}
           className="px-4 py-2.5 rounded-xl bg-[#EA580C] text-white text-xs font-black active:scale-95 transition disabled:opacity-50 flex items-center gap-1.5"
         >
           {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />} Send
         </button>
       </div>
+
+      {attachSheet && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-end justify-center" onClick={() => setAttachSheet(false)}>
+          <div className="bg-white rounded-t-3xl w-full max-w-md p-4 space-y-2 animate-in slide-in-from-bottom duration-300" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-1 pb-1">
+              <p className="text-sm font-black text-slate-900">Attach</p>
+              <button onClick={() => setAttachSheet(false)} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500" aria-label="Close">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            {photosAllowed && (
+              <button onClick={() => fileRef.current?.click()} className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-left active:scale-[0.99] transition">
+                <span className="w-10 h-10 rounded-xl bg-orange-50 border border-orange-100 text-[#EA580C] flex items-center justify-center"><Info className="w-4 h-4" /></span>
+                <span>
+                  <span className="block text-sm font-black text-slate-900">Photo</span>
+                  <span className="block text-[11px] text-slate-500 font-medium">Take or choose a photo</span>
+                </span>
+              </button>
+            )}
+            <button onClick={() => videoRef.current?.click()} className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-left active:scale-[0.99] transition">
+              <span className="w-10 h-10 rounded-xl bg-violet-50 border border-violet-100 text-violet-600 flex items-center justify-center"><Film className="w-4 h-4" /></span>
+              <span>
+                <span className="block text-sm font-black text-slate-900">Video</span>
+                <span className="block text-[11px] text-slate-500 font-medium">Up to 60 seconds</span>
+              </span>
+            </button>
+            <button onClick={() => docRef.current?.click()} className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-left active:scale-[0.99] transition">
+              <span className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 text-blue-600 flex items-center justify-center"><FileText className="w-4 h-4" /></span>
+              <span>
+                <span className="block text-sm font-black text-slate-900">Document</span>
+                <span className="block text-[11px] text-slate-500 font-medium">PDF, slides, anything else</span>
+              </span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {infoOpen && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-end justify-center" onClick={() => setInfoOpen(false)}>
+          <div className="bg-white rounded-t-3xl w-full max-w-md p-5 space-y-3 animate-in slide-in-from-bottom duration-300" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-black text-slate-900">Group info</p>
+              <button onClick={() => setInfoOpen(false)} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500" aria-label="Close">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4 space-y-2">
+              <p className="text-sm font-black text-slate-900 break-words">{group.name}</p>
+              <p className="text-[11px] text-slate-500 font-medium">{kindLabel(group.kind)}{group.subject ? ` · Subject: ${group.subject}` : ''}</p>
+              <p className="text-[11px] text-slate-500 font-medium">{accessLabel(group)}</p>
+              <p className="text-[11px] text-slate-400 font-medium">
+                {group.kind === 'tos_channel'
+                  ? 'This channel is posted by TOS. You can read and react, but only TOS posts.'
+                  : group.kind === 'announcements'
+                  ? 'Only your centre can post in Announcements. Everyone can read.'
+                  : 'Everyone in this chat can post.'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {videoViewerUrl && (
+        <div className="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+          <button onClick={() => setVideoViewerUrl('')} className="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/15 flex items-center justify-center text-white active:scale-95 transition" aria-label="Close video">
+            <X className="w-4 h-4" />
+          </button>
+          <video src={videoViewerUrl} controls={false} playsInline className="max-h-[70vh] max-w-full rounded-xl" />
+          <button
+            onClick={() => {
+              const v = document.querySelector('video');
+              if (v) { if (v.paused) { v.play().catch(() => {}); } else { v.pause(); } }
+            }}
+            className="mt-4 px-5 py-2.5 rounded-xl bg-white/15 text-white text-xs font-black active:scale-95 transition"
+          >
+            Play / Pause
+          </button>
+        </div>
+      )}
 
       {actionMsg && (
         <MessageActionSheet
@@ -1486,13 +1755,21 @@ const StaffNewChatSheet: React.FC<{
                   <p className="text-[11px] font-black uppercase tracking-wider text-slate-400 mb-1.5">Students</p>
                   <div className="space-y-2">
                     {directory.students.filter((s) => matches(`${s.name || ''} ${s.username || ''}`)).map((s) => (
-                      <button key={s.uid} onClick={() => openWith(s.uid)} disabled={busy} className="w-full flex items-center gap-3 text-left bg-white border border-slate-200 rounded-2xl px-3.5 py-2.5 active:scale-[0.99] transition disabled:opacity-50">
+                      <div key={s.uid} className="flex items-center gap-3 bg-white border border-slate-200 rounded-2xl px-3.5 py-2.5">
                         <span className="w-10 h-10 rounded-full bg-orange-50 border border-orange-100 text-[#EA580C] flex items-center justify-center text-xs font-black shrink-0">{initials(s.name || s.username || '?')}</span>
                         <span className="min-w-0 flex-1">
                           <span className="block text-sm font-black text-slate-900 truncate">{s.name || s.username}</span>
                           <span className="block text-[10px] text-slate-400 font-medium">Student · {s.username}</span>
                         </span>
-                      </button>
+                        <button
+                          onClick={() => openWith(s.uid)}
+                          disabled={busy}
+                          className="shrink-0 px-3.5 py-2 rounded-xl bg-[#EA580C] text-white text-[11px] font-black flex items-center gap-1.5 active:scale-95 transition disabled:opacity-50"
+                          aria-label={`Chat with ${s.name || s.username}`}
+                        >
+                          Chat
+                        </button>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -1502,13 +1779,21 @@ const StaffNewChatSheet: React.FC<{
                   <p className="text-[11px] font-black uppercase tracking-wider text-slate-400 mb-1.5">Staff</p>
                   <div className="space-y-2">
                     {directory.staff.filter((st) => matches(st.name || '')).map((st) => (
-                      <button key={st.uid} onClick={() => openWith(st.uid)} disabled={busy} className="w-full flex items-center gap-3 text-left bg-white border border-slate-200 rounded-2xl px-3.5 py-2.5 active:scale-[0.99] transition disabled:opacity-50">
+                      <div key={st.uid} className="flex items-center gap-3 bg-white border border-slate-200 rounded-2xl px-3.5 py-2.5">
                         <span className="w-10 h-10 rounded-full bg-violet-50 border border-violet-100 text-violet-600 flex items-center justify-center text-xs font-black shrink-0">{initials(st.name || '?')}</span>
                         <span className="min-w-0 flex-1">
                           <span className="block text-sm font-black text-slate-900 truncate">{st.name}</span>
                           <span className="block text-[10px] text-slate-400 font-medium">{st.role === 'admin' ? 'Centre admin' : 'Tutor'}</span>
                         </span>
-                      </button>
+                        <button
+                          onClick={() => openWith(st.uid)}
+                          disabled={busy}
+                          className="shrink-0 px-3.5 py-2 rounded-xl bg-[#EA580C] text-white text-[11px] font-black flex items-center gap-1.5 active:scale-95 transition disabled:opacity-50"
+                          aria-label={`Chat with ${st.name}`}
+                        >
+                          Chat
+                        </button>
+                      </div>
                     ))}
                   </div>
                 </div>

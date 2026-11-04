@@ -603,6 +603,8 @@ export interface CentreChatSettings {
   muteDayOptions: number[];
   /** Cap for generic chat attachments (video, PDF, anything a photo is not), stored in MB. */
   filesMaxMb: number;
+  /** Everyone in the centre can privately chat each other by default; the centre admin can turn it off. */
+  studentsCanChatStudents: boolean;
   updatedAt?: string | null;
 }
 

@@ -66,6 +66,7 @@ interface ViewerStatus {
   audioUrl?: string;
   durationSeconds?: number;
   views?: number;
+  replyCount?: number;
   replies?: StatusReply[];
   viewers?: ViewerPerson[];
   loves?: ViewerPerson[];
@@ -821,6 +822,7 @@ export const StatusViewer: React.FC<{
   // Swiping up on the update is the reply gesture for every status: it
   // opens (focuses) the reply box, the same move a reel uses.
   const swipeStartY = React.useRef(0);
+  const swipeStartX = React.useRef(0);
   const swipeFired = React.useRef(false);
   const replyTouchOpen = () => {
     if (mine || !settings.allowReplies) return;
@@ -967,11 +969,21 @@ export const StatusViewer: React.FC<{
         }}
         onTouchStart={(e) => {
           swipeStartY.current = e.touches[0]?.clientY || 0;
+          swipeStartX.current = e.touches[0]?.clientX || 0;
           swipeFired.current = false;
         }}
         onTouchMove={(e) => {
           if (swipeFired.current) return;
           const y = e.touches[0]?.clientY || 0;
+          const x = e.touches[0]?.clientX || 0;
+          // A downward drag past the threshold closes the viewer, the way a
+          // WhatsApp status is dismissed; it must be clearly vertical so a
+          // sideways drag still moves between updates.
+          if (y - swipeStartY.current > 90 && y - swipeStartY.current > Math.abs(x - swipeStartX.current)) {
+            swipeFired.current = true;
+            onClose();
+            return;
+          }
           if (swipeStartY.current - y > 60) {
             swipeFired.current = true;
             replyTouchOpen();
@@ -1103,7 +1115,7 @@ export const StatusViewer: React.FC<{
           >
             <MessageCircle className="w-5 h-5" />
             <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#EA580C] text-white text-[9px] font-black flex items-center justify-center">
-              {(current.replies || []).length + (current.loves || []).length}
+              {typeof current.replyCount === 'number' ? current.replyCount + (current.loves || []).length : (current.replies || []).length + (current.loves || []).length}
             </span>
           </button>
         </>
@@ -1402,6 +1414,8 @@ export const StatusScreenCore: React.FC<{ call: (path: string, opts?: any) => Pr
     videoUrl: e.videoUrl,
     audioUrl: e.audioUrl,
     durationSeconds: e.durationSeconds,
+    views: (e as MineEntry).views,
+    replyCount: (e as MineEntry).replyCount,
   });
   const openViewer = (entry: StatusEntry) => setViewer({
     person: { uid: entry.uid, name: entry.name, username: entry.username, centreId: entry.centreId },

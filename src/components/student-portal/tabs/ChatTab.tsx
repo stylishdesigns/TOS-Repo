@@ -1030,13 +1030,20 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
   }, [commentsFor, commentText, postingComment, groupId, showToast]);
 
   if (loading) {
+    // The room paints as the room the instant it is tapped: header and
+    // background first, the messages settle in underneath. No blank card.
     return (
-      <div className="p-4 sm:p-5 max-w-lg mx-auto animate-in fade-in duration-300">
-        <button onClick={onBack} className="flex items-center gap-1 text-slate-500 text-xs font-bold mb-4">
-          <ChevronLeft className="w-4 h-4" /> Back
-        </button>
-        <div className="bg-white rounded-3xl p-10 border border-slate-200/90 shadow-sm flex items-center justify-center">
-          <Loader2 className="w-6 h-6 animate-spin text-[#EA580C]" />
+      <div className="fixed inset-0 z-40 flex flex-col bg-[#FFF3E7] animate-in fade-in duration-300" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+        <div className="px-3 sm:px-5 py-2.5 flex items-center gap-2 bg-[#EA580C] shadow-sm shrink-0">
+          <button onClick={onBack} className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center text-white active:scale-95 transition shrink-0" aria-label="Back">
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-black text-white truncate">{group?.name || 'Chat'}</p>
+          </div>
+        </div>
+        <div className="flex-1 flex items-center justify-center">
+          <Loader2 className="w-5 h-5 animate-spin text-[#EA580C]" />
         </div>
       </div>
     );
@@ -1306,7 +1313,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
             when the next day scrolls up; without the wrapper every separator
             stuck to the top of the whole thread and stacked. */}
         {dayGroups(messages).map((g) => (
-          <div key={g.key}>
+          <div key={g.key} className="space-y-2.5">
             {g.label && (
               <div className="sticky top-0 z-20 flex justify-center py-1">
                 <span className="bg-slate-900/85 text-white text-[10px] font-bold px-3 py-1 rounded-full shadow">
