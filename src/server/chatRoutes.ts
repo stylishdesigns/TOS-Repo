@@ -904,6 +904,11 @@ export function registerChatRoutes(app: express.Express): void {
       for (const g of docs) {
         const group = loadGroupFromDoc(g);
         if (group.kind === 'tos_channel' && group.audience !== 'students') continue;
+        // Personal chats are added by the personal loop below with the other
+        // person's real name and photo; the centre-groups loop would add them
+        // a second time with no name (personal docs carry no name), which
+        // showed as the '?' circle in the chat list.
+        if (group.kind === 'personal') continue;
         if (!studentInGroup(student.subjects, group)) continue;
         const gate = gateFor(group, centreChat, tosChat);
         const lock = lockState(group, gate, stats, centreChat);
@@ -3203,7 +3208,7 @@ async function staffStatusContext(caller: Caller, centreId: string) {
       const groupsSnap = await adminDb.collection('chatGroups').where('centreId', '==', centreId).limit(100).get();
       const groups = groupsSnap.docs
         .map((g) => loadGroupFromDoc(g))
-        .filter((g) => g.active)
+        .filter((g) => g.active && g.kind !== 'personal')
         .sort((a, b) => a.name.localeCompare(b.name))
         .map((g) => ({ id: g.id, name: g.name, kind: g.kind, subject: g.subject, access: g.access, createdAt: g.createdAt }));
       // TOS channels for this role's audience: tutors get tutor channels,

@@ -909,7 +909,7 @@ interface ThreadMsg {
 /** What a chat attachment is, from its file type: image, video or document. */
 function initialsOf(name: string): string {
   const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
-  if (!parts.length) return '?';
+  if (!parts.length) return '';
   return parts.slice(0, 2).map((w) => (w[0] || '').toUpperCase()).join('');
 }
 
