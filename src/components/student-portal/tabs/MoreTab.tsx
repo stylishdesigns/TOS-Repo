@@ -1062,7 +1062,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                 </div>
 
                 <form onSubmit={handleSavePersonalDetails} className="space-y-3.5 pt-2">
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     <div>
                       <label className="text-xs font-bold text-slate-700 block mb-1">
                         First Name
@@ -1087,6 +1087,46 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                         className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm font-medium focus:border-orange-500 outline-none"
                       />
                     </div>
+                    <div className="col-span-2 sm:col-span-1">
+                      <label className="text-xs font-bold text-slate-700 block mb-1">Username</label>
+                      <input
+                        value={usernameDraft}
+                        onChange={(e) => { setUsernameDraft(e.target.value); setUsernameError(''); }}
+                        onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
+                        maxLength={16}
+                        placeholder="e.g. swift_lion"
+                        autoComplete="off"
+                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-900 focus:border-orange-500 outline-none"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <p className="text-[11px] text-slate-500 font-medium">Shown on chat and the mock leaderboard. Never your real name.</p>
+                    {usernameInfo && !usernameInfo.mine ? (
+                      <p className="text-xs text-slate-400 font-medium leading-relaxed">Usernames are set by each student from their own profile.</p>
+                    ) : (
+                      <>
+                        {usernameDraft.trim().length >= 4 && usernameCheck && (
+                          <p className={`text-xs font-bold ${usernameCheck.valid && usernameCheck.available ? 'text-emerald-600' : 'text-rose-600'}`}>
+                            {usernameCheck.valid
+                              ? (usernameCheck.available ? `${usernameDraft.trim()} is available.` : (usernameCheck.reason || 'That username is taken.'))
+                              : (usernameCheck.reason || 'Not a valid username.')}
+                          </p>
+                        )}
+                        {usernameDraft.trim().length > 0 && usernameDraft.trim().length < 4 && (
+                          <p className="text-xs text-slate-400 font-medium">At least 4 characters: letters, numbers, underscores or dashes.</p>
+                        )}
+                        {usernameError && <p className="text-xs font-bold text-rose-600">{usernameError}</p>}
+                        <button
+                          type="button"
+                          disabled={usernameBusy || usernameDraft.trim() === usernameInfo?.username || !(usernameCheck?.valid && usernameCheck?.available)}
+                          onClick={saveUsername}
+                          className="px-4 min-h-[40px] rounded-xl bg-[#EA580C] text-white text-xs font-black tracking-wide disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                        >
+                          {usernameBusy ? 'Saving…' : usernameInfo?.username ? 'Save new username' : 'Set username'}
+                        </button>
+                      </>
+                    )}
                   </div>
 
                   <div>
@@ -1153,53 +1193,6 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                       onChange={(e) => setAddress(e.target.value)}
                       className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm font-medium focus:border-orange-500 outline-none"
                     />
-                  </div>
-
-                  {/* Username: lives here with the rest of the personal
-                      details. Same server-checked register as before. */}
-                  <div className="pt-1 space-y-1.5 border-t border-slate-100 pt-3">
-                    <label className="text-xs font-bold text-slate-700 block">Username</label>
-                    <p className="text-[11px] text-slate-500 font-medium">
-                      Shown on chat and the mock leaderboard. Never your real name.
-                    </p>
-                    {usernameInfo && !usernameInfo.mine ? (
-                      <p className="text-xs text-slate-400 font-medium leading-relaxed">
-                        Usernames are set by each student from their own profile.
-                      </p>
-                    ) : (
-                      <>
-                          <>
-                            <input
-                              value={usernameDraft}
-                              onChange={(e) => { setUsernameDraft(e.target.value); setUsernameError(''); }}
-                              onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
-                              maxLength={16}
-                              placeholder="e.g. swift_lion"
-                              autoComplete="off"
-                              className="w-full min-h-[46px] px-4 rounded-xl border-2 border-slate-200 focus:border-[#EA580C] outline-none text-base font-bold text-slate-900 placeholder:text-slate-300 placeholder:font-medium"
-                            />
-                            {usernameDraft.trim().length >= 4 && usernameCheck && (
-                              <p className={`text-xs font-bold ${usernameCheck.valid && usernameCheck.available ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                {usernameCheck.valid
-                                  ? (usernameCheck.available ? `${usernameDraft.trim()} is available.` : (usernameCheck.reason || 'That username is taken.'))
-                                  : (usernameCheck.reason || 'Not a valid username.')}
-                              </p>
-                            )}
-                            {usernameDraft.trim().length > 0 && usernameDraft.trim().length < 4 && (
-                              <p className="text-xs text-slate-400 font-medium">At least 4 characters: letters, numbers, underscores or dashes.</p>
-                            )}
-                            {usernameError && <p className="text-xs font-bold text-rose-600">{usernameError}</p>}
-                            <button
-                              type="button"
-                              disabled={usernameBusy || usernameDraft.trim() === usernameInfo?.username || !(usernameCheck?.valid && usernameCheck?.available)}
-                              onClick={saveUsername}
-                              className="w-full min-h-[44px] rounded-xl bg-[#EA580C] text-white text-sm font-black tracking-wide disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-                            >
-                              {usernameBusy ? 'Saving…' : usernameInfo?.username ? 'Save new username' : 'Set username'}
-                            </button>
-                          </>
-                      </>
-                    )}
                   </div>
 
                   <div className="pt-3">

@@ -228,7 +228,6 @@ export const ChatManager: React.FC<{ onThreadOpenChange?: (open: boolean) => voi
       <div className="p-4 sm:p-6 max-w-3xl mx-auto space-y-5 pb-10">
         <div>
           <h1 className="text-2xl font-black text-slate-900 tracking-tight">Chat</h1>
-          <p className="text-xs text-slate-500 font-medium mt-0.5">Your centre’s group conversations.</p>
         </div>
 
         {tabs.length > 1 && (
@@ -276,6 +275,7 @@ interface SectionProps {
 
 const GroupsSection: React.FC<SectionProps> = ({ data, isAdmin, reload, addToast, centreId, onThreadOpenChange, setData }) => {
   const [listImage, setListImage] = useState('');
+  const [listImageName, setListImageName] = useState('');
   const [creating, setCreating] = useState(false);
   const [busy, setBusy] = useState(false);
   const [name, setName] = useState('');
@@ -582,7 +582,7 @@ const GroupsSection: React.FC<SectionProps> = ({ data, isAdmin, reload, addToast
             <div className="flex items-start gap-3">
               {g.kind === 'personal' ? (
                 <span
-                  onClick={(e) => { if (g.peerAvatar) { e.stopPropagation(); setListImage(g.peerAvatar); } }}
+                  onClick={(e) => { e.stopPropagation(); if (g.peerAvatar) { setListImage(g.peerAvatar); } else { setListImageName(g.name); } }}
                   className={`w-10 h-10 rounded-full bg-orange-50 border border-orange-100 text-[#EA580C] flex items-center justify-center text-xs font-black overflow-hidden shrink-0 ${g.peerAvatar ? 'cursor-pointer' : ''}`}
                 >
                   {g.peerAvatar ? <img src={g.peerAvatar} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" /> : (initialsOf(g.name) || <User className="w-5 h-5" />)}
@@ -602,14 +602,7 @@ const GroupsSection: React.FC<SectionProps> = ({ data, isAdmin, reload, addToast
                 </>
               ) : (
                   <>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-sm font-black text-slate-900">{g.name}</p>
-                      <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500">{kindLabel(g.kind)}</span>
-                    </div>
-                    <p className="text-[11px] text-slate-500 font-medium mt-0.5">
-                      {g.subject ? `Subject: ${g.subject} · ` : ''}{accessLabel(g)}
-                    </p>
-                    <p className="text-[10px] text-slate-400 font-medium mt-0.5">Created {fmtDate(g.createdAt)}</p>
+                    <p className="text-sm font-black text-slate-900 truncate">{g.name}</p>
                     {g.lastMessage && <p className="text-[11px] text-slate-500 font-medium truncate mt-0.5">{lastLineFor(g)}</p>}
                   </>
                 )}
@@ -632,12 +625,18 @@ const GroupsSection: React.FC<SectionProps> = ({ data, isAdmin, reload, addToast
       ))}
       </>
       )}
-      {listImage && (
+      {(listImage || listImageName) && (
         <div className="fixed inset-0 z-[60] bg-black flex items-center justify-center">
-          <button onClick={() => setListImage('')} className="absolute top-3 left-3 z-10 w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center text-white active:scale-95 transition" aria-label="Back">
+          <button onClick={() => { setListImage(''); setListImageName(''); }} className="absolute top-3 left-3 z-10 w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center text-white active:scale-95 transition" aria-label="Back">
             <ChevronLeft className="w-5 h-5" />
           </button>
-          <img src={listImage} alt="Profile photo" className="max-h-full max-w-full object-contain" />
+          {listImage ? (
+            <img src={listImage} alt="Profile photo" className="max-h-full max-w-full object-contain" />
+          ) : (
+            <div className="w-40 h-40 rounded-3xl bg-orange-50 border-2 border-orange-200 flex items-center justify-center">
+              <span className="text-5xl font-black text-[#EA580C]">{initialsOf(listImageName)}</span>
+            </div>
+          )}
         </div>
       )}
 

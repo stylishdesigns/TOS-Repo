@@ -1476,7 +1476,7 @@ export const StatusScreenCore: React.FC<{ call: (path: string, opts?: any) => Pr
   const staff = variant === 'staff';
   return (
     <div className={staff ? 'space-y-5 px-4 sm:px-5 animate-in fade-in duration-300' : 'space-y-5 animate-in fade-in duration-300'}>
-      <div className="flex items-center justify-between">
+      <div className={`flex items-center justify-between ${staff ? 'pt-2' : ''}`}>
         <h2 className="text-2xl font-black text-slate-900 tracking-tight">Status</h2>
         {staff && data?.settings && data.enabled !== false && (
           <button
@@ -1484,7 +1484,7 @@ export const StatusScreenCore: React.FC<{ call: (path: string, opts?: any) => Pr
             aria-label={fanOpen ? 'Close add menu' : 'Add a status update'}
             aria-expanded={fanOpen}
             onClick={() => setFanOpen((o) => !o)}
-            className="w-9 h-9 rounded-xl bg-[#EA580C] text-white flex items-center justify-center shadow-sm active:scale-95 transition"
+            className="relative z-10 w-10 h-10 rounded-xl bg-[#EA580C] text-white flex items-center justify-center shadow-md shrink-0 active:scale-95 transition"
           >
             {fanOpen ? <X className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
           </button>

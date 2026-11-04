@@ -209,6 +209,7 @@ interface ChatTabProps {
 // behind it.
 export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoToPractice, onHideBottomNav, onUnreadTotal, view = 'chats' }) => {
   const [listImage, setListImage] = useState('');
+  const [listImageName, setListImageName] = useState('');
   const cachedOverview = loadLastGood<ChatOverview>(`chat:overview:${student.id}`);
   const [overview, setOverview] = useState<ChatOverview | null>(cachedOverview);
   const [loading, setLoading] = useState(() => !cachedOverview);
@@ -557,7 +558,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
           className="w-full text-left bg-white rounded-2xl p-3.5 border border-slate-200/90 shadow-sm flex items-center gap-3 active:scale-[0.99] transition"
         >
           <div
-            onClick={(e) => { if (g.kind === 'personal' && g.peerAvatar) { e.stopPropagation(); setListImage(g.peerAvatar); } }}
+            onClick={(e) => { if (g.kind === 'personal') { e.stopPropagation(); if (g.peerAvatar) { setListImage(g.peerAvatar); } else { setListImageName(g.name); } } }}
             className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 border ${
               g.kind === 'announcements'
                 ? 'bg-amber-50 border-amber-100 text-amber-600'
@@ -607,12 +608,18 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
           <Loader2 className="w-6 h-6 animate-spin text-[#EA580C]" />
         </div>
       )}
-      {listImage && (
+      {(listImage || listImageName) && (
         <div className="fixed inset-0 z-[60] bg-black flex items-center justify-center">
-          <button onClick={() => setListImage('')} className="absolute top-3 left-3 z-10 w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center text-white active:scale-95 transition" aria-label="Back">
+          <button onClick={() => { setListImage(''); setListImageName(''); }} className="absolute top-3 left-3 z-10 w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center text-white active:scale-95 transition" aria-label="Back">
             <ChevronLeft className="w-5 h-5" />
           </button>
-          <img src={listImage} alt="Profile photo" className="max-h-full max-w-full object-contain" />
+          {listImage ? (
+            <img src={listImage} alt="Profile photo" className="max-h-full max-w-full object-contain" />
+          ) : (
+            <div className="w-40 h-40 rounded-3xl bg-orange-50 border-2 border-orange-200 flex items-center justify-center">
+              <span className="text-5xl font-black text-[#EA580C]">{initialsOf(listImageName)}</span>
+            </div>
+          )}
         </div>
       )}
 
@@ -776,7 +783,6 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
   useEffect(() => {
     let alive = true;
     (async () => {
-      setLoading(true);
       await loadLatest();
       if (alive) setLoading(false);
     })();

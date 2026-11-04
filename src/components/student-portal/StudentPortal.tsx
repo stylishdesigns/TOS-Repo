@@ -338,6 +338,7 @@ export const StudentPortal: React.FC = () => {
   }, []);
   const openStatusScreen = React.useCallback(() => {
     setChatFanOpen(false);
+    setTitoOpen(false);
     setStatusScreenOpen(true);
   }, []);
   // Tutor AI is a placeholder third sub-stack: the screen opens, the
