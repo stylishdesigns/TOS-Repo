@@ -1717,7 +1717,7 @@ const StaffNewChatSheet: React.FC<{
     try {
       const res: any = await api('/api/centre/chat/personal', {
         method: 'POST',
-        body: JSON.stringify({ centreId, uid }),
+        body: { centreId, uid },
       });
       await onOpenChat(res.chatId, res.name || 'Chat');
     } catch (e: any) {

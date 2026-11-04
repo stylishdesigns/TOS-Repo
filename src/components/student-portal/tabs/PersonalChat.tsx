@@ -36,7 +36,7 @@ export const PersonalNewChatSheet: React.FC<{
     setBusy(true);
     setError('');
     try {
-      const res: any = await api('/api/student/chat/personal', { method: 'POST', body: JSON.stringify({ uid }) });
+      const res: any = await api('/api/student/chat/personal', { method: 'POST', body: { uid } });
       onOpenChat(res.chatId, res.name || 'Chat');
     } catch (e: any) {
       setError(String(e?.message || 'That chat could not be opened.'));

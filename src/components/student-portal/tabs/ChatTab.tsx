@@ -1801,7 +1801,7 @@ const ChatSettingsSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     setSaving(true);
     setErr('');
     try {
-      const d = await api('/api/student/chat/settings', { method: 'POST', body: JSON.stringify(patch) });
+      const d = await api('/api/student/chat/settings', { method: 'POST', body: patch });
       if (d && d.ok) {
         setSaved(d.settings);
         setValues(d.settings);
