@@ -25,7 +25,7 @@ import {
 import { SeatsManagementPanel } from './SeatsManagementPanel';
 
 export const StudentsList: React.FC = () => {
-  const { settings, students, programmes, branches, addStudent, toggleStudentSuspend, setSelectedStudent, addToast } = useApp();
+  const { students, programmes, branches, subjects, addStudent, toggleStudentSuspend, setSelectedStudent, addToast } = useApp();
 
   const [activeViewTab, setActiveViewTab] = useState<'directory' | 'seats'>('directory');
   const [programmeFilter, setProgrammeFilter] = useState('All Programmes');
@@ -50,8 +50,7 @@ export const StudentsList: React.FC = () => {
     address: 'Lagos, Nigeria',
     programmeId: programmes[0]?.id || '',
     branchId: branches[0]?.id || 'branch-1',
-    subjectsString: 'English, Mathematics, Physics, Chemistry',
-    notes: '',
+    subjects: [] as string[],
   });
 
   const filteredStudents = (students || []).filter((s) => {
@@ -63,6 +62,18 @@ export const StudentsList: React.FC = () => {
     return matchesProgramme && matchesStatus && matchesSearch;
   });
 
+  const avgAttendance = (students || []).length
+    ? Math.round((students || []).reduce((sum, s) => sum + (s.attendancePercent || 0), 0) / (students || []).length)
+    : 0;
+  const subjectOptions = Array.from(new Set([
+    ...(subjects || []).map((s: any) => String(s?.name || '')).filter(Boolean),
+    ...(programmes || []).flatMap((p: any) => p.subjects || []).map(String),
+  ]));
+  const toggleSubject = (sub: string) =>
+    setFormData((f) => ({
+      ...f,
+      subjects: f.subjects.includes(sub) ? f.subjects.filter((x) => x !== sub) : [...f.subjects, sub],
+    }));
   const totalPages = Math.ceil(filteredStudents.length / itemsPerPage) || 1;
   const paginatedStudents = filteredStudents.slice(
     (currentPage - 1) * itemsPerPage,
@@ -75,7 +86,7 @@ export const StudentsList: React.FC = () => {
 
     const prog = programmes.find((p) => p.id === formData.programmeId) || programmes[0];
     const branch = branches.find((b) => b.id === formData.branchId) || branches[0];
-    const subjects = formData.subjectsString.split(',').map((s) => s.trim()).filter(Boolean);
+    const subjects = formData.subjects.length > 0 ? formData.subjects : (prog?.subjects || []);
 
     addStudent({
       ...formData,
@@ -106,8 +117,7 @@ export const StudentsList: React.FC = () => {
       address: 'Lagos, Nigeria',
       programmeId: programmes[0]?.id || '',
       branchId: branches[0]?.id || 'branch-1',
-      subjectsString: 'English, Mathematics, Physics, Chemistry',
-      notes: '',
+      subjects: [] as string[],
     });
 
     addToast({
@@ -129,10 +139,6 @@ export const StudentsList: React.FC = () => {
         </div>
 
         <div className="flex items-center space-x-4">
-          <div className="text-right hidden md:block">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block leading-none">Academic Session</span>
-            <span className="text-sm font-black text-[#EA580C]">{settings.academicSession}</span>
-          </div>
           <button
             onClick={() => setShowAddModal(true)}
             className="px-4 py-2 text-xs font-semibold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg shadow-sm transition-all flex items-center space-x-1.5 self-start sm:self-auto"
@@ -143,38 +149,7 @@ export const StudentsList: React.FC = () => {
         </div>
       </div>
 
-      {/* Sub-header View Switcher: Directory vs Seats Panel (Part D) */}
-      <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl w-fit">
-        <button
-          type="button"
-          onClick={() => setActiveViewTab('directory')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-            activeViewTab === 'directory'
-              ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
-              : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-          }`}
-        >
-          Students Directory
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveViewTab('seats')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-            activeViewTab === 'seats'
-              ? 'bg-white dark:bg-slate-700 text-orange-600 dark:text-orange-400 shadow-xs'
-              : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-          }`}
-        >
-          <span>Seats & Access Limits</span>
-          <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
-        </button>
-      </div>
-
-      {activeViewTab === 'seats' ? (
-        <SeatsManagementPanel students={students || []} />
-      ) : (
-        <>
-
+      {/* Stat cards: enrollment, attendance and fees sit above the switcher and its filter */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <div className="bg-white p-3.5 sm:p-5 rounded-xl border border-slate-200/90 shadow-xs">
           <div className="flex items-center space-x-2 text-slate-600">
@@ -183,6 +158,16 @@ export const StudentsList: React.FC = () => {
           </div>
           <p className="text-xl sm:text-3xl font-extrabold text-slate-900 tracking-tight mt-1 sm:mt-2">
             {(students || []).length}
+          </p>
+        </div>
+
+        <div className="bg-white p-3.5 sm:p-5 rounded-xl border border-slate-200/90 shadow-xs">
+          <div className="flex items-center space-x-2 text-indigo-600">
+            <Percent className="w-4 h-4 text-indigo-600 shrink-0" />
+            <span className="text-[11px] sm:text-xs font-semibold text-indigo-600">Avg Attendance</span>
+          </div>
+          <p className="text-xl sm:text-3xl font-extrabold text-slate-900 tracking-tight mt-1 sm:mt-2">
+            {avgAttendance}%
           </p>
         </div>
 
@@ -197,16 +182,6 @@ export const StudentsList: React.FC = () => {
         </div>
 
         <div className="bg-white p-3.5 sm:p-5 rounded-xl border border-slate-200/90 shadow-xs">
-          <div className="flex items-center space-x-2 text-indigo-600">
-            <Percent className="w-4 h-4 text-indigo-600 shrink-0" />
-            <span className="text-[11px] sm:text-xs font-semibold text-indigo-600">Avg Attendance</span>
-          </div>
-          <p className="text-xl sm:text-3xl font-extrabold text-slate-900 tracking-tight mt-1 sm:mt-2">
-            88.4%
-          </p>
-        </div>
-
-        <div className="bg-white p-3.5 sm:p-5 rounded-xl border border-slate-200/90 shadow-xs">
           <div className="flex items-center space-x-2 text-amber-600">
             <CreditCard className="w-4 h-4 text-amber-600 shrink-0" />
             <span className="text-[11px] sm:text-xs font-semibold text-amber-600">Fee Balance</span>
@@ -216,8 +191,8 @@ export const StudentsList: React.FC = () => {
           </p>
         </div>
       </div>
-
-      {/* Filter Toolbar */}
+      {/* Filter toolbar: shown above the switcher in the directory view */}
+      {activeViewTab !== 'seats' && (
       <div className="bg-white p-3 md:p-4 rounded-xl border border-slate-200/90 shadow-xs space-y-3 sm:space-y-0 sm:flex sm:items-center sm:justify-between sm:gap-3">
         {/* Search: on mobile appears above the filters */}
         <div className="flex items-center gap-2.5 w-full sm:w-auto sm:order-2">
@@ -271,6 +246,50 @@ export const StudentsList: React.FC = () => {
         </div>
       </div>
 
+      )}
+
+      {/* Sub-header View Switcher: Directory vs Seats Panel. The white thumb
+          slides to the active side so it reads as a toggle at a glance. */}
+      <div className="relative grid grid-cols-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl w-full sm:w-80 mx-auto sm:mx-0" role="tablist">
+        <span
+          aria-hidden="true"
+          className={`absolute top-1 bottom-1 left-1 w-[calc(50%-0.25rem)] rounded-xl bg-white dark:bg-slate-700 shadow-sm transition-transform duration-300 ease-out ${
+            activeViewTab === 'seats' ? 'translate-x-full' : 'translate-x-0'
+          }`}
+        />
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeViewTab === 'directory'}
+          onClick={() => setActiveViewTab('directory')}
+          className={`relative z-10 px-2 py-2 rounded-xl text-[11px] sm:text-xs font-bold text-center transition-colors cursor-pointer ${
+            activeViewTab === 'directory'
+              ? 'text-slate-900 dark:text-white'
+              : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+          }`}
+        >
+          Students Directory
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeViewTab === 'seats'}
+          onClick={() => setActiveViewTab('seats')}
+          className={`relative z-10 px-2 py-2 rounded-xl text-[11px] sm:text-xs font-bold text-center transition-colors flex items-center justify-center gap-1.5 cursor-pointer ${
+            activeViewTab === 'seats'
+              ? 'text-orange-600 dark:text-orange-400'
+              : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+          }`}
+        >
+          <span>Seats &amp; Access Limits</span>
+          <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
+        </button>
+      </div>
+
+      {activeViewTab === 'seats' ? (
+        <SeatsManagementPanel students={students || []} />
+      ) : (
+        <>
       {/* Students Data Table (matches video 00:23 - 00:26) */}
       <div className="bg-white rounded-xl border border-slate-200/90 shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
@@ -515,7 +534,7 @@ export const StudentsList: React.FC = () => {
               <ModernSelect
                 label="Target Exam Programme *"
                 value={formData.programmeId}
-                onChange={(val) => setFormData({ ...formData, programmeId: val })}
+                onChange={(val) => setFormData((f) => ({ ...f, programmeId: val, subjects: programmes.find((p) => p.id === val)?.subjects || f.subjects }))}
                 options={programmes.map(p => ({
                   value: p.id,
                   label: `${p.name} (₦${(p.fee || 0).toLocaleString()})`
@@ -569,26 +588,25 @@ export const StudentsList: React.FC = () => {
               />
 
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">Exam Subjects (comma-separated)</label>
-                <input
-                  type="text"
-                  placeholder="e.g. English, Mathematics, Physics, Chemistry"
-                  value={formData.subjectsString}
-                  onChange={(e) => setFormData({ ...formData, subjectsString: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-900 focus:bg-white focus:border-orange-500 outline-none"
-                />
+                <label className="block font-semibold text-slate-700 mb-1">Exam Subjects *</label>
+                <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 max-h-40 overflow-y-auto space-y-2">
+                  {subjectOptions.map((sub) => (
+                    <label key={sub} className="flex items-center space-x-2 cursor-pointer group">
+                      <input
+                        type="checkbox"
+                        checked={formData.subjects.includes(sub)}
+                        onChange={() => toggleSubject(sub)}
+                        className="w-4 h-4 rounded border-slate-300 text-orange-600 focus:ring-orange-500"
+                      />
+                      <span className="text-xs text-slate-700 group-hover:text-slate-900">{sub}</span>
+                    </label>
+                  ))}
+                  {subjectOptions.length === 0 && (
+                    <p className="text-[10px] text-slate-400 italic">No exam subjects registered yet. Add them in the Subjects section first.</p>
+                  )}
+                </div>
               </div>
 
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Additional Notes</label>
-                <textarea
-                  rows={2}
-                  placeholder="Additional information..."
-                  value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-900 focus:bg-white focus:border-orange-500 outline-none"
-                />
-              </div>
 
               <div className="flex items-center justify-end space-x-2 pt-3 border-t border-slate-100">
                 <button
