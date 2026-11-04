@@ -334,7 +334,7 @@ export const StudentPortal: React.FC = () => {
     setChatFanOpen(false);
     setStatusScreenOpen(true);
   }, []);
-  // Tito AI is a placeholder third sub-stack: the screen opens, the
+  // Tutor AI is a placeholder third sub-stack: the screen opens, the
   // conversation itself arrives later. Opening it closes the fan and every
   // other chat surface, exactly like Status and Chats do.
   const openTito = React.useCallback(() => {
@@ -772,7 +772,7 @@ export const StudentPortal: React.FC = () => {
             </div>
           )}
 
-          {/* Tito AI placeholder: the third sub-stack. A real conversation
+          {/* Tutor AI placeholder: the third sub-stack. A real conversation
               arrives later; for now the screen explains that and stays out of
               the way. The orb is the way back to the fan. */}
           {titoOpen && !hideBottomNav && (
@@ -953,18 +953,18 @@ export const StudentPortal: React.FC = () => {
                       Chats
                     </span>
                   </button>
-                  {/* Tito AI (right of the arc): placeholder sub-stack, no fan entry for Channels any more. */}
+                  {/* Tutor AI (right of the arc): placeholder sub-stack, no fan entry for Channels any more. */}
                   <button
                     type="button"
                     role="menuitem"
                     onClick={openTito}
-                    aria-label="Tito AI"
+                    aria-label="Tutor AI"
                     className={`absolute w-12 h-12 rounded-full bg-white text-violet-600 flex items-center justify-center shadow-lg cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 ${prefersReducedMotion ? '' : 'animate-in fade-in zoom-in-95 duration-200'}`}
                     style={{ left: 72, top: -42, transform: 'translate(-50%, -50%)' }}
                   >
                     <Sparkles className="w-6 h-6" />
                     <span className="absolute top-full mt-2 left-1/2 -translate-x-1/2 whitespace-nowrap text-[11px] font-bold text-white pointer-events-none">
-                      Tito AI
+                      Tutor AI
                     </span>
                   </button>
                 </div>

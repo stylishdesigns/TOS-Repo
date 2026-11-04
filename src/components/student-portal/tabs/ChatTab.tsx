@@ -643,6 +643,30 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
   const videoRef = useRef<HTMLInputElement | null>(null);
   const docRef = useRef<HTMLInputElement | null>(null);
   const [videoUrl, setVideoUrl] = useState('');
+  // Full-screen photo viewer: tapping an image message opens it the same way
+  // a video opens, with a back button and nothing else on the screen.
+  const [imageViewerUrl, setImageViewerUrl] = useState('');
+  // Full-screen video playback without native controls: only a centre
+  // play/pause icon and the timeline, nothing else on the player.
+  const vvRef = useRef<HTMLVideoElement | null>(null);
+  const [vvPlaying, setVvPlaying] = useState(false);
+  const [vvAt, setVvAt] = useState(0);
+  const [vvDur, setVvDur] = useState(0);
+  const toggleVv = () => {
+    const v = vvRef.current;
+    if (!v) return;
+    if (v.paused) { v.play().catch(() => undefined); } else { v.pause(); }
+  };
+  const fmtVvTime = (sec: number) => {
+    const t = Math.max(0, Math.round(Number(sec) || 0));
+    return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
+  };
+  const openVideo = (url: string) => {
+    setVideoUrl(url);
+    setVvAt(0);
+    setVvDur(0);
+    setVvPlaying(true);
+  };
   const [commentsFor, setCommentsFor] = useState<ChatMessage | null>(null);
   const [comments, setComments] = useState<ChatComment[] | null>(null);
   const [commentText, setCommentText] = useState('');
@@ -1082,20 +1106,21 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
               className={`text-[13px] leading-relaxed font-medium whitespace-pre-wrap break-words ${m.mine ? 'text-white' : 'text-slate-800'}`}
             />
           ) : m.photoUrl ? (
-            <img src={m.photoUrl} alt="Shared photo" className="rounded-xl max-h-60 w-auto" />
+            <img src={m.photoUrl} alt="Shared photo" onClick={() => setImageViewerUrl(m.photoUrl as string)} className="rounded-xl max-h-60 w-auto cursor-pointer" />
           ) : null}
           {!m.removed && m.fileUrl && (m.fileKind === 'image' ? (
-            <img src={m.fileUrl} alt="Shared photo" className="rounded-xl max-h-60 w-auto" />
+            <img src={m.fileUrl} alt="Shared photo" onClick={() => setImageViewerUrl(m.fileUrl as string)} className="rounded-xl max-h-60 w-auto cursor-pointer" />
           ) : m.fileKind === 'video' ? (
             <button
-              onClick={() => setVideoUrl(m.fileUrl as string)}
+              onClick={() => openVideo(m.fileUrl as string)}
               className="relative rounded-xl overflow-hidden w-44 h-44 bg-slate-900 flex items-center justify-center"
               aria-label="Play video"
             >
-              <span className="w-12 h-12 rounded-full bg-white/20 border border-white/30 flex items-center justify-center">
+              <video src={m.fileUrl} preload="metadata" muted playsInline tabIndex={-1} aria-hidden="true" className="absolute inset-0 w-full h-full object-cover" />
+              <span className="relative w-12 h-12 rounded-full bg-black/40 border border-white/50 flex items-center justify-center">
                 <Play className="w-5 h-5 text-white ml-0.5" fill="currentColor" />
               </span>
-              <span className="absolute bottom-1.5 right-2 text-[9px] font-bold text-white/70">{m.fileSize ? fmtSize(m.fileSize) : 'Video'}</span>
+              <span className="absolute bottom-1.5 right-2 text-[9px] font-bold text-white/90 bg-black/50 rounded px-1">{m.fileSize ? fmtSize(m.fileSize) : 'Video'}</span>
             </button>
           ) : (
             <a href={m.fileUrl} target="_blank" rel="noreferrer" className="flex items-center gap-2.5 rounded-xl px-3 py-2 max-w-[250px] bg-white/10 border border-white/20">
@@ -1236,7 +1261,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
             />
             <button
               onClick={send}
-              disabled={!text.trim() || sending}
+              disabled={(!text.trim() && !attachFile) || sending}
               className="w-11 h-11 rounded-2xl bg-[#EA580C] text-white flex items-center justify-center shadow-sm shadow-orange-200 active:scale-95 transition disabled:opacity-50 shrink-0"
               aria-label="Send"
             >
@@ -1352,7 +1377,53 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
           <button onClick={() => setVideoUrl('')} className="absolute top-3 left-3 z-10 w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center text-white active:scale-95 transition" aria-label="Back">
             <ChevronLeft className="w-5 h-5" />
           </button>
-          <video src={videoUrl} controls autoPlay playsInline className="flex-1 w-full object-contain" />
+          <div className="flex-1 w-full flex items-center justify-center cursor-pointer" onClick={toggleVv} aria-label={vvPlaying ? 'Pause video' : 'Play video'}>
+            <video
+              ref={vvRef}
+              src={videoUrl}
+              autoPlay
+              playsInline
+              preload="auto"
+              className="max-h-full max-w-full object-contain"
+              onPlay={() => setVvPlaying(true)}
+              onPause={() => setVvPlaying(false)}
+              onTimeUpdate={(e) => setVvAt(e.currentTarget.currentTime || 0)}
+              onLoadedMetadata={(e) => setVvDur(e.currentTarget.duration || 0)}
+              onEnded={() => setVvPlaying(false)}
+            />
+            {!vvPlaying && (
+              <span className="absolute w-16 h-16 rounded-full bg-black/40 border border-white/50 flex items-center justify-center pointer-events-none">
+                <Play className="w-7 h-7 text-white ml-1" fill="currentColor" />
+              </span>
+            )}
+          </div>
+          <div className="w-full px-4 pb-5 pt-3 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+            <span className="text-[10px] font-bold text-white/80 tabular-nums">{fmtVvTime(vvAt)}</span>
+            <input
+              type="range"
+              min={0}
+              max={Math.max(vvDur, 0.1)}
+              step={0.1}
+              value={Math.min(vvAt, vvDur || 0)}
+              onChange={(e) => {
+                const t = Number(e.target.value);
+                setVvAt(t);
+                if (vvRef.current) vvRef.current.currentTime = t;
+              }}
+              className="flex-1 h-1 accent-[#EA580C]"
+              aria-label="Video timeline"
+            />
+            <span className="text-[10px] font-bold text-white/80 tabular-nums">{fmtVvTime(vvDur)}</span>
+          </div>
+        </div>
+      )}
+
+      {imageViewerUrl && (
+        <div className="fixed inset-0 z-[60] bg-black flex items-center justify-center">
+          <button onClick={() => setImageViewerUrl('')} className="absolute top-3 left-3 z-10 w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center text-white active:scale-95 transition" aria-label="Back">
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <img src={imageViewerUrl} alt="Shared photo" className="max-h-full max-w-full object-contain" />
         </div>
       )}
 
@@ -1537,6 +1608,19 @@ const AUTO_ACCEPT_OPTIONS: Array<{ value: string; label: string }> = [
   { value: 'auto', label: 'Accept automatically' },
 ];
 
+// The saved settings are fetched once per app session and reused, so the
+// sheet shows its choices the moment it is tapped instead of reloading them.
+let chatSettingsFetch: Promise<any> | null = null;
+const chatSettingsLoader = (): Promise<any> => {
+  if (!chatSettingsFetch) {
+    chatSettingsFetch = api('/api/student/chat/settings').catch((e) => {
+      chatSettingsFetch = null;
+      throw e;
+    });
+  }
+  return chatSettingsFetch;
+};
+
 const ChatSettingsSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const [values, setValues] = useState<ChatSettingsValues | null>(null);
   const [saved, setSaved] = useState<ChatSettingsValues | null>(null);
@@ -1544,7 +1628,7 @@ const ChatSettingsSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    api('/api/student/chat/settings')
+    chatSettingsLoader()
       .then((d: any) => {
         if (d && d.ok) {
           setValues(d.settings);
@@ -1619,8 +1703,8 @@ const ChatSettingsSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center" role="dialog" aria-modal="true" aria-label="Chat settings">
-      <div className="absolute inset-0 bg-slate-950/50 animate-in fade-in duration-200" onClick={onClose} aria-hidden="true" />
-      <div className="relative w-full max-w-lg bg-slate-50 rounded-t-3xl shadow-2xl max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom-4 fade-in duration-300 p-5 pb-8 space-y-4">
+      <div className="absolute inset-0 bg-slate-950/50 animate-in fade-in duration-100" onClick={onClose} aria-hidden="true" />
+      <div className="relative w-full max-w-lg bg-slate-50 rounded-t-3xl shadow-2xl max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom-2 fade-in duration-150 p-5 pb-8 space-y-4">
         <div className="w-10 h-1.5 rounded-full bg-slate-300 mx-auto" />
         <div className="flex items-start justify-between gap-2">
           <div>

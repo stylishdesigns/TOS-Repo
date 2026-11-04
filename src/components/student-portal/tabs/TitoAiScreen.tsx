@@ -2,7 +2,7 @@ import React from 'react';
 import { Sparkles, Send, Lock } from 'lucide-react';
 
 // ============================================================================
-// Tito AI, the third chat sub-stack: a placeholder for the AI chatbot that
+// Tutor AI, the third chat sub-stack: a placeholder for the AI chatbot that
 // will live inside the app. The screen, the shell and the conversation
 // surface are all here so the real integration slots in without touching
 // the fan, the tab or the layout; nothing sends anywhere yet, so every
@@ -23,7 +23,7 @@ const TitoAiScreen: React.FC = () => (
       </span>
       <h2 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
         <Sparkles className="w-6 h-6 text-violet-600" />
-        Tito AI
+        Tutor AI
       </h2>
       <p className="text-[11px] text-slate-500 font-medium">Your study assistant, arriving soon</p>
     </div>
@@ -34,7 +34,7 @@ const TitoAiScreen: React.FC = () => (
           <Sparkles className="w-5 h-5" />
         </div>
         <div className="min-w-0">
-          <p className="text-sm font-black text-slate-900 truncate">Tito</p>
+          <p className="text-sm font-black text-slate-900 truncate">Tutor AI</p>
           <p className="text-[11px] font-bold text-violet-600">Coming soon</p>
         </div>
       </div>
@@ -42,7 +42,7 @@ const TitoAiScreen: React.FC = () => (
         <div className="flex">
           <div className="max-w-[85%] bg-slate-100 rounded-2xl rounded-bl-md px-4 py-3">
             <p className="text-[13px] text-slate-800 leading-relaxed font-medium">
-              Hi! I'm Tito, your AI study assistant. Soon I'll help you practise, explain
+              Hi! I'm Tutor AI, your AI study assistant. Soon I'll help you practise, explain
               tricky questions and keep you on track with your reading.
             </p>
             <p className="text-[10px] text-slate-400 font-bold mt-1">Just now</p>
@@ -66,8 +66,8 @@ const TitoAiScreen: React.FC = () => (
       <input
         type="text"
         disabled
-        placeholder="Tito is coming soon"
-        aria-label="Message Tito (coming soon)"
+        placeholder="Tutor AI is coming soon"
+        aria-label="Message Tutor AI (coming soon)"
         className="flex-1 bg-transparent text-[13px] text-slate-800 placeholder:text-slate-400 font-medium outline-none min-w-0"
       />
       <span className="w-9 h-9 rounded-full bg-slate-200 text-slate-400 flex items-center justify-center shrink-0">
@@ -75,7 +75,7 @@ const TitoAiScreen: React.FC = () => (
       </span>
     </div>
     <p className="text-[11px] text-slate-500 font-medium text-center px-6">
-      Tito AI is being prepared and will open for everyone at once.
+      Tutor AI is being prepared and will open for everyone at once.
     </p>
   </div>
 );

@@ -716,6 +716,27 @@ type TosStatusOverview = {
   };
 };
 
+
+// The TOS status preview as a circle, the same look students see in their
+// status rail, so the card reads as a status and not a text note.
+const TosStatusCircle: React.FC<{ latest: { statusId: string; kind: string; at: number; expiresAt: number; text: string } }> = ({ latest }) => {
+  const life = Math.max(1, latest.expiresAt - latest.at);
+  const remain = Math.max(0, latest.expiresAt - Date.now());
+  const f = Math.max(0, Math.min(1, remain / life));
+  const RING = 2 * Math.PI * 30;
+  return (
+    <span className="relative block w-14 h-14 shrink-0">
+      <svg viewBox="0 0 64 64" className="w-14 h-14" aria-hidden="true">
+        <circle cx="32" cy="32" r="30" fill="none" stroke="#334155" strokeWidth="3.5" />
+        <circle cx="32" cy="32" r="30" fill="none" stroke="#EA580C" strokeWidth="3.5" strokeLinecap="round" strokeDasharray={RING} strokeDashoffset={RING * (1 - f)} transform="rotate(-90 32 32)" />
+      </svg>
+      <span className="absolute inset-[5px] rounded-full overflow-hidden bg-orange-500/15 border border-orange-500/40 flex items-center justify-center text-[10px] font-black text-orange-200">
+        {latest.kind === 'text' ? 'Aa' : latest.kind === 'photo' ? 'Pic' : 'Vid'}
+      </span>
+    </span>
+  );
+};
+
 const TosStatusTab: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
   const [data, setData] = useState<TosStatusOverview | null>(() => loadLastGood<TosStatusOverview>('tos:status:overview'));
   const [err, setErr] = useState('');
@@ -726,7 +747,6 @@ const TosStatusTab: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
   const [note, setNote] = useState('');
   const photoRef = React.useRef<HTMLInputElement>(null);
   const videoRef = React.useRef<HTMLInputElement>(null);
-  const musicRef = React.useRef<HTMLInputElement>(null);
 
   const call = React.useCallback((path: string, opts?: any) => api('/api/tos/chat/status' + path, opts), []);
 
@@ -767,11 +787,10 @@ const TosStatusTab: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
 
   const latest = data?.me?.latest || null;
   const settings = data?.settings || null;
-  const kinds: Array<{ key: 'text' | 'photo' | 'video' | 'music'; label: string; allowed: boolean; pick: () => void }> = [
+  const kinds: Array<{ key: 'text' | 'photo' | 'video'; label: string; allowed: boolean; pick: () => void }> = [
     { key: 'text', label: 'Text', allowed: !!settings?.allowText, pick: () => setComposingText(true) },
     { key: 'photo', label: 'Photo', allowed: !!settings?.allowPhoto, pick: () => photoRef.current?.click() },
     { key: 'video', label: 'Video', allowed: !!settings?.allowVideo, pick: () => videoRef.current?.click() },
-    { key: 'music', label: 'Music', allowed: !!settings?.allowMusic, pick: () => musicRef.current?.click() },
   ];
 
   return (
@@ -787,10 +806,15 @@ const TosStatusTab: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
             onClick={() => { if (myUid) setViewing(true); }}
             onKeyDown={(e) => { if (e.key === 'Enter' && myUid) setViewing(true); }}
           >
-            <p className="text-xs text-slate-300">
-              Up now: {latest.kind === 'text' ? (latest.text || '') : latest.kind} · posted {fmtWhen(latest.at)}
-            </p>
-            <p className="text-[11px] text-slate-500">Every student sees this in their status feed until it expires. Tap this card to view it the way students see it.</p>
+            <div className="flex items-center gap-3">
+              <TosStatusCircle latest={latest} />
+              <div className="min-w-0">
+                <p className="text-xs text-slate-300 truncate">
+                  {latest.kind === 'text' ? (latest.text || '') : latest.kind} · posted {fmtWhen(latest.at)}
+                </p>
+                <p className="text-[11px] text-slate-500">Live in every student's status feed until it expires. Tap to view it the way students see it.</p>
+              </div>
+            </div>
             <button type="button" onClick={removeLatest} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border border-red-500/40 text-red-300 hover:bg-red-500/10 transition-colors cursor-pointer">
               <Ban className="w-3.5 h-3.5" /> Remove
             </button>
@@ -825,7 +849,6 @@ const TosStatusTab: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
 
       <input ref={photoRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) setMedia({ kind: 'photo', file: f }); }} />
       <input ref={videoRef} type="file" accept="video/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) setMedia({ kind: 'video', file: f }); }} />
-      <input ref={musicRef} type="file" accept="audio/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) setMedia({ kind: 'music', file: f }); }} />
 
       {composingText && settings && (
         <Overlay>

@@ -828,7 +828,7 @@ export function registerChatRoutes(app: express.Express): void {
       const username = await usernameFor(caller.uid);
 
       const centreGroupsSnap = await adminDb.collection('chatGroups').where('centreId', '==', centreId).limit(50).get();
-      const tosChannelSnap = await adminDb.collection('chatGroups').where('kind', '==', 'tos_channel').limit(1).get();
+      const tosChannelSnap = await adminDb.collection('chatGroups').where('kind', '==', 'tos_channel').limit(25).get();
       const docs = [...centreGroupsSnap.docs, ...tosChannelSnap.docs];
 
       const groups: any[] = [];
@@ -2176,9 +2176,11 @@ async function statusOverviewCore(caller: Caller, centreIds: string[], me: { nam
   let myViews = 0;
   let myReplyCount = 0;
   if (myLatest) {
-    const vc = await adminRtdb.ref(`chat/statusSeenCount/${myLatest.centreId}/${myLatest.statusId}`).get();
+    const [vc, rc] = await Promise.all([
+      adminRtdb.ref(`chat/statusSeenCount/${myLatest.centreId}/${myLatest.statusId}`).get(),
+      adminRtdb.ref(`chat/statusReplies/${myLatest.centreId}/${myLatest.statusId}`).get(),
+    ]);
     myViews = Number(vc.val()) || 0;
-    const rc = await adminRtdb.ref(`chat/statusReplies/${myLatest.centreId}/${myLatest.statusId}`).get();
     rc.forEach(() => { myReplyCount += 1; });
   }
 
@@ -2211,17 +2213,22 @@ async function statusOverviewCore(caller: Caller, centreIds: string[], me: { nam
   // it belongs to for as long as that update is up.
   const mineOut: Record<string, unknown>[] = [];
   mineAll.sort((a, b) => a.at - b.at);
-  for (const o of mineAll) {
+  // All of the owner's counts are read in one parallel sweep, so a feed with
+  // several updates up answers as fast as one.
+  const mineCounts = await Promise.all(mineAll.map(async (o) => {
     const vc = await adminRtdb.ref(`chat/statusSeenCount/${o.centreId}/${o.statusId}`).get();
     const rc = await adminRtdb.ref(`chat/statusReplies/${o.centreId}/${o.statusId}`).get();
     let replyCount = 0;
     rc.forEach(() => { replyCount += 1; });
+    return { o, views: Number(vc.val()) || 0, replyCount };
+  }));
+  for (const { o, views, replyCount } of mineCounts) {
     mineOut.push({
       centreId: o.centreId,
       statusId: o.statusId, kind: o.kind, at: o.at, expiresAt: o.expiresAt,
       text: o.text, bg: o.bg, photoUrl: o.photoUrl, videoUrl: o.videoUrl,
       audioUrl: o.audioUrl, durationSeconds: o.durationSeconds,
-      views: Number(vc.val()) || 0, replyCount,
+      views, replyCount,
     });
   }
 
