@@ -869,6 +869,9 @@ export const StatusViewer: React.FC<{
     if (st.kind === 'photo') return 5000;
     return 0;
   };
+  // Restart the white line only when the update itself changes, never when
+  // the seen and reply counts load late: the line must never run backwards.
+  const idsKey = statuses ? statuses.map((st) => st.statusId).join('|') : '';
   React.useEffect(() => {
     const cur = statuses && idx < statuses.length ? statuses[idx] : null;
     if (!cur) return;
@@ -889,7 +892,7 @@ export const StatusViewer: React.FC<{
     }, 100);
     return () => window.clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statuses, idx]);
+  }, [idx, idsKey]);
 
   return (
     <div

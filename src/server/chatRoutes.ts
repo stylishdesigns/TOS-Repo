@@ -101,6 +101,7 @@ interface GroupDoc {
   createdAt: string;
   updatedAt: string;
   active: boolean;
+  members?: string[];
 }
 
 interface ChatStats {
@@ -237,6 +238,7 @@ async function loadGroup(groupId: string): Promise<GroupDoc> {
     createdAt: cleanStr(d.createdAt, 40),
     updatedAt: cleanStr(d.updatedAt, 40),
     active: true,
+    members: Array.isArray(d.members) ? d.members.map((x: any) => cleanStr(String(x), 64)).filter(Boolean) : [],
   };
 }
 
@@ -666,14 +668,15 @@ async function loadReadStates(gid: string): Promise<Record<string, { deliveredAt
 /** One of the caller's own messages: seen when someone else had the room open
  *  after it was written, delivered when their app pulled the thread, sent
  *  otherwise. */
-function tickFor(at: number, states: Record<string, { deliveredAt?: number; seenAt?: number }>, callerUid: string): 'sent' | 'delivered' | 'seen' {
-  let delivered = false;
-  for (const [uid, st] of Object.entries(states || {})) {
-    if (!st || uid === callerUid) continue;
-    if (Number(st.seenAt) >= at) return 'seen';
-    if (Number(st.deliveredAt) >= at) delivered = true;
-  }
-  return delivered ? 'delivered' : 'sent';
+function tickFor(at: number, states: Record<string, { deliveredAt?: number; seenAt?: number }>, callerUid: string, otherUids?: string[]): 'sent' | 'delivered' | 'seen' {
+  const targets = (otherUids && otherUids.length ? otherUids : Object.keys(states || {})).filter((u) => u && u !== callerUid);
+  if (!targets.length) return 'sent';
+  // Groups tick all-or-nothing: the double tick moves only when every
+  // member has been delivered, and to yellow only when every member has
+  // had the room open.
+  if (targets.every((uid) => Number(states?.[uid]?.seenAt) >= at)) return 'seen';
+  if (targets.every((uid) => Number(states?.[uid]?.deliveredAt) >= at)) return 'delivered';
+  return 'sent';
 }
 
 /** Messages stored before file kinds existed still read as videos when the
@@ -918,7 +921,7 @@ export function registerChatRoutes(app: express.Express): void {
           const snap = await adminRtdb.ref(`chat/groups/${group.id}/messages`).limitToLast(1).get();
           snap.forEach((c) => {
             const v = c.val() || {};
-            last = { text: cleanStr(v.text, 120), at: Number(v.at) || 0, removed: Boolean(v.removed), role: cleanStr(v.role, 20) };
+            last = { text: cleanStr(v.text, 120), at: Number(v.at) || 0, removed: Boolean(v.removed), role: cleanStr(v.role, 20), fileKind: effectiveFileKind(v.fileKind, v.fileUrl) };
           });
         }
         groups.push({
@@ -961,7 +964,7 @@ export function registerChatRoutes(app: express.Express): void {
         const snap = await adminRtdb.ref(`chat/groups/${p.id}/messages`).limitToLast(1).get();
         snap.forEach((c) => {
           const v = c.val() || {};
-          last = { text: cleanStr(v.text, 120), at: Number(v.at) || 0, removed: Boolean(v.removed), role: cleanStr(v.role, 20) };
+          last = { text: cleanStr(v.text, 120), at: Number(v.at) || 0, removed: Boolean(v.removed), role: cleanStr(v.role, 20), fileKind: effectiveFileKind(v.fileKind, v.fileUrl) };
         });
         groups.push({
           id: p.id,
@@ -983,6 +986,13 @@ export function registerChatRoutes(app: express.Express): void {
           peerRole: info?.role || '',
         });
       }
+      // Everything with a recent message counts as delivered now: the
+      // caller's app just pulled this list, so their senders see the double
+      // tick the moment their app is open.
+      const recentCutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+      const deliverIds = groups.filter((g: any) => g.lastMessage && g.lastMessage.at >= recentCutoff).slice(0, 25).map((g: any) => g.id);
+      await Promise.all(deliverIds.map((id: string) => markReadState(id, caller.uid, 'delivered')));
+
       groups.sort((a, b) => {
         const rank = (k: string) => (k === 'announcements' ? 0 : k === 'tos_channel' ? 1 : 2);
         const r = rank(a.kind) - rank(b.kind);
@@ -1753,6 +1763,12 @@ export function registerChatRoutes(app: express.Express): void {
         });
       });
       messages.reverse(); // oldest first for a chat timeline
+      // The room was open on screen: record the caller's receipts, then
+      // read everyone's back so their own messages carry live ticks.
+      await markReadState(ctx.group.id, caller.uid, 'seen');
+      const readStates = await loadReadStates(ctx.group.id);
+      const otherUids = (ctx.group.members || []).filter((u: string) => u !== caller.uid);
+      messages.forEach((m) => { if (m.mine) m.status = tickFor(m.at, readStates, caller.uid, otherUids); });
       // Channel posts show a Comments button with a live count, so count the
       // stored comments per post in one read.
       if (ctx.group.kind === 'tos_channel') {
@@ -2350,6 +2366,15 @@ async function statusOverviewCore(caller: Caller, centreIds: string[], me: { nam
     rc.forEach(() => { myReplyCount += 1; });
   }
 
+  // Whether the caller has loved each update, baked into the lists so the
+  // heart is right the moment a viewer opens instead of flipping later.
+  const lovedSet = new Set<string>();
+  await Promise.all([...others, ...mineAll].map(async (o) => {
+    try {
+      const s = await adminRtdb.ref(`chat/statusLoves/${o.centreId}/${o.statusId}/${caller.uid}`).get();
+      if (s.exists()) lovedSet.add(`${o.centreId}:${o.statusId}`);
+    } catch { /* a missed check only delays the heart a moment */ }
+  }));
   const cloudName = String(process.env.CLOUDINARY_CLOUD_NAME || '');
   const presetName = String(process.env.CLOUDINARY_UPLOAD_PRESET || '');
   const settingsOut: Record<string, unknown> = {
@@ -2395,6 +2420,7 @@ async function statusOverviewCore(caller: Caller, centreIds: string[], me: { nam
       text: o.text, bg: o.bg, photoUrl: o.photoUrl, videoUrl: o.videoUrl,
       audioUrl: o.audioUrl, durationSeconds: o.durationSeconds,
       views, replyCount,
+      lovedByMe: lovedSet.has(`${o.centreId}:${o.statusId}`),
     });
   }
 
@@ -2414,6 +2440,7 @@ async function statusOverviewCore(caller: Caller, centreIds: string[], me: { nam
     audioUrl: o.audioUrl,
     durationSeconds: o.durationSeconds,
     count: counts.get(`${o.centreId}:${o.uid}`) || 0,
+    lovedByMe: lovedSet.has(`${o.centreId}:${o.statusId}`),
   });
 
   return {
@@ -2927,6 +2954,12 @@ async function staffStatusContext(caller: Caller, centreId: string) {
         });
       });
       messages.reverse(); // oldest first for a chat timeline
+      // The room was open on screen: record the caller's receipts, then
+      // read everyone's back so their own messages carry live ticks.
+      await markReadState(ctx.group.id, caller.uid, 'seen');
+      const readStates = await loadReadStates(ctx.group.id);
+      const otherUids = (ctx.group.members || []).filter((u: string) => u !== caller.uid);
+      messages.forEach((m) => { if (m.mine) m.status = tickFor(m.at, readStates, caller.uid, otherUids); });
       const isChannel = ctx.group.kind === 'tos_channel';
       res.json({
         ok: true,
@@ -3210,7 +3243,7 @@ async function staffStatusContext(caller: Caller, centreId: string) {
         .map((g) => loadGroupFromDoc(g))
         .filter((g) => g.active && g.kind !== 'personal')
         .sort((a, b) => a.name.localeCompare(b.name))
-        .map((g) => ({ id: g.id, name: g.name, kind: g.kind, subject: g.subject, access: g.access, createdAt: g.createdAt }));
+        .map((g) => ({ id: g.id, name: g.name, kind: g.kind, subject: g.subject, access: g.access, createdAt: g.createdAt } as any));
       // TOS channels for this role's audience: tutors get tutor channels,
       // centre admins get centre-admin channels, always read-only.
       const wantedAudience: ChannelAudience = membership.role === 'tutor' ? 'tutors' : 'centre_admins';
@@ -3251,6 +3284,24 @@ async function staffStatusContext(caller: Caller, centreId: string) {
           peerRole: info?.role || '',
         } as any);
       }
+      // Last message previews for the chat list rows, read in one parallel
+      // sweep, then delivered receipts for anything recent so senders see
+      // the double tick once this member's app has pulled the list.
+      const lastSnaps = await Promise.all(groups.map(async (g: any) => {
+        try {
+          const s = await adminRtdb.ref(`chat/groups/${g.id}/messages`).limitToLast(1).get();
+          let last: any = null;
+          s.forEach((c) => {
+            const v = c.val() || {};
+            last = { text: cleanStr(v.text, 120), at: Number(v.at) || 0, removed: Boolean(v.removed), role: cleanStr(v.role, 20), fileKind: effectiveFileKind(v.fileKind, v.fileUrl) };
+          });
+          return last;
+        } catch { return null; }
+      }));
+      groups.forEach((g: any, i: number) => { g.lastMessage = lastSnaps[i]; });
+      const recentCutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+      const deliverIds = groups.filter((g: any) => g.lastMessage && g.lastMessage.at >= recentCutoff).slice(0, 25).map((g: any) => g.id);
+      await Promise.all(deliverIds.map((id: string) => markReadState(id, caller.uid, 'delivered')));
       const reportsSnap = await adminDb.collection('chatReports')
         .where('centreId', '==', centreId).orderBy('createdAt', 'desc').limit(50).get();
       const reports = reportsSnap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
@@ -3582,7 +3633,7 @@ async function staffStatusContext(caller: Caller, centreId: string) {
       if (wantedId) {
         const doc = await adminDb.collection('chatGroups').doc(wantedId).get();
         if (!doc.exists || (doc.data() as any)?.kind !== 'tos_channel') throw httpError(404, 'Channel not found.');
-        group = loadGroupFromDoc(doc);
+        group = loadGroupFromDoc(doc as Parameters<typeof loadGroupFromDoc>[0]);
       } else {
         const snap = await adminDb.collection('chatGroups').where('kind', '==', 'tos_channel').orderBy('createdAt', 'desc').limit(1).get();
         if (snap.empty) throw httpError(404, 'Create the channel first.');
@@ -3744,6 +3795,7 @@ function loadGroupFromDoc(doc: QueryDocumentSnapshot<DocumentData>): GroupDoc {
     createdAt: cleanStr(d.createdAt, 40),
     updatedAt: cleanStr(d.updatedAt, 40),
     active: d.active !== false,
+    members: Array.isArray(d.members) ? d.members.map((x: any) => cleanStr(String(x), 64)).filter(Boolean) : [],
   };
 }
 

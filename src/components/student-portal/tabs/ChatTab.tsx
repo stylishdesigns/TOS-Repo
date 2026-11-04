@@ -13,6 +13,7 @@ import {
   Lock,
   Megaphone,
   MessageSquare,
+  Paperclip,
   Play,
   Plus,
   Send,
@@ -31,6 +32,15 @@ import { loadLastGood, saveLastGood } from '../../../lib/lastGood';
 import { splitGroupsAndChannels, totalUnread } from './chatNav';
 import { PersonalNewChatSheet } from './PersonalChat';
 import { copyText, EmojiText, isEmojiOnly, makeLongPress, MessageActionSheet, ReactionChips } from '../../communications/chatActions';
+
+// The one line a chat list row shows under the name: the message itself, or
+// what the media is when the last message carried none.
+const lastLineFor = (g: { lastMessage: { text: string; removed: boolean; fileKind?: string | null } | null }): string =>
+  g.lastMessage
+    ? g.lastMessage.removed
+      ? 'Message removed'
+      : g.lastMessage.text || (g.lastMessage.fileKind === 'video' ? 'Video' : g.lastMessage.fileKind ? 'File' : 'Photo')
+    : 'No messages yet';
 
 // ============================================================================
 // CH1 student chat (Step 3). The screens are thin: every rule (entitlement,
@@ -54,7 +64,7 @@ interface ChatGroupSummary {
   myPercent: number;
   myAnswers: number;
   minAnswers: number;
-  lastMessage: { text: string; at: number; removed: boolean; role: string } | null;
+  lastMessage: { text: string; at: number; removed: boolean; role: string; fileKind?: string | null } | null;
   canPost: boolean;
 }
 
@@ -198,6 +208,7 @@ interface ChatTabProps {
 // full reloads, so the list renders straight away while the refresh runs
 // behind it.
 export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoToPractice, onHideBottomNav, onUnreadTotal, view = 'chats' }) => {
+  const [listImage, setListImage] = useState('');
   const cachedOverview = loadLastGood<ChatOverview>(`chat:overview:${student.id}`);
   const [overview, setOverview] = useState<ChatOverview | null>(cachedOverview);
   const [loading, setLoading] = useState(() => !cachedOverview);
@@ -515,11 +526,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
                 <span className="text-[9px] font-black uppercase tracking-wider text-violet-700 bg-violet-50 px-1.5 py-0.5 rounded-full shrink-0">Channel</span>
               </div>
               <p className="text-[11px] text-slate-500 font-medium truncate">
-                {g.lastMessage
-                  ? g.lastMessage.removed
-                    ? 'Message removed'
-                    : g.lastMessage.text || 'Photo'
-                  : 'No messages yet'}
+                {lastLineFor(g)}
               </p>
             </div>
             <div className="flex flex-col items-end gap-1 shrink-0">
@@ -550,6 +557,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
           className="w-full text-left bg-white rounded-2xl p-3.5 border border-slate-200/90 shadow-sm flex items-center gap-3 active:scale-[0.99] transition"
         >
           <div
+            onClick={(e) => { if (g.kind === 'personal' && g.peerAvatar) { e.stopPropagation(); setListImage(g.peerAvatar); } }}
             className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 border ${
               g.kind === 'announcements'
                 ? 'bg-amber-50 border-amber-100 text-amber-600'
@@ -578,11 +586,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
             <p className="text-[11px] text-slate-500 font-medium truncate">
               {g.locked
                 ? `Locked · your score ${g.myPercent}% · needs ${g.thresholdPercent}%`
-                : g.lastMessage
-                  ? g.lastMessage.removed
-                    ? 'Message removed'
-                    : g.lastMessage.text || 'Photo'
-                  : 'No messages yet'}
+                : lastLineFor(g)}
             </p>
           </div>
           <div className="flex flex-col items-end gap-1 shrink-0">
@@ -603,6 +607,15 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
           <Loader2 className="w-6 h-6 animate-spin text-[#EA580C]" />
         </div>
       )}
+      {listImage && (
+        <div className="fixed inset-0 z-[60] bg-black flex items-center justify-center">
+          <button onClick={() => setListImage('')} className="absolute top-3 left-3 z-10 w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center text-white active:scale-95 transition" aria-label="Back">
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <img src={listImage} alt="Profile photo" className="max-h-full max-w-full object-contain" />
+        </div>
+      )}
+
       {pickerOpen && (
         <PersonalNewChatSheet onClose={() => setPickerOpen(false)} onOpenChat={openPersonalChat} />
       )}
@@ -656,6 +669,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
   const [attachFile, setAttachFile] = useState<File | null>(null);
   const [attachProgress, setAttachProgress] = useState(0);
   const [attachSheet, setAttachSheet] = useState(false);
+  const [attachModal, setAttachModal] = useState<{ kind: 'image' | 'video' | 'file'; url: string; file: File | null } | null>(null);
   const photoRef = useRef<HTMLInputElement | null>(null);
   const videoRef = useRef<HTMLInputElement | null>(null);
   const docRef = useRef<HTMLInputElement | null>(null);
@@ -820,8 +834,17 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
       return;
     }
     if (file.size > 200 * 1024 * 1024) { showToast('That file is too large. Choose a smaller one.'); return; }
-    setAttachFile(file);
+    const k = kindOf(file);
+    const url = k === 'image' || k === 'video' ? URL.createObjectURL(file) : '';
+    setAttachModal({ kind: k === 'image' || k === 'video' ? k : 'file', url, file });
   }, [resp, showToast]);
+
+  const closeAttachModal = useCallback(() => {
+    setAttachModal((cur) => {
+      if (cur && cur.url.startsWith('blob:')) URL.revokeObjectURL(cur.url);
+      return null;
+    });
+  }, []);
 
   const uploadChatFile = useCallback(async (file: File, onProgress?: (pct: number) => void): Promise<string> => {
     let cached = chatUploadCfg && Date.now() - chatUploadCfg.at < 10 * 60 * 1000 ? chatUploadCfg : null;
@@ -868,18 +891,11 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
     return url;
   }, []);
 
-  const fmtSize = (n: number): string => {
-    if (!n) return '';
-    if (n >= 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(n >= 10 * 1024 * 1024 ? 0 : 1)} MB`;
-    if (n >= 1024) return `${Math.round(n / 1024)} KB`;
-    return `${n} B`;
-  };
-
-  const send = useCallback(async () => {
+  const send = useCallback(async (override?: { file?: File | null }) => {
     const t = text.trim();
-    if ((!t && !attachFile) || sending) return;
+    const file = override ? override.file ?? null : attachFile;
+    if ((!t && !file) || sending) return;
     setSending(true);
-    const file = attachFile;
     const rt = replyTo;
     // The message shows in the room straight away, media included, with the
     // upload percentage on the media itself instead of a loading screen.
@@ -1247,7 +1263,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
                 <span className="relative w-12 h-12 rounded-full bg-black/40 border border-white/50 flex items-center justify-center">
                   <Play className="w-5 h-5 text-white ml-0.5" fill="currentColor" />
                 </span>
-                <span className="absolute bottom-1.5 right-2 text-[9px] font-bold text-white/90 bg-black/50 rounded px-1">{m.fileSize ? fmtSize(m.fileSize) : 'Video'}</span>
+                <span className="absolute bottom-1.5 right-2 text-[9px] font-bold text-white/90 bg-black/50 rounded px-1">Video</span>
               </button>
               {uploading && (
                 <span className="absolute inset-0 rounded-xl bg-black/45 flex items-center justify-center text-white text-xs font-black pointer-events-none">{m.progress ?? 0}%</span>
@@ -1260,7 +1276,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
                 <span className="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center shrink-0 text-white font-black text-[10px] uppercase">{(m.fileName || 'file').split('.').pop()?.slice(0, 4)}</span>
                 <span className="min-w-0 flex-1">
                   <span className="block text-[12px] font-bold text-white truncate">{m.fileName || 'File'}</span>
-                  <span className="block text-[10px] font-medium text-white/70">{uploading ? `Uploading ${m.progress ?? 0}%` : m.fileSize ? fmtSize(m.fileSize) : 'Tap to open'}</span>
+                  <span className="block text-[10px] font-medium text-white/70">{uploading ? `Uploading ${m.progress ?? 0}%` : 'Tap to open'}</span>
                 </span>
                 <ExternalLink className="w-4 h-4 text-white/80 shrink-0" />
               </a>
@@ -1375,17 +1391,6 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
       </div>
 
       <div className="relative shrink-0 bg-white border-t border-slate-200 px-3 sm:px-4 pt-2 pb-2">
-        {attachFile && (
-          <div className="flex items-center gap-2 mb-2 rounded-xl bg-slate-50 border border-slate-200 px-2 py-1.5">
-            <span className="w-10 h-10 rounded-lg bg-slate-200 text-slate-500 flex items-center justify-center text-[10px] font-black uppercase shrink-0">{attachFile.name.split('.').pop()?.slice(0, 4)}</span>
-            <p className="text-[11px] font-bold text-slate-600 flex-1 min-w-0 truncate">
-              {sending && attachProgress > 0 && attachProgress < 100 ? `Uploading ${attachProgress}%` : `${attachFile.name}${attachFile.size ? ` · ${fmtSize(attachFile.size)}` : ''}`}
-            </p>
-            <button onClick={() => { setAttachFile(null); setAttachProgress(0); }} className="rounded-full p-1 text-slate-400 hover:bg-slate-100" aria-label="Remove file">
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        )}
         {canPost ? (
           <div className="flex items-end gap-2">
             {replyTo && (
@@ -1423,11 +1428,11 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
             />
             <button
               onClick={send}
-              disabled={(!text.trim() && !attachFile) || sending}
+              disabled={!text.trim() && !attachFile}
               className="w-11 h-11 rounded-2xl bg-[#EA580C] text-white flex items-center justify-center shadow-sm shadow-orange-200 active:scale-95 transition disabled:opacity-50 shrink-0"
               aria-label="Send"
             >
-              {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              <Send className="w-4 h-4" />
             </button>
           </div>
         ) : (
@@ -1528,6 +1533,44 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
               )}
               <p>• Your centre can remove messages and mute accounts that break the house rules.</p>
             </div>
+          </div>
+        </div>
+      )}
+
+      {attachModal && (
+        <div className="fixed inset-0 z-[55] bg-black/85 flex flex-col" role="dialog" aria-label="Attachment preview">
+          <div className="flex justify-end p-3">
+            <button onClick={closeAttachModal} className="w-10 h-10 rounded-full bg-white/10 text-white flex items-center justify-center active:scale-95 transition" aria-label="Cancel">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <div className="flex-1 min-h-0 flex items-center justify-center px-4">
+            {attachModal.kind === 'image' && (
+              <img src={attachModal.url} alt="Attachment preview" className="max-h-[70vh] max-w-full rounded-2xl object-contain" />
+            )}
+            {attachModal.kind === 'video' && (
+              <video src={attachModal.url} controls autoPlay playsInline className="max-h-[70vh] max-w-full rounded-2xl" />
+            )}
+            {attachModal.kind === 'file' && (
+              <div className="w-28 h-28 rounded-3xl bg-white/10 flex flex-col items-center justify-center gap-2 text-white">
+                <Paperclip className="w-9 h-9" />
+                <span className="text-[11px] font-bold">Ready to send</span>
+              </div>
+            )}
+          </div>
+          <div className="p-4 flex justify-end gap-3">
+            <button onClick={closeAttachModal} className="px-5 py-3 rounded-2xl bg-white/10 text-white text-xs font-black active:scale-95 transition">Cancel</button>
+            <button
+              onClick={() => {
+                const cur = attachModal;
+                if (cur.url.startsWith('blob:')) URL.revokeObjectURL(cur.url);
+                setAttachModal(null);
+                send({ file: cur.file });
+              }}
+              className="px-5 py-3 rounded-2xl bg-[#EA580C] text-white text-xs font-black flex items-center gap-2 active:scale-95 transition"
+            >
+              <Send className="w-4 h-4" /> Send
+            </button>
           </div>
         </div>
       )}

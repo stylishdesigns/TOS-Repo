@@ -46,9 +46,12 @@ interface ChatGroup {
   audience?: 'students' | 'tutors' | 'centre_admins';
   peerUid?: string;
   peerUsername?: string;
+  peerName?: string;
+  peerAvatar?: string;
   subject: string | null;
   access: ChatAccess;
   createdAt: string;
+  lastMessage?: { text: string; at: number; removed: boolean; role: string; fileKind?: string | null } | null;
 }
 
 interface ChatSettings {
@@ -249,7 +252,7 @@ export const ChatManager: React.FC<{ onThreadOpenChange?: (open: boolean) => voi
         </div>
         )}
 
-        {tab === 'groups' && data && <GroupsSection data={data} isAdmin={isAdmin} reload={load} addToast={addToast} centreId={activeCentreId || ''} onThreadOpenChange={onThreadOpenChange} />}
+        {tab === 'groups' && data && <GroupsSection data={data} setData={setData} isAdmin={isAdmin} reload={load} addToast={addToast} centreId={activeCentreId || ''} onThreadOpenChange={onThreadOpenChange} />}
         {tab === 'settings' && data && <SettingsSection data={data} isAdmin={isAdmin} reload={load} addToast={addToast} centreId={activeCentreId || ''} />}
         {tab === 'reports' && data && <ReportsSection data={data} isAdmin={isAdmin} reload={load} addToast={addToast} centreId={activeCentreId || ''} />}
       </div>
@@ -264,13 +267,15 @@ export const ChatManager: React.FC<{ onThreadOpenChange?: (open: boolean) => voi
 interface SectionProps {
   data: Bootstrap;
   isAdmin: boolean;
+  setData?: React.Dispatch<React.SetStateAction<Bootstrap | null>>;
   onThreadOpenChange?: (open: boolean) => void;
   reload: () => Promise<void>;
   addToast: (msg: string, kind?: string) => void;
   centreId: string;
 }
 
-const GroupsSection: React.FC<SectionProps> = ({ data, isAdmin, reload, addToast, centreId, onThreadOpenChange }) => {
+const GroupsSection: React.FC<SectionProps> = ({ data, isAdmin, reload, addToast, centreId, onThreadOpenChange, setData }) => {
+  const [listImage, setListImage] = useState('');
   const [creating, setCreating] = useState(false);
   const [busy, setBusy] = useState(false);
   const [name, setName] = useState('');
@@ -576,7 +581,10 @@ const GroupsSection: React.FC<SectionProps> = ({ data, isAdmin, reload, addToast
           ) : (
             <div className="flex items-start gap-3">
               {g.kind === 'personal' ? (
-                <span className="w-10 h-10 rounded-full bg-orange-50 border border-orange-100 text-[#EA580C] flex items-center justify-center text-xs font-black overflow-hidden shrink-0">
+                <span
+                  onClick={(e) => { if (g.peerAvatar) { e.stopPropagation(); setListImage(g.peerAvatar); } }}
+                  className={`w-10 h-10 rounded-full bg-orange-50 border border-orange-100 text-[#EA580C] flex items-center justify-center text-xs font-black overflow-hidden shrink-0 ${g.peerAvatar ? 'cursor-pointer' : ''}`}
+                >
                   {g.peerAvatar ? <img src={g.peerAvatar} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" /> : (initialsOf(g.name) || <User className="w-5 h-5" />)}
                 </span>
               ) : (
@@ -588,8 +596,11 @@ const GroupsSection: React.FC<SectionProps> = ({ data, isAdmin, reload, addToast
               )}
               <div className="flex-1 min-w-0">
                 {g.kind === 'personal' ? (
+                <>
                   <p className="text-sm font-black text-slate-900 truncate">{g.name}</p>
-                ) : (
+                  {g.lastMessage && <p className="text-[11px] text-slate-500 font-medium truncate mt-0.5">{lastLineFor(g)}</p>}
+                </>
+              ) : (
                   <>
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="text-sm font-black text-slate-900">{g.name}</p>
@@ -599,10 +610,12 @@ const GroupsSection: React.FC<SectionProps> = ({ data, isAdmin, reload, addToast
                       {g.subject ? `Subject: ${g.subject} · ` : ''}{accessLabel(g)}
                     </p>
                     <p className="text-[10px] text-slate-400 font-medium mt-0.5">Created {fmtDate(g.createdAt)}</p>
+                    {g.lastMessage && <p className="text-[11px] text-slate-500 font-medium truncate mt-0.5">{lastLineFor(g)}</p>}
                   </>
                 )}
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
+                {g.lastMessage && <span className="text-[10px] text-slate-400 font-bold">{fmtListTime(g.lastMessage.at)}</span>}
                 {isAdmin && g.kind !== 'personal' && (
                   <button
                     onClick={(e) => { e.stopPropagation(); startEdit(g); }}
@@ -619,15 +632,39 @@ const GroupsSection: React.FC<SectionProps> = ({ data, isAdmin, reload, addToast
       ))}
       </>
       )}
+      {listImage && (
+        <div className="fixed inset-0 z-[60] bg-black flex items-center justify-center">
+          <button onClick={() => setListImage('')} className="absolute top-3 left-3 z-10 w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center text-white active:scale-95 transition" aria-label="Back">
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <img src={listImage} alt="Profile photo" className="max-h-full max-w-full object-contain" />
+        </div>
+      )}
+
       {pickerOpen && (
         <StaffNewChatSheet
           centreId={centreId}
           onClose={() => setPickerOpen(false)}
           onOpenChat={async (chatId, name) => {
             setPickerOpen(false);
-            await reload();
+            // Straight into the room: the chat opens on the spot with an
+            // optimistic entry while the fresh list loads behind it.
+            if (setData) {
+              setData((cur) => {
+                if (!cur || cur.groups.some((g) => g.id === chatId)) return cur;
+                return {
+                  ...cur,
+                  groups: [...cur.groups, {
+                    id: chatId, name, kind: 'personal' as const, subject: null,
+                    access: { mode: 'none' as const, thresholdPercent: null },
+                    createdAt: '', peerUid: '', peerName: name, peerAvatar: '',
+                  }],
+                };
+              });
+            }
             setOpenId(chatId);
             addToast(`Chat with ${name} opened`);
+            await reload();
           }}
         />
       )}
@@ -921,12 +958,31 @@ function kindOf(file: File): string {
   return 'file';
 }
 
-function fmtSize(bytes: number): string {
-  if (!bytes || bytes <= 0) return '';
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+// The one line a chat list row shows under the name: the message itself, or
+// what the media is when the last message carried none.
+function lastLineFor(g: { lastMessage?: { text: string; removed: boolean; fileKind?: string | null } | null }): string {
+  const lm = g.lastMessage;
+  if (!lm) return '';
+  if (lm.removed) return 'Message removed';
+  return lm.text || (lm.fileKind === 'video' ? 'Video' : lm.fileKind ? 'File' : 'Photo');
 }
+
+function fmtListTime(at: number): string {
+  if (!at) return '';
+  const d = new Date(at);
+  const now = new Date();
+  if (d.toDateString() === now.toDateString()) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const days = Math.floor((now.getTime() - at) / 86400000);
+  if (days > 0 && days < 7) return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()];
+  return d.toLocaleDateString([], { day: 'numeric', month: 'short' });
+}
+
+const fmtVvTime = (n: number): string => {
+  if (!Number.isFinite(n) || n <= 0) return '0:00';
+  const sec = Math.floor(n % 60);
+  const min = Math.floor(n / 60);
+  return `${min}:${String(sec).padStart(2, '0')}`;
+};
 
 function roleChip(role: string): string {
   if (role === 'admin') return 'Admin';
@@ -959,10 +1015,13 @@ const ThreadPanel: React.FC<{
   const [text, setText] = useState('');
   const [attachPreview, setAttachPreview] = useState('');
   const [attachFile, setAttachFile] = useState<File | null>(null);
+  const [attachModal, setAttachModal] = useState<{ kind: 'image' | 'video' | 'file'; url: string; file: File | null; dataUrl?: string } | null>(null);
   const [attachProgress, setAttachProgress] = useState(0);
   const [attachSheet, setAttachSheet] = useState(false);
   const [videoViewerUrl, setVideoViewerUrl] = useState('');
   const [videoPaused, setVideoPaused] = useState(false);
+  const [vvAt, setVvAt] = useState(0);
+  const [vvDur, setVvDur] = useState(0);
   const [infoOpen, setInfoOpen] = useState(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [canLoadEarlier, setCanLoadEarlier] = useState(true);
@@ -1105,11 +1164,11 @@ const ThreadPanel: React.FC<{
     });
   };
 
-  const send = async () => {
+  const send = async (override?: { preview?: string; file?: File | null }) => {
     if (busy) return;
     const value = text.trim();
-    const preview = attachPreview;
-    const file = attachFile;
+    const preview = override ? override.preview ?? '' : attachPreview;
+    const file = override ? override.file ?? null : attachFile;
     const rt = replyTo;
     if (!value && !preview && !file) return;
     setBusy(true);
@@ -1206,7 +1265,7 @@ const ThreadPanel: React.FC<{
         let out = canvas.toDataURL('image/jpeg', 0.82);
         let q = 0.82;
         while (out.length * 0.75 > 900 * 1024 && q > 0.35) { q -= 0.15; out = canvas.toDataURL('image/jpeg', q); }
-        setAttachPreview(out);
+        setAttachModal({ kind: 'image', url: out, file: null, dataUrl: out });
       };
       img.onerror = () => addToast('That photo could not be read. Try another.');
       img.src = String(reader.result || '');
@@ -1218,7 +1277,16 @@ const ThreadPanel: React.FC<{
     if (!file) return;
     if (kindOf(file) === 'image') { onPhotoPicked(file); return; }
     if (file.size > 200 * 1024 * 1024) { addToast('That file is too large. Choose a smaller one.'); return; }
-    setAttachFile(file);
+    const k = kindOf(file);
+    const url = k === 'video' ? URL.createObjectURL(file) : '';
+    setAttachModal({ kind: k === 'video' ? 'video' : 'file', url, file });
+  };
+
+  const closeAttachModal = () => {
+    setAttachModal((cur) => {
+      if (cur && cur.url.startsWith('blob:')) URL.revokeObjectURL(cur.url);
+      return null;
+    });
   };
 
   const myUid = (messages || []).find((m) => m.mine)?.uid || '';
@@ -1375,7 +1443,7 @@ const ThreadPanel: React.FC<{
               <span className="relative block">
                 <button
                   {...press}
-                  onClick={() => { if (!m.pending) setVideoViewerUrl(mediaUrl as string); }}
+                  onClick={() => { if (!m.pending) { setVvAt(0); setVvDur(0); setVideoViewerUrl(mediaUrl as string); } }}
                   className="relative rounded-xl overflow-hidden w-44 h-64 bg-slate-900 flex items-center justify-center"
                   aria-label="Play video"
                 >
@@ -1383,7 +1451,7 @@ const ThreadPanel: React.FC<{
                   <span className="relative w-12 h-12 rounded-full bg-black/40 border border-white/50 flex items-center justify-center">
                     <Play className="w-5 h-5 text-white ml-0.5" fill="currentColor" />
                   </span>
-                  <span className="absolute bottom-1.5 right-2 text-[9px] font-bold text-white/90 bg-black/50 rounded px-1">{m.fileSize ? fmtSize(m.fileSize) : 'Video'}</span>
+                  <span className="absolute bottom-1.5 right-2 text-[9px] font-bold text-white/90 bg-black/50 rounded px-1">Video</span>
                 </button>
                 {uploading && (
                   <span className="absolute inset-0 rounded-xl bg-black/45 flex items-center justify-center text-white text-xs font-black pointer-events-none">{m.progress ?? 0}%</span>
@@ -1405,7 +1473,7 @@ const ThreadPanel: React.FC<{
                   <span className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 text-[10px] font-black uppercase ${m.mine ? 'bg-white/15 text-white' : 'bg-slate-100 text-slate-500'}`}>{(m.fileName || 'file').split('.').pop()?.slice(0, 4)}</span>
                   <span className="min-w-0 flex-1">
                     <span className={`block text-[12px] font-bold truncate ${m.mine ? 'text-white' : 'text-slate-800'}`}>{m.fileName || 'File'}</span>
-                    <span className={`block text-[10px] font-medium ${m.mine ? 'text-white/70' : 'text-slate-400'}`}>{uploading ? `Uploading ${m.progress ?? 0}%` : m.fileSize ? fmtSize(m.fileSize) : 'Tap to open'}</span>
+                    <span className={`block text-[10px] font-medium ${m.mine ? 'text-white/70' : 'text-slate-400'}`}>{uploading ? `Uploading ${m.progress ?? 0}%` : 'Tap to open'}</span>
                   </span>
                   <FileText className={`w-4 h-4 shrink-0 ${m.mine ? 'text-white/80' : 'text-slate-400'}`} />
                 </a>
@@ -1445,27 +1513,7 @@ const ThreadPanel: React.FC<{
       </div>
 
       <div className={`relative shrink-0 bg-white border-t border-slate-200 p-3 items-end gap-2 ${group.kind === 'tos_channel' ? 'hidden' : 'flex'}`}>
-        {attachPreview && (
-          <div className="absolute bottom-full left-3 right-3 mb-1 flex items-center gap-2 rounded-xl bg-slate-50 border border-slate-200 px-2 py-1.5">
-            <img src={attachPreview} alt="Photo to send" className="w-10 h-10 rounded-lg object-cover" />
-            <p className="text-[11px] font-bold text-slate-600 flex-1">Photo ready to send</p>
-            <button onClick={() => setAttachPreview('')} className="rounded-full p-1 text-slate-400 hover:bg-slate-100" aria-label="Remove photo">
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        )}
-        {attachFile && !attachPreview && (
-          <div className="absolute bottom-full left-3 right-3 mb-1 flex items-center gap-2 rounded-xl bg-slate-50 border border-slate-200 px-2 py-1.5">
-            <span className="w-10 h-10 rounded-lg bg-slate-200 text-slate-500 flex items-center justify-center text-[10px] font-black uppercase shrink-0">{(attachFile.name.split('.').pop() || 'file').slice(0, 4)}</span>
-            <p className="text-[11px] font-bold text-slate-600 flex-1 min-w-0 truncate">
-              {attachProgress > 0 && attachProgress < 100 ? `Uploading ${attachProgress}%` : `${attachFile.name}${attachFile.size ? ` · ${fmtSize(attachFile.size)}` : ''}`}
-            </p>
-            <button onClick={() => { setAttachFile(null); setAttachProgress(0); }} className="rounded-full p-1 text-slate-400 hover:bg-slate-100" aria-label="Remove file">
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        )}
-        {replyTo && !attachPreview && !attachFile && (
+        {replyTo && (
           <div className="absolute bottom-full left-3 right-3 mb-1 flex items-start gap-2 rounded-xl bg-orange-50 border border-orange-100 px-3 py-2">
             <div className="min-w-0 flex-1">
               <p className="text-[10px] font-black text-[#C2410C]">Replying to {replyTo.username}</p>
@@ -1512,13 +1560,50 @@ const ThreadPanel: React.FC<{
           className="flex-1 resize-none px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium text-slate-800 focus:outline-none focus:border-orange-300"
         />
         <button
-          onClick={send}
-          disabled={busy}
-          className="px-4 py-2.5 rounded-xl bg-[#EA580C] text-white text-xs font-black active:scale-95 transition disabled:opacity-50 flex items-center gap-1.5"
+          onClick={() => send()}
+          className="px-4 py-2.5 rounded-xl bg-[#EA580C] text-white text-xs font-black active:scale-95 transition flex items-center gap-1.5"
         >
-          {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />} Send
+          <Send className="w-3.5 h-3.5" /> Send
         </button>
       </div>
+
+      {attachModal && (
+        <div className="fixed inset-0 z-[55] bg-black/85 flex flex-col" role="dialog" aria-label="Attachment preview">
+          <div className="flex justify-end p-3">
+            <button onClick={closeAttachModal} className="w-10 h-10 rounded-full bg-white/10 text-white flex items-center justify-center active:scale-95 transition" aria-label="Cancel">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <div className="flex-1 min-h-0 flex items-center justify-center px-4">
+            {attachModal.kind === 'image' && (
+              <img src={attachModal.url} alt="Attachment preview" className="max-h-[70vh] max-w-full rounded-2xl object-contain" />
+            )}
+            {attachModal.kind === 'video' && (
+              <video src={attachModal.url} controls autoPlay playsInline className="max-h-[70vh] max-w-full rounded-2xl" />
+            )}
+            {attachModal.kind === 'file' && (
+              <div className="w-28 h-28 rounded-3xl bg-white/10 flex flex-col items-center justify-center gap-2 text-white">
+                <FileText className="w-9 h-9" />
+                <span className="text-[11px] font-bold">Ready to send</span>
+              </div>
+            )}
+          </div>
+          <div className="p-4 flex justify-end gap-3">
+            <button onClick={closeAttachModal} className="px-5 py-3 rounded-2xl bg-white/10 text-white text-xs font-black active:scale-95 transition">Cancel</button>
+            <button
+              onClick={() => {
+                const cur = attachModal;
+                if (cur.url.startsWith('blob:')) URL.revokeObjectURL(cur.url);
+                setAttachModal(null);
+                send({ preview: cur.dataUrl, file: cur.file });
+              }}
+              className="px-5 py-3 rounded-2xl bg-[#EA580C] text-white text-xs font-black flex items-center gap-2 active:scale-95 transition"
+            >
+              <Send className="w-4 h-4" /> Send
+            </button>
+          </div>
+        </div>
+      )}
 
       {attachSheet && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-end justify-center" onClick={() => setAttachSheet(false)}>
@@ -1602,31 +1687,49 @@ const ThreadPanel: React.FC<{
       )}
 
       {videoViewerUrl && (
-        <div className="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-          <button onClick={() => setVideoViewerUrl('')} className="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/15 flex items-center justify-center text-white active:scale-95 transition" aria-label="Close video">
-            <X className="w-4 h-4" />
+        <div className="fixed inset-0 z-[60] bg-black flex flex-col">
+          <button onClick={() => { setVideoViewerUrl(''); setVvAt(0); setVvDur(0); }} className="absolute top-3 left-3 z-10 w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center text-white active:scale-95 transition" aria-label="Back">
+            <ChevronLeft className="w-5 h-5" />
           </button>
-          <video
-            ref={viewerVideoRef}
-            src={videoViewerUrl}
-            controls={false}
-            playsInline
-            autoPlay
-            onCanPlay={() => { const v = viewerVideoRef.current; if (v && v.paused) v.play().catch(() => undefined); }}
-            onPlay={() => setVideoPaused(false)}
-            onPause={() => setVideoPaused(true)}
-            className="max-h-[70vh] max-w-full rounded-xl"
-          />
-          <button
-            onClick={() => {
-              const v = viewerVideoRef.current;
-              if (v) { if (v.paused) { v.play().catch(() => {}); } else { v.pause(); } }
-            }}
-            className="absolute w-16 h-16 rounded-full bg-black/45 border border-white/25 backdrop-blur-sm flex items-center justify-center text-white active:scale-95 transition"
-            aria-label={videoPaused ? 'Play video' : 'Pause video'}
-          >
-            {videoPaused ? <Play className="w-7 h-7 ml-1 fill-white" /> : <Pause className="w-7 h-7 fill-white" />}
-          </button>
+          <div className="flex-1 w-full flex items-center justify-center cursor-pointer relative" onClick={() => { const v = viewerVideoRef.current; if (v) { if (v.paused) { v.play().catch(() => {}); } else { v.pause(); } } }} aria-label={videoPaused ? 'Play video' : 'Pause video'}>
+            <video
+              ref={viewerVideoRef}
+              src={videoViewerUrl}
+              controls={false}
+              playsInline
+              autoPlay
+              onCanPlay={() => { const v = viewerVideoRef.current; if (v && v.paused) v.play().catch(() => undefined); }}
+              onPlay={() => setVideoPaused(false)}
+              onPause={() => setVideoPaused(true)}
+              onTimeUpdate={(e) => setVvAt(e.currentTarget.currentTime || 0)}
+              onLoadedMetadata={(e) => setVvDur(e.currentTarget.duration || 0)}
+              onEnded={() => setVideoPaused(true)}
+              className="max-h-full max-w-full object-contain"
+            />
+            {videoPaused && (
+              <span className="absolute w-16 h-16 rounded-full bg-black/40 border border-white/50 flex items-center justify-center pointer-events-none">
+                <Play className="w-7 h-7 text-white ml-1" fill="currentColor" />
+              </span>
+            )}
+          </div>
+          <div className="w-full px-4 pb-5 pt-3 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+            <span className="text-[10px] font-bold text-white/80 tabular-nums">{fmtVvTime(vvAt)}</span>
+            <input
+              type="range"
+              min={0}
+              max={Math.max(vvDur, 0.1)}
+              step={0.1}
+              value={Math.min(vvAt, vvDur || 0)}
+              onChange={(e) => {
+                const t = Number(e.target.value);
+                setVvAt(t);
+                if (viewerVideoRef.current) viewerVideoRef.current.currentTime = t;
+              }}
+              className="flex-1 h-1 accent-[#EA580C]"
+              aria-label="Video timeline"
+            />
+            <span className="text-[10px] font-bold text-white/80 tabular-nums">{fmtVvTime(vvDur)}</span>
+          </div>
         </div>
       )}
 
