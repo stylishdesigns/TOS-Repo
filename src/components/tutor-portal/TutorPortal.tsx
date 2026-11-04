@@ -8,7 +8,8 @@ import { AssessmentTab } from './tabs/AssessmentTab';
 import { MoreTab } from './tabs/MoreTab';
 import { ChatManager } from '../communications/ChatManager';
 import { StaffStatusScreen } from '../student-portal/tabs/StatusTab';
-import { ChatModeToggle } from '../communications/ChatSplash';
+import { ChatModeToggle, ChatMode } from '../communications/ChatSplash';
+import TutorAiScreen from '../communications/TutorAiScreen';
 import { PWAInstallButton } from '../pwa/PWAInstallButton';
 import {
   Home,
@@ -53,7 +54,7 @@ export const TutorPortal: React.FC = () => {
   const [activeTab, setActiveTabState] = useState<TabType>(parseInitialTutorTab);
   const [chatThreadOpen, setChatThreadOpen] = useState(false);
   // Which thing chat opens: the splash chooser first, then Status or Chat.
-  const [chatMode, setChatMode] = useState<'status' | 'chat'>('status');
+  const [chatMode, setChatMode] = useState<ChatMode>('status');
   const [desktopViewMode, setDesktopViewMode] = useState<'mobile_frame' | 'expanded'>('mobile_frame');
 
   const activeTutor = contextTutor || {
@@ -223,7 +224,8 @@ export const TutorPortal: React.FC = () => {
                 <div className="sticky top-0 z-20 bg-slate-50/95 backdrop-blur px-4 py-3 -mt-1">
                   <ChatModeToggle mode={chatMode === 'choose' ? 'status' : chatMode} onChange={(m) => setChatMode(m)} />
                 </div>
-                {chatMode !== 'chat' && <StaffStatusScreen />}
+                {chatMode === 'tito' && <TutorAiScreen />}
+                {chatMode !== 'chat' && chatMode !== 'tito' && <StaffStatusScreen />}
                 {chatMode === 'chat' && <ChatManager onThreadOpenChange={setChatThreadOpen} />}
               </>
             )}
@@ -268,18 +270,6 @@ export const TutorPortal: React.FC = () => {
                 {activeTab === 'classes' && <div className="w-1 h-1 bg-white rounded-full mt-0.5" />}
               </button>
 
-              {/* Assessment */}
-              <button
-                onClick={() => setActiveTab('assessment')}
-                className={`flex flex-col items-center justify-center py-1 transition-all ${
-                  activeTab === 'assessment' ? 'text-white scale-110' : 'text-orange-100/70'
-                }`}
-              >
-                <Laptop className={`w-5 h-5 ${activeTab === 'assessment' ? 'fill-white/10' : ''}`} />
-                <span className="text-[10px] mt-1 font-bold">Assessment</span>
-                {activeTab === 'assessment' && <div className="w-1 h-1 bg-white rounded-full mt-0.5" />}
-              </button>
-
               {/* Chat */}
               <button
                 onClick={() => setActiveTab('chat')}
@@ -290,6 +280,18 @@ export const TutorPortal: React.FC = () => {
                 <MessageSquare className={`w-5 h-5 ${activeTab === 'chat' ? 'fill-white/10' : ''}`} />
                 <span className="text-[10px] mt-1 font-bold">Chat</span>
                 {activeTab === 'chat' && <div className="w-1 h-1 bg-white rounded-full mt-0.5" />}
+              </button>
+
+              {/* Assessment */}
+              <button
+                onClick={() => setActiveTab('assessment')}
+                className={`flex flex-col items-center justify-center py-1 transition-all ${
+                  activeTab === 'assessment' ? 'text-white scale-110' : 'text-orange-100/70'
+                }`}
+              >
+                <Laptop className={`w-5 h-5 ${activeTab === 'assessment' ? 'fill-white/10' : ''}`} />
+                <span className="text-[10px] mt-1 font-bold">Assessment</span>
+                {activeTab === 'assessment' && <div className="w-1 h-1 bg-white rounded-full mt-0.5" />}
               </button>
 
               {/* More */}

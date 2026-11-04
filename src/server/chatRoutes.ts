@@ -78,12 +78,21 @@ const START_CENTRE_CHAT: CentreChatSettings = {
   updatedAt: null,
 };
 
+const CHANNEL_AUDIENCES = ['students', 'tutors', 'centre_admins'] as const;
+type ChannelAudience = (typeof CHANNEL_AUDIENCES)[number];
+
+function channelAudienceOf(raw: unknown): ChannelAudience {
+  const v = cleanStr(raw, 20);
+  return (CHANNEL_AUDIENCES as readonly string[]).includes(v) ? (v as ChannelAudience) : 'students';
+}
+
 interface GroupDoc {
   id: string;
   centreId: string | null;
   commentsEnabled?: boolean;
   name: string;
   kind: 'subject' | 'announcements' | 'custom' | 'tos_channel' | 'personal';
+  audience?: ChannelAudience;
   subject: string | null;
   access: ChatAccessRule;
   createdBy: string;
@@ -220,6 +229,7 @@ async function loadGroup(groupId: string): Promise<GroupDoc> {
     subject: d.subject ? cleanStr(d.subject, MAX_SUBJECT_CHARS) : null,
     access: d.access && typeof d.access === 'object' ? d.access : { mode: 'centre_default' },
     commentsEnabled: d.commentsEnabled === true,
+    audience: channelAudienceOf(d.audience),
     createdBy: cleanStr(d.createdBy, 64),
     createdByRole: cleanStr(d.createdByRole, 20),
     createdAt: cleanStr(d.createdAt, 40),
@@ -725,6 +735,7 @@ async function studentGroupContext(caller: Caller, groupId: string, forPost: boo
   } else {
     if (!isTosChannel && group.centreId !== centreId) throw httpError(404, 'Group not found.');
     if (isTosChannel && group.centreId) throw httpError(404, 'Group not found.');
+    if (isTosChannel && group.audience !== 'students') throw httpError(404, 'Group not found.');
   }
   const centreChat = isTosChannel || isPersonal ? await getCentreChat(centreId) : await getCentreChat(group.centreId as string);
   if (!isTosChannel && centreChat.paused) {
@@ -834,6 +845,7 @@ export function registerChatRoutes(app: express.Express): void {
       const groups: any[] = [];
       for (const g of docs) {
         const group = loadGroupFromDoc(g);
+        if (group.kind === 'tos_channel' && group.audience !== 'students') continue;
         if (!studentInGroup(student.subjects, group)) continue;
         const gate = gateFor(group, centreChat, tosChat);
         const lock = lockState(group, gate, stats, centreChat);
@@ -1959,7 +1971,13 @@ async function staffGroupContext(caller: Caller, centreId: string, groupId: stri
   }
   const group = await loadGroup(groupId);
   const isPersonal = group.kind === 'personal';
-  if (group.kind === 'tos_channel' || (!isPersonal && group.centreId !== centreId)) throw httpError(404, 'Group not found.');
+  if (group.kind === 'tos_channel') {
+    // Each channel reaches one audience. TOS reads everything; a tutor sees
+    // tutor channels and a centre admin sees centre-admin channels. Other
+    // audiences' channels are simply not there for this caller.
+    const wanted: ChannelAudience = membership.role === 'tutor' ? 'tutors' : 'centre_admins';
+    if (group.audience !== wanted) throw httpError(404, 'Group not found.');
+  } else if (!isPersonal && group.centreId !== centreId) throw httpError(404, 'Group not found.');
   if (isPersonal && !(await personalMembersOf(groupId)).includes(caller.uid)) throw httpError(404, 'Group not found.');
   const centreChat = await getCentreChat(centreId);
   return { membership, group, centreChat };
@@ -2812,13 +2830,14 @@ async function staffStatusContext(caller: Caller, centreId: string) {
         });
       });
       messages.reverse(); // oldest first for a chat timeline
+      const isChannel = ctx.group.kind === 'tos_channel';
       res.json({
         ok: true,
         groupName: ctx.group.name,
         kind: ctx.group.kind,
         role: ctx.membership.role,
-        canPost: true,
-        photosAllowed: ctx.centreChat.photosAllowed,
+        canPost: !isChannel,
+        photosAllowed: isChannel ? false : ctx.centreChat.photosAllowed,
         photoMaxKb: tosChat.photoMaxKb,
         messageMaxChars: tosChat.messageMaxChars,
         messages,
@@ -2835,6 +2854,7 @@ async function staffStatusContext(caller: Caller, centreId: string) {
       const caller = getCaller(req);
       const centreId = cleanStr(String(req.query.centreId || ''), 120);
       const ctx = await staffGroupContext(caller, centreId, String(req.params.id || ''));
+      if (ctx.group.kind === 'tos_channel') throw httpError(403, 'Only TOS can post in this channel.');
       if (ctx.centreChat.paused) throw httpError(503, 'Chat is paused for your centre right now.');
       const mute = await mutedUntil(caller.uid, centreId);
       if (mute) {
@@ -2881,6 +2901,7 @@ async function staffStatusContext(caller: Caller, centreId: string) {
       const caller = getCaller(req);
       const centreId = cleanStr(String(req.query.centreId || ''), 120);
       const ctx = await staffGroupContext(caller, centreId, String(req.params.id || ''));
+      if (ctx.group.kind === 'tos_channel') throw httpError(403, 'Only TOS can manage this channel.');
       const msgRef = adminRtdb.ref(`chat/groups/${ctx.group.id}/messages/${cleanStr(String(req.params.msgId || ''), 128)}`);
       const snap = await msgRef.get();
       const v = snap.val();
@@ -2893,6 +2914,47 @@ async function staffStatusContext(caller: Caller, centreId: string) {
       res.json({ ok: true });
     } catch (error: any) {
       handleRouteError(res, error, '[chat] staff remove failed');
+    }
+  });
+
+  // Forwarding for staff: a fresh copy of one message into another chat in
+  // their own centre. The same checks a normal staff post goes through apply
+  // here, and the rate limit counts it like any other message.
+  app.post('/api/centre/chat/forward', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const body = req.body || {};
+      const centreId = cleanStr(body.centreId, 120);
+      const fromId = cleanStr(body.fromGroupId, 120);
+      const toId = cleanStr(body.toGroupId, 120);
+      const msgId = cleanStr(body.msgId, 128);
+      if (!centreId) throw httpError(400, 'No centre is selected.');
+      if (!fromId || !toId || !msgId) throw httpError(400, 'Choose a message and a chat to forward it to.');
+      const fromCtx = await staffGroupContext(caller, centreId, fromId);
+      const v = await loadMessage(fromCtx.group.id, msgId);
+      if (v.removed) throw httpError(404, 'That message is no longer available.');
+      const toCtx = await staffGroupContext(caller, centreId, toId);
+      if (toCtx.group.kind === 'announcements') throw httpError(403, 'Only your centre can post in Announcements.');
+      if (toCtx.group.kind === 'tos_channel') throw httpError(403, 'Only TOS can post in this channel.');
+      if (toCtx.centreChat.paused) throw httpError(503, 'Chat is paused for your centre right now.');
+      const mute = await mutedUntil(caller.uid, centreId);
+      if (mute) {
+        const days = Math.max(1, Math.ceil((mute - Date.now()) / DAY_MS));
+        throw httpError(403, `You have been muted from this centre's chats for ${days} more day${days === 1 ? '' : 's'}.`);
+      }
+      const tosChat = await getTosChat();
+      await consumePostRateLimit(caller.uid, tosChat.postRateLimitPerDay);
+      const text = String(v.text ?? '').slice(0, tosChat.messageMaxChars);
+      const photoUrl = toCtx.centreChat.photosAllowed && typeof v.photoUrl === 'string' ? v.photoUrl.slice(0, MAX_PHOTO_URL_CHARS) : null;
+      if (!text && !photoUrl) throw httpError(400, 'Nothing to forward.');
+      const username = (await staffDisplayName(caller)).slice(0, 16);
+      const role = toCtx.membership.role === 'tutor' ? 'tutor' : 'admin';
+      await writeMessage(toCtx.group, { uid: caller.uid, username, role }, text, photoUrl, {
+        forwardedFrom: cleanStr(fromCtx.group.name, 80),
+      });
+      res.json({ ok: true });
+    } catch (error: any) {
+      handleRouteError(res, error, '[chat] staff forward failed');
     }
   });
 
@@ -3034,6 +3096,14 @@ async function staffStatusContext(caller: Caller, centreId: string) {
         .filter((g) => g.active)
         .sort((a, b) => a.name.localeCompare(b.name))
         .map((g) => ({ id: g.id, name: g.name, kind: g.kind, subject: g.subject, access: g.access, createdAt: g.createdAt }));
+      // TOS channels for this role's audience: tutors get tutor channels,
+      // centre admins get centre-admin channels, always read-only.
+      const wantedAudience: ChannelAudience = membership.role === 'tutor' ? 'tutors' : 'centre_admins';
+      const tosChannelSnap = await adminDb.collection('chatGroups').where('kind', '==', 'tos_channel').limit(25).get();
+      tosChannelSnap.docs
+        .map((g) => loadGroupFromDoc(g))
+        .filter((g) => g.active && g.audience === wantedAudience)
+        .forEach((g) => groups.push({ id: g.id, name: g.name, kind: 'tos_channel', subject: null, access: g.access, createdAt: g.createdAt, audience: g.audience } as any));
       // One-to-one chats this staff member is part of, same-centre only by
       // the rules that guard opening one.
       const staffPersonalSnap = await adminDb.collection('chatGroups')
@@ -3287,6 +3357,8 @@ async function staffStatusContext(caller: Caller, centreId: string) {
         centreId: null,
         name,
         kind: 'tos_channel',
+        // One audience per channel: students, tutors or centre admins.
+        audience: channelAudienceOf(req.body?.audience),
         // Announcement-only by default; TOS opts a channel into comments.
         commentsEnabled,
         subject: null,
@@ -3317,6 +3389,7 @@ async function staffStatusContext(caller: Caller, centreId: string) {
       const patch: Record<string, unknown> = { updatedAt: new Date().toISOString() };
       if (typeof req.body?.name === 'string' && cleanStr(req.body.name, 60)) patch.name = cleanStr(req.body.name, 60);
       if (req.body?.commentsEnabled !== undefined) patch.commentsEnabled = req.body.commentsEnabled === true;
+      if (req.body?.audience !== undefined) patch.audience = channelAudienceOf(req.body.audience);
       await ref.set(patch, { merge: true });
       res.json({ ok: true });
     } catch (error: any) {
@@ -3332,7 +3405,7 @@ async function staffStatusContext(caller: Caller, centreId: string) {
       const channels: Record<string, unknown>[] = [];
       snap.forEach((d) => {
         const v = d.data() as any;
-        channels.push({ id: d.id, name: cleanStr(v?.name, 60), createdAt: cleanStr(v?.createdAt, 40), commentsEnabled: v?.commentsEnabled === true });
+        channels.push({ id: d.id, name: cleanStr(v?.name, 60), createdAt: cleanStr(v?.createdAt, 40), commentsEnabled: v?.commentsEnabled === true, audience: channelAudienceOf(v?.audience) });
       });
       res.json({ ok: true, channels });
     } catch (error: any) {

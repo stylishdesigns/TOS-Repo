@@ -462,18 +462,6 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
         </div>
       )}
 
-      {!error && overview && view !== 'channels' && chatFilter !== 'channels' && listForView.length === 0 && (
-        <div className="bg-white rounded-3xl p-8 border border-slate-200/90 shadow-sm text-center space-y-2">
-          <div className="w-14 h-14 rounded-2xl bg-orange-50 border border-orange-100 text-[#EA580C] flex items-center justify-center mx-auto">
-            <MessageSquare className="w-7 h-7" />
-          </div>
-          <h3 className="text-base font-black text-slate-900 tracking-tight">No groups yet</h3>
-          <p className="text-xs text-slate-500 leading-relaxed font-medium max-w-xs mx-auto">
-            When your centre opens chat groups, they will appear here.
-          </p>
-        </div>
-      )}
-
       {!error && overview && (view === 'channels' || chatFilter === 'channels') && listForView.length === 0 && (
         <div className="bg-white rounded-3xl p-8 border border-slate-200/90 shadow-sm text-center space-y-2">
           <div className="w-14 h-14 rounded-2xl bg-violet-50 border border-violet-100 text-violet-600 flex items-center justify-center mx-auto">

@@ -37,6 +37,7 @@ interface ChatGroup {
   id: string;
   name: string;
   kind: 'announcements' | 'custom' | 'tos_channel' | 'personal';
+  audience?: 'students' | 'tutors' | 'centre_admins';
   peerUid?: string;
   peerUsername?: string;
   subject: string | null;
@@ -269,7 +270,7 @@ const GroupsSection: React.FC<SectionProps> = ({ data, isAdmin, reload, addToast
   const [accessMode, setAccessMode] = useState<'centre_default' | 'custom' | 'none'>('centre_default');
   const [threshold, setThreshold] = useState('70');
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [staffFilter, setStaffFilter] = useState<'groups' | 'personal'>('groups');
+  const [staffFilter, setStaffFilter] = useState<'personal' | 'groups' | 'channels'>('personal');
   const [pickerOpen, setPickerOpen] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const openGroup = openId ? (data.groups.find((g) => g.id === openId) || data.personalChats?.find((g) => g.id === openId)) || null : null;
@@ -351,6 +352,10 @@ const GroupsSection: React.FC<SectionProps> = ({ data, isAdmin, reload, addToast
           centreId={centreId}
           messageMaxChars={data.platform.messageMaxChars}
           photosAllowed={data.settings.photosAllowed}
+          forwardOptions={[
+            ...data.groups.filter((g) => g.id !== openGroup.id && g.kind !== 'tos_channel'),
+            ...(data.personalChats || []),
+          ].map((g) => ({ id: g.id, name: g.name, kind: g.kind }))}
           addToast={addToast}
           onBack={() => setOpenId(null)}
         />
@@ -447,6 +452,14 @@ const GroupsSection: React.FC<SectionProps> = ({ data, isAdmin, reload, addToast
         <div className="flex gap-2" aria-label="Chats filter">
           <button
             type="button"
+            aria-pressed={staffFilter === 'personal'}
+            onClick={() => setStaffFilter('personal')}
+            className={`px-4 py-2 rounded-full text-xs font-black shadow-sm transition ${staffFilter === 'personal' ? 'bg-[#EA580C] text-white' : 'bg-white border border-slate-200 text-slate-500'}`}
+          >
+            Personal
+          </button>
+          <button
+            type="button"
             aria-pressed={staffFilter === 'groups'}
             onClick={() => setStaffFilter('groups')}
             className={`px-4 py-2 rounded-full text-xs font-black shadow-sm transition ${staffFilter === 'groups' ? 'bg-[#EA580C] text-white' : 'bg-white border border-slate-200 text-slate-500'}`}
@@ -455,11 +468,11 @@ const GroupsSection: React.FC<SectionProps> = ({ data, isAdmin, reload, addToast
           </button>
           <button
             type="button"
-            aria-pressed={staffFilter === 'personal'}
-            onClick={() => setStaffFilter('personal')}
-            className={`px-4 py-2 rounded-full text-xs font-black shadow-sm transition ${staffFilter === 'personal' ? 'bg-[#EA580C] text-white' : 'bg-white border border-slate-200 text-slate-500'}`}
+            aria-pressed={staffFilter === 'channels'}
+            onClick={() => setStaffFilter('channels')}
+            className={`px-4 py-2 rounded-full text-xs font-black shadow-sm transition ${staffFilter === 'channels' ? 'bg-[#EA580C] text-white' : 'bg-white border border-slate-200 text-slate-500'}`}
           >
-            Personal
+            Channels
           </button>
         </div>
       )}
@@ -487,7 +500,15 @@ const GroupsSection: React.FC<SectionProps> = ({ data, isAdmin, reload, addToast
         </div>
       )}
 
-      {staffFilter === 'groups' && data.groups.length === 0 && (
+      {staffFilter === 'channels' && data.groups.filter((g) => g.kind === 'tos_channel').length === 0 && (
+        <div className="bg-white rounded-2xl p-8 border border-slate-200 text-center space-y-1.5">
+          <Megaphone className="w-7 h-7 text-slate-300 mx-auto" />
+          <p className="text-sm font-black text-slate-800">No channels for you yet</p>
+          <p className="text-xs text-slate-500 font-medium">Channels are posted by TOS. Yours will appear here.</p>
+        </div>
+      )}
+
+      {staffFilter === 'groups' && data.groups.filter((g) => g.kind !== 'personal' && g.kind !== 'tos_channel').length === 0 && (
         <div className="bg-white rounded-2xl p-8 border border-slate-200 text-center space-y-1.5">
           <Users className="w-7 h-7 text-slate-300 mx-auto" />
           <p className="text-sm font-black text-slate-800">No groups yet</p>
@@ -497,8 +518,10 @@ const GroupsSection: React.FC<SectionProps> = ({ data, isAdmin, reload, addToast
         </div>
       )}
 
-      {(staffFilter === 'groups'
-        ? data.groups.filter((g) => g.kind !== 'personal')
+      {(staffFilter === 'channels'
+        ? data.groups.filter((g) => g.kind === 'tos_channel')
+        : staffFilter === 'groups'
+        ? data.groups.filter((g) => g.kind !== 'personal' && g.kind !== 'tos_channel')
         : data.personalChats || []
       ).map((g) => (
         <div
@@ -857,6 +880,8 @@ interface ThreadMsg {
   forwardedFrom?: string | null;
   replyTo?: { id: string; username: string; excerpt: string } | null;
   reactions?: Record<string, string> | null;
+  pending?: boolean;
+  localUrl?: string;
 }
 
 function roleChip(role: string): string {
@@ -882,9 +907,10 @@ const ThreadPanel: React.FC<{
   centreId: string;
   messageMaxChars: number;
   photosAllowed: boolean;
+  forwardOptions?: { id: string; name: string; kind: string }[];
   addToast: (msg: string, kind?: string) => void;
   onBack: () => void;
-}> = ({ group, centreId, messageMaxChars, photosAllowed, addToast, onBack }) => {
+}> = ({ group, centreId, messageMaxChars, photosAllowed, forwardOptions, addToast, onBack }) => {
   const [messages, setMessages] = useState<ThreadMsg[] | null>(() => threadCache.get(group.id) || null);
   const [text, setText] = useState('');
   const [attachPreview, setAttachPreview] = useState('');
@@ -897,6 +923,12 @@ const ThreadPanel: React.FC<{
   const [flagTarget, setFlagTarget] = useState<ThreadMsg | null>(null);
   const [flagReason, setFlagReason] = useState('');
   const [sendingFlag, setSendingFlag] = useState(false);
+  // Day separators, the full-screen photo viewer, the delete confirmation and
+  // forwarding all work the same way they do in the student chat.
+  const [imageViewerUrl, setImageViewerUrl] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState<ThreadMsg | null>(null);
+  const [forwardTarget, setForwardTarget] = useState<ThreadMsg | null>(null);
+  const [forwarding, setForwarding] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -918,6 +950,34 @@ const ThreadPanel: React.FC<{
 
   // Newest message sits at the bottom of the conversation, like any chat app.
   const shown = [...(messages || [])].sort((a, b) => a.at - b.at);
+
+  const dayKey = (at: number): string => {
+    const d = new Date(at);
+    return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+  };
+  const daySeparatorLabel = (at: number, prevAt: number | null): string | null => {
+    if (prevAt != null && dayKey(at) === dayKey(prevAt)) return null;
+    const d = new Date(at);
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const that = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    const diffDays = Math.round((today - that) / 86400000);
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
+    return d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  };
+  // Messages grouped per day so each date separator sticks inside its own day
+  // block instead of the whole scroll area.
+  const dayGroups = (list: ThreadMsg[]): Array<{ key: string; label: string | null; msgs: ThreadMsg[] }> => {
+    const groups: Array<{ key: string; label: string | null; msgs: ThreadMsg[] }> = [];
+    list.forEach((m, i) => {
+      const label = daySeparatorLabel(m.at, i > 0 ? list[i - 1].at : null);
+      if (label) groups.push({ key: label + '-' + i, label, msgs: [] });
+      if (groups.length) groups[groups.length - 1].msgs.push(m);
+      else groups.push({ key: 'open', label: null, msgs: [m] });
+    });
+    return groups;
+  };
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
@@ -926,24 +986,45 @@ const ThreadPanel: React.FC<{
   const send = async () => {
     if (busy) return;
     const value = text.trim();
-    if (!value && !attachPreview) return;
+    const preview = attachPreview;
+    const rt = replyTo;
+    if (!value && !preview) return;
     setBusy(true);
+    // The message shows in the room straight away, photo included, and the
+    // upload happens behind its pending bubble.
+    const penId = `pending-${Date.now()}`;
+    const pen: ThreadMsg = {
+      id: penId,
+      uid: '',
+      username: '',
+      role: '',
+      text: value,
+      photoUrl: preview || null,
+      at: Date.now(),
+      removed: false,
+      mine: true,
+      pending: true,
+      localUrl: preview || undefined,
+    };
+    setMessages((prev) => [...(prev || []), pen]);
+    setText('');
+    setAttachPreview('');
+    setReplyTo(null);
     try {
       let photoUrl: string | undefined;
-      if (attachPreview) {
-        const res = await api(`/api/centre/chat/photo?centreId=${encodeURIComponent(centreId)}`, { method: 'POST', body: { dataUrl: attachPreview } });
+      if (preview) {
+        const res = await api(`/api/centre/chat/photo?centreId=${encodeURIComponent(centreId)}`, { method: 'POST', body: { dataUrl: preview } });
         photoUrl = String(res?.url || '');
         if (!photoUrl) throw new Error('The photo could not be uploaded.');
       }
       await api(`/api/centre/chat/groups/${group.id}/messages?centreId=${encodeURIComponent(centreId)}`, {
         method: 'POST',
-        body: { text: value, photoUrl, replyTo: replyTo ? replyTo.id : undefined },
+        body: { text: value, photoUrl, replyTo: rt ? rt.id : undefined },
       });
-      setText('');
-      setAttachPreview('');
-      setReplyTo(null);
+      setMessages((prev) => (prev || []).filter((x) => x.id !== penId));
       await load();
     } catch (e: any) {
+      setMessages((prev) => (prev || []).filter((x) => x.id !== penId));
       addToast(String(e?.message || 'The message could not be sent.'), 'error');
     } finally {
       setBusy(false);
@@ -1021,6 +1102,23 @@ const ThreadPanel: React.FC<{
     addToast(ok ? 'Copied' : 'Could not copy on this device', ok ? 'success' : 'error');
   };
 
+  const doForward = async (toId: string) => {
+    if (!forwardTarget || forwarding) return;
+    setForwarding(true);
+    try {
+      await api('/api/centre/chat/forward', {
+        method: 'POST',
+        body: { centreId, fromGroupId: group.id, toGroupId: toId, msgId: forwardTarget.id },
+      });
+      addToast('Forwarded', 'success');
+      setForwardTarget(null);
+    } catch (e: any) {
+      addToast(String(e?.message || 'The message could not be forwarded. Try again.'), 'error');
+    } finally {
+      setForwarding(false);
+    }
+  };
+
   // Same shell as the student room: a fixed screen with the header and the
   // composer both pinned, and only the messages scroll between them.
   return (
@@ -1048,9 +1146,22 @@ const ThreadPanel: React.FC<{
         {messages !== null && messages.length === 0 && (
           <p className="text-center text-xs text-slate-400 font-medium py-8">No messages yet. Send the first one.</p>
         )}
-        {shown.map((m) => {
+        {/* Each day gets its own wrapper so its sticky separator releases
+            when the next day scrolls up, exactly like the student chat. */}
+        {dayGroups(shown).map((g) => (
+          <div key={g.key}>
+            {g.label && (
+              <div className="sticky top-0 z-20 flex justify-center py-1">
+                <span className="bg-slate-900/85 text-white text-[10px] font-bold px-3 py-1 rounded-full shadow">
+                  {g.label}
+                </span>
+              </div>
+            )}
+            {g.msgs.map((m) => {
           const press = makeLongPress(() => { if (!m.removed) setActionMsg(m); });
           const emojiOnly = !m.removed && !!m.text && isEmojiOnly(m.text);
+          const mediaUrl = m.localUrl || m.photoUrl || null;
+          const uploading = !!m.pending && !mediaUrl?.startsWith('data:');
           return (
           <div key={m.id} className={`flex flex-col ${m.mine ? 'items-end' : 'items-start'}`}>
             <div className="flex items-center gap-1.5 mb-0.5">
@@ -1061,8 +1172,19 @@ const ThreadPanel: React.FC<{
             {m.forwardedFrom && (
               <p className={`text-[9px] font-bold italic ${m.mine ? 'text-orange-100' : 'text-slate-400'}`}>Forwarded from {m.forwardedFrom}</p>
             )}
-            {!m.removed && m.photoUrl && (
-              <img src={m.photoUrl} alt="Shared photo" className="rounded-xl max-h-60 w-auto" />
+            {!m.removed && mediaUrl && (
+              <span
+                {...press}
+                className="relative block rounded-xl overflow-hidden w-44 h-64 bg-slate-100 cursor-pointer"
+                onClick={() => { if (!m.pending) setImageViewerUrl(mediaUrl as string); }}
+              >
+                <img src={mediaUrl as string} alt="Shared photo" className={`w-full h-full object-cover block ${m.pending ? 'opacity-70' : ''}`} />
+                {uploading && (
+                  <span className="absolute inset-0 bg-black/45 flex items-center justify-center">
+                    <Loader2 className="w-6 h-6 animate-spin text-white" />
+                  </span>
+                )}
+              </span>
             )}
             <div
               {...press}
@@ -1074,7 +1196,13 @@ const ThreadPanel: React.FC<{
                   <p className={`text-[10px] truncate ${m.mine ? 'text-orange-100/80' : 'text-slate-500'}`}>{m.replyTo.excerpt}</p>
                 </div>
               )}
-              {m.removed ? <span className="italic opacity-70">Message removed</span> : emojiOnly ? <span className="block text-2xl leading-snug whitespace-pre-wrap">{m.text}</span> : <EmojiText text={m.text} mine={m.mine && !emojiOnly} className="whitespace-pre-wrap break-words" />}
+              {m.removed ? <span className="italic opacity-70">Message removed</span> : emojiOnly ? <span className="block text-3xl leading-snug whitespace-pre-wrap break-words">{m.text}</span> : <EmojiText text={m.text} mine={m.mine && !emojiOnly} className="whitespace-pre-wrap break-words" />}
+              {m.pending && (
+                <span className="flex items-center gap-1 justify-end mt-0.5">
+                  <Loader2 className="w-3 h-3 animate-spin opacity-70" />
+                  <span className={`text-[9px] font-bold ${m.mine ? 'text-orange-100' : 'text-slate-400'}`}>Sending</span>
+                </span>
+              )}
             </div>
             {!m.removed && (
               <ReactionChips reactions={m.reactions} mineUid={myUid} onToggle={(emoji) => doReact(m, emoji)} />
@@ -1082,9 +1210,16 @@ const ThreadPanel: React.FC<{
           </div>
           );
         })}
+          </div>
+        ))}
       </div>
 
-      <div className="relative shrink-0 bg-white border-t border-slate-200 p-3 flex items-end gap-2">
+      {group.kind === 'tos_channel' && (
+        <div className="shrink-0 px-4 py-3 bg-amber-50 border-t border-amber-100">
+          <p className="text-[11px] font-bold text-amber-800">Only TOS can post in this channel. Long-press any post to react or reply.</p>
+        </div>
+      )}
+      <div className={`relative shrink-0 bg-white border-t border-slate-200 p-3 items-end gap-2 ${group.kind === 'tos_channel' ? 'hidden' : 'flex'}`}>
         {attachPreview && (
           <div className="absolute bottom-full left-3 right-3 mb-1 flex items-center gap-2 rounded-xl bg-slate-50 border border-slate-200 px-2 py-1.5">
             <img src={attachPreview} alt="Photo to send" className="w-10 h-10 rounded-lg object-cover" />
@@ -1146,10 +1281,69 @@ const ThreadPanel: React.FC<{
           onClose={() => setActionMsg(null)}
           onReact={(emoji) => doReact(actionMsg, emoji)}
           onReply={() => setReplyTo(actionMsg)}
-          onDelete={() => doDelete(actionMsg)}
+          onDelete={() => setConfirmDelete(actionMsg)}
+          onForward={forwardOptions && forwardOptions.length > 0 ? () => setForwardTarget(actionMsg) : undefined}
           onCopy={actionMsg.text ? () => doCopy(actionMsg) : undefined}
           onReport={!actionMsg.removed && !actionMsg.mine ? () => setFlagTarget(actionMsg) : undefined}
         />
+      )}
+
+      {confirmDelete && (
+        <div className="fixed inset-0 z-[60] bg-slate-950/50 flex items-center justify-center p-6" onClick={() => setConfirmDelete(null)}>
+          <div className="w-full max-w-sm bg-white rounded-3xl p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+            <p className="text-base font-black text-slate-900 text-center">Delete this message?</p>
+            <p className="text-xs text-slate-500 text-center font-medium">It will be removed for everyone in this chat.</p>
+            <div className="grid grid-cols-2 gap-3">
+              <button onClick={() => setConfirmDelete(null)} className="py-3 rounded-2xl bg-slate-100 text-slate-600 text-sm font-black active:scale-[0.98] transition">Cancel</button>
+              <button
+                onClick={() => { const m = confirmDelete; setConfirmDelete(null); if (m) doDelete(m); }}
+                className="py-3 rounded-2xl bg-rose-600 text-white text-sm font-black active:scale-[0.98] transition"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {forwardTarget && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex flex-col justify-end" onClick={() => { if (!forwarding) setForwardTarget(null); }}>
+          <div className="bg-white rounded-t-3xl max-h-[70vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="sticky top-0 bg-white rounded-t-3xl border-b border-slate-100 px-5 pt-4 pb-3 flex items-center justify-between">
+              <h2 className="text-base font-black text-slate-900">Forward to</h2>
+              <button onClick={() => setForwardTarget(null)} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500" aria-label="Close">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="px-5 py-4 space-y-2">
+              {(forwardOptions || []).filter((o) => o.id !== group.id).map((o) => (
+                <button
+                  key={o.id}
+                  onClick={() => doForward(o.id)}
+                  disabled={forwarding}
+                  className="w-full flex items-center gap-3 bg-white border border-slate-200 rounded-2xl px-3.5 py-2.5 active:scale-[0.99] transition disabled:opacity-50 text-left"
+                >
+                  <span className="w-9 h-9 rounded-xl bg-orange-50 border border-orange-100 text-[#EA580C] flex items-center justify-center shrink-0">
+                    {o.kind === 'personal' ? <User className="w-4 h-4" /> : <MessageSquare className="w-4 h-4" />}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-black text-slate-900 truncate">{o.name}</span>
+                    <span className="block text-[10px] text-slate-400 font-medium">{o.kind === 'personal' ? 'Personal chat' : kindLabel(o.kind)}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {imageViewerUrl && (
+        <div className="fixed inset-0 z-[70] bg-black/95 flex items-center justify-center">
+          <button onClick={() => setImageViewerUrl('')} className="absolute top-4 left-4 w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white" aria-label="Close photo">
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <img src={imageViewerUrl} alt="Photo" className="max-w-full max-h-full object-contain" />
+        </div>
       )}
 
       {flagTarget && (
@@ -1224,6 +1418,15 @@ const StaffNewChatSheet: React.FC<{
   const [directory, setDirectory] = useState<{ students: StaffDirectoryEntry[]; staff: StaffDirectoryEntry[] } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [search, setSearch] = useState('');
+
+  const initials = (name: string): string =>
+    name.trim().split(/\s+/).slice(0, 2).map((w) => (w[0] || '').toUpperCase()).join('') || '?';
+  const matches = (label: string): boolean => {
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    return label.toLowerCase().includes(q);
+  };
 
   useEffect(() => {
     let alive = true;
@@ -1269,30 +1472,42 @@ const StaffNewChatSheet: React.FC<{
           {error && <p className="text-[11px] font-bold text-rose-600 bg-rose-50 rounded-xl px-3 py-2">{error}</p>}
           {directory && (
             <>
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search name or username"
+                className="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-sm font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-orange-300"
+              />
               {directory.students.length === 0 && directory.staff.length === 0 && (
                 <p className="text-[11px] text-slate-400 font-medium">No one to chat with yet.</p>
               )}
-              {directory.students.length > 0 && (
+              {directory.students.filter((s) => matches(`${s.name || ''} ${s.username || ''}`)).length > 0 && (
                 <div>
                   <p className="text-[11px] font-black uppercase tracking-wider text-slate-400 mb-1.5">Students</p>
                   <div className="space-y-2">
-                    {directory.students.map((s) => (
-                      <button key={s.uid} onClick={() => openWith(s.uid)} disabled={busy} className="w-full text-left bg-white border border-slate-200 rounded-2xl px-3.5 py-2.5 active:scale-[0.99] transition disabled:opacity-50">
-                        <p className="text-sm font-black text-slate-900 truncate">{s.username}</p>
-                        <p className="text-[10px] text-slate-400 font-medium">Student</p>
+                    {directory.students.filter((s) => matches(`${s.name || ''} ${s.username || ''}`)).map((s) => (
+                      <button key={s.uid} onClick={() => openWith(s.uid)} disabled={busy} className="w-full flex items-center gap-3 text-left bg-white border border-slate-200 rounded-2xl px-3.5 py-2.5 active:scale-[0.99] transition disabled:opacity-50">
+                        <span className="w-10 h-10 rounded-full bg-orange-50 border border-orange-100 text-[#EA580C] flex items-center justify-center text-xs font-black shrink-0">{initials(s.name || s.username || '?')}</span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-sm font-black text-slate-900 truncate">{s.name || s.username}</span>
+                          <span className="block text-[10px] text-slate-400 font-medium">Student · {s.username}</span>
+                        </span>
                       </button>
                     ))}
                   </div>
                 </div>
               )}
-              {directory.staff.length > 0 && (
+              {directory.staff.filter((st) => matches(st.name || '')).length > 0 && (
                 <div>
                   <p className="text-[11px] font-black uppercase tracking-wider text-slate-400 mb-1.5">Staff</p>
                   <div className="space-y-2">
-                    {directory.staff.map((st) => (
-                      <button key={st.uid} onClick={() => openWith(st.uid)} disabled={busy} className="w-full text-left bg-white border border-slate-200 rounded-2xl px-3.5 py-2.5 active:scale-[0.99] transition disabled:opacity-50">
-                        <p className="text-sm font-black text-slate-900 truncate">{st.name}</p>
-                        <p className="text-[10px] text-slate-400 font-medium">Staff</p>
+                    {directory.staff.filter((st) => matches(st.name || '')).map((st) => (
+                      <button key={st.uid} onClick={() => openWith(st.uid)} disabled={busy} className="w-full flex items-center gap-3 text-left bg-white border border-slate-200 rounded-2xl px-3.5 py-2.5 active:scale-[0.99] transition disabled:opacity-50">
+                        <span className="w-10 h-10 rounded-full bg-violet-50 border border-violet-100 text-violet-600 flex items-center justify-center text-xs font-black shrink-0">{initials(st.name || '?')}</span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-sm font-black text-slate-900 truncate">{st.name}</span>
+                          <span className="block text-[10px] text-slate-400 font-medium">{st.role === 'admin' ? 'Centre admin' : 'Tutor'}</span>
+                        </span>
                       </button>
                     ))}
                   </div>

@@ -111,7 +111,9 @@ const ChannelTab: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
   const [actionMsg, setActionMsg] = useState<ChannelMessage | null>(null);
   const [replyTo, setReplyTo] = useState<ChannelMessage | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
-  const [channels, setChannels] = useState<{ id: string; name: string; commentsEnabled?: boolean }[]>([]);
+  const [channels, setChannels] = useState<{ id: string; name: string; commentsEnabled?: boolean; audience?: string }[]>([]);
+  const [createAudience, setCreateAudience] = useState<string>('students');
+  const [editAudience, setEditAudience] = useState<string>('students');
   const [newName, setNewName] = useState('');
   const [createComments, setCreateComments] = useState(false);
   const [editName, setEditName] = useState('');
@@ -138,7 +140,7 @@ const ChannelTab: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
   const load = useCallback(async () => {
     try {
       const list: Json = await api('/api/tos/chat/channel/list');
-      const chans = list && (list as any).ok ? ((list as any).channels as { id: string; name: string; commentsEnabled?: boolean }[]) : [];
+      const chans = list && (list as any).ok ? ((list as any).channels as { id: string; name: string; commentsEnabled?: boolean; audience?: string }[]) : [];
       setChannels(chans);
       const cachedId = lastChannelState?.channel?.id;
       const wanted = (cachedId && chans.some((c) => c.id === cachedId)) ? cachedId : (chans[0]?.id || '');
@@ -160,6 +162,7 @@ const ChannelTab: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
     const ch = (state?.channel as any) || null;
     setEditName(ch ? String(ch.name || '') : '');
     setEditComments(ch ? ch.commentsEnabled === true : false);
+    setEditAudience(ch && ch.audience === 'tutors' ? 'tutors' : ch && ch.audience === 'centre_admins' ? 'centre_admins' : 'students');
   }, [state?.channel?.id, (state?.channel as any)?.commentsEnabled]);
 
   const saveChannel = async () => {
@@ -170,7 +173,7 @@ const ChannelTab: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
     setSavingChannel(true);
     setError('');
     try {
-      const r: Json = await api('/api/tos/chat/channel/update', { method: 'POST', body: { channelId: id, name, commentsEnabled: editComments } });
+      const r: Json = await api('/api/tos/chat/channel/update', { method: 'POST', body: { channelId: id, name, commentsEnabled: editComments, audience: editAudience } });
       if (r && r.ok) { await load(); onChanged(); }
       else setError((r && (r as any).error) || 'Could not save the channel.');
     } catch (e: any) {
@@ -189,13 +192,21 @@ const ChannelTab: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
     if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
   }, [state?.messages.length]);
 
+  const audienceOptions = (
+    <>
+      <option value="students">Students</option>
+      <option value="tutors">Tutors</option>
+      <option value="centre_admins">Centre admins</option>
+    </>
+  );
+
   const createChannel = async () => {
     setBusy(true);
     setError('');
     try {
       const name = newName.trim();
       if (!name) { setError('Type a channel name first.'); return; }
-      const r: Json = await api('/api/tos/chat/channel/create', { method: 'POST', body: { name, commentsEnabled: createComments } });
+      const r: Json = await api('/api/tos/chat/channel/create', { method: 'POST', body: { name, commentsEnabled: createComments, audience: createAudience } });
       if (r && r.ok) { setNewName(''); setCreateComments(false); await load(); onChanged(); }
       else setError((r && (r as any).error) || 'Could not create the channel.');
     } catch (e: any) {
@@ -271,7 +282,7 @@ const ChannelTab: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
           <div className="w-9 h-9 rounded-xl bg-orange-500/15 flex items-center justify-center shrink-0"><Megaphone className="w-4.5 h-4.5 text-orange-300" /></div>
           <div className="min-w-0 flex-1">
             <p className="text-sm font-bold text-slate-100">No channels yet</p>
-            <p className="text-xs text-slate-400 mt-1">Channels reach every centre's students and admins. Students read only. Create as many as you need, each with its own name.</p>
+            <p className="text-xs text-slate-400 mt-1">Each channel reaches one audience: students, tutors or centre admins. Only TOS posts; that audience reads. Create as many as you need.</p>
             <div className="mt-3 flex gap-2">
               <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Channel name, e.g. Mock and Practice" className="flex-1 min-w-0 bg-slate-950/60 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:border-orange-400/60 focus:outline-none" />
               <button onClick={createChannel} disabled={busy} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-50 shrink-0">
@@ -293,7 +304,7 @@ const ChannelTab: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
             <p className="text-sm font-bold text-slate-100">{state.channel.name}</p>
             <button onClick={load} className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold text-slate-300 border border-white/10 hover:border-white/25"><RefreshCw className="w-3.5 h-3.5" /> Refresh</button>
           </div>
-          <p className="text-xs text-slate-400">Channels are visible to every centre; students read only.</p>
+          <p className="text-xs text-slate-400">Each channel reaches one audience (students, tutors or centre admins). Only TOS posts.</p>
           {channels.length > 0 && (
             <div className="flex gap-2 overflow-x-auto pb-1">
               {channels.map((c) => (
@@ -301,25 +312,36 @@ const ChannelTab: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
                   key={c.id}
                   onClick={() => selectChannel(c.id)}
                   className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-bold border ${state.channel && state.channel.id === c.id ? 'bg-orange-500 text-white border-orange-500' : 'text-slate-300 border-white/10 hover:border-white/25'}`}
-                >{c.name}</button>
+                >
+                  {c.name}
+                  <span className={`ml-1.5 text-[9px] font-black uppercase tracking-wider ${state.channel && state.channel.id === c.id ? 'text-orange-100' : 'text-slate-500'}`}>
+                    {c.audience === 'tutors' ? 'Tutors' : c.audience === 'centre_admins' ? 'Admins' : 'Students'}
+                  </span>
+                </button>
               ))}
             </div>
           )}
           <div className="flex gap-2">
             <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="New channel name" className="flex-1 min-w-0 bg-slate-950/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder:text-slate-500 focus:border-orange-400/60 focus:outline-none" />
+            <select value={createAudience} onChange={(e) => setCreateAudience(e.target.value)} className="shrink-0 bg-slate-950/60 border border-white/10 rounded-xl px-2 py-2 text-xs text-slate-100 focus:outline-none" aria-label="Who this channel reaches">
+              {audienceOptions}
+            </select>
             <button onClick={createChannel} disabled={busy || !newName.trim()} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-orange-500 text-white disabled:opacity-50 shrink-0">
               {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />} Add channel
             </button>
           </div>
           <label className="flex items-center gap-2 text-xs text-slate-300 font-medium cursor-pointer select-none w-fit">
             <input type="checkbox" checked={createComments} onChange={(e) => setCreateComments(e.target.checked)} className="accent-orange-500 w-4 h-4" />
-            New channel: allow comments (students can reply to posts)
+            New channel: allow comments on posts
           </label>
 
           <div className="rounded-xl border border-white/10 bg-slate-950/40 p-3 space-y-2">
             <p className="text-xs font-bold text-slate-200">Edit this channel</p>
             <div className="flex gap-2">
               <input value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="Channel name" className="flex-1 min-w-0 bg-slate-950/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder:text-slate-500 focus:border-orange-400/60 focus:outline-none" />
+              <select value={editAudience} onChange={(e) => setEditAudience(e.target.value)} className="shrink-0 bg-slate-950/60 border border-white/10 rounded-xl px-2 py-2 text-xs text-slate-100 focus:outline-none" aria-label="Who this channel reaches">
+                {audienceOptions}
+              </select>
               <button onClick={saveChannel} disabled={savingChannel} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-orange-500 text-white disabled:opacity-50 shrink-0">
                 {savingChannel ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null} Save
               </button>
