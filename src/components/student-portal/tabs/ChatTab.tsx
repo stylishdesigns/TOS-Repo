@@ -560,7 +560,13 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
                     : 'bg-orange-50 border-orange-100 text-[#EA580C]'
             }`}
           >
-            {g.locked ? <Lock className="w-5 h-5" /> : groupIcon(g.kind, 'w-5 h-5')}
+            {g.locked ? <Lock className="w-5 h-5" /> : g.kind === 'personal' ? (
+              g.peerAvatar ? (
+                <img src={g.peerAvatar} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              ) : (
+                <span className="text-xs font-black">{initialsOf(g.name) || <User className="w-5 h-5" />}</span>
+              )
+            ) : groupIcon(g.kind, 'w-5 h-5')}
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5">

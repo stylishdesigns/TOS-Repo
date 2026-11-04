@@ -2126,8 +2126,8 @@ function emailPrefixOf(email: unknown): string {
 /** Names and usernames for a batch of uids, from the students, admins and
  *  tutors collections. When a staff record carries no name, the email
  *  prefix travels along so screens never fall back to a generic label. */
-async function statusNamesFor(uids: string[]): Promise<Map<string, { name: string; username: string; emailPrefix: string }>> {
-  const out = new Map<string, { name: string; username: string; emailPrefix: string }>();
+async function statusNamesFor(uids: string[]): Promise<Map<string, { name: string; username: string; emailPrefix: string; avatar?: string; role?: string }>> {
+  const out = new Map<string, { name: string; username: string; emailPrefix: string; avatar?: string; role?: string }>();
   const unresolved = new Set<string>(uids.map((u) => cleanStr(u, 64)).filter(Boolean));
   const chunks: string[][] = [];
   const all = [...unresolved];
@@ -2137,7 +2137,7 @@ async function statusNamesFor(uids: string[]): Promise<Map<string, { name: strin
     stuList.forEach((d) => {
       const v = d.data() as any;
       const uid = cleanStr(v.uid, 64);
-      if (uid) { out.set(uid, { name: cleanStr(v.name, MAX_NAME_CHARS), username: '', emailPrefix: '' }); unresolved.delete(uid); }
+      if (uid) { out.set(uid, { name: cleanStr(v.name, MAX_NAME_CHARS), username: '', emailPrefix: '', avatar: cleanStr(v.avatar, 400), role: 'student' }); unresolved.delete(uid); }
     });
     const userList = await adminDb.collection('usernames').where('studentId', 'in', part).get();
     userList.forEach((d) => {
@@ -2156,7 +2156,7 @@ async function statusNamesFor(uids: string[]): Promise<Map<string, { name: strin
       const v = d.data() as any;
       const uid = cleanStr(v.uid, 64) || cleanStr(d.id, 64);
       if (uid) {
-        out.set(uid, { name: cleanStr(v.name || v.displayName || v.fullName, MAX_NAME_CHARS), username: '', emailPrefix: emailPrefixOf(v.email) });
+        out.set(uid, { name: cleanStr(v.name || v.displayName || v.fullName, MAX_NAME_CHARS), username: '', emailPrefix: emailPrefixOf(v.email), avatar: cleanStr(v.avatar || v.photoUrl, 400), role: 'admin' });
         unresolved.delete(uid);
       }
     });
@@ -2168,7 +2168,7 @@ async function statusNamesFor(uids: string[]): Promise<Map<string, { name: strin
         const doc = await adminDb.collection('admins').doc(uid).get();
         if (doc.exists) {
           const v = doc.data() as any;
-          out.set(uid, { name: cleanStr(v?.name || v?.displayName || v?.fullName, MAX_NAME_CHARS), username: '', emailPrefix: emailPrefixOf(v?.email) });
+          out.set(uid, { name: cleanStr(v?.name || v?.displayName || v?.fullName, MAX_NAME_CHARS), username: '', emailPrefix: emailPrefixOf(v?.email), avatar: cleanStr(v?.avatar || v?.photoUrl, 400), role: 'admin' });
           unresolved.delete(uid);
         }
       } catch { /* keep looking */ }
@@ -2181,7 +2181,7 @@ async function statusNamesFor(uids: string[]): Promise<Map<string, { name: strin
       const v = d.data() as any;
       const uid = cleanStr(v.uid, 64) || cleanStr(d.id, 64);
       if (uid) {
-        out.set(uid, { name: cleanStr(v.name || v.displayName || v.fullName, MAX_NAME_CHARS), username: '', emailPrefix: emailPrefixOf(v.email) });
+        out.set(uid, { name: cleanStr(v.name || v.displayName || v.fullName, MAX_NAME_CHARS), username: '', emailPrefix: emailPrefixOf(v.email), avatar: cleanStr(v.avatar || v.photoUrl, 400), role: 'tutor' });
         unresolved.delete(uid);
       }
     });
@@ -2191,7 +2191,7 @@ async function statusNamesFor(uids: string[]): Promise<Map<string, { name: strin
         const doc = await adminDb.collection('tutors').doc(uid).get();
         if (doc.exists) {
           const v = doc.data() as any;
-          out.set(uid, { name: cleanStr(v?.name || v?.displayName || v?.fullName, MAX_NAME_CHARS), username: '', emailPrefix: emailPrefixOf(v?.email) });
+          out.set(uid, { name: cleanStr(v?.name || v?.displayName || v?.fullName, MAX_NAME_CHARS), username: '', emailPrefix: emailPrefixOf(v?.email), avatar: cleanStr(v?.avatar || v?.photoUrl, 400), role: 'tutor' });
           unresolved.delete(uid);
         }
       } catch { /* keep looking */ }
@@ -2222,9 +2222,9 @@ async function chatDirectoryFor(centreId: string, excludeUid: string): Promise<R
   const students = uids
     .filter((u) => u !== excludeUid && (studentMap.get(u)?.username || '') !== '')
     .map((u) => {
-      const info = studentMap.get(u) as { name: string; username: string };
+      const info = studentMap.get(u) as { name: string; username: string; avatar?: string };
       const real = cleanStr(info.name, MAX_NAME_CHARS);
-      return { uid: u, name: real || info.username, username: info.username };
+      return { uid: u, name: real || info.username, username: info.username, avatar: info.avatar || '', role: 'student' };
     })
     .sort((a, b) => a.name.localeCompare(b.name))
     .slice(0, 100);
@@ -2256,6 +2256,7 @@ async function chatDirectoryFor(centreId: string, excludeUid: string): Promise<R
       uid: u,
       name: personDisplayName({ isStudent: false, name: staffMap.get(u)?.name || staffMap.get(u)?.emailPrefix || '', username: '' }),
       role: staffRoles.get(u) || 'tutor',
+      avatar: staffMap.get(u)?.avatar || '',
     }))
     // A person is shown by their real name; never a bare 'Staff'.
     .map((x) => (x.name === 'Staff' ? { ...x, name: 'Staff member' } : x))

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Loader2, MessageCircle, X } from 'lucide-react';
+import { Loader2, MessageCircle, User, X } from 'lucide-react';
 import { api } from '../../tos/tosShared';
 
 // The new-chat sheet for personal (one-to-one) chats. It lists everyone under
@@ -7,8 +7,8 @@ import { api } from '../../tos/tosShared';
 // name and a Chat button. The server enforces every rule; this sheet only
 // shows what it returns.
 
-interface StudentEntry { uid: string; name: string; username?: string }
-interface StaffEntry { uid: string; name: string; role?: string }
+interface StudentEntry { uid: string; name: string; username?: string; avatar?: string }
+interface StaffEntry { uid: string; name: string; role?: string; avatar?: string }
 
 export const PersonalNewChatSheet: React.FC<{
   onClose: () => void;
@@ -77,6 +77,11 @@ export const PersonalNewChatSheet: React.FC<{
               )}
               {directory.students.map((s) => (
                 <div key={s.uid} className="flex items-center gap-3 bg-white border border-slate-200 rounded-2xl px-3.5 py-2.5">
+                  <span className="w-10 h-10 rounded-full bg-orange-50 border border-orange-100 text-[#EA580C] flex items-center justify-center text-xs font-black shrink-0 overflow-hidden">
+                    {s.avatar
+                      ? <img src={s.avatar} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      : ((s.name || '').trim().split(/\s+/).slice(0, 2).map((w) => (w[0] || '').toUpperCase()).join('') || <User className="w-5 h-5" />)}
+                  </span>
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-black text-slate-900 truncate">{s.name}</p>
                     <p className="text-[10px] text-slate-400 font-medium">Student</p>
@@ -93,6 +98,11 @@ export const PersonalNewChatSheet: React.FC<{
               ))}
               {directory.staff.map((s) => (
                 <div key={s.uid} className="flex items-center gap-3 bg-white border border-slate-200 rounded-2xl px-3.5 py-2.5">
+                  <span className="w-10 h-10 rounded-full bg-violet-50 border border-violet-100 text-violet-600 flex items-center justify-center text-xs font-black shrink-0 overflow-hidden">
+                    {s.avatar
+                      ? <img src={s.avatar} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      : ((s.name || '').trim().split(/\s+/).slice(0, 2).map((w) => (w[0] || '').toUpperCase()).join('') || <User className="w-5 h-5" />)}
+                  </span>
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-black text-slate-900 truncate">
                       {s.name}

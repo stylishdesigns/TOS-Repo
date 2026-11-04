@@ -14,6 +14,7 @@ import {
   Megaphone,
   MessageSquare,
   Play,
+  Pause,
   Plus,
   Send,
   ShieldAlert,
@@ -576,7 +577,7 @@ const GroupsSection: React.FC<SectionProps> = ({ data, isAdmin, reload, addToast
             <div className="flex items-start gap-3">
               {g.kind === 'personal' ? (
                 <span className="w-10 h-10 rounded-full bg-orange-50 border border-orange-100 text-[#EA580C] flex items-center justify-center text-xs font-black overflow-hidden shrink-0">
-                  {g.peerAvatar ? <img src={g.peerAvatar} alt="" className="w-full h-full object-cover" /> : initialsOf(g.name)}
+                  {g.peerAvatar ? <img src={g.peerAvatar} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" /> : (initialsOf(g.name) || <User className="w-5 h-5" />)}
                 </span>
               ) : (
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${
@@ -902,6 +903,7 @@ interface ThreadMsg {
   pending?: boolean;
   localUrl?: string;
   progress?: number;
+  status?: 'sent' | 'delivered' | 'seen';
 }
 
 /** What a chat attachment is, from its file type: image, video or document. */
@@ -960,6 +962,7 @@ const ThreadPanel: React.FC<{
   const [attachProgress, setAttachProgress] = useState(0);
   const [attachSheet, setAttachSheet] = useState(false);
   const [videoViewerUrl, setVideoViewerUrl] = useState('');
+  const [videoPaused, setVideoPaused] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [canLoadEarlier, setCanLoadEarlier] = useState(true);
@@ -1054,7 +1057,18 @@ const ThreadPanel: React.FC<{
     });
     return groups;
   };
+  const followRef = useRef(true);
   useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const stick = () => {
+      followRef.current = el.scrollTop + el.clientHeight >= el.scrollHeight - 90;
+    };
+    el.addEventListener('scroll', stick, { passive: true });
+    return () => el.removeEventListener('scroll', stick);
+  }, []);
+  useEffect(() => {
+    if (!followRef.current) return;
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages]);
@@ -1278,7 +1292,7 @@ const ThreadPanel: React.FC<{
         <div className="flex-1 min-w-0 flex items-center gap-2.5">
           {group.kind === 'personal' && (
             <span className="w-8 h-8 rounded-full bg-white/20 text-white flex items-center justify-center text-[11px] font-black overflow-hidden shrink-0">
-              {group.peerAvatar ? <img src={group.peerAvatar} alt="" className="w-full h-full object-cover" /> : initialsOf(group.name)}
+              {group.peerAvatar ? <img src={group.peerAvatar} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" /> : (initialsOf(group.name) || <User className="w-5 h-5" />)}
             </span>
           )}
           <p className="text-sm font-black text-white truncate">{group.name}</p>
@@ -1556,7 +1570,7 @@ const ThreadPanel: React.FC<{
                 <>
                   <div className="flex items-center gap-3">
                     <span className="w-12 h-12 rounded-full bg-orange-50 border border-orange-100 text-[#EA580C] flex items-center justify-center text-sm font-black overflow-hidden shrink-0">
-                      {group.peerAvatar ? <img src={group.peerAvatar} alt="" className="w-full h-full object-cover" /> : initialsOf(group.name)}
+                      {group.peerAvatar ? <img src={group.peerAvatar} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" /> : (initialsOf(group.name) || <User className="w-5 h-5" />)}
                     </span>
                     <div className="min-w-0">
                       <p className="text-sm font-black text-slate-900 truncate">{group.name}</p>
@@ -1599,6 +1613,8 @@ const ThreadPanel: React.FC<{
             playsInline
             autoPlay
             onCanPlay={() => { const v = viewerVideoRef.current; if (v && v.paused) v.play().catch(() => undefined); }}
+            onPlay={() => setVideoPaused(false)}
+            onPause={() => setVideoPaused(true)}
             className="max-h-[70vh] max-w-full rounded-xl"
           />
           <button
@@ -1606,9 +1622,10 @@ const ThreadPanel: React.FC<{
               const v = viewerVideoRef.current;
               if (v) { if (v.paused) { v.play().catch(() => {}); } else { v.pause(); } }
             }}
-            className="mt-4 px-5 py-2.5 rounded-xl bg-white/15 text-white text-xs font-black active:scale-95 transition"
+            className="absolute w-16 h-16 rounded-full bg-black/45 border border-white/25 backdrop-blur-sm flex items-center justify-center text-white active:scale-95 transition"
+            aria-label={videoPaused ? 'Play video' : 'Pause video'}
           >
-            Play / Pause
+            {videoPaused ? <Play className="w-7 h-7 ml-1 fill-white" /> : <Pause className="w-7 h-7 fill-white" />}
           </button>
         </div>
       )}
@@ -1746,7 +1763,7 @@ const ThreadPanel: React.FC<{
 // centre is directly chattable; the server rejects anyone outside it.
 // ============================================================================
 
-interface StaffDirectoryEntry { uid: string; username?: string; name?: string }
+interface StaffDirectoryEntry { uid: string; username?: string; name?: string; avatar?: string }
 
 const StaffNewChatSheet: React.FC<{
   centreId: string;
@@ -1759,7 +1776,7 @@ const StaffNewChatSheet: React.FC<{
   const [search, setSearch] = useState('');
 
   const initials = (name: string): string =>
-    name.trim().split(/\s+/).slice(0, 2).map((w) => (w[0] || '').toUpperCase()).join('') || '?';
+    name.trim().split(/\s+/).slice(0, 2).map((w) => (w[0] || '').toUpperCase()).join('');
   const matches = (label: string): boolean => {
     const q = search.trim().toLowerCase();
     if (!q) return true;
@@ -1825,7 +1842,11 @@ const StaffNewChatSheet: React.FC<{
                   <div className="space-y-2">
                     {directory.students.filter((s) => matches(`${s.name || ''} ${s.username || ''}`)).map((s) => (
                       <div key={s.uid} className="flex items-center gap-3 bg-white border border-slate-200 rounded-2xl px-3.5 py-2.5">
-                        <span className="w-10 h-10 rounded-full bg-orange-50 border border-orange-100 text-[#EA580C] flex items-center justify-center text-xs font-black shrink-0">{initials(s.name || s.username || '?')}</span>
+                        <span className="w-10 h-10 rounded-full bg-orange-50 border border-orange-100 text-[#EA580C] flex items-center justify-center text-xs font-black shrink-0 overflow-hidden">
+                          {s.avatar
+                            ? <img src={s.avatar} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                            : (initials(s.name || s.username || '') || <User className="w-5 h-5" />)}
+                        </span>
                         <span className="min-w-0 flex-1">
                           <span className="block text-sm font-black text-slate-900 truncate">{s.name || s.username}</span>
                           <span className="block text-[10px] text-slate-400 font-medium">Student · {s.username}</span>
@@ -1849,7 +1870,11 @@ const StaffNewChatSheet: React.FC<{
                   <div className="space-y-2">
                     {directory.staff.filter((st) => matches(st.name || '')).map((st) => (
                       <div key={st.uid} className="flex items-center gap-3 bg-white border border-slate-200 rounded-2xl px-3.5 py-2.5">
-                        <span className="w-10 h-10 rounded-full bg-violet-50 border border-violet-100 text-violet-600 flex items-center justify-center text-xs font-black shrink-0">{initials(st.name || '?')}</span>
+                        <span className="w-10 h-10 rounded-full bg-violet-50 border border-violet-100 text-violet-600 flex items-center justify-center text-xs font-black shrink-0 overflow-hidden">
+                          {st.avatar
+                            ? <img src={st.avatar} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                            : (initials(st.name || '') || <User className="w-5 h-5" />)}
+                        </span>
                         <span className="min-w-0 flex-1">
                           <span className="block text-sm font-black text-slate-900 truncate">{st.name}</span>
                           <span className="block text-[10px] text-slate-400 font-medium">{st.role === 'admin' ? 'Centre admin' : 'Tutor'}</span>
