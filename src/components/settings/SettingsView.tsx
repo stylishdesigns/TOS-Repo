@@ -61,7 +61,7 @@ export const SettingsView: React.FC = () => {
     state: settings.state,
     phone: settings.phone,
     email: settings.email,
-    whatsapp: settings.whatsappNumber || settings.whatsapp || '+234 805 676 5455',
+    whatsapp: settings.whatsappNumber || settings.whatsapp || '',
     smsNotifications: settings.smsNotifications,
     emailNotifications: settings.emailNotifications,
   });
