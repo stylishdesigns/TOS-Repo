@@ -1052,12 +1052,6 @@ export async function toggleStudentAccessService(params: {
     });
 
     try {
-      await adminAuth.revokeRefreshTokens(studentUid);
-    } catch (err) {
-      console.error('[tenantService] Could not revoke refresh tokens:', err?.message || err);
-    }
-
-    try {
       await adminDb.collection('auditLogs').add({
         actorUid,
         centreId,

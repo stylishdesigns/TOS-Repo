@@ -588,9 +588,11 @@ const MainLayout: React.FC = () => {
             <button onClick={retryCentreEntry} className="px-5 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold transition-colors">
               Try again
             </button>
-            <button onClick={handleLogout} className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-semibold transition-colors">
-              Sign out
-            </button>
+            {!accessBlocked && (
+              <button onClick={handleLogout} className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-semibold transition-colors">
+                Sign out
+              </button>
+            )}
           </div>
         </div>
       );
