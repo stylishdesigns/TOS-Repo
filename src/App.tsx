@@ -96,6 +96,12 @@ const MainLayout: React.FC = () => {
     }
   }, [activeCentreId]);
   const centreEntryKeyRef = useRef<string | null>(null);
+  // What the last failed centre entry said, so the user sees the real reason
+  // (a lockout, an inactive membership, a server hiccup) instead of being
+  // dropped on an access-code screen that asks for the centre all over again.
+  const [centreEntryError, setCentreEntryError] = useState<string | null>(null);
+  const [centreEntryCount, setCentreEntryCount] = useState<number | null>(null);
+  const [centreEntryRetry, setCentreEntryRetry] = useState(0);
   useEffect(() => {
     if (!currentUser || !hasCheckedActiveCentre) return;
     if (activeCentreId) {
@@ -103,16 +109,18 @@ const MainLayout: React.FC = () => {
       setCentreEntryFailed(false);
       return;
     }
-    const key = pendingCentre ? `code:${pendingCentre.code}` : 'auto';
+    const key = `${pendingCentre ? `code:${pendingCentre.code}` : 'auto'}#${centreEntryRetry}`;
     if (centreEntryKeyRef.current === key) return;
     centreEntryKeyRef.current = key;
     setCentreEntryFailed(false);
+    setCentreEntryError(null);
     setCentreEntryBusy(true);
     const work = pendingCentre ? enterCentreByCode(pendingCentre.code) : enterSoleCentre();
     work
       .then((r: any) => {
         const ok = pendingCentre ? !!(r && r.success) : !!(r && r.entered);
         if (!ok) {
+          setCentreEntryCount(pendingCentre ? null : (r && typeof r.count === 'number' ? r.count : null));
           setCentreEntryFailed(true);
           return;
         }
@@ -152,6 +160,7 @@ const MainLayout: React.FC = () => {
             /* The membership check could not run: keep the generic path. */
           }
         }
+        setCentreEntryError(err?.message || 'Your centre could not be opened automatically.');
         setCentreEntryFailed(true);
         addToast({
           type: 'error',
@@ -160,7 +169,7 @@ const MainLayout: React.FC = () => {
         });
       })
       .finally(() => setCentreEntryBusy(false));
-  }, [currentUser, hasCheckedActiveCentre, activeCentreId, pendingCentre, enterCentreByCode, enterSoleCentre]);
+  }, [currentUser, hasCheckedActiveCentre, activeCentreId, pendingCentre, centreEntryRetry, enterCentreByCode, enterSoleCentre]);
 
   // The centre code gate appears only after a login button on the landing
   // page is clicked; the platform-staff door (#tos-admin) never shows it.
@@ -410,6 +419,17 @@ const MainLayout: React.FC = () => {
     }} />;
   }
 
+  // Retry the automatic centre entry without asking for the access code
+  // again: the centre was already chosen before login (or belongs to the
+  // account), so a retry never means re-entering the code.
+  const retryCentreEntry = () => {
+    centreEntryKeyRef.current = null;
+    setCentreEntryFailed(false);
+    setCentreEntryError(null);
+    setCentreEntryBusy(false);
+    setCentreEntryRetry((n) => n + 1);
+  };
+
   // "Enter another access code": leave the current centre selection and show
   // the access-code gate again, without going back to the landing page.
   const handleEnterAnotherCode = () => {
@@ -520,6 +540,28 @@ const MainLayout: React.FC = () => {
         );
       }
       return centreSpinnerScreen;
+    }
+    // A signed-in user whose centre entry failed sees the real reason with a
+    // retry, never the access-code screen: the centre was chosen before login
+    // (or belongs to this account), so the code is not asked again.
+    if (pendingCentre || (centreEntryCount !== null && centreEntryCount > 0)) {
+      return (
+        <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-900 text-white px-6 text-center">
+          <div className="w-14 h-14 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 mb-5">
+            <AlertCircle className="w-7 h-7" />
+          </div>
+          <h2 className="text-xl font-black tracking-widest uppercase text-orange-500 mb-3">{pendingCentre?.centreName || centreName}</h2>
+          <p className="text-sm text-slate-300 font-medium max-w-sm mb-6">{centreEntryError || 'Your centre could not be opened automatically.'}</p>
+          <div className="flex items-center gap-3">
+            <button onClick={retryCentreEntry} className="px-5 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold transition-colors">
+              Try again
+            </button>
+            <button onClick={handleLogout} className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-semibold transition-colors">
+              Sign out
+            </button>
+          </div>
+        </div>
+      );
     }
     if (accessCodeFlow === 'join') {
       return (
