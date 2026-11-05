@@ -449,6 +449,22 @@ function seatCapFor(
   return billing?.seatCap ?? plan?.seatCap ?? 0;
 }
 
+/**
+ * The centre's WhatsApp support line (centreSettings/{id}__global), for the
+ * blocked-access screen: a student whose access was switched off is told to
+ * contact their centre admin, with a one-tap WhatsApp link.
+ */
+async function getCentreWhatsApp(centreId: string): Promise<string | undefined> {
+  try {
+    const doc = await adminDb.collection('centreSettings').doc(`${centreId}__global`).get();
+    if (!doc.exists) return undefined;
+    const raw = (doc.data() as any)?.whatsappNumber || (doc.data() as any)?.whatsapp || '';
+    return raw ? String(raw) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 // ============================================================================
 // ENTER CENTRE (sign-in flow: verify an existing membership by access code)
 // ============================================================================
@@ -561,10 +577,12 @@ export async function enterCentreService(params: {
         at: new Date().toISOString(),
       });
     } catch { /* audit is best-effort */ }
-    throw httpError(
+    const blocked = httpError(
       403,
-      'Your access to this centre is not active yet. Please contact the centre administration.'
+      'Your access to this centre has been switched off. Please contact your centre admin to have it switched back on.'
     );
+    (blocked as any).whatsapp = await getCentreWhatsApp(centreId);
+    throw blocked;
   }
 
   // 4. Subscription status: suspended centres are owner/TOS only.
@@ -609,7 +627,12 @@ export async function validateActiveCentreService(params: {
   // membership. The session's active centre must belong to the caller.
   const membership: CentreMembership | null = await getMembership(uid, centreId, userEmail);
   if (!membership || membership.status !== 'active') {
-    throw httpError(403, 'Your active membership for this centre is no longer active.');
+    const blocked = httpError(
+      403,
+      'Your access to this centre has been switched off. Please contact your centre admin to have it switched back on.'
+    );
+    (blocked as any).whatsapp = await getCentreWhatsApp(centreId);
+    throw blocked;
   }
 
   const billing = await getBillingDoc(centreId);
@@ -838,8 +861,9 @@ async function activateStudentTransactional(params: {
   caller: Caller;
   studentUid: string;
   centreId: string;
+  fromToggle?: boolean;
 }): Promise<{ used: number; cap: number }> {
-  const { caller, studentUid, centreId } = params;
+  const { caller, studentUid, centreId, fromToggle } = params;
 
   const billing = await getBillingDoc(centreId);
   const centre = await getCentreDoc(centreId);
@@ -881,11 +905,14 @@ async function activateStudentTransactional(params: {
       return { used, cap: seatCapFor(freshBilling, plan, status) };
     }
 
-    // Swap (reactivation) limit, checked inside the transaction.
+    // Swap (reactivation) limit, checked inside the transaction. A centre
+    // admin switching one of their students' access off and back on is
+    // normal seat management, not seat swapping, so the toggle path skips
+    // this limit; the seat cap below still applies.
     const recent = (current.reactivationTimestamps || []).filter(
       (ts) => now - new Date(ts).getTime() <= windowMs
     );
-    if (recent.length >= swapLimit) {
+    if (!fromToggle && recent.length >= swapLimit) {
       throw httpError(
         429,
         `Seat swap limit reached for this student (max ${swapLimit} reactivations per ${config.seatSwapWindowDays ?? 30} days).`
@@ -893,7 +920,14 @@ async function activateStudentTransactional(params: {
     }
 
     const cap = seatCapFor(freshBilling, plan, status);
-    const used = billingDoc.data()?.activeStudentCount ?? preSeedCount;
+    // The stored counter can drift upward (a disable that found the student
+    // already off does not decrement, a later enable still increments), so
+    // the cap is checked against the live count of active student
+    // memberships and the counter self-heals to the true number.
+    const used = Math.min(
+      billingDoc.data()?.activeStudentCount ?? preSeedCount,
+      preSeedCount
+    );
     if (used >= cap) {
       throw httpError(
         409,
@@ -1020,7 +1054,7 @@ export async function toggleStudentAccessService(params: {
   }
 
   // Enabling goes through the transactional activation (cap + swap limit).
-  const result = await activateStudentTransactional({ caller, studentUid, centreId });
+  const result = await activateStudentTransactional({ caller, studentUid, centreId, fromToggle: true });
 
   try {
     await adminDb.collection('auditLogs').add({

@@ -16,7 +16,7 @@ import { JoinCentreScreen } from './components/auth/JoinCentreScreen';
 
 import { PasswordChangeOverlay } from './components/auth/PasswordChangeOverlay';
 import { getAuth } from 'firebase/auth';
-import { AlertCircle, ShieldCheck } from 'lucide-react';
+import { AlertCircle, MessageCircle, ShieldCheck } from 'lucide-react';
 
 // The #tos door shows nothing to anyone who is not platform staff.
 const TosNotFound: React.FC = () => (
@@ -102,6 +102,7 @@ const MainLayout: React.FC = () => {
   const [centreEntryError, setCentreEntryError] = useState<string | null>(null);
   const [centreEntryCount, setCentreEntryCount] = useState<number | null>(null);
   const [centreEntryRetry, setCentreEntryRetry] = useState(0);
+  const [centreEntryWhatsapp, setCentreEntryWhatsapp] = useState<string | null>(null);
   useEffect(() => {
     if (!currentUser || !hasCheckedActiveCentre) return;
     if (activeCentreId) {
@@ -114,6 +115,7 @@ const MainLayout: React.FC = () => {
     centreEntryKeyRef.current = key;
     setCentreEntryFailed(false);
     setCentreEntryError(null);
+    setCentreEntryWhatsapp(null);
     setCentreEntryBusy(true);
     const work = pendingCentre ? enterCentreByCode(pendingCentre.code) : enterSoleCentre();
     work
@@ -121,6 +123,7 @@ const MainLayout: React.FC = () => {
         const ok = pendingCentre ? !!(r && r.success) : !!(r && r.entered);
         if (!ok) {
           setCentreEntryCount(pendingCentre ? null : (r && typeof r.count === 'number' ? r.count : null));
+          setCentreEntryWhatsapp(r?.whatsapp || null);
           setCentreEntryFailed(true);
           return;
         }
@@ -161,6 +164,7 @@ const MainLayout: React.FC = () => {
           }
         }
         setCentreEntryError(err?.message || 'Your centre could not be opened automatically.');
+        setCentreEntryWhatsapp(err?.whatsapp || null);
         setCentreEntryFailed(true);
         addToast({
           type: 'error',
@@ -426,6 +430,7 @@ const MainLayout: React.FC = () => {
     centreEntryKeyRef.current = null;
     setCentreEntryFailed(false);
     setCentreEntryError(null);
+    setCentreEntryWhatsapp(null);
     setCentreEntryBusy(false);
     setCentreEntryRetry((n) => n + 1);
   };
@@ -543,15 +548,42 @@ const MainLayout: React.FC = () => {
     }
     // A signed-in user whose centre entry failed sees the real reason with a
     // retry, never the access-code screen: the centre was chosen before login
-    // (or belongs to this account), so the code is not asked again.
+    // (or belongs to this account), so the code is not asked again. When the
+    // account's access was switched off, the screen says who can switch it
+    // back on and offers the centre's WhatsApp line with a pre-filled message.
     if (pendingCentre || (centreEntryCount !== null && centreEntryCount > 0)) {
+      const accessBlocked = !!centreEntryError && /not active/i.test(centreEntryError);
+      const waDigits = accessBlocked && centreEntryWhatsapp ? centreEntryWhatsapp.replace(/\D/g, '') : '';
+      const waHref = waDigits
+        ? `https://wa.me/${waDigits}?text=${encodeURIComponent(`Hello, I am a student of ${pendingCentre?.centreName || centreName}. My portal access has been switched off. Please help me reactivate it. Thank you.`)}`
+        : '';
       return (
         <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-900 text-white px-6 text-center">
-          <div className="w-14 h-14 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 mb-5">
+          <div className={accessBlocked
+            ? "w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 mb-5"
+            : "w-14 h-14 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 mb-5"}>
             <AlertCircle className="w-7 h-7" />
           </div>
           <h2 className="text-xl font-black tracking-widest uppercase text-orange-500 mb-3">{pendingCentre?.centreName || centreName}</h2>
-          <p className="text-sm text-slate-300 font-medium max-w-sm mb-6">{centreEntryError || 'Your centre could not be opened automatically.'}</p>
+          <p className="text-sm text-slate-300 font-medium max-w-sm mb-2">
+            {accessBlocked
+              ? 'Your access to this centre has been switched off. Please contact your centre admin to have it switched back on.'
+              : centreEntryError || 'Your centre could not be opened automatically.'}
+          </p>
+          {accessBlocked && (
+            <p className="text-xs text-slate-500 max-w-sm mb-6">Once the admin switches your access back on, sign in again as usual.</p>
+          )}
+          {waHref ? (
+            <a
+              href={waHref}
+              target="_blank"
+              rel="noreferrer"
+              className="mb-3 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold transition-colors"
+            >
+              <MessageCircle className="w-4 h-4" />
+              Contact the admin on WhatsApp
+            </a>
+          ) : null}
           <div className="flex items-center gap-3">
             <button onClick={retryCentreEntry} className="px-5 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold transition-colors">
               Try again

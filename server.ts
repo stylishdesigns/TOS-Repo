@@ -520,7 +520,7 @@ async function startServer() {
     } catch (error: any) {
       console.warn("enter-centre error:", error.message || error);
       const status = error.status || (error.message?.includes("Too many") ? 429 : 400);
-      res.status(status).json({ error: error.message || "That code did not match. Check it and try again." });
+      res.status(status).json({ error: error.message || "That code did not match. Check it and try again.", whatsapp: error.whatsapp });
     }
   });
 
@@ -542,7 +542,7 @@ async function startServer() {
 
       res.json({ success: true, ...result, centreId });
     } catch (error: any) {
-      res.status(400).json({ error: error.message || "Active centre verification failed." });
+      res.status(error.status || 400).json({ error: error.message || "Active centre verification failed.", whatsapp: error.whatsapp });
     }
   });
 

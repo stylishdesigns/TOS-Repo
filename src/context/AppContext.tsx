@@ -300,7 +300,7 @@ interface AppContextType {
   seatsSummary: CentreSeatsSummary | null;
   hasCheckedActiveCentre: boolean;
   enterCentreByCode: (code: string) => Promise<{ success: boolean; centreId?: string; error?: string }>;
-  enterSoleCentre: () => Promise<{ entered: boolean; count: number }>;
+  enterSoleCentre: () => Promise<{ entered: boolean; count: number; error?: string; whatsapp?: string }>;
   fetchMyCentreIds: () => Promise<string[]>;
   joinCentreByCode: (code: string) => Promise<{ status: 'active' | 'pending'; centreName: string; centreId: string }>;
   switchCentre: (centreId: string) => Promise<void>;
@@ -1173,6 +1173,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // mismatch (400) from a lockout, suspension or server error.
       const e: any = new Error(data.error || 'That code did not match. Check it and try again.');
       e.status = res.status;
+      e.whatsapp = data.whatsapp;
       throw e;
     }
 
@@ -1307,7 +1308,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return centres.map((c: any) => String(c.centreId || '')).filter(Boolean);
   };
 
-  const enterSoleCentre = async (): Promise<{ entered: boolean; count: number }> => {
+  const enterSoleCentre = async (): Promise<{ entered: boolean; count: number; error?: string; whatsapp?: string }> => {
     if (!user) return { entered: false, count: 0 };
     const token = await user.getIdToken();
     try {
@@ -1328,7 +1329,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         body: JSON.stringify({ centreId: target.centreId }),
       });
       const valData = await valRes.json();
-      if (!valRes.ok || !valData.success) return { entered: false, count: 1 };
+      if (!valRes.ok || !valData.success) {
+        return { entered: false, count: 1, error: valData?.error, whatsapp: valData?.whatsapp };
+      }
       setActiveCentreId(target.centreId);
       setActiveCentre(valData.centre);
       if (valData.entitlements) setEntitlements(valData.entitlements);
