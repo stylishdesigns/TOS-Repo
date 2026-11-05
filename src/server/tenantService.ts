@@ -91,8 +91,13 @@ export async function getPlatformConfig(): Promise<PlatformConfigGlobal> {
 }
 
 export async function getPlatformPlan(planId: string): Promise<PlatformPlan> {
+  // Some older centre billing documents carry an empty planId. Firestore
+  // rejects an empty document path, which used to surface as a generic
+  // "server error" (for example when re-enabling a student's access).
+  // Fall back to the standard plan whenever the id is empty.
+  const effectivePlanId = String(planId ?? '').trim() || 'centre_standard';
   try {
-    const doc = await adminDb.collection('platformPlans').doc(planId).get();
+    const doc = await adminDb.collection('platformPlans').doc(effectivePlanId).get();
     if (!doc.exists) {
       console.error(`[tenantService] platformPlans/${planId} is missing. Run scripts/seed-platform-plans.ts.`);
       throw httpError(500, 'Plan configuration is missing. Please contact Tutorial OS support.');
