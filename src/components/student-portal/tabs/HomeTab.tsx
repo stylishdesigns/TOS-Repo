@@ -564,7 +564,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
 
       {/* 7. WhatsApp Campus Coordinator */}
       <a
-        href={`https://wa.me/${(settings.whatsappNumber || settings.whatsapp || '+2348056765455').replace(/\D/g, '')}`}
+        href={`https://wa.me/${(settings.whatsappNumber || settings.whatsapp || settings.phone).replace(/\D/g, '')}`}
         target="_blank"
         rel="noreferrer"
         className="flex items-center justify-between p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-emerald-900 hover:bg-emerald-100/80 transition-all shadow-2xs"

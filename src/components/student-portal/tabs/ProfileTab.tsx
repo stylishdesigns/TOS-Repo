@@ -329,7 +329,7 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({ student, onSelectStudent
         </div>
 
         <a
-          href={`https://wa.me/${(settings.whatsappNumber || settings.whatsapp || '+2348056765455').replace(/\D/g, '')}`}
+          href={`https://wa.me/${(settings.whatsappNumber || settings.whatsapp || settings.phone).replace(/\D/g, '')}`}
           target="_blank"
           rel="noreferrer"
           className="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center space-x-2 transition-all shadow-xs"

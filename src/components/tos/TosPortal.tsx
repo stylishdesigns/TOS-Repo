@@ -364,7 +364,6 @@ const PlansTab: React.FC = () => {
     ['trialDays', 'Trial length (days)'],
     ['skipTrialDiscountPct', 'Skip-trial discount (%)'],
     ['trialGraceDays', 'Grace days after expiry'],
-    ['seatSwapLimitPerStudent', 'Seat swaps per student'],
     ['seatSwapWindowDays', 'Seat swap window (days)'],
     ['aiRouteRateLimitPerHour', 'AI requests per user per hour'],
   ];

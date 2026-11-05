@@ -458,7 +458,11 @@ async function getCentreWhatsApp(centreId: string): Promise<string | undefined> 
   try {
     const doc = await adminDb.collection('centreSettings').doc(`${centreId}__global`).get();
     if (!doc.exists) return undefined;
-    const raw = (doc.data() as any)?.whatsappNumber || (doc.data() as any)?.whatsapp || '';
+    const raw =
+      (doc.data() as any)?.whatsappNumber ||
+      (doc.data() as any)?.whatsapp ||
+      (doc.data() as any)?.phone ||
+      '';
     return raw ? String(raw) : undefined;
   } catch {
     return undefined;
@@ -579,7 +583,7 @@ export async function enterCentreService(params: {
     } catch { /* audit is best-effort */ }
     const blocked = httpError(
       403,
-      'Your access to this centre has been switched off. Please contact your centre admin to have it switched back on.'
+      'You cannot access this centre at the moment. Please contact your centre admin for help getting back in.'
     );
     (blocked as any).whatsapp = await getCentreWhatsApp(centreId);
     throw blocked;
@@ -629,7 +633,7 @@ export async function validateActiveCentreService(params: {
   if (!membership || membership.status !== 'active') {
     const blocked = httpError(
       403,
-      'Your access to this centre has been switched off. Please contact your centre admin to have it switched back on.'
+      'You cannot access this centre at the moment. Please contact your centre admin for help getting back in.'
     );
     (blocked as any).whatsapp = await getCentreWhatsApp(centreId);
     throw blocked;
@@ -657,14 +661,15 @@ export async function listUserCentresService(params: {
   uid: string;
   userEmail: string;
   tos?: boolean;
-}): Promise<
-  Array<{
+}): Promise<{
+  centres: Array<{
     centreId: string;
     role: MembershipRole;
     centreName: string;
     logo?: string;
-  }>
-> {
+  }>;
+  blocked: Array<{ centreId: string; centreName: string; whatsapp?: string }>;
+}> {
   const { uid, userEmail } = params;
   const results: Array<{
     centreId: string;
@@ -672,6 +677,7 @@ export async function listUserCentresService(params: {
     centreName: string;
     logo?: string;
   }> = [];
+  const blocked: Array<{ centreId: string; centreName: string; whatsapp?: string }> = [];
 
   if (params.tos) {
     // TOS staff see every centre on the platform.
@@ -689,7 +695,7 @@ export async function listUserCentresService(params: {
     } catch (err) {
       dbFailure('listUserCentresService(tos)', err);
     }
-    return results;
+    return { centres: results, blocked };
   }
 
   try {
@@ -710,7 +716,35 @@ export async function listUserCentresService(params: {
     dbFailure('listUserCentresService', err);
   }
 
-  return results;
+  // Memberships switched off by the centre admin: surfaced so the post-login
+  // screen can tell the student why they cannot get in and offer the centre's
+  // WhatsApp line, instead of ever falling back to an access-code request.
+  try {
+    const legacyKeys = userEmail && userEmail !== uid ? [uid, userEmail] : [uid];
+    const seenBlocked = new Set(results.map((r) => r.centreId));
+    for (const key of legacyKeys) {
+      const snap = await adminDb
+        .collection('memberships')
+        .where('uid', '==', key)
+        .where('status', '==', 'disabled')
+        .get();
+      for (const docSnap of snap.docs) {
+        const m = docSnap.data() as CentreMembership;
+        if (seenBlocked.has(m.centreId)) continue;
+        seenBlocked.add(m.centreId);
+        const centre = await getCentreDoc(m.centreId);
+        blocked.push({
+          centreId: m.centreId,
+          centreName: centre?.name || 'Centre',
+          whatsapp: await getCentreWhatsApp(m.centreId),
+        });
+      }
+    }
+  } catch (err) {
+    dbFailure('listUserCentresService(blocked)', err);
+  }
+
+  return { centres: results, blocked };
 }
 
 // ============================================================================
@@ -861,9 +895,8 @@ async function activateStudentTransactional(params: {
   caller: Caller;
   studentUid: string;
   centreId: string;
-  fromToggle?: boolean;
 }): Promise<{ used: number; cap: number }> {
-  const { caller, studentUid, centreId, fromToggle } = params;
+  const { caller, studentUid, centreId } = params;
 
   const billing = await getBillingDoc(centreId);
   const centre = await getCentreDoc(centreId);
@@ -871,9 +904,6 @@ async function activateStudentTransactional(params: {
   const plan = billing ? await getPlatformPlan(billing.planId) : null;
   const preSeedCount = await countActiveStudents(centreId);
   const membershipId = `${studentUid}__${centreId}`;
-  const now = Date.now();
-  const windowMs = Math.max(1, config.seatSwapWindowDays ?? 30) * 24 * 60 * 60 * 1000;
-  const swapLimit = config.seatSwapLimitPerStudent ?? 2;
 
   return adminDb.runTransaction(async (tx) => {
     const centreRef = adminDb.collection('centres').doc(centreId);
@@ -905,20 +935,6 @@ async function activateStudentTransactional(params: {
       return { used, cap: seatCapFor(freshBilling, plan, status) };
     }
 
-    // Swap (reactivation) limit, checked inside the transaction. A centre
-    // admin switching one of their students' access off and back on is
-    // normal seat management, not seat swapping, so the toggle path skips
-    // this limit; the seat cap below still applies.
-    const recent = (current.reactivationTimestamps || []).filter(
-      (ts) => now - new Date(ts).getTime() <= windowMs
-    );
-    if (!fromToggle && recent.length >= swapLimit) {
-      throw httpError(
-        429,
-        `Seat swap limit reached for this student (max ${swapLimit} reactivations per ${config.seatSwapWindowDays ?? 30} days).`
-      );
-    }
-
     const cap = seatCapFor(freshBilling, plan, status);
     // The stored counter can drift upward (a disable that found the student
     // already off does not decrement, a later enable still increments), so
@@ -940,7 +956,6 @@ async function activateStudentTransactional(params: {
       memRef,
       {
         status: 'active',
-        reactivationTimestamps: [...recent, nowIso],
         lastAccessToggledAt: nowIso,
         updatedAt: nowIso,
       },
@@ -1054,7 +1069,7 @@ export async function toggleStudentAccessService(params: {
   }
 
   // Enabling goes through the transactional activation (cap + swap limit).
-  const result = await activateStudentTransactional({ caller, studentUid, centreId, fromToggle: true });
+  const result = await activateStudentTransactional({ caller, studentUid, centreId });
 
   try {
     await adminDb.collection('auditLogs').add({

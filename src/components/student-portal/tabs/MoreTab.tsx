@@ -2408,12 +2408,12 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                           WhatsApp Support
                         </span>
                         <span className="text-xs font-bold text-slate-800 truncate block">
-                          {settings.whatsappNumber || settings.whatsapp || '+234 805 676 5455'}
+                          {settings.whatsappNumber || settings.whatsapp || settings.phone}
                         </span>
                       </div>
                     </div>
                     <a
-                      href={`https://wa.me/${(settings.whatsappNumber || settings.whatsapp || '+2348056765455').replace(/\D/g, '')}`}
+                      href={`https://wa.me/${(settings.whatsappNumber || settings.whatsapp || settings.phone).replace(/\D/g, '')}`}
                       target="_blank"
                       rel="noreferrer"
                       className="px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 flex items-center space-x-1 shrink-0 ml-2 shadow-2xs"

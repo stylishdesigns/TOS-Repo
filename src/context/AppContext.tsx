@@ -331,7 +331,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const saved = localStorage.getItem(scopedKey('settings'));
       if (saved) {
         const parsed = JSON.parse(saved);
-        const resolvedWhatsapp = parsed.whatsappNumber || parsed.whatsapp || INITIAL_SETTINGS.whatsapp;
+        const resolvedWhatsapp = parsed.whatsappNumber || parsed.whatsapp || parsed.phone || INITIAL_SETTINGS.whatsapp;
         return {
           ...INITIAL_SETTINGS,
           ...parsed,
@@ -1317,7 +1317,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
       const data = await res.json().catch(() => ({}));
       const centres: CentreUserRole[] = (data && data.success && Array.isArray(data.centres)) ? data.centres : [];
-      if (centres.length !== 1) return { entered: false, count: centres.length };
+      if (centres.length !== 1) {
+        if (centres.length === 0) {
+          const blockedList: any[] = (data && Array.isArray(data.blocked)) ? data.blocked : [];
+          if (blockedList.length > 0) {
+            const b = blockedList[0];
+            return {
+              entered: false,
+              count: 1,
+              error: `You cannot access ${b.centreName || 'your centre'} at the moment. Please contact your centre admin for help getting back in.`,
+              whatsapp: b.whatsapp,
+            };
+          }
+          return { entered: false, count: 1, error: 'No centre is linked to this account yet. Please contact your centre admin to be added.' };
+        }
+        return { entered: false, count: centres.length };
+      }
       const target: any = centres[0];
       if (!target || !target.centreId) return { entered: false, count: 1 };
       const valRes = await fetch('/api/auth/validate-active-centre', {
@@ -1342,7 +1357,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       else setViewMode('portal');
       return { entered: true, count: 1 };
     } catch (e) {
-      return { entered: false, count: 0 };
+      return { entered: false, count: 1, error: 'Your centre could not be opened automatically. Please try again.' };
     }
   };
 

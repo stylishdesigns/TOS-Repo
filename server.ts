@@ -550,12 +550,12 @@ async function startServer() {
   app.get("/api/auth/my-centres", async (req, res) => {
     try {
       const caller = await getCaller(req);
-      const centres = await listUserCentresService({
+      const listResult = await listUserCentresService({
         uid: caller.uid,
         userEmail: caller.email,
         tos: caller.tos,
       });
-      res.json({ success: true, centres });
+      res.json({ success: true, centres: listResult.centres, blocked: listResult.blocked });
     } catch (error: any) {
       res.status(error.status || 500).json({ error: error.message || "Failed to list centres" });
     }

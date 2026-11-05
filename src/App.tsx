@@ -552,10 +552,10 @@ const MainLayout: React.FC = () => {
     // account's access was switched off, the screen says who can switch it
     // back on and offers the centre's WhatsApp line with a pre-filled message.
     if (pendingCentre || (centreEntryCount !== null && centreEntryCount > 0)) {
-      const accessBlocked = !!centreEntryError && /not active/i.test(centreEntryError);
+      const accessBlocked = !!centreEntryError && /cannot access/i.test(centreEntryError);
       const waDigits = accessBlocked && centreEntryWhatsapp ? centreEntryWhatsapp.replace(/\D/g, '') : '';
       const waHref = waDigits
-        ? `https://wa.me/${waDigits}?text=${encodeURIComponent(`Hello, I am a student of ${pendingCentre?.centreName || centreName}. My portal access has been switched off. Please help me reactivate it. Thank you.`)}`
+        ? `https://wa.me/${waDigits}?text=${encodeURIComponent(`Hello, I am a student of ${pendingCentre?.centreName || centreName}. I cannot access the portal at the moment. Please help me regain access. Thank you.`)}`
         : '';
       return (
         <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-900 text-white px-6 text-center">
@@ -571,7 +571,7 @@ const MainLayout: React.FC = () => {
               : centreEntryError || 'Your centre could not be opened automatically.'}
           </p>
           {accessBlocked && (
-            <p className="text-xs text-slate-500 max-w-sm mb-6">Once the admin switches your access back on, sign in again as usual.</p>
+            <p className="text-xs text-slate-500 max-w-sm mb-6">Once the admin restores your access, tap Try again or sign in again.</p>
           )}
           {waHref ? (
             <a

@@ -571,11 +571,10 @@ export const SettingsView: React.FC = () => {
 
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">
-                  WhatsApp Support Line *
+                  WhatsApp number (optional)
                 </label>
                 <input
                   type="tel"
-                  required
                   value={centreForm.whatsapp || ''}
                   onChange={(e) =>
                     setCentreForm({ ...centreForm, whatsapp: e.target.value })
