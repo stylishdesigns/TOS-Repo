@@ -535,12 +535,6 @@ export const StaffRolesManager: React.FC = () => {
                   <span className="text-slate-400">Status:</span>
                   <span className="font-bold text-slate-800">{viewingStaff.status}</span>
                 </div>
-                <div className="flex justify-between py-1 border-b border-slate-100">
-                  <span className="text-slate-400">Assigned Cohort:</span>
-                  <span className="font-medium text-slate-800">
-                    {viewingStaff.assignedCohort || 'All Campuses'}
-                  </span>
-                </div>
               </div>
 
               <div>

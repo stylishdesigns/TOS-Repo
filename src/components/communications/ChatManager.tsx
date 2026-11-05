@@ -163,7 +163,7 @@ export const ChatManager: React.FC<{ onThreadOpenChange?: (open: boolean) => voi
   const [data, setData] = useState<Bootstrap | null>(cachedBoot);
   const [loading, setLoading] = useState(() => !cachedBoot);
   const [error, setError] = useState('');
-  const [tab, setTab] = useState<'groups' | 'settings' | 'reports'>('groups');
+  const [view, setView] = useState<'personal' | 'groups' | 'channels' | 'settings' | 'reports'>('personal');
 
   const isAdmin = !!data && data.role !== 'tutor';
 
@@ -192,11 +192,14 @@ export const ChatManager: React.FC<{ onThreadOpenChange?: (open: boolean) => voi
 
   const pendingReports = data?.reports.filter((r) => r.status === 'pending').length || 0;
 
-  const tabs: { id: 'groups' | 'settings' | 'reports'; label: string; icon: React.ElementType; badge?: number }[] = [
+  // One row of tabs: the chats (Personal, Groups, Channels) with Settings and
+  // Reports beside them. Settings and Reports stay owner/admin only; the
+  // server enforces it too.
+  const tabs: { id: 'personal' | 'groups' | 'channels' | 'settings' | 'reports'; label: string; icon: React.ElementType; badge?: number }[] = [
+    { id: 'personal', label: 'Personal', icon: User },
     { id: 'groups', label: 'Groups', icon: Users },
-    // Settings stay owner/admin only; the server enforces it too.
+    { id: 'channels', label: 'Channels', icon: Megaphone },
     ...(isAdmin ? [{ id: 'settings' as const, label: 'Settings', icon: Info }] : []),
-    // Reports are centre-admin work; the server enforces that too.
     ...(isAdmin ? [{ id: 'reports' as const, label: 'Reports', icon: Flag, badge: pendingReports }] : []),
   ];
 
@@ -235,14 +238,14 @@ export const ChatManager: React.FC<{ onThreadOpenChange?: (open: boolean) => voi
           {tabs.map((t) => (
             <button
               key={t.id}
-              onClick={() => setTab(t.id)}
+              onClick={() => setView(t.id)}
               className={`px-4 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition ${
-                tab === t.id ? 'bg-[#EA580C] text-white shadow-sm shadow-orange-200' : 'bg-white text-slate-500 border border-slate-200'
+                view === t.id ? 'bg-[#EA580C] text-white shadow-sm shadow-orange-200' : 'bg-white text-slate-500 border border-slate-200'
               }`}
             >
               <t.icon className="w-3.5 h-3.5" /> {t.label}
               {!!t.badge && (
-                <span className={`min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-black flex items-center justify-center ${tab === t.id ? 'bg-white text-[#EA580C]' : 'bg-rose-500 text-white'}`}>
+                <span className={`min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-black flex items-center justify-center ${view === t.id ? 'bg-white text-[#EA580C]' : 'bg-rose-500 text-white'}`}>
                   {t.badge}
                 </span>
               )}
@@ -251,9 +254,9 @@ export const ChatManager: React.FC<{ onThreadOpenChange?: (open: boolean) => voi
         </div>
         )}
 
-        {tab === 'groups' && data && <GroupsSection data={data} setData={setData} isAdmin={isAdmin} reload={load} addToast={addToast} centreId={activeCentreId || ''} onThreadOpenChange={onThreadOpenChange} />}
-        {tab === 'settings' && data && <SettingsSection data={data} isAdmin={isAdmin} reload={load} addToast={addToast} centreId={activeCentreId || ''} />}
-        {tab === 'reports' && data && <ReportsSection data={data} isAdmin={isAdmin} reload={load} addToast={addToast} centreId={activeCentreId || ''} />}
+        {(view === 'personal' || view === 'groups' || view === 'channels') && data && <GroupsSection data={data} setData={setData} isAdmin={isAdmin} reload={load} addToast={addToast} centreId={activeCentreId || ''} onThreadOpenChange={onThreadOpenChange} staffFilter={view} />}
+        {view === 'settings' && data && <SettingsSection data={data} isAdmin={isAdmin} reload={load} addToast={addToast} centreId={activeCentreId || ''} />}
+        {view === 'reports' && data && <ReportsSection data={data} isAdmin={isAdmin} reload={load} addToast={addToast} centreId={activeCentreId || ''} />}
       </div>
     </div>
   );
@@ -273,7 +276,7 @@ interface SectionProps {
   centreId: string;
 }
 
-const GroupsSection: React.FC<SectionProps> = ({ data, isAdmin, reload, addToast, centreId, onThreadOpenChange, setData }) => {
+const GroupsSection: React.FC<SectionProps & { staffFilter: 'personal' | 'groups' | 'channels' }> = ({ data, isAdmin, reload, addToast, centreId, onThreadOpenChange, setData, staffFilter }) => {
   const [listImage, setListImage] = useState('');
   const [listImageName, setListImageName] = useState('');
   const [creating, setCreating] = useState(false);
@@ -284,7 +287,6 @@ const GroupsSection: React.FC<SectionProps> = ({ data, isAdmin, reload, addToast
   const [accessMode, setAccessMode] = useState<'centre_default' | 'custom' | 'none'>('centre_default');
   const [threshold, setThreshold] = useState('70');
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [staffFilter, setStaffFilter] = useState<'personal' | 'groups' | 'channels'>('personal');
   // One-to-one chats live in the same groups list the server returns; the
   // Personal tab shows exactly those, so a chat opened from a student lands
   // under Personal and stays there.
@@ -379,7 +381,7 @@ const GroupsSection: React.FC<SectionProps> = ({ data, isAdmin, reload, addToast
         />
       ) : (
       <>
-      {isAdmin && (
+      {isAdmin && staffFilter === 'groups' && (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <button
             onClick={() => setCreating(!creating)}
@@ -456,35 +458,6 @@ const GroupsSection: React.FC<SectionProps> = ({ data, isAdmin, reload, addToast
               </button>
             </div>
           )}
-        </div>
-      )}
-
-      {!openGroup && (
-        <div className="flex gap-2" aria-label="Chats filter">
-          <button
-            type="button"
-            aria-pressed={staffFilter === 'personal'}
-            onClick={() => setStaffFilter('personal')}
-            className={`px-4 py-2 rounded-full text-xs font-black shadow-sm transition ${staffFilter === 'personal' ? 'bg-[#EA580C] text-white' : 'bg-white border border-slate-200 text-slate-500'}`}
-          >
-            Personal
-          </button>
-          <button
-            type="button"
-            aria-pressed={staffFilter === 'groups'}
-            onClick={() => setStaffFilter('groups')}
-            className={`px-4 py-2 rounded-full text-xs font-black shadow-sm transition ${staffFilter === 'groups' ? 'bg-[#EA580C] text-white' : 'bg-white border border-slate-200 text-slate-500'}`}
-          >
-            Groups
-          </button>
-          <button
-            type="button"
-            aria-pressed={staffFilter === 'channels'}
-            onClick={() => setStaffFilter('channels')}
-            className={`px-4 py-2 rounded-full text-xs font-black shadow-sm transition ${staffFilter === 'channels' ? 'bg-[#EA580C] text-white' : 'bg-white border border-slate-200 text-slate-500'}`}
-          >
-            Channels
-          </button>
         </div>
       )}
 
@@ -773,7 +746,6 @@ const SettingsSection: React.FC<SectionProps> = ({ data, isAdmin, reload, addToa
       </div>
 
       <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200 space-y-1.5">
-        <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Set by TOS for every centre</p>
         <p className="text-[11px] text-slate-500 font-medium">Photos up to {data.platform.photoMaxKb} KB · messages up to {data.platform.messageMaxChars} characters · messages kept {data.platform.retentionDays} days · up to {data.platform.postRateLimitPerDay} posts per day.</p>
       </div>
 

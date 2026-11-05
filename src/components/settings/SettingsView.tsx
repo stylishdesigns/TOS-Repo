@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 
 export const SettingsView: React.FC = () => {
-  const { settings, updateSettings, addToast, authMethod, activeUser } = useApp();
+  const { settings, updateSettings, addToast, authMethod, activeUser, activeCentre } = useApp();
 
   const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'sessions' | 'centre'>('profile');
 
@@ -53,7 +53,7 @@ export const SettingsView: React.FC = () => {
 
   // Centre Configuration state
   const [centreForm, setCentreForm] = useState({
-    centreName: settings.centreName,
+    centreName: settings.centreName || activeCentre?.name || '',
     tagline: settings.tagline,
     academicSession: settings.academicSession,
     currencySymbol: settings.currencySymbol,
@@ -65,6 +65,15 @@ export const SettingsView: React.FC = () => {
     smsNotifications: settings.smsNotifications,
     emailNotifications: settings.emailNotifications,
   });
+
+  // The centre official name submitted at creation prefills the field.
+  React.useEffect(() => {
+    if (activeCentre?.name && !centreForm.centreName) {
+      const official = activeCentre.name;
+      setCentreForm((f) => ({ ...f, centreName: official }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeCentre]);
 
   const [showAddSessionModal, setShowAddSessionModal] = useState(false);
   const [newSessionName, setNewSessionName] = useState('');
@@ -500,7 +509,7 @@ export const SettingsView: React.FC = () => {
           <div className="border-b border-slate-100 pb-3">
             <h3 className="text-base font-bold text-slate-900">Centre Identity & Academic Parameters</h3>
             <p className="text-xs text-slate-500">
-              Global Centre name, active academic session, currency symbol, and official contact lines.
+              Global Centre name, active academic session, and official contact lines.
             </p>
           </div>
 
@@ -559,20 +568,6 @@ export const SettingsView: React.FC = () => {
                 </div>
               </div>
 
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Currency Symbol
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={centreForm.currencySymbol || ''}
-                  onChange={(e) =>
-                    setCentreForm({ ...centreForm, currencySymbol: e.target.value })
-                  }
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-900 font-bold focus:bg-white focus:border-orange-500 outline-none"
-                />
-              </div>
 
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">
