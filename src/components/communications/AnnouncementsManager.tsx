@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { api } from '../tos/tosShared';
 import { useApp } from '../../context/AppContext';
 import { ModernSelect } from '../ui/ModernSelect';
 import {
@@ -24,54 +25,56 @@ interface AnnouncementItem {
   title: string;
   body: string;
   audience: string;
-  channels: ('Student Channel' | 'WhatsApp' | 'In-App' | 'Email')[];
+  channels: ('Student Group' | 'WhatsApp' | 'In-App' | 'Email')[];
   dateSent: string;
   isEmergency?: boolean;
   status: 'Delivered' | 'Scheduled';
   imageUrl?: string;
   targetGroups: ('Student' | 'Parents')[];
+  groupName?: string;
 }
 
 export const AnnouncementsManager: React.FC = () => {
-  const { programmes, addToast } = useApp();
+  const { programmes, addToast, activeCentreId } = useApp();
 
-  const [announcements, setAnnouncements] = useState<AnnouncementItem[]>([
-    {
-      id: 'ann-1',
-      title: 'Mandatory Full-Length JAMB Mock Exam (Mock 3)',
-      body: 'All registered 2026 UTME candidates are required to attend CBT Mock 3 this Saturday by 08:30 AM prompt. Come with your ID cards.',
-      audience: 'JAMB / UTME',
-      channels: ['In-App', 'Student Channel', 'WhatsApp'],
-      dateSent: 'Today, 10:15 AM',
-      isEmergency: false,
-      status: 'Delivered',
-      targetGroups: ['Student'],
-    },
-    {
-      id: 'ann-2',
-      title: 'Important: 2nd Tranche Tuition Fee Reminder',
-      body: 'Dear parents, please be reminded that the final installment of the 2026 Academic Session tuition is due on Friday. Receipts are issued automatically upon bank transfer or online payment.',
-      audience: 'WAEC / WASSCE',
-      channels: ['Student Channel', 'WhatsApp'],
-      dateSent: 'Yesterday, 02:00 PM',
-      isEmergency: false,
-      status: 'Delivered',
-      targetGroups: ['Parents'],
-    },
-  ]);
+  const [studentGroups, setStudentGroups] = useState<{ id: string; name: string; kind: string }[]>([]);
+  const [selectedGroupId, setSelectedGroupId] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const [announcements, setAnnouncements] = useState<AnnouncementItem[]>([]);
+
+  // The centre's own chat groups, pulled live so the Student Group channel
+  // can target any group the centre has created.
+  useEffect(() => {
+    if (!activeCentreId || activeCentreId === 'none') return;
+    let dead = false;
+    (async () => {
+      try {
+        const res: any = await api(`/api/centre/chat/bootstrap?centreId=${encodeURIComponent(activeCentreId)}`);
+        if (dead) return;
+        const gs = (res?.groups || [])
+          .filter((g: any) => g.kind === 'custom' || g.kind === 'announcements')
+          .map((g: any) => ({ id: String(g.id), name: String(g.name || 'Group'), kind: String(g.kind || 'custom') }));
+        setStudentGroups(gs);
+        const pref = gs.find((g: any) => g.kind === 'announcements') || gs[0];
+        setSelectedGroupId((prev) => (gs.some((g: any) => g.id === prev) ? prev : pref ? pref.id : ''));
+      } catch { /* the page stays usable without the group list */ }
+    })();
+    return () => { dead = true; };
+  }, [activeCentreId]);
 
   const [showComposeModal, setShowComposeModal] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
     body: '',
     audience: 'All Programs',
-    channels: ['In-App', 'Student Channel'] as ('Student Channel' | 'WhatsApp' | 'In-App' | 'Email')[],
+    channels: ['In-App', 'Student Group'] as ('Student Group' | 'WhatsApp' | 'In-App' | 'Email')[],
     sendMode: 'now' as 'now' | 'schedule',
     scheduleTime: '',
     imageUrl: '',
   });
 
-  const handleToggleChannel = (ch: 'Student Channel' | 'WhatsApp' | 'In-App' | 'Email') => {
+  const handleToggleChannel = (ch: 'Student Group' | 'WhatsApp' | 'In-App' | 'Email') => {
     if (formData.channels.includes(ch)) {
       if (formData.channels.length === 1) return;
       setFormData({
@@ -86,7 +89,7 @@ export const AnnouncementsManager: React.FC = () => {
     }
   };
 
-  const handleSend = (target: 'Student' | 'Parents') => {
+  const handleSend = async (target: 'Student' | 'Parents') => {
     if (!formData.title.trim() || !formData.body.trim()) {
       addToast({ type: 'error', title: 'Missing Info', description: 'Please fill in the title and body.' });
       return;
@@ -95,6 +98,35 @@ export const AnnouncementsManager: React.FC = () => {
     if (formData.sendMode === 'schedule' && !formData.scheduleTime) {
       addToast({ type: 'error', title: 'Missing Time', description: 'Please select a schedule time.' });
       return;
+    }
+
+    const wantsGroup = formData.channels.includes('Student Group');
+    if (wantsGroup && !selectedGroupId) {
+      addToast({ type: 'error', title: 'Select a Group', description: 'Choose the student group this announcement should go into.' });
+      return;
+    }
+
+    let groupName = '';
+    if (wantsGroup && activeCentreId && activeCentreId !== 'none') {
+      if (busy) return;
+      setBusy(true);
+      try {
+        let photoUrl: string | undefined;
+        if (formData.imageUrl) {
+          const up: any = await api(`/api/centre/chat/photo?centreId=${encodeURIComponent(activeCentreId)}`, { method: 'POST', body: { dataUrl: formData.imageUrl } });
+          photoUrl = String(up?.url || '') || undefined;
+        }
+        await api(`/api/centre/chat/groups/${selectedGroupId}/messages?centreId=${encodeURIComponent(activeCentreId)}`, {
+          method: 'POST',
+          body: { text: `${formData.title.trim()}\n\n${formData.body.trim()}`, photoUrl },
+        });
+        groupName = (studentGroups.find((g) => g.id === selectedGroupId) || {}).name || '';
+      } catch (e: any) {
+        setBusy(false);
+        addToast({ type: 'error', title: 'Not Delivered', description: String(e?.message || 'The announcement could not be posted to the selected group.') });
+        return;
+      }
+      setBusy(false);
     }
 
     const newAnn: AnnouncementItem = {
@@ -107,6 +139,7 @@ export const AnnouncementsManager: React.FC = () => {
       status: formData.sendMode === 'now' ? 'Delivered' : 'Scheduled',
       imageUrl: formData.imageUrl,
       targetGroups: [target],
+      groupName: groupName || undefined,
     };
 
     setAnnouncements([newAnn, ...announcements]);
@@ -115,7 +148,7 @@ export const AnnouncementsManager: React.FC = () => {
       title: '',
       body: '',
       audience: 'All Programs',
-      channels: ['In-App', 'Student Channel'],
+      channels: ['In-App', 'Student Group'],
       sendMode: 'now',
       scheduleTime: '',
       imageUrl: '',
@@ -137,7 +170,7 @@ export const AnnouncementsManager: React.FC = () => {
             Announcements
           </h2>
           <p className="text-[11px] text-slate-500 mt-1 uppercase font-black tracking-widest">
-            Omnichannel notification broadcast via Student Channel, WhatsApp, In-App, and Email.
+            Broadcast announcements to your centre's student groups, in-app, WhatsApp and email.
           </p>
         </div>
 
@@ -166,12 +199,12 @@ export const AnnouncementsManager: React.FC = () => {
         <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-sm">
           <div className="flex items-center space-x-2 text-purple-600">
             <Users className="w-3.5 h-3.5 text-purple-600" />
-            <span className="text-[9px] sm:text-[10px] font-black text-purple-600 uppercase tracking-[0.2em]">Reached</span>
+            <span className="text-[9px] sm:text-[10px] font-black text-purple-600 uppercase tracking-[0.2em]">Student Groups</span>
           </div>
           <p className="text-2xl sm:text-3xl font-black text-purple-600 tracking-tight mt-1.5">
-            1,240+
+            {studentGroups.length}
           </p>
-          <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-tighter">Total Audience</p>
+          <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-tighter">Created by your centre</p>
         </div>
       </div>
 
@@ -183,7 +216,12 @@ export const AnnouncementsManager: React.FC = () => {
         </div>
 
         <div className="space-y-4">
-          {announcements.map((ann) => (
+          {announcements.length === 0 ? (
+            <div className="py-12 bg-white rounded-3xl border border-dashed border-slate-200 text-center">
+              <Bell className="w-8 h-8 text-slate-300 mx-auto" />
+              <p className="text-xs font-medium text-slate-400 mt-3">No announcements sent yet.</p>
+            </div>
+          ) : announcements.map((ann) => (
             <div
               key={ann.id}
               className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm hover:border-slate-300 transition-all space-y-3.5 group relative overflow-hidden"
@@ -235,6 +273,11 @@ export const AnnouncementsManager: React.FC = () => {
                       To {g}
                     </span>
                   ))}
+                  {ann.groupName && (
+                    <span className="px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest bg-slate-900 text-white shadow-sm">
+                      {ann.groupName}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -381,7 +424,7 @@ export const AnnouncementsManager: React.FC = () => {
                   Delivery Channels
                 </label>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                  {(['In-App', 'Student Channel', 'WhatsApp', 'Email'] as const).map((ch) => {
+                  {(['In-App', 'Student Group', 'WhatsApp', 'Email'] as const).map((ch) => {
                     const active = formData.channels.includes(ch);
                     return (
                       <button
@@ -399,6 +442,24 @@ export const AnnouncementsManager: React.FC = () => {
                     );
                   })}
                 </div>
+
+                {formData.channels.includes('Student Group') && (
+                  <div className="mt-4 animate-in slide-in-from-top-2">
+                    <ModernSelect
+                      label="Student Group"
+                      value={selectedGroupId}
+                      onChange={(val) => setSelectedGroupId(val)}
+                      options={
+                        studentGroups.length
+                          ? studentGroups.map((g) => ({ value: g.id, label: g.name }))
+                          : [{ value: '', label: 'No student groups yet' }]
+                      }
+                    />
+                    <p className="text-[10px] font-bold text-slate-400 mt-1.5 uppercase tracking-widest">
+                      The announcement posts straight into the selected group.
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center gap-4 pt-6 border-t border-slate-100">

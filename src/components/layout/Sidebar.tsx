@@ -73,7 +73,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
         { id: 'timetable', label: 'Timetable', icon: Calendar },
         { id: 'attendance', label: 'Attendance', icon: UserCheck },
         { id: 'results', label: 'Performance', icon: BarChart3 },
-        { id: 'cbt', label: 'CBT Practice', icon: Laptop },
+        { id: 'cbt', label: 'Tutors Assessment', icon: Laptop },
       ],
     },
     {
