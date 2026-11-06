@@ -124,6 +124,83 @@ function validateConversationId(raw: string, centreId: string, uid: string): str
 // assistant speaks differently in each portal. Students get a friendly
 // subject teacher; tutors get a teaching colleague; admins get a centre
 // management assistant.
+// P1 personalisation: a student's OWN data, read server-side only, so the
+// assistant can give real advice ("your weakest topic is X") instead of
+// generic tips. Students get only their own records; other students are
+// never read, named or quoted. Mock scores appear only after release.
+async function studentContextFor(
+  centreId: string,
+  uid: string,
+  name: string
+): Promise<string> {
+  const lines: string[] = [];
+  if (name) lines.push(`Name: ${name}`);
+  try {
+    let stu: any = null;
+    const byId = await adminDb.collection("students").doc(uid).get();
+    if (byId.exists) stu = byId.data();
+    else {
+      const q = await adminDb.collection("students").where("uid", "==", uid).limit(1).get();
+      if (!q.empty) stu = q.docs[0].data();
+    }
+    if (stu) {
+      const cls = String(stu.class || stu.classroom || stu.level || "").trim();
+      if (cls) lines.push(`Class: ${cls}`);
+      const subs = Array.isArray(stu.subjects)
+        ? stu.subjects.map((v: any) => String(v)).filter(Boolean)
+        : typeof stu.subjects === "string" && stu.subjects.trim()
+          ? stu.subjects.split(",").map((v: string) => v.trim()).filter(Boolean)
+          : [];
+      if (subs.length) lines.push(`Subjects: ${subs.slice(0, 12).join(", ")}`);
+    }
+  } catch { /* the record is optional */ }
+
+  try {
+    const ps = await adminDb.collection("practiceStats").doc(`${uid}__${centreId}`).get();
+    if (ps.exists) {
+      const d = ps.data() as any;
+      const subjects = d?.subjects && typeof d.subjects === "object" ? Object.values(d.subjects) : [];
+      const rows = subjects
+        .filter((v: any) => v && Number(v.answered) > 0)
+        .sort((a: any, b: any) => (Number(b.answered) || 0) - (Number(a.answered) || 0))
+        .slice(0, 8)
+        .map((v: any) => {
+          const pct = Math.round((Number(v.correct) / Number(v.answered)) * 100);
+          const topics = v.topics && typeof v.topics === "object" ? Object.values(v.topics) : [];
+          const weak = topics
+            .filter((t: any) => t && Number(t.answered) >= 3 && Number(t.correct) / Number(t.answered) < 0.6)
+            .sort((a: any, b: any) => Number(a.correct) / Number(a.answered) - Number(b.correct) / Number(b.answered))
+            .slice(0, 3)
+            .map((t: any) => String(t.name || "a topic"));
+          return `${String(v.name || "Subject")}: ${Number(v.correct)}/${Number(v.answered)} correct (${pct}%)${weak.length ? `, weakest topics: ${weak.join(", ")}` : ""}`;
+        });
+      if (rows.length) lines.push(`Practice accuracy (last 60 days): ${rows.join("; ")}.`);
+      const days = d?.days && typeof d.days === "object" ? Object.keys(d.days).filter(Boolean).sort() : [];
+      if (days.length) lines.push(`Practised on ${days.length} of the last 60 days, most recently ${days.slice(-3).join(", ")}.`);
+    }
+  } catch { /* optional */ }
+
+  try {
+    const snap = await adminDb.collection("mockAttempts").where("uid", "==", uid).limit(10).get();
+    const rows = (snap.docs || [])
+      .map((d) => d.data() as any)
+      .filter((a) => String(a?.centreId || "") === centreId)
+      .filter((a) => String(a?.status) === "submitted" && a?.resultSeenAt && a?.score && Number(a.score.answered) > 0)
+      .sort((a, b) => String(b.resultSeenAt).localeCompare(String(a.resultSeenAt)))
+      .slice(0, 3)
+      .map((a) => {
+        const pct = Math.round((Number(a.score.correct) / Number(a.score.answered)) * 100);
+        const per = Array.isArray(a.perSubject)
+          ? a.perSubject.slice(0, 6).map((v: any) => `${String(v.subject || "?")} ${Number(v.correct)}/${Number(v.total)}`).join(", ")
+          : "";
+        return `${String(a.mockTitle || "Mock")}${a.examType ? ` (${String(a.examType).toUpperCase()})` : ""}: ${Number(a.score.correct)}/${Number(a.score.answered)} (${pct}%)${per ? `. Per subject: ${per}` : ""}`;
+      });
+    if (rows.length) lines.push(`Recent mock results (already released to them): ${rows.join("; ")}.`);
+  } catch { /* optional */ }
+
+  return lines.slice(0, 40).join("\n").slice(0, 4000);
+}
+
 async function personaFor(centreId: string, caller: Caller): Promise<string> {
   let role = '';
   let name = '';
@@ -176,12 +253,25 @@ async function personaFor(centreId: string, caller: Caller): Promise<string> {
       "You cannot see the centre’s records (results, attendance, fees) yet. If asked about specific student data, say plainly that you cannot see that yet and give guidance based on what they tell you.",
     ].join(' ');
   }
-  return [
-    `Who you are talking to: ${name ? `${name}, a student${at}.` : `a student${at}.`}`,
+  const studentWho = name ? `${name}, a student${at}.` : `a student${at}.`;
+  const lines = [
+    `Who you are talking to: ${studentWho}`,
     'Talk like a friendly, encouraging subject teacher helping a secondary-school student: simple words, step-by-step explanations, exam tips for WAEC, NECO and JAMB.',
     name ? `When they greet you (for example "hi"), greet ${name} back by name and offer study help.` : 'When they greet you, greet them back warmly and offer study help.',
-    "You cannot see the student’s results, attendance, fees or any school records yet. If asked about their personal performance or school data, say plainly that you cannot see that yet and offer what you can help with instead.",
-  ].join(' ');
+  ];
+  const data = await studentContextFor(centreId, caller.uid, name);
+  if (data) {
+    lines.push(
+      "You CAN see this student's own practice and mock data below. Use it to give personal advice: quote their real scores, name their weak topics and build study plans from it. Never mention or share another student's data.",
+      'Data about this student (their own records only):',
+      data,
+    );
+  } else {
+    lines.push(
+      "You cannot see the student’s results, attendance, fees or any school records yet. If asked about their personal performance or school data, say plainly that you cannot see that yet and offer what you can help with instead.",
+    );
+  }
+  return lines.join('\n');
 }
 
 function titleFrom(text: string, hasImage: boolean): string {
