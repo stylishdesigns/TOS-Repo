@@ -224,11 +224,6 @@ export const TutorPortal: React.FC = () => {
                 <div className="sticky top-0 z-20 bg-slate-50/95 backdrop-blur px-4 py-3 -mt-1">
                   <ChatModeToggle mode={chatMode === 'choose' ? 'status' : chatMode} onChange={(m) => setChatMode(m)} />
                 </div>
-                {chatMode === 'tito' && (
-                  <div className="px-2 sm:px-4 pb-4">
-                    <TutorAiChat embedded mode="light" />
-                  </div>
-                )}
                 {chatMode !== 'chat' && chatMode !== 'tito' && <StaffStatusScreen />}
                 {chatMode === 'chat' && <ChatManager onThreadOpenChange={setChatThreadOpen} />}
               </>
@@ -246,6 +241,15 @@ export const TutorPortal: React.FC = () => {
               />
             )}
           </div>
+
+          {/* Tutor AI: full screen over the frame like the student portal,
+              composer pinned to the bottom; the header back button returns to
+              the chat toggle. The bottom nav is already hidden in this mode. */}
+          {activeTab === 'chat' && chatMode === 'tito' && (
+            <div className="absolute inset-0 z-30 bg-white">
+              <TutorAiChat mode="light" onBack={() => setChatMode('chat')} />
+            </div>
+          )}
 
           {/* 3. Bottom Navigation (Mobile App Style) */}
           <nav className={`${chatThreadOpen || chatMode === 'tito' ? 'hidden' : ''} fixed bottom-0 left-0 right-0 sm:absolute z-40 bg-[#EA580C] border-t border-orange-600/30 py-2 px-3 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] rounded-t-[24px]`}>

@@ -66,8 +66,6 @@ const SYSTEM_PROMPT = [
   'You help secondary-school students and their tutors with their studies: explain topics simply,',
   'answer academic questions step by step, help practise, and help with exam preparation for WAEC, NECO and JAMB.',
   'Rules:',
-  '- You cannot see the student\'s results, attendance, fees or any school records yet. If asked about',
-  '  their personal performance or school data, say plainly that you cannot see that yet and offer what you can help with instead.',
   '- Keep answers clear, warm and concise. Short paragraphs or numbered steps. Simple language.',
   '- Format answers with simple markdown so the app can render them cleanly: **bold** for key terms,',
   '  ## headings for sections of a longer answer, and bullet or numbered lists for steps. Never use',
@@ -119,6 +117,71 @@ function validateConversationId(raw: string, centreId: string, uid: string): str
     throw httpError(400, 'That conversation could not be opened.');
   }
   return id;
+}
+
+// Who the AI is talking to: their portal role (student, tutor or centre
+// admin) and their name, read from the centre's own records, so the same
+// assistant speaks differently in each portal. Students get a friendly
+// subject teacher; tutors get a teaching colleague; admins get a centre
+// management assistant.
+async function personaFor(centreId: string, caller: Caller): Promise<string> {
+  let role = '';
+  let name = '';
+  try {
+    const mem = await adminDb.collection('memberships').doc(`${caller.uid}__${centreId}`).get();
+    if (mem.exists) role = String((mem.data() as any)?.role || '');
+  } catch { /* the fallback persona covers it */ }
+  try {
+    const stu = await adminDb.collection('students').doc(caller.uid).get();
+    if (stu.exists) {
+      name = String((stu.data() as any)?.name || '');
+      role = 'student';
+    }
+  } catch { /* keep the membership role */ }
+  if (!name && (role === 'tutor' || role === 'owner' || role === 'admin' || !role)) {
+    try {
+      const tut = await adminDb.collection('tutors').where('uid', '==', caller.uid).limit(1).get();
+      if (!tut.empty) name = String((tut.docs[0].data() as any)?.name || '');
+    } catch { /* unnamed is fine */ }
+  }
+  if (!name) {
+    try {
+      const adm = await adminDb.collection('admins').doc(caller.uid).get();
+      if (adm.exists) {
+        const v = (adm.data() as any) || {};
+        name = String(v.name || v.displayName || v.fullName || '');
+      }
+    } catch { /* unnamed is fine */ }
+  }
+  let centreName = '';
+  try {
+    const centre = await adminDb.collection('centres').doc(centreId).get();
+    if (centre.exists) centreName = String((centre.data() as any)?.name || '');
+  } catch { /* unnamed is fine */ }
+  const at = centreName ? ` at ${centreName}` : '';
+  const who = name || 'The person you are talking to';
+  if (role === 'tutor') {
+    return [
+      `Who you are talking to: ${name ? `${name}, a tutor${at}.` : `a tutor${at}.`}`,
+      'Treat them as a teaching professional, never like a student. Discuss lesson planning, explaining difficult topics, teaching strategies, class management, marking guidance and how to help their students perform better in WAEC, NECO and JAMB.',
+      name ? `When they greet you (for example "hi"), greet ${name} back by name and offer tutor-relevant help.` : 'When they greet you, greet them back warmly and offer tutor-relevant help.',
+      "You cannot see the centre’s records (results, attendance, fees) yet. If asked about a specific student’s performance, say plainly that you cannot see that yet and give guidance based on what they tell you.",
+    ].join(' ');
+  }
+  if (role === 'owner' || role === 'admin') {
+    return [
+      `Who you are talking to: ${name ? `${name}, the administrator of ${centreName || 'a tutorial centre'}.` : `the administrator of ${centreName || 'a tutorial centre'}.`}`,
+      "Treat them as the centre’s manager. Help with running the centre: understanding student performance and attendance patterns, communicating with students and staff, planning academic programmes, exam preparation logistics and getting the most from the platform.",
+      name ? `When they greet you (for example "hi"), greet ${name} back by name and offer admin-relevant help.` : 'When they greet you, greet them back warmly and offer admin-relevant help.',
+      "You cannot see the centre’s records (results, attendance, fees) yet. If asked about specific student data, say plainly that you cannot see that yet and give guidance based on what they tell you.",
+    ].join(' ');
+  }
+  return [
+    `Who you are talking to: ${name ? `${name}, a student${at}.` : `a student${at}.`}`,
+    'Talk like a friendly, encouraging subject teacher helping a secondary-school student: simple words, step-by-step explanations, exam tips for WAEC, NECO and JAMB.',
+    name ? `When they greet you (for example "hi"), greet ${name} back by name and offer study help.` : 'When they greet you, greet them back warmly and offer study help.',
+    "You cannot see the student’s results, attendance, fees or any school records yet. If asked about their personal performance or school data, say plainly that you cannot see that yet and offer what you can help with instead.",
+  ].join(' ');
 }
 
 function titleFrom(text: string, hasImage: boolean): string {
@@ -229,6 +292,8 @@ export function registerTutorAiRoutes(app: express.Express) {
       });
 
       // Ask the model. The image rides only on this request; history is text.
+      const persona = await personaFor(centreId, caller);
+
       const ai = await getTutorAiClient();
       const contents: any[] = history
         .filter((m) => m.text)
@@ -243,7 +308,7 @@ export function registerTutorAiRoutes(app: express.Express) {
         const response = await ai.models.generateContent({
           model: TUTOR_AI_MODEL,
           contents,
-          config: { systemInstruction: SYSTEM_PROMPT },
+          config: { systemInstruction: `${SYSTEM_PROMPT}\n\n${persona}` },
         });
         reply = String(response.text || '').trim();
       } catch (err: any) {

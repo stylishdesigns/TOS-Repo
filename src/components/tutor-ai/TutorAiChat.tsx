@@ -55,13 +55,6 @@ interface Convo {
   updatedAt: number;
 }
 
-const CHIPS: { label: string; fill: string }[] = [
-  { label: 'Explain a topic', fill: 'Explain ' },
-  { label: 'Practice questions', fill: 'Give me practice questions on ' },
-  { label: 'Study tips', fill: 'Give me study tips for ' },
-  { label: 'Check my work', fill: 'Check my work: ' },
-];
-
 // Same downscale approach as the chat composer: long edge 1400px, JPEG,
 // quality stepped down until it fits the send budget. A small thumbnail is
 // produced alongside for the bubble and the stored history.
@@ -302,6 +295,7 @@ const TutorAiChat: React.FC<Props> = ({
   const [convos, setConvos] = useState<Convo[]>([]);
   const [convosLoaded, setConvosLoaded] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [chipTurn, setChipTurn] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -364,6 +358,7 @@ const TutorAiChat: React.FC<Props> = ({
       setMsgs(Array.isArray(res?.messages) ? res.messages : []);
       if (res?.conversationId) setActiveId(res.conversationId);
       loadConversations();
+      setChipTurn((t) => t + 1);
     } catch (e: any) {
       setError(e?.message || 'Tutor AI could not answer just now. Please try again.');
     } finally {
@@ -378,6 +373,7 @@ const TutorAiChat: React.FC<Props> = ({
     setMsgs([]);
     setActiveId(null);
     setError('');
+    setChipTurn((t) => t + 1);
     inputRef.current?.focus();
   }, []);
 
@@ -391,6 +387,7 @@ const TutorAiChat: React.FC<Props> = ({
         setMsgs(Array.isArray(res?.messages) ? res.messages : []);
         setActiveId(id);
         setError('');
+        setChipTurn((t) => t + 1);
       } catch {
         setError('That chat could not be opened. Please try again.');
       }
@@ -434,7 +431,7 @@ const TutorAiChat: React.FC<Props> = ({
         {m.role === 'ai' ? (
           <div className="text-[15px] leading-relaxed">{renderRichText(m.text)}</div>
         ) : (
-          <p className="text-[15px] leading-relaxed whitespace-pre-wrap break-words font-medium">{m.text}</p>
+          <p className="text-[15px] leading-relaxed whitespace-pre-wrap break-words font-medium text-white">{m.text}</p>
         )}
         <p className={`text-[11px] mt-1 font-bold ${m.role === 'user' ? 'text-orange-200/80' : th.aiTime}`}>
           {optimistic ? 'sending…' : clock(m.at)}
@@ -464,8 +461,37 @@ const TutorAiChat: React.FC<Props> = ({
     rendered.push(renderBubble(m, optimistic, `m${i}`));
   });
 
+  // One suggestion at a time, driven by the last thing the AI said, so the
+  // chip follows the conversation instead of sitting there forever.
+  const chip = (() => {
+    const lastAi = [...msgs].reverse().find((m) => m.role === 'ai');
+    if (!lastAi) {
+      const starters = [
+        { label: 'Explain a topic', fill: 'Explain ' },
+        { label: 'Give me practice questions', fill: 'Give me practice questions on ' },
+        { label: 'Give me study tips', fill: 'Give me study tips for ' },
+        { label: 'Check my work', fill: 'Check my work: ' },
+      ];
+      return starters[chipTurn % starters.length];
+    }
+    const heading = /^#{1,6}\s+(.{3,48})$/m.exec(lastAi.text);
+    const bold = /\*\*([^*]{3,48})\*\*/.exec(lastAi.text);
+    let topic = ((heading ? heading[1] : '') || (bold ? bold[1] : '')).replace(/[:.,!?]+$/, '').trim();
+    if (!topic) {
+      const first = lastAi.text.replace(/[#*`>]/g, '').split('\n').find((l) => l.trim().length > 8) || 'that';
+      topic = first.trim().split(/\s+/).slice(0, 5).join(' ');
+    }
+    const variants = [
+      { label: `Tell me more about ${topic}`, fill: `Tell me more about ${topic}` },
+      { label: 'Give me an example', fill: `Give me a simple example of ${topic}` },
+      { label: `Quiz me on ${topic}`, fill: `Give me 5 practice questions on ${topic}` },
+      { label: 'Explain it more simply', fill: `Explain ${topic} again in the simplest way possible` },
+    ];
+    return variants[chipTurn % variants.length];
+  })();
+
   const shell = embedded
-    ? `h-[75vh] max-h-[760px] min-h-[480px] rounded-2xl border ${th.embedded} overflow-hidden shadow-inner`
+    ? `h-[75vh] max-h-[760px] min-h-[480px] rounded-2xl border ${th.embedded} overflow-hidden`
     : 'h-full';
 
   return (
@@ -475,7 +501,7 @@ const TutorAiChat: React.FC<Props> = ({
         <div className="absolute inset-0 z-40 flex" role="dialog" aria-label="Chat history">
           <div className="absolute inset-0 bg-black/40" onClick={() => setDrawerOpen(false)} aria-hidden="true" />
           <div
-            className={`relative w-72 max-w-[80%] h-full border-r shadow-2xl flex flex-col animate-in slide-in-from-left duration-200 ${th.drawer}`}
+            className={`relative w-72 max-w-[80%] h-full border-r flex flex-col animate-in slide-in-from-left duration-200 ${th.drawer}`}
           >
             <div className={`shrink-0 px-4 pt-4 pb-3 flex items-center justify-between border-b ${th.drawer}`}>
               <p className={`text-sm font-black ${th.drawerText}`}>Your chats</p>
@@ -602,21 +628,18 @@ const TutorAiChat: React.FC<Props> = ({
         </div>
       )}
 
-      {/* Quick chips */}
-      <div className="shrink-0 flex gap-2 overflow-x-auto px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {CHIPS.map((c) => (
-          <button
-            key={c.label}
-            type="button"
-            onClick={() => {
-              setInput(c.fill);
-              inputRef.current?.focus();
-            }}
-            className={`shrink-0 text-[12px] font-bold border rounded-full px-3 py-1.5 transition-all cursor-pointer ${th.chip}`}
-          >
-            {c.label}
-          </button>
-        ))}
+      {/* One dynamic suggestion above the composer */}
+      <div className="shrink-0 flex px-4 pb-2">
+        <button
+          type="button"
+          onClick={() => {
+            setInput(chip.fill);
+            inputRef.current?.focus();
+          }}
+          className={`shrink-0 max-w-full truncate text-[12px] font-bold border rounded-full px-3 py-1.5 transition-all cursor-pointer ${th.chip}`}
+        >
+          {chip.label.length > 44 ? `${chip.label.slice(0, 41)}…` : chip.label}
+        </button>
       </div>
 
       {/* Pinned composer */}
