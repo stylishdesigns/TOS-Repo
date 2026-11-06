@@ -152,27 +152,6 @@ async function consumeBurstLimit(caller: Caller, config: any): Promise<void> {
   }
 }
 
-// The member's monthly counter, shared by all of their conversations in the
-// centre. Returns how many messages are left this month after counting one.
-async function consumeMonthlyCap(
-  tx: FirebaseFirestore.Transaction,
-  centreId: string,
-  caller: Caller,
-  monthlyCap: number
-): Promise<number> {
-  const usageRef = adminDb.collection('tutorAiUsage').doc(`${centreId}__${caller.uid}`);
-  const snap = await tx.get(usageRef);
-  const data = (snap.exists ? snap.data() : null) as any;
-  const now = Date.now();
-  const monthKey = new Date().toISOString().slice(0, 7);
-  const monthCount = data && data.monthKey === monthKey ? (data.monthCount || 0) + 1 : 1;
-  if (monthCount > monthlyCap) {
-    throw httpError(429, 'Tutor AI has reached its message limit for this centre this month. Ask the centre admin for help.');
-  }
-  tx.set(usageRef, { centreId, uid: caller.uid, monthKey, monthCount, updatedAt: now }, { merge: false });
-  return Math.max(0, monthlyCap - monthCount);
-}
-
 export function registerTutorAiRoutes(app: express.Express) {
   // Send a message (and optionally a photo) to the Tutor AI. The first message
   // of a new chat creates the conversation; later messages carry its id.
@@ -205,17 +184,28 @@ export function registerTutorAiRoutes(app: express.Express) {
 
       // One transaction: enforce the monthly cap across all conversations,
       // create the conversation when it is new, and store the user's message
-      // (thumbnail only, never the full upload).
+      // (thumbnail only, never the full upload). Firestore requires every
+      // read inside a transaction to run before any write, so both documents
+      // are read first and only then written.
       let history: Array<{ role: 'user' | 'ai'; text: string }> = [];
       let remaining = 0;
       await adminDb.runTransaction(async (tx) => {
-        remaining = await consumeMonthlyCap(tx, centreId, caller, monthlyCap);
-        const snap = await tx.get(convRef);
-        const data = (snap.exists ? snap.data() : null) as any;
+        const usageRef = adminDb.collection('tutorAiUsage').doc(`${centreId}__${caller.uid}`);
+        const usageSnap = await tx.get(usageRef);
+        const convSnap = await tx.get(convRef);
+        const u = (usageSnap.exists ? usageSnap.data() : null) as any;
+        const monthKey = new Date().toISOString().slice(0, 7);
+        const monthCount = u && u.monthKey === monthKey ? (u.monthCount || 0) + 1 : 1;
+        if (monthCount > monthlyCap) {
+          throw httpError(429, 'Tutor AI has reached its message limit for this centre this month. Ask the centre admin for help.');
+        }
+        remaining = Math.max(0, monthlyCap - monthCount);
+        const data = (convSnap.exists ? convSnap.data() : null) as any;
         const previous: any[] = Array.isArray(data?.messages) ? data.messages : [];
         history = previous.slice(-CONTEXT_MESSAGES).map((m: any) => ({ role: m.role === 'ai' ? 'ai' : 'user', text: String(m.text || '') }));
         const userMsg = { role: 'user', text: rawText, img: thumb ? thumb.data : null, at: now };
         const messages = [...previous, userMsg].slice(-MESSAGES_KEPT);
+        tx.set(usageRef, { centreId, uid: caller.uid, monthKey, monthCount, updatedAt: now }, { merge: false });
         tx.set(convRef, {
           centreId,
           uid: caller.uid,
