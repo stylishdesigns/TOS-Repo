@@ -171,7 +171,7 @@ function renderRichText(text: string): React.ReactNode[] {
       if (heading) {
         flushList();
         out.push(
-          <p key={`h${i}`} className="text-[14px] font-black mt-2 first:mt-0">
+          <p key={`h${i}`} className="text-[16px] font-black mt-2 first:mt-0">
             {inline(heading[1])}
           </p>
         );
@@ -432,11 +432,11 @@ const TutorAiChat: React.FC<Props> = ({
           />
         )}
         {m.role === 'ai' ? (
-          <div className="text-[13px] leading-relaxed">{renderRichText(m.text)}</div>
+          <div className="text-[15px] leading-relaxed">{renderRichText(m.text)}</div>
         ) : (
-          <p className="text-[13px] leading-relaxed whitespace-pre-wrap break-words font-medium">{m.text}</p>
+          <p className="text-[15px] leading-relaxed whitespace-pre-wrap break-words font-medium">{m.text}</p>
         )}
-        <p className={`text-[10px] mt-1 font-bold ${m.role === 'user' ? 'text-orange-200/80' : th.aiTime}`}>
+        <p className={`text-[11px] mt-1 font-bold ${m.role === 'user' ? 'text-orange-200/80' : th.aiTime}`}>
           {optimistic ? 'sending…' : clock(m.at)}
         </p>
       </div>
@@ -538,8 +538,8 @@ const TutorAiChat: React.FC<Props> = ({
           <Sparkles className="w-5 h-5 text-white" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className={`text-sm font-black ${th.headerTitle}`}>Tutor AI</p>
-          <p className={`text-[11px] font-semibold truncate ${th.headerSub}`}>
+          <p className={`text-[17px] font-black ${th.headerTitle}`}>Tutor AI</p>
+          <p className={`text-[13px] font-semibold truncate ${th.headerSub}`}>
             {activeCentre?.name || 'Your study assistant'}
           </p>
         </div>
@@ -564,7 +564,7 @@ const TutorAiChat: React.FC<Props> = ({
               <Sparkles className="w-3.5 h-3.5 text-white" />
             </div>
             <div className={`max-w-[85%] px-4 py-2.5 rounded-2xl rounded-tl-md ${th.aiBubble}`}>
-              <p className="text-[13px] leading-relaxed font-medium">
+              <p className="text-[15px] leading-relaxed font-medium">
                 Hi! I'm Tutor AI, your study assistant. Ask me anything about your schoolwork, or send a
                 photo of a question or your work and I'll help you with it.
               </p>
@@ -612,7 +612,7 @@ const TutorAiChat: React.FC<Props> = ({
               setInput(c.fill);
               inputRef.current?.focus();
             }}
-            className={`shrink-0 text-[11px] font-bold border rounded-full px-3 py-1.5 transition-all cursor-pointer ${th.chip}`}
+            className={`shrink-0 text-[12px] font-bold border rounded-full px-3 py-1.5 transition-all cursor-pointer ${th.chip}`}
           >
             {c.label}
           </button>
@@ -644,7 +644,7 @@ const TutorAiChat: React.FC<Props> = ({
             }}
             placeholder="Ask Tutor AI anything…"
             aria-label="Message Tutor AI"
-            className={`flex-1 border rounded-full px-4 py-2.5 text-[13px] font-medium outline-none min-w-0 ${th.input}`}
+            className={`flex-1 border rounded-full px-4 py-3 text-[15px] font-medium outline-none min-w-0 ${th.input}`}
           />
           <button
             type="button"
@@ -683,7 +683,7 @@ const TutorAiChat: React.FC<Props> = ({
               }}
               placeholder="Add a question about this photo (optional)"
               aria-label="Question about the photo"
-              className={`w-full border rounded-full px-4 py-2.5 text-[13px] font-medium outline-none mb-3 ${th.captionInput}`}
+              className={`w-full border rounded-full px-4 py-3 text-[15px] font-medium outline-none mb-3 ${th.captionInput}`}
             />
             <div className="flex gap-2">
               <button
@@ -692,7 +692,7 @@ const TutorAiChat: React.FC<Props> = ({
                   setPreview(null);
                   setCaption('');
                 }}
-                className={`flex-1 py-2.5 rounded-full text-[13px] font-black transition-all cursor-pointer ${th.cancelBtn}`}
+                className={`flex-1 py-3 rounded-full text-[14px] font-black transition-all cursor-pointer ${th.cancelBtn}`}
               >
                 Cancel
               </button>
@@ -705,7 +705,7 @@ const TutorAiChat: React.FC<Props> = ({
                   setCaption('');
                   send(text, att);
                 }}
-                className="flex-1 py-2.5 rounded-full bg-gradient-to-br from-orange-500 to-orange-700 text-white text-[13px] font-black hover:brightness-110 transition-all cursor-pointer"
+                className="flex-1 py-3 rounded-full bg-gradient-to-br from-orange-500 to-orange-700 text-white text-[14px] font-black hover:brightness-110 transition-all cursor-pointer"
               >
                 Send
               </button>

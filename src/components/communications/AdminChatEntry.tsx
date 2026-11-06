@@ -16,7 +16,7 @@ export const AdminChatEntry: React.FC = () => {
       <div className="sticky top-0 z-20 bg-slate-50/95 backdrop-blur px-4 pt-4 pb-3">
         <ChatModeToggle mode={mode} onChange={setMode} />
       </div>
-      {mode === 'status' ? <StaffStatusScreen /> : mode === 'tito' ? <div className="px-2 pb-4"><TutorAiChat embedded /></div> : <ChatManager />}
+      {mode === 'status' ? <StaffStatusScreen /> : mode === 'tito' ? <div className="px-2 pb-4"><TutorAiChat embedded mode="light" /></div> : <ChatManager />}
     </div>
   );
 };

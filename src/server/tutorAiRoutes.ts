@@ -47,6 +47,17 @@ const MAX_TEXT_CHARS = 4000;
 const MAX_IMAGE_BASE64_CHARS = 4_600_000; // ~3.4 MB binary
 const MAX_THUMB_BASE64_CHARS = 260_000; // ~190 KB binary
 const ID_RE = /^[a-zA-Z0-9_\-]+$/;
+// Photos sent to the AI are stored as small thumbnails inside the
+// conversation document (the full upload is never stored). Any thumbnail
+// older than this is dropped the next time the conversation is written, so
+// old chats do not pile up storage forever.
+const IMAGE_RETENTION_DAYS = 30;
+const pruneOldImages = (messages: any[], now = Date.now()) =>
+  messages.map((m) =>
+    m && m.img && now - (m.at || 0) > IMAGE_RETENTION_DAYS * 24 * 60 * 60 * 1000
+      ? { ...m, img: null }
+      : m
+  );
 
 const rateLimitDocId = (key: string) => encodeURIComponent(key).slice(0, 1400);
 
@@ -204,7 +215,7 @@ export function registerTutorAiRoutes(app: express.Express) {
         const previous: any[] = Array.isArray(data?.messages) ? data.messages : [];
         history = previous.slice(-CONTEXT_MESSAGES).map((m: any) => ({ role: m.role === 'ai' ? 'ai' : 'user', text: String(m.text || '') }));
         const userMsg = { role: 'user', text: rawText, img: thumb ? thumb.data : null, at: now };
-        const messages = [...previous, userMsg].slice(-MESSAGES_KEPT);
+        const messages = pruneOldImages([...previous, userMsg].slice(-MESSAGES_KEPT), now);
         tx.set(usageRef, { centreId, uid: caller.uid, monthKey, monthCount, updatedAt: now }, { merge: false });
         tx.set(convRef, {
           centreId,
@@ -246,7 +257,7 @@ export function registerTutorAiRoutes(app: express.Express) {
         const snap = await tx.get(convRef);
         const data = (snap.exists ? snap.data() : null) as any;
         const previous: any[] = Array.isArray(data?.messages) ? data.messages : [];
-        const messages = [...previous, { role: 'ai', text: reply, img: null, at: Date.now() }].slice(-MESSAGES_KEPT);
+        const messages = pruneOldImages([...previous, { role: 'ai', text: reply, img: null, at: Date.now() }].slice(-MESSAGES_KEPT));
         tx.set(convRef, { ...(data || { centreId, uid: caller.uid }), messages, updatedAt: Date.now() }, { merge: false });
       }).catch((err) => tutorAiFailure('storeReply', err));
 

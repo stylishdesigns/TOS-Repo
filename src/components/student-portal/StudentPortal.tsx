@@ -780,7 +780,7 @@ export const StudentPortal: React.FC = () => {
                 bgTheme === 'dark' ? 'bg-slate-950' : 'bg-white'
               }`}
             >
-              <TutorAiChat bottomInset={0} mode={bgTheme} onBack={() => setTitoOpen(false)} />
+              <TutorAiChat bottomInset={0} mode={bgTheme} onBack={() => { setTitoOpen(false); openChatFan(); }} />
             </div>
           )}
 
@@ -972,7 +972,7 @@ export const StudentPortal: React.FC = () => {
                     role="menuitem"
                     onClick={fanWing(openTito)}
                     aria-label="Tutor AI"
-                    className={`absolute w-12 h-12 rounded-full bg-white text-violet-600 flex items-center justify-center shadow-lg cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 ${prefersReducedMotion ? '' : 'animate-in fade-in zoom-in-95 duration-200'}`}
+                    className={`absolute w-12 h-12 rounded-full bg-white text-[#EA580C] flex items-center justify-center shadow-lg cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 ${prefersReducedMotion ? '' : 'animate-in fade-in zoom-in-95 duration-200'}`}
                     style={{ left: 72, top: -42, transform: 'translate(-50%, -50%)' }}
                   >
                     <Sparkles className="w-6 h-6" />
