@@ -662,19 +662,25 @@ const TutorAiChat: React.FC<Props> = ({
         </div>
       )}
 
-      {/* One dynamic suggestion above the composer */}
-      <div className="shrink-0 flex px-4 pb-2">
-        <button
-          type="button"
-          onClick={() => {
-            setInput(chip.fill);
-            inputRef.current?.focus();
-          }}
-          className={`shrink-0 max-w-full truncate text-[12px] font-bold border rounded-full px-3 py-1.5 transition-all cursor-pointer ${th.chip}`}
-        >
-          {chip.label.length > 44 ? `${chip.label.slice(0, 41)}…` : chip.label}
-        </button>
-      </div>
+      {/* One dynamic suggestion above the composer. It only sits there while
+          nothing is being asked: hidden the moment the composer has text and
+          while the AI is answering or typing out its reply, then it slides
+          back in with a small pop once the response lands. */}
+      {!(busy || pending || typing || input.trim().length > 0) && (
+        <div className="shrink-0 flex px-4 pb-2">
+          <button
+            key={chip.label}
+            type="button"
+            onClick={() => {
+              setInput(chip.fill);
+              inputRef.current?.focus();
+            }}
+            className={`animate-chip-in shrink-0 max-w-full truncate text-[12px] font-bold border rounded-full px-3 py-1.5 transition-all cursor-pointer ${th.chip}`}
+          >
+            {chip.label.length > 44 ? `${chip.label.slice(0, 41)}…` : chip.label}
+          </button>
+        </div>
+      )}
 
       {/* Pinned composer */}
       <div className={`shrink-0 backdrop-blur-md border-t px-3 pt-2 ${th.composer}`} style={bottomInset ? { paddingBottom: bottomInset } : { paddingBottom: 10 }}>

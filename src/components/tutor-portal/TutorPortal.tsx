@@ -244,9 +244,11 @@ export const TutorPortal: React.FC = () => {
 
           {/* Tutor AI: full screen over the frame like the student portal,
               composer pinned to the bottom; the header back button returns to
-              the chat toggle. The bottom nav is already hidden in this mode. */}
+              the chat toggle. The bottom nav is already hidden in this mode.
+              z-50 puts it above the sticky portal header (z-40): at z-30 the
+              header covered the AI's own back button and trapped the portal. */}
           {activeTab === 'chat' && chatMode === 'tito' && (
-            <div className="fixed inset-0 z-30 bg-white">
+            <div className="fixed inset-0 z-50 bg-white">
               <TutorAiChat mode="light" onBack={() => setChatMode('chat')} />
             </div>
           )}
