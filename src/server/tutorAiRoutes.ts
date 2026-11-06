@@ -211,25 +211,156 @@ async function mockAggregateFor(centreId: string): Promise<MockAgg | null> {
 }
 
 /** The centre's class roster: names and classes only, no scores here. */
-async function rosterFor(centreId: string): Promise<{ name: string; cls: string; uid: string }[]> {
-  const cached = cacheGet(`roster:${centreId}`);
-  if (cached) return cached as { name: string; cls: string; uid: string }[];
+interface RosterRow {
+  name: string;
+  cls: string;
+  uid: string;
+  subjects: string[];
+  attendance: number; // percent, 0 when not recorded
+  totalFee: number;
+  paidAmount: number;
+  outstanding: number;
+  paymentStatus: string;
+}
+
+async function rosterFor(centreId: string): Promise<RosterRow[]> {
+  const cached = cacheGet(`roster2:${centreId}`);
+  if (cached) return cached as RosterRow[];
   try {
     const snap = await adminDb.collection('students').where('centreId', '==', centreId).limit(60).get();
-    const rows = (snap.docs || [])
+    const rows: RosterRow[] = (snap.docs || [])
       .map((d) => {
         const v = d.data() as any;
+        const totalFee = Number(v?.totalFee) || 0;
+        const paidAmount = Number(v?.paidAmount) || 0;
+        const outstanding =
+          typeof v?.outstandingBalance === 'number' ? v.outstandingBalance : Math.max(totalFee - paidAmount, 0);
         return {
           name: String(v?.name || '').trim(),
           cls: String(v?.class || v?.classroom || v?.level || '').trim(),
           uid: String(v?.uid || d.id),
+          subjects: Array.isArray(v?.subjects) ? v.subjects.map((x: any) => String(x)).filter(Boolean) : [],
+          attendance: Math.round(Number(v?.attendancePercent) || 0),
+          totalFee,
+          paidAmount,
+          outstanding,
+          paymentStatus: String(v?.paymentStatus || ''),
         };
       })
       .filter((r) => r.name);
-    cacheSet(`roster:${centreId}`, rows);
+    cacheSet(`roster2:${centreId}`, rows);
     return rows;
   } catch {
     return [];
+  }
+}
+
+/** P5: the centre's tutors, matched by subject so students can find theirs and
+ *  tutors can find their own students. */
+interface TutorRow {
+  name: string;
+  subjects: string[];
+  classes: string[];
+}
+
+async function tutorsFor(centreId: string): Promise<TutorRow[]> {
+  const cached = cacheGet(`tutors:${centreId}`);
+  if (cached) return cached as TutorRow[];
+  try {
+    const snap = await adminDb.collection('tutors').where('centreId', '==', centreId).limit(100).get();
+    const rows: TutorRow[] = (snap.docs || [])
+      .map((d) => {
+        const v = d.data() as any;
+        return {
+          name: String(v?.name || '').trim(),
+          subjects: Array.isArray(v?.subjects) ? v.subjects.map((x: any) => String(x)).filter(Boolean) : [],
+          classes: [
+            ...(Array.isArray(v?.classrooms) ? v.classrooms.map((x: any) => String(x)).filter(Boolean) : []),
+            ...(Array.isArray(v?.classesAssigned) ? v.classesAssigned.map((x: any) => String(x)).filter(Boolean) : []),
+          ],
+        };
+      })
+      .filter((r) => r.name);
+    cacheSet(`tutors:${centreId}`, rows);
+    return rows;
+  } catch {
+    return [];
+  }
+}
+
+/** P5: finance aggregates for admins allowed to see money. Reads at most 60
+ *  recent payments plus the cached roster; only Paid/Partial count as money
+ *  received (Pending/Rejected are claims, not cash). */
+interface FinanceAgg {
+  collected: number;
+  collectedCount: number;
+  pendingCount: number;
+  pendingSum: number;
+  recent: string[];
+  feeTotal: number;
+  feePaid: number;
+  feeOutstanding: number;
+  debtors: string[];
+  scannedStudents: number;
+}
+
+async function financeFor(centreId: string): Promise<FinanceAgg | null> {
+  const cached = cacheGet(`finance:${centreId}`);
+  if (cached) return cached as FinanceAgg;
+  const out: FinanceAgg = {
+    collected: 0,
+    collectedCount: 0,
+    pendingCount: 0,
+    pendingSum: 0,
+    recent: [],
+    feeTotal: 0,
+    feePaid: 0,
+    feeOutstanding: 0,
+    debtors: [],
+    scannedStudents: 0,
+  };
+  try {
+    const snap = await adminDb.collection('payments').where('centreId', '==', centreId).limit(60).get();
+    const rows = (snap.docs || [])
+      .map((d) => d.data() as any)
+      .filter((v) => v && typeof v === 'object' && v.status)
+      .sort((a, b) => String(b?.date || '').localeCompare(String(a?.date || '')));
+    for (const v of rows) {
+      const status = String(v.status || '');
+      const amt = Number(v.amountPaid) || 0;
+      if (status === 'Paid' || status === 'Partial') {
+        out.collected += amt;
+        out.collectedCount++;
+      } else if (status === 'Pending') {
+        out.pendingCount++;
+        out.pendingSum += amt;
+      }
+    }
+    out.recent = rows
+      .slice(0, 10)
+      .map(
+        (v) =>
+          `${String(v.date || '').slice(0, 10)}: ${String(v.studentName || 'a student')} paid ₦${(Number(v.amountPaid) || 0).toLocaleString()} (${String(v.method || '?')}, ${String(v.status)})`
+      );
+    const roster = await rosterFor(centreId);
+    out.scannedStudents = roster.length;
+    for (const r of roster) {
+      out.feeTotal += r.totalFee;
+      out.feePaid += r.paidAmount;
+    }
+    out.feeOutstanding = Math.max(out.feeTotal - out.feePaid, 0);
+    out.debtors = roster
+      .filter((r) => r.outstanding > 0)
+      .sort((a, b) => b.outstanding - a.outstanding)
+      .slice(0, 10)
+      .map(
+        (r) =>
+          `${r.name}${r.cls ? ` (${r.cls})` : ''} owes ₦${r.outstanding.toLocaleString()} of ₦${r.totalFee.toLocaleString()}${r.paymentStatus ? ` (${r.paymentStatus})` : ''}`
+      );
+    cacheSet(`finance:${centreId}`, out);
+    return out;
+  } catch {
+    return null;
   }
 }
 
@@ -264,37 +395,87 @@ async function tutorContext(centreId: string, uid: string, name: string): Promis
     if (agg.perSubject.length) {
       lines.push(`Weakest to strongest subjects: ${agg.perSubject.map((v) => `${v.subject} ${v.pct}%`).join(', ')}.`);
     }
-    const roster = await rosterFor(centreId);
-    const withMocks = roster
-      .filter((r) => agg.perStudent.has(r.uid))
+  }
+  // P5: which students does this tutor actually teach? Matched by the subjects
+  // on their tutor record and the classes they are assigned; a tutor with
+  // neither recorded keeps seeing the whole roster as before.
+  let roster: RosterRow[] = [];
+  try {
+    roster = await rosterFor(centreId);
+  } catch {
+    roster = [];
+  }
+  if (roster.length) {
+    let tutSubjects: string[] = [];
+    let tutClasses: string[] = [];
+    try {
+      let tut: any = null;
+      const byId = await adminDb.collection('tutors').doc(uid).get().catch(() => null);
+      if (byId?.exists) tut = byId.data();
+      else {
+        const q = await adminDb.collection('tutors').where('uid', '==', uid).limit(1).get();
+        if (!q.empty) tut = q.docs[0].data();
+      }
+      if (tut) {
+        tutSubjects = Array.isArray(tut.subjects)
+          ? tut.subjects.map((v: any) => String(v).trim().toLowerCase()).filter(Boolean)
+          : [];
+        const rawCls = [
+          ...(Array.isArray(tut.classrooms) ? tut.classrooms : []),
+          ...(Array.isArray(tut.classesAssigned) ? tut.classesAssigned : []),
+        ];
+        tutClasses = rawCls.map((v: any) => String(v).trim().toLowerCase()).filter(Boolean);
+      }
+    } catch {
+      /* fall back to the whole roster */
+    }
+    const assigned =
+      tutSubjects.length || tutClasses.length
+        ? roster.filter(
+            (r) =>
+              (tutSubjects.length > 0 && r.subjects.some((x) => tutSubjects.includes(x.trim().toLowerCase()))) ||
+              (!!r.cls && tutClasses.includes(r.cls.trim().toLowerCase()))
+          )
+        : roster;
+    const shown = assigned
+      .slice(0, 25)
       .map((r) => {
-        const m = agg.perStudent.get(r.uid)!;
-        return `${r.name}${r.cls ? ` (${r.cls})` : ''}: ${m.mocks} mock${m.mocks === 1 ? '' : 's'}, average ${m.pct}%`;
+        const m = agg ? agg.perStudent.get(r.uid) : null;
+        const att = r.attendance ? `, attendance ${r.attendance}%` : '';
+        const subs = r.subjects.length ? `, subjects ${r.subjects.slice(0, 8).join(', ')}` : '';
+        const mk = m ? `, released mock average ${m.pct}% across ${m.mocks} mock${m.mocks === 1 ? '' : 's'}` : '';
+        return `${r.name}${r.cls ? ` (${r.cls})` : ''}${subs}${att}${mk}`;
       })
-      .sort((a, b) => Number(a.match(/average (\d+)%/)?.[1] || 0) - Number(b.match(/average (\d+)%/)?.[1] || 0))
-      .slice(0, 25);
-    if (withMocks.length) {
-      lines.push(`Student mock averages (weakest first): ${withMocks.join('; ')}.`);
-      const rest = roster.length - withMocks.length;
-      if (rest > 0) lines.push(`${rest} more student(s) have no released mock results yet.`);
-    } else if (roster.length) {
-      lines.push(`Roster: ${roster.slice(0, 25).map((r) => r.name + (r.cls ? ` (${r.cls})` : '')).join(', ')}${roster.length > 25 ? ' and others' : ''}. No released mock results yet.`);
+      .sort((a, b) => Number(a.match(/average (\d+)%/)?.[1] ?? 999) - Number(b.match(/average (\d+)%/)?.[1] ?? 999));
+    if (shown.length) {
+      lines.push(
+        `Your students (matched by the subjects you cover and their classes, weakest released mock first): ${shown.join('; ')}.`
+      );
+      const rest = roster.length - assigned.length;
+      if (rest > 0) lines.push(`${rest} more student(s) are outside your subjects and classes.`);
+    } else {
+      lines.push(`No students match your subjects or classes yet (the roster has about ${roster.length}).`);
     }
   }
   return lines.join('\n').slice(0, 4000);
 }
 
-/** P3: the admin's centre overview: enrolment, staff, billing state and
- *  released mock performance. Students' private practice records are never
- *  included. */
-async function adminContext(centreId: string): Promise<string> {
+/** P3+P5: the admin's centre overview: enrolment, staff, attendance and
+ *  released mock performance for everyone; finance (billing, payments,
+ *  balances) only for roles allowed to see money. Students' private practice
+ *  records are never included. */
+async function adminContext(centreId: string, opts: { finance: boolean }): Promise<string> {
   const lines: string[] = [];
   const roster = await rosterFor(centreId);
   if (roster.length) lines.push(`Students enrolled: about ${roster.length}${roster.length >= 60 ? '+' : ''}.`);
-  try {
-    const tutSnap = await adminDb.collection('tutors').where('centreId', '==', centreId).limit(100).get();
-    if (tutSnap.size) lines.push(`Tutors: about ${tutSnap.size}${tutSnap.size >= 100 ? '+' : ''}.`);
-  } catch { /* optional */ }
+  const tutors = await tutorsFor(centreId);
+  if (tutors.length) lines.push(`Tutors: about ${tutors.length}${tutors.length >= 100 ? '+' : ''}.`);
+  const withAtt = roster.filter((r) => r.attendance > 0);
+  if (withAtt.length) {
+    const avg = Math.round(withAtt.reduce((sum, r) => sum + r.attendance, 0) / withAtt.length);
+    lines.push(`Average attendance: about ${avg}%.`);
+  }
+  if (opts.finance) {
   try {
     const billing = await adminDb.collection('centreBilling').doc(centreId).get();
     if (billing.exists) {
@@ -312,6 +493,24 @@ async function adminContext(centreId: string): Promise<string> {
       if (bits.length) lines.push(`Billing: ${bits.join(', ')}.`);
     }
   } catch { /* optional */ }
+  try {
+    const fin = await financeFor(centreId);
+    if (fin) {
+      if (fin.scannedStudents) {
+        lines.push(
+          `Fees across the roster scanned: billed \u20a6${fin.feeTotal.toLocaleString()}, paid \u20a6${fin.feePaid.toLocaleString()}, outstanding \u20a6${fin.feeOutstanding.toLocaleString()}.`
+        );
+      }
+      if (fin.collectedCount || fin.pendingCount) {
+        lines.push(
+          `Payments recorded (up to 60 most recent scanned): \u20a6${fin.collected.toLocaleString()} collected across ${fin.collectedCount} paid or partial payment(s)${fin.pendingCount ? `, ${fin.pendingCount} student claim(s) awaiting confirmation worth \u20a6${fin.pendingSum.toLocaleString()}` : ''}.`
+        );
+      }
+      if (fin.recent.length) lines.push(`Recent payments: ${fin.recent.join('; ')}.`);
+      if (fin.debtors.length) lines.push(`Highest outstanding balances: ${fin.debtors.join('; ')}.`);
+    }
+  } catch { /* optional */ }
+  }
   const agg = await mockAggregateFor(centreId);
   if (agg && agg.attempts > 0) {
     if (agg.overallPct !== null) lines.push(`Mock performance: overall average ${agg.overallPct}% across ${agg.attempts} released mock results.`);
@@ -348,6 +547,28 @@ async function studentContextFor(
           ? stu.subjects.split(",").map((v: string) => v.trim()).filter(Boolean)
           : [];
       if (subs.length) lines.push(`Subjects: ${subs.slice(0, 12).join(", ")}`);
+      // P5: the student's own fee record and the centre's tutors.
+      const totalFee = Number(stu.totalFee) || 0;
+      if (totalFee > 0 || Number(stu.paidAmount) > 0) {
+        const paid = Number(stu.paidAmount) || 0;
+        const out = typeof stu.outstandingBalance === "number" ? stu.outstandingBalance : Math.max(totalFee - paid, 0);
+        const status = String(stu.paymentStatus || "");
+        lines.push(
+          `Fees: total \u20a6${totalFee.toLocaleString()}, paid \u20a6${paid.toLocaleString()}, outstanding \u20a6${out.toLocaleString()}${status ? ` (${status})` : ""}.`
+        );
+      }
+      try {
+        const tutors = await tutorsFor(centreId);
+        if (tutors.length) {
+          const lcSubs = subs.map((v: string) => v.trim().toLowerCase());
+          const mine = tutors.filter((t) => t.subjects.some((x) => lcSubs.includes(x.trim().toLowerCase())));
+          const others = tutors.filter((t) => !mine.includes(t));
+          const fmt = (t: { name: string; subjects: string[] }) =>
+            `${t.name}${t.subjects.length ? ` (${t.subjects.slice(0, 6).join(", ")})` : ""}`;
+          if (mine.length) lines.push(`Your tutors (they teach subjects you offer): ${mine.slice(0, 8).map(fmt).join("; ")}.`);
+          if (others.length) lines.push(`Other tutors at your centre: ${others.slice(0, 8).map(fmt).join("; ")}.`);
+        }
+      } catch { /* optional */ }
     }
   } catch { /* the record is optional */ }
 
@@ -442,7 +663,7 @@ async function personaFor(centreId: string, caller: Caller): Promise<string> {
     const ctx = await tutorContext(centreId, caller.uid, name);
     if (ctx) {
       lines.push(
-        "You CAN see centre-wide data below: the class roster and released mock performance per subject and per student. Use it to give grounded teaching advice. You cannot see students' private practice records, attendance or fees.",
+        "You CAN see centre data below: your assigned students (matched by the subjects you cover and their classes) with their attendance and released mock results, plus centre-wide mock averages. Use it for grounded teaching advice. You cannot see students' private practice records or fees.",
         'Centre data (released mock results only):',
         ctx,
       );
@@ -459,13 +680,38 @@ async function personaFor(centreId: string, caller: Caller): Promise<string> {
       "Treat them as the centre’s manager. Help with running the centre: understanding student performance and attendance patterns, communicating with students and staff, planning academic programmes, exam preparation logistics and getting the most from the platform.",
       name ? `When they greet you (for example "hi"), greet ${name} back by name and offer admin-relevant help.` : 'When they greet you, greet them back warmly and offer admin-relevant help.',
     ];
-    const actx = await adminContext(centreId);
+    // P5: which admin privileges apply? The membership role says owner or
+    // admin; the admins record carries the specific role (Super
+    // Administrator, Finance Admin, Center Admin, Admin Secretary). Finance
+    // stays with the owner and finance-level roles only.
+    let adminsRole = '';
+    try {
+      const adm = await adminDb.collection('admins').doc(caller.uid).get().catch(() => null);
+      if (adm?.exists) adminsRole = String((adm.data() as any)?.role || '');
+      else if (caller.email) {
+        const q = await adminDb.collection('admins').where('email', '==', caller.email).limit(1).get();
+        if (!q.empty) adminsRole = String((q.docs[0].data() as any)?.role || '');
+      }
+    } catch {
+      /* default to no finance */
+    }
+    const financeAllowed =
+      role === 'owner' || ['Super Administrator', 'Super Admin', 'Finance Admin'].includes(adminsRole);
+    const actx = await adminContext(centreId, { finance: financeAllowed });
     if (actx) {
-      lines.push(
-        "You CAN see the centre overview below: enrolment, staff, billing state and released mock performance. Use it for grounded management advice. You cannot see students' private practice records, attendance details or fees beyond the billing state shown.",
-        'Centre overview:',
-        actx,
-      );
+      if (financeAllowed) {
+        lines.push(
+          "You CAN see the centre overview below: enrolment, staff, attendance, released mock performance and finance (billed, collected, outstanding, recent payments). When asked for a payment report, lay it out as a clean list, one student per line with paid and outstanding amounts, and bold the totals. Quote only the figures shown here, never invented ones. You cannot see students' private practice records.",
+          'Centre overview:',
+          actx,
+        );
+      } else {
+        lines.push(
+          "You CAN see the centre overview below: enrolment, staff, attendance and released mock performance. Use it for grounded management advice. You cannot see finance (payments, fees, billing): if asked, say plainly that is outside your access and point them to the centre owner.",
+          'Centre overview:',
+          actx,
+        );
+      }
     } else {
       lines.push(
         "You cannot see the centre’s records (results, attendance, fees) yet. If asked about specific student data, say plainly that you cannot see that yet and give guidance based on what they tell you.",
@@ -482,7 +728,7 @@ async function personaFor(centreId: string, caller: Caller): Promise<string> {
   const data = await studentContextFor(centreId, caller.uid, name);
   if (data) {
     lines.push(
-      "You CAN see this student's own practice and mock data below. Use it to give personal advice: quote their real scores, name their weak topics and build study plans from it. Never mention or share another student's data.",
+      "You CAN see this student's own records below: their practice and mock results, the centre's tutors (noted when one teaches subjects this student offers) and their own fee balance. Use them for personal advice: quote their real scores, name their weak topics, and answer questions about their tutors and their own fees. Never mention or share another student's data or anyone else's fees.",
       'Data about this student (their own records only):',
       data,
     );
