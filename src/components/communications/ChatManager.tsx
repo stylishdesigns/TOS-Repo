@@ -987,6 +987,7 @@ const ThreadPanel: React.FC<{
   const [attachPreview, setAttachPreview] = useState('');
   const [attachFile, setAttachFile] = useState<File | null>(null);
   const [attachModal, setAttachModal] = useState<{ kind: 'image' | 'video' | 'file'; url: string; file: File | null; dataUrl?: string } | null>(null);
+  const [attachCaption, setAttachCaption] = useState('');
   const [attachProgress, setAttachProgress] = useState(0);
   const [attachSheet, setAttachSheet] = useState(false);
   const [videoViewerUrl, setVideoViewerUrl] = useState('');
@@ -1135,9 +1136,9 @@ const ThreadPanel: React.FC<{
     });
   };
 
-  const send = async (override?: { preview?: string; file?: File | null }) => {
+  const send = async (override?: { preview?: string; file?: File | null; text?: string }) => {
     if (busy) return;
-    const value = text.trim();
+    const value = (override && override.text !== undefined ? override.text : text).trim();
     const preview = override ? override.preview ?? '' : attachPreview;
     const file = override ? override.file ?? null : attachFile;
     const rt = replyTo;
@@ -1258,6 +1259,7 @@ const ThreadPanel: React.FC<{
       if (cur && cur.url.startsWith('blob:')) URL.revokeObjectURL(cur.url);
       return null;
     });
+    setAttachCaption('');
   };
 
   const myUid = (messages || []).find((m) => m.mine)?.uid || '';
@@ -1559,6 +1561,16 @@ const ThreadPanel: React.FC<{
               </div>
             )}
           </div>
+          <div className="px-4 pb-1 w-full">
+            <input
+              type="text"
+              value={attachCaption}
+              onChange={(e) => setAttachCaption(e.target.value)}
+              placeholder="Add a caption (optional)"
+              aria-label="Caption for the attachment"
+              className="w-full bg-white/10 border border-white/20 rounded-full px-4 py-3 text-[13px] text-white placeholder:text-white/50 font-medium outline-none focus:border-[#EA580C]/60"
+            />
+          </div>
           <div className="p-4 flex justify-end gap-3">
             <button onClick={closeAttachModal} className="px-5 py-3 rounded-2xl bg-white/10 text-white text-xs font-black active:scale-95 transition">Cancel</button>
             <button
@@ -1566,7 +1578,8 @@ const ThreadPanel: React.FC<{
                 const cur = attachModal;
                 if (cur.url.startsWith('blob:')) URL.revokeObjectURL(cur.url);
                 setAttachModal(null);
-                send({ preview: cur.dataUrl, file: cur.file });
+                setAttachCaption('');
+                send({ preview: cur.dataUrl, file: cur.file, text: attachCaption.trim() });
               }}
               className="px-5 py-3 rounded-2xl bg-[#EA580C] text-white text-xs font-black flex items-center gap-2 active:scale-95 transition"
             >

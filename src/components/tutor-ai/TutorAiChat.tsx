@@ -1,18 +1,33 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Sparkles, Send, Plus, ImagePlus, X, TriangleAlert, ArrowLeft } from 'lucide-react';
+import {
+  Sparkles,
+  Send,
+  ImagePlus,
+  X,
+  TriangleAlert,
+  ArrowLeft,
+  PanelLeft,
+  MessageSquarePlus,
+} from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { api } from '../tos/tosShared';
 
 // ============================================================================
-// Tutor AI chat (T1): the conversation surface shared by the student, tutor
+// Tutor AI chat (T1/T2): the conversation surface shared by the student, tutor
 // and centre-admin portals. The server does all the work (see
 // src/server/tutorAiRoutes.ts); this screen only sends, renders and keeps
-// state honest with the server's stored conversation.
+// state honest with the server's stored conversations.
 //
 // Theming: the screen follows the visitor's Appearance setting (bgTheme in
 // AppContext), light by default, exactly like the chat and status screens.
 // Staff portals render it without a mode prop, which keeps the original dark
 // look until their portals grow their own appearance settings.
+//
+// T2: the header's panel button opens a collapsible sidebar listing every
+// chat the member has had with the AI (server-side conversations), with a
+// New chat action. The AI's answers are rendered as clean formatted text:
+// headings, bold, italics, code and lists render as real formatting, never
+// as raw markdown characters.
 //
 // Entry points:
 // - Students: the Tutor AI wing in the chat fan (StudentPortal). Opening it
@@ -32,6 +47,12 @@ interface TitoMessage {
 interface Attachment {
   full: string;
   thumb: string;
+}
+
+interface Convo {
+  id: string;
+  title: string;
+  updatedAt: number;
 }
 
 const CHIPS: { label: string; fill: string }[] = [
@@ -93,6 +114,94 @@ const dayLabel = (ms: number) => {
   return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
 };
 
+// Renders the AI's answers as real formatting. The model writes simple
+// markdown; this turns headings, bold, italics, inline code and lists into
+// styled React nodes, so the student never sees a hash, asterisk or star.
+function renderRichText(text: string): React.ReactNode[] {
+  const out: React.ReactNode[] = [];
+  let list: { ordered: boolean; items: string[] } | null = null;
+  let k = 0;
+
+  const inline = (s: string): React.ReactNode[] => {
+    const parts: React.ReactNode[] = [];
+    const re = /\*\*([^*]+)\*\*|\*([^*]+)\*|`([^`]+)`/g;
+    let last = 0;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(s))) {
+      if (m.index > last) parts.push(s.slice(last, m.index));
+      if (m[1] !== undefined) parts.push(<strong key={k++} className="font-black">{m[1]}</strong>);
+      else if (m[2] !== undefined) parts.push(<em key={k++} className="italic">{m[2]}</em>);
+      else if (m[3] !== undefined) parts.push(<code key={k++} className="font-mono text-[11px] px-1 py-0.5 rounded bg-black/10">{m[3]}</code>);
+      last = m.index + m[0].length;
+    }
+    if (last < s.length) parts.push(s.slice(last));
+    return parts;
+  };
+
+  const flushList = () => {
+    if (!list) return;
+    const items = list.items.map((item, i) => {
+      const li = inline(item);
+      return list!.ordered ? (
+        <li key={i} className="pl-1">{li}</li>
+      ) : (
+        <li key={i} className="pl-1 relative">
+          <span className="absolute -left-3 top-0">•</span>
+          {li}
+        </li>
+      );
+    });
+    out.push(
+      list.ordered ? (
+        <ol key={`l${k++}`} className="list-decimal ml-5 space-y-1 my-1">{items}</ol>
+      ) : (
+        <ul key={`l${k++}`} className="ml-5 space-y-1 my-1">{items}</ul>
+      )
+    );
+    list = null;
+  };
+
+  text
+    .replace(/\r\n/g, '\n')
+    .split('\n')
+    .forEach((line, i) => {
+      const heading = /^#{1,6}\s+(.*)$/.exec(line.trim());
+      const bullet = /^\s*[-*•]\s+(.*)$/.exec(line);
+      const numbered = /^\s*(\d+)[.)]\s+(.*)$/.exec(line);
+      if (heading) {
+        flushList();
+        out.push(
+          <p key={`h${i}`} className="text-[14px] font-black mt-2 first:mt-0">
+            {inline(heading[1])}
+          </p>
+        );
+      } else if (bullet) {
+        if (!list || list.ordered) {
+          flushList();
+          list = { ordered: false, items: [] };
+        }
+        list.items.push(bullet[1]);
+      } else if (numbered) {
+        if (!list || !list.ordered) {
+          flushList();
+          list = { ordered: true, items: [] };
+        }
+        list.items.push(`${numbered[1]}. ${numbered[2]}`);
+      } else if (!line.trim()) {
+        flushList();
+      } else {
+        flushList();
+        out.push(
+          <p key={`p${i}`} className="mb-1 last:mb-0">
+            {inline(line)}
+          </p>
+        );
+      }
+    });
+  flushList();
+  return out;
+}
+
 // The one palette difference between the light and dark looks. Orange stays
 // the accent in both; only the neutrals swap.
 const PALETTES = {
@@ -120,6 +229,13 @@ const PALETTES = {
     overlay: 'bg-slate-900/50 backdrop-blur-sm',
     overlayPanel: 'bg-white border-slate-200',
     cancelBtn: 'bg-slate-100 text-slate-700 hover:bg-slate-200',
+    drawer: 'bg-white border-slate-200',
+    drawerText: 'text-slate-900',
+    drawerSub: 'text-slate-400',
+    drawerItem: 'hover:bg-slate-100 text-slate-800',
+    drawerItemActive: 'bg-orange-50 text-orange-700',
+    drawerNew: 'text-orange-600 hover:bg-orange-50',
+    captionInput: 'bg-slate-100 border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-orange-500/50',
   },
   dark: {
     shell: 'bg-slate-950 text-white',
@@ -145,6 +261,13 @@ const PALETTES = {
     overlay: 'bg-slate-950/85 backdrop-blur-sm',
     overlayPanel: 'bg-slate-900 border-slate-700',
     cancelBtn: 'bg-slate-800 text-slate-300 hover:bg-slate-700',
+    drawer: 'bg-slate-900 border-slate-800',
+    drawerText: 'text-white',
+    drawerSub: 'text-slate-500',
+    drawerItem: 'hover:bg-slate-800 text-slate-200',
+    drawerItemActive: 'bg-orange-500/15 text-orange-300',
+    drawerNew: 'text-orange-400 hover:bg-orange-500/10',
+    captionInput: 'bg-slate-800/70 border-slate-700 text-slate-100 placeholder:text-slate-500 focus:border-orange-500/50',
   },
 } as const;
 
@@ -171,12 +294,29 @@ const TutorAiChat: React.FC<Props> = ({
   const [pending, setPending] = useState<TitoMessage | null>(null);
   const [busy, setBusy] = useState(false);
   const [input, setInput] = useState('');
+  const [caption, setCaption] = useState('');
   const [error, setError] = useState('');
   const [preview, setPreview] = useState<Attachment | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [convos, setConvos] = useState<Convo[]>([]);
+  const [convosLoaded, setConvosLoaded] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const loadConversations = useCallback(async () => {
+    try {
+      const q = centreId ? `?centreId=${encodeURIComponent(centreId)}` : '';
+      const res: any = await api(`/api/tutor-ai/conversations${q}`);
+      setConvos(Array.isArray(res?.conversations) ? res.conversations : []);
+    } catch {
+      // The sidebar is a nicety; an empty list is fine if it will not load.
+    } finally {
+      setConvosLoaded(true);
+    }
+  }, [centreId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -184,7 +324,10 @@ const TutorAiChat: React.FC<Props> = ({
       try {
         const q = centreId ? `?centreId=${encodeURIComponent(centreId)}` : '';
         const res: any = await api(`/api/tutor-ai/history${q}`);
-        if (!cancelled) setMsgs(Array.isArray(res?.messages) ? res.messages : []);
+        if (!cancelled) {
+          setMsgs(Array.isArray(res?.messages) ? res.messages : []);
+          setActiveId(res?.conversationId || null);
+        }
       } catch {
         // History is a nicety: a fresh screen is fine if it will not load.
       } finally {
@@ -213,30 +356,47 @@ const TutorAiChat: React.FC<Props> = ({
         method: 'POST',
         body: {
           ...(centreId ? { centreId } : {}),
+          ...(activeId ? { conversationId: activeId } : {}),
           text,
           ...(img ? { image: img.full, imageThumb: img.thumb } : {}),
         },
       });
       setMsgs(Array.isArray(res?.messages) ? res.messages : []);
+      if (res?.conversationId) setActiveId(res.conversationId);
+      loadConversations();
     } catch (e: any) {
       setError(e?.message || 'Tutor AI could not answer just now. Please try again.');
     } finally {
       setPending(null);
       setBusy(false);
     }
-  }, [busy, centreId]);
+  }, [busy, centreId, activeId, loadConversations]);
 
-  const startNewChat = useCallback(async () => {
-    try {
-      const q = centreId ? `?centreId=${encodeURIComponent(centreId)}` : '';
-      await api('/api/tutor-ai/clear', { method: 'POST', body: centreId ? { centreId } : {} });
-    } catch {
-      // Clearing is best-effort; the local view resets regardless.
-    }
+  // A brand-new chat: nothing is stored until the first message is sent.
+  const startNewChat = useCallback(() => {
+    setDrawerOpen(false);
     setMsgs([]);
+    setActiveId(null);
     setError('');
     inputRef.current?.focus();
-  }, [centreId]);
+  }, []);
+
+  const openConversation = useCallback(
+    async (id: string) => {
+      if (busy) return;
+      setDrawerOpen(false);
+      try {
+        const q = `${centreId ? `centreId=${encodeURIComponent(centreId)}&` : ''}conversationId=${encodeURIComponent(id)}`;
+        const res: any = await api(`/api/tutor-ai/history?${q}`);
+        setMsgs(Array.isArray(res?.messages) ? res.messages : []);
+        setActiveId(id);
+        setError('');
+      } catch {
+        setError('That chat could not be opened. Please try again.');
+      }
+    },
+    [busy, centreId]
+  );
 
   const onPickFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files && e.target.files[0];
@@ -271,7 +431,11 @@ const TutorAiChat: React.FC<Props> = ({
             className={`rounded-lg max-w-[180px] w-auto mb-1.5 border ${th.imgBorder}`}
           />
         )}
-        <p className="text-[13px] leading-relaxed whitespace-pre-wrap break-words font-medium">{m.text}</p>
+        {m.role === 'ai' ? (
+          <div className="text-[13px] leading-relaxed">{renderRichText(m.text)}</div>
+        ) : (
+          <p className="text-[13px] leading-relaxed whitespace-pre-wrap break-words font-medium">{m.text}</p>
+        )}
         <p className={`text-[10px] mt-1 font-bold ${m.role === 'user' ? 'text-orange-200/80' : th.aiTime}`}>
           {optimistic ? 'sending…' : clock(m.at)}
         </p>
@@ -305,7 +469,59 @@ const TutorAiChat: React.FC<Props> = ({
     : 'h-full';
 
   return (
-    <div className={`flex flex-col relative ${th.shell} ${shell}`}>
+    <div className={`flex flex-col relative overflow-hidden ${th.shell} ${shell}`}>
+      {/* Chat history sidebar (collapsible) */}
+      {drawerOpen && (
+        <div className="absolute inset-0 z-40 flex" role="dialog" aria-label="Chat history">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setDrawerOpen(false)} aria-hidden="true" />
+          <div
+            className={`relative w-72 max-w-[80%] h-full border-r shadow-2xl flex flex-col animate-in slide-in-from-left duration-200 ${th.drawer}`}
+          >
+            <div className={`shrink-0 px-4 pt-4 pb-3 flex items-center justify-between border-b ${th.drawer}`}>
+              <p className={`text-sm font-black ${th.drawerText}`}>Your chats</p>
+              <button
+                type="button"
+                onClick={() => setDrawerOpen(false)}
+                aria-label="Close chat history"
+                className={`p-1.5 rounded-full transition-all cursor-pointer ${th.ghostBtn}`}
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="shrink-0 px-3 pt-3">
+              <button
+                type="button"
+                onClick={startNewChat}
+                className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-[13px] font-bold transition-all cursor-pointer ${th.drawerNew}`}
+              >
+                <MessageSquarePlus className="w-4 h-4" />
+                New chat
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-3 py-2 space-y-1">
+              {convosLoaded && convos.length === 0 && (
+                <p className={`text-[12px] font-medium px-3 py-4 leading-snug ${th.drawerSub}`}>
+                  Your chats will appear here once you start talking to Tutor AI.
+                </p>
+              )}
+              {convos.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => openConversation(c.id)}
+                  className={`w-full text-left px-3 py-2.5 rounded-xl transition-all cursor-pointer ${
+                    c.id === activeId ? th.drawerItemActive : th.drawerItem
+                  }`}
+                >
+                  <p className="text-[13px] font-bold truncate">{c.title || 'New chat'}</p>
+                  <p className={`text-[10px] font-semibold mt-0.5 ${th.drawerSub}`}>{dayLabel(c.updatedAt)}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Pinned header */}
       <div className={`shrink-0 backdrop-blur-md border-b px-4 py-3 flex items-center gap-3 ${th.header}`}>
         {onBack && (
@@ -322,23 +538,21 @@ const TutorAiChat: React.FC<Props> = ({
           <Sparkles className="w-5 h-5 text-white" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className={`text-sm font-black flex items-center gap-2 ${th.headerTitle}`}>
-            Tutor AI
-            <span className="text-[9px] font-black uppercase tracking-widest text-orange-300 bg-orange-500/15 border border-orange-500/30 rounded-full px-2 py-0.5">
-              Beta
-            </span>
-          </p>
+          <p className={`text-sm font-black ${th.headerTitle}`}>Tutor AI</p>
           <p className={`text-[11px] font-semibold truncate ${th.headerSub}`}>
             {activeCentre?.name || 'Your study assistant'}
           </p>
         </div>
         <button
           type="button"
-          onClick={startNewChat}
-          aria-label="Start a new chat"
+          onClick={() => {
+            if (!convosLoaded) loadConversations();
+            setDrawerOpen((v) => !v);
+          }}
+          aria-label="Chat history"
           className={`p-2 rounded-full transition-all cursor-pointer ${th.ghostBtn}`}
         >
-          <Plus className="w-5 h-5" />
+          <PanelLeft className="w-5 h-5" />
         </button>
       </div>
 
@@ -447,15 +661,37 @@ const TutorAiChat: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* Photo preview sheet: shows the photo without its filename */}
+      {/* Photo preview sheet: shows the photo without its filename, with a
+          field for a question to send along with the photo. */}
       {preview && (
         <div className={`absolute inset-0 z-50 flex items-center justify-center p-5 ${th.overlay}`}>
           <div className={`border rounded-3xl p-4 max-w-sm w-full ${th.overlayPanel}`}>
-            <img src={preview.thumb || preview.full} alt="Photo to send" className="rounded-2xl max-h-[50vh] w-auto mx-auto mb-4" />
+            <img src={preview.thumb || preview.full} alt="Photo to send" className="rounded-2xl max-h-[40vh] w-auto mx-auto mb-3" />
+            <input
+              type="text"
+              value={caption}
+              onChange={(e) => setCaption(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  const att = preview;
+                  const text = caption.trim() || input.trim();
+                  setPreview(null);
+                  setCaption('');
+                  send(text, att);
+                }
+              }}
+              placeholder="Add a question about this photo (optional)"
+              aria-label="Question about the photo"
+              className={`w-full border rounded-full px-4 py-2.5 text-[13px] font-medium outline-none mb-3 ${th.captionInput}`}
+            />
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => setPreview(null)}
+                onClick={() => {
+                  setPreview(null);
+                  setCaption('');
+                }}
                 className={`flex-1 py-2.5 rounded-full text-[13px] font-black transition-all cursor-pointer ${th.cancelBtn}`}
               >
                 Cancel
@@ -464,8 +700,10 @@ const TutorAiChat: React.FC<Props> = ({
                 type="button"
                 onClick={() => {
                   const att = preview;
+                  const text = caption.trim() || input.trim();
                   setPreview(null);
-                  send(input, att);
+                  setCaption('');
+                  send(text, att);
                 }}
                 className="flex-1 py-2.5 rounded-full bg-gradient-to-br from-orange-500 to-orange-700 text-white text-[13px] font-black hover:brightness-110 transition-all cursor-pointer"
               >

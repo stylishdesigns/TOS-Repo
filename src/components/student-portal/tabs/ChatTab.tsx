@@ -677,6 +677,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
   const [attachProgress, setAttachProgress] = useState(0);
   const [attachSheet, setAttachSheet] = useState(false);
   const [attachModal, setAttachModal] = useState<{ kind: 'image' | 'video' | 'file'; url: string; file: File | null } | null>(null);
+  const [attachCaption, setAttachCaption] = useState('');
   const photoRef = useRef<HTMLInputElement | null>(null);
   const videoRef = useRef<HTMLInputElement | null>(null);
   const docRef = useRef<HTMLInputElement | null>(null);
@@ -850,6 +851,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
       if (cur && cur.url.startsWith('blob:')) URL.revokeObjectURL(cur.url);
       return null;
     });
+    setAttachCaption('');
   }, []);
 
   const uploadChatFile = useCallback(async (file: File, onProgress?: (pct: number) => void): Promise<string> => {
@@ -897,8 +899,8 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
     return url;
   }, []);
 
-  const send = useCallback(async (override?: { file?: File | null }) => {
-    const t = text.trim();
+  const send = useCallback(async (override?: { file?: File | null; text?: string }) => {
+    const t = (override && override.text !== undefined ? override.text : text).trim();
     const file = override ? override.file ?? null : attachFile;
     if ((!t && !file) || sending) return;
     setSending(true);
@@ -1564,6 +1566,16 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
               </div>
             )}
           </div>
+          <div className="px-4 pb-1 w-full">
+            <input
+              type="text"
+              value={attachCaption}
+              onChange={(e) => setAttachCaption(e.target.value)}
+              placeholder="Add a caption (optional)"
+              aria-label="Caption for the attachment"
+              className="w-full bg-white/10 border border-white/20 rounded-full px-4 py-3 text-[13px] text-white placeholder:text-white/50 font-medium outline-none focus:border-[#EA580C]/60"
+            />
+          </div>
           <div className="p-4 flex justify-end gap-3">
             <button onClick={closeAttachModal} className="px-5 py-3 rounded-2xl bg-white/10 text-white text-xs font-black active:scale-95 transition">Cancel</button>
             <button
@@ -1571,7 +1583,8 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
                 const cur = attachModal;
                 if (cur.url.startsWith('blob:')) URL.revokeObjectURL(cur.url);
                 setAttachModal(null);
-                send({ file: cur.file });
+                setAttachCaption('');
+                send({ file: cur.file, text: attachCaption.trim() });
               }}
               className="px-5 py-3 rounded-2xl bg-[#EA580C] text-white text-xs font-black flex items-center gap-2 active:scale-95 transition"
             >

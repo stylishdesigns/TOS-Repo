@@ -1,5 +1,5 @@
 // ============================================================================
-// Tutor AI (T1) — general study-assistant chat for centre members.
+// Tutor AI (T1/T2) — general study-assistant chat for centre members.
 //
 // Scope: centre portals only (students, tutors, centre admins). T1 is the
 // general conversation layer: the model answers study questions and photos
@@ -12,10 +12,15 @@
 // @google/genai in enterprise mode. Never GEMINI_API_KEY. This module is
 // separate new code; the existing AI routes and collections are untouched.
 //
-// Storage: one chat document per user per centre in `tutorAiChats`
-// (id `${centreId}__${uid}`), written by the server only. Messages are capped
-// so the document stays small; image attachments are stored as small
-// thumbnails only, never the full upload.
+// Storage (T2): each chat a member has with the AI is its own document in
+// `tutorAiConversations` (id `${centreId}__${uid}__${createdAtMs}`), written
+// by the server only, so the client can list a chat history sidebar. Messages
+// are capped so each document stays small; image attachments are stored as
+// small thumbnails only, never the full upload. The legacy single-chat
+// collection `tutorAiChats` is no longer written and stays untouched.
+//
+// Monthly usage moves to its own counter document `tutorAiUsage/${centreId}__${uid}`
+// so the per-centre monthly cap counts across every conversation of a member.
 //
 // Caps (both overridable via platformConfig): a monthly per-centre message
 // cap and an hourly per-user burst cap, enforced server-side.
@@ -33,13 +38,15 @@ import {
 } from './tenantService';
 
 const TUTOR_AI_MODEL = 'gemini-3.8-flash';
-const MESSAGES_KEPT = 60; // newest messages kept in the chat document
+const MESSAGES_KEPT = 60; // newest messages kept per conversation
 const CONTEXT_MESSAGES = 24; // newest messages sent to the model as context
+const CONVERSATIONS_LISTED = 50; // newest conversations shown in the sidebar
 const DEFAULT_MONTHLY_CAP = 300; // messages per centre per month
 const DEFAULT_HOURLY_CAP = 30; // messages per user per hour
 const MAX_TEXT_CHARS = 4000;
 const MAX_IMAGE_BASE64_CHARS = 4_600_000; // ~3.4 MB binary
 const MAX_THUMB_BASE64_CHARS = 260_000; // ~190 KB binary
+const ID_RE = /^[a-zA-Z0-9_\-]+$/;
 
 const rateLimitDocId = (key: string) => encodeURIComponent(key).slice(0, 1400);
 
@@ -51,7 +58,10 @@ const SYSTEM_PROMPT = [
   '- You cannot see the student\'s results, attendance, fees or any school records yet. If asked about',
   '  their personal performance or school data, say plainly that you cannot see that yet and offer what you can help with instead.',
   '- Keep answers clear, warm and concise. Short paragraphs or numbered steps. Simple language.',
-  '- Write mathematics in plain text, not LaTeX: x^2, sqrt(x), 2x + 5 = 17, 3/4. Avoid unicode superscripts.',
+  '- Format answers with simple markdown so the app can render them cleanly: **bold** for key terms,',
+  '  ## headings for sections of a longer answer, and bullet or numbered lists for steps. Never use',
+  '  code blocks or LaTeX for maths: write mathematics in plain text, x^2, sqrt(x), 2x + 5 = 17, 3/4.',
+  '  Avoid unicode superscripts.',
   '- Never invent facts about the centre, its staff or its students. If unsure, say so.',
   '- Never discuss, identify or gossip about other students or staff members.',
   '- Respond in the language the question is written in (English stays English, Yoruba stays Yoruba, and so on).',
@@ -87,6 +97,23 @@ async function resolveCentreId(caller: Caller, centreId: string): Promise<string
   if (!cid) throw httpError(403, 'You do not have access to this feature.');
   await requireMembership(caller, cid);
   return cid;
+}
+
+// A conversation id only counts when it belongs to this caller in this centre,
+// so one member can never read or write another member's conversations.
+function validateConversationId(raw: string, centreId: string, uid: string): string {
+  const id = String(raw || '').trim();
+  if (!id) return '';
+  if (!ID_RE.test(id) || id.length > 200 || !id.startsWith(`${centreId}__${uid}__`)) {
+    throw httpError(400, 'That conversation could not be opened.');
+  }
+  return id;
+}
+
+function titleFrom(text: string, hasImage: boolean): string {
+  const base = text.trim();
+  if (base) return base.length > 60 ? `${base.slice(0, 57)}…` : base;
+  return hasImage ? 'Photo question' : 'New chat';
 }
 
 function parseImageDataUrl(value: unknown): { mimeType: string; data: string } | null {
@@ -125,8 +152,30 @@ async function consumeBurstLimit(caller: Caller, config: any): Promise<void> {
   }
 }
 
+// The member's monthly counter, shared by all of their conversations in the
+// centre. Returns how many messages are left this month after counting one.
+async function consumeMonthlyCap(
+  tx: FirebaseFirestore.Transaction,
+  centreId: string,
+  caller: Caller,
+  monthlyCap: number
+): Promise<number> {
+  const usageRef = adminDb.collection('tutorAiUsage').doc(`${centreId}__${caller.uid}`);
+  const snap = await tx.get(usageRef);
+  const data = (snap.exists ? snap.data() : null) as any;
+  const now = Date.now();
+  const monthKey = new Date().toISOString().slice(0, 7);
+  const monthCount = data && data.monthKey === monthKey ? (data.monthCount || 0) + 1 : 1;
+  if (monthCount > monthlyCap) {
+    throw httpError(429, 'Tutor AI has reached its message limit for this centre this month. Ask the centre admin for help.');
+  }
+  tx.set(usageRef, { centreId, uid: caller.uid, monthKey, monthCount, updatedAt: now }, { merge: false });
+  return Math.max(0, monthlyCap - monthCount);
+}
+
 export function registerTutorAiRoutes(app: express.Express) {
-  // Send a message (and optionally a photo) to the Tutor AI.
+  // Send a message (and optionally a photo) to the Tutor AI. The first message
+  // of a new chat creates the conversation; later messages carry its id.
   app.post('/api/tutor-ai/chat', async (req, res) => {
     try {
       const caller = getCallerOr401(req);
@@ -149,33 +198,31 @@ export function registerTutorAiRoutes(app: express.Express) {
       const monthlyCap = Number((config as any)?.tutorAiMonthlyCap) || DEFAULT_MONTHLY_CAP;
       await consumeBurstLimit(caller, config);
 
-      const chatId = `${centreId}__${caller.uid}`;
-      const chatRef = adminDb.collection('tutorAiChats').doc(chatId);
+      const requestedId = validateConversationId(String(body.conversationId || ''), centreId, caller.uid);
+      const now = Date.now();
+      const conversationId = requestedId || `${centreId}__${caller.uid}__${now}`;
+      const convRef = adminDb.collection('tutorAiConversations').doc(conversationId);
 
-      // One transaction: enforce the monthly cap, count the message and store
-      // the user's message (thumbnail only, never the full upload).
+      // One transaction: enforce the monthly cap across all conversations,
+      // create the conversation when it is new, and store the user's message
+      // (thumbnail only, never the full upload).
       let history: Array<{ role: 'user' | 'ai'; text: string }> = [];
+      let remaining = 0;
       await adminDb.runTransaction(async (tx) => {
-        const snap = await tx.get(chatRef);
+        remaining = await consumeMonthlyCap(tx, centreId, caller, monthlyCap);
+        const snap = await tx.get(convRef);
         const data = (snap.exists ? snap.data() : null) as any;
-        const now = Date.now();
-        const monthKey = new Date().toISOString().slice(0, 7);
-        const monthCount = data && data.monthKey === monthKey ? (data.monthCount || 0) + 1 : 1;
-        if (monthCount > monthlyCap) {
-          throw httpError(429, 'Tutor AI has reached its message limit for this centre this month. Ask the centre admin for help.');
-        }
         const previous: any[] = Array.isArray(data?.messages) ? data.messages : [];
         history = previous.slice(-CONTEXT_MESSAGES).map((m: any) => ({ role: m.role === 'ai' ? 'ai' : 'user', text: String(m.text || '') }));
         const userMsg = { role: 'user', text: rawText, img: thumb ? thumb.data : null, at: now };
         const messages = [...previous, userMsg].slice(-MESSAGES_KEPT);
-        tx.set(chatRef, {
+        tx.set(convRef, {
           centreId,
           uid: caller.uid,
           email: caller.email || '',
+          title: data?.title || titleFrom(rawText, !!image),
           createdAt: data?.createdAt || now,
           updatedAt: now,
-          monthKey,
-          monthCount,
           messages,
         }, { merge: false });
       });
@@ -206,19 +253,19 @@ export function registerTutorAiRoutes(app: express.Express) {
 
       // Store the assistant's reply, keeping the document bounded.
       await adminDb.runTransaction(async (tx) => {
-        const snap = await tx.get(chatRef);
+        const snap = await tx.get(convRef);
         const data = (snap.exists ? snap.data() : null) as any;
         const previous: any[] = Array.isArray(data?.messages) ? data.messages : [];
         const messages = [...previous, { role: 'ai', text: reply, img: null, at: Date.now() }].slice(-MESSAGES_KEPT);
-        tx.set(chatRef, { ...data, messages, updatedAt: Date.now() }, { merge: false });
+        tx.set(convRef, { ...(data || { centreId, uid: caller.uid }), messages, updatedAt: Date.now() }, { merge: false });
       }).catch((err) => tutorAiFailure('storeReply', err));
 
-      const after = await adminDb.collection('tutorAiChats').doc(chatId).get();
-      const monthCount = (after.data() as any)?.monthCount || 0;
+      const after = await convRef.get();
       res.json({
         reply,
+        conversationId,
         messages: (after.data() as any)?.messages || [],
-        remaining: Math.max(0, monthlyCap - monthCount),
+        remaining,
         cap: monthlyCap,
       });
     } catch (error: any) {
@@ -226,19 +273,61 @@ export function registerTutorAiRoutes(app: express.Express) {
     }
   });
 
-  // Load this member's conversation with the Tutor AI.
+  // List the member's chats with the Tutor AI, newest first, for the sidebar.
+  app.get('/api/tutor-ai/conversations', async (req, res) => {
+    try {
+      const caller = getCallerOr401(req);
+      const centreId = await resolveCentreId(caller, String((req.query.centreId as string) || '').slice(0, 128));
+      const snap = await adminDb
+        .collection('tutorAiConversations')
+        .where('centreId', '==', centreId)
+        .where('uid', '==', caller.uid)
+        .orderBy('updatedAt', 'desc')
+        .limit(CONVERSATIONS_LISTED)
+        .get()
+        .catch((err: any) => tutorAiFailure('listConversations', err));
+      const conversations = snap.docs.map((d: any) => {
+        const x = d.data() || {};
+        return { id: d.id, title: String(x.title || 'New chat'), updatedAt: x.updatedAt || x.createdAt || 0 };
+      });
+      res.json({ conversations });
+    } catch (error: any) {
+      res.status(error.status || 500).json({ error: error.message || 'Could not load the chat list.' });
+    }
+  });
+
+  // Load one conversation's messages; without an id, the newest one.
   app.get('/api/tutor-ai/history', async (req, res) => {
     try {
       const caller = getCallerOr401(req);
       const centreId = await resolveCentreId(caller, String((req.query.centreId as string) || '').slice(0, 128));
       const config = await getPlatformConfig();
       const monthlyCap = Number((config as any)?.tutorAiMonthlyCap) || DEFAULT_MONTHLY_CAP;
-      const snap = await adminDb.collection('tutorAiChats').doc(`${centreId}__${caller.uid}`).get();
-      const data = snap.data() as any;
+      let conversationId = validateConversationId(String((req.query.conversationId as string) || ''), centreId, caller.uid);
+      if (!conversationId) {
+        const latest = await adminDb
+          .collection('tutorAiConversations')
+          .where('centreId', '==', centreId)
+          .where('uid', '==', caller.uid)
+          .orderBy('updatedAt', 'desc')
+          .limit(1)
+          .get()
+          .catch((err: any) => tutorAiFailure('latestConversation', err));
+        conversationId = latest.empty ? '' : latest.docs[0].id;
+      }
+      let messages: any[] = [];
+      if (conversationId) {
+        const snap = await adminDb.collection('tutorAiConversations').doc(conversationId).get();
+        const data = (snap.exists ? snap.data() : null) as any;
+        messages = Array.isArray(data?.messages) ? data.messages : [];
+      }
+      const usage = await adminDb.collection('tutorAiUsage').doc(`${centreId}__${caller.uid}`).get();
+      const u = (usage.exists ? usage.data() : null) as any;
       const monthKey = new Date().toISOString().slice(0, 7);
-      const used = data && data.monthKey === monthKey ? data.monthCount || 0 : 0;
+      const used = u && u.monthKey === monthKey ? u.monthCount || 0 : 0;
       res.json({
-        messages: Array.isArray(data?.messages) ? data.messages : [],
+        conversationId: conversationId || null,
+        messages,
         remaining: Math.max(0, monthlyCap - used),
         cap: monthlyCap,
       });
@@ -247,17 +336,31 @@ export function registerTutorAiRoutes(app: express.Express) {
     }
   });
 
-  // Start a fresh conversation: clears the stored messages (the monthly cap
-  // already counts the messages sent, so it is not reset).
+  // Delete one conversation from the history (the monthly cap already counts
+  // the messages sent, so it is not reset). Without an id, the newest goes.
   app.post('/api/tutor-ai/clear', async (req, res) => {
     try {
       const caller = getCallerOr401(req);
       const centreId = await resolveCentreId(caller, String(req.body?.centreId || '').slice(0, 128));
-      const chatRef = adminDb.collection('tutorAiChats').doc(`${centreId}__${caller.uid}`);
-      await chatRef.set({ messages: [], updatedAt: Date.now() }, { merge: true });
-      res.json({ ok: true, messages: [] });
+      let conversationId = validateConversationId(String(req.body?.conversationId || ''), centreId, caller.uid);
+      if (!conversationId) {
+        const latest = await adminDb
+          .collection('tutorAiConversations')
+          .where('centreId', '==', centreId)
+          .where('uid', '==', caller.uid)
+          .orderBy('updatedAt', 'desc')
+          .limit(1)
+          .get()
+          .catch((err: any) => tutorAiFailure('latestConversation', err));
+        conversationId = latest.empty ? '' : latest.docs[0].id;
+      }
+      if (conversationId) {
+        await adminDb.collection('tutorAiConversations').doc(conversationId).delete()
+          .catch((err: any) => tutorAiFailure('deleteConversation', err));
+      }
+      res.json({ ok: true });
     } catch (error: any) {
-      res.status(error.status || 500).json({ error: error.message || 'Could not clear the conversation.' });
+      res.status(error.status || 500).json({ error: error.message || 'Could not delete the conversation.' });
     }
   });
 }
