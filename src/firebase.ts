@@ -1,5 +1,11 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import {
+  getAuth,
+  setPersistence,
+  browserLocalPersistence,
+  browserSessionPersistence,
+  inMemoryPersistence,
+} from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
 // Firebase web config is supplied at build time through environment variables
@@ -56,5 +62,22 @@ export const db = firebaseConfig.firestoreDatabaseId
   : getFirestore(app);
 
 export const auth = getAuth(app);
+
+// Session permanence: hold the sign-in on this device for as long as the
+// browser allows, strongest storage first. The SDK's silent fallback used to
+// land weak browsers (private-mode setups where IndexedDB is refused) on
+// in-memory storage, where any tab reload meant a lost login; state the chain
+// explicitly so the strongest storage the browser offers is always picked.
+export const authPersistenceReady = (async () => {
+  const chain = [browserLocalPersistence, browserSessionPersistence, inMemoryPersistence];
+  for (const persistence of chain) {
+    try {
+      await setPersistence(auth, persistence);
+      return;
+    } catch {
+      // Storage refused; try the next strongest.
+    }
+  }
+})();
 
 export default app;
