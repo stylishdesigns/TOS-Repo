@@ -19,7 +19,6 @@ import {
   ExternalLink,
   Edit,
   X,
-  Sparkles,
   BookMarked,
   Check,
   AlertCircle,
@@ -41,8 +40,6 @@ export const ProgrammesManager: React.FC = () => {
   const { programmes, subjects: allSubjects, addProgramme, updateProgramme, students, settings, updateSettings, addToast } = useApp();
 
   const [activeSubsection, setActiveSubsection] = useState<ProgrammeSubsection>('Exam Programmes');
-  const academicSessions = settings.academicSessions || [];
-  const [selectedSession, setSelectedSession] = useState<string>(settings.academicSession);
 
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [selectedStatus, setSelectedStatus] = useState<string>('All');
@@ -242,16 +239,9 @@ export const ProgrammesManager: React.FC = () => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative">
         <div>
           <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Exam Programs</h2>
-          <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-orange-100 text-orange-800">
-            {selectedSession.split(' ')[0]}
-          </span>
         </div>
 
         <div className="flex items-center space-x-4">
-          <div className="text-right hidden md:block">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block leading-none">Academic Session</span>
-            <span className="text-sm font-black text-[#EA580C]">{settings.academicSession}</span>
-          </div>
           <button
             onClick={handleOpenAdd}
             className="px-4 py-2 text-xs font-semibold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg shadow-sm transition-all flex items-center space-x-1.5 shadow-xs"
@@ -595,43 +585,13 @@ export const ProgrammesManager: React.FC = () => {
                     className="p-2.5 bg-slate-50/70 border border-slate-200/80 rounded-lg flex items-center justify-between"
                   >
                     <span className="font-semibold text-slate-800">{sub}</span>
-                    <span className="text-[10px] font-mono text-emerald-600 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
-                      Standard Syllabus
-                    </span>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Examination Plan & Methodology */}
-            <div className="p-4 bg-orange-50/50 rounded-xl border border-orange-200/70 space-y-2 text-xs">
-              <div className="flex items-center space-x-2 text-[#EA580C]">
-                <Sparkles className="w-4 h-4" />
-                <span className="font-bold uppercase tracking-wider text-[11px]">
-                  Official Exam Mastery Methodology
-                </span>
-              </div>
-              <ul className="space-y-1.5 text-slate-700 list-disc list-inside">
-                <li>
-                  Daily continuous assessment and simulated Computer Based Test (CBT) practice.
-                </li>
-                <li>
-                  Exhaustive past question paper dissection (2010 – 2026 examination series).
-                </li>
-                <li>
-                  Weekly parent academic progress SMS summaries and bi-weekly report cards.
-                </li>
-                <li>
-                  Practical science laboratory mock examinations for WAEC & NECO candidates.
-                </li>
-              </ul>
-            </div>
-
             {/* Footer buttons */}
-            <div className="flex items-center justify-between pt-4 border-t border-slate-100">
-              <span className="text-[11px] text-slate-400">
-                Official Programme Ref: ETC-{inspectingProg.code}
-              </span>
+            <div className="flex items-center justify-end pt-4 border-t border-slate-100">
               <button
                 onClick={() => setInspectingProg(null)}
                 className="px-4 py-2 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-lg shadow-sm"
@@ -654,7 +614,7 @@ export const ProgrammesManager: React.FC = () => {
                   {editingProg ? 'Edit Exam Program' : 'Add New Exam Program'}
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Set up exam board, tuition, subjects, and cohort capacity.
+                  Set up exam board, tuition, subjects and duration.
                 </p>
               </div>
               <button
@@ -713,38 +673,23 @@ export const ProgrammesManager: React.FC = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1.5">Exam Subjects (Curriculum Scope) *</label>
-                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 max-h-40 overflow-y-auto space-y-2">
-                    {allSubjects.map((subject) => (
-                      <label key={subject.id} className="flex items-center space-x-2 cursor-pointer group">
-                        <input
-                          type="checkbox"
-                          checked={formData.selectedSubjects.includes(subject.name)}
-                          onChange={() => toggleSubjectSelection(subject.name)}
-                          className="w-4 h-4 rounded border-slate-300 text-orange-600 focus:ring-orange-500"
-                        />
-                        <span className="text-xs text-slate-700 group-hover:text-slate-900">{subject.name}</span>
-                      </label>
-                    ))}
-                    {allSubjects.length === 0 && (
-                      <p className="text-[10px] text-slate-400 italic">No subjects registered. Please add subjects in the Subjects Manager.</p>
-                    )}
-                  </div>
-                </div>
-                <div className="space-y-4">
-                  <div>
-                    <ModernSelect
-                      label="Max Student Capacity *"
-                      value={formData.maxStudents}
-                      onChange={(val) => setFormData({ ...formData, maxStudents: Number(val) })}
-                      options={[20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 150, 200, 250, 300, 500].map(cap => ({
-                        value: cap,
-                        label: `${cap} Candidates`
-                      }))}
-                    />
-                  </div>
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1.5">Exam Subjects (Curriculum Scope) *</label>
+                <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 max-h-40 overflow-y-auto space-y-2">
+                  {allSubjects.map((subject) => (
+                    <label key={subject.id} className="flex items-center space-x-2 cursor-pointer group">
+                      <input
+                        type="checkbox"
+                        checked={formData.selectedSubjects.includes(subject.name)}
+                        onChange={() => toggleSubjectSelection(subject.name)}
+                        className="w-4 h-4 rounded border-slate-300 text-orange-600 focus:ring-orange-500"
+                      />
+                      <span className="text-xs text-slate-700 group-hover:text-slate-900">{subject.name}</span>
+                    </label>
+                  ))}
+                  {allSubjects.length === 0 && (
+                    <p className="text-[10px] text-slate-400 italic">No subjects registered. Please add subjects in the Subjects Manager.</p>
+                  )}
                 </div>
               </div>
 

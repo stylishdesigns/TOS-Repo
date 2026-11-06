@@ -1,0 +1,36 @@
+# Netlify builds the Vite frontend and serves the Express backend through a
+# Netlify Function (netlify/functions/api.mts), so previews are fully usable.
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+# The FIREBASE_* / FIRESTORE_DATABASE_ID vars are Firebase web config: public
+# identifiers that appear in every browser bundle by design (Firebase secures
+# access with security rules, not key secrecy). Tell secrets scanning they are
+# expected in the build output. Truly secret values (the service account, the
+# AI key) are server-only and stay out of the client bundle entirely.
+[build.environment]
+  # firebase-admin 14 needs Node >= 22 to load (jwks-rsa requires ESM-only jose).
+  # The functions runtime is pinned via AWS_LAMBDA_JS_RUNTIME=nodejs22.x, which
+  # Netlify only reads from the UI/API (not netlify.toml), so it is set in the
+  # Netlify UI as a site environment variable. NODE_VERSION keeps the build on
+  # Node 22 so the runtime default matches too.
+  NODE_VERSION = "22"
+  SECRETS_SCAN_OMIT_KEYS = "FIREBASE_API_KEY,FIREBASE_APP_ID,FIREBASE_PROJECT_ID,FIREBASE_AUTH_DOMAIN,FIREBASE_STORAGE_BUCKET,FIREBASE_MESSAGING_SENDER_ID,FIRESTORE_DATABASE_ID"
+
+# Backend: everything under /api is handled by the Express app in the function.
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api/:splat"
+  status = 200
+
+# SPA fallback, always last.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

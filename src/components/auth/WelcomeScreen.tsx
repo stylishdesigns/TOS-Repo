@@ -10,7 +10,7 @@ import {
 
 export const WelcomeScreen: React.FC<{ onSelectRole: (role: 'student' | 'tutor' | 'admin') => void }> = ({ onSelectRole }) => {
   const [showSplash, setShowSplash] = useState(true);
-  const { settings } = useApp();
+  const { settings, centreName } = useApp();
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -36,7 +36,7 @@ export const WelcomeScreen: React.FC<{ onSelectRole: (role: 'student' | 'tutor' 
           
           <div className="space-y-2 text-center">
             <h1 className="text-3xl font-black tracking-[0.3em] uppercase text-white">
-              {settings.centreName || 'Excellence'}
+              {centreName}
             </h1>
             <div className="flex items-center justify-center space-x-2">
               <div className="h-[1px] w-8 bg-orange-500/50" />
@@ -75,7 +75,7 @@ export const WelcomeScreen: React.FC<{ onSelectRole: (role: 'student' | 'tutor' 
             Select Your <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-orange-600">Access Portal</span>
           </h2>
           <p className="text-slate-400 max-w-lg mx-auto text-sm font-medium">
-            Welcome to {settings.centreName || 'Excellence Tutorial Centre'}. Please choose the appropriate portal to continue to your dashboard.
+            Welcome to {centreName}. Please choose the appropriate portal to continue to your dashboard.
           </p>
         </div>
 
@@ -137,7 +137,7 @@ export const WelcomeScreen: React.FC<{ onSelectRole: (role: 'student' | 'tutor' 
 
         <div className="mt-12 text-center animate-in fade-in duration-1000 delay-500">
           <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.2em]">
-            © {new Date().getFullYear()} {settings.centreName || 'Excellence Tutorial Centre'} • All Rights Reserved
+            © {new Date().getFullYear()} {centreName} • All Rights Reserved
           </p>
         </div>
       </div>

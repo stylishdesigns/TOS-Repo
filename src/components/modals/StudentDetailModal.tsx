@@ -11,7 +11,6 @@ import {
   Calendar,
   CheckCircle,
   CreditCard,
-  Award,
   Clock,
   Edit2,
   Save,
@@ -23,7 +22,6 @@ export const StudentDetailModal: React.FC = () => {
     setSelectedStudent,
     settings,
     updateStudent,
-    results,
     recordPayment,
     payments,
   } = useApp();
@@ -35,7 +33,6 @@ export const StudentDetailModal: React.FC = () => {
 
   if (!selectedStudent) return null;
 
-  const studentResults = results.filter((r) => r.studentId === selectedStudent.id);
   const studentPayments = payments.filter((p) => p.studentId === selectedStudent.id);
 
   const handleRecordInstallment = (e: React.FormEvent) => {
@@ -242,52 +239,6 @@ export const StudentDetailModal: React.FC = () => {
             </div>
           </div>
 
-          {/* Examination & Mock Results */}
-          <div>
-            <h4 className="font-bold text-slate-900 text-sm mb-2 flex items-center space-x-2">
-              <Award className="w-4 h-4 text-amber-600" />
-              <span>Diagnostic Mock & Examination Scores</span>
-            </h4>
-
-            {studentResults.length === 0 ? (
-              <p className="text-xs text-slate-400 italic p-3 bg-slate-50 rounded-lg">
-                No mock test scores logged yet for this candidate.
-              </p>
-            ) : (
-              <div className="space-y-2">
-                {studentResults.map((res) => (
-                  <div
-                    key={res.id}
-                    className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-2"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-slate-900">{res.examTitle}</span>
-                      <span className="font-bold text-emerald-600">
-                        Total: {res.totalScore} pts ({res.averagePercent}%)
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 border-t border-slate-200/60">
-                      {res.scores.map((sc, i) => (
-                        <div key={i} className="p-1.5 bg-white rounded-md border border-slate-100">
-                          <span className="text-[10px] text-slate-400 block truncate">
-                            {sc.subject}
-                          </span>
-                          <span className="font-extrabold text-slate-800">
-                            {sc.score} / {sc.maxScore}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-
-                    <p className="text-[11px] text-slate-500 italic mt-1">
-                      Remark: "{res.remark}"
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
         </div>
 
         <div className="pt-4 border-t border-slate-100 flex items-center justify-end">

@@ -26,6 +26,7 @@ import {
 export const PublicWebsite: React.FC = () => {
   const {
     settings,
+    centreName,
     programmes,
     tutors,
     branches,
@@ -82,7 +83,7 @@ export const PublicWebsite: React.FC = () => {
             </div>
             <div>
               <span className="text-base font-black tracking-tight text-slate-900 uppercase block leading-tight">
-                {settings.centreName}
+                {centreName}
               </span>
               <span className="text-[10px] text-slate-500 font-semibold tracking-wider block uppercase">
                 {settings.tagline}
@@ -405,7 +406,7 @@ export const PublicWebsite: React.FC = () => {
                 Online Registration & Enrolment
               </span>
               <h2 className="text-xl sm:text-2xl font-black">
-                Register for {settings.centreName}
+                Register for {centreName}
               </h2>
               <p className="text-xs sm:text-sm text-slate-400 mt-1">
                 Complete this form to reserve your seat for the {settings.academicSession} academic session.
@@ -677,15 +678,15 @@ export const PublicWebsite: React.FC = () => {
               E
             </div>
             <div>
-              <p className="font-extrabold text-white">{settings.centreName}</p>
+              <p className="font-extrabold text-white">{centreName}</p>
               <p className="text-[10px] text-slate-500">{settings.tagline}</p>
             </div>
           </div>
 
           <div className="text-center sm:text-right text-[11px] space-y-1">
-            <p>© {new Date().getFullYear()} {settings.centreName}. All rights reserved.</p>
+            <p>© {new Date().getFullYear()} {centreName}. All rights reserved.</p>
             <p className="text-slate-500">
-              Powered by Excellence Tutorial Management System & Dynamic CMS Software.
+              Powered by Tutorial OS Management System & Dynamic CMS Software.
             </p>
           </div>
         </div>

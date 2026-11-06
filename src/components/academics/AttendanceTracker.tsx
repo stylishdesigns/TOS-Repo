@@ -32,7 +32,7 @@ interface AttendanceRecord {
 }
 
 export const AttendanceTracker: React.FC = () => {
-  const { students, programmes, settings, attendanceSettings, updateAttendanceSettings, attendanceLogs, addToast } =
+  const { students, programmes, settings, attendanceSettings, updateAttendanceSettings, attendanceLogs, addToast, centreName } =
     useApp();
 
   const [selectedDate, setSelectedDate] = useState<string>(
@@ -104,7 +104,7 @@ export const AttendanceTracker: React.FC = () => {
     addToast({
       type: 'success',
       title: 'Parent Alert Dispatched!',
-      description: `SMS notification sent to ${record.parentPhone}: "${record.studentName} was marked absent today at ${settings.centreName}."`,
+      description: `SMS notification sent to ${record.parentPhone}: "${record.studentName} was marked absent today at ${centreName}."`,
     });
   };
 

@@ -162,12 +162,12 @@
     },
     "Centre": {
       "title": "Centre",
-      "description": "Tenant organization or independent tutor practice",
+      "description": "Tenant organization (a tutorial centre)",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
         "name": { "type": "string" },
-        "type": { "type": "string", "enum": ["centre", "independent"] },
+        "type": { "type": "string", "enum": ["centre"] },
         "status": { "type": "string", "enum": ["trial", "active", "overdue", "suspended", "closed"] },
         "ownerUid": { "type": "string" },
         "audienceTypes": { "type": "array" },
@@ -216,7 +216,7 @@
       "properties": {
         "id": { "type": "string" },
         "name": { "type": "string" },
-        "accountType": { "type": "string", "enum": ["centre", "independent"] },
+        "accountType": { "type": "string", "enum": ["centre"] },
         "price": { "type": "number" },
         "seatCap": { "type": "number" },
         "trialSeatCap": { "type": "number" },
@@ -256,7 +256,7 @@
     "/cbt_exams/{examId}": { "schema": "CBTExam", "description": "CBT assessments" },
     "/mock_grading/{settingId}": { "schema": "MockGrading", "description": "Mock grading configurations" },
     "/attendance_logs/{logId}": { "schema": "AttendanceLog", "description": "Daily attendance records" },
-    "/centres/{centreId}": { "schema": "Centre", "description": "Centres and independent tutor practices" },
+    "/centres/{centreId}": { "schema": "Centre", "description": "Tutorial centres" },
     "/centreBilling/{centreId}": { "schema": "CentreBilling", "description": "Tenant subscription and billing metadata" },
     "/accessCodes/{code}": { "schema": "AccessCode", "description": "Routing access code index" },
     "/memberships/{membershipId}": { "schema": "Membership", "description": "User memberships across centres" },
@@ -265,4 +265,3 @@
     "/auditLogs/{logId}": { "schema": "AuditLog", "description": "Platform audit log entries" }
   }
 }
-

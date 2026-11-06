@@ -1,0 +1,199 @@
+1. In a food chain, the organisms that manufacture their own food are the
+A: producers
+B: consumers
+C: decomposers
+D: parasites
+Answer: A
+Explanation: Green plants produce food by photosynthesis.
+
+2. An organism that feeds directly on producers is a
+A: producer
+B: primary consumer
+C: tertiary consumer
+D: decomposer
+Answer: B
+Explanation: Herbivores that eat plants are primary consumers.
+
+3. The arrows in a food chain show the direction of
+A: blood flow
+B: water absorption
+C: energy flow
+D: age increase
+Answer: C
+Explanation: Arrows point from food to the eater: energy flow.
+
+4. Bacteria and fungi that break down dead matter are
+A: producers
+B: herbivores
+C: predators
+D: decomposers
+Answer: D
+Explanation: Decomposers recycle nutrients.
+
+5. The natural place where an organism lives is its
+A: habitat
+B: niche
+C: biome
+D: range
+Answer: A
+Explanation: Habitat is the address of the organism.
+
+6. All the individuals of one species living in an area at a given time form a
+A: community
+B: population
+C: ecosystem
+D: biosphere
+Answer: B
+Explanation: One species, one area: population.
+
+7. All the populations of different species living together in an area form a
+A: population
+B: family
+C: community
+D: niche
+Answer: C
+Explanation: Many species together: community.
+
+8. A community together with its physical environment forms an
+A: organ system
+B: habitat
+C: ecotype
+D: ecosystem
+Answer: D
+Explanation: That definition is an ecosystem.
+
+9. As energy passes along a food chain, the amount available at each level
+A: decreases
+B: increases
+C: stays constant
+D: doubles
+Answer: A
+Explanation: Energy is lost as heat at each transfer.
+
+10. An animal that feeds only on plants is a
+A: carnivore
+B: herbivore
+C: omnivore
+D: saprophyte
+Answer: B
+Explanation: Goats and rabbits are herbivores.
+
+11. A lion is best described as a
+A: herbivore
+B: producer
+C: carnivore
+D: decomposer
+Answer: C
+Explanation: Lions eat flesh: carnivores.
+
+12. An organism that eats both plants and animals is an
+A: herbivore
+B: carnivore
+C: autotroph
+D: omnivore
+Answer: D
+Explanation: Man and pigs are omnivores.
+
+13. A pond is an example of a
+A: habitat
+B: tissue
+C: niche
+D: population
+Answer: A
+Explanation: A pond is a place where organisms live.
+
+14. The specific role an organism plays in its habitat is its
+A: habitat
+B: niche
+C: biome
+D: shelter
+Answer: B
+Explanation: Niche is the organism's job, habitat its address.
+
+15. In a pyramid of numbers for a grassland, the level with the largest number of organisms is usually the
+A: primary consumers
+B: secondary consumers
+C: producers
+D: tertiary consumers
+Answer: C
+Explanation: Many grass plants support fewer insects and still fewer hawks.
+
+16. In the nitrogen cycle, the bacteria that convert atmospheric nitrogen into nitrates carry out
+A: denitrification
+B: photosynthesis
+C: transpiration
+D: nitrogen fixation
+Answer: D
+Explanation: Fixing bacteria turn N2 into usable nitrates.
+
+17. Photosynthesis removes carbon dioxide from the air while
+A: respiration adds it
+B: photosynthesis also adds it
+C: evaporation removes it
+D: combustion removes it
+Answer: A
+Explanation: Respiration and combustion return CO2; photosynthesis takes it up.
+
+18. A cactus with a thick water-storing stem living in the desert shows
+A: mutation
+B: adaptation
+C: succession
+D: competition between species
+Answer: B
+Explanation: Such features are adaptations to drought.
+
+19. A relationship where both partners benefit is
+A: parasitism
+B: commensalism
+C: mutualism
+D: predation
+Answer: C
+Explanation: Both benefiting is mutualism.
+
+20. A tapeworm living in the human gut, harming the host, shows
+A: mutualism
+B: saprophytism
+C: symbiosis of equals
+D: parasitism
+Answer: D
+Explanation: One benefits, the other is harmed: parasitism.
+
+21. The gradual change in the species making up a community over time is
+A: succession
+B: evolution
+C: pollution
+D: migration
+Answer: A
+Explanation: That orderly change is succession.
+
+22. Light, temperature and soil are examples of
+A: biotic factors
+B: abiotic factors
+C: producers
+D: decomposers
+Answer: B
+Explanation: Non-living factors are abiotic.
+
+23. The maximum population of a species an environment can support is its
+A: biomass
+B: natality
+C: carrying capacity
+D: habitat size
+Answer: C
+Explanation: That ceiling is the carrying capacity.
+
+24. A complex network of many interlinked food chains is a
+A: food chain
+B: pyramid of energy
+C: nutrient cycle
+D: food web
+Answer: D
+Explanation: Interlinked chains form a food web.
+
+25. In the chain grass, grasshopper, lizard, hawk, the lizard is a
+A: secondary consumer
+B: producer
+C: primary consumer
+D: decomposer
+Answer: A
+Explanation: The lizard eats the primary consumer, so it is secondary.

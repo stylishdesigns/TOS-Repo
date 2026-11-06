@@ -1,0 +1,199 @@
+1. The cell theory states that all living things are made up of
+A: cells
+B: tissues
+C: organs
+D: systems
+Answer: A
+Explanation: Cells are the basic units of life.
+
+2. The organelle known as the powerhouse of the cell is the
+A: ribosome
+B: mitochondrion
+C: lysosome
+D: vacuole
+Answer: B
+Explanation: Mitochondria release energy in respiration.
+
+3. Photosynthesis takes place in the
+A: mitochondrion
+B: nucleus
+C: chloroplast
+D: ribosome
+Answer: C
+Explanation: Chloroplasts contain the chlorophyll that traps light.
+
+4. The part of the cell that controls all its activities is the
+A: cell wall
+B: vacuole
+C: cytoplasm
+D: nucleus
+Answer: D
+Explanation: The nucleus houses the genetic instructions.
+
+5. A structure present in plant cells but absent in animal cells is the
+A: cell wall
+B: cell membrane
+C: nucleus
+D: mitochondrion
+Answer: A
+Explanation: Only plant cells have a cellulose cell wall.
+
+6. Protein synthesis in the cell takes place on the
+A: lysosomes
+B: ribosomes
+C: vacuoles
+D: chloroplasts
+Answer: B
+Explanation: Ribosomes assemble amino acids into proteins.
+
+7. The cell membrane controls
+A: cell division only
+B: the colour of the cell
+C: what enters and leaves the cell
+D: the shape of chromosomes
+Answer: C
+Explanation: The membrane is selectively permeable.
+
+8. The largest organelle in a mature plant cell is the
+A: nucleus
+B: ribosome
+C: chloroplast
+D: central vacuole
+Answer: D
+Explanation: The sap-filled vacuole dominates the plant cell.
+
+9. Ribosomes are found in
+A: both plant and animal cells
+B: plant cells only
+C: animal cells only
+D: bacteria only
+Answer: A
+Explanation: All cells need proteins, so all have ribosomes.
+
+10. The movement of water from a dilute to a more concentrated solution through a semi-permeable membrane is
+A: diffusion
+B: osmosis
+C: transpiration
+D: active transport
+Answer: B
+Explanation: That definition is osmosis.
+
+11. The movement of molecules from a region of higher concentration to one of lower concentration is
+A: osmosis
+B: phagocytosis
+C: diffusion
+D: pinocytosis
+Answer: C
+Explanation: That definition is diffusion.
+
+12. A plant cell placed in a concentrated sugar solution loses water and its cytoplasm shrinks from the wall. This is
+A: turgidity
+B: haemolysis
+C: ciliation
+D: plasmolysis
+Answer: D
+Explanation: Water loss shrinks the protoplast: plasmolysis.
+
+13. The correct order of levels of organisation is
+A: cell, tissue, organ, system
+B: tissue, cell, system, organ
+C: organ, cell, tissue, system
+D: system, organ, tissue, cell
+Answer: A
+Explanation: Cells form tissues, tissues form organs, organs form systems.
+
+14. Which of these organisms is unicellular?
+A: Mucor
+B: Amoeba
+C: Hydra
+D: earthworm
+Answer: B
+Explanation: Amoeba is a single-celled organism.
+
+15. Chromosomes carry the units of inheritance called
+A: vacuoles
+B: ribosomes
+C: genes
+D: plastids
+Answer: C
+Explanation: Genes are borne on chromosomes.
+
+16. The organelle sometimes called the suicide bag because it digests worn-out cell parts is the
+A: nucleolus
+B: ribosome
+C: chloroplast
+D: lysosome
+Answer: D
+Explanation: Lysosomes hold digestive enzymes.
+
+17. Prokaryotic cells, such as bacteria, differ from eukaryotic cells because they lack a
+A: true nucleus
+B: cell membrane
+C: cytoplasm
+D: ribosome
+Answer: A
+Explanation: Bacterial DNA is not enclosed in a nuclear membrane.
+
+18. The ability of a microscope to show fine detail clearly is its
+A: magnification
+B: resolving power
+C: field of view
+D: brightness
+Answer: B
+Explanation: Resolution is the distinguishing of detail.
+
+19. In green plants, light energy is trapped by
+A: haemoglobin
+B: melanin
+C: chlorophyll
+D: carotene in roots
+Answer: C
+Explanation: Chlorophyll absorbs light for photosynthesis.
+
+20. Movement of substances against a concentration gradient, requiring energy, is
+A: diffusion
+B: osmosis
+C: evaporation
+D: active transport
+Answer: D
+Explanation: Active transport uses energy to pump against the gradient.
+
+21. Chloroplasts are found
+A: only in plant cells
+B: only in animal cells
+C: in all cells
+D: only in bacteria
+Answer: A
+Explanation: Chloroplasts belong to photosynthetic plant cells.
+
+22. The jelly-like medium in which cell organelles are suspended is the
+A: nucleoplasm
+B: cytoplasm
+C: cell sap
+D: lymph
+Answer: B
+Explanation: Cytoplasm hosts the organelles and many reactions.
+
+23. In mammals, mature red blood cells are unusual because they
+A: have two nuclei
+B: are green in colour
+C: have no nucleus
+D: carry no haemoglobin
+Answer: C
+Explanation: Mammalian red cells expel their nucleus.
+
+24. A group of similar cells performing the same function is a
+A: system
+B: organ
+C: organism
+D: tissue
+Answer: D
+Explanation: That definition is a tissue.
+
+25. Cell sap is mainly found in the
+A: vacuole
+B: nucleus
+C: ribosome
+D: cell wall
+Answer: A
+Explanation: The vacuole stores cell sap.

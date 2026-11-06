@@ -63,7 +63,7 @@ interface MockGradingSettings {
 }
 
 export const CBTManager: React.FC = () => {
-  const { programmes, subjects: allSubjects, tutors, settings, addToast, exams, results, students } = useApp();
+  const { programmes, subjects: allSubjects, tutors, settings, addToast, exams, results, students, activeCentreId } = useApp();
 
   const [activeFrequency, setActiveFrequency] = useState<'General' | 'Mock'>('General');
   const [activeTimeFilter, setActiveTimeFilter] = useState<'Current' | 'Upcoming'>('Current');
@@ -109,12 +109,12 @@ export const CBTManager: React.FC = () => {
 
   // Firestore Sync for Global Grading
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'mock_grading'), (snapshot) => {
+    const unsub = onSnapshot(activeCentreId ? query(collection(db, 'mock_grading'), where('centreId', '==', activeCentreId)) : collection(db, 'mock_grading'), (snapshot) => {
       const data = snapshot.docs.map(doc => doc.data() as MockGradingSettings);
       setGlobalMockGrading(data);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'mock_grading'));
     return () => unsub();
-  }, []);
+  }, [activeCentreId]);
 
   React.useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 60000); // Update every minute for timers
@@ -721,7 +721,9 @@ export const CBTManager: React.FC = () => {
         essayTotalMarks: (setupData.mode === 'Essay' || setupData.mode === 'Both') ? totalEssayMarks : 0,
       };
 
-      await setDoc(doc(db, 'cbt_exams', examId), JSON.parse(JSON.stringify(examData)));
+      const examPayload = JSON.parse(JSON.stringify(examData)) as Record<string, any>;
+      if (activeCentreId) examPayload.centreId = activeCentreId;
+      await setDoc(doc(db, 'cbt_exams', examId), examPayload);
       addToast({ 
         type: 'success', 
         title: editingExamId ? 'Assessment Updated' : 'Assessment Published', 
@@ -840,7 +842,7 @@ export const CBTManager: React.FC = () => {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-bold text-slate-900 tracking-tight">
-              CBT Practice
+              Tutors Assessment
             </h2>
             <p className="text-xs text-slate-500 mt-1">Configure automated assessments & simulations</p>
           </div>
@@ -980,7 +982,7 @@ export const CBTManager: React.FC = () => {
                   : 'text-slate-500 hover:text-slate-700'
               }`}
             >
-              {freq === 'General' ? 'CBT Assessment' : 'CBT Mock'}
+              {freq === 'General' ? 'Tutors Assessment' : 'Tutors Mock'}
             </button>
           ))}
         </div>
@@ -988,7 +990,7 @@ export const CBTManager: React.FC = () => {
         {showArchive && (
           <div className="px-6 py-2.5 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] flex items-center justify-center gap-3 w-fit mx-auto shadow-xl ring-4 ring-slate-100">
              <BookOpen className="w-4 h-4 text-orange-400" />
-             Archive View: Past {activeFrequency === 'General' ? 'CBT' : 'CBT Mock'} Assessments
+             Archive View: Past {activeFrequency === 'General' ? 'Tutors' : 'Tutors Mock'} Assessments
           </div>
         )}
       </div>
@@ -1068,7 +1070,7 @@ export const CBTManager: React.FC = () => {
                     const isToday = examStart.toDateString() === currentTime.toDateString();
                     const isStartingSoon = !isLive && !isPast && isToday;
                     
-                    const mappedFreqLabel = (exam.frequency === 'General' || exam.frequency as any === 'Daily' || exam.frequency as any === 'Weekly') ? 'CBT' : 'CBT Mock';
+                    const mappedFreqLabel = (exam.frequency === 'General' || exam.frequency as any === 'Daily' || exam.frequency as any === 'Weekly') ? 'Tutors' : 'Tutors Mock';
                     
                     return (
                       <>
@@ -1112,7 +1114,7 @@ export const CBTManager: React.FC = () => {
 
                     <div className="mt-3 space-y-1">
                       <h3 className="font-black text-slate-900 text-lg group-hover:text-[#EA580C] transition-colors leading-tight">
-                        {exam.title.replace(/General Assessment/g, 'CBT Assessment').replace(/General/g, 'CBT')}
+                        {exam.title.replace(/General Assessment/g, 'Tutors Assessment').replace(/General/g, 'Tutors')}
                       </h3>
                       {exam.topic && (
                         <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tight flex items-center gap-1">
@@ -1426,8 +1428,8 @@ export const CBTManager: React.FC = () => {
                       value={setupData.frequency}
                       onChange={(val) => setSetupData({...setupData, frequency: val})}
                       options={[
-                        { value: 'General', label: 'CBT Assessment' },
-                        { value: 'Mock', label: 'Mock Examination' }
+                        { value: 'General', label: 'Tutors Assessment' },
+                        { value: 'Mock', label: 'Tutors Mock' }
                       ]}
                     />
 
@@ -2435,7 +2437,8 @@ Number of Questions: ${setupData.questionCount}`;
                   onClick={async () => {
                     try {
                       for (const grading of globalMockGrading) {
-                        await setDoc(doc(db, 'mock_grading', grading.programmeId), grading);
+                        // Stamp the centre so the row stays visible to, and writable by, its own centre.
+                        await setDoc(doc(db, 'mock_grading', grading.programmeId), activeCentreId ? { ...grading, centreId: activeCentreId } : grading);
                       }
                       addToast({ type: 'success', title: 'Grading Saved', description: 'Global mock rules updated.' });
                       setShowGlobalGradingModal(false);

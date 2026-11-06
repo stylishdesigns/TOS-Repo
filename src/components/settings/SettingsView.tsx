@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { AccessCodeSettings } from './AccessCodeSettings';
 import { ModernSelect } from '../ui/ModernSelect';
 import {
   User,
@@ -24,7 +25,7 @@ import {
 } from 'lucide-react';
 
 export const SettingsView: React.FC = () => {
-  const { settings, updateSettings, addToast, authMethod, activeUser } = useApp();
+  const { settings, updateSettings, addToast, authMethod, activeUser, activeCentre } = useApp();
 
   const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'sessions' | 'centre'>('profile');
 
@@ -52,7 +53,7 @@ export const SettingsView: React.FC = () => {
 
   // Centre Configuration state
   const [centreForm, setCentreForm] = useState({
-    centreName: settings.centreName,
+    centreName: settings.centreName || activeCentre?.name || '',
     tagline: settings.tagline,
     academicSession: settings.academicSession,
     currencySymbol: settings.currencySymbol,
@@ -60,10 +61,19 @@ export const SettingsView: React.FC = () => {
     state: settings.state,
     phone: settings.phone,
     email: settings.email,
-    whatsapp: settings.whatsappNumber || settings.whatsapp || '+234 805 676 5455',
+    whatsapp: settings.whatsappNumber || settings.whatsapp || '',
     smsNotifications: settings.smsNotifications,
     emailNotifications: settings.emailNotifications,
   });
+
+  // The centre official name submitted at creation prefills the field.
+  React.useEffect(() => {
+    if (activeCentre?.name && !centreForm.centreName) {
+      const official = activeCentre.name;
+      setCentreForm((f) => ({ ...f, centreName: official }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeCentre]);
 
   const [showAddSessionModal, setShowAddSessionModal] = useState(false);
   const [newSessionName, setNewSessionName] = useState('');
@@ -160,24 +170,24 @@ export const SettingsView: React.FC = () => {
           <div>
             <div className="flex items-center space-x-2.5">
               <h2 className="text-xl font-bold text-slate-900">
-                {activeUser.name}
+                {activeUser?.name || 'Admin'}
               </h2>
               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200">
-                {activeUser.role}
+                {activeUser?.role || 'Administrator'}
               </span>
             </div>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 mt-1">
               <span className="flex items-center space-x-1">
                 <Mail className="w-3.5 h-3.5 text-slate-400" />
-                <span>{activeUser.email}</span>
+                <span>{activeUser?.email || ''}</span>
               </span>
               <span>•</span>
               <span className="flex items-center space-x-1">
                 <Phone className="w-3.5 h-3.5 text-slate-400" />
-                <span>{activeUser.phone || 'No phone set'}</span>
+                <span>{activeUser?.phone || 'No phone set'}</span>
               </span>
               <span>•</span>
-              <span className="text-slate-600 font-medium">{activeUser.department}</span>
+              <span className="text-slate-600 font-medium">{activeUser?.department || 'General'}</span>
             </div>
           </div>
         </div>
@@ -492,11 +502,14 @@ export const SettingsView: React.FC = () => {
 
       {/* Tab: Centre & System Parameters */}
       {activeTab === 'centre' && (
-        <div className="bg-white p-5 sm:p-6 rounded-xl border border-slate-200/90 shadow-xs space-y-5">
+        <div className="space-y-6">
+          {/* Access code (Prompt C Part C): owner-managed, server-verified. */}
+          <AccessCodeSettings />
+          <div className="bg-white p-5 sm:p-6 rounded-xl border border-slate-200/90 shadow-xs space-y-5">
           <div className="border-b border-slate-100 pb-3">
             <h3 className="text-base font-bold text-slate-900">Centre Identity & Academic Parameters</h3>
             <p className="text-xs text-slate-500">
-              Global Centre name, active academic session, currency symbol, and official contact lines.
+              Global Centre name, active academic session, and official contact lines.
             </p>
           </div>
 
@@ -555,28 +568,13 @@ export const SettingsView: React.FC = () => {
                 </div>
               </div>
 
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Currency Symbol
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={centreForm.currencySymbol || ''}
-                  onChange={(e) =>
-                    setCentreForm({ ...centreForm, currencySymbol: e.target.value })
-                  }
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-900 font-bold focus:bg-white focus:border-orange-500 outline-none"
-                />
-              </div>
 
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">
-                  WhatsApp Support Line *
+                  WhatsApp number (optional)
                 </label>
                 <input
                   type="tel"
-                  required
                   value={centreForm.whatsapp || ''}
                   onChange={(e) =>
                     setCentreForm({ ...centreForm, whatsapp: e.target.value })
@@ -625,6 +623,7 @@ export const SettingsView: React.FC = () => {
               </button>
             </div>
           </form>
+          </div>
         </div>
       )}
 

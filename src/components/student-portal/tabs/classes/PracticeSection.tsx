@@ -1,3 +1,4 @@
+import { loadLastGood, saveLastGood } from '../../../../lib/lastGood';
 import React, { useState, useEffect, useMemo } from 'react';
 import { Student } from '../../../../types';
 import { Sparkles, BookOpen, ChevronRight, HelpCircle, ArrowRight, CheckCircle2 } from 'lucide-react';
@@ -60,6 +61,16 @@ export const PracticeSection: React.FC<PracticeSectionProps> = ({
   // Load topics & student's progress for selected subject
   useEffect(() => {
     let isMounted = true;
+    // Show the saved copy of this subject's topics at once, then refresh
+    // behind it. Scoped to this student and subject so nothing mixes.
+    const ownerKey = student.id || student.uid || '';
+    const cachedTopics = loadLastGood<{ topic: string; total: number }[]>(`practice:topics:${ownerKey}:${selectedSubject}`);
+    const cachedProgress = loadLastGood<Record<string, TopicProgress>>(`practice:progress:${ownerKey}:${selectedSubject}`);
+    if (cachedTopics && cachedTopics.length) {
+      setTopics(cachedTopics);
+      if (cachedProgress) setProgressMap(cachedProgress);
+      setLoading(false);
+    }
     setLoading(true);
 
     const loadData = async () => {
@@ -72,6 +83,8 @@ export const PracticeSection: React.FC<PracticeSectionProps> = ({
       if (isMounted) {
         setTopics(fetchedTopics);
         setProgressMap(studentProgress);
+        saveLastGood(`practice:topics:${ownerKey}:${selectedSubject}`, fetchedTopics);
+        saveLastGood(`practice:progress:${ownerKey}:${selectedSubject}`, studentProgress);
         setLoading(false);
       }
     };
@@ -248,7 +261,7 @@ export const PracticeSection: React.FC<PracticeSectionProps> = ({
         })}
       </div>
 
-      {loading ? (
+      {loading && topics.length === 0 ? (
         <div className="p-8 text-center bg-white rounded-[20px] border border-[#E2E8F0] space-y-2">
           <div className="w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto" />
           <p className="text-xs text-slate-500 font-medium">Loading topics for {selectedSubject}...</p>

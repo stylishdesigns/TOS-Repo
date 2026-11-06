@@ -157,23 +157,6 @@ export const PerformanceManager: React.FC = () => {
         </div>
       </div>
 
-      {/* View Mode Toggle */}
-      <div className="flex items-center space-x-1 bg-slate-100 p-1 rounded-xl w-fit">
-        {(['General', 'Mock'] as const).map((mode) => (
-          <button
-            key={mode}
-            onClick={() => setActiveToggle(mode)}
-            className={`px-8 py-2.5 text-xs font-black rounded-lg transition-all ${
-              activeToggle === mode
-                ? 'bg-white text-[#EA580C] shadow-md scale-105'
-                : 'text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            {mode === 'General' ? 'CBT Assessment Performance' : 'CBT Mock Performance'}
-          </button>
-        ))}
-      </div>
-
       {/* Filters Bar */}
       <div className="bg-white p-4 md:p-6 rounded-3xl border border-slate-200/90 shadow-sm space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -252,6 +235,23 @@ export const PerformanceManager: React.FC = () => {
         </div>
       </div>
 
+      {/* View Mode Toggle */}
+      <div className="flex items-center space-x-1 bg-slate-100 p-1 rounded-xl w-fit">
+        {(['General', 'Mock'] as const).map((mode) => (
+          <button
+            key={mode}
+            onClick={() => setActiveToggle(mode)}
+            className={`px-8 py-2.5 text-xs font-black rounded-lg transition-all ${
+              activeToggle === mode
+                ? 'bg-white text-[#EA580C] shadow-md scale-105'
+                : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            {mode === 'General' ? 'Tutors Assessment Performance' : 'CBT Mock Performance'}
+          </button>
+        ))}
+      </div>
+
       {/* Assessment Leaderboards List */}
       <div className="space-y-4">
         {(() => {
@@ -302,7 +302,7 @@ export const PerformanceManager: React.FC = () => {
                              {exam.subjects.join(', ')}
                           </span>
                        </div>
-                       <h3 className="text-slate-900 font-black text-base truncate">{exam.title.replace(/General Assessment/g, 'CBT Assessment').replace(/General/g, 'CBT')}</h3>
+                       <h3 className="text-slate-900 font-black text-base truncate">{exam.title.replace(/General Assessment/g, 'Tutors Assessment').replace(/General/g, 'Tutors')}</h3>
                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter mt-1">{exam.targetExam}</p>
                     </div>
 

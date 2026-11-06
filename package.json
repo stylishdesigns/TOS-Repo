@@ -1,5 +1,5 @@
 {
-  "name": "react-example",
+  "name": "tutorial-os",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -8,8 +8,9 @@
     "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
     "start": "NODE_ENV=production node dist/server.cjs",
     "clean": "rm -rf dist server.js",
-    "test": "tsx src/components/student-portal/tabs/performance/utils/performance.test.ts",
-    "lint": "tsc --noEmit"
+    "test": "tsx src/components/student-portal/tabs/chatNav.test.ts && tsx src/components/student-portal/tabs/performance/utils/performance.test.ts && tsx src/server/paymentLogic.test.ts && tsx src/server/paymentService.test.ts",
+    "lint": "tsc --noEmit",
+    "test:rules": "npx firebase-tools emulators:exec --only firestore --project demo-tos-rules \"node tests/rules/dirtyDozen.rules.test.mjs && node tests/rules/centreScope.rules.test.mjs && node tests/rules/adminScope.rules.test.mjs && node tests/rules/catalogScope.rules.test.mjs\""
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
@@ -28,16 +29,22 @@
     "motion": "^12.23.24",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
+    "serverless-http": "^4.0.0",
     "tsx": "^4.21.0",
     "vite": "^6.2.3"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.2",
     "@types/express": "^4.17.21",
     "@types/node": "^22.14.0",
     "autoprefixer": "^10.4.21",
+    "firebase-tools": "^15.34.1",
     "sharp": "^0.35.4",
     "tailwindcss": "^4.1.14",
     "typescript": "~5.8.2",
     "vite-plugin-pwa": "^0.21.1"
+  },
+  "overrides": {
+    "jwks-rsa": "^3.1.0"
   }
 }

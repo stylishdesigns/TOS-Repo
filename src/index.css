@@ -141,4 +141,194 @@ span.text-slate-600:not(.dark-bg-mode *) {
   animation: splashFadeIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* ---------------------------------------------------------------------------
+   MB1 Step 1: bank colour scoping. Inside the Practice Bank workspace every
+   orange accent renders sky blue; inside the Mock Bank workspace it renders
+   amber. The scope class is set by the Question Bank shell on the wrapper
+   that holds the banner, the tabs and the active bank screen, so the rest of
+   the console keeps its own colours. Unlayered rules sit above Tailwind's
+   utility layer, so no !important is needed.
+   ------------------------------------------------------------------------- */
+.bank-scope-practice .text-orange-100 { color: #e0f2fe; }
+.bank-scope-practice .text-orange-200 { color: #bae6fd; }
+.bank-scope-practice .text-orange-200\/90 { color: rgba(186, 230, 253, 0.9); }
+.bank-scope-practice .text-orange-300 { color: #7dd3fc; }
+.bank-scope-practice .text-orange-300\/90 { color: rgba(125, 211, 252, 0.9); }
+.bank-scope-practice .text-orange-400 { color: #38bdf8; }
+.bank-scope-practice .text-orange-400\/60 { color: rgba(56, 189, 248, 0.6); }
+.bank-scope-practice .bg-orange-500 { background-color: #0ea5e9; }
+.bank-scope-practice .bg-orange-500\/10 { background-color: rgba(14, 165, 233, 0.10); }
+.bank-scope-practice .bg-orange-500\/15 { background-color: rgba(14, 165, 233, 0.15); }
+.bank-scope-practice .bg-orange-500\/20 { background-color: rgba(14, 165, 233, 0.20); }
+.bank-scope-practice .bg-orange-500\/25 { background-color: rgba(14, 165, 233, 0.25); }
+.bank-scope-practice .bg-orange-600 { background-color: #0284c7; }
+.bank-scope-practice .hover\:bg-orange-500:hover { background-color: #0ea5e9; }
+.bank-scope-practice .hover\:text-orange-300:hover { color: #7dd3fc; }
+.bank-scope-practice .border-orange-500\/30 { border-color: rgba(14, 165, 233, 0.30); }
+.bank-scope-practice .border-orange-500\/40 { border-color: rgba(14, 165, 233, 0.40); }
+.bank-scope-practice .border-orange-500\/50 { border-color: rgba(14, 165, 233, 0.50); }
+.bank-scope-practice .border-orange-500\/60 { border-color: rgba(14, 165, 233, 0.60); }
+.bank-scope-practice .focus\:border-orange-500\/60:focus { border-color: rgba(14, 165, 233, 0.60); }
+.bank-scope-practice .bg-orange-500.text-white,
+.bank-scope-practice .bg-orange-600.text-white { color: #082f49; }
 
+.bank-scope-mock .text-orange-100 { color: #fef3c7; }
+.bank-scope-mock .text-orange-200 { color: #fde68a; }
+.bank-scope-mock .text-orange-200\/90 { color: rgba(253, 230, 138, 0.9); }
+.bank-scope-mock .text-orange-300 { color: #fcd34d; }
+.bank-scope-mock .text-orange-300\/90 { color: rgba(252, 211, 77, 0.9); }
+.bank-scope-mock .text-orange-400 { color: #fbbf24; }
+.bank-scope-mock .text-orange-400\/60 { color: rgba(251, 191, 36, 0.6); }
+.bank-scope-mock .bg-orange-500 { background-color: #f59e0b; }
+.bank-scope-mock .bg-orange-500\/10 { background-color: rgba(245, 158, 11, 0.10); }
+.bank-scope-mock .bg-orange-500\/15 { background-color: rgba(245, 158, 11, 0.15); }
+.bank-scope-mock .bg-orange-500\/20 { background-color: rgba(245, 158, 11, 0.20); }
+.bank-scope-mock .bg-orange-500\/25 { background-color: rgba(245, 158, 11, 0.25); }
+.bank-scope-mock .bg-orange-600 { background-color: #d97706; }
+.bank-scope-mock .hover\:bg-orange-500:hover { background-color: #f59e0b; }
+.bank-scope-mock .hover\:text-orange-300:hover { color: #fcd34d; }
+.bank-scope-mock .border-orange-500\/30 { border-color: rgba(245, 158, 11, 0.30); }
+.bank-scope-mock .border-orange-500\/40 { border-color: rgba(245, 158, 11, 0.40); }
+.bank-scope-mock .border-orange-500\/50 { border-color: rgba(245, 158, 11, 0.50); }
+.bank-scope-mock .border-orange-500\/60 { border-color: rgba(245, 158, 11, 0.60); }
+.bank-scope-mock .focus\:border-orange-500\/60:focus { border-color: rgba(245, 158, 11, 0.60); }
+.bank-scope-mock .bg-orange-500.text-white,
+.bank-scope-mock .bg-orange-600.text-white { color: #451a03; }
+
+
+/* ------------------------------------------------------------------
+   Student portal appearance (More > Appearance). The student picks
+   Light, Dark or System. The screens are written light, so dark mode
+   works as a scoped stylesheet: while the body carries
+   .tos-student-dark, the common light surfaces, borders and text
+   remap to dark equivalents and nothing inside the screens changes.
+   The status and chat overlays attach to the body, so they follow.
+   ------------------------------------------------------------------ */
+.tos-student-dark .bg-white { background-color: #101a2c; }
+.tos-student-dark .bg-white\/80 { background-color: #101a2ccc; }
+.tos-student-dark .bg-white\/70 { background-color: #101a2cb3; }
+.tos-student-dark .bg-white\/60 { background-color: #101a2c99; }
+.tos-student-dark .bg-slate-50 { background-color: #0d1526; }
+.tos-student-dark .bg-slate-50\/80 { background-color: #0d1526cc; }
+.tos-student-dark .bg-slate-100 { background-color: #1a2438; }
+.tos-student-dark .bg-slate-100\/80 { background-color: #1a2438cc; }
+.tos-student-dark .bg-slate-200 { background-color: #243252; }
+.tos-student-dark .bg-slate-300 { background-color: #334155; }
+.tos-student-dark .bg-slate-400 { background-color: #64748b; }
+.tos-student-dark .hover\:bg-slate-50:hover { background-color: #0d1526; }
+.tos-student-dark .hover\:bg-slate-50\/80:hover { background-color: #0d1526cc; }
+.tos-student-dark .hover\:bg-slate-100:hover { background-color: #1a2438; }
+.tos-student-dark .hover\:bg-slate-100\/80:hover { background-color: #1a2438cc; }
+.tos-student-dark .hover\:bg-slate-200:hover { background-color: #243252; }
+.tos-student-dark .hover\:bg-slate-900:hover { background-color: #0b1220; }
+.tos-student-dark .hover\:bg-slate-900\/80:hover { background-color: #0b1220cc; }
+.tos-student-dark .active\:bg-slate-100\/80:active { background-color: #1a2438cc; }
+.tos-student-dark .active\:bg-slate-50\/80:active { background-color: #0d1526cc; }
+.tos-student-dark .border-slate-100 { border-color: #22304a; }
+.tos-student-dark .border-slate-200 { border-color: #22304a; }
+.tos-student-dark .border-slate-200\/90 { border-color: #22304a; }
+.tos-student-dark .border-slate-200\/80 { border-color: #22304a; }
+.tos-student-dark .border-slate-300 { border-color: #2d3c5a; }
+.tos-student-dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]) { border-color: #22304a; }
+.tos-student-dark .divide-slate-200 > :not([hidden]) ~ :not([hidden]) { border-color: #22304a; }
+.tos-student-dark .text-slate-900 { color: #f1f5f9; }
+.tos-student-dark .text-slate-800 { color: #e2e8f0; }
+.tos-student-dark .text-slate-700 { color: #cbd5e1; }
+.tos-student-dark .text-slate-600 { color: #94a3b8; }
+.tos-student-dark .text-slate-500 { color: #94a3b8; }
+.tos-student-dark .text-slate-400 { color: #64748b; }
+.tos-student-dark .text-slate-300 { color: #64748b; }
+.tos-student-dark .text-\[\#0F172A\] { color: #f1f5f9; }
+.tos-student-dark .text-\[\#334155\] { color: #cbd5e1; }
+.tos-student-dark .text-\[\#475569\] { color: #94a3b8; }
+.tos-student-dark .text-\[\#64748B\] { color: #94a3b8; }
+.tos-student-dark .text-\[\#94A3B8\] { color: #64748b; }
+.tos-student-dark .text-\[\#EA580C\] { color: #fb923c; }
+.tos-student-dark .text-\[\#C2410C\] { color: #fb923c; }
+.tos-student-dark .text-\[\#BE123C\] { color: #fb7185; }
+.tos-student-dark .text-\[\#047857\] { color: #34d399; }
+.tos-student-dark .text-\[\#B45309\] { color: #fbbf24; }
+.tos-student-dark .border-\[\#E2E8F0\] { border-color: #22304a; }
+.tos-student-dark .border-\[\#CBD5E1\] { border-color: #2d3c5a; }
+.tos-student-dark .border-\[\#0F172A\] { border-color: #334155; }
+.tos-student-dark .border-\[\#FFEDD5\] { border-color: #7c2d12; }
+.tos-student-dark .border-\[\#FED7AA\] { border-color: #9a3412; }
+.tos-student-dark .placeholder\:text-slate-300::placeholder { color: #475569; }
+.tos-student-dark .placeholder\:text-slate-400::placeholder { color: #64748b; }
+.tos-student-dark .bg-orange-50 { background-color: #3a1a07; }
+.tos-student-dark .bg-orange-100 { background-color: #4a2410; }
+.tos-student-dark .bg-emerald-50 { background-color: #06281f; }
+.tos-student-dark .bg-emerald-50\/80 { background-color: #06281fcc; }
+.tos-student-dark .bg-rose-50 { background-color: #3f0d1e; }
+.tos-student-dark .bg-rose-50\/50 { background-color: #3f0d1e80; }
+.tos-student-dark .bg-amber-50 { background-color: #3a2506; }
+.tos-student-dark .bg-purple-50 { background-color: #2a1245; }
+.tos-student-dark .bg-indigo-50 { background-color: #1e2148; }
+.tos-student-dark .bg-sky-50 { background-color: #0c2a3f; }
+.tos-student-dark .bg-blue-50 { background-color: #16274d; }
+.tos-student-dark .bg-blue-50\/80 { background-color: #16274dcc; }
+.tos-student-dark .bg-\[\#FFF7ED\] { background-color: #3a1a07; }
+.tos-student-dark .bg-\[\#F1F5F9\] { background-color: #1a2438; }
+.tos-student-dark .bg-\[\#F8FAFC\] { background-color: #0d1526; }
+
+/* Second wave: coloured texts that went murky on dark surfaces, the dark
+   buttons that looked faded on dark cards, and the remaining tinted
+   backgrounds and borders. */
+.tos-student-dark .text-emerald-700 { color: #6ee7b7; }
+.tos-student-dark .text-emerald-600 { color: #34d399; }
+.tos-student-dark .text-emerald-800 { color: #a7f3d0; }
+.tos-student-dark .text-rose-600 { color: #fb7185; }
+.tos-student-dark .text-rose-700 { color: #fda4af; }
+.tos-student-dark .text-rose-500 { color: #fb7185; }
+.tos-student-dark .text-orange-600 { color: #fb923c; }
+.tos-student-dark .text-orange-500 { color: #fb923c; }
+.tos-student-dark .text-amber-800 { color: #fcd34d; }
+.tos-student-dark .text-amber-600 { color: #fbbf24; }
+.tos-student-dark .text-amber-700 { color: #fcd34d; }
+.tos-student-dark .text-blue-700 { color: #93c5fd; }
+.tos-student-dark .text-blue-600 { color: #60a5fa; }
+.tos-student-dark .text-purple-600 { color: #c084fc; }
+.tos-student-dark .text-indigo-600 { color: #a5b4fc; }
+.tos-student-dark .text-sky-600 { color: #7dd3fc; }
+.tos-student-dark .bg-slate-900 { background-color: #334155; }
+.tos-student-dark .hover\:bg-slate-900:hover { background-color: #3f4d63; }
+.tos-student-dark .hover\:bg-slate-900\/80:hover { background-color: #3f4d63cc; }
+.tos-student-dark .bg-slate-800 { background-color: #1e293b; }
+.tos-student-dark .border-slate-800 { border-color: #3b4a63; }
+.tos-student-dark .bg-slate-50\/70 { background-color: #0d1526b3; }
+.tos-student-dark .bg-emerald-600 { background-color: #059669; }
+.tos-student-dark .bg-emerald-500 { background-color: #059669; }
+.tos-student-dark .bg-emerald-100 { background-color: #064e3b; }
+.tos-student-dark .bg-rose-100 { background-color: #4c0519; }
+.tos-student-dark .bg-amber-100 { background-color: #451a03; }
+.tos-student-dark .bg-blue-100 { background-color: #1e3a8a; }
+.tos-student-dark .bg-purple-100 { background-color: #3b0764; }
+.tos-student-dark .bg-indigo-100 { background-color: #1e1b4b; }
+.tos-student-dark .bg-sky-100 { background-color: #082f49; }
+.tos-student-dark .bg-orange-500\/10 { background-color: #7c2d1219; }
+.tos-student-dark .bg-orange-500\/15 { background-color: #7c2d1226; }
+.tos-student-dark .bg-orange-500\/20 { background-color: #7c2d1233; }
+.tos-student-dark .border-orange-100 { border-color: #7c2d12; }
+.tos-student-dark .border-orange-200 { border-color: #9a3412; }
+.tos-student-dark .border-emerald-200 { border-color: #065f46; }
+.tos-student-dark .border-emerald-100 { border-color: #064e3b; }
+.tos-student-dark .border-rose-200 { border-color: #9f1239; }
+.tos-student-dark .border-amber-200 { border-color: #92400e; }
+.tos-student-dark .border-blue-200 { border-color: #1e40af; }
+.tos-student-dark .border-purple-200 { border-color: #6b21a8; }
+.tos-student-dark .border-indigo-200 { border-color: #3730a3; }
+.tos-student-dark .border-sky-200 { border-color: #0c4a6e; }
+.tos-student-dark .text-\[\#1E293B\] { color: #e2e8f0; }
+
+/* Third wave: segmented toggles and pill pickers. In dark mode the active
+   pill was dark-on-dark and unreadable; it now carries the centre's orange
+   with a soft glow, and hover states stay light. */
+.tos-student-dark .bg-\[\#0F172A\].text-white.rounded-\[10px\],
+.tos-student-dark .bg-\[\#0F172A\].text-white.rounded-full {
+  background-image: linear-gradient(135deg, #C2410C, #EA580C);
+  box-shadow: 0 2px 8px rgba(234, 88, 12, 0.35);
+}
+.tos-student-dark .hover\:text-\[\#0F172A\]:hover { color: #f1f5f9; }
+.tos-student-dark .hover\:text-\[\#EA580C\]:hover { color: #fb923c; }
+.tos-student-dark .hover\:border-\[\#CBD5E1\]:hover { border-color: #2d3c5a; }
+.tos-student-dark .hover\:bg-\[\#FFF7ED\]:hover { background-color: #3a1a07; }

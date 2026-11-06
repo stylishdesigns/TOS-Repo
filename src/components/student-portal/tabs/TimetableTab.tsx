@@ -216,7 +216,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({ student }) => {
   });
 
   return (
-    <div className="space-y-4 px-4 py-3 max-w-lg mx-auto pb-20 animate-in fade-in duration-300">
+    <div className="space-y-4 px-4 py-3 max-w-lg mx-auto animate-in fade-in duration-300">
       {/* 1. Switch at top: "Timetable | Study Materials" */}
       <div className="bg-white rounded-[14px] p-1 border border-[#E2E8F0] shadow-2xs grid grid-cols-2 gap-1">
         <button
@@ -251,16 +251,6 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({ student }) => {
         />
       ) : (
         <>
-          {/* Header Banner */}
-          <div className="pt-1">
-            <span className="text-[10px] font-extrabold uppercase text-[#C2410C] tracking-wider block">
-              {student.name} · {student.programmeName || 'Academic Schedule'}
-            </span>
-            <h2 className="text-xl font-black text-[#0F172A] tracking-tight">
-              Classes & Lectures
-            </h2>
-          </div>
-
           {/* 2. Week Strip: 7 days Mon - Sun */}
           <div className="grid grid-cols-7 gap-1.5 pb-1">
             {DAYS.map((day) => {

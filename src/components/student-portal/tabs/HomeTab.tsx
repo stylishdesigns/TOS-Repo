@@ -118,7 +118,6 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
     'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?auto=format&fit=crop&w=500&q=80';
 
   const studentAvatar =
-    studentHeroAvatar ||
     (student.avatar &&
     !student.avatar.includes('photo-1534528741775') &&
     !student.avatar.includes('photo-1517841905240')
@@ -565,7 +564,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
 
       {/* 7. WhatsApp Campus Coordinator */}
       <a
-        href={`https://wa.me/${(settings.whatsappNumber || settings.whatsapp || '+2348056765455').replace(/\D/g, '')}`}
+        href={`https://wa.me/${(settings.whatsappNumber || settings.whatsapp || settings.phone).replace(/\D/g, '')}`}
         target="_blank"
         rel="noreferrer"
         className="flex items-center justify-between p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-emerald-900 hover:bg-emerald-100/80 transition-all shadow-2xs"

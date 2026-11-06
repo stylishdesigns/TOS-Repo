@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useApp } from '../../../context/AppContext';
+import { api, Json } from '../../tos/tosShared';
 import { Student } from '../../../types';
 import regeneratedStudentAvatar from '../../../assets/images/regenerated_image_1789369642757.jpg';
 import { ModernSelect } from '../../ui/ModernSelect';
@@ -12,6 +13,7 @@ import {
   KeyRound,
   Fingerprint,
   Palette,
+  Camera,
   HelpCircle,
   FileText,
   LogOut,
@@ -37,9 +39,180 @@ import {
   EyeOff,
   Building2,
   Banknote,
+  BookOpen,
   Upload,
   Image as ImageIcon,
 } from 'lucide-react';
+
+/** A real profile picture, never the placeholder stock avatars the demo
+ *  data shipped with. Empty string means "show the initials circle". */
+function realAvatar(url?: string): string {
+  if (!url) return '';
+  if (url.includes('photo-1534528741775') || url.includes('photo-1517841905240')) return '';
+  return url;
+}
+
+/** Shrinks a phone photo in the browser before upload, so a weak connection
+ *  is never asked to carry a full camera shot. */
+async function shrinkImage(file: File, maxEdge: number): Promise<string> {
+  const raw = await new Promise<string>((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload = () => resolve(String(fr.result));
+    fr.onerror = () => reject(new Error('The picture could not be read.'));
+    fr.readAsDataURL(file);
+  });
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const scale = Math.min(1, maxEdge / Math.max(img.width || 1, img.height || 1));
+        const w = Math.max(1, Math.round((img.width || 1) * scale));
+        const h = Math.max(1, Math.round((img.height || 1) * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { resolve(raw); return; }
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', 0.85));
+      } catch {
+        resolve(raw);
+      }
+    };
+    img.onerror = () => resolve(raw);
+    img.src = raw;
+  });
+}
+
+/** Small deterministic hash of a string, for the card's barcode and logo
+ *  mark: the same student always renders the same card. */
+function cardSeed(seed: string): () => number {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) | 0;
+  return () => {
+    h = (h * 1103515245 + 12345) | 0;
+    return ((h >>> 16) & 0x7fff) / 0x7fff;
+  };
+}
+
+function cardBars(seed: string): { x: number; w: number }[] {
+  const rand = cardSeed(seed);
+  const bars: { x: number; w: number }[] = [];
+  let x = 0;
+  while (x < 150) {
+    const w = 2 + Math.floor(rand() * 4);
+    bars.push({ x, w });
+    x += w + 2 + Math.floor(rand() * 2);
+  }
+  return bars;
+}
+
+function cardEsc(value: string): string {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+/** The ID card, drawn as an SVG. The same design is shown in the popup and
+ *  downloaded as a picture, so the saved copy always matches what the
+ *  student sees. Every word comes from the student's own record. */
+function buildCardSvg(opts: {
+  centreName: string;
+  name: string;
+  programme: string;
+  department: string;
+  session: string;
+  studentId: string;
+  subjects: string[];
+  avatarDataUrl: string | null;
+  initials: string;
+  status: string;
+}): string {
+  const { centreName, name, programme, department, session, studentId, subjects, avatarDataUrl, initials, status } = opts;
+  const markWords = centreName.trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() || '').join('') || 'TC';
+  const centreShort = centreName.toUpperCase();
+  const centreSize = centreShort.length > 26 ? 12 : 15;
+  const nameSize = name.length > 16 ? 17 : name.length > 12 ? 20 : 24;
+  const active = String(status).toLowerCase() === 'active';
+  const chipWord = `${String(status).toUpperCase()}${session ? ` \u00b7 ${session}` : ''}`;
+  const chipW = Math.max(150, chipWord.length * 7 + 44);
+  const rand = cardSeed(studentId);
+  const bars: string[] = [];
+  let bx = 0;
+  while (bx < 150) {
+    const w = 2 + Math.floor(rand() * 4);
+    bars.push(`<rect x="${(390 + bx).toFixed(1)}" y="356" width="${w}" height="34" rx="1" fill="#E2E8F0"/>`);
+    bx += w + 2 + Math.floor(rand() * 2);
+  }
+  const dots: string[] = [];
+  for (let cx = 30; cx < 690; cx += 44) {
+    for (let cy = 30; cy < 430; cy += 44) {
+      dots.push(`<circle cx="${cx}" cy="${cy}" r="1.3" fill="#FFFFFF" opacity="0.045"/>`);
+    }
+  }
+  const photo = avatarDataUrl
+    ? `<image x="34" y="112" width="132" height="164" preserveAspectRatio="xMidYMid slice" clip-path="url(#photoRound)" href="${avatarDataUrl}"/>`
+    : `<circle cx="100" cy="172" r="34" fill="#334155"/><circle cx="100" cy="164" r="20" fill="#94A3B8"/><path d="M 62 240 Q 100 196 138 240 L 138 250 Q 100 262 62 250 Z" fill="#94A3B8"/>`;
+  const chips: string[] = [];
+  let chipX = 196;
+  const shown = subjects.slice(0, 4);
+  for (const sub of shown) {
+    const w = Math.min(150, sub.length * 6.4 + 26);
+    chips.push(`<rect x="${chipX}" y="318" width="${w.toFixed(0)}" height="22" rx="11" fill="#FFFFFF" fill-opacity="0.08"/>`);
+    chips.push(`<text x="${(chipX + w / 2).toFixed(0)}" y="333" font-family="Arial, sans-serif" font-size="10.5" font-weight="bold" fill="#E2E8F0" text-anchor="middle">${cardEsc(sub)}</text>`);
+    chipX += w + 8;
+  }
+  if (subjects.length > 4) {
+    chips.push(`<text x="${chipX + 2}" y="333" font-family="Arial, sans-serif" font-size="10.5" font-weight="bold" fill="#94A3B8">+${subjects.length - 4} more</text>`);
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="700" height="440" viewBox="0 0 700 440">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0A1020"/><stop offset="0.55" stop-color="#111C33"/><stop offset="1" stop-color="#1B2540"/>
+    </linearGradient>
+    <linearGradient id="mark" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#F97316"/><stop offset="1" stop-color="#EA580C"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.85" cy="0.05" r="0.9">
+      <stop offset="0" stop-color="#EA580C" stop-opacity="0.28"/><stop offset="0.55" stop-color="#EA580C" stop-opacity="0.06"/><stop offset="1" stop-color="#EA580C" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="round"><rect x="10" y="10" width="680" height="420" rx="30"/></clipPath>
+    <clipPath id="photoRound"><rect x="34" y="112" width="132" height="164" rx="16"/></clipPath>
+  </defs>
+  <g clip-path="url(#round)">
+    <rect x="0" y="0" width="700" height="440" fill="url(#bg)"/>
+    <rect x="0" y="0" width="700" height="440" fill="url(#glow)"/>
+    ${dots.join('')}
+    <rect x="34" y="34" width="46" height="46" rx="13" fill="url(#mark)"/>
+    <text x="57" y="64" font-family="Arial, sans-serif" font-size="19" font-weight="bold" fill="#FFFFFF" text-anchor="middle">${cardEsc(markWords)}</text>
+    <text x="94" y="53" font-family="Arial, sans-serif" font-size="${centreSize}" font-weight="bold" fill="#F8FAFC" letter-spacing="1.2">${cardEsc(centreShort)}</text>
+    <text x="94" y="71" font-family="Arial, sans-serif" font-size="10.5" fill="#94A3B8" letter-spacing="2.5">STUDENT IDENTITY CARD</text>
+    <rect x="${(666 - chipW).toFixed(0)}" y="42" width="${chipW.toFixed(0)}" height="30" rx="15" fill="none" stroke="#EA580C" stroke-opacity="0.55" stroke-width="1.4"/>
+    <circle cx="${(666 - chipW + 20).toFixed(0)}" cy="57" r="4.5" fill="${active ? '#22C55E' : '#F59E0B'}"/>
+    <text x="${(666 - chipW + 32).toFixed(0)}" y="61" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#FDBA74" letter-spacing="1">${cardEsc(chipWord)}</text>
+    <rect x="34" y="112" width="132" height="164" rx="16" fill="#1B2540"/>
+    ${photo}
+    <rect x="34" y="112" width="132" height="164" rx="16" fill="none" stroke="#EA580C" stroke-opacity="0.7" stroke-width="2"/>
+    <text x="196" y="152" font-family="Arial, sans-serif" font-size="10" fill="#94A3B8" letter-spacing="2">CANDIDATE NAME</text>
+    <text x="196" y="176" font-family="Arial, sans-serif" font-size="${nameSize}" font-weight="bold" fill="#F8FAFC">${cardEsc(name)}</text>
+    <text x="196" y="206" font-family="Arial, sans-serif" font-size="10" fill="#94A3B8" letter-spacing="2">PROGRAMME</text>
+    <text x="196" y="226" font-family="Arial, sans-serif" font-size="15" font-weight="bold" fill="#E2E8F0">${cardEsc(programme || '\u2014')}</text>
+    <text x="196" y="254" font-family="Arial, sans-serif" font-size="10" fill="#94A3B8" letter-spacing="2">DEPARTMENT</text>
+    <text x="196" y="274" font-family="Arial, sans-serif" font-size="15" font-weight="bold" fill="#E2E8F0">${cardEsc(department || '\u2014')}</text>
+    <text x="470" y="152" font-family="Arial, sans-serif" font-size="10" fill="#94A3B8" letter-spacing="2">SESSION</text>
+    <text x="470" y="176" font-family="Arial, sans-serif" font-size="17" font-weight="bold" fill="#E2E8F0">${cardEsc(session || '\u2014')}</text>
+    <text x="470" y="206" font-family="Arial, sans-serif" font-size="10" fill="#94A3B8" letter-spacing="2">STUDENT ID</text>
+    <text x="470" y="230" font-family="Courier New, monospace" font-size="${studentId.length > 14 ? 12 : 16}" font-weight="bold" fill="#FDBA74">${cardEsc(studentId)}</text>
+    <text x="196" y="308" font-family="Arial, sans-serif" font-size="10" fill="#94A3B8" letter-spacing="2">REGISTERED SUBJECTS</text>
+    ${subjects.length === 0 ? '<text x="196" y="333" font-family="Arial, sans-serif" font-size="11" fill="#94A3B8">None registered yet</text>' : chips.join('')}
+    <rect x="34" y="368" width="632" height="1" fill="#FFFFFF" fill-opacity="0.08"/>
+    ${bars.join('')}
+    <text x="390" y="408" font-family="Courier New, monospace" font-size="10" fill="#94A3B8" letter-spacing="3">${cardEsc(studentId)}</text>
+    <text x="34" y="404" font-family="Arial, sans-serif" font-size="10" fill="#64748B">Issued by the centre · Verify with the centre office</text>
+  </g>
+</svg>`;
+}
 
 interface MoreTabProps {
   student: Student;
@@ -74,16 +247,152 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
     setBgTheme,
     isAdmin,
     logout,
+    centreName,
+    subjects,
   } = useApp();
 
   // Active bottom splash-up modal
   const [activeModal, setActiveModal] = useState<ModalType>(null);
 
+  // My subjects: view and edit the student's registered subjects from the centre's own list
+  const [showSubjectsEditor, setShowSubjectsEditor] = useState<boolean>(() => {
+    try {
+      if (sessionStorage.getItem('EXCELLENCE_open_subject_editor') === '1') {
+        sessionStorage.removeItem('EXCELLENCE_open_subject_editor');
+        return true;
+      }
+    } catch {}
+    return false;
+  });
+  const [subjectSearch, setSubjectSearch] = useState('');
+  const [draftSubjects, setDraftSubjects] = useState<Set<string>>(() => new Set<string>());
+  const [savingSubjects, setSavingSubjects] = useState(false);
+
+  // Only this centre's subjects, never another centre's.
+  const centreSubjects = subjects.filter(
+    (sub) => !student.centreId || !sub.centreId || sub.centreId === student.centreId
+  );
+  const registeredNames = useMemo(
+    () => (student.subjects || []).map((n) => String(n).trim()).filter(Boolean),
+    [student]
+  );
+  const departmentOf = (name: string): string => {
+    const found = centreSubjects.find((sub) => sub.name.trim().toLowerCase() === name.trim().toLowerCase());
+    return found ? found.department : 'Other';
+  };
+  const groupOrder = ['General', 'Science', 'Commercial', 'Arts', 'Other'];
+  const groupedRegistered = useMemo(() => {
+    const acc: Record<string, string[]> = {};
+    registeredNames.forEach((name) => {
+      const dept = departmentOf(name);
+      (acc[dept] = acc[dept] || []).push(name);
+    });
+    return acc;
+  }, [registeredNames, centreSubjects]);
+  const filteredCentreSubjects = centreSubjects.filter(
+    (sub) => sub.name.toLowerCase().includes(subjectSearch.trim().toLowerCase())
+  );
+
+  const openSubjectsEditor = () => {
+    setDraftSubjects(new Set(registeredNames));
+    setSubjectSearch('');
+    setShowSubjectsEditor(true);
+  };
+  const toggleDraftSubject = (name: string) => {
+    setDraftSubjects((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  };
+  const saveSubjects = async () => {
+    setSavingSubjects(true);
+    try {
+      await updateStudent(student.id, {
+        subjects: Array.from(draftSubjects as Set<string>).sort((a, b) => a.localeCompare(b)),
+      });
+      setShowSubjectsEditor(false);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSavingSubjects(false);
+    }
+  };
+
+  // CH1 Step 1: username lives in Profile. One claim per student, set here,
+  // shown on chat and the mock leaderboard, changeable once every 30 days.
+  const [usernameInfo, setUsernameInfo] = useState<{
+    username: string;
+    lastChangedAt: string | null;
+    canChangeAt: string | null;
+    canChange: boolean;
+    mine: boolean;
+  } | null>(null);
+  const [usernameDraft, setUsernameDraft] = useState('');
+  const [usernameCheck, setUsernameCheck] = useState<Json | null>(null);
+  const [usernameBusy, setUsernameBusy] = useState(false);
+  const [usernameError, setUsernameError] = useState('');
+
+  useEffect(() => {
+    let dead = false;
+    (async () => {
+      try {
+        const r = await api('/api/student/profile/username');
+        if (dead) return;
+        const mine = Boolean(r?.studentId) && r.studentId === student.id;
+        setUsernameInfo({
+          username: String(r?.username || ''),
+          lastChangedAt: r?.lastChangedAt || null,
+          canChangeAt: r?.canChangeAt || null,
+          canChange: Boolean(r?.canChange),
+          mine,
+        });
+        setUsernameDraft(mine ? String(r?.username || '') : '');
+      } catch {
+        if (!dead) setUsernameInfo({ username: '', lastChangedAt: null, canChangeAt: null, canChange: false, mine: false });
+      }
+    })();
+    return () => { dead = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [student.id]);
+
+  useEffect(() => {
+    const trimmed = usernameDraft.trim();
+    if (!usernameInfo?.mine || trimmed === usernameInfo.username || trimmed.length < 4) {
+      setUsernameCheck(null);
+      return undefined;
+    }
+    const t = setTimeout(async () => {
+      try {
+        const r = await api(`/api/student/profile/username/check?name=${encodeURIComponent(trimmed)}`);
+        setUsernameCheck(r);
+      } catch { setUsernameCheck(null); }
+    }, 400);
+    return () => clearTimeout(t);
+  }, [usernameDraft, usernameInfo?.mine, usernameInfo?.username]);
+
+  const saveUsername = async () => {
+    if (!usernameInfo?.mine) return;
+    setUsernameBusy(true);
+    setUsernameError('');
+    try {
+      const r = await api('/api/student/profile/username', { method: 'POST', body: { name: usernameDraft.trim() } });
+      setUsernameInfo({ username: String(r?.username || ''), lastChangedAt: new Date().toISOString(), canChangeAt: null, canChange: true, mine: true });
+      setUsernameCheck(null);
+      addToast({ type: 'success', title: 'Username Saved', description: `${String(r?.username || '')} now shows on chat and the mock leaderboard.` });
+    } catch (e: any) {
+      setUsernameError(e.message || 'Could not save that username.');
+    } finally {
+      setUsernameBusy(false);
+    }
+  };
+
   // Biometric toggle state
   const [biometricEnabled, setBiometricEnabled] = useState(true);
 
   // Theme selection state ('system' | 'light' | 'dark')
-  const [selectedTheme, setSelectedTheme] = useState<'system' | 'light' | 'dark'>('system');
+  const [selectedTheme, setSelectedTheme] = useState<'system' | 'light' | 'dark'>(() => (bgTheme === 'dark' ? 'dark' : 'light'));
 
   // Copy indicator state
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
@@ -92,7 +401,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
   const [firstName, setFirstName] = useState(student.name.split(' ')[0] || 'John');
   const [lastName, setLastName] = useState(student.name.split(' ').slice(1).join(' ') || 'Ade');
   const [phone, setPhone] = useState(student.phone || '+234 812 345 6789');
-  const [email, setEmail] = useState(student.email || 'john.ade@gmail.com');
+  const [email, setEmail] = useState(student.email || '');
   const [gender, setGender] = useState(student.gender || 'Male');
   const [dob, setDob] = useState(student.dob || '2008-04-12');
   const [address, setAddress] = useState(student.address || '12 Admiralty Way, Lekki Phase 1, Lagos');
@@ -124,6 +433,106 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
   );
 
   // Handle personal details save
+  // Profile picture: chosen and uploaded right here with the personal
+  // details. The server hands out the media host details after checking the
+  // signed-in student; nothing is hardcoded in this screen.
+  const photoInputRef = React.useRef<HTMLInputElement>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string>(() => realAvatar(student.avatar));
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [photoError, setPhotoError] = useState('');
+  const uploadAvatar = async (file: File) => {
+    setPhotoError('');
+    if (!file.type.startsWith('image/')) {
+      setPhotoError('Choose an image file.');
+      return;
+    }
+    setPhotoBusy(true);
+    try {
+      const cfg: any = await api('/api/student/profile/upload-config', { method: 'POST' });
+      if (!cfg?.ok || !cfg?.cloud || !cfg?.preset) throw new Error('Picture hosting is not set up on this deployment yet.');
+      const dataUrl = await shrinkImage(file, 640);
+      const form = new FormData();
+      form.append('file', dataUrl);
+      form.append('upload_preset', String(cfg.preset));
+      form.append('folder', String(cfg.folder || 'tos/avatar'));
+      const up = await fetch(`https://api.cloudinary.com/v1_1/${encodeURIComponent(String(cfg.cloud))}/image/upload`, { method: 'POST', body: form });
+      const j: any = await up.json().catch(() => null);
+      if (!j?.secure_url) throw new Error(String(j?.error?.message || 'The picture could not be uploaded. Try again.'));
+      await updateStudent(student.id, { avatar: String(j.secure_url) });
+      setAvatarPreview(String(j.secure_url));
+      student.avatar = String(j.secure_url);
+    } catch (e: any) {
+      setPhotoError(String(e?.message || 'The picture could not be uploaded. Try again.'));
+    } finally {
+      setPhotoBusy(false);
+    }
+  };
+
+  // ID card download: the card is drawn as a picture (the student's own
+  // photo embedded when they have one) and saved straight to the device.
+  const [cardBusy, setCardBusy] = useState(false);
+  const downloadIdCard = async () => {
+    setCardBusy(true);
+    try {
+      let photo: string | null = null;
+      const av = realAvatar(student.avatar);
+      if (av) {
+        try {
+          const r = await fetch(av, { mode: 'cors' });
+          const blob = await r.blob();
+          photo = await new Promise<string>((resolve, reject) => {
+            const fr = new FileReader();
+            fr.onload = () => resolve(String(fr.result));
+            fr.onerror = () => reject(new Error('read failed'));
+            fr.readAsDataURL(blob);
+          });
+        } catch {
+          photo = null; // The card falls back to the initials mark.
+        }
+      }
+      const initials =
+        student.name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase() || '').join('') || '?';
+      const svg = buildCardSvg({
+        centreName: centreName || 'Tutorial Centre',
+        name: student.name,
+        programme: student.programmeName || '',
+        department: student.department || '',
+        session: settings.academicSession || '',
+        studentId: student.id.toUpperCase(),
+        subjects: student.subjects || [],
+        avatarDataUrl: photo,
+        initials,
+        status: student.status || 'Active',
+      });
+      const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const img = new Image();
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error('The card could not be rendered. Try again.'));
+        img.src = url;
+      });
+      const canvas = document.createElement('canvas');
+      canvas.width = 1400;
+      canvas.height = 880;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Your browser could not render the card. Try again.');
+      ctx.drawImage(img, 0, 0, 1400, 880);
+      URL.revokeObjectURL(url);
+      const a = document.createElement('a');
+      a.href = canvas.toDataURL('image/png');
+      a.download = `${student.name} - ID card.png`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      addToast({ type: 'success', title: 'ID Card Saved', description: 'The ID card picture was downloaded to your device.' });
+    } catch (e: any) {
+      addToast({ type: 'error', title: 'Download Failed', description: String(e?.message || 'The card could not be downloaded. Try again.') });
+    } finally {
+      setCardBusy(false);
+    }
+  };
+
   const handleSavePersonalDetails = (e: React.FormEvent) => {
     e.preventDefault();
     const updatedFullName = `${firstName} ${lastName}`.trim();
@@ -231,7 +640,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
   };
 
   // Handle Tuition Payment
-  const handleCompletePayment = (e: React.FormEvent) => {
+  const handleCompletePayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (payAmount <= 0) {
       addToast({
@@ -253,32 +662,22 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
 
     setIsSubmittingPayment(true);
     try {
-      recordPayment({
+      const result = await recordPayment({
         studentId: student.id,
-        studentName: student.name,
-        programmeName: student.programmeName,
         amountPaid: payAmount,
-        totalFee: student.totalFee,
-        balance: Math.max(0, student.outstandingBalance - payAmount),
-        status: student.outstandingBalance - payAmount <= 0 ? 'Paid' : 'Partial',
         method: paymentMode,
         evidenceUrl: evidenceDataUrl || undefined,
         evidenceName: evidenceFileName || undefined,
         note: paymentNote.trim() || undefined,
-        submittedBy: 'Student',
       });
-
-      student.paidAmount = (student.paidAmount || 0) + payAmount;
-      student.outstandingBalance = Math.max(0, student.totalFee - student.paidAmount);
-      updateStudent(student.id, {
-        paidAmount: student.paidAmount,
-        outstandingBalance: student.outstandingBalance,
-      });
+      if (!result) return; // The payment helper already explained the failure.
 
       addToast({
         type: 'success',
-        title: 'Payment Submitted',
-        description: `Your payment of ${settings.currencySymbol}${(payAmount || 0).toLocaleString()} via ${paymentMode} has been recorded and synced live with the admin.`,
+        title: result.pending ? 'Payment Sent for Confirmation' : 'Payment Submitted',
+        description: result.pending
+          ? `Your payment of ${settings.currencySymbol}${(payAmount || 0).toLocaleString()} via ${paymentMode} was sent to the centre. Your balance updates once the centre confirms it.`
+          : `Your payment of ${settings.currencySymbol}${(payAmount || 0).toLocaleString()} via ${paymentMode} has been recorded. Receipt ${result.receiptNumber}.`,
       });
 
       setEvidenceDataUrl(null);
@@ -312,14 +711,8 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
     'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?auto=format&fit=crop&w=500&q=80';
 
   const studentAvatar =
-    MALE_NIGERIAN_STUDENT_AVATAR ||
-    (student.avatar &&
-    !student.avatar.includes('photo-1534528741775') &&
-    !student.avatar.includes('photo-1517841905240')
-      ? student.avatar
-      : student.gender === 'Female'
-      ? FEMALE_NIGERIAN_STUDENT_AVATAR
-      : MALE_NIGERIAN_STUDENT_AVATAR);
+    realAvatar(student.avatar) ||
+    (student.gender === 'Female' ? FEMALE_NIGERIAN_STUDENT_AVATAR : MALE_NIGERIAN_STUDENT_AVATAR);
 
   return (
     <div className="min-h-full bg-slate-50/70 pb-16 px-4 pt-6 max-w-lg mx-auto">
@@ -362,7 +755,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
             <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-slate-600 transition-colors" />
           </button>
 
-          {/* Item 2: Academic & Enrollment Details */}
+          {/* Item 2: Academic Details */}
           <button
             onClick={() => setActiveModal('academic_details')}
             className="w-full flex items-center justify-between p-3.5 hover:bg-slate-50/80 active:bg-slate-100/80 transition-colors text-left group"
@@ -372,13 +765,13 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                 <GraduationCap className="w-4.5 h-4.5" />
               </div>
               <span className="text-sm font-semibold text-slate-800">
-                Academic & Enrollment Details
+                Academic Details
               </span>
             </div>
             <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-slate-600 transition-colors" />
           </button>
 
-          {/* Item 3: Digital Student ID Card */}
+          {/* Item 3: ID Card */}
           <button
             onClick={() => setActiveModal('id_card')}
             className="w-full flex items-center justify-between p-3.5 hover:bg-slate-50/80 active:bg-slate-100/80 transition-colors text-left group"
@@ -388,7 +781,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                 <CreditCard className="w-4.5 h-4.5" />
               </div>
               <span className="text-sm font-semibold text-slate-800">
-                Digital Student ID Card
+                ID Card
               </span>
             </div>
             <div className="flex items-center space-x-2">
@@ -400,7 +793,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
             </div>
           </button>
 
-          {/* Item 4: Tuition & Payment Statement */}
+          {/* Item 4: Fees and Payments */}
           <button
             onClick={() => setActiveModal('tuition_statement')}
             className="w-full flex items-center justify-between p-3.5 hover:bg-slate-50/80 active:bg-slate-100/80 transition-colors text-left group"
@@ -410,7 +803,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                 <Receipt className="w-4.5 h-4.5" />
               </div>
               <span className="text-sm font-semibold text-slate-800">
-                Tuition & Payment Statement
+                Fees and Payments
               </span>
             </div>
             <div className="flex items-center space-x-2">
@@ -500,7 +893,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
             </button>
           </div>
 
-          {/* Item 4: Theme Settings */}
+          {/* Item 4: Appearance */}
           <button
             onClick={() => setActiveModal('theme_settings')}
             className="w-full flex items-center justify-between p-3.5 hover:bg-slate-50/80 active:bg-slate-100/80 transition-colors text-left group"
@@ -509,7 +902,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
               <div className="w-9 h-9 rounded-full bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
                 <Palette className="w-4.5 h-4.5" />
               </div>
-              <span className="text-sm font-semibold text-slate-800">Theme Settings</span>
+              <span className="text-sm font-semibold text-slate-800">Appearance</span>
             </div>
             <div className="flex items-center space-x-2">
               <span className="text-xs text-slate-500 font-medium capitalize">
@@ -542,7 +935,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
             <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-slate-600 transition-colors" />
           </button>
 
-          {/* Item 2: Examination & Privacy Policy */}
+          {/* Item 2: Centre Policy */}
           <button
             onClick={() => setActiveModal('exam_policy')}
             className="w-full flex items-center justify-between p-3.5 hover:bg-slate-50/80 active:bg-slate-100/80 transition-colors text-left group"
@@ -552,7 +945,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                 <FileText className="w-4.5 h-4.5" />
               </div>
               <span className="text-sm font-semibold text-slate-800">
-                Examination & Privacy Policy
+                Centre Policy
               </span>
             </div>
             <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-slate-600 transition-colors" />
@@ -584,7 +977,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
 
       {/* 5. Version Footer (Exact look from video) */}
       <div className="text-center pt-6 pb-4 text-slate-400 text-xs font-medium">
-        {settings.centreName || 'Excellence Tutorial Centre'} • Version 1.0.0 (2026)
+        {centreName} • Version 1.0.0 (2026)
       </div>
 
       {/* =========================================================================
@@ -625,8 +1018,51 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                   </button>
                 </div>
 
+                {/* Profile picture: view it and change it right here, centred. */}
+                <div className="flex flex-col items-center text-center pb-1">
+                  <div className="relative">
+                    {avatarPreview ? (
+                      <img src={avatarPreview} alt="" className="w-24 h-24 rounded-full object-cover border-2 border-[#EA580C]" />
+                    ) : (
+                      <div className="w-24 h-24 rounded-full bg-orange-50 border-2 border-[#EA580C] flex items-center justify-center text-[#C2410C] text-xl font-black">
+                        {student.name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase() || '').join('') || '?'}
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => photoInputRef.current?.click()}
+                      disabled={photoBusy}
+                      className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-[#EA580C] text-white flex items-center justify-center shadow-md active:scale-95 transition disabled:opacity-60 cursor-pointer"
+                      aria-label="Change profile picture"
+                    >
+                      <Camera className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <p className="text-sm font-black text-slate-900 mt-2">Profile picture</p>
+                  <button
+                    type="button"
+                    onClick={() => photoInputRef.current?.click()}
+                    disabled={photoBusy}
+                    className="text-xs font-bold text-[#EA580C] cursor-pointer disabled:opacity-60"
+                  >
+                    {photoBusy ? 'Uploading…' : avatarPreview ? 'Change picture' : 'Add a picture'}
+                  </button>
+                  {photoError ? <p className="text-xs font-bold text-rose-600 mt-0.5">{photoError}</p> : null}
+                  <input
+                    ref={photoInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) uploadAvatar(f);
+                      e.target.value = '';
+                    }}
+                  />
+                </div>
+
                 <form onSubmit={handleSavePersonalDetails} className="space-y-3.5 pt-2">
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     <div>
                       <label className="text-xs font-bold text-slate-700 block mb-1">
                         First Name
@@ -651,6 +1087,46 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                         className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm font-medium focus:border-orange-500 outline-none"
                       />
                     </div>
+                    <div className="col-span-2 sm:col-span-1">
+                      <label className="text-xs font-bold text-slate-700 block mb-1">Username</label>
+                      <input
+                        value={usernameDraft}
+                        onChange={(e) => { setUsernameDraft(e.target.value); setUsernameError(''); }}
+                        onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
+                        maxLength={16}
+                        placeholder="e.g. swift_lion"
+                        autoComplete="off"
+                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-900 focus:border-orange-500 outline-none"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <p className="text-[11px] text-slate-500 font-medium">Shown on chat and the mock leaderboard. Never your real name.</p>
+                    {usernameInfo && !usernameInfo.mine ? (
+                      <p className="text-xs text-slate-400 font-medium leading-relaxed">Usernames are set by each student from their own profile.</p>
+                    ) : (
+                      <>
+                        {usernameDraft.trim().length >= 4 && usernameCheck && (
+                          <p className={`text-xs font-bold ${usernameCheck.valid && usernameCheck.available ? 'text-emerald-600' : 'text-rose-600'}`}>
+                            {usernameCheck.valid
+                              ? (usernameCheck.available ? `${usernameDraft.trim()} is available.` : (usernameCheck.reason || 'That username is taken.'))
+                              : (usernameCheck.reason || 'Not a valid username.')}
+                          </p>
+                        )}
+                        {usernameDraft.trim().length > 0 && usernameDraft.trim().length < 4 && (
+                          <p className="text-xs text-slate-400 font-medium">At least 4 characters: letters, numbers, underscores or dashes.</p>
+                        )}
+                        {usernameError && <p className="text-xs font-bold text-rose-600">{usernameError}</p>}
+                        <button
+                          type="button"
+                          disabled={usernameBusy || usernameDraft.trim() === usernameInfo?.username || !(usernameCheck?.valid && usernameCheck?.available)}
+                          onClick={saveUsername}
+                          className="px-4 min-h-[40px] rounded-xl bg-[#EA580C] text-white text-xs font-black tracking-wide disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                        >
+                          {usernameBusy ? 'Saving…' : usernameInfo?.username ? 'Save new username' : 'Set username'}
+                        </button>
+                      </>
+                    )}
                   </div>
 
                   <div>
@@ -660,10 +1136,12 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                     <input
                       type="email"
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm font-medium focus:border-orange-500 outline-none"
+                      readOnly
+                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm font-medium text-slate-500 outline-none cursor-not-allowed"
                     />
+                    <p className="text-[11px] text-slate-400 font-medium mt-1">
+                      Your email cannot be changed.
+                    </p>
                   </div>
 
                   <div>
@@ -729,21 +1207,22 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
               </div>
             )}
 
-            {/* MODAL 2: Academic & Enrollment Details */}
+            {/* MODAL 2: Academic Details - everything here reads the student's own
+                record, so rows without data simply do not appear. */}
             {activeModal === 'academic_details' && (
               <div className="p-6 overflow-y-auto space-y-4">
                 <div className="flex items-start justify-between">
                   <div>
                     <h3 className="text-lg font-black text-slate-900">
-                      Academic & Enrollment Details
+                      Academic Details
                     </h3>
                     <p className="text-xs text-slate-500 mt-0.5">
-                      Candidate cohort, enrolled track, and exam configuration
+                      Programme, session, branch and registered subjects
                     </p>
                   </div>
                   <button
                     onClick={() => setActiveModal(null)}
-                    className="p-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500"
+                    className="p-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 cursor-pointer"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -751,176 +1230,310 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
 
                 <div className="grid grid-cols-2 gap-3 pt-2 text-xs">
                   <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-0.5">
-                    <span className="text-[10px] text-slate-400 font-semibold block uppercase">
-                      Programme Track
-                    </span>
-                    <span className="font-bold text-slate-900 block leading-tight">
-                      {student.programmeName}
-                    </span>
+                    <span className="text-[10px] text-slate-400 font-semibold block uppercase">Programme Track</span>
+                    <span className="font-bold text-slate-900 block leading-tight">{student.programmeName || '—'}</span>
                   </div>
-
-                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-0.5">
-                    <span className="text-[10px] text-slate-400 font-semibold block uppercase">
-                      Academic Session
-                    </span>
-                    <span className="font-bold text-slate-900 block">
-                      {settings.academicSession || '2026/2027 Session'}
-                    </span>
-                  </div>
-
-                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-0.5 col-span-2">
-                    <span className="text-[10px] text-slate-400 font-semibold block uppercase">
-                      Assigned Branch
-                    </span>
-                    <span className="font-bold text-slate-900 block">
-                      {student.branchName || 'Main Campus'}
-                    </span>
-                  </div>
-
-                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-0.5">
-                    <span className="text-[10px] text-slate-400 font-semibold block uppercase">
-                      Parent / Guardian
-                    </span>
-                    <span className="font-bold text-slate-900 block">
-                      {student.parentName || 'Chief Olumide Ade'}
-                    </span>
-                  </div>
-
-                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-0.5">
-                    <span className="text-[10px] text-slate-400 font-semibold block uppercase">
-                      Emergency Contact
-                    </span>
-                    <span className="font-bold text-slate-900 block">
-                      {student.parentWhatsApp || '+234 803 111 2233'}
-                    </span>
-                  </div>
+                  {settings.academicSession ? (
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-0.5">
+                      <span className="text-[10px] text-slate-400 font-semibold block uppercase">Academic Session</span>
+                      <span className="font-bold text-slate-900 block">{settings.academicSession}</span>
+                    </div>
+                  ) : null}
+                  {student.branchName ? (
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-0.5 col-span-2">
+                      <span className="text-[10px] text-slate-400 font-semibold block uppercase">Assigned Branch</span>
+                      <span className="font-bold text-slate-900 block">{student.branchName}</span>
+                    </div>
+                  ) : null}
+                  {student.department ? (
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-0.5">
+                      <span className="text-[10px] text-slate-400 font-semibold block uppercase">Department</span>
+                      <span className="font-bold text-slate-900 block">{student.department}</span>
+                    </div>
+                  ) : null}
+                  {student.registrationDate ? (
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-0.5">
+                      <span className="text-[10px] text-slate-400 font-semibold block uppercase">Registered On</span>
+                      <span className="font-bold text-slate-900 block">
+                        {new Date(student.registrationDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </span>
+                    </div>
+                  ) : null}
+                  {student.parentName ? (
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-0.5">
+                      <span className="text-[10px] text-slate-400 font-semibold block uppercase">Parent / Guardian</span>
+                      <span className="font-bold text-slate-900 block leading-tight">{student.parentName}</span>
+                    </div>
+                  ) : null}
+                  {student.parentWhatsApp ? (
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-0.5 col-span-2">
+                      <span className="text-[10px] text-slate-400 font-semibold block uppercase">Guardian Contact</span>
+                      <span className="font-bold text-slate-900 block">{student.parentWhatsApp}</span>
+                    </div>
+                  ) : null}
                 </div>
 
-                <div className="bg-emerald-50/80 p-3.5 rounded-xl border border-emerald-200 flex items-center justify-between text-xs">
-                  <div>
-                    <span className="font-bold text-emerald-950 block">Attendance Standing</span>
-                    <span className="text-[11px] text-emerald-800">
-                      Eligible for official center mock examinations
-                    </span>
+                {typeof student.attendancePercent === 'number' && (
+                  <div className="bg-emerald-50/80 p-3.5 rounded-xl border border-emerald-200 flex items-center justify-between text-xs">
+                    <div>
+                      <span className="font-bold text-emerald-950 block">Attendance Standing</span>
+                      <span className="text-[11px] text-emerald-800">
+                        Eligible for official centre mock examinations
+                      </span>
+                    </div>
+                    <span className="text-base font-black text-emerald-700">{student.attendancePercent}%</span>
                   </div>
-                  <span className="text-base font-black text-emerald-700">
-                    {student.attendancePercent || 92}%
-                  </span>
+                )}
+
+                {/* Registered subjects, moved here from its own section. The
+                    student adds or removes subjects right in this popup, and
+                    saving goes through the same server-checked update as
+                    before. */}
+                <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-black text-slate-900">Registered Subjects</p>
+                      <p className="text-[11px] text-slate-500 font-medium">
+                        {registeredNames.length === 0 ? 'None registered yet' : `${registeredNames.length} registered`}
+                      </p>
+                    </div>
+                    {centreSubjects.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => (showSubjectsEditor ? setShowSubjectsEditor(false) : openSubjectsEditor())}
+                        className="h-9 px-3.5 rounded-xl bg-[#EA580C] text-white text-xs font-bold hover:bg-[#C2410C] transition-colors cursor-pointer disabled:opacity-60 shrink-0"
+                      >
+                        {showSubjectsEditor ? 'Done' : 'Add or remove'}
+                      </button>
+                    )}
+                  </div>
+
+                  {registeredNames.length === 0 ? (
+                    <p className="text-xs text-slate-500 font-medium leading-relaxed">
+                      You have no registered subjects yet. Choose from your centre's list below.
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {groupOrder.map((dept) =>
+                        groupedRegistered[dept] ? (
+                          <div key={dept}>
+                            <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-1">{dept}</div>
+                            <div className="flex flex-wrap gap-1.5">
+                              {groupedRegistered[dept].map((n) => (
+                                <span key={n} className="px-2 py-1 rounded-full bg-white text-[11px] font-semibold text-slate-700 border border-slate-200">{n}</span>
+                              ))}
+                            </div>
+                          </div>
+                        ) : null
+                      )}
+                    </div>
+                  )}
+
+                  {showSubjectsEditor && (
+                    centreSubjects.length === 0 ? (
+                      <p className="text-xs text-slate-500 font-medium leading-relaxed">
+                        Your centre hasn't set up its subject list yet. Please ask your centre to add subjects.
+                      </p>
+                    ) : (
+                      <>
+                        <input
+                          value={subjectSearch}
+                          onChange={(e) => setSubjectSearch(e.target.value)}
+                          placeholder="Search your centre's subjects"
+                          className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#EA580C]/30"
+                        />
+                        <div className="max-h-48 overflow-y-auto rounded-xl border border-slate-100 bg-white divide-y divide-slate-100">
+                          {filteredCentreSubjects.map((sub) => {
+                            const checked = draftSubjects.has(sub.name);
+                            return (
+                              <button
+                                key={sub.id}
+                                type="button"
+                                onClick={() => toggleDraftSubject(sub.name)}
+                                className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-slate-50/80 active:bg-slate-100/80 transition-colors text-left"
+                              >
+                                <div className="flex items-center space-x-2.5 min-w-0">
+                                  <span
+                                    className={`w-4.5 h-4.5 rounded-md border flex items-center justify-center shrink-0 ${
+                                      checked ? 'bg-[#EA580C] border-[#EA580C] text-white' : 'border-slate-300 bg-white'
+                                    }`}
+                                  >
+                                    {checked ? <Check className="w-3 h-3" /> : null}
+                                  </span>
+                                  <span className="text-xs font-semibold text-slate-800 truncate">{sub.name}</span>
+                                </div>
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 shrink-0 ml-2">{sub.department}</span>
+                              </button>
+                            );
+                          })}
+                          {filteredCentreSubjects.length === 0 ? (
+                            <div className="px-3 py-2.5 text-xs text-slate-400 font-medium">No subjects match your search.</div>
+                          ) : null}
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[11px] font-bold text-slate-500">{draftSubjects.size} selected</span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setShowSubjectsEditor(false)}
+                              className="h-10 px-4 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              disabled={savingSubjects}
+                              onClick={saveSubjects}
+                              className="h-10 px-4 rounded-xl bg-[#EA580C] text-white text-xs font-bold hover:bg-[#C2410C] transition-colors cursor-pointer disabled:opacity-60"
+                            >
+                              {savingSubjects ? 'Saving...' : 'Save subjects'}
+                            </button>
+                          </div>
+                        </div>
+                      </>
+                    )
+                  )}
                 </div>
               </div>
             )}
 
-            {/* MODAL 3: Digital Student ID Card */}
+            {/* MODAL 3: ID Card - the student's real record, their own photo
+                when they have one, and a Download button that saves the card
+                as a picture. */}
             {activeModal === 'id_card' && (
               <div className="p-6 overflow-y-auto space-y-4">
                 <div className="flex items-start justify-between">
                   <div>
-                    <h3 className="text-lg font-black text-slate-900">Student Identity Card</h3>
+                    <h3 className="text-lg font-black text-slate-900">ID Card</h3>
                     <p className="text-xs text-slate-500 mt-0.5">
-                      Official digital candidate card with access barcode
+                      Your centre's official student card, from your own record
                     </p>
                   </div>
                   <button
                     onClick={() => setActiveModal(null)}
-                    className="p-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500"
+                    className="p-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 cursor-pointer"
                   >
                     <X className="w-4 h-4" />
                   </button>
                 </div>
 
-                {/* ID Badge Card */}
-                <div className="relative rounded-3xl overflow-hidden shadow-xl border border-slate-800 bg-gradient-to-br from-slate-950 via-[#070F1E] to-slate-900 text-white p-5 space-y-4">
-                  <div className="absolute top-0 right-0 w-48 h-48 bg-orange-500/15 rounded-full blur-3xl pointer-events-none" />
+                {(() => {
+                  const logoInitials = (centreName || 'Tutorial Centre').trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() || '').join('') || 'TC';
+                  const cardPhoto = realAvatar(student.avatar);
+                  const active = String(student.status || 'Active').toLowerCase() === 'active';
+                  const chips = student.subjects || [];
+                  return (
+                    <div
+                      className="rounded-3xl overflow-hidden shadow-xl text-white"
+                      style={{ background: 'linear-gradient(135deg,#0A1020 0%,#111C33 55%,#1B2540 100%)' }}
+                    >
+                      <div className="p-5">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-orange-500 to-[#EA580C] flex items-center justify-center text-sm font-black shrink-0">
+                              {logoInitials}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-[15px] font-bold tracking-wide leading-tight truncate">{centreName}</p>
+                              <p className="text-[10px] text-slate-400 tracking-[0.2em]">STUDENT IDENTITY CARD</p>
+                            </div>
+                          </div>
+                          <div className="rounded-full border border-[#EA580C]/60 pl-2.5 pr-3 py-1.5 flex items-center gap-1.5 shrink-0">
+                            <span className={`w-2 h-2 rounded-full ${active ? 'bg-emerald-500' : 'bg-amber-400'}`} />
+                            <span className="text-[10px] font-bold text-orange-300 tracking-wide whitespace-nowrap">
+                              {String(student.status || 'Active').toUpperCase()}
+                              {settings.academicSession ? ` \u00b7 ${settings.academicSession}` : ''}
+                            </span>
+                          </div>
+                        </div>
 
-                  {/* Card Header */}
-                  <div className="flex items-center justify-between border-b border-slate-800 pb-3 relative z-10">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-7 h-7 rounded-lg bg-[#EA580C] text-white flex items-center justify-center font-black text-xs">
-                        EX
-                      </div>
-                      <div>
-                        <span className="text-xs font-black tracking-wider uppercase block leading-none">
-                          {settings.centreName || 'Excellence Tutorial Centre'}
-                        </span>
-                        <span className="text-[9px] text-orange-400 font-semibold tracking-wider uppercase">
-                          Official Student Identity Card
-                        </span>
+                        <div className="flex gap-4 mt-5">
+                          <div className="w-24 h-32 sm:w-[104px] sm:h-[132px] rounded-2xl border-2 border-[#EA580C]/70 bg-[#1B2540] overflow-hidden shrink-0 flex items-center justify-center">
+                            {cardPhoto ? (
+                              <img src={cardPhoto} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-14 h-14 rounded-full bg-slate-600 flex items-center justify-center text-lg font-black text-slate-300">
+                                {student.name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase() || '').join('') || '?'}
+                              </div>
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[9px] text-slate-400 tracking-[0.15em] font-semibold">CANDIDATE NAME</p>
+                            <p className="text-xl font-bold text-slate-50 leading-tight truncate">{student.name}</p>
+                            <div className="grid grid-cols-2 gap-x-3 gap-y-2 mt-2.5">
+                              <div>
+                                <p className="text-[9px] text-slate-400 tracking-[0.15em] font-semibold">PROGRAMME</p>
+                                <p className="text-[13px] font-bold text-slate-200 truncate">{student.programmeName || '\u2014'}</p>
+                              </div>
+                              <div>
+                                <p className="text-[9px] text-slate-400 tracking-[0.15em] font-semibold">SESSION</p>
+                                <p className="text-[13px] font-bold text-slate-200 truncate">{settings.academicSession || '\u2014'}</p>
+                              </div>
+                              <div>
+                                <p className="text-[9px] text-slate-400 tracking-[0.15em] font-semibold">DEPARTMENT</p>
+                                <p className="text-[13px] font-bold text-slate-200 truncate">{student.department || '\u2014'}</p>
+                              </div>
+                              <div>
+                                <p className="text-[9px] text-slate-400 tracking-[0.15em] font-semibold">STUDENT ID</p>
+                                <p className="text-[12px] font-bold text-orange-300 font-mono truncate">{student.id.toUpperCase()}</p>
+                              </div>
+                            </div>
+                            {chips.length > 0 && (
+                              <div className="mt-2.5">
+                                <p className="text-[9px] text-slate-400 tracking-[0.15em] font-semibold mb-1">REGISTERED SUBJECTS</p>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {chips.slice(0, 4).map((sub) => (
+                                    <span key={sub} className="px-2.5 py-1 rounded-full bg-white/10 text-[10px] font-bold text-slate-200">{sub}</span>
+                                  ))}
+                                  {chips.length > 4 && (
+                                    <span className="px-2.5 py-1 rounded-full text-[10px] font-bold text-slate-400">+{chips.length - 4} more</span>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="mt-4 pt-3 border-t border-white/10 flex items-end justify-between gap-3">
+                          <p className="text-[10px] text-slate-500">Issued by the centre · Verify with the centre office</p>
+                          <div className="text-right shrink-0">
+                            <div className="flex items-end justify-end gap-[2px] h-8">
+                              {cardBars(student.id).map((bar, i) => (
+                                <span key={i} className="inline-block bg-slate-200" style={{ width: bar.w, height: 30 + ((i % 3) * 2) }} />
+                              ))}
+                            </div>
+                            <p className="font-mono text-[9px] text-slate-400 tracking-[0.25em] mt-1">{student.id.toUpperCase()}</p>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                    <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
-                      Active 2026
-                    </span>
-                  </div>
+                  );
+                })()}
 
-                  {/* Card Body */}
-                  <div className="flex items-start gap-4 relative z-10">
-                    <div className="relative shrink-0">
-                      <img
-                        src={studentAvatar}
-                        alt={student.name}
-                        className="w-20 h-24 rounded-2xl object-cover border-2 border-orange-500/80 shadow-lg"
-                      />
-                      <span className="absolute -bottom-1 -right-1 px-1.5 py-0.5 bg-slate-900 text-orange-300 font-mono text-[8px] font-bold rounded border border-orange-500/40">
-                        VERIFIED
-                      </span>
-                    </div>
-
-                    <div className="space-y-1.5 flex-1 min-w-0">
-                      <div>
-                        <span className="text-[9px] text-slate-400 uppercase font-semibold block">
-                          Candidate Name
-                        </span>
-                        <h4 className="text-sm font-black text-white truncate">{student.name}</h4>
-                      </div>
-
-                      <div>
-                        <span className="text-[9px] text-slate-400 uppercase font-semibold block">
-                          Target Programme
-                        </span>
-                        <span className="text-[11px] font-medium text-slate-300 line-clamp-1">
-                          {student.programmeName}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Card Footer with Access Barcode */}
-                  <div className="pt-3 border-t border-slate-800 flex items-center justify-between relative z-10">
-                    <div className="space-y-0.5">
-                      <span className="text-[8px] text-slate-400 uppercase font-mono tracking-wider block">
-                        Access Barcode
-                      </span>
-                      <div className="flex items-center space-x-0.5 h-6 opacity-85">
-                        {[3, 1, 2, 4, 1, 3, 2, 1, 4, 2, 1, 3, 4, 1, 2, 3, 1, 2, 4, 1, 3, 2].map(
-                          (w, i) => (
-                            <span
-                              key={i}
-                              style={{ width: `${w}px` }}
-                              className="h-full bg-slate-200 inline-block"
-                            />
-                          )
-                        )}
-                      </div>
-                    </div>
-
-                    <span className="font-mono text-[9px] text-slate-400">
-                      SEC-ID-{student.id}
-                    </span>
-                  </div>
-                </div>
+                <button
+                  type="button"
+                  onClick={downloadIdCard}
+                  disabled={cardBusy}
+                  className="w-full py-3.5 px-4 rounded-xl bg-[#EA580C] hover:bg-[#C2410C] text-white font-bold text-sm shadow-md active:scale-98 transition-all cursor-pointer disabled:opacity-60"
+                >
+                  {cardBusy ? 'Preparing the picture…' : 'Download ID Card'}
+                </button>
+                <p className="text-center text-[11px] text-slate-400 font-medium -mt-2">
+                  Saved as a picture in your downloads, your own photo included.
+                </p>
               </div>
             )}
 
-            {/* MODAL 4: Tuition & Payment Statement */}
+                        {/* MODAL 4: Fees and Payments */}
             {activeModal === 'tuition_statement' && (
               <div className="p-6 overflow-y-auto space-y-4 max-h-[85vh]">
                 <div className="flex items-start justify-between">
                   <div>
                     <h3 className="text-lg font-black text-slate-900">
-                      Tuition & Payment Statement
+                      Fees and Payments
                     </h3>
                     <p className="text-xs text-slate-500 mt-0.5">
-                      Enrolled: {new Date(student.registrationDate || '2026-08-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })} • {student.programmeName}
+                      {student.registrationDate ? `Enrolled: ${new Date(student.registrationDate).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })} • ` : ''}{student.programmeName}
                     </p>
                   </div>
                   <button
@@ -1086,7 +1699,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                             <div className="flex justify-between items-center text-xs">
                               <span className="text-slate-500 font-medium">Account Name:</span>
                               <span className="font-bold text-slate-900 truncate max-w-[180px]">
-                                {settings.bankAccountName || 'Excellence Tutorial Centre Ltd'}
+                                {settings.bankAccountName || centreName}
                               </span>
                             </div>
                           </div>
@@ -1274,7 +1887,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
 
                     <div className="flex items-center justify-between text-slate-500">
                       <span className="text-[11px] font-bold uppercase tracking-wider">
-                        Payment History Since Enrollment ({new Date(student.registrationDate || '2026-08-01').toLocaleDateString('en-US', { month: 'short', year: 'numeric' })})
+                        Payment History{student.registrationDate ? ` since ${new Date(student.registrationDate).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}` : ''}
                       </span>
                       <span className="text-[10px] font-bold text-slate-400">
                         {studentPayments.length} records
@@ -1299,14 +1912,21 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
                                       p.status === 'Paid'
                                         ? 'bg-emerald-100 text-emerald-800'
+                                        : p.status === 'Pending'
+                                        ? 'bg-blue-100 text-blue-800'
+                                        : p.status === 'Rejected'
+                                        ? 'bg-rose-100 text-rose-800'
                                         : 'bg-amber-100 text-amber-800'
                                     }`}>
-                                      {p.status}
+                                      {p.status === 'Pending' ? 'Awaiting confirmation' : p.status}
                                     </span>
                                   </div>
                                   <p className="text-[10px] text-slate-500 font-mono mt-0.5">
-                                    {p.receiptNumber} • {p.date} • {p.method}
+                                    {p.status === 'Pending' || p.status === 'Rejected' ? p.status === 'Pending' ? 'Not yet counted' : 'Not counted' : p.receiptNumber} • {p.date} • {p.method}
                                   </p>
+                                  {p.status === 'Rejected' && p.rejectionReason && (
+                                    <p className="text-[10px] text-rose-700 mt-0.5">Reason: {p.rejectionReason}</p>
+                                  )}
                                 </div>
 
                                 {p.evidenceUrl && (
@@ -1338,7 +1958,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                         <Receipt className="w-8 h-8 text-slate-300 mx-auto" />
                         <p className="text-xs font-bold text-slate-700">No Payment History Yet</p>
                         <p className="text-[11px] text-slate-400 max-w-xs mx-auto">
-                          No payments logged since candidate enrollment in {new Date(student.registrationDate || '2026-08-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}.
+                          No payments logged yet.
                         </p>
                         <button
                           type="button"
@@ -1565,12 +2185,12 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
               </div>
             )}
 
-            {/* MODAL 7: Theme Settings (Exact Match to video 00:08!) */}
+            {/* MODAL 7: Appearance (Exact Match to video 00:08!) */}
             {activeModal === 'theme_settings' && (
               <div className="p-6 overflow-y-auto space-y-4">
                 <div className="flex items-start justify-between">
                   <div>
-                    <h3 className="text-lg font-black text-slate-900">Theme</h3>
+                    <h3 className="text-lg font-black text-slate-900">Appearance</h3>
                     <p className="text-xs text-slate-500 mt-0.5">
                       Select your preferred display appearance
                     </p>
@@ -1593,9 +2213,13 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                       key={item.id}
                       type="button"
                       onClick={() => {
-                        setSelectedTheme(item.id as 'system' | 'light' | 'dark');
-                        if (item.id === 'dark') setBgTheme('dark');
-                        else setBgTheme('light');
+                        const id = item.id as 'system' | 'light' | 'dark';
+                        setSelectedTheme(id);
+                        const deviceDark =
+                          typeof window !== 'undefined' &&
+                          window.matchMedia &&
+                          window.matchMedia('(prefers-color-scheme: dark)').matches;
+                        setBgTheme(id === 'system' ? (deviceDark ? 'dark' : 'light') : id);
                         addToast({
                           type: 'success',
                           title: 'Theme Updated',
@@ -1784,12 +2408,12 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                           WhatsApp Support
                         </span>
                         <span className="text-xs font-bold text-slate-800 truncate block">
-                          {settings.whatsappNumber || settings.whatsapp || '+234 805 676 5455'}
+                          {settings.whatsappNumber || settings.whatsapp || settings.phone}
                         </span>
                       </div>
                     </div>
                     <a
-                      href={`https://wa.me/${(settings.whatsappNumber || settings.whatsapp || '+2348056765455').replace(/\D/g, '')}`}
+                      href={`https://wa.me/${(settings.whatsappNumber || settings.whatsapp || settings.phone).replace(/\D/g, '')}`}
                       target="_blank"
                       rel="noreferrer"
                       className="px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 flex items-center space-x-1 shrink-0 ml-2 shadow-2xs"
@@ -1839,16 +2463,16 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
               </div>
             )}
 
-            {/* MODAL 9: Examination & Privacy Policy (Video 00:13) */}
+            {/* MODAL 9: Centre Policy (Video 00:13) */}
             {activeModal === 'exam_policy' && (
               <div className="p-6 overflow-y-auto space-y-4">
                 <div className="flex items-start justify-between">
                   <div>
                     <h3 className="text-lg font-black text-slate-900">
-                      Examination & Privacy Policy
+                      Centre Policy
                     </h3>
                     <p className="text-xs text-slate-500 mt-0.5">
-                      Candidate guidelines and academic code of conduct
+                      Your centre’s guidelines and code of conduct
                     </p>
                   </div>
                   <button
