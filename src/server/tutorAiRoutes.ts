@@ -27,6 +27,7 @@
 // ============================================================================
 
 import express from 'express';
+import { FieldPath } from 'firebase-admin/firestore';
 import { adminDb } from './firebaseAdmin';
 import {
   requireMembership,
@@ -124,6 +125,201 @@ function validateConversationId(raw: string, centreId: string, uid: string): str
 // assistant speaks differently in each portal. Students get a friendly
 // subject teacher; tutors get a teaching colleague; admins get a centre
 // management assistant.
+// P2/P3 shared context, cached briefly so a busy portal does not re-read
+// the centre on every message. Released mock results are the data every
+// staff member may already see on the platform; students' private practice
+// records stay private and are never fed to tutors or admins.
+const CTX_CACHE_TTL_MS = 5 * 60 * 1000;
+const ctxCache = new Map<string, { at: number; value: unknown }>();
+function cacheGet(key: string): unknown | null {
+  const hit = ctxCache.get(key);
+  if (hit && Date.now() - hit.at < CTX_CACHE_TTL_MS) return hit.value;
+  return null;
+}
+function cacheSet(key: string, value: unknown): void {
+  if (ctxCache.size > 100) {
+    const now = Date.now();
+    for (const [k, v] of ctxCache) if (now - v.at > CTX_CACHE_TTL_MS) ctxCache.delete(k);
+  }
+  ctxCache.set(key, { at: Date.now(), value });
+}
+
+/** Centre-wide released mock performance: per-subject averages and each
+ *  student's released mock average, from the most recent 40 released
+ *  attempts. Attempts are ordered by document id (mock-YYYY-MM-DD__uid), so
+ *  newest mocks come first without needing a composite index. */
+interface MockAgg {
+  perSubject: { subject: string; pct: number }[];
+  overallPct: number | null;
+  perStudent: Map<string, { pct: number; mocks: number; username: string }>;
+  attempts: number;
+}
+async function mockAggregateFor(centreId: string): Promise<MockAgg | null> {
+  const cached = cacheGet(`mock:${centreId}`);
+  if (cached) return cached as MockAgg;
+  try {
+    const snap = await adminDb
+      .collection('mockAttempts')
+      .where('centreId', '==', centreId)
+      .orderBy(FieldPath.documentId(), 'desc')
+      .limit(40)
+      .get();
+    const atts = (snap.docs || [])
+      .map((d) => d.data() as any)
+      .filter((a) => String(a?.status) === 'submitted' && a?.resultSeenAt && a?.score && Number(a.score.answered) > 0)
+      .slice(0, 40);
+    const subj = new Map<string, { correct: number; total: number }>();
+    const perStudent = new Map<string, { pct: number; mocks: number; username: string }>();
+    let totalCorrect = 0;
+    let totalAnswered = 0;
+    for (const a of atts) {
+      const pct = Math.round((Number(a.score.correct) / Number(a.score.answered)) * 100);
+      totalCorrect += Number(a.score.correct);
+      totalAnswered += Number(a.score.answered);
+      const per = Array.isArray(a.perSubject) ? a.perSubject : [];
+      for (const v of per) {
+        if (!v || !Number(v.total)) continue;
+        const key = String(v.subject || 'General');
+        const cur = subj.get(key) || { correct: 0, total: 0 };
+        cur.correct += Number(v.correct);
+        cur.total += Number(v.total);
+        subj.set(key, cur);
+      }
+      const uid = String(a.uid || '');
+      if (uid) {
+        const cur = perStudent.get(uid) || { pct: 0, mocks: 0, username: String(a.username || '') };
+        cur.pct = Math.round(((cur.pct * cur.mocks) + pct) / (cur.mocks + 1));
+        cur.mocks += 1;
+        if (!cur.username) cur.username = String(a.username || '');
+        perStudent.set(uid, cur);
+      }
+    }
+    const value: MockAgg = {
+      perSubject: [...subj.entries()]
+        .map(([subject, v]) => ({ subject, pct: Math.round((v.correct / v.total) * 100) }))
+        .sort((a, b) => a.pct - b.pct)
+        .slice(0, 10),
+      overallPct: totalAnswered > 0 ? Math.round((totalCorrect / totalAnswered) * 100) : null,
+      perStudent,
+      attempts: atts.length,
+    };
+    cacheSet(`mock:${centreId}`, value);
+    return value;
+  } catch {
+    return null;
+  }
+}
+
+/** The centre's class roster: names and classes only, no scores here. */
+async function rosterFor(centreId: string): Promise<{ name: string; cls: string; uid: string }[]> {
+  const cached = cacheGet(`roster:${centreId}`);
+  if (cached) return cached as { name: string; cls: string; uid: string }[];
+  try {
+    const snap = await adminDb.collection('students').where('centreId', '==', centreId).limit(60).get();
+    const rows = (snap.docs || [])
+      .map((d) => {
+        const v = d.data() as any;
+        return {
+          name: String(v?.name || '').trim(),
+          cls: String(v?.class || v?.classroom || v?.level || '').trim(),
+          uid: String(v?.uid || d.id),
+        };
+      })
+      .filter((r) => r.name);
+    cacheSet(`roster:${centreId}`, rows);
+    return rows;
+  } catch {
+    return [];
+  }
+}
+
+/** P2: the tutor's centre context. Tutors see what the platform already
+ *  shows staff: the roster and released mock performance per subject and per
+ *  student. Students' private practice records are never included. */
+async function tutorContext(centreId: string, uid: string, name: string): Promise<string> {
+  const lines: string[] = [];
+  if (name) lines.push(`Your name: ${name}.`);
+  try {
+    let tut: any = null;
+    const byId = await adminDb.collection('tutors').doc(uid).get().catch(() => null);
+    if (byId?.exists) tut = byId.data();
+    else {
+      const q = await adminDb.collection('tutors').where('uid', '==', uid).limit(1).get();
+      if (!q.empty) tut = q.docs[0].data();
+    }
+    if (tut) {
+      const subjects = Array.isArray(tut.subjects)
+        ? tut.subjects.map((v: any) => String(v)).filter(Boolean)
+        : typeof tut.subjects === 'string' && tut.subjects.trim() ? tut.subjects.split(',').map((v: string) => v.trim()).filter(Boolean) : [];
+      if (subjects.length) lines.push(`You teach: ${subjects.slice(0, 10).join(', ')}.`);
+      const rooms = Array.isArray(tut.classrooms)
+        ? tut.classrooms.map((v: any) => String(v)).filter(Boolean)
+        : typeof tut.classrooms === 'string' && tut.classrooms.trim() ? [tut.classrooms.trim()] : [];
+      if (rooms.length) lines.push(`Your classes: ${rooms.slice(0, 10).join(', ')}.`);
+    }
+  } catch { /* optional */ }
+  const agg = await mockAggregateFor(centreId);
+  if (agg && agg.attempts > 0) {
+    if (agg.overallPct !== null) lines.push(`Centre mock performance: overall average ${agg.overallPct}% across ${agg.attempts} released mock results.`);
+    if (agg.perSubject.length) {
+      lines.push(`Weakest to strongest subjects: ${agg.perSubject.map((v) => `${v.subject} ${v.pct}%`).join(', ')}.`);
+    }
+    const roster = await rosterFor(centreId);
+    const withMocks = roster
+      .filter((r) => agg.perStudent.has(r.uid))
+      .map((r) => {
+        const m = agg.perStudent.get(r.uid)!;
+        return `${r.name}${r.cls ? ` (${r.cls})` : ''}: ${m.mocks} mock${m.mocks === 1 ? '' : 's'}, average ${m.pct}%`;
+      })
+      .sort((a, b) => Number(a.match(/average (\d+)%/)?.[1] || 0) - Number(b.match(/average (\d+)%/)?.[1] || 0))
+      .slice(0, 25);
+    if (withMocks.length) {
+      lines.push(`Student mock averages (weakest first): ${withMocks.join('; ')}.`);
+      const rest = roster.length - withMocks.length;
+      if (rest > 0) lines.push(`${rest} more student(s) have no released mock results yet.`);
+    } else if (roster.length) {
+      lines.push(`Roster: ${roster.slice(0, 25).map((r) => r.name + (r.cls ? ` (${r.cls})` : '')).join(', ')}${roster.length > 25 ? ' and others' : ''}. No released mock results yet.`);
+    }
+  }
+  return lines.join('\n').slice(0, 4000);
+}
+
+/** P3: the admin's centre overview: enrolment, staff, billing state and
+ *  released mock performance. Students' private practice records are never
+ *  included. */
+async function adminContext(centreId: string): Promise<string> {
+  const lines: string[] = [];
+  const roster = await rosterFor(centreId);
+  if (roster.length) lines.push(`Students enrolled: about ${roster.length}${roster.length >= 60 ? '+' : ''}.`);
+  try {
+    const tutSnap = await adminDb.collection('tutors').where('centreId', '==', centreId).limit(100).get();
+    if (tutSnap.size) lines.push(`Tutors: about ${tutSnap.size}${tutSnap.size >= 100 ? '+' : ''}.`);
+  } catch { /* optional */ }
+  try {
+    const billing = await adminDb.collection('centreBilling').doc(centreId).get();
+    if (billing.exists) {
+      const b = billing.data() as any;
+      const bits: string[] = [];
+      if (b?.planId) bits.push(`plan ${String(b.planId)}`);
+      if (Number(b?.seatCap)) bits.push(`seat cap ${Number(b.seatCap)}`);
+      if (typeof b?.paidThrough === 'string' && b.paidThrough) {
+        const paid = new Date(b.paidThrough);
+        if (!Number.isNaN(paid.getTime())) {
+          const overdue = paid.getTime() < Date.now();
+          bits.push(`paid through ${paid.toISOString().slice(0, 10)}${overdue ? ' (past date)' : ''}`);
+        }
+      }
+      if (bits.length) lines.push(`Billing: ${bits.join(', ')}.`);
+    }
+  } catch { /* optional */ }
+  const agg = await mockAggregateFor(centreId);
+  if (agg && agg.attempts > 0) {
+    if (agg.overallPct !== null) lines.push(`Mock performance: overall average ${agg.overallPct}% across ${agg.attempts} released mock results.`);
+    if (agg.perSubject.length) lines.push(`Weakest to strongest subjects: ${agg.perSubject.map((v) => `${v.subject} ${v.pct}%`).join(', ')}.`);
+  }
+  return lines.join('\n').slice(0, 4000);
+}
+
 // P1 personalisation: a student's OWN data, read server-side only, so the
 // assistant can give real advice ("your weakest topic is X") instead of
 // generic tips. Students get only their own records; other students are
@@ -238,20 +434,44 @@ async function personaFor(centreId: string, caller: Caller): Promise<string> {
   const at = centreName ? ` at ${centreName}` : '';
   const who = name || 'The person you are talking to';
   if (role === 'tutor') {
-    return [
+    const lines = [
       `Who you are talking to: ${name ? `${name}, a tutor${at}.` : `a tutor${at}.`}`,
       'Treat them as a teaching professional, never like a student. Discuss lesson planning, explaining difficult topics, teaching strategies, class management, marking guidance and how to help their students perform better in WAEC, NECO and JAMB.',
       name ? `When they greet you (for example "hi"), greet ${name} back by name and offer tutor-relevant help.` : 'When they greet you, greet them back warmly and offer tutor-relevant help.',
-      "You cannot see the centre’s records (results, attendance, fees) yet. If asked about a specific student’s performance, say plainly that you cannot see that yet and give guidance based on what they tell you.",
-    ].join(' ');
+    ];
+    const ctx = await tutorContext(centreId, caller.uid, name);
+    if (ctx) {
+      lines.push(
+        "You CAN see centre-wide data below: the class roster and released mock performance per subject and per student. Use it to give grounded teaching advice. You cannot see students' private practice records, attendance or fees.",
+        'Centre data (released mock results only):',
+        ctx,
+      );
+    } else {
+      lines.push(
+        "You cannot see the centre’s records (results, attendance, fees) yet. If asked about a specific student’s performance, say plainly that you cannot see that yet and give guidance based on what they tell you.",
+      );
+    }
+    return lines.join('\n');
   }
   if (role === 'owner' || role === 'admin') {
-    return [
+    const lines = [
       `Who you are talking to: ${name ? `${name}, the administrator of ${centreName || 'a tutorial centre'}.` : `the administrator of ${centreName || 'a tutorial centre'}.`}`,
       "Treat them as the centre’s manager. Help with running the centre: understanding student performance and attendance patterns, communicating with students and staff, planning academic programmes, exam preparation logistics and getting the most from the platform.",
       name ? `When they greet you (for example "hi"), greet ${name} back by name and offer admin-relevant help.` : 'When they greet you, greet them back warmly and offer admin-relevant help.',
-      "You cannot see the centre’s records (results, attendance, fees) yet. If asked about specific student data, say plainly that you cannot see that yet and give guidance based on what they tell you.",
-    ].join(' ');
+    ];
+    const actx = await adminContext(centreId);
+    if (actx) {
+      lines.push(
+        "You CAN see the centre overview below: enrolment, staff, billing state and released mock performance. Use it for grounded management advice. You cannot see students' private practice records, attendance details or fees beyond the billing state shown.",
+        'Centre overview:',
+        actx,
+      );
+    } else {
+      lines.push(
+        "You cannot see the centre’s records (results, attendance, fees) yet. If asked about specific student data, say plainly that you cannot see that yet and give guidance based on what they tell you.",
+      );
+    }
+    return lines.join('\n');
   }
   const studentWho = name ? `${name}, a student${at}.` : `a student${at}.`;
   const lines = [
