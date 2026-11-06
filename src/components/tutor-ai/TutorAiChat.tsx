@@ -1,19 +1,23 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Sparkles, Send, Plus, ImagePlus, X, TriangleAlert } from 'lucide-react';
+import { Sparkles, Send, Plus, ImagePlus, X, TriangleAlert, ArrowLeft } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { api } from '../tos/tosShared';
 
 // ============================================================================
 // Tutor AI chat (T1): the conversation surface shared by the student, tutor
-// and centre-admin portals. Dark slate with the TOS orange accent, matching
-// the approved mockup. The server does all the work (see
+// and centre-admin portals. The server does all the work (see
 // src/server/tutorAiRoutes.ts); this screen only sends, renders and keeps
 // state honest with the server's stored conversation.
 //
+// Theming: the screen follows the visitor's Appearance setting (bgTheme in
+// AppContext), light by default, exactly like the chat and status screens.
+// Staff portals render it without a mode prop, which keeps the original dark
+// look until their portals grow their own appearance settings.
+//
 // Entry points:
-// - Students: the Tutor AI wing in the chat fan (StudentPortal). The chat orb
-//   is the way back to the fan, so there is no back button here, exactly like
-//   the Status and Chats sub-tab pages.
+// - Students: the Tutor AI wing in the chat fan (StudentPortal). Opening it
+//   hides the bottom nav like a native chat thread; the header's back button
+//   is the way back to the fan.
 // - Tutors and centre admins: the Tutor AI stop on the staff chat toggle
 //   (TutorPortal / AdminChatEntry), rendered embedded in the portal content.
 // ============================================================================
@@ -89,15 +93,79 @@ const dayLabel = (ms: number) => {
   return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
 };
 
+// The one palette difference between the light and dark looks. Orange stays
+// the accent in both; only the neutrals swap.
+const PALETTES = {
+  light: {
+    shell: 'bg-white text-slate-900',
+    embedded: 'border-slate-200',
+    header: 'bg-white/95 border-slate-200',
+    headerTitle: 'text-slate-900',
+    headerSub: 'text-slate-500',
+    backBtn: 'text-slate-500 hover:text-orange-600 hover:bg-orange-50',
+    ghostBtn: 'text-slate-500 hover:text-orange-600 hover:bg-orange-50',
+    aiBubble: 'bg-slate-100 text-slate-800',
+    aiTime: 'text-slate-400',
+    imgBorder: 'border-slate-200',
+    dayChip: 'text-slate-500 bg-slate-100',
+    banner: 'bg-rose-50 border-rose-200',
+    bannerText: 'text-rose-700',
+    bannerIcon: 'text-rose-500',
+    bannerDismiss: 'text-rose-500 hover:text-rose-600',
+    chip: 'text-slate-600 bg-slate-100 border-slate-200 hover:text-orange-600 hover:border-orange-500/40',
+    composer: 'bg-white/95 border-slate-200',
+    attachBtn: 'text-slate-500 hover:text-orange-600 hover:bg-orange-50',
+    input: 'bg-slate-100 border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-orange-500/50',
+    sendOff: 'bg-slate-200 text-slate-400',
+    overlay: 'bg-slate-900/50 backdrop-blur-sm',
+    overlayPanel: 'bg-white border-slate-200',
+    cancelBtn: 'bg-slate-100 text-slate-700 hover:bg-slate-200',
+  },
+  dark: {
+    shell: 'bg-slate-950 text-white',
+    embedded: 'border-slate-800',
+    header: 'bg-slate-950/95 border-slate-800',
+    headerTitle: 'text-white',
+    headerSub: 'text-slate-400',
+    backBtn: 'text-slate-400 hover:text-orange-400 hover:bg-orange-500/10',
+    ghostBtn: 'text-slate-400 hover:text-orange-400 hover:bg-orange-500/10',
+    aiBubble: 'bg-slate-800/90 text-slate-100',
+    aiTime: 'text-slate-500',
+    imgBorder: 'border-slate-700/60',
+    dayChip: 'text-slate-500 bg-slate-800/60',
+    banner: 'bg-rose-500/10 border-rose-500/30',
+    bannerText: 'text-rose-200',
+    bannerIcon: 'text-rose-400',
+    bannerDismiss: 'text-rose-400 hover:text-rose-300',
+    chip: 'text-slate-300 bg-slate-800/80 border-slate-700 hover:text-orange-300 hover:border-orange-500/40',
+    composer: 'bg-slate-950/95 border-slate-800',
+    attachBtn: 'text-slate-400 hover:text-orange-400 hover:bg-orange-500/10',
+    input: 'bg-slate-800/70 border-slate-700 text-slate-100 placeholder:text-slate-500 focus:border-orange-500/50',
+    sendOff: 'bg-slate-800 text-slate-500',
+    overlay: 'bg-slate-950/85 backdrop-blur-sm',
+    overlayPanel: 'bg-slate-900 border-slate-700',
+    cancelBtn: 'bg-slate-800 text-slate-300 hover:bg-slate-700',
+  },
+} as const;
+
 interface Props {
   onClose?: () => void;
   embedded?: boolean;
   centreId?: string | null;
   bottomInset?: number;
+  mode?: 'light' | 'dark';
+  onBack?: () => void;
 }
 
-const TutorAiChat: React.FC<Props> = ({ embedded = false, centreId: centreIdProp, bottomInset = 0 }) => {
+const TutorAiChat: React.FC<Props> = ({
+  embedded = false,
+  centreId: centreIdProp,
+  bottomInset = 0,
+  mode = 'dark',
+  onBack,
+}) => {
   const { activeCentreId, activeCentre } = useApp();
+  const th = PALETTES[mode];
   const centreId = centreIdProp ?? activeCentreId ?? '';
   const [msgs, setMsgs] = useState<TitoMessage[]>([]);
   const [pending, setPending] = useState<TitoMessage | null>(null);
@@ -193,18 +261,18 @@ const TutorAiChat: React.FC<Props> = ({ embedded = false, centreId: centreIdProp
         className={`max-w-[85%] px-4 py-2.5 ${
           m.role === 'user'
             ? 'bg-gradient-to-br from-orange-500 to-orange-700 text-white rounded-2xl rounded-br-md'
-            : 'bg-slate-800/90 text-slate-100 rounded-2xl rounded-tl-md'
+            : `${th.aiBubble} rounded-2xl rounded-tl-md`
         }`}
       >
         {m.img && (
           <img
             src={m.img}
             alt="Attached work"
-            className="rounded-lg max-w-[180px] w-auto mb-1.5 border border-slate-700/60"
+            className={`rounded-lg max-w-[180px] w-auto mb-1.5 border ${th.imgBorder}`}
           />
         )}
         <p className="text-[13px] leading-relaxed whitespace-pre-wrap break-words font-medium">{m.text}</p>
-        <p className={`text-[10px] mt-1 font-bold ${m.role === 'user' ? 'text-orange-200/80' : 'text-slate-500'}`}>
+        <p className={`text-[10px] mt-1 font-bold ${m.role === 'user' ? 'text-orange-200/80' : th.aiTime}`}>
           {optimistic ? 'sending…' : clock(m.at)}
         </p>
       </div>
@@ -223,7 +291,7 @@ const TutorAiChat: React.FC<Props> = ({ embedded = false, centreId: centreIdProp
       lastDay = dk;
       rendered.push(
         <div key={`d${i}`} className="flex items-center justify-center py-1">
-          <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 bg-slate-800/60 rounded-full px-3 py-1">
+          <span className={`text-[10px] font-black uppercase tracking-widest rounded-full px-3 py-1 ${th.dayChip}`}>
             {dayLabel(m.at)}
           </span>
         </div>
@@ -233,24 +301,34 @@ const TutorAiChat: React.FC<Props> = ({ embedded = false, centreId: centreIdProp
   });
 
   const shell = embedded
-    ? 'h-[75vh] max-h-[760px] min-h-[480px] rounded-2xl border border-slate-800 overflow-hidden shadow-inner'
+    ? `h-[75vh] max-h-[760px] min-h-[480px] rounded-2xl border ${th.embedded} overflow-hidden shadow-inner`
     : 'h-full';
 
   return (
-    <div className={`flex flex-col bg-slate-950 text-white relative ${shell}`}>
+    <div className={`flex flex-col relative ${th.shell} ${shell}`}>
       {/* Pinned header */}
-      <div className="shrink-0 bg-slate-950/95 backdrop-blur-md border-b border-slate-800 px-4 py-3 flex items-center gap-3">
+      <div className={`shrink-0 backdrop-blur-md border-b px-4 py-3 flex items-center gap-3 ${th.header}`}>
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            aria-label="Back"
+            className={`-ml-1 p-2 rounded-full transition-all cursor-pointer ${th.backBtn}`}
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+        )}
         <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-500 to-orange-700 flex items-center justify-center shrink-0 shadow">
           <Sparkles className="w-5 h-5 text-white" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-black text-white flex items-center gap-2">
+          <p className={`text-sm font-black flex items-center gap-2 ${th.headerTitle}`}>
             Tutor AI
             <span className="text-[9px] font-black uppercase tracking-widest text-orange-300 bg-orange-500/15 border border-orange-500/30 rounded-full px-2 py-0.5">
               Beta
             </span>
           </p>
-          <p className="text-[11px] font-semibold text-slate-400 truncate">
+          <p className={`text-[11px] font-semibold truncate ${th.headerSub}`}>
             {activeCentre?.name || 'Your study assistant'}
           </p>
         </div>
@@ -258,7 +336,7 @@ const TutorAiChat: React.FC<Props> = ({ embedded = false, centreId: centreIdProp
           type="button"
           onClick={startNewChat}
           aria-label="Start a new chat"
-          className="p-2 rounded-full text-slate-400 hover:text-orange-400 hover:bg-orange-500/10 transition-all cursor-pointer"
+          className={`p-2 rounded-full transition-all cursor-pointer ${th.ghostBtn}`}
         >
           <Plus className="w-5 h-5" />
         </button>
@@ -271,12 +349,12 @@ const TutorAiChat: React.FC<Props> = ({ embedded = false, centreId: centreIdProp
             <div className="w-7 h-7 rounded-full bg-gradient-to-br from-orange-500 to-orange-700 flex items-center justify-center shrink-0 mt-1 mr-2 shadow">
               <Sparkles className="w-3.5 h-3.5 text-white" />
             </div>
-            <div className="max-w-[85%] px-4 py-2.5 bg-slate-800/90 text-slate-100 rounded-2xl rounded-tl-md">
+            <div className={`max-w-[85%] px-4 py-2.5 rounded-2xl rounded-tl-md ${th.aiBubble}`}>
               <p className="text-[13px] leading-relaxed font-medium">
                 Hi! I'm Tutor AI, your study assistant. Ask me anything about your schoolwork, or send a
                 photo of a question or your work and I'll help you with it.
               </p>
-              <p className="text-[10px] text-slate-500 font-bold mt-1">Just now</p>
+              <p className={`text-[10px] font-bold mt-1 ${th.aiTime}`}>Just now</p>
             </div>
           </div>
         )}
@@ -286,11 +364,11 @@ const TutorAiChat: React.FC<Props> = ({ embedded = false, centreId: centreIdProp
             <div className="w-7 h-7 rounded-full bg-gradient-to-br from-orange-500 to-orange-700 flex items-center justify-center shrink-0 mt-1 mr-2 shadow">
               <Sparkles className="w-3.5 h-3.5 text-white" />
             </div>
-            <div className="px-4 py-3 bg-slate-800/90 rounded-2xl rounded-tl-md flex items-center gap-1.5">
+            <div className={`px-4 py-3 rounded-2xl rounded-tl-md flex items-center gap-1.5 ${th.aiBubble}`}>
               {[0, 150, 300].map((d) => (
                 <span
                   key={d}
-                  className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce"
+                  className="w-1.5 h-1.5 rounded-full bg-orange-400 animate-bounce"
                   style={{ animationDelay: `${d}ms` }}
                 />
               ))}
@@ -301,10 +379,10 @@ const TutorAiChat: React.FC<Props> = ({ embedded = false, centreId: centreIdProp
 
       {/* Error banner */}
       {error && (
-        <div className="shrink-0 mx-4 mb-2 flex items-start gap-2 bg-rose-500/10 border border-rose-500/30 rounded-2xl px-3 py-2">
-          <TriangleAlert className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
-          <p className="text-[12px] text-rose-200 font-medium flex-1 leading-snug">{error}</p>
-          <button type="button" onClick={() => setError('')} aria-label="Dismiss" className="text-rose-400 hover:text-rose-300 cursor-pointer">
+        <div className={`shrink-0 mx-4 mb-2 flex items-start gap-2 border rounded-2xl px-3 py-2 ${th.banner}`}>
+          <TriangleAlert className={`w-4 h-4 shrink-0 mt-0.5 ${th.bannerIcon}`} />
+          <p className={`text-[12px] font-medium flex-1 leading-snug ${th.bannerText}`}>{error}</p>
+          <button type="button" onClick={() => setError('')} aria-label="Dismiss" className={`cursor-pointer ${th.bannerDismiss}`}>
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -320,7 +398,7 @@ const TutorAiChat: React.FC<Props> = ({ embedded = false, centreId: centreIdProp
               setInput(c.fill);
               inputRef.current?.focus();
             }}
-            className="shrink-0 text-[11px] font-bold text-slate-300 bg-slate-800/80 border border-slate-700 rounded-full px-3 py-1.5 hover:text-orange-300 hover:border-orange-500/40 transition-all cursor-pointer"
+            className={`shrink-0 text-[11px] font-bold border rounded-full px-3 py-1.5 transition-all cursor-pointer ${th.chip}`}
           >
             {c.label}
           </button>
@@ -328,14 +406,14 @@ const TutorAiChat: React.FC<Props> = ({ embedded = false, centreId: centreIdProp
       </div>
 
       {/* Pinned composer */}
-      <div className="shrink-0 bg-slate-950/95 backdrop-blur-md border-t border-slate-800 px-3 pt-2" style={bottomInset ? { paddingBottom: bottomInset } : { paddingBottom: 10 }}>
+      <div className={`shrink-0 backdrop-blur-md border-t px-3 pt-2 ${th.composer}`} style={bottomInset ? { paddingBottom: bottomInset } : { paddingBottom: 10 }}>
         <div className="flex items-end gap-2">
           <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={onPickFile} />
           <button
             type="button"
             onClick={() => fileRef.current?.click()}
             aria-label="Attach a photo"
-            className="p-2.5 rounded-full text-slate-400 hover:text-orange-400 hover:bg-orange-500/10 transition-all cursor-pointer"
+            className={`p-2.5 rounded-full transition-all cursor-pointer ${th.attachBtn}`}
           >
             <ImagePlus className="w-5 h-5" />
           </button>
@@ -352,7 +430,7 @@ const TutorAiChat: React.FC<Props> = ({ embedded = false, centreId: centreIdProp
             }}
             placeholder="Ask Tutor AI anything…"
             aria-label="Message Tutor AI"
-            className="flex-1 bg-slate-800/70 border border-slate-700 rounded-full px-4 py-2.5 text-[13px] text-slate-100 placeholder:text-slate-500 font-medium outline-none focus:border-orange-500/50 min-w-0"
+            className={`flex-1 border rounded-full px-4 py-2.5 text-[13px] font-medium outline-none min-w-0 ${th.input}`}
           />
           <button
             type="button"
@@ -361,7 +439,7 @@ const TutorAiChat: React.FC<Props> = ({ embedded = false, centreId: centreIdProp
             className={`p-2.5 rounded-full transition-all cursor-pointer ${
               input.trim()
                 ? 'bg-gradient-to-br from-orange-500 to-orange-700 text-white shadow-lg shadow-orange-900/40'
-                : 'bg-slate-800 text-slate-500'
+                : th.sendOff
             }`}
           >
             <Send className="w-4 h-4" />
@@ -371,14 +449,14 @@ const TutorAiChat: React.FC<Props> = ({ embedded = false, centreId: centreIdProp
 
       {/* Photo preview sheet: shows the photo without its filename */}
       {preview && (
-        <div className="absolute inset-0 z-50 bg-slate-950/85 backdrop-blur-sm flex items-center justify-center p-5">
-          <div className="bg-slate-900 border border-slate-700 rounded-3xl p-4 max-w-sm w-full">
+        <div className={`absolute inset-0 z-50 flex items-center justify-center p-5 ${th.overlay}`}>
+          <div className={`border rounded-3xl p-4 max-w-sm w-full ${th.overlayPanel}`}>
             <img src={preview.thumb || preview.full} alt="Photo to send" className="rounded-2xl max-h-[50vh] w-auto mx-auto mb-4" />
             <div className="flex gap-2">
               <button
                 type="button"
                 onClick={() => setPreview(null)}
-                className="flex-1 py-2.5 rounded-full bg-slate-800 text-slate-300 text-[13px] font-black hover:bg-slate-700 transition-all cursor-pointer"
+                className={`flex-1 py-2.5 rounded-full text-[13px] font-black transition-all cursor-pointer ${th.cancelBtn}`}
               >
                 Cancel
               </button>

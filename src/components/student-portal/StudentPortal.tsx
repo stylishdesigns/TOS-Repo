@@ -771,11 +771,16 @@ export const StudentPortal: React.FC = () => {
           )}
 
           {/* Tutor AI: the third sub-stack, now the real study-assistant chat.
-              The orb is still the way back to the fan, so the screen carries no
-              back button, and the composer clears the bottom nav. */}
-          {titoOpen && !hideBottomNav && (
-            <div className="fixed inset-0 z-40 bg-slate-950 overflow-hidden animate-in fade-in duration-200">
-              <TutorAiChat bottomInset={76} />
+              Like a native chat thread, opening it hides the bottom nav; the
+              header's back button is the way back to the fan. It follows the
+              visitor's Appearance theme (light by default). */}
+          {titoOpen && (
+            <div
+              className={`fixed inset-0 z-40 overflow-hidden animate-in fade-in duration-200 ${
+                bgTheme === 'dark' ? 'bg-slate-950' : 'bg-white'
+              }`}
+            >
+              <TutorAiChat bottomInset={0} mode={bgTheme} onBack={() => setTitoOpen(false)} />
             </div>
           )}
 
@@ -790,8 +795,9 @@ export const StudentPortal: React.FC = () => {
             />
           )}
 
-          {/* 3. Persistent Mobile Bottom Navigation Bar (5 Items: Home · Classes · Chat · CBT · More) */}
-          {!hideBottomNav && (
+          {/* 3. Persistent Mobile Bottom Navigation Bar (5 Items: Home · Classes · Chat · CBT · More).
+              Hidden while the Tutor AI thread is open, like a chat room. */}
+          {!hideBottomNav && !titoOpen && (
             <nav
               aria-label="Student Mobile Navigation"
               className="relative z-40 shrink-0 bg-slate-950/95 backdrop-blur-md border-t border-slate-800 py-1.5 px-2 shadow-2xl"
