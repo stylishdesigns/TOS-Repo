@@ -30,6 +30,7 @@ import { registerMockRoutes } from "./src/server/mockRoutes";
 import { PaymentError, parseAmount, parseConfirmAction } from "./src/server/paymentLogic";
 import { loadPaymentActor, submitPayment, decidePayment } from "./src/server/paymentService";
 import { registerStudentMockRoutes } from "./src/server/studentMockRoutes";
+import { registerTutorAiRoutes } from "./src/server/tutorAiRoutes";
 
 
 // Source file is ESM, but compiled to CJS for production.
@@ -1221,6 +1222,12 @@ RULES:
   registerPracticeStatsRoutes(app);
   registerMockRoutes(app);
   registerStudentMockRoutes(app);
+
+  // Tutor AI (T1): general study-assistant chat for centre members. Separate
+  // module; the existing AI routes above are untouched. Same EXCELLENT_API_KEY
+  // Vertex backend, per-centre monthly cap and per-user hourly burst enforced
+  // server-side (see tutorAiRoutes.ts).
+  registerTutorAiRoutes(app);
 
   // Fo database proxy (read-only): Firestore diagnostics through the server's
   // own admin connection, gated by FO_DB_PROXY_KEY_SHA256 (see foDbProxy.ts).

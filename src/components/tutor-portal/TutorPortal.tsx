@@ -9,7 +9,7 @@ import { MoreTab } from './tabs/MoreTab';
 import { ChatManager } from '../communications/ChatManager';
 import { StaffStatusScreen } from '../student-portal/tabs/StatusTab';
 import { ChatModeToggle, ChatMode } from '../communications/ChatSplash';
-import TutorAiScreen from '../communications/TutorAiScreen';
+import TutorAiChat from '../tutor-ai/TutorAiChat';
 import { PWAInstallButton } from '../pwa/PWAInstallButton';
 import {
   Home,
@@ -224,7 +224,11 @@ export const TutorPortal: React.FC = () => {
                 <div className="sticky top-0 z-20 bg-slate-50/95 backdrop-blur px-4 py-3 -mt-1">
                   <ChatModeToggle mode={chatMode === 'choose' ? 'status' : chatMode} onChange={(m) => setChatMode(m)} />
                 </div>
-                {chatMode === 'tito' && <TutorAiScreen />}
+                {chatMode === 'tito' && (
+                  <div className="px-2 sm:px-4 pb-4">
+                    <TutorAiChat embedded />
+                  </div>
+                )}
                 {chatMode !== 'chat' && chatMode !== 'tito' && <StaffStatusScreen />}
                 {chatMode === 'chat' && <ChatManager onThreadOpenChange={setChatThreadOpen} />}
               </>

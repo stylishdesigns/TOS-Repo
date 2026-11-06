@@ -10,7 +10,7 @@ import { HomeTab } from './tabs/HomeTab';
 import { ClassesTabWrapper } from './tabs/ClassesTabWrapper';
 import { ChatTab } from './tabs/ChatTab';
 import { StatusScreen } from './tabs/StatusTab';
-import TitoAiScreen from './tabs/TitoAiScreen';
+import TutorAiChat from '../tutor-ai/TutorAiChat';
 import { CbtTabWrapper } from './tabs/CbtTabWrapper';
 import { MoreTab } from './tabs/MoreTab';
 import { ActionSheetModal, ActionSheetItem } from './tabs/ActionSheetModal';
@@ -770,14 +770,12 @@ export const StudentPortal: React.FC = () => {
             </div>
           )}
 
-          {/* Tutor AI placeholder: the third sub-stack. A real conversation
-              arrives later; for now the screen explains that and stays out of
-              the way. The orb is the way back to the fan. */}
+          {/* Tutor AI: the third sub-stack, now the real study-assistant chat.
+              The orb is still the way back to the fan, so the screen carries no
+              back button, and the composer clears the bottom nav. */}
           {titoOpen && !hideBottomNav && (
-            <div className="fixed inset-0 z-40 bg-slate-50 overflow-y-auto animate-in fade-in duration-200">
-              <div className="p-4 sm:p-5 max-w-lg mx-auto pt-6 pb-24">
-                <TitoAiScreen />
-              </div>
+            <div className="fixed inset-0 z-40 bg-slate-950 overflow-hidden animate-in fade-in duration-200">
+              <TutorAiChat bottomInset={76} />
             </div>
           )}
 

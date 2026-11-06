@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { ChatManager } from './ChatManager';
 import { ChatModeToggle, ChatMode } from './ChatSplash';
 import { StaffStatusScreen } from '../student-portal/tabs/StatusTab';
-import TutorAiScreen from './TutorAiScreen';
+import TutorAiChat from '../tutor-ai/TutorAiChat';
 
 /**
  * Admin chat entry: admins reach chat from their sidebar menu (no bottom
@@ -16,7 +16,7 @@ export const AdminChatEntry: React.FC = () => {
       <div className="sticky top-0 z-20 bg-slate-50/95 backdrop-blur px-4 pt-4 pb-3">
         <ChatModeToggle mode={mode} onChange={setMode} />
       </div>
-      {mode === 'status' ? <StaffStatusScreen /> : mode === 'tito' ? <TutorAiScreen /> : <ChatManager />}
+      {mode === 'status' ? <StaffStatusScreen /> : mode === 'tito' ? <div className="px-2 pb-4"><TutorAiChat embedded /></div> : <ChatManager />}
     </div>
   );
 };
