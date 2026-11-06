@@ -110,6 +110,12 @@ const dayLabel = (ms: number) => {
 // Renders the AI's answers as real formatting. The model writes simple
 // markdown; this turns headings, bold, italics, inline code and lists into
 // styled React nodes, so the student never sees a hash, asterisk or star.
+// Typewriter chunks: markdown-quoted spans (bold, italics, code) stay whole,
+// so nothing half-bold ever flashes while the answer draws in.
+function tokenizeForTyping(text: string): string[] {
+  return text.match(/\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`|\s+|[^\s*`]+/g) || [text];
+}
+
 function renderRichText(text: string): React.ReactNode[] {
   const out: React.ReactNode[] = [];
   let list: { ordered: boolean; items: string[] } | null = null;
@@ -296,6 +302,7 @@ const TutorAiChat: React.FC<Props> = ({
   const [convosLoaded, setConvosLoaded] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [chipTurn, setChipTurn] = useState(0);
+  const [typing, setTyping] = useState<{ tokens: string[]; shown: number } | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -336,7 +343,24 @@ const TutorAiChat: React.FC<Props> = ({
   useEffect(() => {
     const el = listRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [msgs, pending, busy]);
+  }, [msgs, pending, busy, typing]);
+
+  // Fast typewriter reveal for fresh AI answers: the reply arrives from the
+  // server in one piece, then draws in chunk by chunk. Chunks are cut so
+  // markdown markers (bold, italics, code) never split mid-marker, and the
+  // pace is capped so even a long answer finishes in a few seconds.
+  useEffect(() => {
+    if (!typing) return;
+    const t = setTimeout(() => {
+      setTyping((cur) => {
+        if (!cur) return null;
+        const step = Math.max(2, Math.ceil(cur.tokens.length / 110));
+        const next = cur.shown + step;
+        return next >= cur.tokens.length ? null : { ...cur, shown: next };
+      });
+    }, 22);
+    return () => clearTimeout(t);
+  }, [typing]);
 
   const send = useCallback(async (rawText: string, img?: Attachment | null) => {
     const text = rawText.trim();
@@ -357,6 +381,10 @@ const TutorAiChat: React.FC<Props> = ({
       });
       setMsgs(Array.isArray(res?.messages) ? res.messages : []);
       if (res?.conversationId) setActiveId(res.conversationId);
+      const freshAi = (Array.isArray(res?.messages) ? (res.messages as TitoMessage[]) : [])
+        .filter((m) => m.role === 'ai')
+        .pop();
+      if (freshAi?.text) setTyping({ tokens: tokenizeForTyping(freshAi.text), shown: 0 });
       loadConversations();
       setChipTurn((t) => t + 1);
     } catch (e: any) {
@@ -370,6 +398,7 @@ const TutorAiChat: React.FC<Props> = ({
   // A brand-new chat: nothing is stored until the first message is sent.
   const startNewChat = useCallback(() => {
     setDrawerOpen(false);
+    setTyping(null);
     setMsgs([]);
     setActiveId(null);
     setError('');
@@ -381,6 +410,7 @@ const TutorAiChat: React.FC<Props> = ({
     async (id: string) => {
       if (busy) return;
       setDrawerOpen(false);
+      setTyping(null);
       try {
         const q = `${centreId ? `centreId=${encodeURIComponent(centreId)}&` : ''}conversationId=${encodeURIComponent(id)}`;
         const res: any = await api(`/api/tutor-ai/history?${q}`);
@@ -407,7 +437,7 @@ const TutorAiChat: React.FC<Props> = ({
     setPreview(att);
   };
 
-  const renderBubble = (m: TitoMessage, optimistic = false, key?: React.Key) => (
+  const renderBubble = (m: TitoMessage, optimistic = false, key?: React.Key, typewriter?: string | null) => (
     <div key={key} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
       {m.role === 'ai' && (
         <div className="w-7 h-7 rounded-full bg-gradient-to-br from-orange-500 to-orange-700 flex items-center justify-center shrink-0 mt-1 mr-2 shadow">
@@ -429,12 +459,12 @@ const TutorAiChat: React.FC<Props> = ({
           />
         )}
         {m.role === 'ai' ? (
-          <div className="text-[15px] leading-relaxed">{renderRichText(m.text)}</div>
+          <div className="text-[15px] leading-relaxed">{renderRichText(typewriter ?? m.text)}</div>
         ) : (
           <p className="text-[15px] leading-relaxed whitespace-pre-wrap break-words font-medium text-white">{m.text}</p>
         )}
         <p className={`text-[11px] mt-1 font-bold ${m.role === 'user' ? 'text-orange-200/80' : th.aiTime}`}>
-          {optimistic ? 'sending…' : clock(m.at)}
+          {clock(m.at)}
         </p>
       </div>
     </div>
@@ -458,7 +488,11 @@ const TutorAiChat: React.FC<Props> = ({
         </div>
       );
     }
-    rendered.push(renderBubble(m, optimistic, `m${i}`));
+    const typingText =
+      typing && msgs.length > 0 && msgs[msgs.length - 1].role === 'ai' && i === all.length - 1
+        ? typing.tokens.slice(0, typing.shown).join('')
+        : null;
+    rendered.push(renderBubble(m, optimistic, `m${i}`, typingText));
   });
 
   // One suggestion at a time, driven by the last thing the AI said, so the

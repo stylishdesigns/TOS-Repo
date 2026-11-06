@@ -246,7 +246,7 @@ export const TutorPortal: React.FC = () => {
               composer pinned to the bottom; the header back button returns to
               the chat toggle. The bottom nav is already hidden in this mode. */}
           {activeTab === 'chat' && chatMode === 'tito' && (
-            <div className="absolute inset-0 z-30 bg-white">
+            <div className="fixed inset-0 z-30 bg-white">
               <TutorAiChat mode="light" onBack={() => setChatMode('chat')} />
             </div>
           )}
