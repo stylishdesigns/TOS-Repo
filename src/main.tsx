@@ -1,6 +1,7 @@
 import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
+import { PublicLandingPage } from './components/landing/PublicLandingPage';
 import './index.css';
 import {registerSW} from 'virtual:pwa-register';
 import { installServerApiFetch } from './utils/serverApi';
@@ -24,8 +25,12 @@ const updateSW = registerSW({
 // Attach the Firebase ID token to same-origin /api requests (Prompt A step 10).
 installServerApiFetch();
 
+// Public centre landing pages (piece 1): /c/{centreId} renders the centre's
+// public website for anonymous visitors, outside the app shell entirely.
+const landingMatch = window.location.pathname.match(/^\/c\/([A-Za-z0-9_-]{3,64})\/?$/);
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    {landingMatch ? <PublicLandingPage centreId={landingMatch[1]} /> : <App />}
   </StrictMode>,
 );

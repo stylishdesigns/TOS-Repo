@@ -26,6 +26,7 @@ import { registerFoDbProxy } from "./src/server/foDbProxy";
 import { registerFoAccessDoors } from "./src/server/foAccessDoors";
 import { registerFoIndexDoors } from "./src/server/foIndexDoors";
 import { registerPracticeStatsRoutes } from "./src/server/practiceStatsRoutes";
+import { registerLandingRoutes } from "./src/server/landingRoutes";
 import { registerMockRoutes } from "./src/server/mockRoutes";
 import { PaymentError, parseAmount, parseConfirmAction } from "./src/server/paymentLogic";
 import { loadPaymentActor, submitPayment, decidePayment } from "./src/server/paymentService";
@@ -1220,6 +1221,7 @@ RULES:
   // registered before the static/SPA fallback so no GET route is swallowed.
   registerExtendedRoutes(app);
   registerPracticeStatsRoutes(app);
+  registerLandingRoutes(app);
   registerMockRoutes(app);
   registerStudentMockRoutes(app);
 
