@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, Building2, Wallet, ScrollText, UserPlus, Loader2,
   RefreshCw, Send, Ban, CheckCircle2, PlayCircle, Check, Plus, ShieldCheck,
   Clock, ArrowUpRight, UserRound, BookOpen, CalendarDays, Copy, HelpCircle,
-  AlertTriangle, X, ChevronRight, MessageSquare,
+  AlertTriangle, X, ChevronRight, MessageSquare, Globe,
 } from 'lucide-react';
 import {
   api, fmtDate, fmtDateTime, LEAD_STATUS_LABELS, STATUS_STYLES, Json,
@@ -18,6 +18,7 @@ import { QuestionLibraryTab } from './TosQuestionLibrary';
 import { QuestionBankHub, MockPapersTab } from './TosQuestionHub';
 import { MocksTab } from './TosMocks';
 import { TosChat } from './TosChat';
+import { WebsiteTab } from './TosWebsite';
 
 /**
  * TOS platform console (Prompt C Part D).
@@ -790,6 +791,7 @@ const TABS = [
   { id: 'questions', label: 'Question Bank', mlabel: 'Bank', icon: BookOpen, group: 'Content' },
   { id: 'mocks', label: 'Mocks', mlabel: 'Mocks', icon: CalendarDays, group: 'Content' },
   { id: 'chat', label: 'Chat', mlabel: 'Chat', icon: MessageSquare, group: 'Content' },
+  { id: 'website', label: 'Website', mlabel: 'Website', icon: Globe, group: 'Content' },
   { id: 'audit', label: 'Audit log', mlabel: 'Audit', icon: ScrollText, group: 'System' },
   { id: 'team', label: 'Team', mlabel: 'Team', icon: Users, group: 'System' },
   { id: 'account', label: 'Account', mlabel: 'Account', icon: UserRound, group: 'System' },
@@ -1096,6 +1098,7 @@ export const TosPortal: React.FC = () => {
             {tab === 'questions' && 'Two separate banks: Practice and Mock. Pick one on the hub to work in.'}
             {tab === 'mocks' && "One mock a day for every centre's students. Create, freeze and manage them from here."}
             {tab === 'chat' && 'The platform channel, chat settings and escalated reports.'}
+            {tab === 'website' && 'Each centre\'s public landing page: template, content and publish.'}
             {tab === 'audit' && 'Every privileged action, recorded.'}
             {tab === 'team' && 'The people who run the platform.'}
             {tab === 'account' && 'Your platform profile, password and sign-out.'}
@@ -1109,6 +1112,7 @@ export const TosPortal: React.FC = () => {
         {tab === 'library' && <QuestionLibraryTab refreshKey={refreshKey} />}
         {tab === 'mocks' && <MocksTab refreshKey={refreshKey} openCreateSignal={mocksCreateKey} />}
         {tab === 'chat' && <TosChat refreshKey={refreshKey} />}
+        {tab === 'website' && <WebsiteTab refreshKey={refreshKey} />}
         {tab === 'plans' && <PlansTab />}
         {tab === 'audit' && <AuditTab />}
         {tab === 'team' && <TeamTab />}
