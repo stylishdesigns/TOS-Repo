@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { loadLastGood, saveLastGood } from '../../lib/lastGood';
 import {
   Loader2, ChevronLeft, AlertTriangle, Send, Ban, RefreshCw,
-  Copy, Wallet, CheckCircle2, Plus, Trash2,
+  Copy, Wallet, CheckCircle2, Plus, Trash2, Globe,
 } from 'lucide-react';
 import {
   api, money, fmtDate, fmtDateTime, STATUS_LABELS, Json,
@@ -111,6 +111,24 @@ const CentreDetail: React.FC<{ centreId: string; onBack: () => void; onDataChang
               {centre.contact?.state ? ` · ${centre.contact.city || ''}${centre.contact.city ? ', ' : ''}${centre.contact.state}` : ''}
               {(centre.audienceTypes || []).length ? ` · ${(centre.audienceTypes || []).join(', ')}` : ''}
             </p>
+            <div className="mt-2 flex items-center gap-2">
+              <a
+                href={`/c/${centreId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-orange-300 hover:text-orange-200 inline-flex items-center gap-1.5"
+              >
+                <Globe className="w-3.5 h-3.5" /> Landing page
+              </a>
+              <button
+                onClick={() => navigator.clipboard?.writeText(`${window.location.origin}/c/${centreId}`).catch(() => {})}
+                className="text-slate-400 hover:text-orange-300"
+                title="Copy landing page link"
+                aria-label="Copy landing page link"
+              >
+                <Copy className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
         </div>
         {centre.credentialsNotDelivered && (
