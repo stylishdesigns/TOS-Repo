@@ -15,7 +15,12 @@ import {
   CheckCircle2,
   AlertCircle,
   ChevronDown,
+  MessageSquare,
 } from 'lucide-react';
+import { PortalShowcase } from './landing/PortalShowcase';
+import { AiSection } from './landing/AiSection';
+import { BrandSection } from './landing/BrandSection';
+import { HeroPreview } from './landing/HeroPreview';
 
 /**
  * Tutorial OS product landing page: the first screen a visitor sees. It sells
@@ -164,6 +169,11 @@ export const TutorialOsLanding: React.FC<{
       text: 'See who has paid and who is owing, per student and per branch.',
     },
     {
+      icon: MessageSquare,
+      title: 'Centre chat',
+      text: 'A chat window where admins, tutors and students talk to each other, with groups for every class.',
+    },
+    {
       icon: Building2,
       title: 'Multi-branch',
       text: 'Every branch, tutor and class in one dashboard, with the right people seeing the right things.',
@@ -247,8 +257,9 @@ export const TutorialOsLanding: React.FC<{
           </h1>
           <p className="text-slate-400 max-w-xl mx-auto text-sm md:text-base font-medium leading-relaxed mb-8">
             Admissions, attendance, CBT assessments, results and fees, all in one
-            place and on every phone. Set your centre up in minutes and let the
-            records keep themselves.
+            place and on every phone, with AI built in and your own name on
+            everything. Set your centre up in minutes and let the records keep
+            themselves.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
             <button
@@ -285,6 +296,7 @@ export const TutorialOsLanding: React.FC<{
           <p className="text-slate-500 text-xs mt-4">
             Preparing for JAMB, WAEC, NECO or A-Levels? Your centre runs it all here.
           </p>
+          <HeroPreview onReserve={scrollToReserve} />
         </section>
 
         {/* Features */}
@@ -302,6 +314,11 @@ export const TutorialOsLanding: React.FC<{
             </div>
           ))}
         </section>
+
+        {/* Portals, AI and white-label sections */}
+        <PortalShowcase />
+        <AiSection onReserve={scrollToReserve} />
+        <BrandSection />
 
         {/* How it works */}
         <section className="mb-16">
