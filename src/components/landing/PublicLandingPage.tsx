@@ -35,11 +35,12 @@ function hrefFor(href: string): string {
   return '/';
 }
 
-/** wa.me wants digits only; anything else is dropped. */
 function waDigits(v: string): string {
-  return (v || '').replace(/[^0-9]/g, '');
+  let digits = (v || '').replace(/[^0-9]/g, '');
+  // Nigerian numbers are usually saved locally (0903…); wa.me needs 234….
+  if (digits.length === 11 && digits.startsWith('0')) digits = '234' + digits.slice(1);
+  return digits;
 }
-
 function waLink(v: string | undefined): string {
   const digits = waDigits(v || '');
   return digits ? `https://wa.me/${digits}` : '';

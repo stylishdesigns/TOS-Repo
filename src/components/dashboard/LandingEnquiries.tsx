@@ -32,7 +32,13 @@ function dayLabel(iso: string): string {
   return `${d.toLocaleDateString([], { day: 'numeric', month: 'short' })} ${time}`;
 }
 
-const waLink = (phone: string): string => `https://wa.me/${phone.replace(/[^0-9]/g, '')}`;
+function waDigits(v: string): string {
+  let digits = (v || '').replace(/[^0-9]/g, '');
+  // Nigerian numbers are usually saved locally (0903…); wa.me needs 234….
+  if (digits.length === 11 && digits.startsWith('0')) digits = '234' + digits.slice(1);
+  return digits;
+}
+const waLink = (phone: string): string => { const d = waDigits(phone); return d ? `https://wa.me/${d}` : '#'; };
 
 export const LandingEnquiries: React.FC = () => {
   const [leads, setLeads] = useState<Lead[] | null>(null);
