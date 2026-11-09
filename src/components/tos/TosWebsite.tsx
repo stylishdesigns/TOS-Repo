@@ -57,6 +57,11 @@ function toState(raw: any): LandingState {
       hours: raw?.contact?.hours || '',
     },
     footer: { copyright: raw?.footer?.copyright || '' },
+    socials: {
+      facebook: raw?.socials?.facebook || '',
+      instagram: raw?.socials?.instagram || '',
+      tiktok: raw?.socials?.tiktok || '',
+    },
   };
 }
 
@@ -332,6 +337,18 @@ export const WebsiteTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => 
                   <input className={inputCls} maxLength={120} value={content.contact.hours || ''} onChange={(e) => set({ contact: { ...content.contact, hours: e.target.value } })} placeholder="Hours" aria-label="Contact hours" />
                 </div>
                 <input className={inputCls} maxLength={120} value={content.footer.copyright} onChange={(e) => set({ footer: { copyright: e.target.value } })} placeholder="Footer line" aria-label="Footer copyright" />
+              </div>
+            </Card>
+
+            <Card title="Social media">
+              <div className="space-y-3">
+                <p className="text-[12px] text-slate-500">Your Facebook, Instagram and TikTok pages show as icons at the foot of the landing page. Paste each page's full address (starting with https://); leave a box empty to hide it.</p>
+                <div className="grid sm:grid-cols-3 gap-3">
+                  <input className={inputCls} maxLength={200} value={content.socials?.facebook || ''} onChange={(e) => set({ socials: { ...(content.socials || { facebook: '', instagram: '', tiktok: '' }), facebook: e.target.value } })} placeholder="https://facebook.com/…" aria-label="Facebook page address" />
+                  <input className={inputCls} maxLength={200} value={content.socials?.instagram || ''} onChange={(e) => set({ socials: { ...(content.socials || { facebook: '', instagram: '', tiktok: '' }), instagram: e.target.value } })} placeholder="https://instagram.com/…" aria-label="Instagram page address" />
+                  <input className={inputCls} maxLength={200} value={content.socials?.tiktok || ''} onChange={(e) => set({ socials: { ...(content.socials || { facebook: '', instagram: '', tiktok: '' }), tiktok: e.target.value } })} placeholder="https://tiktok.com/@…" aria-label="TikTok page address" />
+                </div>
+                <p className="text-[12px] text-slate-500">The floating WhatsApp button on the landing page uses the WhatsApp number set in centre admin settings (System Settings), so update it there, not here.</p>
               </div>
             </Card>
 

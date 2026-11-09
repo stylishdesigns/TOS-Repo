@@ -25,6 +25,12 @@ function safeHref(v: unknown): string {
   return s.startsWith('/') || s.startsWith('#') ? s : '/';
 }
 
+/** Social page links must be real https addresses; anything else is dropped. */
+function safeLink(v: unknown): string {
+  const s = str(v, 200);
+  return /^https:\/\/[^\s]+$/i.test(s) ? s : '';
+}
+
 function sanitizeLandingContent(raw: unknown): LandingContent {
   const v = (raw || {}) as Record<string, any>;
   const hero = (v.hero || {}) as Record<string, any>;
@@ -95,8 +101,15 @@ function sanitizeLandingContent(raw: unknown): LandingContent {
       hours: str(contact.hours, 120) || undefined,
     },
     footer: { copyright: str(footer.copyright, 120) },
+    socials: {
+      facebook: safeLink(v.socials?.facebook),
+      instagram: safeLink(v.socials?.instagram),
+      tiktok: safeLink(v.socials?.tiktok),
+    },
   };
-  return out;
+  // Firestore rejects undefined field values, so strip every undefined key
+  // (this bit a real save: any empty optional field made the write throw).
+  return JSON.parse(JSON.stringify(out)) as LandingContent;
 }
 
 function requireTos(req: express.Request): { uid: string } {

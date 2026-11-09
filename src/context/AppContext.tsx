@@ -143,6 +143,7 @@ export type AdminSection =
   | 'payments'
   | 'announcements'
   | 'chat'
+  | 'website-enquiries'
   | 'cms-editor'
   | 'branches'
   | 'settings'

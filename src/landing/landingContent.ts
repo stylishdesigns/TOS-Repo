@@ -56,6 +56,9 @@ export type LandingContent = {
     hours?: string;
   };
   footer: { copyright: string };
+  /** Social pages the centre wants linked from its landing page. Empty
+   *  strings mean the platform is not shown at all. */
+  socials: { facebook: string; instagram: string; tiktok: string };
 };
 
 /**
@@ -75,8 +78,8 @@ export function defaultLandingContent(centreName: string): LandingContent {
       subText:
         'WAEC, NECO and JAMB preparation taught by experienced tutors, with weekly mock exams that keep every student on track.',
       buttons: [
-        { label: 'Register your child', href: '/', kind: 'primary' },
-        { label: 'Contact us', href: '#contact', kind: 'ghost' },
+        { label: 'Send an enquiry', href: '#enquiry', kind: 'primary' },
+        { label: 'Chat on WhatsApp', href: '#whatsapp', kind: 'ghost' },
       ],
       badges: ['WAEC', 'NECO', 'JAMB', 'Morning & evening classes'],
     },
@@ -152,6 +155,7 @@ export function defaultLandingContent(centreName: string): LandingContent {
       hours: 'Mon – Sat · 8:00am – 6:00pm',
     },
     footer: { copyright: `© ${new Date().getFullYear()} ${name}` },
+    socials: { facebook: '', instagram: '', tiktok: '' },
   };
 }
 

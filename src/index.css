@@ -400,6 +400,31 @@ span.text-slate-600:not(.dark-bg-mode *) {
 .plp-contactmeta a{color:#fff;text-decoration:underline}
 .plp-footer{border-top:1px solid #e2e8f0;padding:26px 0;color:#94a3b8;font-size:13px}
 .plp-footrow{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+
+/* Landing page piece 3: floating WhatsApp button, enquiry form, social links */
+.plp-wafab{position:fixed;right:18px;bottom:18px;width:56px;height:56px;border-radius:999px;background:#25D366;color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(16,24,40,.28);z-index:60;transition:transform .15s ease}
+.plp-wafab:hover{transform:scale(1.06)}
+.plp-wafab svg{width:28px;height:28px}
+.plp-socials{display:flex;gap:10px;align-items:center}
+.plp-socials a{width:34px;height:34px;border-radius:999px;display:flex;align-items:center;justify-content:center;background:#f1f5f9;color:#475569;transition:all .15s ease}
+.plp-socials a:hover{background:var(--plp-accent);color:#fff}
+.plp-form{max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:14px;text-align:left;background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:22px;box-shadow:0 10px 30px rgba(15,23,42,.06)}
+.plp-formrow{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.plp-form label{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600;color:#334155}
+.plp-form input,.plp-form textarea{border:1px solid #cbd5e1;border-radius:10px;padding:10px 12px;font-size:14px;color:#0f172a;font-family:inherit;outline:none;background:#f8fafc}
+.plp-form input:focus,.plp-form textarea:focus{border-color:var(--plp-accent);background:#fff;box-shadow:0 0 0 3px rgba(234,88,12,.12)}
+.plp-form textarea{resize:vertical;min-height:96px}
+.plp-formbtn{border:none;cursor:pointer;background:var(--plp-accent);color:#fff;font-weight:700;font-size:14px;padding:12px 20px;border-radius:999px;align-self:flex-start;min-height:44px}
+.plp-formbtn:disabled{opacity:.6;cursor:default}
+.plp-formerr{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;border-radius:10px;padding:10px 12px;font-size:13px}
+.plp-formdone{max-width:640px;margin:0 auto;text-align:center;background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:30px 22px;box-shadow:0 10px 30px rgba(15,23,42,.06)}
+.plp-formdone b{color:#15803d;font-size:17px}
+.plp-formdone p{color:#475569;margin-top:8px;font-size:14px;line-height:1.55}
+@media (max-width:760px){
+  .plp-wafab{right:14px;bottom:14px;width:52px;height:52px}
+  .plp-formrow{grid-template-columns:1fr}
+  .plp-form{padding:16px}
+}
 @media(max-width:760px){
 .plp-nav{display:none}
 .plp-hero h1{font-size:30px}

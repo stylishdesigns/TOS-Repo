@@ -28,6 +28,7 @@ import { registerFoIndexDoors } from "./src/server/foIndexDoors";
 import { registerPracticeStatsRoutes } from "./src/server/practiceStatsRoutes";
 import { registerLandingRoutes } from "./src/server/landingRoutes";
 import { registerLandingAdminRoutes } from "./src/server/landingAdminRoutes";
+import { registerLandingLeadRoutes } from "./src/server/landingLeadRoutes";
 import { registerMockRoutes } from "./src/server/mockRoutes";
 import { PaymentError, parseAmount, parseConfirmAction } from "./src/server/paymentLogic";
 import { loadPaymentActor, submitPayment, decidePayment } from "./src/server/paymentService";
@@ -1223,6 +1224,7 @@ RULES:
   registerExtendedRoutes(app);
   registerPracticeStatsRoutes(app);
   registerLandingRoutes(app);
+  registerLandingLeadRoutes(app);
   registerLandingAdminRoutes(app);
   registerMockRoutes(app);
   registerStudentMockRoutes(app);
