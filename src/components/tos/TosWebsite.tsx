@@ -169,7 +169,7 @@ export const WebsiteTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => 
         </select>
         {liveUrl ? (
           <a href={liveUrl} target="_blank" rel="noreferrer" className={`${btnGhost} min-h-[44px] inline-flex items-center gap-2`}>
-            <ExternalLink className="w-4 h-4" /> View live page
+            <ExternalLink className="w-4 h-4" /> View {centreName || "live"} page
           </a>
         ) : null}
       </div>

@@ -196,9 +196,15 @@ export const PublicLandingPage: React.FC<{ centreId: string }> = ({ centreId }) 
             </div>
           </div>
           <div className="plp-heroart">
-            <div className="plp-line" />
-            <div className="plp-line plp-short" />
-            <div className="plp-line" />
+            {c.hero.photoUrl ? (
+              <img className="plp-heroimg" src={c.hero.photoUrl} alt={data.centreName || 'Centre photo'} />
+            ) : (
+              <>
+                <div className="plp-line" />
+                <div className="plp-line plp-short" />
+                <div className="plp-line" />
+              </>
+            )}
             <div className="plp-badges">
               {c.hero.badges.map((b, i) => (
                 <span key={i} className="plp-badge">{b}</span>
