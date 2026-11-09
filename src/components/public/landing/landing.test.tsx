@@ -1,58 +1,61 @@
 import assert from 'node:assert/strict';
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import {
-  ALL_POINTS, BRAND_COLOURS, COACH_PROMPTS, COACH_REPLIES, brandDisplayName, brandInitials,
-} from './landingContent';
-import { PortalShowcase } from './PortalShowcase';
-import { AiSection } from './AiSection';
-import { PointList } from './PointList';
-import { BrandSection } from './BrandSection';
+import { TutorialOsLanding } from '../TutorialOsLanding';
 
 console.log('--- Running landing page tests ---');
+const html = renderToStaticMarkup(
+  <TutorialOsLanding
+    onAdminSignIn={() => undefined}
+    onStudentAccess={() => undefined}
+    onExplorePortals={() => undefined}
+  />,
+);
+const has = (...xs: string[]) => xs.forEach((x) => assert.ok(html.includes(x), `missing: ${x}`));
 
-// brandInitials / brandDisplayName
-assert.equal(brandInitials('Bright Minds Tutorial'), 'BM');
-assert.equal(brandInitials('  greenfield   tutorial centre '), 'GT');
-assert.equal(brandInitials('Excellence'), 'E');
-assert.equal(brandInitials(''), 'YC');
-assert.equal(brandInitials('   '), 'YC');
-assert.equal(brandDisplayName('  '), 'Your Centre');
-assert.equal(brandDisplayName(' Acme '), 'Acme');
-console.log('✓ brand helpers');
+// Structure and copy follow the design artboard (Main.dc.html).
+has(
+  'Run your whole tutorial centre from one place.',
+  'Try it live as',
+  'What you get',
+  'One system, three portals.',
+  'AI built in',
+  'Your name on everything.',
+  'Live in three steps.',
+  'Simple pricing, in naira.',
+  'Free for 14 days',
+  'Questions, answered.',
+  'Ready to run your centre on one system?',
+  '\u20A63,000',
+  '\u20A65,000',
+);
+console.log('✓ artboard sections and copy');
 
-// The honesty table: the expected status of every point. All are live (confirmed
-// by the product owner). To add a future feature, add it as 'soon'; the tag
-// mechanism is tested below.
-for (const pt of ALL_POINTS) assert.equal(pt.status, 'live', `${pt.id} is ${pt.status}; update this table if that is intended`);
-assert.equal(new Set(ALL_POINTS.map((p) => p.id)).size, ALL_POINTS.length, 'duplicate point ids');
-for (const pt of ALL_POINTS) assert.ok(!/\s{2,}|\.\.|—/.test(pt.text), `odd text in ${pt.id}`);
-console.log(`✓ ${ALL_POINTS.length} points, all live`);
+// The interactive hero preview, portals tabs, AI section, brand picker, estimator.
+has('Chemistry, 10:00 AM', 'Dashboard', 'Top performers this month', 'Bright Minds Tutorial', 'Estimate your monthly cost');
+console.log('✓ interactive previews render');
 
-// AI essay marking is internal only and must never be advertised.
-assert.ok(!ALL_POINTS.some((p) => /essay/i.test(p.text)), 'essay marking must not appear on the public page');
-assert.ok(!Object.values(COACH_REPLIES).some((r) => /essay/i.test(r)));
-assert.equal(COACH_PROMPTS.length, 3);
-assert.equal(BRAND_COLOURS.length, 4);
-console.log('✓ no essay-marking claim');
+// The real login entries kept from the previous landing page.
+has('Student sign in', 'Student &amp; tutor portals', 'Sign in instead');
+assert.ok(html.split('Sign in').length >= 3, 'Sign in must appear in the header and footer');
+console.log('✓ login entries retained');
 
-// Server render smoke tests: the sections render and carry the key content.
-const portals = renderToStaticMarkup(<PortalShowcase />);
-for (const s of ['One system,', 'Centre admins', 'Tutors', 'Students', 'Fees &amp; Payments', 'Top performers this month', 'Generate report sheet', 'Sample data', 'role="tablist"']) {
-  assert.ok(portals.includes(s), `PortalShowcase is missing: ${s}`);
-}
-assert.ok(!portals.includes('Coming soon'), 'no Coming soon tag when every point is live');
-const ai = renderToStaticMarkup(<AiSection onReserve={() => undefined} />);
-for (const s of ['Student study coach', 'What am I weak at?', 'What should I study next?', 'Challenge me', 'For students', 'For tutors', 'For admins', 'mole calculations', 'Centre Plus']) {
-  assert.ok(ai.includes(s), `AiSection is missing: ${s}`);
-}
-assert.ok(!ai.includes('Coming soon'), 'no Coming soon tag in the AI section');
-const brand = renderToStaticMarkup(<BrandSection />);
-for (const s of ['Your name on everything.', 'Bright Minds Tutorial', 'BM', 'Facebook', 'Instagram', 'TikTok', 'Enrol now', 'aria-label="Orange"']) {
-  assert.ok(brand.includes(s), `BrandSection is missing: ${s}`);
-}
-// The tag mechanism still works for a future 'soon' point.
-const tagged = renderToStaticMarkup(<PointList points={[{ id: 'x', text: 'A future feature', status: 'soon' }, { id: 'y', text: 'A live feature', status: 'live' }]} />);
-assert.equal((tagged.match(/Coming soon/g) || []).length, 1, 'only the soon point is tagged');
-console.log('✓ sections render with their key content; the tag mechanism still works');
-console.log('--- ALL LANDING TESTS PASSED SUCCESSFULLY ---');
+// The trial form fields from the artboard.
+has(
+  'Full name', 'Centre name', 'Email', 'Phone', 'State', 'City',
+  'How many students do you teach?', 'Request my free trial',
+);
+console.log('✓ trial form fields');
+
+// AI essay-marking must never appear on the public page.
+const dir = 'src/components/public';
+const scan = (d: string): string[] =>
+  readdirSync(d, { withFileTypes: true }).flatMap((e) => {
+    const p = join(d, e.name);
+    return e.isDirectory() ? scan(p) : e.name === 'landing.test.tsx' ? [] : /\.(tsx?|css)$/.test(e.name) ? [readFileSync(p, 'utf8')] : [];
+  });
+for (const src of scan(dir)) assert.ok(!/essay/i.test(src), 'essay marking must never appear on the public page');
+console.log('✓ no essay-marking wording anywhere in the public components');
+console.log('All landing tests passed.');

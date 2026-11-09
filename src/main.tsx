@@ -5,6 +5,8 @@ import { PublicLandingPage } from './components/landing/PublicLandingPage';
 import './index.css';
 import {registerSW} from 'virtual:pwa-register';
 import { installServerApiFetch } from './utils/serverApi';
+import './components/public/landing/design.css';
+
 
 // Register PWA service worker with auto-update
 const updateSW = registerSW({
