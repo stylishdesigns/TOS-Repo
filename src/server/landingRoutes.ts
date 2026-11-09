@@ -12,7 +12,7 @@ import { defaultLandingContent, isLandingContent, LandingContent } from "../land
  *   records, fee data, access codes or any private centre data.
  */
 export function registerLandingRoutes(app: express.Express): void {
-  app.get("/api/landing/:centreId", async (req, res) => {
+  app.get("/api/public/landing/:centreId", async (req, res) => {
     try {
       const centreId = String(req.params.centreId || "");
       if (!/^[a-zA-Z0-9_-]{3,64}$/.test(centreId)) {
@@ -57,7 +57,7 @@ export function registerLandingRoutes(app: express.Express): void {
       res.set("Cache-Control", "public, max-age=60");
       return res.json({ ok: true, published, centreName, content });
     } catch (err) {
-      console.error("[landing] GET /api/landing failed:", err);
+      console.error("[landing] GET /api/public/landing failed:", err);
       return res.status(500).json({ error: "Could not load this centre's website." });
     }
   });

@@ -38,7 +38,7 @@ export const PublicLandingPage: React.FC<{ centreId: string }> = ({ centreId }) 
 
   useEffect(() => {
     let alive = true;
-    fetch(`/api/landing/${encodeURIComponent(centreId)}`)
+    fetch(`/api/public/landing/${encodeURIComponent(centreId)}`)
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
       .then((j: ApiResult) => {
         if (alive) setData(j);
