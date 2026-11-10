@@ -1,19 +1,22 @@
 import { useEffect, useRef, useState } from 'react';
-import type { CSSProperties, ReactNode } from 'react';
+import type { CSSProperties, Key, ReactNode } from 'react';
 
-/* "One system, three portals" rebuilt as a scroll-driven sequence: the section
-   stage stays pinned (fixed dark background) while the three portal screens
-   slide in from the right, one after another (admins -> tutors -> students),
-   each held in place as you scroll. Honours prefers-reduced-motion by showing
-   the same screens stacked with no pinning or sliding. */
+/* "One system, three portals" as a scroll-driven sequence: the section stage
+   stays pinned (fixed dark background) while the three portal screens slide in
+   from the right, one after another (admins -> tutors -> students). Each
+   screen sits above its check list: the role title stays at the top, the
+   portal screen is the centrepiece, and the check text sits below it. The
+   tutor and student screens mirror the real portals' home screens. Honours
+   prefers-reduced-motion by showing the same screens stacked with no pinning
+   or sliding. */
 
 const TICK = 'M5 12l5 5 9-10';
 const AI_GLYPH = 'M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z';
 
-function Bullet({ children }: { children: ReactNode }) {
+function Bullet({ children }: { children: ReactNode; key?: Key }) {
   return (
     <div className="li">
-      <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style={{ flex: 'none', color: '#15803D' }}>
+      <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style={{ flex: 'none', color: '#FDBA74' }}>
         <path d={TICK} />
       </svg>
       {children}
@@ -26,6 +29,50 @@ function Tag() {
     <span className="tag">
       <svg width="11" height="11" viewBox="0 0 24 24" aria-hidden="true"><path d={AI_GLYPH} /></svg>AI
     </span>
+  );
+}
+
+/* Bottom bars: the student portal has the five-item nav with the centre orb;
+   the tutor portal has five flat items with no orb. */
+
+const TUTOR_NAV = [
+  { l: 'Home', d: 'M3 11l9-8 9 8v10H3z' },
+  { l: 'Classes', d: 'M3 5h18v16H3zM3 10h18M8 3v4M16 3v4' },
+  { l: 'Roll call', d: 'M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M2 21v-2a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v2M19 8v6M16 11h6' },
+  { l: 'Assess', d: 'M4 5h16v11H4zM2 20h20' },
+  { l: 'More', d: 'M5 12h14M12 5v14' },
+];
+const STUDENT_NAV = [
+  { l: 'Home', d: 'M3 11l9-8 9 8v10H3z' },
+  { l: 'Classes', d: 'M3 5h18v16H3zM3 10h18M8 3v4M16 3v4' },
+  { l: 'CBT', d: 'M4 5h16v11H4zM2 20h20' },
+  { l: 'Results', d: 'M5 20V10M12 20V4M19 20v-7' },
+];
+
+function Bar({ kind, active }: { kind: 'tutor' | 'student'; active?: string }) {
+  return (
+    <div className="pbar">
+      {kind === 'tutor' ? (
+        <>
+          {TUTOR_NAV.slice(0, 2).map((n) => (
+            <span key={n.l} className={'pnav' + (active === n.l ? ' on' : '')}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d={n.d} /></svg>{n.l}</span>
+          ))}
+          {TUTOR_NAV.slice(2).map((n) => (
+            <span key={n.l} className={'pnav' + (active === n.l ? ' on' : '')}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d={n.d} /></svg>{n.l}</span>
+          ))}
+        </>
+      ) : (
+        <>
+          {STUDENT_NAV.slice(0, 2).map((n) => (
+            <span key={n.l} className={'pnav' + (active === n.l ? ' on' : '')}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d={n.d} /></svg>{n.l}</span>
+          ))}
+          <span className="porb"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d={AI_GLYPH} /></svg></span>
+          {STUDENT_NAV.slice(2).map((n) => (
+            <span key={n.l} className={'pnav' + (active === n.l ? ' on' : '')}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d={n.d} /></svg>{n.l}</span>
+          ))}
+        </>
+      )}
+    </div>
   );
 }
 
@@ -82,41 +129,31 @@ function AdminScreen() {
   );
 }
 
-function DarkBar() {
-  return (
-    <div style={{ height: '60px', background: '#020617', display: 'flex', alignItems: 'center', justifyContent: 'space-around', padding: '0 14px', flex: 'none' }}>
-      <span style={{ width: '18px', height: '3px', borderRadius: '2px', background: '#475569' }} />
-      <span style={{ width: '18px', height: '3px', borderRadius: '2px', background: '#FB923C' }} />
-      <span style={{ width: '44px', height: '44px', borderRadius: '50%', background: '#C2410C', marginTop: '-20px', border: '4px solid #020617' }} />
-      <span style={{ width: '18px', height: '3px', borderRadius: '2px', background: '#475569' }} />
-      <span style={{ width: '18px', height: '3px', borderRadius: '2px', background: '#475569' }} />
-    </div>
-  );
-}
+/* Tutor portal home, matching the real screen: orange greeting card, stat
+   grid, Today's Classes. */
 
 function TutorScreen() {
   return (
-    <div className="ph">
-      <div style={{ padding: '18px 16px 14px' }}>
-        <span style={{ font: '500 12px Inter,sans-serif', color: '#475569' }}>Tutor</span>
-        <b style={{ font: '800 19px Inter,sans-serif', color: '#0F172A', display: 'block' }}>Today&apos;s classes</b>
-        <div className="pr2">
-          <span className="ti" style={{ background: '#DBEAFE', color: '#1E3A8A' }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l5 5v13H7z" /></svg>
-          </span>
-          <span>
-            <b style={{ font: '700 13px Inter,sans-serif', color: '#0F172A', display: 'block' }}>Chemistry, SS3</b>
-            <span style={{ font: '500 12px Inter,sans-serif', color: '#475569' }}>10:00 AM</span>
-          </span>
+    <div className="ph pphone">
+      <div className="pbd2">
+        <p className="pcentre">Bright Minds Tutorial</p>
+        <div className="phero">
+          <p className="pkick-o">Tutor portal</p>
+          <p className="phi-o">Hello, Mr Kale!</p>
+          <p className="pdate-o">Tuesday, 10 November</p>
         </div>
-        <div className="pr2">
-          <span className="ti" style={{ background: '#FFEDD5', color: '#9A3412' }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18" /></svg>
-          </span>
-          <span>
-            <b style={{ font: '700 13px Inter,sans-serif', color: '#0F172A', display: 'block' }}>Physics, SS2</b>
-            <span style={{ font: '500 12px Inter,sans-serif', color: '#475569' }}>2:00 PM</span>
-          </span>
+        <div className="pstatgrid">
+          <div className="pstcard d"><b>24</b><span>Total students</span></div>
+          <div className="pstcard w"><b>4.9</b><span>Tutor rating</span></div>
+        </div>
+        <div className="prow-h"><b>Today&apos;s Classes</b><span>Full timetable</span></div>
+        <div className="prow">
+          <b>Chemistry · SS2</b>
+          <span>10:00 AM · Room 2</span>
+        </div>
+        <div className="prow">
+          <b>Physics · SS2</b>
+          <span>2:00 PM · Room 1</span>
         </div>
         <div className="aic">
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Tag /></div>
@@ -124,41 +161,47 @@ function TutorScreen() {
           <button className="ab" type="button">Create practice questions</button>
         </div>
       </div>
-      <DarkBar />
+      <Bar kind="tutor" active="Home" />
     </div>
   );
 }
 
+/* Student portal home, matching the real screen: dark greeting card with the
+   avatar, orange continue-practice card, quick actions, and the five-item
+   bottom nav with the centre orb. */
+
 function StudentScreen() {
   return (
-    <div className="ph">
-      <div style={{ padding: '18px 16px 14px' }}>
-        <span style={{ font: '500 12px Inter,sans-serif', color: '#475569' }}>Your results</span>
-        <b style={{ font: '800 19px Inter,sans-serif', color: '#0F172A', display: 'block' }}>How you are doing</b>
-        <div className="pr2" style={{ display: 'block' }}>
-          {[
-            { s: 'Maths', w: '78%', c: '#15803D' },
-            { s: 'Chemistry', w: '46%', c: '#C2410C' },
-            { s: 'English', w: '84%', c: '#15803D' },
-          ].map((r) => (
-            <div key={r.s} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
-              <span style={{ font: '600 12px Inter,sans-serif', width: '70px' }}>{r.s}</span>
-              <span style={{ flex: '1', height: '8px', borderRadius: '4px', background: '#E2E8F0' }}>
-                <span style={{ display: 'block', width: r.w, height: '100%', borderRadius: '4px', background: r.c }} />
-              </span>
+    <div className="ph pphone">
+      <div className="pbd2">
+        <p className="pcentre">Bright Minds Tutorial</p>
+        <div className="pdhero">
+          <span className="pdavatar">E</span>
+          <div>
+            <p className="pdhello">Good afternoon</p>
+            <p className="pdbig">Welcome back</p>
+          </div>
+        </div>
+        <div className="pdcta">
+          <div><b>Continue practice</b><span>Chemistry · Mole calculations</span></div>
+          <span className="pdctabar"><span style={{ width: '62%' }} /></span>
+        </div>
+        <div className="pdgrid">
+          <div className="pdact"><b>Classes</b><span>Today: Chemistry</span></div>
+          <div className="pdact"><b>CBT practice</b><span>Try a question</span></div>
+        </div>
+        <div className="pdresults">
+          <b>Your results</b>
+          {[['Maths', '78%', '#15803D'], ['Chemistry', '46%', '#C2410C'], ['English', '84%', '#15803D']].map((r) => (
+            <div key={r[0]} className="pdrow">
+              <span>{r[0]}</span>
+              <span className="pdbar"><span style={{ width: r[1], background: r[2] }} /></span>
+              <i>{r[1]}</i>
             </div>
           ))}
         </div>
-        <div className="aic">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Tag />
-            <span style={{ font: '800 11px Inter,sans-serif', color: '#9A3412' }}>Study coach</span>
-          </div>
-          <p style={{ font: '600 13px/1.4 Inter,sans-serif', margin: '6px 0 0' }}>Weak topic: mole calculations. Ready for a short practice set?</p>
-          <button className="ab" type="button">Start practice</button>
-        </div>
       </div>
-      <DarkBar />
+      <Bar kind="student" active="Home" />
     </div>
   );
 }
@@ -238,17 +281,14 @@ export function PortalsSlide() {
         <div className="pcap" style={{ opacity: staticMode ? 1 : active === 0 ? 1 : 0 }}>
           <p className="pkick">{PANELS[0].kicker}</p>
           <h3 className="ptitle">{PANELS[0].title}</h3>
-          <div className="pbl">{PANELS[0].bullets.map((b) => <Bullet>{b}</Bullet>)}</div>
         </div>
         <div className="pcap" style={{ opacity: staticMode ? 0 : active === 1 ? 1 : 0 }}>
           <p className="pkick">{PANELS[1].kicker}</p>
           <h3 className="ptitle">{PANELS[1].title}</h3>
-          <div className="pbl">{PANELS[1].bullets.map((b) => <Bullet>{b}</Bullet>)}</div>
         </div>
         <div className="pcap" style={{ opacity: staticMode ? 0 : active === 2 ? 1 : 0 }}>
           <p className="pkick">{PANELS[2].kicker}</p>
           <h3 className="ptitle">{PANELS[2].title}</h3>
-          <div className="pbl">{PANELS[2].bullets.map((b) => <Bullet>{b}</Bullet>)}</div>
         </div>
         <div className="pfilm">
           {PANELS.map((p, i) => {
@@ -262,7 +302,9 @@ export function PortalsSlide() {
             return (
               <div key={p.k} className={'ppanel p' + p.k} style={st}>
                 {p.screen}
-                <p style={{ font: '500 12px Inter,sans-serif', color: '#94A3B8', margin: '12px 0 0', textAlign: 'center' }}>Sample data</p>
+                <div className={'pbl punder' + (staticMode || active === i ? ' show' : '')}>
+                  {p.bullets.map((b) => <Bullet key={b}>{b}</Bullet>)}
+                </div>
               </div>
             );
           })}
