@@ -2,6 +2,7 @@ import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import { PublicLandingPage } from './components/landing/PublicLandingPage';
+import { AppInstallPage } from './components/public/AppInstallPage';
 import './index.css';
 import {registerSW} from 'virtual:pwa-register';
 import { installServerApiFetch } from './utils/serverApi';
@@ -51,8 +52,17 @@ try {
 // public website for anonymous visitors, outside the app shell entirely.
 const landingMatch = window.location.pathname.match(/^\/c\/([A-Za-z0-9_-]{3,64})\/?$/);
 
+// Dedicated install page for the welcome email's "Download the app" button.
+const appInstallMatch = window.location.pathname.match(/^\/app\/?$/);
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    {landingMatch ? <PublicLandingPage centreId={landingMatch[1]} /> : <App />}
+    {landingMatch ? (
+    <PublicLandingPage centreId={landingMatch[1]} />
+  ) : appInstallMatch ? (
+    <AppInstallPage />
+  ) : (
+    <App />
+  )}
   </StrictMode>,
 );
