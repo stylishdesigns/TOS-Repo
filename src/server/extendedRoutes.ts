@@ -191,6 +191,67 @@ export function registerExtendedRoutes(app: express.Express): void {
   });
 
   // ==========================================================================
+  // PUBLIC: self-serve trial. "Start my free trial" provisions the centre and
+  // its owner on the spot and emails the welcome pack (access code, temporary
+  // password, the centre's own sign-in link). No email-verification hop: the
+  // credentials themselves are the verification, and a mistyped address
+  // simply receives nothing. The same one-trial-per-person duplicate check
+  // that provisioning applies keeps this endpoint from being farmed.
+  // ==========================================================================
+  app.post('/api/public/trial', async (req, res) => {
+    try {
+      const ip = clientIp(req);
+      if (!(await countRateLimit(`ip-${ip.replace(/\W/g, '')}`, 20, 60 * 60 * 1000))) {
+        return res.status(429).json({ error: 'Too many requests. Please try again later.' });
+      }
+      const checked = validateLeadBody(req.body);
+      if (typeof checked === 'string') return res.status(400).json({ error: checked });
+      if (!(await verifyCaptcha(req.body.captchaToken))) {
+        return res.status(400).json({ error: 'Captcha verification failed. Please try again.' });
+      }
+      if (!(await countRateLimit(`email-${checked.email.replace(/\W/g, '')}`, 5, 60 * 60 * 1000))) {
+        return res.status(429).json({ error: 'Too many requests for this email. Please try again later.' });
+      }
+      const result = await provisionCentre({
+        fullName: checked.fullName,
+        businessName: checked.businessName,
+        email: checked.email,
+        phone: checked.phone,
+        studentCount: Number(checked.studentCount),
+        state: checked.state,
+        city: checked.city,
+        examTypes: Array.isArray(checked.examTypes) ? checked.examTypes.filter(Boolean) : [],
+        skipTrial: checked.skipTrial === true,
+        source: 'lead',
+        actorUid: 'public:trial-form',
+        appBaseUrl: baseUrl(req),
+      });
+      await adminDb.collection('leads').add({
+        ...checked,
+        status: 'trial_started',
+        centreId: result.centreId,
+        welcomeDelivered: result.welcomeDelivered,
+        createdAt: new Date().toISOString(),
+      });
+      await audit({
+        actorUid: 'public:trial-form',
+        action: 'TRIAL_STARTED',
+        after: {
+          centreId: result.centreId,
+          email: checked.email,
+          businessName: checked.businessName,
+          welcomeDelivered: result.welcomeDelivered,
+        },
+      });
+      res.json({ success: true, emailDelivered: result.welcomeDelivered });
+    } catch (error: any) {
+      if (error?.status) return res.status(error.status).json({ error: error.message });
+      console.error('[trial] start failed:', error?.message || error);
+      res.status(500).json({ error: 'Could not start your trial. Please try again.' });
+    }
+  });
+
+  // ==========================================================================
   // PUBLIC: centre lookup by access code. The code is a centre selector, not
   // a secret: it reveals only the centre's own name before sign-in, and
   // sign-in plus membership still gate every piece of centre data.

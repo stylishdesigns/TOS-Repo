@@ -1,4 +1,5 @@
 import * as crypto from 'crypto';
+import { renderWelcomeTemplate } from './welcomeTemplate';
 import { adminAuth, adminDb } from './firebaseAdmin';
 import {
   effectiveStatus,
@@ -78,7 +79,7 @@ export async function createAccessCode(centreId: string): Promise<string> {
 }
 
 export async function provisionCentre(
-  params: ProvisionLead & { source: 'lead' | 'tos'; actorUid: string; planId?: string; tempPassword?: string }
+  params: ProvisionLead & { source: 'lead' | 'tos'; actorUid: string; planId?: string; tempPassword?: string; appBaseUrl?: string }
 ): Promise<ProvisionResult> {
   const email = normalizeEmail(params.email);
   const phone = normalizePhone(params.phone);
@@ -220,18 +221,19 @@ export async function provisionCentre(
   const accessCode = await createAccessCode(centreId);
   await centreRef.update({ accessCode });
 
-  const appUrl = (process.env.APP_URL || '').replace(/\/+$/, '');
-  const emailRes = await sendEmail(
-    buildWelcomeEmail({
-      to: email,
-      fullName,
-      centreName: businessName,
-      loginEmail: email,
-      tempPassword,
-      accessCode,
-      appUrl,
-    })
-  );
+  // The welcome email is the user's ZeptoMail template (welcomeTemplate.ts):
+  // access code, temporary password, the centre's own sign-in link, the app
+  // install link and the WhatsApp community group.
+  const appBase = (params.appBaseUrl || process.env.APP_URL || 'https://tutorialos.com').replace(/\/+$/, '');
+  const welcome = renderWelcomeTemplate({
+    fullName,
+    centreName: businessName,
+    accessCode,
+    loginEmail: email,
+    tempPassword: tempPassword || '',
+    signInUrl: `${appBase}/c/${centreId}`,
+  });
+  const emailRes = await sendEmail({ to: email, subject: welcome.subject, html: welcome.html, text: welcome.text });
   const credentialsNotDelivered = !!tempPassword && !emailRes.delivered;
   if (credentialsNotDelivered) {
     await centreRef.update({ credentialsNotDelivered: true });

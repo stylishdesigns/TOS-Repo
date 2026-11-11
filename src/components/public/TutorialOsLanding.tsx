@@ -317,7 +317,7 @@ export const TutorialOsLanding: React.FC<{
     setSending(true);
     try {
       const hpEl = document.getElementById('hp-website') as HTMLInputElement | null;
-      const res = await fetch('/api/public/leads', {
+      const res = await fetch('/api/public/trial', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

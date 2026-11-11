@@ -20,15 +20,71 @@ export interface OutgoingEmail {
 
 export interface SendEmailResult {
   delivered: boolean;
-  provider: 'resend' | 'none';
+  provider: 'resend' | 'zeptomail' | 'none';
   error?: string;
 }
 
 export function emailProviderConfigured(): boolean {
-  return !!process.env.RESEND_API_KEY;
+  return !!(process.env.ZEPTOMAIL_API || process.env.RESEND_API_KEY);
+}
+
+// ZeptoMail (Zoho) transactional sending. Credentials come from Netlify env:
+//   ZEPTOMAIL_API          - the mail agent's Send Mail token
+//   ZEPTOMAIL_AGENT_ALIAS  - the verified sender address when it holds one
+//   ZEPTOMAIL_HOST         - API base URL when it holds one (otherwise the
+//                            default https://api.zeptomail.com)
+// Values are never logged.
+function zeptoFromAddress(): string {
+  const alias = (process.env.ZEPTOMAIL_AGENT_ALIAS || '').trim();
+  if (alias.includes('@')) return alias;
+  const from = (process.env.EMAIL_FROM || '').trim();
+  const m = from.match(/<([^>]+)>/);
+  const addr = (m ? m[1] : from).trim();
+  if (addr.includes('@') && !addr.includes('resend.dev')) return addr;
+  return 'noreply@tutorialos.com';
+}
+
+async function sendViaZepto(email: OutgoingEmail): Promise<SendEmailResult> {
+  const token = process.env.ZEPTOMAIL_API;
+  if (!token) return { delivered: false, provider: 'zeptomail', error: 'not configured' };
+  const host = (process.env.ZEPTOMAIL_HOST || '').trim();
+  const base = /^https?:\/\//.test(host) ? host.replace(/\/+$/, '') : 'https://api.zeptomail.com';
+  const from = zeptoFromAddress();
+  const domain = (from.split('@')[1] || 'tutorialos.com').trim();
+  const bounce = host.includes('@') ? host : `bounce@${domain}`;
+  try {
+    const res = await fetch(`${base}/v1.1/email`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Zoho-enczapikey ${token}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({
+        bounce_address: bounce,
+        from: { address: from, name: 'Tutorial OS' },
+        to: [{ email_address: { address: email.to } }],
+        subject: email.subject,
+        htmlbody: email.html,
+        textbody: email.text,
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      // ZeptoMail rejection reasons (unverified sender, bad bounce address) are
+      // operational detail worth logging; the token never appears in responses.
+      console.error('[email] zeptomail rejected the message:', res.status, body.slice(0, 300));
+      return { delivered: false, provider: 'zeptomail', error: `provider status ${res.status}` };
+    }
+    return { delivered: true, provider: 'zeptomail' };
+  } catch (err: any) {
+    console.error('[email] zeptomail send failed:', err?.message || err);
+    return { delivered: false, provider: 'zeptomail', error: 'network error' };
+  }
 }
 
 export async function sendEmail(email: OutgoingEmail): Promise<SendEmailResult> {
+  if (process.env.ZEPTOMAIL_API) return sendViaZepto(email);
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.EMAIL_FROM || 'Tutorial OS <onboarding@resend.dev>';
 
