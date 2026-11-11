@@ -268,7 +268,7 @@ export function PortalsSlide() {
         const p = Math.min(1, Math.max(0, -r.top / total));
         setT(Math.min(2, Math.max(0, (p - 1 / 6) * 3)));
         const filmH = film.current ? film.current.clientHeight : 730;
-        setFitP(Math.min(1, filmH / 750, (vw * (vw < 900 ? 0.92 : 1)) / 380));
+        setFitP(Math.min(1, filmH / 740, (vw * (vw < 900 ? 0.92 : 1)) / 380));
         setFitA(Math.min(1, filmH / 640, (Math.min(vw, 1120) * 0.94) / 760));
       });
     };
