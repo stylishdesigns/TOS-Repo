@@ -67,7 +67,7 @@
 .pcap .pbl{display:flex;flex-wrap:wrap;gap:8px 20px;justify-content:center;margin-top:14px}
 .pcap .li{color:#CBD5E1;font:500 13px/1.4 Inter,sans-serif;background:rgba(15,23,42,.72);border:1px solid #1E293B;border-radius:10px;padding:8px 12px}
 .pcap .li svg{color:#4ADE80}
-.pfilm{position:relative;z-index:1;height:min(680px,calc(100vh - 250px));margin-top:10px}
+.pfilm{position:relative;z-index:1;height:min(734px,calc(100vh - 150px));margin-top:8px}
 .ppanel{position:absolute;top:50%;left:50%;text-align:center}
 .ppanel.padmin{width:760px}
 .ppanel .shot,.ppanel .ph{margin:0 auto}
@@ -160,16 +160,16 @@
 .pdbar{flex:1;height:7px;border-radius:4px;background:#E2E8F0;overflow:hidden}
 .pdbar span{display:block;height:100%;border-radius:4px}
 .pdrow i{font:700 10px Inter,sans-serif;color:#475569;font-style:normal}
-.punder{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin:18px auto 0;max-width:600px;opacity:0;transition:opacity .3s ease;position:relative;z-index:2}
+.punder{display:grid;grid-template-columns:repeat(2,auto);gap:8px 12px;justify-content:center;margin:18px auto 0;max-width:660px;opacity:0;transition:opacity .3s ease;position:relative;z-index:2}
 .punder.show{opacity:1}
-.punder .li{color:#E2E8F0;font:800 16px/1.35 Inter,sans-serif;background:rgba(15,23,42,.78);border:1px solid #334155;border-radius:12px;padding:12px 16px;text-align:left;align-items:center}
+.punder .li{color:#E2E8F0;font:800 15px/1.3 Inter,sans-serif;background:rgba(15,23,42,.78);border:1px solid #334155;border-radius:12px;padding:9px 14px;text-align:left;align-items:center}
 .punder .li svg{width:20px;height:20px}
 .punder .li svg{color:#FDBA74}
 @media(max-width:899px){
-  .pfilm{height:min(680px,calc(100vh - 190px))}
+  .pfilm{height:min(734px,calc(100vh - 170px))}
   .pcaps{height:58px}
-  .punder{gap:8px;max-width:92vw}
-  .punder .li{font-size:14px;padding:10px 13px}
+  .punder{max-width:92vw;gap:7px 10px}
+  .punder .li{font-size:14px;padding:9px 12px}
   .pphone{height:540px}
 }
 
@@ -207,7 +207,7 @@
 @media(prefers-reduced-motion:reduce){.aiub,.aiab,.airole{animation:none}}
 
 /* Portals: scroll hint and admin extra rows */
-.pbottom{display:flex;flex-direction:column;align-items:center;gap:8px;flex:none;padding:12px 0 16px;position:relative;z-index:3}
+.pbottom{display:flex;flex-direction:column;align-items:center;gap:6px;flex:none;padding:8px 0 12px;position:relative;z-index:3}
 .phint{display:inline-flex;align-items:center;gap:7px;font:800 12px Inter,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#FDBA74;margin:0}
 .phchev{animation:phb 1.4s ease infinite}
 @keyframes phb{0%,100%{transform:translateY(0)}50%{transform:translateY(4px)}}

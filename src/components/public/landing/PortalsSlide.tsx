@@ -249,7 +249,8 @@ export function PortalsSlide() {
   const wrap = useRef<HTMLDivElement>(null);
   const film = useRef<HTMLDivElement>(null);
   const [t, setT] = useState(0);
-  const [fit, setFit] = useState(1);
+  const [fitP, setFitP] = useState(1);
+  const [fitA, setFitA] = useState(1);
   const [staticMode, setStaticMode] = useState(false);
 
   useEffect(() => {
@@ -266,8 +267,9 @@ export function PortalsSlide() {
         const total = Math.max(1, r.height - window.innerHeight);
         const p = Math.min(1, Math.max(0, -r.top / total));
         setT(Math.min(2, Math.max(0, (p - 1 / 6) * 3)));
-        const filmH = film.current ? film.current.clientHeight : 680;
-        setFit(Math.min(1, (Math.min(vw, 1120) * (vw < 900 ? 0.96 : 0.94)) / 760, filmH / 680));
+        const filmH = film.current ? film.current.clientHeight : 730;
+        setFitP(Math.min(1, filmH / 750, (vw * (vw < 900 ? 0.92 : 1)) / 380));
+        setFitA(Math.min(1, filmH / 640, (Math.min(vw, 1120) * 0.94) / 760));
       });
     };
     measure();
@@ -306,7 +308,7 @@ export function PortalsSlide() {
             const st: CSSProperties = staticMode
               ? { width: p.w === 760 ? 'min(760px,94vw)' : 'min(380px,88vw)' }
               : {
-                  transform: `translate(calc(-50% + ${(d * 105).toFixed(2)}vw), -50%) rotate(${(d * -2.2).toFixed(2)}deg) scale(${(fit * (p.w === 760 ? 1 : Math.min(1, 1.02)) * (1 - Math.min(0.08, Math.abs(d) * 0.08))).toFixed(3)})`,
+                  transform: `translate(calc(-50% + ${(d * 105).toFixed(2)}vw), -50%) rotate(${(d * -2.2).toFixed(2)}deg) scale(${((p.w === 760 ? fitA : fitP) * (1 - Math.min(0.08, Math.abs(d) * 0.08))).toFixed(3)})`,
                   zIndex: String(10 - Math.round(Math.abs(d) * 10)),
                 };
             return (
