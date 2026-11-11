@@ -33,6 +33,9 @@ export function emailProviderConfigured(): boolean {
 //   ZEPTOMAIL_AGENT_ALIAS  - the verified sender address when it holds one
 //   ZEPTOMAIL_HOST         - API base URL when it holds one (otherwise the
 //                            default https://api.zeptomail.com)
+//   ZEPTOMAIL_BOUNCE       - the bounce address ZeptoMail created for the mail
+//                            agent (required: an unregistered bounce address
+//                            makes ZeptoMail answer 500 with an empty body)
 // Values are never logged.
 function zeptoFromAddress(): string {
   const alias = (process.env.ZEPTOMAIL_AGENT_ALIAS || '').trim();
@@ -45,13 +48,15 @@ function zeptoFromAddress(): string {
 }
 
 async function sendViaZepto(email: OutgoingEmail): Promise<SendEmailResult> {
-  const token = process.env.ZEPTOMAIL_API;
+  const token = (process.env.ZEPTOMAIL_API || '').trim();
   if (!token) return { delivered: false, provider: 'zeptomail', error: 'not configured' };
   const host = (process.env.ZEPTOMAIL_HOST || '').trim();
   const base = /^https?:\/\//.test(host) ? host.replace(/\/+$/, '') : 'https://api.zeptomail.com';
   const from = zeptoFromAddress();
   const domain = (from.split('@')[1] || 'tutorialos.com').trim();
-  const bounce = host.includes('@') ? host : `bounce@${domain}`;
+  const bounce =
+    (process.env.ZEPTOMAIL_BOUNCE || '').trim() ||
+    (host.includes('@') ? host : `bounce@${domain}`);
   try {
     const res = await fetch(`${base}/v1.1/email`, {
       method: 'POST',
@@ -73,7 +78,9 @@ async function sendViaZepto(email: OutgoingEmail): Promise<SendEmailResult> {
       const body = await res.text();
       // ZeptoMail rejection reasons (unverified sender, bad bounce address) are
       // operational detail worth logging; the token never appears in responses.
-      console.error('[email] zeptomail rejected the message:', res.status, body.slice(0, 300));
+      // from/bounce are addresses, not secrets; they pinpoint which side of
+      // the send ZeptoMail refused.
+      console.error('[email] zeptomail rejected the message:', res.status, 'from', from, 'bounce', bounce, body.slice(0, 300));
       return { delivered: false, provider: 'zeptomail', error: `provider status ${res.status}` };
     }
     return { delivered: true, provider: 'zeptomail' };
