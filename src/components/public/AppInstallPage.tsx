@@ -67,7 +67,7 @@ export function AppInstallPage() {
         </div>
       </header>
 
-      <section className="hero" style={{padding:'56px 0 64px'}}>
+      <section className="hero dk" style={{padding:'56px 0 64px'}}>
         <div style={{maxWidth:560, margin:'0 auto', textAlign:'center'}}>
           <span className="pill" style={{marginBottom:18}}>Tutorial OS community</span>
           <h1 className="hx" style={{fontSize:'clamp(32px,6vw,46px)'}}>Get the Tutorial OS app</h1>
