@@ -16,7 +16,7 @@ const AI_GLYPH = 'M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z';
 function Bullet({ children }: { children: ReactNode; key?: Key }) {
   return (
     <div className="li">
-      <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style={{ flex: 'none', color: '#FDBA74' }}>
+      <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" style={{ flex: 'none', color: '#FDBA74' }}>
         <path d={TICK} />
       </svg>
       {children}
@@ -96,7 +96,7 @@ function AdminScreen() {
           <span>Fees &amp; Payments</span>
           <span>Chat</span>
         </div>
-        <div style={{ flex: '1', padding: '16px', background: '#F8FAFC', minWidth: '0' }}>
+        <div style={{ flex: '1', padding: '16px', background: '#F8FAFC', minWidth: '0', minHeight: '440px' }}>
           <b style={{ font: '800 17px Inter,sans-serif', color: '#0F172A', display: 'block' }}>Dashboard</b>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '8px', marginTop: '10px' }}>
             <div className="stt"><b>248</b><span>Students</span></div>
@@ -122,6 +122,12 @@ function AdminScreen() {
               </div>
             ))}
             <button className="ab" type="button">Generate report sheet</button>
+          </div>
+          <b style={{ font: '800 12px Inter,sans-serif', color: '#334155', display: 'block', margin: '14px 0 0', textTransform: 'uppercase', letterSpacing: '.06em' }}>Recent payments</b>
+          <div style={{ display: 'grid', gap: '6px', marginTop: '8px' }}>
+            <div className="prrow"><span>+ ₦25,000 · Ade B.</span><i>Today, 9:14 AM</i></div>
+            <div className="prrow"><span>+ ₦40,000 · Fatima O.</span><i>Yesterday</i></div>
+            <div className="prrow"><span>Fee reminder sent · Tunde K.</span><i>Yesterday</i></div>
           </div>
         </div>
       </div>
@@ -241,6 +247,7 @@ const PANELS: Array<{ k: string; kicker: string; title: string; bullets: string[
 
 export function PortalsSlide() {
   const wrap = useRef<HTMLDivElement>(null);
+  const film = useRef<HTMLDivElement>(null);
   const [t, setT] = useState(0);
   const [fit, setFit] = useState(1);
   const [staticMode, setStaticMode] = useState(false);
@@ -259,7 +266,8 @@ export function PortalsSlide() {
         const total = Math.max(1, r.height - window.innerHeight);
         const p = Math.min(1, Math.max(0, -r.top / total));
         setT(Math.min(2, Math.max(0, (p - 1 / 6) * 3)));
-        setFit(Math.min(1, (Math.min(vw, 1120) * (vw < 900 ? 0.96 : 0.94)) / 760));
+        const filmH = film.current ? film.current.clientHeight : 680;
+        setFit(Math.min(1, (Math.min(vw, 1120) * (vw < 900 ? 0.96 : 0.94)) / 760, filmH / 680));
       });
     };
     measure();
@@ -278,6 +286,7 @@ export function PortalsSlide() {
     <div className={'pwrap' + (staticMode ? ' pstatic' : '')} ref={wrap}>
       <div className="pstage">
         <div className="pglow" aria-hidden="true" />
+        <div className="pcaps">
         <div className="pcap" style={{ opacity: staticMode ? 1 : active === 0 ? 1 : 0 }}>
           <p className="pkick">{PANELS[0].kicker}</p>
           <h3 className="ptitle">{PANELS[0].title}</h3>
@@ -290,11 +299,12 @@ export function PortalsSlide() {
           <p className="pkick">{PANELS[2].kicker}</p>
           <h3 className="ptitle">{PANELS[2].title}</h3>
         </div>
-        <div className="pfilm">
+        </div>
+        <div className="pfilm" ref={film}>
           {PANELS.map((p, i) => {
             const d = staticMode ? 0 : i - t;
             const st: CSSProperties = staticMode
-              ? { width: p.w === 760 ? 'min(760px,94vw)' : 'min(320px,86vw)' }
+              ? { width: p.w === 760 ? 'min(760px,94vw)' : 'min(380px,88vw)' }
               : {
                   transform: `translate(calc(-50% + ${(d * 105).toFixed(2)}vw), -50%) rotate(${(d * -2.2).toFixed(2)}deg) scale(${(fit * (p.w === 760 ? 1 : Math.min(1, 1.02)) * (1 - Math.min(0.08, Math.abs(d) * 0.08))).toFixed(3)})`,
                   zIndex: String(10 - Math.round(Math.abs(d) * 10)),
@@ -309,8 +319,15 @@ export function PortalsSlide() {
             );
           })}
         </div>
-        <div className="pdots" aria-hidden="true">
-          {PANELS.map((p, i) => <span key={p.k} className={i === active ? 'on' : ''} />)}
+        <div className="pbottom">
+          <div className="pdots" aria-hidden="true">
+            {PANELS.map((p, i) => <span key={p.k} className={i === active ? 'on' : ''} />)}
+          </div>
+          {!staticMode && (
+            <p className="phint">Keep scrolling · {active + 1} of 3
+              <svg className="phchev" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
+            </p>
+          )}
         </div>
       </div>
     </div>
