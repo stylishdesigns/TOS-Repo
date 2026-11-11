@@ -28,25 +28,32 @@ has(
   'Free for 14 days',
   'Questions, answered.',
   'Ready to run your centre on one system?',
-  '\u20A63,000',
-  '\u20A65,000',
+  '\u20A62,000',
+  '\u20A63,500',
 );
+assert.ok(html.includes('Check your email'), 'automated flow step 2');
+assert.ok(html.includes('Set up and invite'), 'automated flow step 3');
+assert.ok(!html.includes('Our team reviews your request'), 'no manual setup copy');
 console.log('✓ artboard sections and copy');
 
 // The interactive hero preview, portals tabs, AI section, brand picker, estimator.
-has('Chemistry, 10:00 AM', 'Dashboard', 'Top performers this month', 'Bright Minds Tutorial', 'Estimate your monthly cost');
+has('Chemistry, 10:00 AM', 'Dashboard', 'Top performers this month', 'Bright Minds Tutorial');
+assert.ok(!html.includes('Estimate your monthly cost'), 'cost estimator must be gone');
 console.log('✓ interactive previews render');
 
-// The real login entries kept from the previous landing page.
-has('Student sign in', 'Student &amp; tutor portals', 'Sign in instead');
-assert.ok(html.split('Sign in').length >= 3, 'Sign in must appear in the header and footer');
-console.log('✓ login entries retained');
+// No sign-in or sign-up buttons anywhere on the landing page.
+has('Student &amp; tutor portals');
+assert.ok(!html.includes('Sign in'), 'no Sign in button may appear');
+assert.ok(!html.includes('Student sign in'), 'no Student sign in button may appear');
+assert.ok(!html.includes('Sign in instead'), 'no Sign in instead link may appear');
+console.log('✓ no sign-in or sign-up buttons');
 
 // The trial form fields from the artboard.
 has(
   'Full name', 'Centre name', 'Email', 'Phone', 'State', 'City',
-  'How many students do you teach?', 'Request my free trial',
+  'How many students do you teach?', 'Start my free trial',
 );
+assert.ok(html.includes('Request a 20% discount'), 'discount request checkbox must be present');
 console.log('✓ trial form fields');
 
 // AI essay-marking must never appear on the public page.

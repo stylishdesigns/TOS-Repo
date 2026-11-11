@@ -216,3 +216,6 @@
 .prrow i{font:600 11px Inter,sans-serif;color:#94A3B8;font-style:normal;white-space:nowrap}
 .pstatic .pbottom{padding:8px 0}
 @media(prefers-reduced-motion:reduce){.phchev{animation:none}}
+
+.btt{width:44px;height:44px;border-radius:50%;border:1px solid #334155;background:#0F172A;color:#FDBA74;display:inline-flex;align-items:center;justify-content:center;flex:none}.btt:hover{border-color:#EA580C;color:#FB923C}
+html{scroll-behavior:smooth}
