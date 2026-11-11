@@ -68,7 +68,7 @@ export function AppInstallPage() {
       </header>
 
       <section className="hero dk" style={{padding:'56px 0 64px'}}>
-        <div style={{maxWidth:560, margin:'0 auto', textAlign:'center'}}>
+        <div style={{maxWidth:560, margin:'0 auto', textAlign:'center', padding:'0 24px'}}>
           <span className="pill" style={{marginBottom:18}}>Tutorial OS community</span>
           <h1 className="hx" style={{fontSize:'clamp(32px,6vw,46px)'}}>Get the Tutorial OS app</h1>
           <p className="sub" style={{margin:'0 auto 30px'}}>
@@ -77,17 +77,17 @@ export function AppInstallPage() {
           </p>
 
           {installed ? (
-            <div className="cd" style={{padding:24}}>
+            <div className="cd" style={{padding:24, color:'#0F172A'}}>
               <h3 style={{fontSize:20, marginBottom:6}}>You already have the app</h3>
               <p style={{fontSize:15, color:'#475569'}}>Tutorial OS is installed. Open it from your home screen or app list and sign in with the details from your welcome email.</p>
             </div>
           ) : justInstalled ? (
-            <div className="cd" style={{padding:24}}>
+            <div className="cd" style={{padding:24, color:'#0F172A'}}>
               <h3 style={{fontSize:20, marginBottom:6}}>All set</h3>
               <p style={{fontSize:15, color:'#475569'}}>Tutorial OS is now on your home screen. Open it and sign in with the details from your welcome email.</p>
             </div>
           ) : ios ? (
-            <div className="cd" style={{padding:24, textAlign:'left'}}>
+            <div className="cd" style={{padding:24, textAlign:'left', color:'#0F172A'}}>
               <h3 style={{fontSize:20, marginBottom:14}}>Add it to your Home Screen</h3>
               <ol style={{margin:0, paddingLeft:20, display:'grid', gap:12}}>
                 <li style={{fontSize:15, lineHeight:1.5}}>Tap the <strong>Share</strong> button at the bottom of Safari.</li>
@@ -102,7 +102,7 @@ export function AppInstallPage() {
                   Install the app
                 </button>
               ) : mobile ? (
-                <div className="cd" style={{padding:24, textAlign:'left'}}>
+                <div className="cd" style={{padding:24, textAlign:'left', color:'#0F172A'}}>
                   <h3 style={{fontSize:20, marginBottom:14}}>Add it to your Home Screen</h3>
                   <ol style={{margin:0, paddingLeft:20, display:'grid', gap:12}}>
                     <li style={{fontSize:15, lineHeight:1.5}}>Tap the <strong>menu</strong> button (three dots) at the top of your browser.</li>
@@ -110,13 +110,13 @@ export function AppInstallPage() {
                   </ol>
                 </div>
               ) : (
-                <div className="cd" style={{padding:24}}>
+                <div className="cd" style={{padding:24, color:'#0F172A'}}>
                   <h3 style={{fontSize:20, marginBottom:6}}>On a computer?</h3>
                   <p style={{fontSize:15, color:'#475569', marginBottom:18}}>Tutorial OS runs right in your browser, and you can install it from the address bar too. On your phone it is even better.</p>
                   <a className="btn pr" style={{minWidth:220, minHeight:52, fontSize:15}} href="/">Open Tutorial OS</a>
                 </div>
               )}
-              <p style={{fontSize:13, color:'#64748B'}}>Free during your 14-day trial.</p>
+              <p style={{fontSize:13, color:'#94A3B8'}}>Free during your 14-day trial.</p>
             </div>
           )}
         </div>
