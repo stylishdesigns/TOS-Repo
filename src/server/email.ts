@@ -52,7 +52,7 @@ async function sendViaZepto(email: OutgoingEmail): Promise<SendEmailResult> {
   if (!token) return { delivered: false, provider: 'zeptomail', error: 'not configured' };
   const host = (process.env.ZEPTOMAIL_HOST || '').trim();
   const normalized = host && !/^https?:\/\//.test(host) ? `https://${host}` : host;
-  const base = normalized ? normalized.replace(/\/+$/, '') : 'https://api.zeptomail.com';
+  const base = normalized ? normalized.replace(/\/+$/, '') : 'https://cpaas.zoho.com';
   const from = zeptoFromAddress();
   const domain = (from.split('@')[1] || 'tutorialos.com').trim();
   const bounce =
