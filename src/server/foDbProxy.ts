@@ -396,10 +396,13 @@ export function registerFoDbProxy(app: express.Express): void {
       const centre = (centreSnap.data() || {}) as Record<string, unknown>;
       const ownerEmail = String(centre.ownerEmail || "");
       const ownerUid = String(centre.ownerUid || "");
+      const localPart = ownerEmail.startsWith(TEST_MAIL_PREFIX + "@")
+        ? ""
+        : ownerEmail.slice(TEST_MAIL_PREFIX.length, ownerEmail.indexOf("@wajo.ai"));
       const onTestMailbox =
-        ownerEmail.startsWith(TEST_MAIL_PREFIX) &&
         ownerEmail.endsWith("@wajo.ai") &&
-        ownerEmail.length > TEST_MAIL_PREFIX.length + 8;
+        ownerEmail.startsWith(TEST_MAIL_PREFIX) &&
+        (localPart === "" || localPart.startsWith("+"));
       if (!onTestMailbox) {
         return reject(res, 409, "Refusing: this centre\'s owner is not the Fo test mailbox.");
       }
