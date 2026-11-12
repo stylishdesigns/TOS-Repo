@@ -33,9 +33,9 @@ export function emailProviderConfigured(): boolean {
 //   ZEPTOMAIL_AGENT_ALIAS  - the verified sender address when it holds one
 //   ZEPTOMAIL_HOST         - API base URL when it holds one (otherwise the
 //                            default https://api.zeptomail.com)
-//   ZEPTOMAIL_BOUNCE       - the bounce address ZeptoMail created for the mail
-//                            agent (required: an unregistered bounce address
-//                            makes ZeptoMail answer 500 with an empty body)
+//   ZEPTOMAIL_BOUNCE       - optional: a verified bounce address under the
+//                            agent's domain; when unset the field is omitted
+//                            and Zoho uses the account's bounce address
 // Values are never logged.
 function zeptoFromAddress(): string {
   const alias = (process.env.ZEPTOMAIL_AGENT_ALIAS || '').trim();
@@ -51,12 +51,13 @@ async function sendViaZepto(email: OutgoingEmail): Promise<SendEmailResult> {
   const token = (process.env.ZEPTOMAIL_API || '').trim();
   if (!token) return { delivered: false, provider: 'zeptomail', error: 'not configured' };
   const host = (process.env.ZEPTOMAIL_HOST || '').trim();
-  const base = /^https?:\/\//.test(host) ? host.replace(/\/+$/, '') : 'https://api.zeptomail.com';
+  const normalized = host && !/^https?:\/\//.test(host) ? `https://${host}` : host;
+  const base = normalized ? normalized.replace(/\/+$/, '') : 'https://api.zeptomail.com';
   const from = zeptoFromAddress();
   const domain = (from.split('@')[1] || 'tutorialos.com').trim();
   const bounce =
     (process.env.ZEPTOMAIL_BOUNCE || '').trim() ||
-    (host.includes('@') ? host : `bounce@${domain}`);
+    (host.includes('@') ? host : '');
   try {
     const res = await fetch(`${base}/v1.1/email`, {
       method: 'POST',
@@ -66,7 +67,7 @@ async function sendViaZepto(email: OutgoingEmail): Promise<SendEmailResult> {
         Accept: 'application/json',
       },
       body: JSON.stringify({
-        bounce_address: bounce,
+        ...(bounce ? { bounce_address: bounce } : {}),
         from: { address: from, name: 'Tutorial OS' },
         to: [{ email_address: { address: email.to } }],
         subject: email.subject,
