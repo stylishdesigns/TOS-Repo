@@ -1,6 +1,6 @@
 import express from "express";
 import { createHash, timingSafeEqual } from "crypto";
-import { adminDb } from "./firebaseAdmin";
+import { adminDb, adminAuth } from "./firebaseAdmin";
 
 /**
  * Fo database proxy (read-only, phase 1).
@@ -370,6 +370,84 @@ export function registerFoDbProxy(app: express.Express): void {
     } catch (err: any) {
       console.error(`[fo-db-proxy] query ${body.collection} failed:`, err?.message || err);
       reject(res, 500, "The query failed on the server.");
+    }
+  });
+  // 5. Test-centre cleanup (user-approved in chat, 2026-11-12): deletes the
+  //    Firestore records and Firebase Auth user for ONE trial centre created
+  //    during email-delivery testing. Guardrails: requires
+  //    confirm:"DELETE-TEST-CENTRE"; refuses any centre whose ownerEmail is
+  //    not on the Fo test mailbox (af9d2121beb31872703e...@wajo.ai); deletes
+  //    the admins/{uid} record and the Auth user only when they still point
+  //    at this centre. Real centres can never pass the mailbox guard.
+  const TEST_MAIL_PREFIX = "af9d2121beb31872703e";
+  app.post("/api/internal/fs/delete-test-centre", async (req, res) => {
+    const body = (req.body || {}) as Record<string, unknown>;
+    const centreId = typeof body.centreId === "string" ? body.centreId.trim() : "";
+    if (body.confirm !== "DELETE-TEST-CENTRE") {
+      return reject(res, 400, 'Confirm with confirm:"DELETE-TEST-CENTRE".');
+    }
+    if (!centreId || centreId.length > 150 || !ID_RE.test(centreId)) {
+      return reject(res, 400, "A valid centreId is required.");
+    }
+    try {
+      const centreRef = adminDb.collection("centres").doc(centreId);
+      const centreSnap = await centreRef.get();
+      if (!centreSnap.exists) return reject(res, 404, "No centre document with this id.");
+      const centre = (centreSnap.data() || {}) as Record<string, unknown>;
+      const ownerEmail = String(centre.ownerEmail || "");
+      const ownerUid = String(centre.ownerUid || "");
+      const onTestMailbox =
+        ownerEmail.startsWith(TEST_MAIL_PREFIX) &&
+        ownerEmail.endsWith("@wajo.ai") &&
+        ownerEmail.length > TEST_MAIL_PREFIX.length + 8;
+      if (!onTestMailbox) {
+        return reject(res, 409, "Refusing: this centre\'s owner is not the Fo test mailbox.");
+      }
+      if (!ownerUid || !ID_RE.test(ownerUid)) {
+        return reject(res, 409, "Refusing: the centre has no usable ownerUid.");
+      }
+      const deleted: string[] = [];
+      await centreRef.delete();
+      deleted.push(`centres/${centreId}`);
+      const billingRef = adminDb.collection("centreBilling").doc(centreId);
+      if ((await billingRef.get()).exists) {
+        await billingRef.delete();
+        deleted.push(`centreBilling/${centreId}`);
+      }
+      const codes = await adminDb.collection("accessCodes").where("centreId", "==", centreId).get();
+      for (const d of codes.docs) {
+        await d.ref.delete();
+        deleted.push(`accessCodes/${d.id}`);
+      }
+      const memberships = await adminDb.collection("memberships").where("centreId", "==", centreId).get();
+      for (const d of memberships.docs) {
+        await d.ref.delete();
+        deleted.push(`memberships/${d.id}`);
+      }
+      const adminRef = adminDb.collection("admins").doc(ownerUid);
+      const adminSnap = await adminRef.get();
+      if (adminSnap.exists) {
+        const admin = (adminSnap.data() || {}) as Record<string, unknown>;
+        if (String(admin.centreId || "") === centreId) {
+          await adminRef.delete();
+          deleted.push(`admins/${ownerUid}`);
+        }
+      }
+      let authDeleted = false;
+      try {
+        const user = await adminAuth.getUser(ownerUid);
+        if ((user.email || "") === ownerEmail) {
+          await adminAuth.deleteUser(ownerUid);
+          authDeleted = true;
+        }
+      } catch {
+        // Auth user already gone; the Firestore cleanup still stands.
+      }
+      console.log(`[fo-db-proxy] delete-test-centre ${centreId}: deleted ${deleted.length} record(s), authDeleted=${authDeleted}`);
+      res.json({ ok: true, centreId, deleted, authDeleted });
+    } catch (err: any) {
+      console.error(`[fo-db-proxy] delete-test-centre failed:`, err?.message || err);
+      reject(res, 500, "The deletion failed on the server.");
     }
   });
 }
