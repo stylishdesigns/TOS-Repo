@@ -48,11 +48,16 @@ function zeptoFromAddress(): string {
 }
 
 async function sendViaZepto(email: OutgoingEmail): Promise<SendEmailResult> {
-  const token = (process.env.ZEPTOMAIL_API || '').trim();
+  const token = (process.env.ZEPTOMAIL_API || '').trim().replace(/^Zoho-enczapikey\s+/i, '');
   if (!token) return { delivered: false, provider: 'zeptomail', error: 'not configured' };
+  // The tutorialos_email agent was created on the Zoho CPaaS console, whose
+  // send endpoint is cpaas.zoho.com/v1.1/email (NOT the legacy
+  // api.zeptomail.com). Honor ZEPTOMAIL_HOST only when it names a zoho host.
   const host = (process.env.ZEPTOMAIL_HOST || '').trim();
   const normalized = host && !/^https?:\/\//.test(host) ? `https://${host}` : host;
-  const base = normalized ? normalized.replace(/\/+$/, '') : 'https://cpaas.zoho.com';
+  const base = normalized && /zoho\.com/i.test(normalized)
+    ? normalized.replace(/\/+$/, '')
+    : 'https://cpaas.zoho.com';
   const from = zeptoFromAddress();
   const domain = (from.split('@')[1] || 'tutorialos.com').trim();
   const bounce =
