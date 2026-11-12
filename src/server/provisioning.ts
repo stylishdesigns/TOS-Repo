@@ -1,5 +1,5 @@
 import * as crypto from 'crypto';
-import { renderWelcomeTemplate } from './welcomeTemplate';
+import { APP_INSTALL_URL, WHATSAPP_GROUP_URL, renderWelcomeTemplate } from './welcomeTemplate';
 import { adminAuth, adminDb } from './firebaseAdmin';
 import {
   effectiveStatus,
@@ -233,7 +233,25 @@ export async function provisionCentre(
     tempPassword: tempPassword || '',
     signInUrl: `${appBase}/c/${centreId}`,
   });
-  const emailRes = await sendEmail({ to: email, subject: welcome.subject, html: welcome.html, text: welcome.text });
+  const emailRes = await sendEmail({
+    to: email,
+    subject: welcome.subject,
+    html: welcome.html,
+    text: welcome.text,
+    // Same values the embedded template renders locally; when
+    // ZEPTOMAIL_TEMPLATE_KEY is set the send goes through the registered
+    // ZeptoMail template and these fill its placeholders instead.
+    mergeFields: {
+      full_name: fullName || 'there',
+      centre_name: businessName,
+      access_code: accessCode,
+      login_email: email,
+      temp_password: tempPassword || '',
+      sign_in_url: `${appBase}/c/${centreId}`,
+      app_url: APP_INSTALL_URL,
+      whatsapp_url: WHATSAPP_GROUP_URL,
+    },
+  });
   const credentialsNotDelivered = !!tempPassword && !emailRes.delivered;
   if (credentialsNotDelivered) {
     await centreRef.update({ credentialsNotDelivered: true });

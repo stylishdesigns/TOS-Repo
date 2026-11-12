@@ -16,6 +16,10 @@ export interface OutgoingEmail {
   subject: string;
   html: string;
   text: string;
+  /** ZeptoMail template merge values (full_name, centre_name, ...). When set
+   *  and ZEPTOMAIL_TEMPLATE_KEY is configured, the mail goes out through the
+   *  registered ZeptoMail template instead of the raw-message endpoint. */
+  mergeFields?: Record<string, string>;
 }
 
 export interface SendEmailResult {
@@ -63,6 +67,38 @@ async function sendViaZepto(email: OutgoingEmail): Promise<SendEmailResult> {
   const bounce =
     (process.env.ZEPTOMAIL_BOUNCE || '').trim() ||
     (host.includes('@') ? host : '');
+  const templateKey = (process.env.ZEPTOMAIL_TEMPLATE_KEY || '').trim();
+  // A registered ZeptoMail template (the welcome template) carries its own
+  // subject and layout; Zoho fills the placeholders from merge_info. The
+  // template key is an identifier, never logged.
+  if (templateKey && email.mergeFields) {
+    try {
+      const res = await fetch(`${base}/v1.1/email/template`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Zoho-enczapikey ${token}`,
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({
+          ...(bounce ? { bounce_address: bounce } : {}),
+          template_key: templateKey,
+          from: { address: from, name: 'Tutorial OS' },
+          to: [{ email_address: { address: email.to } }],
+          merge_info: email.mergeFields,
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.text();
+        console.error('[email] zeptomail template rejected the message:', res.status, 'from', from, 'bounce', bounce, body.slice(0, 300));
+        return { delivered: false, provider: 'zeptomail', error: `provider status ${res.status}` };
+      }
+      return { delivered: true, provider: 'zeptomail' };
+    } catch (err: any) {
+      console.error('[email] zeptomail template send failed:', err?.message || err);
+      return { delivered: false, provider: 'zeptomail', error: 'network error' };
+    }
+  }
   try {
     const res = await fetch(`${base}/v1.1/email`, {
       method: 'POST',
