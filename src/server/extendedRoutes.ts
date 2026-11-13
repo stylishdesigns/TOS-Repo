@@ -194,13 +194,15 @@ export function registerExtendedRoutes(app: express.Express): void {
   });
 
   // ==========================================================================
-  // PUBLIC: facility-name availability for the signup popup. The popup checks
-  // live while the owner types their facility name, so the subdomain they will
-  // get (slug.tutorialos.com) is known before they continue. Same slug rules
-  // provisionCentre uses; taken means a centre already carries that name.
+  // PUBLIC: facility-name availability for the signup pages. The facility
+  // page checks live while the owner types their facility name, so the
+  // subdomain they will get (slug.tutorialos.com) is known before they
+  // continue. The WHOLE name is used with every space and symbol removed
+  // ("Peace Academy" -> peaceacademy); only the 63-character DNS label limit
+  // ever shortens it. Taken means a centre already carries that name.
   // ==========================================================================
   const slugifyName = (raw: string) =>
-    String(raw || '').toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 40);
+    String(raw || '').toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 63);
   app.get('/api/public/name-check', async (req, res) => {
     try {
       const raw = String(req.query.name || '').trim();

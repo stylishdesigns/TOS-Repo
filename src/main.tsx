@@ -3,6 +3,7 @@ import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import { PublicLandingPage } from './components/landing/PublicLandingPage';
 import { AppInstallPage } from './components/public/AppInstallPage';
+import { SignupStartPage, SignupConfirmPage, SignupAppPage } from './components/public/landing/SignupFlow';
 import './index.css';
 import {registerSW} from 'virtual:pwa-register';
 import { installServerApiFetch } from './utils/serverApi';
@@ -55,12 +56,24 @@ const landingMatch = window.location.pathname.match(/^\/c\/([A-Za-z0-9_-]{3,64})
 // Dedicated install page for the welcome email's "Download the app" button.
 const appInstallMatch = window.location.pathname.match(/^\/app\/?$/);
 
+// Trial signup flow as separate pages (no popup): facility details, then the
+// congratulations/plan review, then the app install page.
+const startMatch = window.location.pathname.match(/^\/start\/?$/);
+const confirmMatch = window.location.pathname.match(/^\/start\/confirm\/?$/);
+const appFlowMatch = window.location.pathname.match(/^\/start\/app\/?$/);
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     {landingMatch ? (
     <PublicLandingPage centreId={landingMatch[1]} />
   ) : appInstallMatch ? (
     <AppInstallPage />
+  ) : startMatch ? (
+    <SignupStartPage />
+  ) : confirmMatch ? (
+    <SignupConfirmPage />
+  ) : appFlowMatch ? (
+    <SignupAppPage />
   ) : (
     <App />
   )}

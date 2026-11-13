@@ -219,3 +219,7 @@
 
 .btt{width:44px;height:44px;border-radius:50%;border:1px solid #334155;background:#0F172A;color:#FDBA74;display:inline-flex;align-items:center;justify-content:center;flex:none}.btt:hover{border-color:#EA580C;color:#FB923C}
 html{scroll-behavior:smooth}
+
+/* Signup flow: one-shot celebration confetti on the confirm page */
+.confetti{position:fixed;top:-24px;border-radius:2px;opacity:0;animation-name:confetti-fall;animation-timing-function:linear;animation-fill-mode:forwards}
+@keyframes confetti-fall{0%{transform:translateY(-10px) rotate(0deg);opacity:1}85%{opacity:1}100%{transform:translateY(94vh) rotate(340deg);opacity:0}}
