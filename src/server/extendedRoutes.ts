@@ -109,7 +109,10 @@ function validateLeadBody(body: any): Record<string, any> | string {
   const phoneRaw = String(body.phone || '');
   const state = String(body.state || '').trim();
   const city = String(body.city || '').trim();
-  const studentCount = Number(body.studentCount);
+  const studentCountRaw = body.studentCount;
+  const studentCount = typeof studentCountRaw === 'number' && Number.isInteger(studentCountRaw) && studentCountRaw >= 1 && studentCountRaw <= 10000
+    ? studentCountRaw
+    : (typeof studentCountRaw === 'string' && studentCountRaw.trim().length >= 1 && studentCountRaw.trim().length <= 20 ? studentCountRaw.trim() : null);
   const examTypes = Array.isArray(body.examTypes)
     ? body.examTypes.map((t: any) => String(t).trim()).filter(Boolean).slice(0, 10)
     : [];
@@ -119,9 +122,9 @@ function validateLeadBody(body: any): Record<string, any> | string {
   if (businessName.length < 2 || businessName.length > 120) return 'Please give your centre name.';
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return 'That email address does not look right.';
   if (phoneDigits.length < 7 || phoneDigits.length > 15) return 'That phone number does not look right.';
-  if (!Number.isInteger(studentCount) || studentCount < 1 || studentCount > 10000) return 'How many students do you teach?';
+  if (!studentCount) return 'How many students does your facility have?';
   if (!state || state.length > 60) return 'Please choose a state.';
-  if (!city || city.length > 60) return 'Please tell us your city.';
+  if (city.length > 60) return 'Please tell us your city.';
   if (!examTypes.length) return 'Pick at least one exam type you teach.';
   return { fullName, businessName, email, phone: phoneDigits, state, city, studentCount, examTypes, skipTrial };
 }
@@ -275,7 +278,7 @@ export function registerExtendedRoutes(app: express.Express): void {
         businessName: checked.businessName,
         email: checked.email,
         phone: checked.phone,
-        studentCount: Number(checked.studentCount),
+        studentCount: checked.studentCount,
         state: checked.state,
         city: checked.city,
         address: typeof req.body.address === 'string' ? String(req.body.address).trim().slice(0, 200) : '',

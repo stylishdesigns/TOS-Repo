@@ -43,7 +43,7 @@ export interface ProvisionLead {
   businessName: string;
   email: string;
   phone: string;
-  studentCount: number;
+  studentCount: number | string;
   state: string;
   city: string;
   examTypes: string[];

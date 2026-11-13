@@ -3,10 +3,10 @@ import React, { useEffect, useRef, useState } from 'react';
 /**
  * TrialSignupModal (W1, 2026-11-13): the three-stage signup popup.
  *
- * Stage 1 - Educational facility information: facility name (with a live
+ * Stage 1 - Education facility information: facility name (with a live
  *   subdomain availability check under the field), logo upload (becomes the
  *   PWA app branding), teachers dropdown, state + address, exams with a
- *   Custom option, student count, the 20% discount request and consent.
+ *   Custom option, student count and consent.
  *   Continue provisions the facility right away and moves to stage 2 with the
  *   "login details sent" notice.
  * Stage 2 - Get the app: best experience on mobile, the app carries the
@@ -16,7 +16,7 @@ import React, { useEffect, useRef, useState } from 'react';
  *   join button, then back to their email for the login details.
  */
 
-const NIGERIAN_STATES = ['Abia','Adamawa','Akwa Ibom','Anambra','Bauchi','Bayelsa','Benue','Borno','Cross River','Delta','Ebonyi','Edo','Ekiti','Enugu','Gombe','Imo','Jigawa','Kaduna','Kano','Katsina','Kebbi','Kogi','Kwara','Lagos','Nasarawa','Niger','Ogun','Ondo','Osun','Oyo','Plateau','Rivers','Sokoto','Taraba','Yobe','Zamfara','FCT Abuja'];
+export const NIGERIAN_STATES = ['Abia','Adamawa','Akwa Ibom','Anambra','Bauchi','Bayelsa','Benue','Borno','Cross River','Delta','Ebonyi','Edo','Ekiti','Enugu','Gombe','Imo','Jigawa','Kaduna','Kano','Katsina','Kebbi','Kogi','Kwara','Lagos','Nasarawa','Niger','Ogun','Ondo','Osun','Oyo','Plateau','Rivers','Sokoto','Taraba','Yobe','Zamfara','FCT Abuja'];
 
 const WHATSAPP_URL = 'https://chat.whatsapp.com/CfaN0Rt2J9IFZLsBkUUS2N?s=cl&p=a&iam=2';
 
@@ -29,6 +29,8 @@ export interface OwnerInfo {
 interface Props {
   open: boolean;
   owner: OwnerInfo;
+  /** The state chosen on the landing form; shown read-only in stage 1. */
+  state: string;
   onClose: () => void;
 }
 
@@ -36,7 +38,7 @@ const STEP_LABELS = ['Facility information', 'Get the app', 'Join the community'
 
 const t = (x: unknown) => String(x || '').trim();
 
-export const TrialSignupModal: React.FC<Props> = ({ open, owner, onClose }) => {
+export const TrialSignupModal: React.FC<Props> = ({ open, owner, state, onClose }) => {
   const [stage, setStage] = useState(1);
   const [sentNotice, setSentNotice] = useState(false);
   const [sending, setSending] = useState(false);
@@ -49,12 +51,10 @@ export const TrialSignupModal: React.FC<Props> = ({ open, owner, onClose }) => {
   const [logoName, setLogoName] = useState('');
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [teachers, setTeachers] = useState('');
-  const [state, setState] = useState('');
   const [address, setAddress] = useState('');
   const [ex, setEx] = useState({ jamb: true, waec: true, neco: false, post: false, custom: false });
   const [customExam, setCustomExam] = useState('');
   const [students, setStudents] = useState('');
-  const [discount, setDiscount] = useState(false);
   const [consent, setConsent] = useState(false);
 
   // Live name availability: debounced so typing does not hammer the endpoint.
@@ -125,8 +125,7 @@ export const TrialSignupModal: React.FC<Props> = ({ open, owner, onClose }) => {
     if (!teachers) e.teachers = 'Please choose how many teachers you have.';
     if (!state) e.state = 'Please choose a state.';
     if (!t(address) || t(address).length > 200) e.address = 'Please give your facility address.';
-    const c = Number(students);
-    if (!Number.isInteger(c) || c < 1 || c > 10000) e.students = 'How many students do you teach?';
+    if (!students) e.students = 'Please choose how many students your facility has.';
     if (ex.custom && !t(customExam)) e.customExam = 'Please type the exams you prepare students for.';
     if (!ex.jamb && !ex.waec && !ex.neco && !ex.post && !ex.custom) e.exams = 'Choose at least one exam.';
     if (!consent) e.consent = 'Consent is required.';
@@ -152,14 +151,13 @@ export const TrialSignupModal: React.FC<Props> = ({ open, owner, onClose }) => {
           businessName: name,
           email: owner.email,
           phone: owner.phone,
-          studentCount: Number(students),
+          studentCount: students,
           state,
           city: '',
           address,
           logoUrl,
           teacherCount: teachers,
           examTypes,
-          skipTrial: discount,
           consent: true,
           website: '', // honeypot: real visitors leave it empty
         }),
@@ -218,10 +216,10 @@ export const TrialSignupModal: React.FC<Props> = ({ open, owner, onClose }) => {
         {stage === 1 && (
           <div>
             <p style={{ margin: '0 0 4px', font: '600 13px Inter, sans-serif', color: '#C2410C', letterSpacing: '0.02em' }}>STAGE 1 OF 3</p>
-            <h3 style={{ margin: '0 0 18px', font: '700 20px Inter, sans-serif', color: '#0F172A' }}>Educational facility information</h3>
+            <h3 style={{ margin: '0 0 18px', font: '700 20px Inter, sans-serif', color: '#0F172A' }}>Education facility information</h3>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px' }}>
               <div style={{ gridColumn: '1/-1' }}>
-                <label htmlFor="w1-name" style={{ display: 'block', font: '600 14px Inter, sans-serif', color: '#334155', marginBottom: '6px' }}>Name of your educational facility</label>
+                <label htmlFor="w1-name" style={{ display: 'block', font: '600 14px Inter, sans-serif', color: '#334155', marginBottom: '6px' }}>Name of your education facility</label>
                 <input id="w1-name" type="text" value={name} onChange={(ev) => setName(ev.target.value)} aria-invalid={errors.name ? true : false} style={{ width: '100%', minHeight: '44px', borderRadius: '12px', border: errors.name ? '1px solid #DC2626' : '1px solid #E2E8F0', padding: '10px 14px', font: '500 15px Inter, sans-serif', color: '#0F172A' }} />
                 {nameState.status !== 'idle' && nameState.domain && (
                   <p style={{ margin: '8px 0 0', font: '500 13px Inter, sans-serif', color: nameState.status === 'available' ? '#15803D' : nameState.status === 'taken' ? '#DC2626' : '#64748B' }}>
@@ -241,7 +239,7 @@ export const TrialSignupModal: React.FC<Props> = ({ open, owner, onClose }) => {
                   <label htmlFor="w1-logo" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minHeight: '44px', padding: '0 18px', borderRadius: '12px', border: '1px solid #E2E8F0', background: '#fff', color: '#334155', font: '600 14px Inter, sans-serif', cursor: 'pointer' }}>{uploadingLogo ? 'Uploading...' : logoUrl ? 'Change logo' : 'Upload logo'}</label>
                   {logoName && <span style={{ font: '400 13px Inter, sans-serif', color: '#64748B', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{logoName}</span>}
                 </div>
-                <input id="w1-logo" type="file" accept="image/png,image/jpeg,image/webp" onChange={(ev) => pickLogo(ev.target.files && ev.target.files[0] ? ev.target.files[0] : null)} style={{ position: 'absolute', width: '1px', height: '1px', overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap' }} />
+                <input id="w1-logo" type="file" accept="image/png,image/jpeg,image/webp" onChange={(ev) => { const file = ev.target.files && ev.target.files[0] ? ev.target.files[0] : null; ev.target.value = ''; pickLogo(file); }} style={{ position: 'absolute', width: '1px', height: '1px', overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap' }} />
                 {errors.logo && <span role="alert" style={{ display: 'block', marginTop: '6px', font: '500 13px Inter, sans-serif', color: '#DC2626' }}>{errors.logo}</span>}
               </div>
 
@@ -260,11 +258,10 @@ export const TrialSignupModal: React.FC<Props> = ({ open, owner, onClose }) => {
 
               <div>
                 <label htmlFor="w1-state" style={{ display: 'block', font: '600 14px Inter, sans-serif', color: '#334155', marginBottom: '6px' }}>State</label>
-                <select id="w1-state" value={state} onChange={(ev) => setState(ev.target.value)} aria-invalid={errors.state ? true : false} style={{ width: '100%', minHeight: '44px', borderRadius: '12px', border: errors.state ? '1px solid #DC2626' : '1px solid #E2E8F0', padding: '10px 14px', font: '500 15px Inter, sans-serif', color: '#0F172A', background: '#fff' }}>
-                  <option value="">Choose a state</option>
-                  {NIGERIAN_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
+                <select id="w1-state" value={state} disabled aria-readonly="true" style={{ width: '100%', minHeight: '44px', borderRadius: '12px', border: '1px solid #E2E8F0', padding: '10px 14px', font: '500 15px Inter, sans-serif', color: '#475569', background: '#F1F5F9' }}>
+                  <option value={state}>{state || 'Chosen on the first step'}</option>
                 </select>
-                {errors.state && <span role="alert" style={{ display: 'block', marginTop: '6px', font: '500 13px Inter, sans-serif', color: '#DC2626' }}>{errors.state}</span>}
+                <p style={{ margin: '6px 0 0', font: '400 12px Inter, sans-serif', color: '#64748B' }}>You chose your state on the first step.</p>
               </div>
 
               <div style={{ gridColumn: '1/-1' }}>
@@ -292,17 +289,17 @@ export const TrialSignupModal: React.FC<Props> = ({ open, owner, onClose }) => {
               </div>
 
               <div>
-                <label htmlFor="w1-students" style={{ display: 'block', font: '600 14px Inter, sans-serif', color: '#334155', marginBottom: '6px' }}>How many students do you teach?</label>
-                <input id="w1-students" type="number" min={1} value={students} onChange={(ev) => setStudents(ev.target.value)} aria-invalid={errors.students ? true : false} style={{ width: '100%', minHeight: '44px', borderRadius: '12px', border: errors.students ? '1px solid #DC2626' : '1px solid #E2E8F0', padding: '10px 14px', font: '500 15px Inter, sans-serif', color: '#0F172A' }} />
+                <label htmlFor="w1-students" style={{ display: 'block', font: '600 14px Inter, sans-serif', color: '#334155', marginBottom: '6px' }}>How many students does your facility have?</label>
+                <select id="w1-students" value={students} onChange={(ev) => setStudents(ev.target.value)} aria-invalid={errors.students ? true : false} style={{ width: '100%', minHeight: '44px', borderRadius: '12px', border: errors.students ? '1px solid #DC2626' : '1px solid #E2E8F0', padding: '10px 14px', font: '500 15px Inter, sans-serif', color: '#0F172A', background: '#fff' }}>
+                  <option value="">Choose one</option>
+                  <option value="1 to 10">1 to 10 students</option>
+                  <option value="11 to 20">11 to 20 students</option>
+                  <option value="21 to 30">21 to 30 students</option>
+                  <option value="31 to 50">31 to 50 students</option>
+                  <option value="51 to 100">51 to 100 students</option>
+                  <option value="More than 100">More than 100 students</option>
+                </select>
                 {errors.students && <span role="alert" style={{ display: 'block', marginTop: '6px', font: '500 13px Inter, sans-serif', color: '#DC2626' }}>{errors.students}</span>}
-              </div>
-
-              <div style={{ gridColumn: '1/-1' }}>
-                <label style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', font: '500 14px Inter, sans-serif', color: '#334155', minHeight: '44px', cursor: 'pointer' }}>
-                  <input type="checkbox" checked={discount} onChange={() => setDiscount((p) => !p)} style={{ width: '20px', height: '20px', marginTop: '2px', flex: 'none' }} />
-                  Request a 20% discount
-                </label>
-                {discount && <p style={{ margin: '0', font: '600 13px/1.5 Inter, sans-serif', color: '#9A3412' }}>The 20% discount applies when you pay upfront for at least 10 students in one payment, and you enjoy it from day one.</p>}
               </div>
 
               <div style={{ gridColumn: '1/-1' }}>
@@ -324,7 +321,7 @@ export const TrialSignupModal: React.FC<Props> = ({ open, owner, onClose }) => {
             <p style={{ margin: '0 0 4px', font: '600 13px Inter, sans-serif', color: '#C2410C', letterSpacing: '0.02em' }}>STAGE 2 OF 3</p>
             <h3 style={{ margin: '0 0 10px', font: '700 20px Inter, sans-serif', color: '#0F172A' }}>Download your own branded app</h3>
             <p style={{ margin: '0 0 14px', font: '400 15px/1.6 Inter, sans-serif', color: '#334155' }}>
-              You can get the best experience on the mobile app. With the app downloaded, your educational facility is branded in your own business format: your name, your logo and your colours on everything your students and tutors see.
+              You can get the best experience on the mobile app. With the app downloaded, your education facility is branded in your own business format: your name, your logo and your colours on everything your students and tutors see.
             </p>
             <div style={{ display: 'grid', gap: '14px' }}>
               <div style={{ border: '1px solid #E2E8F0', borderRadius: '16px', padding: '16px' }}>
