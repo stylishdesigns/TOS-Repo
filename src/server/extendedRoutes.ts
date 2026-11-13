@@ -191,6 +191,64 @@ export function registerExtendedRoutes(app: express.Express): void {
   });
 
   // ==========================================================================
+  // PUBLIC: facility-name availability for the signup popup. The popup checks
+  // live while the owner types their facility name, so the subdomain they will
+  // get (slug.tutorialos.com) is known before they continue. Same slug rules
+  // provisionCentre uses; taken means a centre already carries that name.
+  // ==========================================================================
+  const slugifyName = (raw: string) =>
+    String(raw || '').toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 40);
+  app.get('/api/public/name-check', async (req, res) => {
+    try {
+      const raw = String(req.query.name || '').trim();
+      if (raw.length < 2) return res.json({ ok: false, reason: 'too-short' });
+      if (raw.length > 120) return res.status(400).json({ error: 'Name is too long.' });
+      const slug = slugifyName(raw);
+      if (!slug) return res.json({ ok: false, reason: 'too-short' });
+      const snap = await adminDb.collection('centres').limit(200).get();
+      const taken = snap.docs.some((d) => slugifyName(String((d.data() as any)?.name || '')) === slug);
+      res.json({ ok: true, slug, domain: `${slug}.tutorialos.com`, taken });
+    } catch (error: any) {
+      console.error('[name-check] failed:', error?.message || error);
+      res.status(500).json({ error: 'Name check failed. Please try again.' });
+    }
+  });
+
+  // ==========================================================================
+  // PUBLIC: facility logo upload for the signup popup. A data URL in, a hosted
+  // Cloudinary URL out (tos/logos), so the branding is ready before the centre
+  // exists and provisionCentre can store it on the centre document.
+  // ==========================================================================
+  app.post('/api/public/logo-upload', async (req, res) => {
+    try {
+      const ip = clientIp(req);
+      if (!(await countRateLimit(`logo-${ip.replace(/\W/g, '')}`, 10, 60 * 60 * 1000))) {
+        return res.status(429).json({ error: 'Too many uploads. Please try again later.' });
+      }
+      const dataUrl = String(req.body?.data || '');
+      const m = /^data:(image\/(?:png|jpe?g|webp));base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl);
+      if (!m) return res.status(400).json({ error: 'Upload a PNG, JPG or WebP image.' });
+      const bytes = Math.floor((m[2].length * 3) / 4);
+      if (bytes > 2 * 1024 * 1024) return res.status(413).json({ error: 'The logo can be up to 2 MB.' });
+      const cloud = String(process.env.CLOUDINARY_CLOUD_NAME || '');
+      const preset = String(process.env.CLOUDINARY_UPLOAD_PRESET || '');
+      if (!cloud || !preset) return res.status(500).json({ error: 'Logo hosting is not configured on this deployment.' });
+      const form = new FormData();
+      form.append('upload_preset', preset);
+      form.append('folder', 'tos/logos');
+      form.append('file', dataUrl);
+      const resp = await fetch(`https://api.cloudinary.com/v1_1/${cloud}/image/upload`, { method: 'POST', body: form });
+      const data: any = await resp.json().catch(() => null);
+      const url = data && typeof data.secure_url === 'string' ? data.secure_url : '';
+      if (!resp.ok || !url) return res.status(502).json({ error: 'The logo could not be uploaded. Please try again.' });
+      res.json({ ok: true, url });
+    } catch (error: any) {
+      console.error('[logo-upload] failed:', error?.message || error);
+      res.status(500).json({ error: 'The logo could not be uploaded. Please try again.' });
+    }
+  });
+
+  // ==========================================================================
   // PUBLIC: self-serve trial. "Start my free trial" provisions the centre and
   // its owner on the spot and emails the welcome pack (access code, temporary
   // password, the centre's own sign-in link). No email-verification hop: the
@@ -220,6 +278,9 @@ export function registerExtendedRoutes(app: express.Express): void {
         studentCount: Number(checked.studentCount),
         state: checked.state,
         city: checked.city,
+        address: typeof req.body.address === 'string' ? String(req.body.address).trim().slice(0, 200) : '',
+        logoUrl: typeof req.body.logoUrl === 'string' && /^https:\/\//.test(String(req.body.logoUrl)) ? String(req.body.logoUrl).trim() : '',
+        teacherCount: typeof req.body.teacherCount === 'string' ? String(req.body.teacherCount).trim().slice(0, 20) : '',
         examTypes: Array.isArray(checked.examTypes) ? checked.examTypes.filter(Boolean) : [],
         skipTrial: checked.skipTrial === true,
         source: 'lead',
