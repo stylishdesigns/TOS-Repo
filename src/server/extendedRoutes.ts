@@ -252,6 +252,61 @@ export function registerExtendedRoutes(app: express.Express): void {
   });
 
   // ==========================================================================
+  // PUBLIC: email delivery test trigger (user-requested, 2026-11-13). A small
+  // self-serve tool on the landing page: sends the ONE registered ZeptoMail
+  // template (the welcome/login-details template) to an address the owner
+  // types, so delivery can be checked without provisioning another trial
+  // account. Guardrails: the endpoint is dead unless ZEPTOMAIL_TEST_TRIGGER
+  // is "on" in the environment; per-IP and per-address rate limits; the
+  // template key lives in the environment and is never logged; the merge
+  // values are fixed sample data, so no real credentials flow through it.
+  // Switch the env var off when testing is done.
+  // ==========================================================================
+  app.post('/api/public/email-test', async (req, res) => {
+    if ((process.env.ZEPTOMAIL_TEST_TRIGGER || '').trim().toLowerCase() !== 'on') {
+      return res.status(403).json({ error: 'The email test trigger is switched off.' });
+    }
+    try {
+      const body = (req.body || {}) as Record<string, unknown>;
+      const to = String(body.email || '').trim();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to) || to.length > 200) {
+        return res.status(400).json({ error: 'Please enter a valid email address.' });
+      }
+      const ip = clientIp(req);
+      if (!(await countRateLimit(`emailtest-ip-${ip.replace(/\W/g, '')}`, 10, 60 * 60 * 1000))) {
+        return res.status(429).json({ error: 'Too many requests. Please try again later.' });
+      }
+      if (!(await countRateLimit(`emailtest-to-${to.replace(/\W/g, '').toLowerCase()}`, 5, 60 * 60 * 1000))) {
+        return res.status(429).json({ error: 'Too many test emails to this address. Please try again later.' });
+      }
+      // Fixed sample values so the template renders fully. Never a real
+      // credential; login_email is the recipient's own address so the mail
+      // reads sensibly when it lands.
+      const result = await sendEmail({
+        to,
+        subject: 'Tutorial OS delivery test (welcome template)',
+        html: '<p>Tutorial OS email delivery test: the welcome template. If you can read this, delivery works.</p>',
+        text: 'Tutorial OS email delivery test: the welcome template. If you can read this, delivery works.',
+        mergeFields: {
+          full_name: 'Test Trigger',
+          centre_name: 'TOS Test Centre',
+          access_code: '123456',
+          login_email: to,
+          temp_password: 'Test-1234',
+          sign_in_url: `${baseUrl(req)}/c/test-trigger`,
+          app_url: 'https://tutorialos.com/app',
+          whatsapp_url: 'https://chat.whatsapp.com/CfaN0Rt2J9IFZLsBkUUS2N?s=cl&p=a&iam=2',
+        },
+      });
+      console.log(`[email-test] welcome template to ${to}: delivered=${result.delivered}${result.error ? ' error=' + result.error : ''}`);
+      res.json({ success: result.delivered, delivered: result.delivered, error: result.error });
+    } catch (error: any) {
+      console.error('[email-test] failed:', error?.message || error);
+      res.status(500).json({ error: 'Could not send the test email. Please try again.' });
+    }
+  });
+
+  // ==========================================================================
   // PUBLIC: centre lookup by access code. The code is a centre selector, not
   // a secret: it reveals only the centre's own name before sign-in, and
   // sign-in plus membership still gate every piece of centre data.
