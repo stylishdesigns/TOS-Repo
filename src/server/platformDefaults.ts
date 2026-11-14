@@ -13,11 +13,11 @@ export const STARTING_PLANS = [
   {
     id: 'centre_standard',
     name: 'Facility Standard',
-    price: 3000, // ₦ per student per month
+    price: 2000, // ₦ per student per month
     priceType: 'per_seat',
     seatCap: 100,
     trialSeatCap: 10,
-    trialDays: 30,
+    trialDays: 14,
     studentChat: true,
     whatsappNotifications: false,
     aiEssayMarking: true, // internal only, never shown to customers
@@ -27,11 +27,11 @@ export const STARTING_PLANS = [
   {
     id: 'centre_plus',
     name: 'Facility Plus',
-    price: 5000, // ₦ per student per month
+    price: 3500, // ₦ per student per month
     priceType: 'per_seat',
     seatCap: 100,
     trialSeatCap: 10,
-    trialDays: 30,
+    trialDays: 14,
     studentChat: true,
     whatsappNotifications: true,
     aiEssayMarking: true, // internal only, never shown to customers
@@ -41,7 +41,7 @@ export const STARTING_PLANS = [
 ];
 
 export const STARTING_CONFIG = {
-  trialDays: 30,
+  trialDays: 14,
   skipTrialDiscountPct: 15, // set by TOS staff; the discount for skipping the trial
   trialGraceDays: 7,
   seatSwapLimitPerStudent: 2,
