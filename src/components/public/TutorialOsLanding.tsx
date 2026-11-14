@@ -63,16 +63,18 @@ export const TutorialOsLanding: React.FC<{
 
   // Three quick taps (within two seconds of each other) on the Tutorial OS
   // logo, in the header or the footer, open the TOS staff login door
-  // (#tos-admin). Ordinary single clicks keep scrolling to the top; nothing
+  // (#tos-admin). Ordinary taps leave the page exactly where it is; nothing
   // about the logo changes visually.
   const brandTaps = useRef<{ n: number; at: number }>({ n: 0, at: 0 });
   const onBrandTap = (ev: React.MouseEvent) => {
+    // The logo never navigates or scrolls on tap: the page stands still while
+    // the taps are counted, so nothing jumps or looks like a refresh.
+    ev.preventDefault();
     const now = Date.now();
     const b = brandTaps.current;
     b.n = now - b.at < 2000 ? b.n + 1 : 1;
     b.at = now;
     if (b.n >= 3) {
-      ev.preventDefault();
       b.n = 0;
       window.location.hash = 'tos-admin';
     }
