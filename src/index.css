@@ -438,3 +438,6 @@ span.text-slate-600:not(.dark-bg-mode *) {
 .plp-statgrid{padding:18px 12px}
 .plp-sec{padding:36px 0}
 }
+
+/* Inside the installed app (standalone) the way back to the public site is hidden: the access-code page is the first thing the app shows. */
+@media (display-mode: standalone){ [data-gate-back]{display:none!important} }

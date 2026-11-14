@@ -29,14 +29,14 @@ export default defineConfig(({mode}) => {
         includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'icon.svg'],
         manifest: {
           id: '/',
-          name: 'Excellence Tutorial Centre',
-          short_name: 'Excellence',
+          name: 'Tutorial OS',
+          short_name: 'TOS',
           description:
             'Multi-Tenant Tutorial Centre Management System, CBT Testing Engine & Student Mobile Portal.',
           theme_color: '#EA580C',
           background_color: '#0F172A',
           display: 'standalone',
-          start_url: '/',
+          start_url: '/#access',
           scope: '/',
           icons: [
             {

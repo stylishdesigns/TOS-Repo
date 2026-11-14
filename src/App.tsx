@@ -58,6 +58,7 @@ const MainLayout: React.FC = () => {
     const onHashChange = () => {
       setTosLoginRequested(/^#tos(-admin)?$/.test(window.location.hash.toLowerCase()));
       setCentreAppRequested(/^#centre(-admin)?$/.test(window.location.hash.toLowerCase()));
+      if (window.location.hash.toLowerCase() === '#access') setCentreGateRequested(true);
     };
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);
@@ -177,7 +178,7 @@ const MainLayout: React.FC = () => {
 
   // The centre code gate appears only after a login button on the landing
   // page is clicked; the platform-staff door (#tos-admin) never shows it.
-  const [centreGateRequested, setCentreGateRequested] = useState(false);
+  const [centreGateRequested, setCentreGateRequested] = useState(() => window.location.hash.toLowerCase() === '#access');
 
   // Platform (TOS) admins are exempt from the centre access-code gate below.
   // TOS access is the server-stamped `tos` custom claim, verified in a fresh

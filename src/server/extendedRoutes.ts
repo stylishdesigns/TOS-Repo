@@ -220,6 +220,46 @@ export function registerExtendedRoutes(app: express.Express): void {
   });
 
   // ==========================================================================
+  // PUBLIC: per-facility PWA manifest. When a device is tied to a facility
+  // (?centre=<slug>), the install popup shows that facility's own name and
+  // logo, and the installed app opens on the access-code page, never the
+  // platform landing page.
+  // ==========================================================================
+  app.get('/api/pwa/manifest', async (req, res) => {
+    try {
+      const slug = slugifyName(String(req.query.centre || '').trim());
+      if (!slug) return res.status(400).json({ error: 'Missing facility.' });
+      const snap = await adminDb.collection('centres').limit(200).get();
+      const doc = snap.docs.find((d) => slugifyName(String((d.data() as any)?.name || '')) === slug);
+      if (!doc) return res.status(404).json({ error: 'Facility not found.' });
+      const name = String((doc.data() as any)?.name || 'Tutorial OS').slice(0, 60);
+      const logoUrl = String((doc.data() as any)?.logoUrl || '');
+      const icon = (size: number, purpose: string) => {
+        const m = logoUrl.match(/^(https:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/)(.+)$/);
+        if (m) return { src: `${m[1]}w_${size},h_${size},c_pad,b_white,f_png/${m[2]}`, sizes: `${size}x${size}`, type: 'image/png', purpose };
+        return { src: size <= 192 ? '/pwa-192x192.png' : '/pwa-512x512.png', sizes: `${size}x${size}`, type: 'image/png', purpose };
+      };
+      res.set('Content-Type', 'application/manifest+json');
+      res.set('Cache-Control', 'public, max-age=300');
+      res.json({
+        id: `/pwa/${slug}`,
+        name,
+        short_name: name.slice(0, 12),
+        description: `${name} on Tutorial OS.`,
+        theme_color: '#EA580C',
+        background_color: '#0F172A',
+        display: 'standalone',
+        start_url: '/#access',
+        scope: '/',
+        icons: [icon(192, 'any'), icon(512, 'maskable')],
+      });
+    } catch (error: any) {
+      console.error('[pwa-manifest] failed:', error?.message || error);
+      res.status(500).json({ error: 'Could not build the app manifest. Please try again.' });
+    }
+  });
+
+  // ==========================================================================
   // PUBLIC: facility logo upload for the signup popup. A data URL in, a hosted
   // Cloudinary URL out (tos/logos), so the branding is ready before the centre
   // exists and provisionCentre can store it on the centre document.

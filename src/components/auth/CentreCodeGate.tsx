@@ -211,7 +211,7 @@ export const CentreCodeGate: React.FC<CentreCodeGateProps> = ({ onProceed, onBac
         <div className="mt-8 pt-6 border-t border-slate-800/80 flex flex-col items-center gap-2">
           <button
             type="button"
-            onClick={onBack}
+            onClick={onBack} data-gate-back
             className="text-[11px] text-slate-600 hover:text-slate-400 font-medium transition-colors flex items-center gap-1.5 cursor-pointer"
           >
             <ArrowRight className="w-3.5 h-3.5 rotate-180" />

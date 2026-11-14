@@ -256,7 +256,7 @@ export async function provisionCentre(
       login_email: email,
       temp_password: tempPassword || '',
       sign_in_url: `${appBase}/c/${centreId}`,
-      app_url: APP_INSTALL_URL,
+      app_url: `${APP_INSTALL_URL}?centre=${String(businessName || '').toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 63)}`,
       whatsapp_url: WHATSAPP_GROUP_URL,
     },
   });

@@ -280,6 +280,7 @@ export const SignupStartPage: React.FC = () => {
       <FlowHeader />
       <main style={{ maxWidth: 680, margin: '0 auto', padding: '0 20px 72px' }}>
         <StepStrip current={2} />
+        <p style={{ margin: '0 0 16px' }}><a href="/#trial" style={{ font: '600 14px Inter, sans-serif', color: '#C2410C', textDecoration: 'underline' }}>&larr; Back</a></p>
         <h1 style={h1Style}>About your education facility</h1>
         <p style={{ font: '500 15px/1.6 Inter, sans-serif', color: '#475569', margin: '10px 0 0' }}>
           Signing up as <b>{owner.fullName}</b> ({owner.email}). Not you? <a href="/" style={{ textDecoration: 'underline', color: '#C2410C' }}>Go back</a>.
@@ -290,7 +291,6 @@ export const SignupStartPage: React.FC = () => {
             <div>
               <label htmlFor="w1-name" style={L}>Name of your education facility</label>
               <input id="w1-name" type="text" value={name} onChange={(ev) => setName(ev.target.value)} aria-invalid={errors.name ? true : false} style={IN(!!errors.name)} />
-              <p style={{ margin: '6px 0 0', font: NOTE, color: '#94A3B8' }}>Spaces in the name are removed automatically. "Peace Academy" becomes peaceacademy.tutorialos.com.</p>
               {nameState.status !== 'idle' && nameState.domain && (
                 <p style={{ margin: '8px 0 0', font: '600 13.5px Inter, sans-serif', color: nameState.status === 'available' ? '#15803D' : nameState.status === 'taken' ? '#DC2626' : '#64748B' }}>
                   {nameState.status === 'checking' && `Checking ${nameState.domain}...`}
@@ -444,6 +444,7 @@ export const SignupConfirmPage: React.FC = () => {
       <FlowHeader />
       <main style={{ maxWidth: 680, margin: '0 auto', padding: '0 20px 72px' }}>
         <StepStrip current={3} />
+        <p style={{ margin: '0 0 16px' }}><a href="/start" style={{ font: '600 14px Inter, sans-serif', color: '#C2410C', textDecoration: 'underline' }}>&larr; Back</a></p>
         <div role="status" style={{ background: 'linear-gradient(135deg, #FFF7ED, #FEF3C7)', border: '1px solid #FDBA74', borderRadius: '20px', padding: '22px 20px', display: 'flex', gap: '14px', alignItems: 'center', marginTop: '14px' }}>
           <span style={{ width: '46px', height: '46px', borderRadius: '50%', background: '#16A34A', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}>
             <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5 9-10" /></svg>
@@ -558,6 +559,7 @@ export const SignupAppPage: React.FC = () => {
       sessionStorage.removeItem(OWNER_KEY);
       sessionStorage.removeItem(FACILITY_KEY);
       sessionStorage.removeItem(RESULT_KEY);
+      sessionStorage.removeItem('tos:signup-owner-draft');
     } catch { /* ignore */ }
     window.location.assign('/');
   };
@@ -567,6 +569,7 @@ export const SignupAppPage: React.FC = () => {
       <FlowHeader />
       <main style={{ maxWidth: 680, margin: '0 auto', padding: '0 20px 72px' }}>
         <StepStrip current={4} />
+        <p style={{ margin: '0 0 16px' }}><a href="/start/confirm" style={{ font: '600 14px Inter, sans-serif', color: '#C2410C', textDecoration: 'underline' }}>&larr; Back</a></p>
         <h1 style={{ ...h1Style, margin: '12px 0 10px' }}>Get your own branded app</h1>
         <p style={{ font: '500 15px/1.6 Inter, sans-serif', color: '#475569' }}>
           Everything your facility runs on works best on the app: your name, your logo and your colours on every screen your students and tutors see.

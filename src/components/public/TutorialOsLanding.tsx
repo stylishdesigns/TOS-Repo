@@ -82,7 +82,19 @@ export const TutorialOsLanding: React.FC<{
 
   // Lead form state (design field names; mapped to the API payload on submit)
   const [banner, setBanner] = useState('');
-  const [f, setF] = useState({ fullName: '', email: '', phone: '', state: '' });
+  const [f, setF] = useState(() => {
+    // Returning to this form (a refresh, or Back from the facility page)
+    // keeps whatever the owner already typed instead of starting over.
+    try {
+      const raw = sessionStorage.getItem('tos:signup-owner-draft') || sessionStorage.getItem('tos:signup-owner');
+      const saved = raw ? (JSON.parse(raw) as { fullName?: string; email?: string; phone?: string; state?: string }) : null;
+      if (saved) return { fullName: String(saved.fullName || ''), email: String(saved.email || ''), phone: String(saved.phone || ''), state: String(saved.state || '') };
+    } catch { /* ignore */ }
+    return { fullName: '', email: '', phone: '', state: '' };
+  });
+  useEffect(() => {
+    try { sessionStorage.setItem('tos:signup-owner-draft', JSON.stringify(f)); } catch { /* ignore */ }
+  }, [f]);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Page sections state

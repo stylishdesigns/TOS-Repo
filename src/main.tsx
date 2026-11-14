@@ -29,6 +29,21 @@ const updateSW = registerSW({
 // Attach the Firebase ID token to same-origin /api requests (Prompt A step 10).
 installServerApiFetch();
 
+// Owner-branded app install: when this device is tied to a facility (a
+// welcome-email link ?centre=..., or a signup in progress on this device),
+// point the PWA manifest at that facility's own manifest, so the install
+// popup shows the facility's name and logo and the installed app opens on
+// the access-code page.
+try {
+  let centre = new URLSearchParams(window.location.search).get('centre') || '';
+  if (!centre) {
+    const raw = sessionStorage.getItem('tos:signup-result');
+    if (raw) centre = String((JSON.parse(raw) as { domain?: string }).domain || '').split('.')[0];
+  }
+  const link = document.querySelector('link[rel="manifest"]') as HTMLLinkElement | null;
+  if (centre && link) link.href = `/api/pwa/manifest?centre=${encodeURIComponent(centre)}`;
+} catch { /* branding fallback: the default manifest stays. */ }
+
 // When a new build deploys, the hashed asset files this open tab remembers
 // may already be gone, and the next lazily loaded screen fails with
 // "Failed to fetch dynamically imported module". Instead of leaving the user
