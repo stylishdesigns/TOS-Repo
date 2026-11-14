@@ -40,7 +40,7 @@ export const AdmissionsManager: React.FC = () => {
   return (
     <div id="admissions-management-page" className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
       {/* Header Row */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-facility justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Admissions Registry</h2>
           <p className="text-xs text-slate-500 mt-1">
@@ -48,7 +48,7 @@ export const AdmissionsManager: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center space-x-4">
+        <div className="flex items-facility space-x-4">
           <div className="text-right hidden md:block">
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block leading-none">Academic Session</span>
             <span className="text-sm font-black text-[#EA580C]">{settings.academicSession}</span>
@@ -57,7 +57,7 @@ export const AdmissionsManager: React.FC = () => {
       </div>
 
       {/* Tabs Row */}
-      <div className="flex items-center space-x-2">
+      <div className="flex items-facility space-x-2">
         {(['Pending', 'Approved', 'Rejected'] as const).map((tab) => (
           <button
             key={tab}
@@ -74,7 +74,7 @@ export const AdmissionsManager: React.FC = () => {
       </div>
 
       {/* Filter Row */}
-      <div className="bg-white p-3 md:p-4 rounded-xl border border-slate-200/90 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+      <div className="bg-white p-3 md:p-4 rounded-xl border border-slate-200/90 shadow-xs flex flex-col md:flex-row md:items-facility justify-between gap-3">
         <div className="relative">
           <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
@@ -102,7 +102,7 @@ export const AdmissionsManager: React.FC = () => {
             <tbody className="divide-y divide-slate-100 text-xs">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="py-12 text-center text-slate-400 font-medium italic">
+                  <td colSpan={4} className="py-12 text-facility text-slate-400 font-medium italic">
                     No {activeTab.toLowerCase()} applications found.
                   </td>
                 </tr>
@@ -110,8 +110,8 @@ export const AdmissionsManager: React.FC = () => {
                 filtered.map((app) => (
                   <tr key={app.id} className="hover:bg-slate-50/60 transition-colors">
                     <td className="py-3.5 px-5">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 rounded-lg bg-orange-50 text-[#EA580C] font-bold text-xs flex items-center justify-center shrink-0">
+                      <div className="flex items-facility space-x-3">
+                        <div className="w-8 h-8 rounded-lg bg-orange-50 text-[#EA580C] font-bold text-xs flex items-facility justify-facility shrink-0">
                           {app.applicantName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
                         </div>
                         <div>
@@ -124,7 +124,7 @@ export const AdmissionsManager: React.FC = () => {
                     <td className="py-3.5 px-5 font-medium text-slate-600">{app.appliedDate}</td>
                     <td className="py-3.5 px-5 text-right">
                       {app.status === 'Pending' ? (
-                        <div className="flex items-center justify-end space-x-2">
+                        <div className="flex items-facility justify-end space-x-2">
                           <button
                             onClick={() => approveAdmission(app.id)}
                             className="px-3 py-1 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 transition-colors"

@@ -123,6 +123,26 @@ span.text-slate-600:not(.dark-bg-mode *) {
   }
 }
 
+/* Tutor AI suggestion chip: slides up with a soft pop instead of jumping in. */
+@keyframes chipIn {
+  0% {
+    transform: translateY(10px) scale(0.85);
+    opacity: 0;
+  }
+  70% {
+    transform: translateY(-2px) scale(1.04);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-chip-in {
+  animation: chipIn 280ms cubic-bezier(0.34, 1.4, 0.64, 1) both;
+}
+
 @keyframes splashFadeIn {
   0% {
     opacity: 0;
@@ -141,4 +161,280 @@ span.text-slate-600:not(.dark-bg-mode *) {
   animation: splashFadeIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* ---------------------------------------------------------------------------
+   MB1 Step 1: bank colour scoping. Inside the Practice Bank workspace every
+   orange accent renders sky blue; inside the Mock Bank workspace it renders
+   amber. The scope class is set by the Question Bank shell on the wrapper
+   that holds the banner, the tabs and the active bank screen, so the rest of
+   the console keeps its own colours. Unlayered rules sit above Tailwind's
+   utility layer, so no !important is needed.
+   ------------------------------------------------------------------------- */
+.bank-scope-practice .text-orange-100 { color: #e0f2fe; }
+.bank-scope-practice .text-orange-200 { color: #bae6fd; }
+.bank-scope-practice .text-orange-200\/90 { color: rgba(186, 230, 253, 0.9); }
+.bank-scope-practice .text-orange-300 { color: #7dd3fc; }
+.bank-scope-practice .text-orange-300\/90 { color: rgba(125, 211, 252, 0.9); }
+.bank-scope-practice .text-orange-400 { color: #38bdf8; }
+.bank-scope-practice .text-orange-400\/60 { color: rgba(56, 189, 248, 0.6); }
+.bank-scope-practice .bg-orange-500 { background-color: #0ea5e9; }
+.bank-scope-practice .bg-orange-500\/10 { background-color: rgba(14, 165, 233, 0.10); }
+.bank-scope-practice .bg-orange-500\/15 { background-color: rgba(14, 165, 233, 0.15); }
+.bank-scope-practice .bg-orange-500\/20 { background-color: rgba(14, 165, 233, 0.20); }
+.bank-scope-practice .bg-orange-500\/25 { background-color: rgba(14, 165, 233, 0.25); }
+.bank-scope-practice .bg-orange-600 { background-color: #0284c7; }
+.bank-scope-practice .hover\:bg-orange-500:hover { background-color: #0ea5e9; }
+.bank-scope-practice .hover\:text-orange-300:hover { color: #7dd3fc; }
+.bank-scope-practice .border-orange-500\/30 { border-color: rgba(14, 165, 233, 0.30); }
+.bank-scope-practice .border-orange-500\/40 { border-color: rgba(14, 165, 233, 0.40); }
+.bank-scope-practice .border-orange-500\/50 { border-color: rgba(14, 165, 233, 0.50); }
+.bank-scope-practice .border-orange-500\/60 { border-color: rgba(14, 165, 233, 0.60); }
+.bank-scope-practice .focus\:border-orange-500\/60:focus { border-color: rgba(14, 165, 233, 0.60); }
+.bank-scope-practice .bg-orange-500.text-white,
+.bank-scope-practice .bg-orange-600.text-white { color: #082f49; }
 
+.bank-scope-mock .text-orange-100 { color: #fef3c7; }
+.bank-scope-mock .text-orange-200 { color: #fde68a; }
+.bank-scope-mock .text-orange-200\/90 { color: rgba(253, 230, 138, 0.9); }
+.bank-scope-mock .text-orange-300 { color: #fcd34d; }
+.bank-scope-mock .text-orange-300\/90 { color: rgba(252, 211, 77, 0.9); }
+.bank-scope-mock .text-orange-400 { color: #fbbf24; }
+.bank-scope-mock .text-orange-400\/60 { color: rgba(251, 191, 36, 0.6); }
+.bank-scope-mock .bg-orange-500 { background-color: #f59e0b; }
+.bank-scope-mock .bg-orange-500\/10 { background-color: rgba(245, 158, 11, 0.10); }
+.bank-scope-mock .bg-orange-500\/15 { background-color: rgba(245, 158, 11, 0.15); }
+.bank-scope-mock .bg-orange-500\/20 { background-color: rgba(245, 158, 11, 0.20); }
+.bank-scope-mock .bg-orange-500\/25 { background-color: rgba(245, 158, 11, 0.25); }
+.bank-scope-mock .bg-orange-600 { background-color: #d97706; }
+.bank-scope-mock .hover\:bg-orange-500:hover { background-color: #f59e0b; }
+.bank-scope-mock .hover\:text-orange-300:hover { color: #fcd34d; }
+.bank-scope-mock .border-orange-500\/30 { border-color: rgba(245, 158, 11, 0.30); }
+.bank-scope-mock .border-orange-500\/40 { border-color: rgba(245, 158, 11, 0.40); }
+.bank-scope-mock .border-orange-500\/50 { border-color: rgba(245, 158, 11, 0.50); }
+.bank-scope-mock .border-orange-500\/60 { border-color: rgba(245, 158, 11, 0.60); }
+.bank-scope-mock .focus\:border-orange-500\/60:focus { border-color: rgba(245, 158, 11, 0.60); }
+.bank-scope-mock .bg-orange-500.text-white,
+.bank-scope-mock .bg-orange-600.text-white { color: #451a03; }
+
+
+/* ------------------------------------------------------------------
+   Student portal appearance (More > Appearance). The student picks
+   Light, Dark or System. The screens are written light, so dark mode
+   works as a scoped stylesheet: while the body carries
+   .tos-student-dark, the common light surfaces, borders and text
+   remap to dark equivalents and nothing inside the screens changes.
+   The status and chat overlays attach to the body, so they follow.
+   ------------------------------------------------------------------ */
+.tos-student-dark .bg-white { background-color: #101a2c; }
+.tos-student-dark .bg-white\/80 { background-color: #101a2ccc; }
+.tos-student-dark .bg-white\/70 { background-color: #101a2cb3; }
+.tos-student-dark .bg-white\/60 { background-color: #101a2c99; }
+.tos-student-dark .bg-slate-50 { background-color: #0d1526; }
+.tos-student-dark .bg-slate-50\/80 { background-color: #0d1526cc; }
+.tos-student-dark .bg-slate-100 { background-color: #1a2438; }
+.tos-student-dark .bg-slate-100\/80 { background-color: #1a2438cc; }
+.tos-student-dark .bg-slate-200 { background-color: #243252; }
+.tos-student-dark .bg-slate-300 { background-color: #334155; }
+.tos-student-dark .bg-slate-400 { background-color: #64748b; }
+.tos-student-dark .hover\:bg-slate-50:hover { background-color: #0d1526; }
+.tos-student-dark .hover\:bg-slate-50\/80:hover { background-color: #0d1526cc; }
+.tos-student-dark .hover\:bg-slate-100:hover { background-color: #1a2438; }
+.tos-student-dark .hover\:bg-slate-100\/80:hover { background-color: #1a2438cc; }
+.tos-student-dark .hover\:bg-slate-200:hover { background-color: #243252; }
+.tos-student-dark .hover\:bg-slate-900:hover { background-color: #0b1220; }
+.tos-student-dark .hover\:bg-slate-900\/80:hover { background-color: #0b1220cc; }
+.tos-student-dark .active\:bg-slate-100\/80:active { background-color: #1a2438cc; }
+.tos-student-dark .active\:bg-slate-50\/80:active { background-color: #0d1526cc; }
+.tos-student-dark .border-slate-100 { border-color: #22304a; }
+.tos-student-dark .border-slate-200 { border-color: #22304a; }
+.tos-student-dark .border-slate-200\/90 { border-color: #22304a; }
+.tos-student-dark .border-slate-200\/80 { border-color: #22304a; }
+.tos-student-dark .border-slate-300 { border-color: #2d3c5a; }
+.tos-student-dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]) { border-color: #22304a; }
+.tos-student-dark .divide-slate-200 > :not([hidden]) ~ :not([hidden]) { border-color: #22304a; }
+.tos-student-dark .text-slate-900 { color: #f1f5f9; }
+.tos-student-dark .text-slate-800 { color: #e2e8f0; }
+.tos-student-dark .text-slate-700 { color: #cbd5e1; }
+.tos-student-dark .text-slate-600 { color: #94a3b8; }
+.tos-student-dark .text-slate-500 { color: #94a3b8; }
+.tos-student-dark .text-slate-400 { color: #64748b; }
+.tos-student-dark .text-slate-300 { color: #64748b; }
+.tos-student-dark .text-\[\#0F172A\] { color: #f1f5f9; }
+.tos-student-dark .text-\[\#334155\] { color: #cbd5e1; }
+.tos-student-dark .text-\[\#475569\] { color: #94a3b8; }
+.tos-student-dark .text-\[\#64748B\] { color: #94a3b8; }
+.tos-student-dark .text-\[\#94A3B8\] { color: #64748b; }
+.tos-student-dark .text-\[\#EA580C\] { color: #fb923c; }
+.tos-student-dark .text-\[\#C2410C\] { color: #fb923c; }
+.tos-student-dark .text-\[\#BE123C\] { color: #fb7185; }
+.tos-student-dark .text-\[\#047857\] { color: #34d399; }
+.tos-student-dark .text-\[\#B45309\] { color: #fbbf24; }
+.tos-student-dark .border-\[\#E2E8F0\] { border-color: #22304a; }
+.tos-student-dark .border-\[\#CBD5E1\] { border-color: #2d3c5a; }
+.tos-student-dark .border-\[\#0F172A\] { border-color: #334155; }
+.tos-student-dark .border-\[\#FFEDD5\] { border-color: #7c2d12; }
+.tos-student-dark .border-\[\#FED7AA\] { border-color: #9a3412; }
+.tos-student-dark .placeholder\:text-slate-300::placeholder { color: #475569; }
+.tos-student-dark .placeholder\:text-slate-400::placeholder { color: #64748b; }
+.tos-student-dark .bg-orange-50 { background-color: #3a1a07; }
+.tos-student-dark .bg-orange-100 { background-color: #4a2410; }
+.tos-student-dark .bg-emerald-50 { background-color: #06281f; }
+.tos-student-dark .bg-emerald-50\/80 { background-color: #06281fcc; }
+.tos-student-dark .bg-rose-50 { background-color: #3f0d1e; }
+.tos-student-dark .bg-rose-50\/50 { background-color: #3f0d1e80; }
+.tos-student-dark .bg-amber-50 { background-color: #3a2506; }
+.tos-student-dark .bg-purple-50 { background-color: #2a1245; }
+.tos-student-dark .bg-indigo-50 { background-color: #1e2148; }
+.tos-student-dark .bg-sky-50 { background-color: #0c2a3f; }
+.tos-student-dark .bg-blue-50 { background-color: #16274d; }
+.tos-student-dark .bg-blue-50\/80 { background-color: #16274dcc; }
+.tos-student-dark .bg-\[\#FFF7ED\] { background-color: #3a1a07; }
+.tos-student-dark .bg-\[\#F1F5F9\] { background-color: #1a2438; }
+.tos-student-dark .bg-\[\#F8FAFC\] { background-color: #0d1526; }
+
+/* Second wave: coloured texts that went murky on dark surfaces, the dark
+   buttons that looked faded on dark cards, and the remaining tinted
+   backgrounds and borders. */
+.tos-student-dark .text-emerald-700 { color: #6ee7b7; }
+.tos-student-dark .text-emerald-600 { color: #34d399; }
+.tos-student-dark .text-emerald-800 { color: #a7f3d0; }
+.tos-student-dark .text-rose-600 { color: #fb7185; }
+.tos-student-dark .text-rose-700 { color: #fda4af; }
+.tos-student-dark .text-rose-500 { color: #fb7185; }
+.tos-student-dark .text-orange-600 { color: #fb923c; }
+.tos-student-dark .text-orange-500 { color: #fb923c; }
+.tos-student-dark .text-amber-800 { color: #fcd34d; }
+.tos-student-dark .text-amber-600 { color: #fbbf24; }
+.tos-student-dark .text-amber-700 { color: #fcd34d; }
+.tos-student-dark .text-blue-700 { color: #93c5fd; }
+.tos-student-dark .text-blue-600 { color: #60a5fa; }
+.tos-student-dark .text-purple-600 { color: #c084fc; }
+.tos-student-dark .text-indigo-600 { color: #a5b4fc; }
+.tos-student-dark .text-sky-600 { color: #7dd3fc; }
+.tos-student-dark .bg-slate-900 { background-color: #334155; }
+.tos-student-dark .hover\:bg-slate-900:hover { background-color: #3f4d63; }
+.tos-student-dark .hover\:bg-slate-900\/80:hover { background-color: #3f4d63cc; }
+.tos-student-dark .bg-slate-800 { background-color: #1e293b; }
+.tos-student-dark .border-slate-800 { border-color: #3b4a63; }
+.tos-student-dark .bg-slate-50\/70 { background-color: #0d1526b3; }
+.tos-student-dark .bg-emerald-600 { background-color: #059669; }
+.tos-student-dark .bg-emerald-500 { background-color: #059669; }
+.tos-student-dark .bg-emerald-100 { background-color: #064e3b; }
+.tos-student-dark .bg-rose-100 { background-color: #4c0519; }
+.tos-student-dark .bg-amber-100 { background-color: #451a03; }
+.tos-student-dark .bg-blue-100 { background-color: #1e3a8a; }
+.tos-student-dark .bg-purple-100 { background-color: #3b0764; }
+.tos-student-dark .bg-indigo-100 { background-color: #1e1b4b; }
+.tos-student-dark .bg-sky-100 { background-color: #082f49; }
+.tos-student-dark .bg-orange-500\/10 { background-color: #7c2d1219; }
+.tos-student-dark .bg-orange-500\/15 { background-color: #7c2d1226; }
+.tos-student-dark .bg-orange-500\/20 { background-color: #7c2d1233; }
+.tos-student-dark .border-orange-100 { border-color: #7c2d12; }
+.tos-student-dark .border-orange-200 { border-color: #9a3412; }
+.tos-student-dark .border-emerald-200 { border-color: #065f46; }
+.tos-student-dark .border-emerald-100 { border-color: #064e3b; }
+.tos-student-dark .border-rose-200 { border-color: #9f1239; }
+.tos-student-dark .border-amber-200 { border-color: #92400e; }
+.tos-student-dark .border-blue-200 { border-color: #1e40af; }
+.tos-student-dark .border-purple-200 { border-color: #6b21a8; }
+.tos-student-dark .border-indigo-200 { border-color: #3730a3; }
+.tos-student-dark .border-sky-200 { border-color: #0c4a6e; }
+.tos-student-dark .text-\[\#1E293B\] { color: #e2e8f0; }
+
+/* Third wave: segmented toggles and pill pickers. In dark mode the active
+   pill was dark-on-dark and unreadable; it now carries the centre's orange
+   with a soft glow, and hover states stay light. */
+.tos-student-dark .bg-\[\#0F172A\].text-white.rounded-\[10px\],
+.tos-student-dark .bg-\[\#0F172A\].text-white.rounded-full {
+  background-image: linear-gradient(135deg, #C2410C, #EA580C);
+  box-shadow: 0 2px 8px rgba(234, 88, 12, 0.35);
+}
+.tos-student-dark .hover\:text-\[\#0F172A\]:hover { color: #f1f5f9; }
+.tos-student-dark .hover\:text-\[\#EA580C\]:hover { color: #fb923c; }
+.tos-student-dark .hover\:border-\[\#CBD5E1\]:hover { border-color: #2d3c5a; }
+.tos-student-dark .hover\:bg-\[\#FFF7ED\]:hover { background-color: #3a1a07; }
+
+/* ===== Centre landing page (Classic Orange template) ===== */
+.plp-root{--plp-accent:#EA580C;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#1e293b;background:#fff;min-height:100vh}
+.plp-shell{max-width:1080px;margin:0 auto;padding:0 20px}
+.plp-topbar{position:sticky;top:0;background:#fff;border-bottom:1px solid #e2e8f0;z-index:5}
+.plp-toprow{display:flex;align-items:center;gap:10px;padding:12px 20px}
+.plp-logo{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--plp-accent),#f59e0b);color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
+.plp-brand{font-weight:700;font-size:15px}
+.plp-nav{margin-left:auto;display:flex;gap:18px;font-size:14px;color:#475569}
+.plp-btn{display:inline-block;background:var(--plp-accent);color:#fff;font-weight:600;font-size:14px;padding:10px 18px;border-radius:10px;border:0;text-align:center}
+.plp-btn:hover{filter:brightness(.95)}
+.plp-ghost{background:#fff;color:var(--plp-accent);border:1.5px solid color-mix(in srgb,var(--plp-accent) 40%,white)}
+.plp-hero{background:linear-gradient(180deg,#fff7ed,#fff)}
+.plp-herogrid{display:grid;grid-template-columns:1.1fr .9fr;gap:36px;align-items:center;padding:56px 20px}
+.plp-tag{display:inline-block;background:#ffedd5;color:#9a3412;font-size:12px;font-weight:600;padding:5px 10px;border-radius:999px;margin-bottom:14px}
+.plp-hero h1{font-size:40px;line-height:1.15;letter-spacing:-.5px;font-weight:800}
+.plp-sub{color:#475569;margin:14px 0 22px;font-size:16px;max-width:46ch}
+.plp-ctas{display:flex;gap:10px;flex-wrap:wrap}
+.plp-heroart{background:linear-gradient(150deg,var(--plp-accent) 0%,color-mix(in srgb,var(--plp-accent) 70%,black) 60%,#7c2d12 100%);border-radius:22px;color:#fff;padding:26px;min-height:300px;display:flex;flex-direction:column;justify-content:flex-end;gap:14px}
+.plp-heroart{position:relative;overflow:hidden}
+.plp-heroimg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center;border-radius:22px}
+.plp-heroart .plp-badges{position:relative;z-index:1}
+.plp-heroart .plp-line{position:relative;z-index:1}
+.plp-line{height:10px;border-radius:6px;background:rgba(255,255,255,.35)}
+.plp-short{width:55%}
+.plp-badges{display:flex;gap:10px;flex-wrap:wrap}
+.plp-badge{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.25);padding:7px 12px;border-radius:999px;font-size:12.5px;font-weight:600}
+.plp-stats{border-top:1px solid #fee2e2;background:#fff}
+.plp-statgrid{display:grid;grid-template-columns:repeat(3,1fr);text-align:center;padding:22px 20px}
+.plp-statgrid b{display:block;font-size:24px;color:var(--plp-accent)}
+.plp-statgrid span{font-size:13px;color:#64748b}
+.plp-sec{padding:52px 0}
+.plp-sec h2{font-size:24px;letter-spacing:-.3px;font-weight:800;margin-bottom:6px}
+.plp-lead{color:#64748b;font-size:14.5px;margin-bottom:22px}
+.plp-grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.plp-card{border:1px solid #e2e8f0;border-radius:16px;padding:20px;background:#fff}
+.plp-ic{width:40px;height:40px;border-radius:12px;background:#fff7ed;color:var(--plp-accent);display:flex;align-items:center;justify-content:center;font-size:18px;margin-bottom:12px}
+.plp-card h3{font-size:15.5px;margin-bottom:6px;font-weight:700}
+.plp-card p{font-size:13.5px;color:#64748b;line-height:1.5}
+.plp-tint{background:#fff7ed}
+.plp-quote{border:1px solid #e2e8f0;border-left:4px solid var(--plp-accent);border-radius:14px;padding:18px;background:#fffbf7}
+.plp-quote p{font-size:14px;line-height:1.55;color:#334155}
+.plp-who{margin-top:12px;font-size:13px;font-weight:600}
+.plp-who span{color:#94a3b8;font-weight:400}
+.plp-cta{background:linear-gradient(135deg,var(--plp-accent),color-mix(in srgb,var(--plp-accent) 70%,black));color:#fff;border-radius:20px;padding:36px;text-align:center}
+.plp-cta h2{color:#fff}
+.plp-cta p{opacity:.85;margin:10px auto 20px;max-width:52ch;font-size:15px}
+.plp-cta .plp-btn{background:#fff;color:color-mix(in srgb,var(--plp-accent) 70%,black)}
+.plp-contactmeta{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-top:18px;font-size:13px;opacity:.9}
+.plp-contactmeta a{color:#fff;text-decoration:underline}
+.plp-footer{border-top:1px solid #e2e8f0;padding:26px 0;color:#94a3b8;font-size:13px}
+.plp-footrow{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+
+/* Landing page piece 3: floating WhatsApp button, enquiry form, social links */
+.plp-wafab{position:fixed;right:18px;bottom:18px;width:56px;height:56px;border-radius:999px;background:#25D366;color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(16,24,40,.28);z-index:60;transition:transform .15s ease}
+.plp-wafab:hover{transform:scale(1.06)}
+.plp-wafab svg{width:28px;height:28px}
+.plp-socials{display:flex;gap:10px;align-items:center}
+.plp-socials a{width:34px;height:34px;border-radius:999px;display:flex;align-items:center;justify-content:center;background:#f1f5f9;color:#475569;transition:all .15s ease}
+.plp-socials a:hover{background:var(--plp-accent);color:#fff}
+.plp-form{max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:14px;text-align:left;background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:22px;box-shadow:0 10px 30px rgba(15,23,42,.06)}
+.plp-formrow{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.plp-form label{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600;color:#334155}
+.plp-form input,.plp-form textarea{border:1px solid #cbd5e1;border-radius:10px;padding:10px 12px;font-size:14px;color:#0f172a;font-family:inherit;outline:none;background:#f8fafc}
+.plp-form input:focus,.plp-form textarea:focus{border-color:var(--plp-accent);background:#fff;box-shadow:0 0 0 3px rgba(234,88,12,.12)}
+.plp-form textarea{resize:vertical;min-height:96px}
+.plp-formbtn{border:none;cursor:pointer;background:var(--plp-accent);color:#fff;font-weight:700;font-size:14px;padding:12px 20px;border-radius:999px;align-self:flex-start;min-height:44px}
+.plp-formbtn:disabled{opacity:.6;cursor:default}
+.plp-formerr{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;border-radius:10px;padding:10px 12px;font-size:13px}
+.plp-formdone{max-width:640px;margin:0 auto;text-align:center;background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:30px 22px;box-shadow:0 10px 30px rgba(15,23,42,.06)}
+.plp-formdone b{color:#15803d;font-size:17px}
+.plp-formdone p{color:#475569;margin-top:8px;font-size:14px;line-height:1.55}
+@media (max-width:760px){
+  .plp-wafab{right:14px;bottom:14px;width:52px;height:52px}
+  .plp-formrow{grid-template-columns:1fr}
+  .plp-form{padding:16px}
+}
+@media(max-width:760px){
+.plp-nav{display:none}
+.plp-hero h1{font-size:30px}
+.plp-herogrid{grid-template-columns:1fr;padding:36px 20px;gap:24px}
+.plp-heroart{min-height:200px}
+.plp-grid3{grid-template-columns:1fr}
+.plp-statgrid{padding:18px 12px}
+.plp-sec{padding:36px 0}
+}

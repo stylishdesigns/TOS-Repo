@@ -21,6 +21,8 @@ import {
   Shield,
   Award,
   Sparkles,
+  MessageSquare,
+  Inbox,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -39,6 +41,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
     branches,
     activeUser,
     setViewMode,
+    centreName,
   } = useApp();
 
   const pendingAdmissionsCount = admissions.filter((a) => a.status === 'Pending').length;
@@ -72,7 +75,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
         { id: 'timetable', label: 'Timetable', icon: Calendar },
         { id: 'attendance', label: 'Attendance', icon: UserCheck },
         { id: 'results', label: 'Performance', icon: BarChart3 },
-        { id: 'cbt', label: 'CBT Practice', icon: Laptop },
+        { id: 'cbt', label: 'Tutors Assessment', icon: Laptop },
       ],
     },
     {
@@ -80,13 +83,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
       items: [
         { id: 'payments', label: 'Fees & Payments', icon: CreditCard },
         { id: 'announcements', label: 'Announcements', icon: Bell },
-      ],
-    },
-    {
-      title: 'PORTALS',
-      items: [
-        { id: 'student-portal', label: 'Student Portal', icon: Laptop },
-        { id: 'tutor-portal', label: 'Tutor Portal', icon: GraduationCap },
+        { id: 'chat', label: 'Chat', icon: MessageSquare },
+        { id: 'website-enquiries', label: 'Website Enquiries', icon: Inbox },
       ],
     },
     {
@@ -116,20 +114,20 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
         }`}
       >
         {/* Brand Header */}
-        <div className="px-5 py-5 border-b border-[#15233C] flex items-center justify-between">
+        <div className="px-5 py-5 border-b border-[#15233C] flex items-facility justify-between">
           <div
             onClick={() => setAdminSection('dashboard')}
-            className="flex items-center space-x-2.5 cursor-pointer group"
+            className="flex items-facility space-x-2.5 cursor-pointer group"
           >
-            <div className="w-8 h-8 rounded-lg bg-[#EA580C] flex items-center justify-center text-white font-extrabold text-sm shadow-md shadow-orange-950/40">
+            <div className="w-8 h-8 rounded-lg bg-[#EA580C] flex items-facility justify-facility text-white font-extrabold text-sm shadow-md shadow-orange-950/40">
               <GraduationCap className="w-4 h-4 text-white" />
             </div>
             <div>
               <div className="flex items-baseline space-x-1 leading-none">
-                <span className="text-white font-black text-sm tracking-tight">EXCELLENCE</span>
+                <span className="text-white font-black text-sm tracking-tight truncate max-w-[9.5rem]">{(centreName.split(/\s+/)[0] || 'TUTORIAL').toUpperCase()}</span>
               </div>
-              <span className="text-[#EA580C] font-black text-[10px] tracking-wider leading-none block mt-0.5 uppercase">
-                TUTORIAL CENTRE
+              <span className="text-[#EA580C] font-black text-[10px] tracking-wider leading-none block mt-0.5 uppercase truncate max-w-[9.5rem]">
+                {centreName.split(/\s+/).slice(1).join(' ') || 'EDUCATION FACILITY'}
               </span>
             </div>
           </div>
@@ -162,13 +160,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
                       setAdminSection(item.id);
                       setMobileOpen(false);
                     }}
-                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all ${
+                    className={`w-full flex items-facility justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all ${
                       isActive
                         ? 'bg-[#132238] border border-slate-700/60 text-white font-semibold shadow-xs'
                         : 'text-slate-400 hover:text-white hover:bg-[#0F1B2E]'
                     }`}
                   >
-                    <div className="flex items-center space-x-3 truncate">
+                    <div className="flex items-facility space-x-3 truncate">
                       <Icon
                         className={`w-4 h-4 shrink-0 transition-colors ${
                           isActive ? 'text-[#EA580C]' : 'text-slate-400'
@@ -200,10 +198,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
           <div
             id="sidebar-user-card"
             onClick={() => setAdminSection('account')}
-            className="flex items-center justify-between p-2 rounded-xl bg-[#0F1B2E]/60 hover:bg-[#0F1B2E] border border-transparent hover:border-slate-800 cursor-pointer transition-all group"
+            className="flex items-facility justify-between p-2 rounded-xl bg-[#0F1B2E]/60 hover:bg-[#0F1B2E] border border-transparent hover:border-slate-800 cursor-pointer transition-all group"
           >
-            <div className="flex items-center space-x-2.5 overflow-hidden">
-              <div className="w-8 h-8 rounded-lg bg-[#EA580C] flex items-center justify-center text-white font-bold text-xs shrink-0 shadow-sm">
+            <div className="flex items-facility space-x-2.5 overflow-hidden">
+              <div className="w-8 h-8 rounded-lg bg-[#EA580C] flex items-facility justify-facility text-white font-bold text-xs shrink-0 shadow-sm">
                 {(activeUser?.name || 'EX').slice(0, 2).toUpperCase()}
               </div>
               <div className="text-left overflow-hidden">

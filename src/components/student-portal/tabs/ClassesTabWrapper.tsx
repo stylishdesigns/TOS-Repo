@@ -45,7 +45,7 @@ export const ClassesTabWrapper: React.FC<ClassesTabWrapperProps> = ({
       <button
         type="button"
         onClick={() => onAssessmentViewChange('assessments')}
-        className={`h-10 rounded-[10px] text-xs font-extrabold transition-all flex items-center justify-center cursor-pointer ${
+        className={`h-10 rounded-[10px] text-xs font-extrabold transition-all flex items-facility justify-facility cursor-pointer ${
           assessmentView === 'assessments'
             ? 'bg-[#0F172A] text-white shadow-xs'
             : 'text-[#64748B] hover:text-[#0F172A]'
@@ -56,7 +56,7 @@ export const ClassesTabWrapper: React.FC<ClassesTabWrapperProps> = ({
       <button
         type="button"
         onClick={() => onAssessmentViewChange('performance')}
-        className={`h-10 rounded-[10px] text-xs font-extrabold transition-all flex items-center justify-center cursor-pointer ${
+        className={`h-10 rounded-[10px] text-xs font-extrabold transition-all flex items-facility justify-facility cursor-pointer ${
           assessmentView === 'performance'
             ? 'bg-[#0F172A] text-white shadow-xs'
             : 'text-[#64748B] hover:text-[#0F172A]'
@@ -73,7 +73,11 @@ export const ClassesTabWrapper: React.FC<ClassesTabWrapperProps> = ({
         student={student}
         lockedFrequency="General"
         hideFrequencyToggle={true}
-        onHideBottomNav={onHideBottomNav}
+        onHideBottomNav={(hide) => {
+          // Tell the PWA updater to hold its auto-reload while an exam screen is up.
+          try { sessionStorage.setItem('tos:defer-pwa-reload', hide ? '1' : '0'); } catch {}
+          onHideBottomNav?.(hide);
+        }}
         initialSubjectFilter={cbtSubjectFilter}
         directReviewResult={cbtReviewTarget?.result}
         directReviewExamId={cbtReviewTarget?.result?.examId}
@@ -85,11 +89,11 @@ export const ClassesTabWrapper: React.FC<ClassesTabWrapperProps> = ({
 
   // Performance view: header on top, toggle below it, then performance content
   return (
-    <div className="space-y-4 max-w-lg mx-auto pb-20 animate-in fade-in duration-300">
+    <div className="space-y-4 max-w-lg mx-auto animate-in fade-in duration-300">
       <div className="px-4 pt-4 space-y-3">
-        <div className="flex items-center justify-between">
+        <div className="flex items-facility justify-between">
           <h2 className="text-xl font-black tracking-tight text-[#0F172A]">
-            Academic Performance
+            Assessment Performance
           </h2>
         </div>
         {renderToggle()}

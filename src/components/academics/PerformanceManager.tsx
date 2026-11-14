@@ -148,7 +148,7 @@ export const PerformanceManager: React.FC = () => {
   return (
     <div id="academic-performance-page" className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
       {/* Header Row */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-facility justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-900 tracking-tight">
             Performance Analytics
@@ -157,34 +157,17 @@ export const PerformanceManager: React.FC = () => {
         </div>
       </div>
 
-      {/* View Mode Toggle */}
-      <div className="flex items-center space-x-1 bg-slate-100 p-1 rounded-xl w-fit">
-        {(['General', 'Mock'] as const).map((mode) => (
-          <button
-            key={mode}
-            onClick={() => setActiveToggle(mode)}
-            className={`px-8 py-2.5 text-xs font-black rounded-lg transition-all ${
-              activeToggle === mode
-                ? 'bg-white text-[#EA580C] shadow-md scale-105'
-                : 'text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            {mode === 'General' ? 'CBT Assessment Performance' : 'CBT Mock Performance'}
-          </button>
-        ))}
-      </div>
-
       {/* Filters Bar */}
       <div className="bg-white p-4 md:p-6 rounded-3xl border border-slate-200/90 shadow-sm space-y-4">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center space-x-3">
-             <div className="w-8 h-8 rounded-xl bg-orange-50 flex items-center justify-center">
+        <div className="flex flex-col md:flex-row md:items-facility justify-between gap-4">
+          <div className="flex items-facility space-x-3">
+             <div className="w-8 h-8 rounded-xl bg-orange-50 flex items-facility justify-facility">
                 <Filter className="w-4 h-4 text-[#EA580C]" />
              </div>
              <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest leading-none">Performance Filters</h3>
           </div>
 
-          <div className="relative flex items-center bg-slate-50/60 border border-slate-200 rounded-lg px-3 py-2 w-full sm:w-72 focus-within:bg-white focus-within:border-orange-500 transition-all">
+          <div className="relative flex items-facility bg-slate-50/60 border border-slate-200 rounded-lg px-3 py-2 w-full sm:w-72 focus-within:bg-white focus-within:border-orange-500 transition-all">
             <Search className="w-4 h-4 text-slate-400 mr-2.5 shrink-0" />
             <input
               type="text"
@@ -252,6 +235,23 @@ export const PerformanceManager: React.FC = () => {
         </div>
       </div>
 
+      {/* View Mode Toggle */}
+      <div className="flex items-facility space-x-1 bg-slate-100 p-1 rounded-xl w-fit">
+        {(['General', 'Mock'] as const).map((mode) => (
+          <button
+            key={mode}
+            onClick={() => setActiveToggle(mode)}
+            className={`px-8 py-2.5 text-xs font-black rounded-lg transition-all ${
+              activeToggle === mode
+                ? 'bg-white text-[#EA580C] shadow-md scale-105'
+                : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            {mode === 'General' ? 'Tutors Assessment Performance' : 'CBT Mock Performance'}
+          </button>
+        ))}
+      </div>
+
       {/* Assessment Leaderboards List */}
       <div className="space-y-4">
         {(() => {
@@ -261,8 +261,8 @@ export const PerformanceManager: React.FC = () => {
 
           if (filteredExams.length === 0) {
             return (
-              <div className="py-12 bg-white rounded-3xl border border-dashed border-slate-200 text-center space-y-3">
-                 <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto">
+              <div className="py-12 bg-white rounded-3xl border border-dashed border-slate-200 text-facility space-y-3">
+                 <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-facility justify-facility mx-auto">
                     <BarChart2 className="w-8 h-8 text-slate-300" />
                  </div>
                  <p className="text-xs font-medium text-slate-400">No assessments found for this category.</p>
@@ -280,14 +280,14 @@ export const PerformanceManager: React.FC = () => {
             return (
               <div key={exam.id} className="bg-white border border-slate-200 rounded-2xl overflow-hidden transition-all shadow-sm hover:border-orange-200 relative">
                  {/* Top Right Corner - Created Date */}
-                 <div className="absolute top-0 right-0 px-3 py-1 bg-slate-700 text-white text-[8px] font-black uppercase tracking-widest flex items-center gap-1 border-b border-l border-slate-600 rounded-bl-lg z-10">
+                 <div className="absolute top-0 right-0 px-3 py-1 bg-slate-700 text-white text-[8px] font-black uppercase tracking-widest flex items-facility gap-1 border-b border-l border-slate-600 rounded-bl-lg z-10">
                     <Clock className="w-2.5 h-2.5 text-orange-400" />
                     <span>Created: <span className="text-orange-300">{exam.createdAt ? new Date(exam.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : (exam.startTime ? new Date(exam.startTime).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A')}</span></span>
                  </div>
 
-                 <div className="p-5 pt-6 flex items-center justify-between gap-4">
+                 <div className="p-5 pt-6 flex items-facility justify-between gap-4">
                     <div className="flex-1 min-w-0">
-                       <div className="flex items-center gap-2 mb-1.5">
+                       <div className="flex items-facility gap-2 mb-1.5">
                           <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest ${isPast ? 'bg-slate-100 text-slate-500' : 'bg-emerald-50 text-emerald-600'}`}>
                              {isPast ? 'Finished' : 'Live Now'}
                           </span>
@@ -302,18 +302,18 @@ export const PerformanceManager: React.FC = () => {
                              {exam.subjects.join(', ')}
                           </span>
                        </div>
-                       <h3 className="text-slate-900 font-black text-base truncate">{exam.title.replace(/General Assessment/g, 'CBT Assessment').replace(/General/g, 'CBT')}</h3>
+                       <h3 className="text-slate-900 font-black text-base truncate">{exam.title.replace(/General Assessment/g, 'Tutors Assessment').replace(/General/g, 'Tutors')}</h3>
                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter mt-1">{exam.targetExam}</p>
                     </div>
 
-                    <div className="flex items-center gap-6 shrink-0">
+                    <div className="flex items-facility gap-6 shrink-0">
                        <div className="text-right border-l border-slate-100 pl-6">
                           <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest block">Students</span>
                           <span className="text-lg font-black text-slate-900">{examResults.length}</span>
                        </div>
                        <button
                           onClick={() => setExpandedExamId(expandedExamId === exam.id ? null : exam.id)}
-                          className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${expandedExamId === exam.id ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
+                          className={`w-10 h-10 rounded-xl flex items-facility justify-facility transition-all ${expandedExamId === exam.id ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
                        >
                           <ChevronDown className={`w-5 h-5 transition-transform duration-300 ${expandedExamId === exam.id ? 'rotate-180' : 'rotate-0'}`} />
                        </button>
@@ -328,14 +328,14 @@ export const PerformanceManager: React.FC = () => {
                                <tr className="text-slate-400 font-black uppercase tracking-[0.2em] border-b border-slate-200">
                                   <th className="px-4 py-3 w-16">Rank</th>
                                   <th className="px-4 py-3">Student</th>
-                                  <th className="px-4 py-3 text-center">Duration</th>
+                                  <th className="px-4 py-3 text-facility">Duration</th>
                                   <th className="px-4 py-3 text-right">Score</th>
                                </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
                                {examResults.length === 0 ? (
                                  <tr>
-                                   <td colSpan={4} className="px-4 py-8 text-center text-slate-400 font-medium italic">
+                                   <td colSpan={4} className="px-4 py-8 text-facility text-slate-400 font-medium italic">
                                      No attempts recorded for this assessment yet.
                                    </td>
                                  </tr>
@@ -343,7 +343,7 @@ export const PerformanceManager: React.FC = () => {
                                  examResults.map((result, idx) => (
                                     <tr key={result.id} className="hover:bg-white transition-colors group">
                                        <td className="px-4 py-4">
-                                          <span className={`flex items-center justify-center w-6 h-6 rounded-lg text-[10px] font-black ${
+                                          <span className={`flex items-facility justify-facility w-6 h-6 rounded-lg text-[10px] font-black ${
                                              idx === 0 ? 'bg-amber-100 text-amber-700 shadow-sm' : 
                                              idx === 1 ? 'bg-slate-100 text-slate-600' :
                                              idx === 2 ? 'bg-orange-50 text-orange-700' : 'text-slate-400'
@@ -352,8 +352,8 @@ export const PerformanceManager: React.FC = () => {
                                           </span>
                                        </td>
                                        <td className="px-4 py-4">
-                                          <div className="flex items-center space-x-2.5">
-                                             <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-black text-slate-400 border border-slate-200 group-hover:border-orange-200 transition-colors">
+                                          <div className="flex items-facility space-x-2.5">
+                                             <div className="w-7 h-7 rounded-full bg-slate-100 flex items-facility justify-facility text-[10px] font-black text-slate-400 border border-slate-200 group-hover:border-orange-200 transition-colors">
                                                 {result.studentName.charAt(0)}
                                              </div>
                                              <div className="flex flex-col">
@@ -361,8 +361,8 @@ export const PerformanceManager: React.FC = () => {
                                              </div>
                                           </div>
                                        </td>
-                                       <td className="px-4 py-4 text-center">
-                                          <div className="flex flex-col items-center">
+                                       <td className="px-4 py-4 text-facility">
+                                          <div className="flex flex-col items-facility">
                                              <span className="font-mono text-slate-600">
                                                 {result.timeTakenSeconds ? `${Math.floor(result.timeTakenSeconds / 60)}m ${result.timeTakenSeconds % 60}s` : 'N/A'}
                                              </span>
@@ -387,7 +387,7 @@ export const PerformanceManager: React.FC = () => {
           })}
 
           {totalPerformancePages > 1 && (
-            <div className="flex items-center justify-between pt-6 pb-2 text-xs">
+            <div className="flex items-facility justify-between pt-6 pb-2 text-xs">
               <button
                 onClick={() => setPerformancePage(p => Math.max(1, p - 1))}
                 disabled={performancePage === 1}

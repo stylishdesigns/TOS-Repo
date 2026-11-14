@@ -78,7 +78,7 @@ export const AssessmentSheet: React.FC<AssessmentSheetProps> = ({
       role="dialog"
       aria-modal="true"
       aria-label={`${result.examTitle} Assessment Details`}
-      className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
+      className="fixed inset-0 z-[60] flex items-end sm:items-facility justify-facility bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div
@@ -88,7 +88,7 @@ export const AssessmentSheet: React.FC<AssessmentSheetProps> = ({
         {/* Header */}
         <div className="p-5 pb-3 border-b border-slate-100 flex items-start justify-between shrink-0 gap-3">
           <div className="min-w-0 flex-1">
-            <div className="flex items-center space-x-2">
+            <div className="flex items-facility space-x-2">
               <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700 font-mono">
                 {subject}
               </span>
@@ -99,12 +99,12 @@ export const AssessmentSheet: React.FC<AssessmentSheetProps> = ({
             </h3>
           </div>
 
-          <div className="flex items-center space-x-2 shrink-0">
+          <div className="flex items-facility space-x-2 shrink-0">
             {parentSubject && (
               <button
                 type="button"
                 onClick={onClose}
-                className="inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer active:scale-95"
+                className="inline-flex items-facility space-x-1 px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer active:scale-95"
                 title={`Back to ${parentSubject}`}
               >
                 <ChevronLeft className="w-3.5 h-3.5 text-slate-500" />
@@ -115,7 +115,7 @@ export const AssessmentSheet: React.FC<AssessmentSheetProps> = ({
               type="button"
               onClick={onClose}
               aria-label="Close Assessment Details"
-              className="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors cursor-pointer shrink-0"
+              className="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-facility justify-facility transition-colors cursor-pointer shrink-0"
             >
               <X className="w-5 h-5" />
             </button>
@@ -125,7 +125,7 @@ export const AssessmentSheet: React.FC<AssessmentSheetProps> = ({
         {/* Scrollable Sheet Body (Clean view for both MCQ & Essay without rubric block) */}
         <div className="p-5 overflow-y-auto space-y-4 flex-1 text-xs">
           {/* Score Card Banner */}
-          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 flex items-center justify-between">
+          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 flex items-facility justify-between">
             <div>
               <span className="text-[10px] text-slate-400 uppercase font-bold block">
                 Composite Score
@@ -174,7 +174,7 @@ export const AssessmentSheet: React.FC<AssessmentSheetProps> = ({
             {/* MCQ Bar */}
             {mcqScore && mcqScore.maxScore > 0 && (
               <div className="space-y-1">
-                <div className="flex justify-between items-center text-xs">
+                <div className="flex justify-between items-facility text-xs">
                   <span className="font-bold text-slate-800">Multiple Choice (MCQ)</span>
                   <span className="font-mono font-bold text-slate-700 tabular-nums">
                     {mcqScore.score} / {mcqScore.maxScore} (
@@ -193,7 +193,7 @@ export const AssessmentSheet: React.FC<AssessmentSheetProps> = ({
             {/* Essay Bar */}
             {essayScore && essayScore.maxScore > 0 && (
               <div className="space-y-1">
-                <div className="flex justify-between items-center text-xs">
+                <div className="flex justify-between items-facility text-xs">
                   <span className="font-bold text-slate-800">Theory / Essay Section</span>
                   <span className="font-mono font-bold text-slate-700 tabular-nums">
                     {essayScore.score} / {essayScore.maxScore} (
@@ -211,8 +211,8 @@ export const AssessmentSheet: React.FC<AssessmentSheetProps> = ({
 
             {/* Time Used Bar */}
             <div className="space-y-1 pt-1 border-t border-slate-100">
-              <div className="flex justify-between items-center text-xs">
-                <span className="font-bold text-slate-800 flex items-center gap-1">
+              <div className="flex justify-between items-facility text-xs">
+                <span className="font-bold text-slate-800 flex items-facility gap-1">
                   <Clock className="w-3.5 h-3.5 text-slate-400" />
                   Time Utilised
                 </span>
@@ -236,7 +236,7 @@ export const AssessmentSheet: React.FC<AssessmentSheetProps> = ({
               onClick={() => {
                 onReviewAnswers?.(result);
               }}
-              className="w-full min-h-[44px] px-4 py-3 rounded-2xl bg-slate-900 hover:bg-slate-800 active:scale-98 text-white font-extrabold text-xs shadow-xs transition-all inline-flex items-center justify-center space-x-2 cursor-pointer"
+              className="w-full min-h-[44px] px-4 py-3 rounded-2xl bg-slate-900 hover:bg-slate-800 active:scale-98 text-white font-extrabold text-xs shadow-xs transition-all inline-flex items-facility justify-facility space-x-2 cursor-pointer"
             >
               <BookOpen className="w-4 h-4 text-orange-400" />
               <span>Review My Answers</span>

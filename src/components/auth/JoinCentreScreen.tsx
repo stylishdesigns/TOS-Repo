@@ -104,7 +104,7 @@ export const JoinCentreScreen: React.FC<JoinCentreScreenProps> = ({
       }
     } catch (err: any) {
       if (err.code === 'CENTRE_FULL' || err.message?.includes('student limit')) {
-        setCentreFullInfo({ centreName: err.centreName || 'this centre' });
+        setCentreFullInfo({ centreName: err.centreName || 'this facility' });
       } else {
         setError(err.message || 'That code did not match. Check it and try again.');
       }
@@ -116,9 +116,9 @@ export const JoinCentreScreen: React.FC<JoinCentreScreenProps> = ({
   // 1. CENTRE FULL OUTCOME (Part B, point 3)
   if (centreFullInfo) {
     return (
-      <div className="min-h-screen w-full flex items-center justify-center bg-slate-950 p-4 relative overflow-hidden">
-        <div className="w-full max-w-md bg-slate-900 border border-rose-500/30 rounded-3xl p-8 backdrop-blur-xl shadow-2xl relative z-10 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-500 mx-auto mb-5 shadow-inner">
+      <div className="min-h-screen w-full flex items-facility justify-facility bg-slate-950 p-4 relative overflow-hidden">
+        <div className="w-full max-w-md bg-slate-900 border border-rose-500/30 rounded-3xl p-8 backdrop-blur-xl shadow-2xl relative z-10 text-facility">
+          <div className="w-16 h-16 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-facility justify-facility text-rose-500 mx-auto mb-5 shadow-inner">
             <ShieldAlert className="w-8 h-8" />
           </div>
 
@@ -131,7 +131,7 @@ export const JoinCentreScreen: React.FC<JoinCentreScreenProps> = ({
           </h2>
 
           <p className="text-sm text-slate-300 leading-relaxed bg-slate-800/60 p-4 rounded-2xl border border-slate-700/60 mb-6">
-            This centre has reached its student limit. Please contact{' '}
+            This facility has reached its student limit. Please contact{' '}
             <strong className="text-white font-semibold">{centreFullInfo.centreName}</strong>.
           </p>
 
@@ -147,7 +147,7 @@ export const JoinCentreScreen: React.FC<JoinCentreScreenProps> = ({
             </button>
             <button
               onClick={onSignOut}
-              className="w-full py-3 text-slate-500 hover:text-slate-400 text-xs font-medium transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+              className="w-full py-3 text-slate-500 hover:text-slate-400 text-xs font-medium transition-colors cursor-pointer flex items-facility justify-facility gap-1.5"
             >
               <LogOut className="w-3.5 h-3.5" />
               <span>Sign out</span>
@@ -161,9 +161,9 @@ export const JoinCentreScreen: React.FC<JoinCentreScreenProps> = ({
   // 2. PENDING APPROVAL OUTCOME (Part B, point 4)
   if (pendingApprovalInfo) {
     return (
-      <div className="min-h-screen w-full flex items-center justify-center bg-slate-950 p-4 relative overflow-hidden">
-        <div className="w-full max-w-md bg-slate-900 border border-amber-500/30 rounded-3xl p-8 backdrop-blur-xl shadow-2xl relative z-10 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 mx-auto mb-5 shadow-inner">
+      <div className="min-h-screen w-full flex items-facility justify-facility bg-slate-950 p-4 relative overflow-hidden">
+        <div className="w-full max-w-md bg-slate-900 border border-amber-500/30 rounded-3xl p-8 backdrop-blur-xl shadow-2xl relative z-10 text-facility">
+          <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-facility justify-facility text-amber-400 mx-auto mb-5 shadow-inner">
             <Clock className="w-8 h-8 animate-pulse" />
           </div>
 
@@ -188,7 +188,7 @@ export const JoinCentreScreen: React.FC<JoinCentreScreenProps> = ({
             </button>
             <button
               onClick={onSignOut}
-              className="w-full py-3 text-slate-500 hover:text-slate-400 text-xs font-medium transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+              className="w-full py-3 text-slate-500 hover:text-slate-400 text-xs font-medium transition-colors cursor-pointer flex items-facility justify-facility gap-1.5"
             >
               <LogOut className="w-3.5 h-3.5" />
               <span>Sign out</span>
@@ -201,25 +201,25 @@ export const JoinCentreScreen: React.FC<JoinCentreScreenProps> = ({
 
   // STANDARD CODE ENTRY FORM
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-slate-950 p-4 relative overflow-hidden select-none">
+    <div className="min-h-screen w-full flex items-facility justify-facility bg-slate-950 p-4 relative overflow-hidden select-none">
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[550px] h-[550px] bg-blue-600/10 rounded-full blur-[140px] pointer-events-none" />
       <div className="absolute bottom-10 right-10 w-80 h-80 bg-orange-600/10 rounded-full blur-[120px] pointer-events-none" />
 
       <div className="w-full max-w-md bg-slate-900/90 border border-slate-800/80 rounded-3xl p-8 backdrop-blur-xl shadow-2xl relative z-10">
-        <div className="flex flex-col items-center text-center mb-8">
-          <div className="w-16 h-16 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 shadow-inner mb-4">
+        <div className="flex flex-col items-facility text-facility mb-8">
+          <div className="w-16 h-16 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-facility justify-facility text-blue-400 shadow-inner mb-4">
             <Building2 className="w-8 h-8" />
           </div>
 
           <h1 className="text-2xl font-black tracking-tight text-white mb-2">
-            Join a centre
+            Join a facility
           </h1>
           <p className="text-sm text-slate-400 font-medium max-w-xs">
-            Enter the 6-digit access code for the centre or tutor you wish to enroll with.
+            Enter the 6-digit access code for the facility or tutor you wish to enroll with.
           </p>
 
           {userName && (
-            <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800/80 border border-slate-700/60 text-xs text-slate-300">
+            <div className="mt-3 inline-flex items-facility gap-1.5 px-3 py-1 rounded-full bg-slate-800/80 border border-slate-700/60 text-xs text-slate-300">
               <span>Account: <strong className="text-white">{userName}</strong></span>
             </div>
           )}
@@ -233,7 +233,7 @@ export const JoinCentreScreen: React.FC<JoinCentreScreenProps> = ({
             </div>
           )}
 
-          <div className="flex justify-between items-center gap-2 sm:gap-3 py-2">
+          <div className="flex justify-between items-facility gap-2 sm:gap-3 py-2">
             {digits.map((digit, idx) => (
               <input
                 key={idx}
@@ -247,7 +247,7 @@ export const JoinCentreScreen: React.FC<JoinCentreScreenProps> = ({
                 onKeyDown={(e) => handleKeyDown(idx, e)}
                 onPaste={handlePaste}
                 autoComplete="one-time-code"
-                className={`w-12 h-14 sm:w-13 sm:h-16 text-center text-2xl font-black rounded-2xl border transition-all duration-200 outline-none
+                className={`w-12 h-14 sm:w-13 sm:h-16 text-facility text-2xl font-black rounded-2xl border transition-all duration-200 outline-none
                   ${
                     digit
                       ? 'border-blue-500 bg-blue-500/10 text-white shadow-lg shadow-blue-500/10'
@@ -260,7 +260,7 @@ export const JoinCentreScreen: React.FC<JoinCentreScreenProps> = ({
           <button
             type="submit"
             disabled={!isComplete || isLoading}
-            className={`w-full py-4 rounded-2xl font-bold text-sm tracking-wide transition-all duration-200 flex items-center justify-center gap-2 shadow-lg
+            className={`w-full py-4 rounded-2xl font-bold text-sm tracking-wide transition-all duration-200 flex items-facility justify-facility gap-2 shadow-lg
               ${
                 isComplete && !isLoading
                   ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-600/30 cursor-pointer active:scale-[0.98]'
@@ -274,14 +274,14 @@ export const JoinCentreScreen: React.FC<JoinCentreScreenProps> = ({
               </>
             ) : (
               <>
-                <span>Join Centre</span>
+                <span>Join Facility</span>
                 <ArrowRight className="w-4 h-4" />
               </>
             )}
           </button>
         </form>
 
-        <div className="mt-8 pt-6 border-t border-slate-800/80 flex flex-col items-center gap-3">
+        <div className="mt-8 pt-6 border-t border-slate-800/80 flex flex-col items-facility gap-3">
           {onSwitchToEnterCode && (
             <button
               type="button"
@@ -295,7 +295,7 @@ export const JoinCentreScreen: React.FC<JoinCentreScreenProps> = ({
           <button
             type="button"
             onClick={onSignOut}
-            className="text-xs text-slate-500 hover:text-slate-400 font-medium transition-colors flex items-center gap-1.5 cursor-pointer"
+            className="text-xs text-slate-500 hover:text-slate-400 font-medium transition-colors flex items-facility gap-1.5 cursor-pointer"
           >
             <LogOut className="w-3.5 h-3.5" />
             <span>Sign out</span>

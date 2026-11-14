@@ -6,6 +6,10 @@ import { ScheduleTab } from './tabs/ScheduleTab';
 import { RollCallTab } from './tabs/RollCallTab';
 import { AssessmentTab } from './tabs/AssessmentTab';
 import { MoreTab } from './tabs/MoreTab';
+import { ChatManager } from '../communications/ChatManager';
+import { StaffStatusScreen } from '../student-portal/tabs/StatusTab';
+import { ChatModeToggle, ChatMode } from '../communications/ChatSplash';
+import TutorAiChat from '../tutor-ai/TutorAiChat';
 import { PWAInstallButton } from '../pwa/PWAInstallButton';
 import {
   Home,
@@ -21,13 +25,14 @@ import {
   Shield,
   Eye,
   EyeOff,
-  Laptop
+  Laptop,
+  MessageSquare
 } from 'lucide-react';
 
 import { PasswordChangeOverlay } from '../auth/PasswordChangeOverlay';
 import { useScrollLock } from '../../hooks/useScrollLock';
 
-type TabType = 'home' | 'classes' | 'assessment' | 'more';
+type TabType = 'home' | 'classes' | 'assessment' | 'chat' | 'more';
 
 export const TutorPortal: React.FC = () => {
   const { tutors, settings, setViewMode, isAdmin, activeTutor: contextTutor, updateTutor, logout } = useApp();
@@ -47,6 +52,9 @@ export const TutorPortal: React.FC = () => {
   };
 
   const [activeTab, setActiveTabState] = useState<TabType>(parseInitialTutorTab);
+  const [chatThreadOpen, setChatThreadOpen] = useState(false);
+  // Which thing chat opens: the splash chooser first, then Status or Chat.
+  const [chatMode, setChatMode] = useState<ChatMode>('status');
   const [desktopViewMode, setDesktopViewMode] = useState<'mobile_frame' | 'expanded'>('mobile_frame');
 
   const activeTutor = contextTutor || {
@@ -82,6 +90,7 @@ export const TutorPortal: React.FC = () => {
   };
 
   const setActiveTab = (tab: TabType) => {
+    if (tab === 'chat') setChatMode('choose');
     setActiveTabState(tab);
     try {
       localStorage.setItem('EXCELLENCE_TUTORIAL_DATA_V1_tutorTab', tab);
@@ -134,19 +143,19 @@ export const TutorPortal: React.FC = () => {
 
       {/* 1. Top Desktop Control Bar */}
       <header className="bg-slate-950/80 backdrop-blur-md border-b border-slate-800 text-white px-4 py-2.5 z-40 sticky top-0">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
-          <div className="flex items-center space-x-2.5">
+        <div className="max-w-7xl mx-auto flex items-facility justify-between gap-3">
+          <div className="flex items-facility space-x-2.5">
             <span className="w-2.5 h-2.5 rounded-full bg-[#EA580C] animate-pulse shrink-0" />
             <span className="hidden sm:inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-500/20 text-orange-400 border border-orange-500/30">
               Tutor Portal
             </span>
           </div>
 
-          <div className="flex items-center space-x-2">
+          <div className="flex items-facility space-x-2">
             <PWAInstallButton variant="pill" />
             
             <button
-               className="w-9 h-9 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 flex items-center justify-center border border-slate-700 transition-all relative"
+               className="w-9 h-9 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 flex items-facility justify-facility border border-slate-700 transition-all relative"
                aria-label="Notifications"
             >
                <Bell className="w-4 h-4" />
@@ -157,7 +166,7 @@ export const TutorPortal: React.FC = () => {
               onClick={() =>
                 setDesktopViewMode(desktopViewMode === 'mobile_frame' ? 'expanded' : 'mobile_frame')
               }
-              className="hidden lg:flex items-center space-x-1 px-2.5 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 text-xs font-semibold border border-slate-700 transition-all"
+              className="hidden lg:flex items-facility space-x-1 px-2.5 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 text-xs font-semibold border border-slate-700 transition-all"
             >
               {desktopViewMode === 'mobile_frame' ? (
                 <>
@@ -180,7 +189,7 @@ export const TutorPortal: React.FC = () => {
                   setShowLogoutConfirm(true);
                 }
               }}
-              className="px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-rose-500/20 hover:text-rose-400 text-slate-400 border border-slate-700 transition-all flex items-center space-x-2"
+              className="px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-rose-500/20 hover:text-rose-400 text-slate-400 border border-slate-700 transition-all flex items-facility space-x-2"
               title={isAdmin ? "Switch to Admin" : "Logout"}
             >
               {isAdmin ? (
@@ -197,7 +206,7 @@ export const TutorPortal: React.FC = () => {
       </header>
 
       {/* 2. Main Body: Shell Container */}
-      <main className="flex-1 flex items-center justify-center p-0 sm:py-6 sm:px-4">
+      <main className="flex-1 flex items-facility justify-facility p-0 sm:py-6 sm:px-4">
         <div
           className={`w-full transition-all duration-500 cubic-bezier(0.4, 0, 0.2, 1) ${
             desktopViewMode === 'mobile_frame'
@@ -210,6 +219,15 @@ export const TutorPortal: React.FC = () => {
             {activeTab === 'home' && <HomeTab tutor={activeTutor} onNavigateTab={setActiveTab} />}
             {activeTab === 'classes' && <ScheduleTab tutor={activeTutor} />}
             {activeTab === 'assessment' && <AssessmentTab tutor={activeTutor} />}
+            {activeTab === 'chat' && (
+              <>
+                <div className="sticky top-0 z-20 bg-slate-50/95 backdrop-blur px-4 py-3 -mt-1">
+                  <ChatModeToggle mode={chatMode === 'choose' ? 'status' : chatMode} onChange={(m) => setChatMode(m)} />
+                </div>
+                {chatMode !== 'chat' && chatMode !== 'tito' && <StaffStatusScreen />}
+                {chatMode === 'chat' && <ChatManager onThreadOpenChange={setChatThreadOpen} />}
+              </>
+            )}
             {activeTab === 'more' && (
               <MoreTab 
                 tutor={activeTutor} 
@@ -224,13 +242,24 @@ export const TutorPortal: React.FC = () => {
             )}
           </div>
 
+          {/* Tutor AI: full screen over the frame like the student portal,
+              composer pinned to the bottom; the header back button returns to
+              the chat toggle. The bottom nav is already hidden in this mode.
+              z-50 puts it above the sticky portal header (z-40): at z-30 the
+              header covered the AI's own back button and trapped the portal. */}
+          {activeTab === 'chat' && chatMode === 'tito' && (
+            <div className="fixed inset-0 z-50 bg-white">
+              <TutorAiChat mode="light" onBack={() => setChatMode('chat')} />
+            </div>
+          )}
+
           {/* 3. Bottom Navigation (Mobile App Style) */}
-          <nav className="fixed bottom-0 left-0 right-0 sm:absolute z-40 bg-[#EA580C] border-t border-orange-600/30 py-2 px-3 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] rounded-t-[24px]">
-            <div className="max-w-md mx-auto grid grid-cols-4 gap-1 items-center">
+          <nav className={`${chatThreadOpen || chatMode === 'tito' ? 'hidden' : ''} fixed bottom-0 left-0 right-0 sm:absolute z-40 bg-[#EA580C] border-t border-orange-600/30 py-2 px-3 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] rounded-t-[24px]`}>
+            <div className="max-w-md mx-auto grid grid-cols-5 gap-1 items-facility">
               {/* Home */}
               <button
                 onClick={() => setActiveTab('home')}
-                className={`flex flex-col items-center justify-center py-1 transition-all ${
+                className={`flex flex-col items-facility justify-facility py-1 transition-all ${
                   activeTab === 'home' ? 'text-white scale-110' : 'text-orange-100/70'
                 }`}
               >
@@ -242,7 +271,7 @@ export const TutorPortal: React.FC = () => {
               {/* Classes */}
               <button
                 onClick={() => setActiveTab('classes')}
-                className={`flex flex-col items-center justify-center py-1 transition-all ${
+                className={`flex flex-col items-facility justify-facility py-1 transition-all ${
                   activeTab === 'classes' ? 'text-white scale-110' : 'text-orange-100/70'
                 }`}
               >
@@ -251,10 +280,22 @@ export const TutorPortal: React.FC = () => {
                 {activeTab === 'classes' && <div className="w-1 h-1 bg-white rounded-full mt-0.5" />}
               </button>
 
+              {/* Chat */}
+              <button
+                onClick={() => setActiveTab('chat')}
+                className={`flex flex-col items-facility justify-facility py-1 transition-all ${
+                  activeTab === 'chat' ? 'text-white scale-110' : 'text-orange-100/70'
+                }`}
+              >
+                <MessageSquare className={`w-5 h-5 ${activeTab === 'chat' ? 'fill-white/10' : ''}`} />
+                <span className="text-[10px] mt-1 font-bold">Chat</span>
+                {activeTab === 'chat' && <div className="w-1 h-1 bg-white rounded-full mt-0.5" />}
+              </button>
+
               {/* Assessment */}
               <button
                 onClick={() => setActiveTab('assessment')}
-                className={`flex flex-col items-center justify-center py-1 transition-all ${
+                className={`flex flex-col items-facility justify-facility py-1 transition-all ${
                   activeTab === 'assessment' ? 'text-white scale-110' : 'text-orange-100/70'
                 }`}
               >
@@ -266,7 +307,7 @@ export const TutorPortal: React.FC = () => {
               {/* More */}
               <button
                 onClick={() => setActiveTab('more')}
-                className={`flex flex-col items-center justify-center py-1 transition-all ${
+                className={`flex flex-col items-facility justify-facility py-1 transition-all ${
                   activeTab === 'more' ? 'text-white scale-110' : 'text-orange-100/70'
                 }`}
               >
@@ -280,10 +321,10 @@ export const TutorPortal: React.FC = () => {
       </main>
       {/* Logout Confirmation Modal */}
       {showLogoutConfirm && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[110] flex items-facility justify-facility p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
           <div className="w-full max-w-sm bg-white rounded-[32px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
-            <div className="p-8 text-center">
-              <div className="w-16 h-16 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <div className="p-8 text-facility">
+              <div className="w-16 h-16 bg-rose-50 text-rose-600 rounded-2xl flex items-facility justify-facility mx-auto mb-4">
                 <LogOut className="w-8 h-8" />
               </div>
               <h3 className="text-xl font-black text-slate-900 mb-2">Sign Out?</h3>

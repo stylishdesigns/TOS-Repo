@@ -1,3 +1,4 @@
+import { loadLastGood, loadLastGoodFlag, saveLastGoodFlag } from '../../lib/lastGood';
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useFirebase } from '../../context/FirebaseContext';
@@ -8,6 +9,8 @@ import { StudentOnboarding } from './StudentOnboarding';
 import { HomeTab } from './tabs/HomeTab';
 import { ClassesTabWrapper } from './tabs/ClassesTabWrapper';
 import { ChatTab } from './tabs/ChatTab';
+import { StatusScreen } from './tabs/StatusTab';
+import TutorAiChat from '../tutor-ai/TutorAiChat';
 import { CbtTabWrapper } from './tabs/CbtTabWrapper';
 import { MoreTab } from './tabs/MoreTab';
 import { ActionSheetModal, ActionSheetItem } from './tabs/ActionSheetModal';
@@ -23,12 +26,35 @@ import {
   MessageSquare,
   FileText,
   Sparkles,
+  ChevronLeft,
+  MessageCircle,
+  X,
 } from 'lucide-react';
+
+import { orbBadgeLabel, totalUnread } from './tabs/chatNav';
+
+// Phase 1 chat orb icon: bubble with a plus and a small sparkle (design spec).
+const ChatOrbIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg
+    viewBox="0 0 32 32"
+    className={className}
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={2.2}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M5 14.5C5 9.8 9.4 6 14.8 6h2.4C22.6 6 27 9.8 27 14.5S22.6 23 17.2 23h-2.6L9 27v-4.6C6.6 21 5 18 5 14.5z" />
+    <path d="M16 11.5v6M13 14.5h6" />
+    <path d="M27 1.5l1 2.5 2.5 1-2.5 1-1 2.5-1-2.5-2.5-1 2.5-1z" fill="currentColor" stroke="none" />
+  </svg>
+);
 
 export type TabType = 'home' | 'classes' | 'chat' | 'cbt' | 'results' | 'more';
 
 export const StudentPortal: React.FC = () => {
-  const { students, settings, isAdmin, attendanceSettings, attendanceLogs, entitlements } = useApp();
+  const { students, settings, isAdmin, attendanceSettings, attendanceLogs, entitlements, centreName, bgTheme } = useApp();
 
   const { user, loading: authLoading } = useFirebase();
   const [profileLoading, setProfileLoading] = useState(true);
@@ -37,6 +63,9 @@ export const StudentPortal: React.FC = () => {
   const [portalMode, setPortalMode] = useState<'student' | 'parent'>('student');
   const [desktopViewMode] = useState<'mobile_frame' | 'expanded'>('mobile_frame');
   const [hideBottomNav, setHideBottomNav] = useState(false);
+  // Orb badge: seeded from the chat overview's last good copy (no new reads);
+  // ChatTab reports each fresh total through onUnreadTotal after its loads.
+  const [orbUnread, setOrbUnread] = useState(0);
   const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
@@ -49,10 +78,18 @@ export const StudentPortal: React.FC = () => {
 
     const checkProfile = () => {
       if (user) {
+        // A saved "profile exists" flag for this account lets the portal open
+        // straight away on later visits; the live snapshot still confirms or
+        // corrects it behind the scenes.
+        if (loadLastGoodFlag(`hasProfile:${user.uid}`)) {
+          setHasProfile(true);
+          setProfileLoading(false);
+        }
         const docRef = doc(db, 'students', user.uid);
         unsubscribe = onSnapshot(
           docRef,
           (docSnap) => {
+            saveLastGoodFlag(`hasProfile:${user.uid}`, docSnap.exists());
             setHasProfile(docSnap.exists());
             setProfileLoading(false);
           },
@@ -265,14 +302,88 @@ export const StudentPortal: React.FC = () => {
     return () => window.removeEventListener('hashchange', handleHash);
   }, [activeTab]);
 
+  // Phase 1 B: the chat orb opens a fan menu (Status / Chats / Channels).
+  // Escape, the dimmed page and the orb's X all close it; focus moves to
+  // Chats on open and returns to the orb on close. Reduced-motion users
+  // get no entrance animation.
+  const [chatFanOpen, setChatFanOpen] = useState(false);
+  const [chatView, setChatView] = useState<'chats' | 'channels'>('chats');
+  const [statusScreenOpen, setStatusScreenOpen] = useState(false);
+  const [titoOpen, setTitoOpen] = useState(false);
+  const fanOpenedAtRef = React.useRef(0);
+  const fanWing = (open: () => void) => () => {
+    if (Date.now() - fanOpenedAtRef.current < 350) return;
+    open();
+  };
+  const orbRef = React.useRef<HTMLButtonElement>(null);
+  const fanChatsRef = React.useRef<HTMLButtonElement>(null);
+  const prefersReducedMotion = React.useMemo(
+    () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+    [],
+  );
+  const openChatFan = React.useCallback(() => {
+    fanOpenedAtRef.current = Date.now();
+    setChatFanOpen(true);
+  }, []);
+  const closeChatFan = React.useCallback(() => {
+    setChatFanOpen(false);
+    orbRef.current?.focus();
+  }, []);
+  const openChatSection = React.useCallback((next: 'chats' | 'channels') => {
+    setChatView(next);
+    setChatFanOpen(false);
+    setStatusScreenOpen(false);
+    setTitoOpen(false);
+    setActiveTab('chat');
+  }, []);
+  const openStatusScreen = React.useCallback(() => {
+    setChatFanOpen(false);
+    setTitoOpen(false);
+    setStatusScreenOpen(true);
+  }, []);
+  // Tutor AI is a placeholder third sub-stack: the screen opens, the
+  // conversation itself arrives later. Opening it closes the fan and every
+  // other chat surface, exactly like Status and Chats do.
+  const openTito = React.useCallback(() => {
+    setChatFanOpen(false);
+    setStatusScreenOpen(false);
+    setTitoOpen(true);
+  }, []);
+  // The orb is the way back to the fan. Whatever page is on screen (the
+  // Status screen included) stays visible under the fan; the fan opens over
+  // it. fanOpenedAt guards against a stray second tap landing on a wing
+  // button in the same breath the fan opens.
+  const handleOrbClick = React.useCallback(() => {
+    if (chatFanOpen) { closeChatFan(); return; }
+    openChatFan();
+  }, [chatFanOpen, closeChatFan]);
+
+  useEffect(() => {
+    if (!chatFanOpen) return;
+    fanChatsRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeChatFan();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [chatFanOpen, closeChatFan]);
+
   // Bottom navigation handlers: Classes and CBT open bottom sheet
   const handleNavClassesClick = () => {
     if (hideBottomNav) return;
+    // The fan never sticks: tapping any other bottom-nav item cancels it so
+    // the tapped item shows clearly.
+    setChatFanOpen(false);
+    setStatusScreenOpen(false);
+    setTitoOpen(false);
     setIsClassesSheetOpen(true);
   };
 
   const handleNavCbtClick = () => {
     if (hideBottomNav) return;
+    setChatFanOpen(false);
+    setStatusScreenOpen(false);
+    setTitoOpen(false);
     setIsCbtSheetOpen(true);
   };
 
@@ -345,22 +456,6 @@ export const StudentPortal: React.FC = () => {
     },
   ];
 
-  if (!isAdmin && (authLoading || profileLoading)) {
-    return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <div className="w-12 h-12 border-4 border-orange-500/30 border-t-orange-500 rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  if (!isAdmin && !user) {
-    return <StudentLogin onSuccess={() => {}} />;
-  }
-
-  if (!isAdmin && !hasProfile) {
-    return <StudentOnboarding onComplete={() => setOnboardingComplete(true)} />;
-  }
-
   const MALE_NIGERIAN_AVATAR =
     regeneratedStudentAvatar ||
     'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=500&q=80';
@@ -408,28 +503,78 @@ export const StudentPortal: React.FC = () => {
   const todayLog = attendanceLogs.find(
     (l) => l.studentId === activeStudent.id && l.date === todayStr
   );
+  // Seed the orb badge from this student's last good chat overview.
+  useEffect(() => {
+    if (!activeStudent) return;
+    const cached = loadLastGood<{ groups?: { unread?: number; locked?: boolean }[] }>(
+      `chat:overview:${activeStudent.id}`,
+    );
+    if (cached?.groups) setOrbUnread(totalUnread(cached.groups));
+  }, [activeStudent?.id]);
+
+  // The shell pins to the stable small viewport (100svh), so the bottom nav
+  // keeps one fixed screen position even while the browser URL bar slides in
+  // or out. The strip that can open up under the shell then shows the page
+  // background, which is kept the nav's dark colour while this portal is up.
+  React.useEffect(() => {
+    const prev = document.body.style.backgroundColor;
+    document.body.style.backgroundColor = '#020617';
+    return () => {
+      document.body.style.backgroundColor = prev;
+    };
+  }, []);
+
+  // Appearance: the student's Light / Dark pick in More. The screens stay as
+  // written; a scoped stylesheet flips their light surfaces while the body
+  // carries the marker class. Chat and status portals attach to the body
+  // too, so they follow along.
+  React.useEffect(() => {
+    if (bgTheme === 'dark') document.body.classList.add('tos-student-dark');
+    else document.body.classList.remove('tos-student-dark');
+    return () => document.body.classList.remove('tos-student-dark');
+  }, [bgTheme]);
+
+  if (!isAdmin && (authLoading || profileLoading)) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-facility justify-facility">
+        <div className="w-12 h-12 border-4 border-orange-500/30 border-t-orange-500 rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!isAdmin && !user) {
+    return <StudentLogin onSuccess={() => {}} />;
+  }
+
+  if (!isAdmin && !hasProfile) {
+    return <StudentOnboarding onComplete={() => setOnboardingComplete(true)} />;
+  }
+
+
+  const orbBadgeText = orbBadgeLabel(orbUnread);
+
   const lateMinutesThreshold = parseTime(attendanceSettings.lateArrivalTime || '08:30 AM');
   const currentMinutes = currentTime.getHours() * 60 + currentTime.getMinutes();
   const isRunningLate = !todayLog?.clockInAt && currentMinutes > lateMinutesThreshold;
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col justify-between selection:bg-orange-500 selection:text-white">
+    <div className="h-[100dvh] overflow-hidden bg-slate-50 flex flex-col justify-between selection:bg-orange-500 selection:text-white sm:h-auto sm:min-h-screen sm:overflow-visible">
       {/* 1. Top Desktop Control Bar */}
       <header className="bg-slate-950 text-white px-4 py-3 z-40 sticky top-0 overflow-hidden shadow-md">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-3 relative">
+        <div className="max-w-7xl mx-auto flex items-facility justify-between gap-3 relative">
           {/* Brand / Tutorial App Name */}
-          <div className="flex items-center space-x-2.5">
+          <div className="flex items-facility space-x-2.5">
             <span className="w-2.5 h-2.5 rounded-full bg-orange-500 animate-pulse shrink-0 shadow-sm shadow-orange-500" />
             <span className="font-black text-sm uppercase tracking-[0.2em]">
-              {settings.centreName || 'Excellence Tutorial Centre'}
+              {centreName}
             </span>
           </div>
 
           {/* Late Notification Animation */}
           {isRunningLate && (
             <div
-              onClick={() => setActiveTab('home')}
-              className="absolute left-1/2 -translate-x-1/2 top-full bg-rose-600 px-4 py-2 rounded-b-2xl shadow-xl border border-white/10 animate-in slide-in-from-top-full duration-700 cursor-pointer flex items-center space-x-2 group active:scale-95"
+              onClick={() => { setChatFanOpen(false); setTitoOpen(false); setStatusScreenOpen(false); setActiveTab('home'); }}
+              className="absolute left-1/2 -translate-x-1/2 top-full bg-rose-600 px-4 py-2 rounded-b-2xl shadow-xl border border-white/10 animate-in slide-in-from-top-full duration-700 cursor-pointer flex items-facility space-x-2 group active:scale-95"
             >
               <div className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
               <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap">
@@ -439,7 +584,7 @@ export const StudentPortal: React.FC = () => {
           )}
 
           {/* PWA Icon Button beside banner */}
-          <div className="flex items-center">
+          <div className="flex items-facility">
             <PWAInstallButton
               variant="icon"
               className="!bg-white/10 !border-white/10 hover:!bg-white/20"
@@ -449,18 +594,18 @@ export const StudentPortal: React.FC = () => {
       </header>
 
       {/* 2. Main Body: Phone Shell Container */}
-      <main className="flex-1 flex items-center justify-center p-0 sm:py-6 sm:px-4">
+      <main className="flex-1 min-h-0 flex items-facility justify-facility p-0 sm:py-6 sm:px-4">
         <div
           className={`w-full transition-all duration-300 ${
             desktopViewMode === 'mobile_frame'
               ? 'max-w-md mx-auto sm:rounded-[36px] sm:shadow-2xl sm:border-[6px] sm:border-slate-800'
               : 'max-w-4xl mx-auto sm:rounded-3xl sm:border sm:border-slate-800'
-          } bg-slate-50 min-h-screen sm:min-h-[844px] flex flex-col relative overflow-hidden`}
+          } bg-slate-50 h-full sm:h-[100svh] flex flex-col relative overflow-hidden`}
         >
           {/* Parent Mode Indicator Notification if active */}
           {portalMode === 'parent' && (
-            <div className="bg-blue-600 text-white px-4 py-2 text-xs font-bold flex items-center justify-between shrink-0 shadow-xs">
-              <div className="flex items-center space-x-1.5">
+            <div className="bg-blue-600 text-white px-4 py-2 text-xs font-bold flex items-facility justify-between shrink-0 shadow-xs">
+              <div className="flex items-facility space-x-1.5">
                 <ShieldCheck className="w-4 h-4" />
                 <span>Parent Oversight Mode: Monitoring {activeStudent.name}</span>
               </div>
@@ -474,7 +619,7 @@ export const StudentPortal: React.FC = () => {
           )}
 
           {/* Scrollable Tab Content Container */}
-          <div className="flex-1 overflow-y-auto pb-24 relative">
+          <div className="flex-1 overflow-y-auto min-h-0 relative pb-2">
             {activeTab === 'home' && (
               <HomeTab
                 student={activeStudent}
@@ -543,11 +688,21 @@ export const StudentPortal: React.FC = () => {
               />
             )}
 
-            {activeTab === 'chat' && <ChatTab student={activeStudent} />}
+            {activeTab === 'chat' && (
+              <ChatTab
+                student={activeStudent}
+                onGoToProfile={() => setActiveTab('more')}
+                onGoToPractice={() => setActiveTab('cbt')}
+                onHideBottomNav={setHideBottomNav}
+                onUnreadTotal={setOrbUnread}
+                view={chatView}
+                              />
+            )}
 
             {activeTab === 'cbt' && (
               <CbtTabWrapper
                 student={activeStudent}
+                onGoToProfile={() => setActiveTab('more')}
                 subPage={cbtSubPage}
                 onSubPageChange={(sp) => {
                   setCbtSubPage(sp);
@@ -604,18 +759,56 @@ export const StudentPortal: React.FC = () => {
             {activeTab === 'more' && <MoreTab student={activeStudent} />}
           </div>
 
-          {/* 3. Persistent Mobile Bottom Navigation Bar (5 Items: Home · Classes · Chat · CBT · More) */}
-          {!hideBottomNav && (
+          {/* Phase 2 S1: the read-only Status screen, wired to the stored
+              allow-status flag and status limits. No back control: the chat
+              orb is the way back to the fan. */}
+          {statusScreenOpen && !hideBottomNav && (
+            <div className="fixed inset-0 z-40 bg-slate-50 overflow-y-auto animate-in fade-in duration-200">
+              <div className="p-4 sm:p-5 max-w-lg mx-auto pt-6 pb-24">
+                <StatusScreen student={activeStudent} />
+              </div>
+            </div>
+          )}
+
+          {/* Tutor AI: the third sub-stack, now the real study-assistant chat.
+              Like a native chat thread, opening it hides the bottom nav. The
+              header's back button opens the fan over the ongoing conversation
+              and stays on the Tutor AI page; picking a wing switches away. It
+              follows the visitor's Appearance theme (light by default). */}
+          {titoOpen && (
+            <div
+              className={`fixed inset-0 z-40 overflow-hidden animate-in fade-in duration-200 ${
+                bgTheme === 'dark' ? 'bg-slate-950' : 'bg-white'
+              }`}
+            >
+              <TutorAiChat bottomInset={0} mode={bgTheme} onBack={() => openChatFan()} />
+            </div>
+          )}
+
+          {/* Phase 1 B: dims the page behind the fan (the bar stays bright).
+              It sits after the Status and Tutor AI screens in the layer order
+              so it covers whichever of them is open under the fan. */}
+          {chatFanOpen && !hideBottomNav && (
+            <div
+              className="fixed inset-0 z-40 bg-slate-950/60"
+              onClick={closeChatFan}
+              aria-hidden="true"
+            />
+          )}
+
+          {/* 3. Persistent Mobile Bottom Navigation Bar (5 Items: Home · Classes · Chat · CBT · More).
+              Hidden while the Tutor AI thread is open, like a chat room. */}
+          {!hideBottomNav && (!titoOpen || chatFanOpen) && (
             <nav
               aria-label="Student Mobile Navigation"
-              className="fixed bottom-0 left-0 right-0 sm:absolute z-40 bg-slate-950/95 backdrop-blur-md border-t border-slate-800 py-1.5 px-2 shadow-2xl"
+              className="relative z-40 shrink-0 bg-slate-950/95 backdrop-blur-md border-t border-slate-800 py-1.5 px-2 shadow-2xl"
             >
-              <div className="max-w-md mx-auto grid grid-cols-5 gap-1 items-center">
+              <div className="max-w-md mx-auto grid grid-cols-5 gap-1 items-facility">
                 {/* 1: Home */}
                 <button
                   type="button"
-                  onClick={() => setActiveTab('home')}
-                  className={`flex flex-col items-center justify-center py-1.5 px-1 rounded-2xl transition-all cursor-pointer ${
+                  onClick={() => { setChatFanOpen(false); setTitoOpen(false); setStatusScreenOpen(false); setActiveTab('home'); }}
+                  className={`flex flex-col items-facility justify-facility py-1.5 px-1 rounded-2xl transition-all cursor-pointer ${
                     activeTab === 'home'
                       ? 'text-orange-400 font-black'
                       : 'text-slate-400 hover:text-slate-200 font-semibold'
@@ -635,7 +828,7 @@ export const StudentPortal: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleNavClassesClick}
-                  className={`flex flex-col items-center justify-center py-1.5 px-1 rounded-2xl transition-all cursor-pointer ${
+                  className={`flex flex-col items-facility justify-facility py-1.5 px-1 rounded-2xl transition-all cursor-pointer ${
                     activeTab === 'classes'
                       ? 'text-orange-400 font-black'
                       : 'text-slate-400 hover:text-slate-200 font-semibold'
@@ -651,34 +844,17 @@ export const StudentPortal: React.FC = () => {
                   <span className="text-[10px] mt-0.5 tracking-tight">Classes</span>
                 </button>
 
-                {/* 3: Chat (rendered only if entitled, Part E) */}
-                {entitlements?.chat && (
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab('chat')}
-                    className={`flex flex-col items-center justify-center py-1.5 px-1 rounded-2xl transition-all cursor-pointer ${
-                      activeTab === 'chat'
-                        ? 'text-orange-400 font-black'
-                        : 'text-slate-400 hover:text-slate-200 font-semibold'
-                    }`}
-                  >
-                    <div
-                      className={`p-1 rounded-xl transition-all ${
-                        activeTab === 'chat' ? 'bg-orange-500/20 text-orange-400' : ''
-                      }`}
-                    >
-                      <MessageSquare className="w-5 h-5" />
-                    </div>
-                    <span className="text-[10px] mt-0.5 tracking-tight">Chat</span>
-                  </button>
-                )}
+                                {/* 3: Chat orb (rendered only if entitled, Phase 1 A). The orb
+                    floats above this slot, centred on the bar's top edge;
+                    the empty cell keeps the 5-column rhythm. */}
+                {entitlements?.chat && <div aria-hidden="true" />}
 
 
                 {/* 4: CBT (opens bottom sheet) */}
                 <button
                   type="button"
                   onClick={handleNavCbtClick}
-                  className={`flex flex-col items-center justify-center py-1.5 px-1 rounded-2xl transition-all cursor-pointer ${
+                  className={`flex flex-col items-facility justify-facility py-1.5 px-1 rounded-2xl transition-all cursor-pointer ${
                     activeTab === 'cbt'
                       ? 'text-orange-400 font-black'
                       : 'text-slate-400 hover:text-slate-200 font-semibold'
@@ -697,8 +873,8 @@ export const StudentPortal: React.FC = () => {
                 {/* 5: More */}
                 <button
                   type="button"
-                  onClick={() => setActiveTab('more')}
-                  className={`flex flex-col items-center justify-center py-1.5 px-1 rounded-2xl transition-all cursor-pointer ${
+                  onClick={() => { setChatFanOpen(false); setTitoOpen(false); setStatusScreenOpen(false); setActiveTab('more'); }}
+                  className={`flex flex-col items-facility justify-facility py-1.5 px-1 rounded-2xl transition-all cursor-pointer ${
                     activeTab === 'more'
                       ? 'text-orange-400 font-black'
                       : 'text-slate-400 hover:text-slate-200 font-semibold'
@@ -714,6 +890,99 @@ export const StudentPortal: React.FC = () => {
                   <span className="text-[10px] mt-0.5 tracking-tight">More</span>
                 </button>
               </div>
+              {entitlements?.chat && (
+                <button
+                  type="button"
+                  ref={orbRef}
+                  onClick={handleOrbClick}
+                  aria-label={chatFanOpen ? 'Close chat menu' : `Open chat menu, ${orbUnread} unread`}
+                  aria-haspopup="menu"
+                  aria-expanded={chatFanOpen}
+                  className="absolute left-1/2 top-0 z-50 -translate-x-1/2 -translate-y-1/2 rounded-full cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400/70"
+                  style={
+                    chatFanOpen
+                      ? {
+                          width: 62,
+                          height: 62,
+                          background: '#FFFFFF',
+                          border: '4px solid #020617',
+                          boxShadow: '0 0 0 5px rgba(234,88,12,.18), 0 10px 24px rgba(15,23,42,.35)',
+                        }
+                      : {
+                          width: 62,
+                          height: 62,
+                          background: 'linear-gradient(145deg, #EA580C, #9A3412)',
+                          border: '4px solid #020617',
+                          boxShadow: '0 0 0 5px rgba(234,88,12,.22), 0 10px 24px rgba(234,88,12,.5), inset 0 2px 0 rgba(255,255,255,.35)',
+                        }
+                  }
+                >
+                  {chatFanOpen ? (
+                    <X className="w-7 h-7 text-slate-900" />
+                  ) : (
+                    <ChatOrbIcon className="w-8 h-8 text-white" />
+                  )}
+                  {orbBadgeText && !chatFanOpen && (
+                    <span className="absolute -top-0.5 -right-0.5 min-w-[22px] h-[22px] px-1 rounded-full bg-white text-[#EA580C] text-[11px] font-black flex items-facility justify-facility border border-orange-200 shadow-sm">
+                      {orbBadgeText}
+                    </span>
+                  )}
+                </button>
+              )}
+              {chatFanOpen && entitlements?.chat && (
+                <div
+                  role="menu"
+                  aria-label="Chat menu"
+                  className="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2"
+                >
+                  {/* Status (first on the arc, left wing) */}
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={fanWing(openStatusScreen)}
+                    aria-label="Status"
+                    className={`absolute w-12 h-12 rounded-full bg-white text-[#EA580C] flex items-facility justify-facility shadow-lg cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 ${prefersReducedMotion ? '' : 'animate-in fade-in zoom-in-95 duration-200'}`}
+                    style={{ left: -72, top: -42, transform: 'translate(-50%, -50%)' }}
+                  >
+                    <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden="true">
+                      <circle cx="12" cy="12" r="9" strokeDasharray="3.5 3.5" />
+                      <path d="M12 8.5v7M8.5 12h7" />
+                    </svg>
+                    <span className="absolute top-full mt-2 left-1/2 -translate-x-1/2 whitespace-nowrap text-[11px] font-bold text-white pointer-events-none">
+                      Status
+                    </span>
+                  </button>
+                  {/* Chats (centre of the arc, largest, filled orange) */}
+                  <button
+                    type="button"
+                    ref={fanChatsRef}
+                    role="menuitem"
+                    onClick={fanWing(() => openChatSection('chats'))}
+                    aria-label="Chats"
+                    className={`absolute w-14 h-14 rounded-full text-white flex items-facility justify-facility shadow-xl cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-200 ${prefersReducedMotion ? '' : 'animate-in fade-in zoom-in-95 duration-200'}`}
+                    style={{ left: 0, top: -84, transform: 'translate(-50%, -50%)', background: 'linear-gradient(145deg, #EA580C, #9A3412)' }}
+                  >
+                    <MessageCircle className="w-7 h-7" />
+                    <span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 whitespace-nowrap text-[11px] font-bold text-white pointer-events-none">
+                      Chats
+                    </span>
+                  </button>
+                  {/* Tutor AI (right of the arc): placeholder sub-stack, no fan entry for Channels any more. */}
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={fanWing(openTito)}
+                    aria-label="Tutor AI"
+                    className={`absolute w-12 h-12 rounded-full bg-white text-[#EA580C] flex items-facility justify-facility shadow-lg cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 ${prefersReducedMotion ? '' : 'animate-in fade-in zoom-in-95 duration-200'}`}
+                    style={{ left: 72, top: -42, transform: 'translate(-50%, -50%)' }}
+                  >
+                    <Sparkles className="w-6 h-6" />
+                    <span className="absolute top-full mt-2 left-1/2 -translate-x-1/2 whitespace-nowrap text-[11px] font-bold text-white pointer-events-none">
+                      Tutor AI
+                    </span>
+                  </button>
+                </div>
+              )}
             </nav>
           )}
 

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { AccessCodeSettings } from './AccessCodeSettings';
 import { ModernSelect } from '../ui/ModernSelect';
 import {
   User,
@@ -24,7 +25,7 @@ import {
 } from 'lucide-react';
 
 export const SettingsView: React.FC = () => {
-  const { settings, updateSettings, addToast, authMethod, activeUser } = useApp();
+  const { settings, updateSettings, addToast, authMethod, activeUser, activeCentre } = useApp();
 
   const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'sessions' | 'centre'>('profile');
 
@@ -52,7 +53,7 @@ export const SettingsView: React.FC = () => {
 
   // Centre Configuration state
   const [centreForm, setCentreForm] = useState({
-    centreName: settings.centreName,
+    centreName: settings.centreName || activeCentre?.name || '',
     tagline: settings.tagline,
     academicSession: settings.academicSession,
     currencySymbol: settings.currencySymbol,
@@ -60,10 +61,19 @@ export const SettingsView: React.FC = () => {
     state: settings.state,
     phone: settings.phone,
     email: settings.email,
-    whatsapp: settings.whatsappNumber || settings.whatsapp || '+234 805 676 5455',
+    whatsapp: settings.whatsappNumber || settings.whatsapp || '',
     smsNotifications: settings.smsNotifications,
     emailNotifications: settings.emailNotifications,
   });
+
+  // The centre official name submitted at creation prefills the field.
+  React.useEffect(() => {
+    if (activeCentre?.name && !centreForm.centreName) {
+      const official = activeCentre.name;
+      setCentreForm((f) => ({ ...f, centreName: official }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeCentre]);
 
   const [showAddSessionModal, setShowAddSessionModal] = useState(false);
   const [newSessionName, setNewSessionName] = useState('');
@@ -126,7 +136,7 @@ export const SettingsView: React.FC = () => {
     addToast({
       type: 'success',
       title: 'System Settings Saved',
-      description: 'Global centre configuration and session parameters updated.',
+      description: 'Global facility configuration and session parameters updated.',
     });
   };
 
@@ -151,33 +161,33 @@ export const SettingsView: React.FC = () => {
   return (
     <div id="system-settings-page" className="p-4 sm:p-6 md:p-8 space-y-6 max-w-7xl mx-auto animate-in fade-in duration-200">
       {/* Top Banner Card */}
-      <div className="bg-white p-5 sm:p-6 rounded-xl border border-slate-200/90 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center space-x-4">
-          <div className="w-13 h-13 rounded-xl bg-orange-100 text-[#EA580C] font-black text-xl flex items-center justify-center shrink-0 border border-orange-200">
+      <div className="bg-white p-5 sm:p-6 rounded-xl border border-slate-200/90 shadow-xs flex flex-col md:flex-row md:items-facility justify-between gap-4">
+        <div className="flex items-facility space-x-4">
+          <div className="w-13 h-13 rounded-xl bg-orange-100 text-[#EA580C] font-black text-xl flex items-facility justify-facility shrink-0 border border-orange-200">
             {firstName[0]}
             {lastName[0]}
           </div>
           <div>
-            <div className="flex items-center space-x-2.5">
+            <div className="flex items-facility space-x-2.5">
               <h2 className="text-xl font-bold text-slate-900">
-                {activeUser.name}
+                {activeUser?.name || 'Admin'}
               </h2>
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200">
-                {activeUser.role}
+              <span className="inline-flex items-facility px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200">
+                {activeUser?.role || 'Administrator'}
               </span>
             </div>
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 mt-1">
-              <span className="flex items-center space-x-1">
+            <div className="flex flex-wrap items-facility gap-x-4 gap-y-1 text-xs text-slate-500 mt-1">
+              <span className="flex items-facility space-x-1">
                 <Mail className="w-3.5 h-3.5 text-slate-400" />
-                <span>{activeUser.email}</span>
+                <span>{activeUser?.email || ''}</span>
               </span>
               <span>•</span>
-              <span className="flex items-center space-x-1">
+              <span className="flex items-facility space-x-1">
                 <Phone className="w-3.5 h-3.5 text-slate-400" />
-                <span>{activeUser.phone || 'No phone set'}</span>
+                <span>{activeUser?.phone || 'No phone set'}</span>
               </span>
               <span>•</span>
-              <span className="text-slate-600 font-medium">{activeUser.department}</span>
+              <span className="text-slate-600 font-medium">{activeUser?.department || 'General'}</span>
             </div>
           </div>
         </div>
@@ -189,10 +199,10 @@ export const SettingsView: React.FC = () => {
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center space-x-1.5 bg-slate-100/80 p-1.5 rounded-xl border border-slate-200/80 overflow-x-auto scrollbar-none">
+      <div className="flex items-facility space-x-1.5 bg-slate-100/80 p-1.5 rounded-xl border border-slate-200/80 overflow-x-auto scrollbar-none">
         <button
           onClick={() => setActiveTab('profile')}
-          className={`px-3.5 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap flex items-center space-x-2 ${
+          className={`px-3.5 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap flex items-facility space-x-2 ${
             activeTab === 'profile'
               ? 'bg-[#EA580C] text-white shadow-xs'
               : 'text-slate-600 hover:text-slate-900 hover:bg-white/70'
@@ -205,7 +215,7 @@ export const SettingsView: React.FC = () => {
         {authMethod !== 'google' && (
           <button
             onClick={() => setActiveTab('security')}
-            className={`px-3.5 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap flex items-center space-x-2 ${
+            className={`px-3.5 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap flex items-facility space-x-2 ${
               activeTab === 'security'
                 ? 'bg-[#EA580C] text-white shadow-xs'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-white/70'
@@ -218,7 +228,7 @@ export const SettingsView: React.FC = () => {
 
         <button
           onClick={() => setActiveTab('sessions')}
-          className={`px-3.5 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap flex items-center space-x-2 ${
+          className={`px-3.5 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap flex items-facility space-x-2 ${
             activeTab === 'sessions'
               ? 'bg-[#EA580C] text-white shadow-xs'
               : 'text-slate-600 hover:text-slate-900 hover:bg-white/70'
@@ -230,14 +240,14 @@ export const SettingsView: React.FC = () => {
 
         <button
           onClick={() => setActiveTab('centre')}
-          className={`px-3.5 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap flex items-center space-x-2 ${
+          className={`px-3.5 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap flex items-facility space-x-2 ${
             activeTab === 'centre'
               ? 'bg-[#EA580C] text-white shadow-xs'
               : 'text-slate-600 hover:text-slate-900 hover:bg-white/70'
           }`}
         >
           <Building className="w-3.5 h-3.5" />
-          <span>Centre & System Parameters</span>
+          <span>Facility & System Parameters</span>
         </button>
       </div>
 
@@ -320,7 +330,7 @@ export const SettingsView: React.FC = () => {
             <div className="flex justify-end pt-3 border-t border-slate-100">
               <button
                 type="submit"
-                className="px-4 py-2 text-xs font-semibold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg shadow-sm flex items-center space-x-1.5"
+                className="px-4 py-2 text-xs font-semibold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg shadow-sm flex items-facility space-x-1.5"
               >
                 <Save className="w-3.5 h-3.5" />
                 <span>Save Profile Changes</span>
@@ -376,7 +386,7 @@ export const SettingsView: React.FC = () => {
                 />
               </div>
 
-              <div className="flex items-center space-x-2 pt-1">
+              <div className="flex items-facility space-x-2 pt-1">
                 <input
                   type="checkbox"
                   id="show-pass-cb"
@@ -401,7 +411,7 @@ export const SettingsView: React.FC = () => {
           </div>
 
           {/* 2FA Card */}
-          <div className="bg-white p-5 sm:p-6 rounded-xl border border-slate-200/90 shadow-xs flex items-center justify-between">
+          <div className="bg-white p-5 sm:p-6 rounded-xl border border-slate-200/90 shadow-xs flex items-facility justify-between">
             <div>
               <h4 className="text-sm font-bold text-slate-900">Two-Factor Authentication (2FA)</h4>
               <p className="text-xs text-slate-500 mt-0.5">
@@ -440,9 +450,9 @@ export const SettingsView: React.FC = () => {
           </div>
 
           <div className="divide-y divide-slate-100">
-            <div className="py-3 flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center text-slate-600">
+            <div className="py-3 flex items-facility justify-between">
+              <div className="flex items-facility space-x-3">
+                <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-facility justify-facility text-slate-600">
                   <Laptop className="w-5 h-5" />
                 </div>
                 <div>
@@ -459,9 +469,9 @@ export const SettingsView: React.FC = () => {
               </span>
             </div>
 
-            <div className="py-3 flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center text-slate-600">
+            <div className="py-3 flex items-facility justify-between">
+              <div className="flex items-facility space-x-3">
+                <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-facility justify-facility text-slate-600">
                   <Laptop className="w-5 h-5" />
                 </div>
                 <div>
@@ -492,11 +502,14 @@ export const SettingsView: React.FC = () => {
 
       {/* Tab: Centre & System Parameters */}
       {activeTab === 'centre' && (
-        <div className="bg-white p-5 sm:p-6 rounded-xl border border-slate-200/90 shadow-xs space-y-5">
+        <div className="space-y-6">
+          {/* Access code (Prompt C Part C): owner-managed, server-verified. */}
+          <AccessCodeSettings />
+          <div className="bg-white p-5 sm:p-6 rounded-xl border border-slate-200/90 shadow-xs space-y-5">
           <div className="border-b border-slate-100 pb-3">
-            <h3 className="text-base font-bold text-slate-900">Centre Identity & Academic Parameters</h3>
+            <h3 className="text-base font-bold text-slate-900">Facility Identity & Academic Parameters</h3>
             <p className="text-xs text-slate-500">
-              Global Centre name, active academic session, currency symbol, and official contact lines.
+              Global Facility name, active academic session, and official contact lines.
             </p>
           </div>
 
@@ -504,7 +517,7 @@ export const SettingsView: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">
-                  Centre Official Name *
+                  Facility Official Name *
                 </label>
                 <input
                   type="text"
@@ -547,7 +560,7 @@ export const SettingsView: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setShowAddSessionModal(true)}
-                    className="h-[42px] px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg border border-slate-200 transition-colors shrink-0 flex items-center justify-center mb-[1px]"
+                    className="h-[42px] px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg border border-slate-200 transition-colors shrink-0 flex items-facility justify-facility mb-[1px]"
                     title="Add new academic session"
                   >
                     <Plus className="w-4 h-4" />
@@ -555,28 +568,13 @@ export const SettingsView: React.FC = () => {
                 </div>
               </div>
 
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Currency Symbol
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={centreForm.currencySymbol || ''}
-                  onChange={(e) =>
-                    setCentreForm({ ...centreForm, currencySymbol: e.target.value })
-                  }
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-900 font-bold focus:bg-white focus:border-orange-500 outline-none"
-                />
-              </div>
 
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">
-                  WhatsApp Support Line *
+                  WhatsApp number (optional)
                 </label>
                 <input
                   type="tel"
-                  required
                   value={centreForm.whatsapp || ''}
                   onChange={(e) =>
                     setCentreForm({ ...centreForm, whatsapp: e.target.value })
@@ -587,7 +585,7 @@ export const SettingsView: React.FC = () => {
 
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">
-                  Centre Public Email
+                  Facility Public Email
                 </label>
                 <input
                   type="email"
@@ -618,22 +616,23 @@ export const SettingsView: React.FC = () => {
             <div className="flex justify-end pt-3 border-t border-slate-100">
               <button
                 type="submit"
-                className="px-4 py-2 text-xs font-semibold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg shadow-sm flex items-center space-x-1.5"
+                className="px-4 py-2 text-xs font-semibold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg shadow-sm flex items-facility space-x-1.5"
               >
                 <Save className="w-3.5 h-3.5" />
-                <span>Save Centre Parameters</span>
+                <span>Save Facility Parameters</span>
               </button>
             </div>
           </form>
+          </div>
         </div>
       )}
 
       {/* Add New Session Modal */}
       {showAddSessionModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-facility justify-facility p-4 backdrop-blur-xs">
           <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center space-x-2">
+            <div className="flex items-facility justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-facility space-x-2">
                 <Calendar className="w-5 h-5 text-[#EA580C]" />
                 <h3 className="font-bold text-base text-slate-900">Add Academic Session</h3>
               </div>
@@ -660,7 +659,7 @@ export const SettingsView: React.FC = () => {
                 />
               </div>
 
-              <div className="flex items-center justify-end space-x-2 pt-2 border-t border-slate-100">
+              <div className="flex items-facility justify-end space-x-2 pt-2 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setShowAddSessionModal(false)}

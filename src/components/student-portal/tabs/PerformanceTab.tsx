@@ -105,17 +105,7 @@ export const PerformanceTab: React.FC<PerformanceTabProps> = ({
   }, [selectedResult, results]);
 
   return (
-    <div className="space-y-4 px-4 py-3 max-w-lg mx-auto pb-20">
-      {/* Eyebrow Header */}
-      <div>
-        <span className="text-[10px] font-extrabold uppercase text-[#C2410C] tracking-wider block">
-          {student.name} · {student.programmeName || 'Pre-Exam Track'}
-        </span>
-        <h2 className="text-xl font-black text-[#0F172A] tracking-tight">
-          Performance
-        </h2>
-      </div>
-
+    <div className="space-y-4 px-4 py-3 max-w-lg mx-auto">
       {studentResults.length === 0 ? (
         /* Empty State */
         <EmptyState onGoToCbt={handleGoToCbt} />

@@ -1,0 +1,199 @@
+1. The SI unit of speed is
+A: metre per second
+B: kilometre per hour
+C: metre per second squared
+D: newton
+Answer: A
+Explanation: Speed is distance per time, m/s in SI units.
+
+2. A car covers 100 m in 20 s. Its average speed is
+A: 20 m/s
+B: 5 m/s
+C: 50 m/s
+D: 0.2 m/s
+Answer: B
+Explanation: 100 ÷ 20 = 5 m/s.
+
+3. The SI unit of acceleration is
+A: m/s
+B: km/h
+C: m/s²
+D: N/kg
+Answer: C
+Explanation: Acceleration is change of velocity per time.
+
+4. A body moving with uniform velocity travels
+A: with changing speed
+B: along a circular path only
+C: with increasing acceleration
+D: equal distances in equal times in one direction
+Answer: D
+Explanation: Uniform velocity means constant speed in a straight line.
+
+5. A body starts from rest and accelerates at 2 m/s² for 5 s. Its final velocity is
+A: 10 m/s
+B: 2.5 m/s
+C: 7 m/s
+D: 25 m/s
+Answer: A
+Explanation: v = u + at = 0 + 2×5 = 10 m/s.
+
+6. A body starts from rest with acceleration 4 m/s². The distance covered in 3 s is
+A: 12 m
+B: 18 m
+C: 24 m
+D: 36 m
+Answer: B
+Explanation: s = ½at² = ½×4×9 = 18 m.
+
+7. The acceleration of a body falling freely near the Earth is about
+A: 1 m/s²
+B: 100 m/s²
+C: 10 m/s²
+D: zero
+Answer: C
+Explanation: Free-fall acceleration g is about 9.8, roughly 10 m/s².
+
+8. The slope of a distance-time graph gives
+A: acceleration
+B: force
+C: distance
+D: speed
+Answer: D
+Explanation: Slope of distance against time is speed.
+
+9. The slope of a velocity-time graph gives
+A: acceleration
+B: distance
+C: speed only
+D: displacement only
+Answer: A
+Explanation: Change of velocity over time is acceleration.
+
+10. The area under a velocity-time graph gives
+A: the acceleration
+B: the distance travelled
+C: the force
+D: the momentum
+Answer: B
+Explanation: Velocity × time summed gives distance.
+
+11. At the highest point of its flight, a ball thrown vertically upwards has
+A: zero acceleration
+B: maximum velocity
+C: zero velocity but non-zero acceleration
+D: maximum kinetic energy
+Answer: C
+Explanation: Velocity momentarily vanishes while gravity still acts.
+
+12. The momentum of a body is the product of its
+A: mass and acceleration
+B: weight and height
+C: force and time squared
+D: mass and velocity
+Answer: D
+Explanation: p = mv.
+
+13. Newton's first law of motion is also called the law of
+A: inertia
+B: momentum
+C: action and reaction
+D: gravitation
+Answer: A
+Explanation: A body keeps its state unless forced: inertia.
+
+14. The force needed to accelerate a 4 kg body at 3 m/s² is
+A: 7 N
+B: 12 N
+C: 1.33 N
+D: 36 N
+Answer: B
+Explanation: F = ma = 4×3 = 12 N.
+
+15. A car moving at constant velocity has a resultant force of
+A: mg
+B: ma
+C: zero
+D: its weight
+Answer: C
+Explanation: Constant velocity means no acceleration, hence no net force.
+
+16. From 20 m/s to rest in 5 s, a vehicle's deceleration is
+A: 5 m/s²
+B: 100 m/s²
+C: 0.25 m/s²
+D: 4 m/s²
+Answer: D
+Explanation: 20/5 = 4 m/s².
+
+17. A speed of 72 km/h expressed in m/s is
+A: 20 m/s
+B: 7.2 m/s
+C: 200 m/s
+D: 36 m/s
+Answer: A
+Explanation: 72 × 1000/3600 = 20 m/s.
+
+18. A cyclist rides at 10 m/s for 30 s. The distance covered is
+A: 3 m
+B: 300 m
+C: 30 m
+D: 600 m
+Answer: B
+Explanation: 10 × 30 = 300 m.
+
+19. A body thrown horizontally from a height follows a
+A: straight horizontal line
+B: vertical line
+C: parabolic path
+D: circular path
+Answer: C
+Explanation: Horizontal motion plus free fall gives a parabola.
+
+20. The weight of a 5 kg body where g = 10 m/s² is
+A: 5 N
+B: 25 N
+C: 500 N
+D: 50 N
+Answer: D
+Explanation: W = mg = 5×10 = 50 N.
+
+21. A satellite moves in a circle at constant speed. Its velocity is
+A: changing because its direction changes
+B: constant in every way
+C: zero
+D: increasing steadily
+Answer: A
+Explanation: Direction keeps changing, so the vector velocity changes.
+
+22. Newton's third law states that
+A: force equals mass times acceleration
+B: action and reaction are equal and opposite
+C: every body resists change
+D: energy is conserved
+Answer: B
+Explanation: Forces act in equal and opposite pairs.
+
+23. A bus starts from rest and reaches 24 m/s in 8 s. Its acceleration is
+A: 8 m/s²
+B: 32 m/s²
+C: 3 m/s²
+D: 0.33 m/s²
+Answer: C
+Explanation: 24 ÷ 8 = 3 m/s².
+
+24. The average speed of a journey is
+A: the mean of all speeds
+B: half the maximum speed
+C: total time over total distance
+D: total distance divided by total time
+Answer: D
+Explanation: Average speed = total distance/total time.
+
+25. Which graph has time on the horizontal axis and distance on the vertical axis?
+A: a distance-time graph
+B: a velocity-time graph
+C: a force-extension graph
+D: a pressure-volume graph
+Answer: A
+Explanation: Distance-time plots distance against time.

@@ -85,7 +85,7 @@ export const ActionSheetModal: React.FC<ActionSheetModalProps> = ({
       role="dialog"
       aria-modal="true"
       aria-label={title}
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center animate-splash-backdrop bg-slate-950/65 backdrop-blur-md"
+      className="fixed inset-0 z-50 flex items-end sm:items-facility justify-facility animate-splash-backdrop bg-slate-950/65 backdrop-blur-md"
       onClick={(e) => {
         if (e.target === e.currentTarget) {
           onClose();
@@ -111,9 +111,9 @@ export const ActionSheetModal: React.FC<ActionSheetModalProps> = ({
         />
 
         {/* Header with Title, badge, and Close button */}
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex items-facility justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
+            <div className="flex items-facility gap-2">
               <span className="w-2 h-2 rounded-full bg-[#EA580C] animate-pulse" />
               <h3 className="text-base font-black text-[#0F172A] tracking-tight">
                 {title}
@@ -130,7 +130,7 @@ export const ActionSheetModal: React.FC<ActionSheetModalProps> = ({
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="w-10 h-10 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-all cursor-pointer shrink-0 active:scale-90"
+            className="w-10 h-10 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-facility justify-facility transition-all cursor-pointer shrink-0 active:scale-90"
           >
             <X className="w-5 h-5" />
           </button>
@@ -147,16 +147,16 @@ export const ActionSheetModal: React.FC<ActionSheetModalProps> = ({
                 onClose();
                 item.onClick();
               }}
-              className="w-full min-h-[72px] p-3.5 sm:p-4 rounded-[20px] border border-slate-200/90 hover:border-orange-500/70 bg-gradient-to-r from-slate-50/70 via-white to-white hover:from-orange-50/30 hover:to-white transition-all flex items-center justify-between gap-3.5 text-left cursor-pointer active:scale-[0.98] group shadow-2xs"
+              className="w-full min-h-[72px] p-3.5 sm:p-4 rounded-[20px] border border-slate-200/90 hover:border-orange-500/70 bg-gradient-to-r from-slate-50/70 via-white to-white hover:from-orange-50/30 hover:to-white transition-all flex items-facility justify-between gap-3.5 text-left cursor-pointer active:scale-[0.98] group shadow-2xs"
             >
-              <div className="flex items-center gap-3.5 min-w-0 flex-1">
+              <div className="flex items-facility gap-3.5 min-w-0 flex-1">
                 <div
-                  className={`w-12 h-12 rounded-2xl ${item.iconBg} flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 group-active:scale-95 transition-transform`}
+                  className={`w-12 h-12 rounded-2xl ${item.iconBg} flex items-facility justify-facility shrink-0 shadow-xs group-hover:scale-105 group-active:scale-95 transition-transform`}
                 >
                   {item.icon}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-facility gap-2">
                     <h4 className="text-sm font-black text-[#0F172A] tracking-tight group-hover:text-[#C2410C] transition-colors truncate">
                       {item.title}
                     </h4>

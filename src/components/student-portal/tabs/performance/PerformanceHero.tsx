@@ -80,7 +80,7 @@ export const PerformanceHero: React.FC<PerformanceHeroProps> = ({ stats }) => {
       </span>
 
       {/* Big Number & Chips */}
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-facility justify-between gap-3">
         {/* Number with Orange % */}
         <div className="flex items-baseline tracking-[-0.03em]">
           <span className="text-[56px] leading-none font-extrabold tabular-nums text-white">
@@ -100,7 +100,7 @@ export const PerformanceHero: React.FC<PerformanceHeroProps> = ({ stats }) => {
               color: gradeStyles.text,
               borderColor: gradeStyles.border,
             }}
-            className="text-[11px] font-extrabold rounded-[999px] py-[3px] px-[9px] border inline-flex items-center leading-tight shadow-2xs whitespace-nowrap"
+            className="text-[11px] font-extrabold rounded-[999px] py-[3px] px-[9px] border inline-flex items-facility leading-tight shadow-2xs whitespace-nowrap"
           >
             {grade.badgeText}
           </span>
@@ -113,7 +113,7 @@ export const PerformanceHero: React.FC<PerformanceHeroProps> = ({ stats }) => {
                 color: changePoints >= 0 ? '#047857' : '#BE123C',
                 borderColor: changePoints >= 0 ? 'rgba(16, 185, 129, 0.25)' : 'rgba(244, 63, 94, 0.25)',
               }}
-              className="text-[11px] font-bold rounded-full py-[2px] px-[8px] border inline-flex items-center gap-1 leading-tight tabular-nums whitespace-nowrap"
+              className="text-[11px] font-bold rounded-full py-[2px] px-[8px] border inline-flex items-facility gap-1 leading-tight tabular-nums whitespace-nowrap"
             >
               {changePoints >= 0 ? (
                 <ArrowUp className="w-3 h-3 text-[#047857]" />
@@ -131,7 +131,7 @@ export const PerformanceHero: React.FC<PerformanceHeroProps> = ({ stats }) => {
       {/* Sparkline or Thin Data Box */}
       <div className="mt-4">
         {isThinData ? (
-          <div className="rounded-[14px] p-4 border border-dashed border-white/20 bg-white/[0.06] flex items-center justify-center space-x-2.5">
+          <div className="rounded-[14px] p-4 border border-dashed border-white/20 bg-white/[0.06] flex items-facility justify-facility space-x-2.5">
             <span className="w-2 h-2 rounded-full bg-[#FB923C] shrink-0" />
             <span className="text-xs font-medium text-slate-300">
               Take one more assessment and your trend line will appear here.
@@ -193,7 +193,7 @@ export const PerformanceHero: React.FC<PerformanceHeroProps> = ({ stats }) => {
             </svg>
 
             {/* Dates under sparkline */}
-            <div className="flex items-center justify-between text-[10px] font-semibold text-[#94A3B8] px-1 font-mono">
+            <div className="flex items-facility justify-between text-[10px] font-semibold text-[#94A3B8] px-1 font-mono">
               <span>{formatDate(firstDate)}</span>
               <span>{formatDate(lastDate)}</span>
             </div>
@@ -204,7 +204,7 @@ export const PerformanceHero: React.FC<PerformanceHeroProps> = ({ stats }) => {
       {/* Stats Row: 3 equal columns */}
       <div
         style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}
-        className="grid grid-cols-3 text-center pt-[14px] mt-4"
+        className="grid grid-cols-3 text-facility pt-[14px] mt-4"
       >
         <div>
           <span className="text-[18px] leading-tight font-extrabold text-white tabular-nums block">

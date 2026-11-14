@@ -1,0 +1,1006 @@
+// ============================================================================
+// Tutor AI (T1/T2) — general study-assistant chat for centre members.
+//
+// Scope: centre portals only (students, tutors, centre admins). T1 is the
+// general conversation layer: the model answers study questions and photos
+// of work. It does NOT read student records, results or centre data yet —
+// personalisation lands in a later piece, and until then the assistant says
+// plainly that it cannot see those records.
+//
+// Engine: the SAME key and backend as the existing AI feature in server.ts —
+// EXCELLENT_API_KEY calling Vertex AI (Gemini Enterprise) through
+// @google/genai in enterprise mode. Never GEMINI_API_KEY. This module is
+// separate new code; the existing AI routes and collections are untouched.
+//
+// Storage (T2): each chat a member has with the AI is its own document in
+// `tutorAiConversations` (id `${centreId}__${uid}__${createdAtMs}`), written
+// by the server only, so the client can list a chat history sidebar. Messages
+// are capped so each document stays small; image attachments are stored as
+// small thumbnails only, never the full upload. The legacy single-chat
+// collection `tutorAiChats` is no longer written and stays untouched.
+//
+// Monthly usage moves to its own counter document `tutorAiUsage/${centreId}__${uid}`
+// so the per-centre monthly cap counts across every conversation of a member.
+//
+// Caps (both overridable via platformConfig): a monthly per-centre message
+// cap and an hourly per-user burst cap, enforced server-side.
+// ============================================================================
+
+import express from 'express';
+import { FieldPath } from 'firebase-admin/firestore';
+import { adminDb } from './firebaseAdmin';
+import {
+  requireMembership,
+  getCentreSubscriptionStatus,
+  getPlatformConfig,
+  httpError,
+  listActiveMembershipsForUser,
+  type Caller,
+} from './tenantService';
+
+const TUTOR_AI_MODEL = 'gemini-3.8-flash';
+const MESSAGES_KEPT = 60; // newest messages kept per conversation
+const CONTEXT_MESSAGES = 24; // newest messages sent to the model as context
+const CONVERSATIONS_LISTED = 50; // newest conversations shown in the sidebar
+const DEFAULT_MONTHLY_CAP = 300; // messages per centre per month
+const DEFAULT_HOURLY_CAP = 30; // messages per user per hour
+const MAX_TEXT_CHARS = 4000;
+const MAX_IMAGE_BASE64_CHARS = 4_600_000; // ~3.4 MB binary
+const MAX_THUMB_BASE64_CHARS = 260_000; // ~190 KB binary
+const ID_RE = /^[a-zA-Z0-9_\-]+$/;
+// Photos sent to the AI are stored as small thumbnails inside the
+// conversation document (the full upload is never stored). Any thumbnail
+// older than this is dropped the next time the conversation is written, so
+// old chats do not pile up storage forever.
+const IMAGE_RETENTION_DAYS = 30;
+const pruneOldImages = (messages: any[], now = Date.now()) =>
+  messages.map((m) =>
+    m && m.img && now - (m.at || 0) > IMAGE_RETENTION_DAYS * 24 * 60 * 60 * 1000
+      ? { ...m, img: null }
+      : m
+  );
+
+const rateLimitDocId = (key: string) => encodeURIComponent(key).slice(0, 1400);
+
+const SYSTEM_PROMPT = [
+  'You are Tutor AI, the study assistant inside a Nigerian education facility app.',
+  'You help secondary-school students and their tutors with their studies: explain topics simply,',
+  'answer academic questions step by step, help practise, and help with exam preparation for WAEC, NECO and JAMB.',
+  'Rules:',
+  '- Keep answers clear, warm and concise. Short paragraphs or numbered steps. Simple language.',
+  '- Format answers with simple markdown so the app can render them cleanly: **bold** for key terms,',
+  '  ## headings for sections of a longer answer, and bullet or numbered lists for steps. Never use',
+  '  code blocks or LaTeX for maths: write mathematics in plain text, x^2, sqrt(x), 2x + 5 = 17, 3/4.',
+  '  Avoid unicode superscripts.',
+  '- Never invent facts about the facility, its staff or its students. If unsure, say so.',
+  '- Never discuss, identify or gossip about other students or staff members.',
+  '- Respond in the language the question is written in (English stays English, Yoruba stays Yoruba, and so on).',
+  '- Refuse to help cheat in a live exam or produce work meant to deceive teachers; help with real learning instead.',
+  '- If the user sends a photo, read the question or work in it and answer or correct it step by step.',
+  '  If the photo is unreadable, ask for a clearer photo.',
+].join('\n');
+
+function tutorAiFailure(context: string, err: unknown): never {
+  const message = (err as any)?.message || String(err);
+  console.log(`[tutorAi] Firestore failure in ${context}: ${message}`);
+  throw httpError(500, 'Tutor AI could not be reached just now. Please try again.');
+}
+
+function getCallerOr401(req: express.Request): Caller {
+  const caller = (req as any).caller as Caller | undefined;
+  if (!caller) throw httpError(401, 'Unauthorized');
+  return caller;
+}
+
+// Resolve the centre: an explicit centreId wins (tutors and admins may belong
+// to more than one, so the client sends the active one); otherwise fall back
+// to the caller's single active membership (students belong to one centre).
+async function resolveCentreId(caller: Caller, centreId: string): Promise<string> {
+  if (centreId) {
+    await requireMembership(caller, centreId);
+    return centreId;
+  }
+  const memberships = await listActiveMembershipsForUser(caller.uid);
+  if (!memberships.length) throw httpError(403, 'You do not have access to this feature.');
+  const first = memberships[0] as any;
+  const cid = first.centreId || '';
+  if (!cid) throw httpError(403, 'You do not have access to this feature.');
+  await requireMembership(caller, cid);
+  return cid;
+}
+
+// A conversation id only counts when it belongs to this caller in this centre,
+// so one member can never read or write another member's conversations.
+function validateConversationId(raw: string, centreId: string, uid: string): string {
+  const id = String(raw || '').trim();
+  if (!id) return '';
+  if (!ID_RE.test(id) || id.length > 200 || !id.startsWith(`${centreId}__${uid}__`)) {
+    throw httpError(400, 'That conversation could not be opened.');
+  }
+  return id;
+}
+
+// Who the AI is talking to: their portal role (student, tutor or centre
+// admin) and their name, read from the centre's own records, so the same
+// assistant speaks differently in each portal. Students get a friendly
+// subject teacher; tutors get a teaching colleague; admins get a centre
+// management assistant.
+// P2/P3 shared context, cached briefly so a busy portal does not re-read
+// the centre on every message. Released mock results are the data every
+// staff member may already see on the platform; students' private practice
+// records stay private and are never fed to tutors or admins.
+const CTX_CACHE_TTL_MS = 5 * 60 * 1000;
+const ctxCache = new Map<string, { at: number; value: unknown }>();
+function cacheGet(key: string): unknown | null {
+  const hit = ctxCache.get(key);
+  if (hit && Date.now() - hit.at < CTX_CACHE_TTL_MS) return hit.value;
+  return null;
+}
+function cacheSet(key: string, value: unknown): void {
+  if (ctxCache.size > 100) {
+    const now = Date.now();
+    for (const [k, v] of ctxCache) if (now - v.at > CTX_CACHE_TTL_MS) ctxCache.delete(k);
+  }
+  ctxCache.set(key, { at: Date.now(), value });
+}
+
+/** Centre-wide released mock performance: per-subject averages and each
+ *  student's released mock average, from the most recent 40 released
+ *  attempts. Attempts are ordered by document id (mock-YYYY-MM-DD__uid), so
+ *  newest mocks come first without needing a composite index. */
+interface MockAgg {
+  perSubject: { subject: string; pct: number }[];
+  overallPct: number | null;
+  perStudent: Map<string, { pct: number; mocks: number; username: string }>;
+  attempts: number;
+}
+async function mockAggregateFor(centreId: string): Promise<MockAgg | null> {
+  const cached = cacheGet(`mock:${centreId}`);
+  if (cached) return cached as MockAgg;
+  try {
+    const snap = await adminDb
+      .collection('mockAttempts')
+      .where('centreId', '==', centreId)
+      .orderBy(FieldPath.documentId(), 'desc')
+      .limit(40)
+      .get();
+    const atts = (snap.docs || [])
+      .map((d) => d.data() as any)
+      .filter((a) => String(a?.status) === 'submitted' && a?.resultSeenAt && a?.score && Number(a.score.answered) > 0)
+      .slice(0, 40);
+    const subj = new Map<string, { correct: number; total: number }>();
+    const perStudent = new Map<string, { pct: number; mocks: number; username: string }>();
+    let totalCorrect = 0;
+    let totalAnswered = 0;
+    for (const a of atts) {
+      const pct = Math.round((Number(a.score.correct) / Number(a.score.answered)) * 100);
+      totalCorrect += Number(a.score.correct);
+      totalAnswered += Number(a.score.answered);
+      const per = Array.isArray(a.perSubject) ? a.perSubject : [];
+      for (const v of per) {
+        if (!v || !Number(v.total)) continue;
+        const key = String(v.subject || 'General');
+        const cur = subj.get(key) || { correct: 0, total: 0 };
+        cur.correct += Number(v.correct);
+        cur.total += Number(v.total);
+        subj.set(key, cur);
+      }
+      const uid = String(a.uid || '');
+      if (uid) {
+        const cur = perStudent.get(uid) || { pct: 0, mocks: 0, username: String(a.username || '') };
+        cur.pct = Math.round(((cur.pct * cur.mocks) + pct) / (cur.mocks + 1));
+        cur.mocks += 1;
+        if (!cur.username) cur.username = String(a.username || '');
+        perStudent.set(uid, cur);
+      }
+    }
+    const value: MockAgg = {
+      perSubject: [...subj.entries()]
+        .map(([subject, v]) => ({ subject, pct: Math.round((v.correct / v.total) * 100) }))
+        .sort((a, b) => a.pct - b.pct)
+        .slice(0, 10),
+      overallPct: totalAnswered > 0 ? Math.round((totalCorrect / totalAnswered) * 100) : null,
+      perStudent,
+      attempts: atts.length,
+    };
+    cacheSet(`mock:${centreId}`, value);
+    return value;
+  } catch {
+    return null;
+  }
+}
+
+/** The centre's class roster: names and classes only, no scores here. */
+interface RosterRow {
+  name: string;
+  cls: string;
+  uid: string;
+  subjects: string[];
+  attendance: number; // percent, 0 when not recorded
+  totalFee: number;
+  paidAmount: number;
+  outstanding: number;
+  paymentStatus: string;
+}
+
+async function rosterFor(centreId: string): Promise<RosterRow[]> {
+  const cached = cacheGet(`roster2:${centreId}`);
+  if (cached) return cached as RosterRow[];
+  try {
+    const snap = await adminDb.collection('students').where('centreId', '==', centreId).limit(60).get();
+    const rows: RosterRow[] = (snap.docs || [])
+      .map((d) => {
+        const v = d.data() as any;
+        const totalFee = Number(v?.totalFee) || 0;
+        const paidAmount = Number(v?.paidAmount) || 0;
+        const outstanding =
+          typeof v?.outstandingBalance === 'number' ? v.outstandingBalance : Math.max(totalFee - paidAmount, 0);
+        return {
+          name: String(v?.name || '').trim(),
+          cls: String(v?.class || v?.classroom || v?.level || '').trim(),
+          uid: String(v?.uid || d.id),
+          subjects: Array.isArray(v?.subjects) ? v.subjects.map((x: any) => String(x)).filter(Boolean) : [],
+          attendance: Math.round(Number(v?.attendancePercent) || 0),
+          totalFee,
+          paidAmount,
+          outstanding,
+          paymentStatus: String(v?.paymentStatus || ''),
+        };
+      })
+      .filter((r) => r.name);
+    cacheSet(`roster2:${centreId}`, rows);
+    return rows;
+  } catch {
+    return [];
+  }
+}
+
+/** P5: the centre's tutors, matched by subject so students can find theirs and
+ *  tutors can find their own students. */
+interface TutorRow {
+  name: string;
+  subjects: string[];
+  classes: string[];
+}
+
+async function tutorsFor(centreId: string): Promise<TutorRow[]> {
+  const cached = cacheGet(`tutors:${centreId}`);
+  if (cached) return cached as TutorRow[];
+  try {
+    const snap = await adminDb.collection('tutors').where('centreId', '==', centreId).limit(100).get();
+    const rows: TutorRow[] = (snap.docs || [])
+      .map((d) => {
+        const v = d.data() as any;
+        return {
+          name: String(v?.name || '').trim(),
+          subjects: Array.isArray(v?.subjects) ? v.subjects.map((x: any) => String(x)).filter(Boolean) : [],
+          classes: [
+            ...(Array.isArray(v?.classrooms) ? v.classrooms.map((x: any) => String(x)).filter(Boolean) : []),
+            ...(Array.isArray(v?.classesAssigned) ? v.classesAssigned.map((x: any) => String(x)).filter(Boolean) : []),
+          ],
+        };
+      })
+      .filter((r) => r.name);
+    cacheSet(`tutors:${centreId}`, rows);
+    return rows;
+  } catch {
+    return [];
+  }
+}
+
+/** P5: finance aggregates for admins allowed to see money. Reads at most 60
+ *  recent payments plus the cached roster; only Paid/Partial count as money
+ *  received (Pending/Rejected are claims, not cash). */
+interface FinanceAgg {
+  collected: number;
+  collectedCount: number;
+  pendingCount: number;
+  pendingSum: number;
+  recent: string[];
+  feeTotal: number;
+  feePaid: number;
+  feeOutstanding: number;
+  debtors: string[];
+  scannedStudents: number;
+}
+
+async function financeFor(centreId: string): Promise<FinanceAgg | null> {
+  const cached = cacheGet(`finance:${centreId}`);
+  if (cached) return cached as FinanceAgg;
+  const out: FinanceAgg = {
+    collected: 0,
+    collectedCount: 0,
+    pendingCount: 0,
+    pendingSum: 0,
+    recent: [],
+    feeTotal: 0,
+    feePaid: 0,
+    feeOutstanding: 0,
+    debtors: [],
+    scannedStudents: 0,
+  };
+  try {
+    const snap = await adminDb.collection('payments').where('centreId', '==', centreId).limit(60).get();
+    const rows = (snap.docs || [])
+      .map((d) => d.data() as any)
+      .filter((v) => v && typeof v === 'object' && v.status)
+      .sort((a, b) => String(b?.date || '').localeCompare(String(a?.date || '')));
+    for (const v of rows) {
+      const status = String(v.status || '');
+      const amt = Number(v.amountPaid) || 0;
+      if (status === 'Paid' || status === 'Partial') {
+        out.collected += amt;
+        out.collectedCount++;
+      } else if (status === 'Pending') {
+        out.pendingCount++;
+        out.pendingSum += amt;
+      }
+    }
+    out.recent = rows
+      .slice(0, 10)
+      .map(
+        (v) =>
+          `${String(v.date || '').slice(0, 10)}: ${String(v.studentName || 'a student')} paid ₦${(Number(v.amountPaid) || 0).toLocaleString()} (${String(v.method || '?')}, ${String(v.status)})`
+      );
+    const roster = await rosterFor(centreId);
+    out.scannedStudents = roster.length;
+    for (const r of roster) {
+      out.feeTotal += r.totalFee;
+      out.feePaid += r.paidAmount;
+    }
+    out.feeOutstanding = Math.max(out.feeTotal - out.feePaid, 0);
+    out.debtors = roster
+      .filter((r) => r.outstanding > 0)
+      .sort((a, b) => b.outstanding - a.outstanding)
+      .slice(0, 10)
+      .map(
+        (r) =>
+          `${r.name}${r.cls ? ` (${r.cls})` : ''} owes ₦${r.outstanding.toLocaleString()} of ₦${r.totalFee.toLocaleString()}${r.paymentStatus ? ` (${r.paymentStatus})` : ''}`
+      );
+    cacheSet(`finance:${centreId}`, out);
+    return out;
+  } catch {
+    return null;
+  }
+}
+
+/** P2: the tutor's centre context. Tutors see what the platform already
+ *  shows staff: the roster and released mock performance per subject and per
+ *  student. Students' private practice records are never included. */
+async function tutorContext(centreId: string, uid: string, name: string): Promise<string> {
+  const lines: string[] = [];
+  if (name) lines.push(`Your name: ${name}.`);
+  try {
+    let tut: any = null;
+    const byId = await adminDb.collection('tutors').doc(uid).get().catch(() => null);
+    if (byId?.exists) tut = byId.data();
+    else {
+      const q = await adminDb.collection('tutors').where('uid', '==', uid).limit(1).get();
+      if (!q.empty) tut = q.docs[0].data();
+    }
+    if (tut) {
+      const subjects = Array.isArray(tut.subjects)
+        ? tut.subjects.map((v: any) => String(v)).filter(Boolean)
+        : typeof tut.subjects === 'string' && tut.subjects.trim() ? tut.subjects.split(',').map((v: string) => v.trim()).filter(Boolean) : [];
+      if (subjects.length) lines.push(`You teach: ${subjects.slice(0, 10).join(', ')}.`);
+      const rooms = Array.isArray(tut.classrooms)
+        ? tut.classrooms.map((v: any) => String(v)).filter(Boolean)
+        : typeof tut.classrooms === 'string' && tut.classrooms.trim() ? [tut.classrooms.trim()] : [];
+      if (rooms.length) lines.push(`Your classes: ${rooms.slice(0, 10).join(', ')}.`);
+    }
+  } catch { /* optional */ }
+  const agg = await mockAggregateFor(centreId);
+  if (agg && agg.attempts > 0) {
+    if (agg.overallPct !== null) lines.push(`Facility mock performance: overall average ${agg.overallPct}% across ${agg.attempts} released mock results.`);
+    if (agg.perSubject.length) {
+      lines.push(`Weakest to strongest subjects: ${agg.perSubject.map((v) => `${v.subject} ${v.pct}%`).join(', ')}.`);
+    }
+  }
+  // P5: which students does this tutor actually teach? Matched by the subjects
+  // on their tutor record and the classes they are assigned; a tutor with
+  // neither recorded keeps seeing the whole roster as before.
+  let roster: RosterRow[] = [];
+  try {
+    roster = await rosterFor(centreId);
+  } catch {
+    roster = [];
+  }
+  if (roster.length) {
+    let tutSubjects: string[] = [];
+    let tutClasses: string[] = [];
+    try {
+      let tut: any = null;
+      const byId = await adminDb.collection('tutors').doc(uid).get().catch(() => null);
+      if (byId?.exists) tut = byId.data();
+      else {
+        const q = await adminDb.collection('tutors').where('uid', '==', uid).limit(1).get();
+        if (!q.empty) tut = q.docs[0].data();
+      }
+      if (tut) {
+        tutSubjects = Array.isArray(tut.subjects)
+          ? tut.subjects.map((v: any) => String(v).trim().toLowerCase()).filter(Boolean)
+          : [];
+        const rawCls = [
+          ...(Array.isArray(tut.classrooms) ? tut.classrooms : []),
+          ...(Array.isArray(tut.classesAssigned) ? tut.classesAssigned : []),
+        ];
+        tutClasses = rawCls.map((v: any) => String(v).trim().toLowerCase()).filter(Boolean);
+      }
+    } catch {
+      /* fall back to the whole roster */
+    }
+    const assigned =
+      tutSubjects.length || tutClasses.length
+        ? roster.filter(
+            (r) =>
+              (tutSubjects.length > 0 && r.subjects.some((x) => tutSubjects.includes(x.trim().toLowerCase()))) ||
+              (!!r.cls && tutClasses.includes(r.cls.trim().toLowerCase()))
+          )
+        : roster;
+    const shown = assigned
+      .slice(0, 25)
+      .map((r) => {
+        const m = agg ? agg.perStudent.get(r.uid) : null;
+        const att = r.attendance ? `, attendance ${r.attendance}%` : '';
+        const subs = r.subjects.length ? `, subjects ${r.subjects.slice(0, 8).join(', ')}` : '';
+        const mk = m ? `, released mock average ${m.pct}% across ${m.mocks} mock${m.mocks === 1 ? '' : 's'}` : '';
+        return `${r.name}${r.cls ? ` (${r.cls})` : ''}${subs}${att}${mk}`;
+      })
+      .sort((a, b) => Number(a.match(/average (\d+)%/)?.[1] ?? 999) - Number(b.match(/average (\d+)%/)?.[1] ?? 999));
+    if (shown.length) {
+      lines.push(
+        `Your students (matched by the subjects you cover and their classes, weakest released mock first): ${shown.join('; ')}.`
+      );
+      const rest = roster.length - assigned.length;
+      if (rest > 0) lines.push(`${rest} more student(s) are outside your subjects and classes.`);
+    } else {
+      lines.push(`No students match your subjects or classes yet (the roster has about ${roster.length}).`);
+    }
+  }
+  return lines.join('\n').slice(0, 4000);
+}
+
+/** P3+P5: the admin's centre overview: enrolment, staff, attendance and
+ *  released mock performance for everyone; finance (billing, payments,
+ *  balances) only for roles allowed to see money. Students' private practice
+ *  records are never included. */
+async function adminContext(centreId: string, opts: { finance: boolean }): Promise<string> {
+  const lines: string[] = [];
+  const roster = await rosterFor(centreId);
+  if (roster.length) lines.push(`Students enrolled: about ${roster.length}${roster.length >= 60 ? '+' : ''}.`);
+  const tutors = await tutorsFor(centreId);
+  if (tutors.length) lines.push(`Tutors: about ${tutors.length}${tutors.length >= 100 ? '+' : ''}.`);
+  const withAtt = roster.filter((r) => r.attendance > 0);
+  if (withAtt.length) {
+    const avg = Math.round(withAtt.reduce((sum, r) => sum + r.attendance, 0) / withAtt.length);
+    lines.push(`Average attendance: about ${avg}%.`);
+  }
+  if (opts.finance) {
+  try {
+    const billing = await adminDb.collection('centreBilling').doc(centreId).get();
+    if (billing.exists) {
+      const b = billing.data() as any;
+      const bits: string[] = [];
+      if (b?.planId) bits.push(`plan ${String(b.planId)}`);
+      if (Number(b?.seatCap)) bits.push(`seat cap ${Number(b.seatCap)}`);
+      if (typeof b?.paidThrough === 'string' && b.paidThrough) {
+        const paid = new Date(b.paidThrough);
+        if (!Number.isNaN(paid.getTime())) {
+          const overdue = paid.getTime() < Date.now();
+          bits.push(`paid through ${paid.toISOString().slice(0, 10)}${overdue ? ' (past date)' : ''}`);
+        }
+      }
+      if (bits.length) lines.push(`Billing: ${bits.join(', ')}.`);
+    }
+  } catch { /* optional */ }
+  try {
+    const fin = await financeFor(centreId);
+    if (fin) {
+      if (fin.scannedStudents) {
+        lines.push(
+          `Fees across the roster scanned: billed \u20a6${fin.feeTotal.toLocaleString()}, paid \u20a6${fin.feePaid.toLocaleString()}, outstanding \u20a6${fin.feeOutstanding.toLocaleString()}.`
+        );
+      }
+      if (fin.collectedCount || fin.pendingCount) {
+        lines.push(
+          `Payments recorded (up to 60 most recent scanned): \u20a6${fin.collected.toLocaleString()} collected across ${fin.collectedCount} paid or partial payment(s)${fin.pendingCount ? `, ${fin.pendingCount} student claim(s) awaiting confirmation worth \u20a6${fin.pendingSum.toLocaleString()}` : ''}.`
+        );
+      }
+      if (fin.recent.length) lines.push(`Recent payments: ${fin.recent.join('; ')}.`);
+      if (fin.debtors.length) lines.push(`Highest outstanding balances: ${fin.debtors.join('; ')}.`);
+    }
+  } catch { /* optional */ }
+  }
+  const agg = await mockAggregateFor(centreId);
+  if (agg && agg.attempts > 0) {
+    if (agg.overallPct !== null) lines.push(`Mock performance: overall average ${agg.overallPct}% across ${agg.attempts} released mock results.`);
+    if (agg.perSubject.length) lines.push(`Weakest to strongest subjects: ${agg.perSubject.map((v) => `${v.subject} ${v.pct}%`).join(', ')}.`);
+  }
+  return lines.join('\n').slice(0, 4000);
+}
+
+// P1 personalisation: a student's OWN data, read server-side only, so the
+// assistant can give real advice ("your weakest topic is X") instead of
+// generic tips. Students get only their own records; other students are
+// never read, named or quoted. Mock scores appear only after release.
+async function studentContextFor(
+  centreId: string,
+  uid: string,
+  name: string
+): Promise<string> {
+  const lines: string[] = [];
+  if (name) lines.push(`Name: ${name}`);
+  try {
+    let stu: any = null;
+    const byId = await adminDb.collection("students").doc(uid).get();
+    if (byId.exists) stu = byId.data();
+    else {
+      const q = await adminDb.collection("students").where("uid", "==", uid).limit(1).get();
+      if (!q.empty) stu = q.docs[0].data();
+    }
+    if (stu) {
+      const cls = String(stu.class || stu.classroom || stu.level || "").trim();
+      if (cls) lines.push(`Class: ${cls}`);
+      const subs = Array.isArray(stu.subjects)
+        ? stu.subjects.map((v: any) => String(v)).filter(Boolean)
+        : typeof stu.subjects === "string" && stu.subjects.trim()
+          ? stu.subjects.split(",").map((v: string) => v.trim()).filter(Boolean)
+          : [];
+      if (subs.length) lines.push(`Subjects: ${subs.slice(0, 12).join(", ")}`);
+      // P5: the student's own fee record and the centre's tutors.
+      const totalFee = Number(stu.totalFee) || 0;
+      if (totalFee > 0 || Number(stu.paidAmount) > 0) {
+        const paid = Number(stu.paidAmount) || 0;
+        const out = typeof stu.outstandingBalance === "number" ? stu.outstandingBalance : Math.max(totalFee - paid, 0);
+        const status = String(stu.paymentStatus || "");
+        lines.push(
+          `Fees: total \u20a6${totalFee.toLocaleString()}, paid \u20a6${paid.toLocaleString()}, outstanding \u20a6${out.toLocaleString()}${status ? ` (${status})` : ""}.`
+        );
+      }
+      try {
+        const tutors = await tutorsFor(centreId);
+        if (tutors.length) {
+          const lcSubs = subs.map((v: string) => v.trim().toLowerCase());
+          const mine = tutors.filter((t) => t.subjects.some((x) => lcSubs.includes(x.trim().toLowerCase())));
+          const others = tutors.filter((t) => !mine.includes(t));
+          const fmt = (t: { name: string; subjects: string[] }) =>
+            `${t.name}${t.subjects.length ? ` (${t.subjects.slice(0, 6).join(", ")})` : ""}`;
+          if (mine.length) lines.push(`Your tutors (they teach subjects you offer): ${mine.slice(0, 8).map(fmt).join("; ")}.`);
+          if (others.length) lines.push(`Other tutors at your facility: ${others.slice(0, 8).map(fmt).join("; ")}.`);
+        }
+      } catch { /* optional */ }
+    }
+  } catch { /* the record is optional */ }
+
+  try {
+    const ps = await adminDb.collection("practiceStats").doc(`${uid}__${centreId}`).get();
+    if (ps.exists) {
+      const d = ps.data() as any;
+      const subjects = d?.subjects && typeof d.subjects === "object" ? Object.values(d.subjects) : [];
+      const rows = subjects
+        .filter((v: any) => v && Number(v.answered) > 0)
+        .sort((a: any, b: any) => (Number(b.answered) || 0) - (Number(a.answered) || 0))
+        .slice(0, 8)
+        .map((v: any) => {
+          const pct = Math.round((Number(v.correct) / Number(v.answered)) * 100);
+          const topics = v.topics && typeof v.topics === "object" ? Object.values(v.topics) : [];
+          const weak = topics
+            .filter((t: any) => t && Number(t.answered) >= 3 && Number(t.correct) / Number(t.answered) < 0.6)
+            .sort((a: any, b: any) => Number(a.correct) / Number(a.answered) - Number(b.correct) / Number(b.answered))
+            .slice(0, 3)
+            .map((t: any) => String(t.name || "a topic"));
+          return `${String(v.name || "Subject")}: ${Number(v.correct)}/${Number(v.answered)} correct (${pct}%)${weak.length ? `, weakest topics: ${weak.join(", ")}` : ""}`;
+        });
+      if (rows.length) lines.push(`Practice accuracy (last 60 days): ${rows.join("; ")}.`);
+      const days = d?.days && typeof d.days === "object" ? Object.keys(d.days).filter(Boolean).sort() : [];
+      if (days.length) lines.push(`Practised on ${days.length} of the last 60 days, most recently ${days.slice(-3).join(", ")}.`);
+    }
+  } catch { /* optional */ }
+
+  try {
+    const snap = await adminDb.collection("mockAttempts").where("uid", "==", uid).limit(10).get();
+    const rows = (snap.docs || [])
+      .map((d) => d.data() as any)
+      .filter((a) => String(a?.centreId || "") === centreId)
+      .filter((a) => String(a?.status) === "submitted" && a?.resultSeenAt && a?.score && Number(a.score.answered) > 0)
+      .sort((a, b) => String(b.resultSeenAt).localeCompare(String(a.resultSeenAt)))
+      .slice(0, 3)
+      .map((a) => {
+        const pct = Math.round((Number(a.score.correct) / Number(a.score.answered)) * 100);
+        const per = Array.isArray(a.perSubject)
+          ? a.perSubject.slice(0, 6).map((v: any) => `${String(v.subject || "?")} ${Number(v.correct)}/${Number(v.total)}`).join(", ")
+          : "";
+        return `${String(a.mockTitle || "Mock")}${a.examType ? ` (${String(a.examType).toUpperCase()})` : ""}: ${Number(a.score.correct)}/${Number(a.score.answered)} (${pct}%)${per ? `. Per subject: ${per}` : ""}`;
+      });
+    if (rows.length) lines.push(`Recent mock results (already released to them): ${rows.join("; ")}.`);
+  } catch { /* optional */ }
+
+  return lines.slice(0, 40).join("\n").slice(0, 4000);
+}
+
+async function personaFor(centreId: string, caller: Caller): Promise<string> {
+  let role = '';
+  let name = '';
+  try {
+    const mem = await adminDb.collection('memberships').doc(`${caller.uid}__${centreId}`).get();
+    if (mem.exists) role = String((mem.data() as any)?.role || '');
+  } catch { /* the fallback persona covers it */ }
+  try {
+    const stu = await adminDb.collection('students').doc(caller.uid).get();
+    if (stu.exists) {
+      name = String((stu.data() as any)?.name || '');
+      role = 'student';
+    }
+  } catch { /* keep the membership role */ }
+  if (!name && (role === 'tutor' || role === 'owner' || role === 'admin' || !role)) {
+    try {
+      const tut = await adminDb.collection('tutors').where('uid', '==', caller.uid).limit(1).get();
+      if (!tut.empty) name = String((tut.docs[0].data() as any)?.name || '');
+    } catch { /* unnamed is fine */ }
+  }
+  if (!name) {
+    try {
+      const adm = await adminDb.collection('admins').doc(caller.uid).get();
+      if (adm.exists) {
+        const v = (adm.data() as any) || {};
+        name = String(v.name || v.displayName || v.fullName || '');
+      }
+    } catch { /* unnamed is fine */ }
+  }
+  let centreName = '';
+  try {
+    const centre = await adminDb.collection('centres').doc(centreId).get();
+    if (centre.exists) centreName = String((centre.data() as any)?.name || '');
+  } catch { /* unnamed is fine */ }
+  const at = centreName ? ` at ${centreName}` : '';
+  const who = name || 'The person you are talking to';
+  if (role === 'tutor') {
+    const lines = [
+      `Who you are talking to: ${name ? `${name}, a tutor${at}.` : `a tutor${at}.`}`,
+      'Treat them as a teaching professional, never like a student. Discuss lesson planning, explaining difficult topics, teaching strategies, class management, marking guidance and how to help their students perform better in WAEC, NECO and JAMB.',
+      name ? `When they greet you (for example "hi"), greet ${name} back by name and offer tutor-relevant help.` : 'When they greet you, greet them back warmly and offer tutor-relevant help.',
+    ];
+    const ctx = await tutorContext(centreId, caller.uid, name);
+    if (ctx) {
+      lines.push(
+        "You CAN see facility data below: your assigned students (matched by the subjects you cover and their classes) with their attendance and released mock results, plus facility-wide mock averages. Use it for grounded teaching advice. You cannot see students' private practice records or fees.",
+        'Facility data (released mock results only):',
+        ctx,
+      );
+    } else {
+      lines.push(
+        "You cannot see the facility’s records (results, attendance, fees) yet. If asked about a specific student’s performance, say plainly that you cannot see that yet and give guidance based on what they tell you.",
+      );
+    }
+    return lines.join('\n');
+  }
+  if (role === 'owner' || role === 'admin') {
+    const lines = [
+      `Who you are talking to: ${name ? `${name}, the administrator of ${centreName || 'a education facility'}.` : `the administrator of ${centreName || 'a education facility'}.`}`,
+      "Treat them as the facility’s manager. Help with running the facility: understanding student performance and attendance patterns, communicating with students and staff, planning academic programmes, exam preparation logistics and getting the most from the platform.",
+      name ? `When they greet you (for example "hi"), greet ${name} back by name and offer admin-relevant help.` : 'When they greet you, greet them back warmly and offer admin-relevant help.',
+    ];
+    // P5: which admin privileges apply? The membership role says owner or
+    // admin; the admins record carries the specific role (Super
+    // Administrator, Finance Admin, Center Admin, Admin Secretary). Finance
+    // stays with the owner and finance-level roles only.
+    let adminsRole = '';
+    try {
+      const adm = await adminDb.collection('admins').doc(caller.uid).get().catch(() => null);
+      if (adm?.exists) adminsRole = String((adm.data() as any)?.role || '');
+      else if (caller.email) {
+        const q = await adminDb.collection('admins').where('email', '==', caller.email).limit(1).get();
+        if (!q.empty) adminsRole = String((q.docs[0].data() as any)?.role || '');
+      }
+    } catch {
+      /* default to no finance */
+    }
+    const financeAllowed =
+      role === 'owner' || ['Super Administrator', 'Super Admin', 'Finance Admin'].includes(adminsRole);
+    const actx = await adminContext(centreId, { finance: financeAllowed });
+    if (actx) {
+      if (financeAllowed) {
+        lines.push(
+          "You CAN see the facility overview below: enrolment, staff, attendance, released mock performance and finance (billed, collected, outstanding, recent payments). When asked for a payment report, lay it out as a clean list, one student per line with paid and outstanding amounts, and bold the totals. Quote only the figures shown here, never invented ones. You cannot see students' private practice records.",
+          'Facility overview:',
+          actx,
+        );
+      } else {
+        lines.push(
+          "You CAN see the facility overview below: enrolment, staff, attendance and released mock performance. Use it for grounded management advice. You cannot see finance (payments, fees, billing): if asked, say plainly that is outside your access and point them to the facility owner.",
+          'Facility overview:',
+          actx,
+        );
+      }
+    } else {
+      lines.push(
+        "You cannot see the facility’s records (results, attendance, fees) yet. If asked about specific student data, say plainly that you cannot see that yet and give guidance based on what they tell you.",
+      );
+    }
+    return lines.join('\n');
+  }
+  const studentWho = name ? `${name}, a student${at}.` : `a student${at}.`;
+  const lines = [
+    `Who you are talking to: ${studentWho}`,
+    'Talk like a friendly, encouraging subject teacher helping a secondary-school student: simple words, step-by-step explanations, exam tips for WAEC, NECO and JAMB.',
+    name ? `When they greet you (for example "hi"), greet ${name} back by name and offer study help.` : 'When they greet you, greet them back warmly and offer study help.',
+  ];
+  const data = await studentContextFor(centreId, caller.uid, name);
+  if (data) {
+    lines.push(
+      "You CAN see this student's own records below: their practice and mock results, the facility's tutors (noted when one teaches subjects this student offers) and their own fee balance. Use them for personal advice: quote their real scores, name their weak topics, and answer questions about their tutors and their own fees. Never mention or share another student's data or anyone else's fees.",
+      'Data about this student (their own records only):',
+      data,
+    );
+  } else {
+    lines.push(
+      "You cannot see the student’s results, attendance, fees or any school records yet. If asked about their personal performance or school data, say plainly that you cannot see that yet and offer what you can help with instead.",
+    );
+  }
+  return lines.join('\n');
+}
+
+function titleFrom(text: string, hasImage: boolean): string {
+  const base = text.trim();
+  if (base) return base.length > 60 ? `${base.slice(0, 57)}…` : base;
+  return hasImage ? 'Photo question' : 'New chat';
+}
+
+function parseImageDataUrl(value: unknown): { mimeType: string; data: string } | null {
+  if (value == null || value === '') return null;
+  if (typeof value !== 'string') throw httpError(400, 'The attached image is not valid.');
+  const match = /^data:(image\/(?:png|jpeg|jpg|webp));base64,([A-Za-z0-9+/=]+)$/.exec(value);
+  if (!match) throw httpError(400, 'Only photo attachments (JPG, PNG or WebP) are supported.');
+  if (value.length > MAX_IMAGE_BASE64_CHARS) throw httpError(400, 'The photo is too large. Please attach a smaller one.');
+  return { mimeType: match[1] === 'image/jpg' ? 'image/jpeg' : match[1], data: match[2] };
+}
+
+async function consumeBurstLimit(caller: Caller, config: any): Promise<void> {
+  const limitPerHour = Number(config?.tutorAiHourlyCap) || DEFAULT_HOURLY_CAP;
+  const id = rateLimitDocId(`tutor-ai-burst:${caller.uid}`);
+  try {
+    await adminDb.runTransaction(async (tx) => {
+      const ref = adminDb.collection('rateLimits').doc(id);
+      const doc = await tx.get(ref);
+      const now = Date.now();
+      const windowMs = 60 * 60 * 1000;
+      let count = 1;
+      let windowStart = now;
+      if (doc.exists && now - (doc.data()!.windowStart || 0) <= windowMs) {
+        count = (doc.data()!.count || 0) + 1;
+        windowStart = doc.data()!.windowStart;
+      }
+      if (count > limitPerHour) {
+        const waitMinutes = Math.ceil((windowStart + windowMs - now) / 60000);
+        throw httpError(429, `You are sending messages too quickly. Please wait ${waitMinutes} minute${waitMinutes === 1 ? '' : 's'} before trying again.`);
+      }
+      tx.set(ref, { count, windowStart, expiresAt: new Date(windowStart + windowMs + windowMs) }, { merge: true });
+    });
+  } catch (err: any) {
+    if (err?.status === 429) throw err;
+    tutorAiFailure('consumeBurstLimit', err);
+  }
+}
+
+export function registerTutorAiRoutes(app: express.Express) {
+  // Send a message (and optionally a photo) to the Tutor AI. The first message
+  // of a new chat creates the conversation; later messages carry its id.
+  app.post('/api/tutor-ai/chat', async (req, res) => {
+    try {
+      const caller = getCallerOr401(req);
+      const body = req.body && typeof req.body === 'object' ? req.body : {};
+      const rawText = typeof body.text === 'string' ? body.text.trim() : '';
+      const image = parseImageDataUrl(body.image);
+      const thumb = parseImageDataUrl(body.imageThumb);
+      if (thumb && !image) throw httpError(400, 'The photo attachment is incomplete. Please try again.');
+      if (!rawText && !image) throw httpError(400, 'Type a question or attach a photo first.');
+      if (rawText.length > MAX_TEXT_CHARS) throw httpError(400, `Messages are limited to ${MAX_TEXT_CHARS.toLocaleString()} characters.`);
+
+      const centreId = await resolveCentreId(caller, String(body.centreId || '').slice(0, 128));
+
+      const status = await getCentreSubscriptionStatus(centreId);
+      if (status !== 'active' && status !== 'trial') {
+        throw httpError(403, 'Tutor AI is unavailable while the facility\'s subscription is not active.');
+      }
+
+      const config = await getPlatformConfig();
+      const monthlyCap = Number((config as any)?.tutorAiMonthlyCap) || DEFAULT_MONTHLY_CAP;
+      await consumeBurstLimit(caller, config);
+
+      const requestedId = validateConversationId(String(body.conversationId || ''), centreId, caller.uid);
+      const now = Date.now();
+      const conversationId = requestedId || `${centreId}__${caller.uid}__${now}`;
+      const convRef = adminDb.collection('tutorAiConversations').doc(conversationId);
+
+      // One transaction: enforce the monthly cap across all conversations,
+      // create the conversation when it is new, and store the user's message
+      // (thumbnail only, never the full upload). Firestore requires every
+      // read inside a transaction to run before any write, so both documents
+      // are read first and only then written.
+      let history: Array<{ role: 'user' | 'ai'; text: string }> = [];
+      let remaining = 0;
+      await adminDb.runTransaction(async (tx) => {
+        const usageRef = adminDb.collection('tutorAiUsage').doc(`${centreId}__${caller.uid}`);
+        const usageSnap = await tx.get(usageRef);
+        const convSnap = await tx.get(convRef);
+        const u = (usageSnap.exists ? usageSnap.data() : null) as any;
+        const monthKey = new Date().toISOString().slice(0, 7);
+        const monthCount = u && u.monthKey === monthKey ? (u.monthCount || 0) + 1 : 1;
+        if (monthCount > monthlyCap) {
+          throw httpError(429, 'Tutor AI has reached its message limit for this facility this month. Ask the facility admin for help.');
+        }
+        remaining = Math.max(0, monthlyCap - monthCount);
+        const data = (convSnap.exists ? convSnap.data() : null) as any;
+        const previous: any[] = Array.isArray(data?.messages) ? data.messages : [];
+        history = previous.slice(-CONTEXT_MESSAGES).map((m: any) => ({ role: m.role === 'ai' ? 'ai' : 'user', text: String(m.text || '') }));
+        const userMsg = { role: 'user', text: rawText, img: thumb ? thumb.data : null, at: now };
+        const messages = pruneOldImages([...previous, userMsg].slice(-MESSAGES_KEPT), now);
+        tx.set(usageRef, { centreId, uid: caller.uid, monthKey, monthCount, updatedAt: now }, { merge: false });
+        tx.set(convRef, {
+          centreId,
+          uid: caller.uid,
+          email: caller.email || '',
+          title: data?.title || titleFrom(rawText, !!image),
+          createdAt: data?.createdAt || now,
+          updatedAt: now,
+          messages,
+        }, { merge: false });
+      });
+
+      // Ask the model. The image rides only on this request; history is text.
+      const persona = await personaFor(centreId, caller);
+
+      const ai = await getTutorAiClient();
+      const contents: any[] = history
+        .filter((m) => m.text)
+        .map((m) => ({ role: m.role === 'ai' ? 'model' : 'user', parts: [{ text: m.text }] }));
+      const finalParts: any[] = [];
+      if (image) finalParts.push({ inlineData: { mimeType: image.mimeType, data: image.data } });
+      finalParts.push({ text: rawText || 'Please look at this photo and help me with it.' });
+      contents.push({ role: 'user', parts: finalParts });
+
+      let reply = '';
+      try {
+        const response = await ai.models.generateContent({
+          model: TUTOR_AI_MODEL,
+          contents,
+          config: { systemInstruction: `${SYSTEM_PROMPT}\n\n${persona}` },
+        });
+        reply = String(response.text || '').trim();
+      } catch (err: any) {
+        console.log(`[tutorAi] model call failed: ${err?.message || err}`);
+        throw httpError(502, 'Tutor AI could not answer just now. Please try again in a moment.');
+      }
+      if (!reply) throw httpError(502, 'Tutor AI could not answer just now. Please try again in a moment.');
+
+      // Store the assistant's reply, keeping the document bounded.
+      await adminDb.runTransaction(async (tx) => {
+        const snap = await tx.get(convRef);
+        const data = (snap.exists ? snap.data() : null) as any;
+        const previous: any[] = Array.isArray(data?.messages) ? data.messages : [];
+        const messages = pruneOldImages([...previous, { role: 'ai', text: reply, img: null, at: Date.now() }].slice(-MESSAGES_KEPT));
+        tx.set(convRef, { ...(data || { centreId, uid: caller.uid }), messages, updatedAt: Date.now() }, { merge: false });
+      }).catch((err) => tutorAiFailure('storeReply', err));
+
+      const after = await convRef.get();
+      res.json({
+        reply,
+        conversationId,
+        messages: (after.data() as any)?.messages || [],
+        remaining,
+        cap: monthlyCap,
+      });
+    } catch (error: any) {
+      res.status(error.status || 500).json({ error: error.message || 'Tutor AI could not answer just now. Please try again.' });
+    }
+  });
+
+  // List the member's chats with the Tutor AI, newest first, for the sidebar.
+  app.get('/api/tutor-ai/conversations', async (req, res) => {
+    try {
+      const caller = getCallerOr401(req);
+      const centreId = await resolveCentreId(caller, String((req.query.centreId as string) || '').slice(0, 128));
+      const snap = await adminDb
+        .collection('tutorAiConversations')
+        .where('centreId', '==', centreId)
+        .where('uid', '==', caller.uid)
+        .orderBy('updatedAt', 'desc')
+        .limit(CONVERSATIONS_LISTED)
+        .get()
+        .catch((err: any) => tutorAiFailure('listConversations', err));
+      const conversations = snap.docs.map((d: any) => {
+        const x = d.data() || {};
+        return { id: d.id, title: String(x.title || 'New chat'), updatedAt: x.updatedAt || x.createdAt || 0 };
+      });
+      res.json({ conversations });
+    } catch (error: any) {
+      res.status(error.status || 500).json({ error: error.message || 'Could not load the chat list.' });
+    }
+  });
+
+  // Load one conversation's messages; without an id, the newest one.
+  app.get('/api/tutor-ai/history', async (req, res) => {
+    try {
+      const caller = getCallerOr401(req);
+      const centreId = await resolveCentreId(caller, String((req.query.centreId as string) || '').slice(0, 128));
+      const config = await getPlatformConfig();
+      const monthlyCap = Number((config as any)?.tutorAiMonthlyCap) || DEFAULT_MONTHLY_CAP;
+      let conversationId = validateConversationId(String((req.query.conversationId as string) || ''), centreId, caller.uid);
+      if (!conversationId) {
+        const latest = await adminDb
+          .collection('tutorAiConversations')
+          .where('centreId', '==', centreId)
+          .where('uid', '==', caller.uid)
+          .orderBy('updatedAt', 'desc')
+          .limit(1)
+          .get()
+          .catch((err: any) => tutorAiFailure('latestConversation', err));
+        conversationId = latest.empty ? '' : latest.docs[0].id;
+      }
+      let messages: any[] = [];
+      if (conversationId) {
+        const snap = await adminDb.collection('tutorAiConversations').doc(conversationId).get();
+        const data = (snap.exists ? snap.data() : null) as any;
+        messages = Array.isArray(data?.messages) ? data.messages : [];
+      }
+      const usage = await adminDb.collection('tutorAiUsage').doc(`${centreId}__${caller.uid}`).get();
+      const u = (usage.exists ? usage.data() : null) as any;
+      const monthKey = new Date().toISOString().slice(0, 7);
+      const used = u && u.monthKey === monthKey ? u.monthCount || 0 : 0;
+      res.json({
+        conversationId: conversationId || null,
+        messages,
+        remaining: Math.max(0, monthlyCap - used),
+        cap: monthlyCap,
+      });
+    } catch (error: any) {
+      res.status(error.status || 500).json({ error: error.message || 'Could not load the conversation.' });
+    }
+  });
+
+  // Delete one conversation from the history (the monthly cap already counts
+  // the messages sent, so it is not reset). Without an id, the newest goes.
+  app.post('/api/tutor-ai/clear', async (req, res) => {
+    try {
+      const caller = getCallerOr401(req);
+      const centreId = await resolveCentreId(caller, String(req.body?.centreId || '').slice(0, 128));
+      let conversationId = validateConversationId(String(req.body?.conversationId || ''), centreId, caller.uid);
+      if (!conversationId) {
+        const latest = await adminDb
+          .collection('tutorAiConversations')
+          .where('centreId', '==', centreId)
+          .where('uid', '==', caller.uid)
+          .orderBy('updatedAt', 'desc')
+          .limit(1)
+          .get()
+          .catch((err: any) => tutorAiFailure('latestConversation', err));
+        conversationId = latest.empty ? '' : latest.docs[0].id;
+      }
+      if (conversationId) {
+        await adminDb.collection('tutorAiConversations').doc(conversationId).delete()
+          .catch((err: any) => tutorAiFailure('deleteConversation', err));
+      }
+      res.json({ ok: true });
+    } catch (error: any) {
+      res.status(error.status || 500).json({ error: error.message || 'Could not delete the conversation.' });
+    }
+  });
+}
+
+async function getTutorAiClient() {
+  const { GoogleGenAI } = await import('@google/genai');
+  const apiKey = process.env.EXCELLENT_API_KEY;
+  if (!apiKey) {
+    throw Object.assign(new Error('The Tutor AI is not configured yet. Please contact the platform team.'), { status: 400 });
+  }
+  console.log('Tutor AI backend: Vertex (enterprise) via EXCELLENT_API_KEY');
+  const ai = new GoogleGenAI({
+    enterprise: true,
+    apiKey,
+    httpOptions: { headers: { 'User-Agent': 'aistudio-build' } },
+  });
+  if (!ai.vertexai) {
+    throw httpError(400, 'The Tutor AI is not configured correctly. Please contact the platform team.');
+  }
+  return ai;
+}

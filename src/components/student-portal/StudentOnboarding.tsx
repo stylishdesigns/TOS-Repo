@@ -11,7 +11,7 @@ interface StudentOnboardingProps {
 }
 
 export const StudentOnboarding: React.FC<StudentOnboardingProps> = ({ onComplete }) => {
-  const { addToast } = useApp();
+  const { addToast, activeCentreId, centreName } = useApp();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     firstName: '',
@@ -61,11 +61,11 @@ export const StudentOnboarding: React.FC<StudentOnboardingProps> = ({ onComplete
         outstandingBalance: 0,
       };
 
-      await setDoc(doc(db, 'students', user.uid), studentData);
+      await setDoc(doc(db, 'students', user.uid), { ...studentData, ...(activeCentreId ? { centreId: activeCentreId } : {}) });
       addToast({
         type: 'success',
         title: 'Profile Created!',
-        description: 'Welcome to Excellence Tutorial Centre.',
+        description: `Welcome to ${centreName}.`,
       });
       // Small delay to ensure Firestore propagation before parent re-renders
       setTimeout(() => {
@@ -89,7 +89,7 @@ export const StudentOnboarding: React.FC<StudentOnboardingProps> = ({ onComplete
         <form onSubmit={handleSubmit} className="p-8 space-y-8">
           {/* Personal Information */}
           <section className="space-y-4">
-            <div className="flex items-center space-x-2 text-orange-600 mb-2">
+            <div className="flex items-facility space-x-2 text-orange-600 mb-2">
               <User className="w-5 h-5" />
               <h2 className="font-black uppercase tracking-wider text-sm">Personal Information</h2>
             </div>
@@ -119,7 +119,7 @@ export const StudentOnboarding: React.FC<StudentOnboardingProps> = ({ onComplete
 
           {/* Academic Goals */}
           <section className="space-y-4">
-            <div className="flex items-center space-x-2 text-orange-600 mb-2">
+            <div className="flex items-facility space-x-2 text-orange-600 mb-2">
               <GraduationCap className="w-5 h-5" />
               <h2 className="font-black uppercase tracking-wider text-sm">Academic Goals</h2>
             </div>
@@ -165,7 +165,7 @@ export const StudentOnboarding: React.FC<StudentOnboardingProps> = ({ onComplete
 
           {/* Parent Information */}
           <section className="space-y-4">
-            <div className="flex items-center space-x-2 text-orange-600 mb-2">
+            <div className="flex items-facility space-x-2 text-orange-600 mb-2">
               <Users className="w-5 h-5" />
               <h2 className="font-black uppercase tracking-wider text-sm">Parent / Guardian Details</h2>
             </div>
@@ -196,7 +196,7 @@ export const StudentOnboarding: React.FC<StudentOnboardingProps> = ({ onComplete
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-orange-600 hover:bg-orange-700 text-white font-black py-4 rounded-2xl shadow-xl shadow-orange-500/30 transition-all flex items-center justify-center space-x-2 disabled:opacity-50"
+            className="w-full bg-orange-600 hover:bg-orange-700 text-white font-black py-4 rounded-2xl shadow-xl shadow-orange-500/30 transition-all flex items-facility justify-facility space-x-2 disabled:opacity-50"
           >
             {loading ? (
               <span className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin" />

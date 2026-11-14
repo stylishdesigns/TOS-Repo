@@ -1,0 +1,53 @@
+// AUTO-EMBEDDED from welcome-email-template.html (Nov 11 version). Placeholders:
+// {{full_name}} {{centre_name}} {{access_code}} {{login_email}} {{temp_password}}
+// {{sign_in_url}} {{app_url}} {{whatsapp_url}}
+// Regenerate with the repo's tools/embed-welcome-template script if the file changes.
+
+export const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/CfaN0Rt2J9IFZLsBkUUS2N?s=cl&p=a&iam=2';
+export const APP_INSTALL_URL = 'https://tutorialos.com/app';
+
+export interface WelcomeValues {
+  fullName: string;
+  centreName: string;
+  accessCode: string;
+  loginEmail: string;
+  tempPassword: string;
+  signInUrl: string;
+}
+
+const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+export function renderWelcomeTemplate(v: WelcomeValues): { html: string; text: string; subject: string } {
+  const map: Record<string, string> = {
+    '{{full_name}}': esc(v.fullName || 'there'),
+    '{{centre_name}}': esc(v.centreName),
+    '{{access_code}}': esc(v.accessCode),
+    '{{login_email}}': esc(v.loginEmail),
+    '{{temp_password}}': esc(v.tempPassword),
+    '{{sign_in_url}}': esc(v.signInUrl),
+    '{{app_url}}': APP_INSTALL_URL,
+    '{{whatsapp_url}}': WHATSAPP_GROUP_URL,
+  };
+  let html: string = WELCOME_TEMPLATE_HTML;
+  for (const [k, val] of Object.entries(map)) html = html.split(k).join(val);
+  const leftovers = html.match(/{{[a-z_]+}}/g);
+  if (leftovers) console.warn('[welcome-email] unresolved placeholders:', leftovers.join(' '));
+  const text = [
+    `Hi ${v.fullName || 'there'},`,
+    '',
+    `Your Tutorial OS trial for ${v.centreName} is ready.`,
+    '',
+    `Access code: ${v.accessCode}`,
+    `Login email: ${v.loginEmail}`,
+    `Temporary password: ${v.tempPassword}`,
+    '',
+    `Sign in: ${v.signInUrl}`,
+    `Download the app: ${APP_INSTALL_URL}`,
+    `Join the Tutorial OS community on WhatsApp: ${WHATSAPP_GROUP_URL}`,
+    '',
+    'The temporary password works for 7 days; set your own password after signing in. Replies to this email are not read: post in the WhatsApp group instead.',
+  ].join('\n');
+  return { html, text, subject: 'Your Tutorial OS trial is ready' };
+}
+
+export const WELCOME_TEMPLATE_HTML: string = "<!DOCTYPE html>\n<html>\n<head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Your Tutorial OS trial is ready</title></head>\n<body style=\"margin:0;padding:0;background:#F1F5F9;font-family:Arial,Helvetica,sans-serif;color:#0F172A;\">\n  <div style=\"max-width:560px;margin:0 auto;padding:24px 16px;\">\n    <div style=\"background:#020617;border-radius:16px 16px 0 0;padding:20px 24px;\">\n      <span style=\"font-size:18px;font-weight:bold;color:#FFFFFF;\">Tutorial OS</span>\n      <span style=\"float:right;font-size:11px;letter-spacing:2px;color:#FDBA74;\">14-DAY FREE TRIAL</span>\n    </div>\n    <div style=\"background:#FFFFFF;border-radius:0 0 16px 16px;padding:28px 24px;\">\n      <p style=\"margin:0 0 14px;font-size:15px;line-height:1.6;\">Hi {{full_name}},</p>\n      <p style=\"margin:0 0 14px;font-size:15px;line-height:1.6;\">Your <strong>14-day free trial</strong> of Tutorial OS has started for <strong>{{centre_name}}</strong>. Your facility is already set up in the system and you are signed up as its owner and admin. Here is everything you need to get in:</p>\n\n      <div style=\"border:1px solid #E2E8F0;border-radius:12px;padding:14px 16px;margin:0 0 18px;\">\n        <p style=\"margin:0 0 10px;font-size:14px;\"><strong>Access code:</strong> {{access_code}}</p>\n        <p style=\"margin:0 0 10px;font-size:14px;\"><strong>Login email:</strong> {{login_email}}</p>\n        <p style=\"margin:0;font-size:14px;\"><strong>Temporary password:</strong> {{temp_password}}</p>\n      </div>\n\n      <p style=\"margin:0 0 8px;font-size:12px;font-weight:bold;letter-spacing:1px;color:#64748B;\">WHAT TO DO NEXT</p>\n      <ol style=\"margin:0 0 18px;padding-left:20px;font-size:14px;line-height:1.7;\">\n        <li style=\"margin:0 0 8px;\"><strong>Find your facility.</strong> On the sign-in page, enter your access code {{access_code}}. It takes you straight to {{centre_name}}&rsquo;s own sign-in page.</li>\n        <li style=\"margin:0 0 8px;\"><strong>Set your own password.</strong> The temporary password only works for 7 days. You must change it to your own password before you can sign in to your dashboard.</li>\n        <li><strong>Sign in.</strong> Use the button below. We included the link so you get there in one click, and you can always sign in through the Tutorial OS website too. It is smoothest from your facility&rsquo;s own sign-in page or the app.</li>\n      </ol>\n\n      <p style=\"margin:0 0 10px;text-align:facility;\">\n        <a href=\"{{sign_in_url}}\" style=\"display:inline-block;background:#C2410C;color:#FFFFFF;font-size:15px;font-weight:bold;text-decoration:none;padding:14px 28px;border-radius:12px;\">Sign in to your dashboard</a>\n      </p>\n      <p style=\"margin:0 0 22px;text-align:facility;\">\n        <a href=\"{{app_url}}\" style=\"display:inline-block;background:#0F172A;color:#FFFFFF;font-size:14px;font-weight:bold;text-decoration:none;padding:12px 26px;border-radius:12px;border:1px solid #1E293B;\">Download the app</a>\n      </p>\n\n      <p style=\"margin:0 0 12px;font-size:14px;line-height:1.6;\"><strong>Better on mobile.</strong> The best experience is on your phone: use the Download the app button above, add Tutorial OS to your home screen and use the same sign-in flow. If you prefer a laptop or desktop, it works there too.</p>\n\n      <p style=\"margin:0 0 12px;font-size:14px;line-height:1.6;\"><strong>Need a guide?</strong> We run free live webinars that walk you through setting up your dashboard and getting the best out of the tutors&rsquo; and students&rsquo; portals. Webinar dates are announced in the group. Join the Tutorial OS community on WhatsApp to reserve your spot, ask questions and get product updates: <a href=\"{{whatsapp_url}}\" style=\"color:#C2410C;\">{{whatsapp_url}}</a></p>\n\n      <p style=\"margin:0 0 4px;font-size:13px;color:#475569;\">Your free trial runs for 14 days. For any questions or enquiries, ask in the Tutorial OS community on WhatsApp.</p>\n    </div>\n    <p style=\"margin:14px 4px 0;font-size:11px;color:#94A3B8;\">&copy; Tutorial OS. One system for educational facilities.</p>\n  </div>\n</body>\n</html>\n";

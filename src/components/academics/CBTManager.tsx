@@ -63,7 +63,7 @@ interface MockGradingSettings {
 }
 
 export const CBTManager: React.FC = () => {
-  const { programmes, subjects: allSubjects, tutors, settings, addToast, exams, results, students } = useApp();
+  const { programmes, subjects: allSubjects, tutors, settings, addToast, exams, results, students, activeCentreId } = useApp();
 
   const [activeFrequency, setActiveFrequency] = useState<'General' | 'Mock'>('General');
   const [activeTimeFilter, setActiveTimeFilter] = useState<'Current' | 'Upcoming'>('Current');
@@ -109,12 +109,12 @@ export const CBTManager: React.FC = () => {
 
   // Firestore Sync for Global Grading
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'mock_grading'), (snapshot) => {
+    const unsub = onSnapshot(activeCentreId ? query(collection(db, 'mock_grading'), where('centreId', '==', activeCentreId)) : collection(db, 'mock_grading'), (snapshot) => {
       const data = snapshot.docs.map(doc => doc.data() as MockGradingSettings);
       setGlobalMockGrading(data);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'mock_grading'));
     return () => unsub();
-  }, []);
+  }, [activeCentreId]);
 
   React.useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 60000); // Update every minute for timers
@@ -721,7 +721,9 @@ export const CBTManager: React.FC = () => {
         essayTotalMarks: (setupData.mode === 'Essay' || setupData.mode === 'Both') ? totalEssayMarks : 0,
       };
 
-      await setDoc(doc(db, 'cbt_exams', examId), JSON.parse(JSON.stringify(examData)));
+      const examPayload = JSON.parse(JSON.stringify(examData)) as Record<string, any>;
+      if (activeCentreId) examPayload.centreId = activeCentreId;
+      await setDoc(doc(db, 'cbt_exams', examId), examPayload);
       addToast({ 
         type: 'success', 
         title: editingExamId ? 'Assessment Updated' : 'Assessment Published', 
@@ -837,27 +839,27 @@ export const CBTManager: React.FC = () => {
 
       {/* Header Row */}
       <div className="flex flex-col gap-5">
-        <div className="flex items-center justify-between">
+        <div className="flex items-facility justify-between">
           <div>
             <h2 className="text-2xl font-bold text-slate-900 tracking-tight">
-              CBT Practice
+              Tutors Assessment
             </h2>
             <p className="text-xs text-slate-500 mt-1">Configure automated assessments & simulations</p>
           </div>
         </div>
 
         {!showArchive && (
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex items-facility justify-between gap-4">
             <button
               onClick={handleOpenSetup}
-              className="px-4 py-2.5 text-xs font-bold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-xl shadow-sm transition-all flex items-center space-x-2"
+              className="px-4 py-2.5 text-xs font-bold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-xl shadow-sm transition-all flex items-facility space-x-2"
             >
               <Plus className="w-4 h-4" />
               <span>Set up Assessment</span>
             </button>
             <button
               onClick={() => setShowArchive(!showArchive)}
-              className={`px-4 py-2.5 text-xs font-bold rounded-xl shadow-sm transition-all flex items-center space-x-2 border ml-auto ${
+              className={`px-4 py-2.5 text-xs font-bold rounded-xl shadow-sm transition-all flex items-facility space-x-2 border ml-auto ${
                 showArchive 
                   ? 'bg-slate-900 text-white border-slate-900' 
                   : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
@@ -869,10 +871,10 @@ export const CBTManager: React.FC = () => {
           </div>
         )}
         {showArchive && (
-          <div className="flex items-center justify-end">
+          <div className="flex items-facility justify-end">
             <button
               onClick={() => setShowArchive(false)}
-              className="px-4 py-2.5 text-xs font-bold rounded-xl shadow-sm transition-all flex items-center space-x-2 border bg-slate-900 text-white border-slate-900"
+              className="px-4 py-2.5 text-xs font-bold rounded-xl shadow-sm transition-all flex items-facility space-x-2 border bg-slate-900 text-white border-slate-900"
             >
               <BookOpen className="w-4 h-4" />
               <span>Back to Current</span>
@@ -884,8 +886,8 @@ export const CBTManager: React.FC = () => {
       {/* KPI Cards - Hidden in Archive */}
       {!showArchive && (
         <div className="grid grid-cols-2 gap-3 sm:gap-4">
-          <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200/90 shadow-xs flex flex-col sm:flex-row sm:items-center sm:space-x-5">
-            <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-orange-50 text-[#EA580C] flex items-center justify-center shrink-0 mb-2 sm:mb-0">
+          <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200/90 shadow-xs flex flex-col sm:flex-row sm:items-facility sm:space-x-5">
+            <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-orange-50 text-[#EA580C] flex items-facility justify-facility shrink-0 mb-2 sm:mb-0">
               <BookOpen className="w-5 h-5 sm:w-7 sm:h-7" />
             </div>
             <div>
@@ -896,8 +898,8 @@ export const CBTManager: React.FC = () => {
             </div>
           </div>
 
-          <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200/90 shadow-xs flex flex-col sm:flex-row sm:items-center sm:space-x-5">
-            <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 mb-2 sm:mb-0">
+          <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200/90 shadow-xs flex flex-col sm:flex-row sm:items-facility sm:space-x-5">
+            <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-blue-50 text-blue-600 flex items-facility justify-facility shrink-0 mb-2 sm:mb-0">
               <Laptop className="w-5 h-5 sm:w-7 sm:h-7" />
             </div>
             <div>
@@ -912,8 +914,8 @@ export const CBTManager: React.FC = () => {
 
       {/* Unified Filter Component */}
       <div className="bg-white p-4 md:p-6 rounded-3xl border border-slate-200/90 shadow-sm space-y-4">
-        <div className="flex items-center space-x-3 mb-1">
-           <div className="w-8 h-8 rounded-xl bg-orange-50 flex items-center justify-center">
+        <div className="flex items-facility space-x-3 mb-1">
+           <div className="w-8 h-8 rounded-xl bg-orange-50 flex items-facility justify-facility">
               <Filter className="w-4 h-4 text-[#EA580C]" />
            </div>
            <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest leading-none">
@@ -969,7 +971,7 @@ export const CBTManager: React.FC = () => {
 
       {/* Frequency Toggle Switch - Moved below the main filter card */}
       <div className="flex flex-col gap-4">
-        <div className="flex items-center space-x-1 bg-slate-100 p-1.5 rounded-2xl w-fit mx-auto shadow-inner border border-slate-200">
+        <div className="flex items-facility space-x-1 bg-slate-100 p-1.5 rounded-2xl w-fit mx-auto shadow-inner border border-slate-200">
           {(['General', 'Mock'] as const).map((freq) => (
             <button
               key={freq}
@@ -980,15 +982,15 @@ export const CBTManager: React.FC = () => {
                   : 'text-slate-500 hover:text-slate-700'
               }`}
             >
-              {freq === 'General' ? 'CBT Assessment' : 'CBT Mock'}
+              {freq === 'General' ? 'Tutors Assessment' : 'Tutors Mock'}
             </button>
           ))}
         </div>
 
         {showArchive && (
-          <div className="px-6 py-2.5 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] flex items-center justify-center gap-3 w-fit mx-auto shadow-xl ring-4 ring-slate-100">
+          <div className="px-6 py-2.5 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] flex items-facility justify-facility gap-3 w-fit mx-auto shadow-xl ring-4 ring-slate-100">
              <BookOpen className="w-4 h-4 text-orange-400" />
-             Archive View: Past {activeFrequency === 'General' ? 'CBT' : 'CBT Mock'} Assessments
+             Archive View: Past {activeFrequency === 'General' ? 'Tutors' : 'Tutors Mock'} Assessments
           </div>
         )}
       </div>
@@ -1042,7 +1044,7 @@ export const CBTManager: React.FC = () => {
             return (
               <React.Fragment key={exam.id}>
                 {showSeparator && (
-                  <div className="flex items-center space-x-4 py-4">
+                  <div className="flex items-facility space-x-4 py-4">
                     <div className="h-px bg-slate-200 flex-1" />
                     {(() => {
                       const diffMs = startTimeMs - currentTime.getTime();
@@ -1068,7 +1070,7 @@ export const CBTManager: React.FC = () => {
                     const isToday = examStart.toDateString() === currentTime.toDateString();
                     const isStartingSoon = !isLive && !isPast && isToday;
                     
-                    const mappedFreqLabel = (exam.frequency === 'General' || exam.frequency as any === 'Daily' || exam.frequency as any === 'Weekly') ? 'CBT' : 'CBT Mock';
+                    const mappedFreqLabel = (exam.frequency === 'General' || exam.frequency as any === 'Daily' || exam.frequency as any === 'Weekly') ? 'Tutors' : 'Tutors Mock';
                     
                     return (
                       <>
@@ -1083,7 +1085,7 @@ export const CBTManager: React.FC = () => {
                         </div>
 
                         {/* Top Right Tip - Start Time or Created Date (Deep Grey Color) */}
-                        <div className="absolute top-0 right-0 px-3 py-1 bg-slate-700 text-white text-[8px] font-black uppercase tracking-widest flex items-center gap-1 border-b border-l border-slate-600">
+                        <div className="absolute top-0 right-0 px-3 py-1 bg-slate-700 text-white text-[8px] font-black uppercase tracking-widest flex items-facility gap-1 border-b border-l border-slate-600">
                           <Clock className="w-2.5 h-2.5 text-orange-400" />
                           {isPast 
                             ? <span>Created: <span className="text-orange-300">{exam.createdAt ? new Date(exam.createdAt).toLocaleDateString() : 'N/A'}</span></span>
@@ -1099,12 +1101,12 @@ export const CBTManager: React.FC = () => {
                   })()}
 
                   <div>
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-facility justify-between">
                       <span className="px-3 py-1 rounded-lg text-[10px] font-black bg-slate-50 text-slate-600 border border-slate-200 uppercase tracking-tighter">
                         {exam.targetExam}
                       </span>
 
-                      <div className="flex items-center space-x-1.5 text-xs text-slate-500 font-bold">
+                      <div className="flex items-facility space-x-1.5 text-xs text-slate-500 font-bold">
                         <Clock className="w-3.5 h-3.5 text-slate-400" />
                         <span>{exam.durationMinutes} MINS</span>
                       </div>
@@ -1112,17 +1114,17 @@ export const CBTManager: React.FC = () => {
 
                     <div className="mt-3 space-y-1">
                       <h3 className="font-black text-slate-900 text-lg group-hover:text-[#EA580C] transition-colors leading-tight">
-                        {exam.title.replace(/General Assessment/g, 'CBT Assessment').replace(/General/g, 'CBT')}
+                        {exam.title.replace(/General Assessment/g, 'Tutors Assessment').replace(/General/g, 'Tutors')}
                       </h3>
                       {exam.topic && (
-                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tight flex items-center gap-1">
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tight flex items-facility gap-1">
                           <FileText className="w-3 h-3 text-orange-500" />
                           Topic: {exam.topic}
                         </p>
                       )}
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-2 mt-3">
+                    <div className="flex flex-wrap items-facility gap-2 mt-3">
                       {exam.subjects.map((sub, idx) => (
                         <span
                           key={idx}
@@ -1146,7 +1148,7 @@ export const CBTManager: React.FC = () => {
                       const tutor = tutors.find(t => t.id === exam.tutorId);
                       if (!tutor) return null;
                       return (
-                        <div className="flex items-center gap-1.5 mt-3 text-[10px] font-bold text-slate-400">
+                        <div className="flex items-facility gap-1.5 mt-3 text-[10px] font-bold text-slate-400">
                           <Users className="w-3.5 h-3.5 text-slate-400" />
                           <span className="uppercase tracking-tight">Tutor: {tutor.name}</span>
                         </div>
@@ -1154,8 +1156,8 @@ export const CBTManager: React.FC = () => {
                     })()}
                   </div>
 
-                  <div className="pt-5 border-t border-slate-100 flex items-center justify-between relative">
-                    <div className="flex items-center space-x-4">
+                  <div className="pt-5 border-t border-slate-100 flex items-facility justify-between relative">
+                    <div className="flex items-facility space-x-4">
                       <div className="flex flex-col">
                         <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">Attempts</span>
                         <span className="text-sm font-black text-slate-700">
@@ -1165,11 +1167,11 @@ export const CBTManager: React.FC = () => {
                     </div>
 
                     {/* Mode Tag at Bottom - Q Count ONLY (Mode differentiated in Performance) */}
-                    <div className="absolute left-1/2 -translate-x-1/2 -bottom-6 px-4 py-2 bg-slate-50 text-slate-600 text-[9px] font-black uppercase tracking-[0.2em] rounded-b-md border-x border-b border-slate-100 shadow-sm flex items-center gap-2 whitespace-nowrap">
+                    <div className="absolute left-1/2 -translate-x-1/2 -bottom-6 px-4 py-2 bg-slate-50 text-slate-600 text-[9px] font-black uppercase tracking-[0.2em] rounded-b-md border-x border-b border-slate-100 shadow-sm flex items-facility gap-2 whitespace-nowrap">
                       <span className="text-[#EA580C]">{exam.questions?.length || exam.questionCount || 0} Qs</span>
                     </div>
 
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-facility space-x-2">
                       {!showArchive && !isPast && (
                         <button
                           onClick={() => handleOpenEdit(exam)}
@@ -1193,7 +1195,7 @@ export const CBTManager: React.FC = () => {
                         return (
                             <button
                               onClick={() => handleStartExam(exam)}
-                              className="px-5 py-2.5 text-xs font-black text-white rounded-xl shadow-lg transition-all flex items-center space-x-2 bg-slate-900 hover:bg-slate-800"
+                              className="px-5 py-2.5 text-xs font-black text-white rounded-xl shadow-lg transition-all flex items-facility space-x-2 bg-slate-900 hover:bg-slate-800"
                             >
                               <span className="leading-none">
                                 Review
@@ -1212,7 +1214,7 @@ export const CBTManager: React.FC = () => {
           })}
 
           {showArchive && totalArchivePages > 1 && (
-            <div className="flex items-center justify-between pt-6 pb-2 text-xs">
+            <div className="flex items-facility justify-between pt-6 pb-2 text-xs">
               <button
                 onClick={() => setArchivePage(p => Math.max(1, p - 1))}
                 disabled={archivePage === 1}
@@ -1239,11 +1241,11 @@ export const CBTManager: React.FC = () => {
 
       {/* Analytics Modal */}
       {showAnalyticsModal && (
-        <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 bg-black/60 z-[60] flex items-facility justify-facility p-4 backdrop-blur-sm">
           <div className="bg-white rounded-[32px] max-w-lg w-full shadow-2xl border border-slate-100 overflow-hidden animate-in fade-in zoom-in-95">
             <div className="bg-slate-900 p-6 text-white relative">
-              <div className="flex items-center space-x-3">
-                <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-md">
+              <div className="flex items-facility space-x-3">
+                <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-facility justify-facility backdrop-blur-md">
                   <BarChart2 className="w-6 h-6 text-orange-400" />
                 </div>
                 <div>
@@ -1281,7 +1283,7 @@ export const CBTManager: React.FC = () => {
               </div>
 
               <div className="space-y-4">
-                <h4 className="font-black text-slate-900 text-[10px] uppercase tracking-[0.2em] flex items-center gap-2">
+                <h4 className="font-black text-slate-900 text-[10px] uppercase tracking-[0.2em] flex items-facility gap-2">
                    <div className="w-2 h-2 rounded-full bg-blue-500" />
                    Class Performance Stats
                 </h4>
@@ -1319,12 +1321,12 @@ export const CBTManager: React.FC = () => {
                         ))}
 
                         <div className="mt-10 space-y-5">
-                          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                            <h4 className="font-black text-slate-900 text-[11px] uppercase tracking-[0.1em] flex items-center gap-2">
+                          <div className="flex items-facility justify-between border-b border-slate-100 pb-4">
+                            <h4 className="font-black text-slate-900 text-[11px] uppercase tracking-[0.1em] flex items-facility gap-2">
                                <Users className="w-4 h-4 text-[#EA580C]" />
                                Live Student Attempt Record
                             </h4>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-facility gap-2">
                                <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
                                <span className="text-[9px] font-black text-slate-400 uppercase">
                                   {examResults.length} SYNCED RECORDS
@@ -1337,15 +1339,15 @@ export const CBTManager: React.FC = () => {
                               <thead className="bg-slate-50 text-slate-500 font-black uppercase tracking-widest border-b border-slate-100">
                                 <tr>
                                   <th className="px-5 py-4">Student Name</th>
-                                  <th className="px-5 py-4 text-center">Submission Date</th>
+                                  <th className="px-5 py-4 text-facility">Submission Date</th>
                                   <th className="px-5 py-4 text-right">Score / Acc.</th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-slate-100">
                                 {examResults.length === 0 ? (
                                   <tr>
-                                    <td colSpan={3} className="px-5 py-16 text-center text-slate-400 font-medium italic">
-                                      <div className="flex flex-col items-center gap-2 opacity-50">
+                                    <td colSpan={3} className="px-5 py-16 text-facility text-slate-400 font-medium italic">
+                                      <div className="flex flex-col items-facility gap-2 opacity-50">
                                          <HelpCircle className="w-8 h-8" />
                                          <span>Gathering participation data...</span>
                                          <span className="text-[10px] uppercase font-black tracking-widest mt-1">Check database for exam ID: {showAnalyticsModal.id}</span>
@@ -1361,7 +1363,7 @@ export const CBTManager: React.FC = () => {
                                           <span className="text-[9px] text-slate-400 font-bold uppercase">{res.programmeName}</span>
                                         </div>
                                       </td>
-                                      <td className="px-5 py-4 text-center text-slate-500 font-bold font-mono">
+                                      <td className="px-5 py-4 text-facility text-slate-500 font-bold font-mono">
                                         {res.date || 'Today'}
                                       </td>
                                       <td className="px-5 py-4 text-right">
@@ -1398,11 +1400,11 @@ export const CBTManager: React.FC = () => {
 
       {/* Assessment Setup Modal */}
       {showSetupModal && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-facility justify-facility p-4 backdrop-blur-xs">
           <div className="bg-white rounded-3xl max-w-5xl w-full shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 overflow-hidden flex flex-col h-[90vh] max-h-[90vh]">
             <div className="bg-[#EA580C] p-5 md:p-6 text-white relative shrink-0">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 md:w-12 md:h-12 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-md">
+              <div className="flex items-facility space-x-3">
+                <div className="w-10 h-10 md:w-12 md:h-12 bg-white/20 rounded-2xl flex items-facility justify-facility backdrop-blur-md">
                   <Sparkles className="w-6 h-6 text-white" />
                 </div>
                 <div>
@@ -1426,8 +1428,8 @@ export const CBTManager: React.FC = () => {
                       value={setupData.frequency}
                       onChange={(val) => setSetupData({...setupData, frequency: val})}
                       options={[
-                        { value: 'General', label: 'CBT Assessment' },
-                        { value: 'Mock', label: 'Mock Examination' }
+                        { value: 'General', label: 'Tutors Assessment' },
+                        { value: 'Mock', label: 'Tutors Mock' }
                       ]}
                     />
 
@@ -1458,7 +1460,7 @@ export const CBTManager: React.FC = () => {
                       {setupData.frequency === 'Mock' ? (
                         <div className="space-y-2 max-h-32 overflow-y-auto p-2 bg-slate-50 border border-slate-200 rounded-xl">
                           {allSubjects.map(s => (
-                            <label key={s.id} className="flex items-center space-x-2 cursor-pointer p-1 hover:bg-white rounded transition-colors">
+                            <label key={s.id} className="flex items-facility space-x-2 cursor-pointer p-1 hover:bg-white rounded transition-colors">
                               <input
                                 type="checkbox"
                                 checked={setupData.subjectIds.includes(s.id)}
@@ -1497,9 +1499,9 @@ export const CBTManager: React.FC = () => {
                       />
                     </div>
 
-                    <div className="flex flex-row items-center gap-4 sm:gap-6 py-2">
-                       <label className={`flex items-center space-x-2.5 cursor-pointer group transition-all ${setupData.isAssignment ? 'opacity-40 grayscale' : 'opacity-100'}`}>
-                          <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${setupData.isClasswork ? 'bg-orange-500 border-orange-500 shadow-md scale-110' : 'border-slate-300 group-hover:border-orange-400'}`}>
+                    <div className="flex flex-row items-facility gap-4 sm:gap-6 py-2">
+                       <label className={`flex items-facility space-x-2.5 cursor-pointer group transition-all ${setupData.isAssignment ? 'opacity-40 grayscale' : 'opacity-100'}`}>
+                          <div className={`w-5 h-5 rounded-lg border-2 flex items-facility justify-facility transition-all ${setupData.isClasswork ? 'bg-orange-500 border-orange-500 shadow-md scale-110' : 'border-slate-300 group-hover:border-orange-400'}`}>
                              {setupData.isClasswork && <CheckCircle2 className="w-3.5 h-3.5 text-white" />}
                           </div>
                           <input 
@@ -1512,8 +1514,8 @@ export const CBTManager: React.FC = () => {
                           <span className="font-black text-slate-700 uppercase tracking-widest text-[9px]">Classwork</span>
                        </label>
 
-                       <label className={`flex items-center space-x-2.5 cursor-pointer group transition-all ${setupData.isClasswork ? 'opacity-40 grayscale' : 'opacity-100'}`}>
-                          <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${setupData.isAssignment ? 'bg-blue-600 border-blue-600 shadow-md scale-110' : 'border-slate-300 group-hover:border-blue-400'}`}>
+                       <label className={`flex items-facility space-x-2.5 cursor-pointer group transition-all ${setupData.isClasswork ? 'opacity-40 grayscale' : 'opacity-100'}`}>
+                          <div className={`w-5 h-5 rounded-lg border-2 flex items-facility justify-facility transition-all ${setupData.isAssignment ? 'bg-blue-600 border-blue-600 shadow-md scale-110' : 'border-slate-300 group-hover:border-blue-400'}`}>
                              {setupData.isAssignment && <CheckCircle2 className="w-3.5 h-3.5 text-white" />}
                           </div>
                           <input 
@@ -1563,7 +1565,7 @@ export const CBTManager: React.FC = () => {
                       <div className="grid grid-cols-2 gap-4">
                           <div className="flex flex-col relative group">
                             <label className="block font-black text-slate-700 uppercase tracking-widest mb-1.5 text-[10px]">Start Window</label>
-                            <div className="relative flex items-center group/input">
+                            <div className="relative flex items-facility group/input">
                               <input
                                 id="start-window-input"
                                 type="datetime-local"
@@ -1574,7 +1576,7 @@ export const CBTManager: React.FC = () => {
                               <button
                                 type="button"
                                 onClick={() => (document.activeElement as HTMLElement)?.blur()}
-                                className="absolute right-1 top-1/2 -translate-y-1/2 px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all flex items-center gap-1 shadow-lg active:scale-95 z-20 border border-emerald-500"
+                                className="absolute right-1 top-1/2 -translate-y-1/2 px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all flex items-facility gap-1 shadow-lg active:scale-95 z-20 border border-emerald-500"
                                 title="Confirm Time"
                               >
                                 <span className="text-[10px] font-black uppercase tracking-tighter">ok</span>
@@ -1589,7 +1591,7 @@ export const CBTManager: React.FC = () => {
                           </div>
                           <div className="flex flex-col relative group">
                             <label className="block font-black text-slate-700 uppercase tracking-widest mb-1.5 text-[10px]">End Window</label>
-                            <div className="relative flex items-center group/input">
+                            <div className="relative flex items-facility group/input">
                               <input
                                 id="end-window-input"
                                 type="datetime-local"
@@ -1600,7 +1602,7 @@ export const CBTManager: React.FC = () => {
                               <button
                                 type="button"
                                 onClick={() => (document.activeElement as HTMLElement)?.blur()}
-                                className="absolute right-1 top-1/2 -translate-y-1/2 px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all flex items-center gap-1 shadow-lg active:scale-95 z-20 border border-emerald-500"
+                                className="absolute right-1 top-1/2 -translate-y-1/2 px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all flex items-facility gap-1 shadow-lg active:scale-95 z-20 border border-emerald-500"
                                 title="Confirm Time"
                               >
                                 <span className="text-[10px] font-black uppercase tracking-tighter">ok</span>
@@ -1692,11 +1694,11 @@ export const CBTManager: React.FC = () => {
 
                     <div className="space-y-3">
                       <label className="block font-black text-slate-700 uppercase tracking-widest mb-1.5 text-[10px]">Question Acquisition Mode</label>
-                    <div className="flex items-center space-x-3">
+                    <div className="flex items-facility space-x-3">
                       <button
                         type="button"
                         onClick={() => setSetupData({...setupData, questionInputMode: 'Paste'})}
-                        className={`flex-1 p-4 rounded-2xl border-2 flex flex-col items-center space-y-2 transition-all ${setupData.questionInputMode === 'Paste' ? 'border-[#EA580C] bg-orange-50 text-[#EA580C]' : 'border-slate-100 bg-slate-50 text-slate-400'}`}
+                        className={`flex-1 p-4 rounded-2xl border-2 flex flex-col items-facility space-y-2 transition-all ${setupData.questionInputMode === 'Paste' ? 'border-[#EA580C] bg-orange-50 text-[#EA580C]' : 'border-slate-100 bg-slate-50 text-slate-400'}`}
                       >
                         <FileText className="w-6 h-6" />
                         <span className="text-[10px] font-black uppercase tracking-widest">Paste Copied Text</span>
@@ -1704,7 +1706,7 @@ export const CBTManager: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => setSetupData({...setupData, questionInputMode: 'AI'})}
-                        className={`flex-1 p-4 rounded-2xl border-2 flex flex-col items-center space-y-2 transition-all ${setupData.questionInputMode === 'AI' ? 'border-[#EA580C] bg-orange-50 text-[#EA580C]' : 'border-slate-100 bg-slate-50 text-slate-400'}`}
+                        className={`flex-1 p-4 rounded-2xl border-2 flex flex-col items-facility space-y-2 transition-all ${setupData.questionInputMode === 'AI' ? 'border-[#EA580C] bg-orange-50 text-[#EA580C]' : 'border-slate-100 bg-slate-50 text-slate-400'}`}
                       >
                         <Cpu className="w-6 h-6" />
                         <span className="text-[10px] font-black uppercase tracking-widest">AI Generation</span>
@@ -1722,7 +1724,7 @@ export const CBTManager: React.FC = () => {
                             key={sid}
                             type="button"
                             onClick={() => setActiveMockSubjectId(sid)}
-                            className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border flex items-center gap-2 ${activeMockSubjectId === sid ? 'bg-slate-900 text-white border-slate-900 shadow-md' : 'bg-white text-slate-500 border-slate-200'}`}
+                            className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border flex items-facility gap-2 ${activeMockSubjectId === sid ? 'bg-slate-900 text-white border-slate-900 shadow-md' : 'bg-white text-slate-500 border-slate-200'}`}
                           >
                             {s?.name || 'Subject'}
                             {hasQuestions && <CheckCircle2 className="w-3 h-3 text-emerald-400" />}
@@ -1733,7 +1735,7 @@ export const CBTManager: React.FC = () => {
                   )}
 
                   <div className="p-5 bg-slate-50 border border-slate-100 rounded-2xl">
-                    <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-facility justify-between mb-4">
                        <label className="font-black text-slate-700 uppercase tracking-widest text-[10px]">
                          {setupData.frequency === 'Mock' && activeMockSubjectId 
                             ? `Setup for ${allSubjects.find(s => s.id === activeMockSubjectId)?.name}` 
@@ -1793,8 +1795,8 @@ Number of Questions: ${setupData.questionCount}`;
                                 >
                                   <Copy className="w-3.5 h-3.5" />
                                 </button>
-                                <div className="flex items-center justify-between">
-                                    <span className="font-black uppercase tracking-widest text-slate-900 flex items-center gap-2 text-[10px]">
+                                <div className="flex items-facility justify-between">
+                                    <span className="font-black uppercase tracking-widest text-slate-900 flex items-facility gap-2 text-[10px]">
                                       <FileText className="w-4 h-4 text-[#EA580C]" />
                                       MCQ AI Prompt Guide
                                     </span>
@@ -1850,8 +1852,8 @@ Number of Questions: ${setupData.questionCount}`;
                                 >
                                   <Copy className="w-3.5 h-3.5" />
                                 </button>
-                                <div className="flex items-center justify-between">
-                                    <span className="font-black uppercase tracking-widest text-slate-900 flex items-center gap-2 text-[10px]">
+                                <div className="flex items-facility justify-between">
+                                    <span className="font-black uppercase tracking-widest text-slate-900 flex items-facility gap-2 text-[10px]">
                                       <FileText className="w-4 h-4 text-blue-600" />
                                       Essay AI Prompt Guide
                                     </span>
@@ -1873,7 +1875,7 @@ Number of Questions: ${setupData.questionCount}`;
                           </div>
 
                           <div className="space-y-3">
-                            <div className="flex items-center justify-between">
+                            <div className="flex items-facility justify-between">
                               <label className="block font-black text-slate-500 uppercase tracking-widest text-[10px]">Paste Content Below</label>
                                 <button
                                   type="button"
@@ -1910,7 +1912,7 @@ Number of Questions: ${setupData.questionCount}`;
                                   parsePastedQuestions(pastedText);
                                 }
                               }}
-                              className="w-full py-4 bg-slate-900 text-white font-black uppercase tracking-widest rounded-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-2 shadow-lg"
+                              className="w-full py-4 bg-slate-900 text-white font-black uppercase tracking-widest rounded-xl hover:bg-slate-800 transition-all flex items-facility justify-facility gap-2 shadow-lg"
                             >
                               <Plus className="w-4 h-4" />
                               Process & Parse Questions
@@ -1919,15 +1921,15 @@ Number of Questions: ${setupData.questionCount}`;
                       </div>
                     ) : (
                       <div className="space-y-4">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-2 text-orange-600">
+                          <div className="flex items-facility justify-between">
+                            <div className="flex items-facility space-x-2 text-orange-600">
                               <Sparkles className="w-4 h-4" />
                               <span className="font-black uppercase tracking-widest text-[10px]">AI Assessment Engine</span>
                             </div>
                             <button
                               type="button"
                               onClick={() => handleAutoFillPrompt(activeMockSubjectId)}
-                              className="px-3 py-1.5 bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-200 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all shadow-xs active:scale-95"
+                              className="px-3 py-1.5 bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-200 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-facility gap-1.5 transition-all shadow-xs active:scale-95"
                               title="Auto-fill prompt from current setup settings"
                             >
                               <Wand2 className="w-3.5 h-3.5" />
@@ -1968,7 +1970,7 @@ Number of Questions: ${setupData.questionCount}`;
                                   }
                                 }}
                                 disabled={generatingAI}
-                                className={`w-full py-4 text-white font-black uppercase tracking-widest rounded-xl shadow-md transition-all flex items-center justify-center space-x-2 disabled:opacity-50 ${
+                                className={`w-full py-4 text-white font-black uppercase tracking-widest rounded-xl shadow-md transition-all flex items-facility justify-facility space-x-2 disabled:opacity-50 ${
                                   hasGeneratedBefore ? 'bg-slate-900 hover:bg-slate-800' : 'bg-orange-500 hover:bg-orange-600'
                                 }`}
                               >
@@ -1992,7 +1994,7 @@ Number of Questions: ${setupData.questionCount}`;
 
                     {(setupData.frequency === 'Mock' ? (mockSubjectData[activeMockSubjectId]?.questions?.length || 0) : parsedQuestions.length) > 0 && (
                       <div className="space-y-4 pt-4 border-t border-slate-100">
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-facility justify-between">
                             <span className="font-black uppercase tracking-widest text-blue-600 text-[10px] bg-blue-50 px-3 py-1 rounded-full animate-pulse">
                               Ready for Professional Preview ({(setupData.frequency === 'Mock' ? mockSubjectData[activeMockSubjectId]?.questions?.length : parsedQuestions.length)})
                             </span>
@@ -2000,7 +2002,7 @@ Number of Questions: ${setupData.questionCount}`;
                         <div className="grid grid-cols-1 gap-6 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
                             {(setupData.frequency === 'Mock' ? mockSubjectData[activeMockSubjectId]?.questions : parsedQuestions).map((q, i) => (
                               <div key={i} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm transition-all hover:shadow-md space-y-4">
-                                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                                  <div className="flex items-facility justify-between border-b border-slate-100 pb-3">
                                     <span className="font-black text-blue-600 uppercase tracking-widest text-lg">Question {i + 1}</span>
                                     <span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest ${q.type === 'Essay' ? 'text-blue-600 bg-blue-50' : 'text-emerald-600 bg-emerald-50'}`}>
                                         {q.type || 'MCQ'} Mode
@@ -2022,8 +2024,8 @@ Number of Questions: ${setupData.questionCount}`;
                                         {q.options && q.options.length > 0 && (
                                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                             {q.options.map((opt, optIdx) => (
-                                              <div key={optIdx} className={`p-3 rounded-xl border text-xs font-semibold flex items-center gap-2 ${q.correctAnswer === optIdx ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-slate-50 border-slate-100 text-slate-500'}`}>
-                                                <span className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] ${q.correctAnswer === optIdx ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-600'}`}>
+                                              <div key={optIdx} className={`p-3 rounded-xl border text-xs font-semibold flex items-facility gap-2 ${q.correctAnswer === optIdx ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-slate-50 border-slate-100 text-slate-500'}`}>
+                                                <span className={`w-6 h-6 rounded-lg flex items-facility justify-facility text-[10px] ${q.correctAnswer === optIdx ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-600'}`}>
                                                   {String.fromCharCode(65 + optIdx)}
                                                 </span>
                                                 <MathText text={cleanOptionText(opt)} />
@@ -2057,7 +2059,7 @@ Number of Questions: ${setupData.questionCount}`;
 
             {/* Fixed Footer with Action Buttons */}
             <div className="p-4 md:p-6 bg-slate-50 border-t border-slate-100 flex flex-col space-y-4 shrink-0">
-                <div className="flex items-center justify-between">
+                <div className="flex items-facility justify-between">
                   <button 
                     type="button" 
                     onClick={() => setShowSetupModal(false)} 
@@ -2069,7 +2071,7 @@ Number of Questions: ${setupData.questionCount}`;
                     type="submit" 
                     form="assessmentSetupForm"
                     disabled={isSaving}
-                    className="px-10 py-3.5 bg-slate-900 text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-xl shadow-xl hover:bg-slate-800 transition-all active:scale-95 ring-4 ring-slate-100 flex items-center justify-center gap-2 min-w-[160px]"
+                    className="px-10 py-3.5 bg-slate-900 text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-xl shadow-xl hover:bg-slate-800 transition-all active:scale-95 ring-4 ring-slate-100 flex items-facility justify-facility gap-2 min-w-[160px]"
                   >
                     {isSaving ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -2081,7 +2083,7 @@ Number of Questions: ${setupData.questionCount}`;
                   <button 
                     type="button" 
                     onClick={() => setDeletingExamId(editingExamId)}
-                    className="w-full py-2 text-[8px] font-black text-rose-600 uppercase tracking-widest flex items-center justify-center space-x-1.5 hover:bg-rose-50 rounded-lg transition-all border border-rose-100"
+                    className="w-full py-2 text-[8px] font-black text-rose-600 uppercase tracking-widest flex items-facility justify-facility space-x-1.5 hover:bg-rose-50 rounded-lg transition-all border border-rose-100"
                   >
                     <Trash2 className="w-3 h-3" />
                     <span>Delete</span>
@@ -2094,11 +2096,11 @@ Number of Questions: ${setupData.questionCount}`;
 
       {/* Live CBT Simulator Modal (Scrollable Review Mode) */}
       {activeQuizModal && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-facility justify-facility p-4 backdrop-blur-xs">
           <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 overflow-hidden">
-            <div className="flex items-center justify-between p-6 border-b border-slate-200 shrink-0">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center">
+            <div className="flex items-facility justify-between p-6 border-b border-slate-200 shrink-0">
+              <div className="flex items-facility space-x-3">
+                <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-facility justify-facility">
                   <Laptop className="w-5 h-5 text-[#EA580C]" />
                 </div>
                 <div>
@@ -2106,7 +2108,7 @@ Number of Questions: ${setupData.questionCount}`;
                   <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">{activeQuizModal.targetExam} • {activeQuizModal.questions.length} QUESTIONS</p>
                 </div>
               </div>
-              <div className="flex items-center space-x-4">
+              <div className="flex items-facility space-x-4">
                 <div className="hidden sm:flex flex-col items-end">
                   <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Assessment Duration</span>
                   <span className="text-sm font-black text-slate-900">{activeQuizModal.durationMinutes} Minutes</span>
@@ -2119,7 +2121,7 @@ Number of Questions: ${setupData.questionCount}`;
 
             <div className="flex-1 overflow-y-auto p-6 space-y-8 scrollbar-thin scrollbar-thumb-slate-200">
                {activeQuizModal.questions.length === 0 ? (
-                 <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+                 <div className="flex flex-col items-facility justify-facility py-20 text-slate-400">
                     <AlertCircle className="w-12 h-12 mb-3" />
                     <p className="font-black uppercase tracking-widest text-sm">No Questions Loaded</p>
                  </div>
@@ -2128,7 +2130,7 @@ Number of Questions: ${setupData.questionCount}`;
                     <div key={idx} className="space-y-4 pb-8 border-b border-slate-100 last:border-0">
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
+                          <div className="flex items-facility gap-2 mb-2">
                              <span className="px-2 py-0.5 bg-slate-900 text-white text-[10px] font-black rounded-md">Q{idx + 1}</span>
                              <span className={`px-2 py-0.5 text-[10px] font-black rounded-md uppercase tracking-widest ${(q as any).type === 'Essay' ? 'bg-blue-50 text-blue-600 border border-blue-100' : 'bg-orange-50 text-orange-600 border border-orange-100'}`}>
                                 {(q as any).type || (activeQuizModal.mode === 'Essay' ? 'Essay' : 'MCQ')}
@@ -2149,9 +2151,9 @@ Number of Questions: ${setupData.questionCount}`;
                                   {q.options.map((opt, optIdx) => {
                                     const isCorrect = q.correctAnswer === optIdx;
                                     return (
-                                      <div key={optIdx} className={`p-3.5 rounded-xl border flex items-center justify-between text-xs sm:text-sm ${isCorrect ? 'bg-emerald-50 border-emerald-500 text-emerald-900 font-bold' : 'bg-slate-50 border-slate-200 text-slate-500'}`}>
-                                        <div className="flex items-center space-x-3">
-                                          <span className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${isCorrect ? 'bg-emerald-600 text-white' : 'bg-white text-slate-400 border border-slate-200'}`}>{String.fromCharCode(65 + optIdx)}</span>
+                                      <div key={optIdx} className={`p-3.5 rounded-xl border flex items-facility justify-between text-xs sm:text-sm ${isCorrect ? 'bg-emerald-50 border-emerald-500 text-emerald-900 font-bold' : 'bg-slate-50 border-slate-200 text-slate-500'}`}>
+                                        <div className="flex items-facility space-x-3">
+                                          <span className={`w-6 h-6 rounded-full flex items-facility justify-facility font-bold text-xs shrink-0 ${isCorrect ? 'bg-emerald-600 text-white' : 'bg-white text-slate-400 border border-slate-200'}`}>{String.fromCharCode(65 + optIdx)}</span>
                                           <MathText text={cleanOptionText(opt)} className="flex-1 font-bold" />
                                         </div>
                                         {isCorrect && <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 ml-2" />}
@@ -2162,7 +2164,7 @@ Number of Questions: ${setupData.questionCount}`;
                               )}
                               {/* MCQ Correct Answer & Explanation */}
                               <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl space-y-1.5 mt-3">
-                                <div className="flex items-center space-x-2 text-emerald-800">
+                                <div className="flex items-facility space-x-2 text-emerald-800">
                                   <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                                   <span className="text-xs font-black uppercase tracking-wider">
                                     Correct Answer: Option {typeof q.correctAnswer === 'number' && q.correctAnswer >= 0 ? String.fromCharCode(65 + q.correctAnswer) : (q.correctAnswer || 'A')}
@@ -2177,7 +2179,7 @@ Number of Questions: ${setupData.questionCount}`;
 
                               {q.explanation && (
                                 <div className="p-4 rounded-xl border bg-slate-50 border-slate-200 mt-2">
-                                  <div className="flex items-center space-x-2 mb-1.5">
+                                  <div className="flex items-facility space-x-2 mb-1.5">
                                      <HelpCircle className="w-4 h-4 text-slate-500" />
                                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-600">
                                         Explanation & Solution
@@ -2195,19 +2197,19 @@ Number of Questions: ${setupData.questionCount}`;
                )}
             </div>
 
-            <div className="p-4 md:p-6 border-t border-slate-200 flex items-center justify-between shrink-0 bg-slate-50/50">
+            <div className="p-4 md:p-6 border-t border-slate-200 flex items-facility justify-between shrink-0 bg-slate-50/50">
                {showArchive ? (
-                 <div className="flex items-center space-x-2">
+                 <div className="flex items-facility space-x-2">
                    {!showDeleteConfirm ? (
                      <button 
                        onClick={() => setShowDeleteConfirm(true)}
-                       className="px-6 py-2 bg-rose-50 text-rose-600 text-xs font-black uppercase tracking-widest rounded-xl hover:bg-rose-100 transition-all flex items-center gap-2 border border-rose-200"
+                       className="px-6 py-2 bg-rose-50 text-rose-600 text-xs font-black uppercase tracking-widest rounded-xl hover:bg-rose-100 transition-all flex items-facility gap-2 border border-rose-200"
                      >
                        <Trash2 className="w-4 h-4" />
                        Delete Archive
                      </button>
                    ) : (
-                     <div className="flex items-center space-x-2 bg-rose-600 p-1 rounded-xl animate-in fade-in slide-in-from-left-4">
+                     <div className="flex items-facility space-x-2 bg-rose-600 p-1 rounded-xl animate-in fade-in slide-in-from-left-4">
                         <span className="px-3 text-[9px] font-black text-white uppercase tracking-widest">Confirm?</span>
                         <button 
                           onClick={() => {
@@ -2249,10 +2251,10 @@ Number of Questions: ${setupData.questionCount}`;
 
       {/* Format Guide Modal */}
       {showFormatGuide && (
-        <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4 backdrop-blur-md">
+        <div className="fixed inset-0 bg-black/80 z-[100] flex items-facility justify-facility p-4 backdrop-blur-md">
           <div className="bg-white rounded-3xl max-w-4xl w-full shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95">
-            <div className="bg-slate-900 p-8 text-white flex items-center justify-between">
-              <div className="flex items-center space-x-3">
+            <div className="bg-slate-900 p-8 text-white flex items-facility justify-between">
+              <div className="flex items-facility space-x-3">
                 <div className="p-3 bg-orange-500/20 rounded-2xl">
                   <FileText className="w-8 h-8 text-orange-400" />
                 </div>
@@ -2270,7 +2272,7 @@ Number of Questions: ${setupData.questionCount}`;
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-6">
                   <div className="p-5 bg-orange-50 rounded-2xl border border-orange-100">
-                    <h4 className="text-[10px] font-black text-orange-600 uppercase tracking-widest mb-2 flex items-center">
+                    <h4 className="text-[10px] font-black text-orange-600 uppercase tracking-widest mb-2 flex items-facility">
                       <Sparkles className="w-3.5 h-3.5 mr-1.5" />
                       Rule #1: The Question Marker
                     </h4>
@@ -2280,7 +2282,7 @@ Number of Questions: ${setupData.questionCount}`;
                   </div>
 
                   <div>
-                    <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest mb-4 flex items-center">
+                    <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest mb-4 flex items-facility">
                       <div className="w-2 h-2 rounded-full bg-blue-500 mr-2" />
                       Essay / Sub-Question Format
                     </h4>
@@ -2307,7 +2309,7 @@ Number of Questions: ${setupData.questionCount}`;
 
                 <div className="space-y-6">
                   <div className="p-5 bg-emerald-50 rounded-2xl border border-emerald-100">
-                    <h4 className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-2 flex items-center">
+                    <h4 className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-2 flex items-facility">
                       <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
                       Rule #2: Clear Options
                     </h4>
@@ -2317,7 +2319,7 @@ Number of Questions: ${setupData.questionCount}`;
                   </div>
 
                   <div>
-                    <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest mb-4 flex items-center">
+                    <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest mb-4 flex items-facility">
                       <div className="w-2 h-2 rounded-full bg-emerald-500 mr-2" />
                       Multiple Choice Format
                     </h4>
@@ -2363,11 +2365,11 @@ Number of Questions: ${setupData.questionCount}`;
 
       {/* Global Mock Grading Settings Modal */}
       {showGlobalGradingModal && (
-        <div className="fixed inset-0 bg-black/60 z-[70] flex items-center justify-center p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 bg-black/60 z-[70] flex items-facility justify-facility p-4 backdrop-blur-sm">
           <div className="bg-white rounded-3xl max-w-xl w-full shadow-2xl border border-slate-100 overflow-hidden animate-in fade-in zoom-in-95">
             <div className="bg-slate-900 p-6 text-white relative">
-              <div className="flex items-center space-x-3">
-                <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-md">
+              <div className="flex items-facility space-x-3">
+                <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-facility justify-facility backdrop-blur-md">
                   <Settings className="w-6 h-6 text-white" />
                 </div>
                 <div>
@@ -2389,7 +2391,7 @@ Number of Questions: ${setupData.questionCount}`;
                   const current = globalMockGrading.find(g => g.programmeId === prog.id) || { programmeId: prog.id, mcqScore: 1, essayScore: 5 };
                   return (
                     <div key={prog.id} className="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-4">
-                      <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                      <div className="flex items-facility justify-between border-b border-slate-200 pb-2">
                         <span className="font-black text-slate-900 uppercase tracking-widest text-[10px]">{prog.name}</span>
                         <span className="text-[9px] font-bold text-slate-400">ID: {prog.id}</span>
                       </div>
@@ -2435,7 +2437,8 @@ Number of Questions: ${setupData.questionCount}`;
                   onClick={async () => {
                     try {
                       for (const grading of globalMockGrading) {
-                        await setDoc(doc(db, 'mock_grading', grading.programmeId), grading);
+                        // Stamp the centre so the row stays visible to, and writable by, its own centre.
+                        await setDoc(doc(db, 'mock_grading', grading.programmeId), activeCentreId ? { ...grading, centreId: activeCentreId } : grading);
                       }
                       addToast({ type: 'success', title: 'Grading Saved', description: 'Global mock rules updated.' });
                       setShowGlobalGradingModal(false);
@@ -2455,9 +2458,9 @@ Number of Questions: ${setupData.questionCount}`;
       )}
       {/* Delete Confirmation Modal */}
       {deletingExamId && (
-        <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl max-w-sm w-full p-8 shadow-2xl animate-in zoom-in-95 duration-200 text-center">
-            <div className="w-16 h-16 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
+        <div className="fixed inset-0 bg-black/60 z-[100] flex items-facility justify-facility p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-8 shadow-2xl animate-in zoom-in-95 duration-200 text-facility">
+            <div className="w-16 h-16 bg-rose-50 text-rose-600 rounded-2xl flex items-facility justify-facility mx-auto mb-6">
               <Trash2 className="w-8 h-8" />
             </div>
             <h3 className="text-xl font-black text-slate-900 mb-2">Delete Assessment?</h3>

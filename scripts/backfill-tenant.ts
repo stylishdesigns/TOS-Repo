@@ -34,8 +34,23 @@ function generate6DigitCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
+// The owner UID is a real Firebase Auth UID, passed per run (Prompt D): there
+// is no hard-coded account anywhere in the script.
+function resolveOwnerUid(): string {
+  const i = process.argv.indexOf('--owner-uid');
+  if (i > -1 && process.argv[i + 1]) return String(process.argv[i + 1]);
+  return process.env.EXCELLENCE_OWNER_UID || '';
+}
+
+const OWNER_UID = resolveOwnerUid();
+
 async function main() {
   const isApply = process.argv.includes('--apply');
+  if (isApply && !OWNER_UID) {
+    console.error('APPLY mode requires the real owner UID: pass --owner-uid <uid> or set EXCELLENCE_OWNER_UID.');
+    console.error('Refusing to write a centre whose ownerUid is not a real Firebase Auth UID.');
+    process.exit(1);
+  }
   console.log(`========================================================`);
   console.log(`  Tutorial OS Multi-Tenant Backfill Script (Prompt 1)`);
   console.log(`  Mode: ${isApply ? 'APPLY (Writing changes to Firestore)' : 'DRY RUN (Preview only, use --apply to commit)'}`);
@@ -58,9 +73,8 @@ async function main() {
   const centreDoc: Centre = {
     id: EXCELLENCE_CENTRE_ID,
     name: globalData.centreName || 'Excellence Tutorial Centre',
-    type: 'centre',
     status: 'active',
-    ownerUid: 'stylishdesigns484@gmail.com', // Will be linked to owner UID
+    ownerUid: OWNER_UID, // passed with --owner-uid or EXCELLENCE_OWNER_UID
     branding: {
       logo: globalData.logoText || 'Excellence',
       primaryColor: globalData.primaryColor || '#EA580C',
@@ -121,18 +135,24 @@ async function main() {
 
   // Step 3: Backfill centreId on all tenant collections
   console.log(`\n3. Backfilling centreId across collections:`);
-  const report: Record<string, { total: number; alreadyTagged: number; newlyTagged: number }> = {};
+  const report: Record<string, { total: number; alreadyTagged: number; newlyTagged: number; otherCentre: number }> = {};
 
   for (const collName of TENANT_COLLECTIONS) {
     const snap = await adminDb.collection(collName).get();
     let alreadyTagged = 0;
     let newlyTagged = 0;
+    let otherCentre = 0;
 
     const docsToUpdate: Array<{ id: string; ref: FirebaseFirestore.DocumentReference }> = [];
     snap.forEach((docSnap) => {
       const data = docSnap.data();
       if (data.centreId === EXCELLENCE_CENTRE_ID) {
         alreadyTagged++;
+      } else if (typeof data.centreId === 'string' && data.centreId) {
+        // The row already belongs to a different centre (e.g. Champion).
+        // This script provisions centre #1 only; it must never re-tag or
+        // claim another centre's rows.
+        otherCentre++;
       } else {
         newlyTagged++;
         docsToUpdate.push({ id: docSnap.id, ref: docSnap.ref });
@@ -143,6 +163,7 @@ async function main() {
       total: snap.size,
       alreadyTagged,
       newlyTagged,
+      otherCentre,
     };
 
     if (isApply && docsToUpdate.length > 0) {
@@ -170,9 +191,11 @@ async function main() {
   for (const docSnap of adminsSnap.docs) {
     const data = docSnap.data();
     const uid = data.uid || docSnap.id;
+    // A person already tagged to a different centre belongs there.
+    if (typeof data.centreId === 'string' && data.centreId && data.centreId !== EXCELLENCE_CENTRE_ID) continue;
     if (uid) {
       let role: MembershipRole = 'admin';
-      if (data.role === 'Super Admin' || data.email === 'stylishdesigns484@gmail.com') {
+      if (data.role === 'Super Admin') {
         role = 'owner';
       } else if (data.role === 'Center Admin') {
         role = 'admin';
@@ -207,6 +230,7 @@ async function main() {
   for (const docSnap of tutorsSnap.docs) {
     const data = docSnap.data();
     const uid = data.uid || docSnap.id;
+    if (typeof data.centreId === 'string' && data.centreId && data.centreId !== EXCELLENCE_CENTRE_ID) continue;
     if (uid) {
       const membershipId = `${uid}__${EXCELLENCE_CENTRE_ID}`;
       const memDoc: CentreMembership = {
@@ -231,6 +255,7 @@ async function main() {
   for (const docSnap of studentsSnap.docs) {
     const data = docSnap.data();
     const uid = data.uid || docSnap.id;
+    if (typeof data.centreId === 'string' && data.centreId && data.centreId !== EXCELLENCE_CENTRE_ID) continue;
     if (uid) {
       const membershipId = `${uid}__${EXCELLENCE_CENTRE_ID}`;
       const memDoc: CentreMembership = {
@@ -262,15 +287,16 @@ async function main() {
     `Collection`.padEnd(20) +
     `Total Docs`.padEnd(14) +
     `Tagged centreId`.padEnd(18) +
+    `Other centre`.padEnd(16) +
     `Untagged (Pending)`
   );
-  console.log('-'.repeat(65));
+  console.log('-'.repeat(82));
 
   for (const [coll, stats] of Object.entries(report)) {
-    const tagged = isApply ? stats.total : stats.alreadyTagged;
+    const tagged = isApply ? stats.total - stats.otherCentre : stats.alreadyTagged;
     const pending = isApply ? 0 : stats.newlyTagged;
     console.log(
-      `${coll.padEnd(20)}${String(stats.total).padEnd(14)}${String(tagged).padEnd(18)}${String(pending)}`
+      `${coll.padEnd(20)}${String(stats.total).padEnd(14)}${String(tagged).padEnd(18)}${String(stats.otherCentre).padEnd(16)}${String(pending)}`
     );
   }
 

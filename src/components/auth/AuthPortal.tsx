@@ -12,7 +12,9 @@ import {
   AlertCircle,
   Eye,
   EyeOff,
-  CheckCircle2
+  CheckCircle2,
+  KeyRound,
+  X
 } from 'lucide-react';
 
 // Google Icon Component
@@ -43,6 +45,16 @@ interface AuthPortalProps {
   subtitle: string;
   onSuccess: () => void;
   onBack?: () => void;
+  notice?: string;
+  onNoticeSignUp?: () => void;
+  onNoticeCancel?: () => void;
+  noticeModal?: boolean;
+  onChangeAccessCode?: () => void;
+  verifying?: boolean;
+  email: string;
+  onEmailChange: (v: string) => void;
+  password: string;
+  onPasswordChange: (v: string) => void;
 }
 
 export const AuthPortal: React.FC<AuthPortalProps> = ({ 
@@ -50,13 +62,21 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
   title, 
   subtitle,
   onSuccess,
-  onBack
+  onBack,
+  notice,
+  onNoticeSignUp,
+  onNoticeCancel,
+  noticeModal,
+  onChangeAccessCode,
+  verifying,
+  email,
+  onEmailChange,
+  password,
+  onPasswordChange
 }) => {
   const { loginWithEmail, loginWithGoogle, signUpWithEmail, resetPassword, updatePassword, logout } = useFirebase();
-  const { addToast } = useApp();
+  const { addToast, activeCentreId, centreName } = useApp();
   
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [currentPassword, setCurrentPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -246,7 +266,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
       addToast({
         type: 'success',
         title: `Welcome Back, ${displayRole}!`,
-        description: `We're glad to have you back at Excellence Tutorials.`
+        description: `We're glad to have you back at ${centreName}.`
       });
       onSuccess();
     } catch (err: any) {
@@ -296,7 +316,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
           programmeName: 'General Student',
           courses: []
         };
-        await setDoc(doc(db, 'students', uid), newStudent);
+        await setDoc(doc(db, 'students', uid), { ...newStudent, ...(activeCentreId ? { centreId: activeCentreId } : {}) });
       }
 
       addToast({
@@ -446,7 +466,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
           programmeName: 'General Student',
           courses: []
         };
-        await setDoc(doc(db, 'students', uid), newStudent);
+        await setDoc(doc(db, 'students', uid), { ...newStudent, ...(activeCentreId ? { centreId: activeCentreId } : {}) });
         displayRole = 'Student';
       } else {
         // If in admin/tutor portal and user doesn't exist, this might be an error or they need to be invited
@@ -458,7 +478,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
       addToast({
         type: 'success',
         title: `Welcome, ${displayRole}!`,
-        description: `You're now signed in to Excellence Tutorials.`
+        description: `You're now signed in to ${centreName}.`
       });
       onSuccess();
     } catch (err: any) {
@@ -468,23 +488,12 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
     }
   };
 
-  const fillDemoCredentials = () => {
-    const demoCreds = {
-      admin: { e: 'admin@excellencetutorials.ng', p: 'Admin@123' },
-      tutor: { e: 'tutor@excellencetutorials.ng', p: 'Tutor@123' },
-      student: { e: 'student@excellencetutorials.ng', p: 'Student@123' }
-    };
-    const cred = (demoCreds as any)[portalType];
-    setEmail(cred.e);
-    setPassword(cred.p);
-  };
-
   return (
     <div className={`min-h-screen ${pageBackground} overflow-y-auto overflow-x-hidden selection:bg-orange-500 selection:text-white`}>
-      <div className="min-h-full w-full flex flex-col items-center justify-center py-8 md:py-20 px-4">
+      <div className="min-h-screen w-full flex flex-col items-facility justify-facility py-8 md:py-12 px-4">
         <div className="w-full max-w-md bg-white rounded-[2.5rem] shadow-2xl shadow-black/50 border border-white/10 overflow-hidden animate-in fade-in zoom-in-95 duration-500 relative">
-          <div className={`p-8 ${style.bg} border-b ${style.border} text-center relative`}>
-          <div className={`w-12 h-12 rounded-xl ${style.accent} flex items-center justify-center mx-auto mb-4 shadow-lg shadow-black/5`}>
+          <div className={`p-8 ${style.bg} border-b ${style.border} text-facility relative`}>
+          <div className={`w-12 h-12 rounded-xl ${style.accent} flex items-facility justify-facility mx-auto mb-4 shadow-lg shadow-black/5`}>
             {style.icon}
           </div>
           <h1 className="text-2xl font-bold text-slate-900">{title}</h1>
@@ -499,9 +508,23 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
               </div>
           )}
 
+          {notice && !noticeModal && (
+              <div className="mb-6 p-4 bg-orange-50 border border-orange-200 rounded-xl text-orange-700">
+                <p className="text-sm font-bold">{notice}</p>
+                {onNoticeSignUp && (
+                  <button
+                    onClick={onNoticeSignUp}
+                    className="mt-3 w-full py-3 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-sm font-bold transition-colors"
+                  >
+                    Sign up as a student
+                  </button>
+                )}
+              </div>
+          )}
+
           {resetSent ? (
-            <div className="text-center py-4 space-y-4">
-              <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
+            <div className="text-facility py-4 space-y-4">
+              <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-facility justify-facility mx-auto">
                 <CheckCircle2 className="w-6 h-6" />
               </div>
               <h3 className="text-lg font-bold text-slate-900">Reset Link Sent</h3>
@@ -613,7 +636,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
               <button
                 type="submit"
                 disabled={isLoading}
-                className={`w-full py-4 rounded-xl text-white font-black text-[10px] uppercase tracking-[0.2em] shadow-xl flex items-center justify-center space-x-2 transition-all ${style.accent} hover:shadow-2xl active:scale-[0.98] disabled:opacity-50 mt-4`}
+                className={`w-full py-4 rounded-xl text-white font-black text-[10px] uppercase tracking-[0.2em] shadow-xl flex items-facility justify-facility space-x-2 transition-all ${style.accent} hover:shadow-2xl active:scale-[0.98] disabled:opacity-50 mt-4`}
               >
                 {isLoading ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -678,7 +701,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
                       type="email"
                       required
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      onChange={(e) => onEmailChange(e.target.value)}
                       placeholder="e.g. name@excellencetutorials.ng"
                       className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-4 focus:ring-slate-100 focus:border-slate-900 outline-none transition-all font-medium"
                     />
@@ -687,7 +710,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
 
                 {!isResetting && (
                   <div className="space-y-1.5">
-                    <div className="flex items-center justify-between px-1">
+                    <div className="flex items-facility justify-between px-1">
                       <label className="text-[10px] font-black text-slate-700 uppercase tracking-[0.2em]">
                         {authMode === 'login' ? 'Password' : 'Choose Password'}
                       </label>
@@ -707,7 +730,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
                         type={showPassword ? 'text' : 'password'}
                         required
                         value={password}
-                        onChange={(e) => setPassword(e.target.value)}
+                        onChange={(e) => onPasswordChange(e.target.value)}
                         placeholder="••••••••"
                         className="w-full pl-10 pr-12 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-4 focus:ring-slate-100 focus:border-slate-900 outline-none transition-all font-medium"
                       />
@@ -725,25 +748,25 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
                 <button
                   type={isResetting ? 'button' : 'submit'}
                   onClick={isResetting ? handleResetPassword : undefined}
-                  disabled={isLoading}
-                  className={`w-full py-4 rounded-xl text-white font-black text-[10px] uppercase tracking-[0.2em] shadow-xl flex items-center justify-center space-x-2 transition-all ${style.accent} hover:shadow-2xl active:scale-[0.98] disabled:opacity-50 disabled:translate-y-0 disabled:shadow-none mt-2`}
+                  disabled={isLoading || verifying}
+                  className={`w-full py-4 rounded-xl text-white font-black text-[10px] uppercase tracking-[0.2em] shadow-xl flex items-facility justify-facility space-x-2 transition-all ${style.accent} hover:shadow-2xl active:scale-[0.98] disabled:opacity-50 disabled:translate-y-0 disabled:shadow-none mt-2`}
                 >
-                  {isLoading ? (
+                  {(isLoading || verifying) ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
                     <>
-                      <span>{isResetting ? 'Send Reset Link' : (authMode === 'signup' ? 'Create My Account' : 'Sign In')}</span>
-                      {!isResetting && <ArrowRight className="w-4 h-4 text-white/50" />}
+                      <span>{verifying ? 'Verifying your facility...' : (isResetting ? 'Send Reset Link' : (authMode === 'signup' ? 'Create My Account' : 'Sign In'))}</span>
+                      {!isResetting && !verifying && <ArrowRight className="w-4 h-4 text-white/50" />}
                     </>
                   )}
                 </button>
 
                 {isStudent && !isResetting && (
                   <div className="relative my-8">
-                    <div className="absolute inset-0 flex items-center">
+                    <div className="absolute inset-0 flex items-facility">
                       <div className="w-full border-t border-slate-100"></div>
                     </div>
-                    <div className="relative flex justify-center text-[10px] uppercase font-black tracking-widest">
+                    <div className="relative flex justify-facility text-[10px] uppercase font-black tracking-widest">
                       <span className="px-4 bg-white text-slate-400">Or continue with</span>
                     </div>
                   </div>
@@ -754,10 +777,22 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
                     type="button"
                     onClick={handleGoogleLogin}
                     disabled={isLoading}
-                    className="w-full py-4 border border-slate-200 rounded-xl text-slate-700 font-bold text-sm flex items-center justify-center hover:bg-slate-50 transition-all active:scale-[0.98] disabled:opacity-50"
+                    className="w-full py-4 border border-slate-200 rounded-xl text-slate-700 font-bold text-sm flex items-facility justify-facility hover:bg-slate-50 transition-all active:scale-[0.98] disabled:opacity-50"
                   >
                     <GoogleIcon />
                     {authMode === 'login' ? 'Sign in' : 'Sign up'} with Google
+                  </button>
+                )}
+
+                {onChangeAccessCode && !isResetting && (
+                  <button
+                    type="button"
+                    onClick={onChangeAccessCode}
+                    disabled={verifying}
+                    className="w-full mt-4 flex items-facility justify-facility space-x-2 py-3 border border-dashed border-slate-200 rounded-xl text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-all text-[10px] font-black uppercase tracking-widest disabled:opacity-50"
+                  >
+                    <KeyRound className="w-4 h-4 opacity-50" />
+                    <span>Enter another access code</span>
                   </button>
                 )}
 
@@ -765,7 +800,8 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
                   <button
                     type="button"
                     onClick={onBack}
-                    className="w-full mt-4 flex items-center justify-center space-x-2 py-3 border border-dashed border-slate-200 rounded-xl text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-all text-[10px] font-black uppercase tracking-widest"
+                    disabled={verifying}
+                    className="w-full mt-2 flex items-facility justify-facility space-x-2 py-3 border border-dashed border-slate-200 rounded-xl text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-all text-[10px] font-black uppercase tracking-widest disabled:opacity-50"
                   >
                     <ArrowRight className="w-4 h-4 rotate-180 opacity-50" />
                     <span>Back to landing page</span>
@@ -789,6 +825,50 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
           )}
         </div>
       </div>
+
+      {/* Wrong-centre notice popup: the message with a Cancel button and a
+          route to the student login page. */}
+      {notice && noticeModal && (
+        <div className="fixed inset-0 z-50 flex items-facility justify-facility p-4 bg-slate-950/60 backdrop-blur-sm">
+          <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl border border-slate-100 p-6 space-y-4 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-start space-x-3">
+              <div className="w-10 h-10 rounded-xl bg-rose-50 border border-rose-100 flex items-facility justify-facility shrink-0">
+                <AlertCircle className="w-5 h-5 text-rose-500" />
+              </div>
+              <div className="space-y-1.5">
+                <h3 className="text-base font-black text-slate-900">No account found</h3>
+                <p className="text-sm text-slate-500 font-medium leading-relaxed">{notice}</p>
+              </div>
+              <button
+                type="button"
+                onClick={onNoticeCancel}
+                className="ml-auto p-1.5 text-slate-300 hover:text-slate-500 transition-colors rounded-lg hover:bg-slate-50"
+                aria-label="Close"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="flex items-facility space-x-2 pt-1">
+              <button
+                type="button"
+                onClick={onNoticeCancel}
+                className="flex-1 py-3 rounded-xl border border-slate-200 text-slate-600 font-bold text-sm hover:bg-slate-50 transition-colors"
+              >
+                Cancel
+              </button>
+              {portalType !== 'student' && onNoticeSignUp && (
+                <button
+                  type="button"
+                  onClick={onNoticeSignUp}
+                  className="flex-1 py-3 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-bold text-sm transition-colors"
+                >
+                  Student login
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   </div>
 );

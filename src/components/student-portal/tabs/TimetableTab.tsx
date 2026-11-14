@@ -216,13 +216,13 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({ student }) => {
   });
 
   return (
-    <div className="space-y-4 px-4 py-3 max-w-lg mx-auto pb-20 animate-in fade-in duration-300">
+    <div className="space-y-4 px-4 py-3 max-w-lg mx-auto animate-in fade-in duration-300">
       {/* 1. Switch at top: "Timetable | Study Materials" */}
       <div className="bg-white rounded-[14px] p-1 border border-[#E2E8F0] shadow-2xs grid grid-cols-2 gap-1">
         <button
           type="button"
           onClick={() => setActiveSection('timetable')}
-          className={`h-10 rounded-[10px] text-xs font-extrabold transition-all flex items-center justify-center cursor-pointer ${
+          className={`h-10 rounded-[10px] text-xs font-extrabold transition-all flex items-facility justify-facility cursor-pointer ${
             activeSection === 'timetable'
               ? 'bg-[#0F172A] text-white shadow-xs'
               : 'text-[#64748B] hover:text-[#0F172A]'
@@ -234,7 +234,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({ student }) => {
         <button
           type="button"
           onClick={() => setActiveSection('materials')}
-          className={`h-10 rounded-[10px] text-xs font-extrabold transition-all flex items-center justify-center cursor-pointer ${
+          className={`h-10 rounded-[10px] text-xs font-extrabold transition-all flex items-facility justify-facility cursor-pointer ${
             activeSection === 'materials'
               ? 'bg-[#0F172A] text-white shadow-xs'
               : 'text-[#64748B] hover:text-[#0F172A]'
@@ -251,16 +251,6 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({ student }) => {
         />
       ) : (
         <>
-          {/* Header Banner */}
-          <div className="pt-1">
-            <span className="text-[10px] font-extrabold uppercase text-[#C2410C] tracking-wider block">
-              {student.name} · {student.programmeName || 'Academic Schedule'}
-            </span>
-            <h2 className="text-xl font-black text-[#0F172A] tracking-tight">
-              Classes & Lectures
-            </h2>
-          </div>
-
           {/* 2. Week Strip: 7 days Mon - Sun */}
           <div className="grid grid-cols-7 gap-1.5 pb-1">
             {DAYS.map((day) => {
@@ -275,7 +265,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({ student }) => {
                     setSelectedDay(day);
                     setSubjectFilter('All');
                   }}
-                  className={`py-2 px-1 rounded-[20px] text-center transition-all border cursor-pointer flex flex-col items-center justify-between min-h-[64px] active:scale-95 ${
+                  className={`py-2 px-1 rounded-[20px] text-facility transition-all border cursor-pointer flex flex-col items-facility justify-between min-h-[64px] active:scale-95 ${
                     isSelected
                       ? 'bg-[#C2410C] text-white border-[#C2410C] shadow-sm'
                       : 'bg-white text-slate-800 border-[#E2E8F0] hover:bg-slate-50'
@@ -305,13 +295,13 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({ student }) => {
             <div
               className="rounded-[24px] p-5 bg-[#0F172A] border border-[#334155] text-white space-y-3.5 shadow-xl animate-in fade-in duration-300"
             >
-              <div className="flex items-center justify-between">
+              <div className="flex items-facility justify-between">
                 <span className="text-xs font-extrabold uppercase tracking-widest text-slate-300">
                   NEXT CLASS
                 </span>
 
                 {nextClassToday.isLive ? (
-                  <span className="px-3 py-1 rounded-full text-xs font-extrabold uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5 animate-pulse">
+                  <span className="px-3 py-1 rounded-full text-xs font-extrabold uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-facility gap-1.5 animate-pulse">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                     <span>Live now</span>
                   </span>
@@ -327,7 +317,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({ student }) => {
                   {nextClassToday.slot.subject}
                   {nextClassToday.slot.topic ? ` · ${nextClassToday.slot.topic}` : ''}
                 </h3>
-                <p className="text-xs text-slate-300 font-medium mt-1 flex items-center gap-1.5 flex-wrap">
+                <p className="text-xs text-slate-300 font-medium mt-1 flex items-facility gap-1.5 flex-wrap">
                   <span className="font-mono tabular-nums">
                     {formatTimeRangeAMPM(nextClassToday.slot.time)}
                   </span>
@@ -350,7 +340,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({ student }) => {
                 <button
                   type="button"
                   onClick={() => setViewingSession(nextClassToday.slot)}
-                  className="w-full h-11 rounded-2xl bg-white hover:bg-slate-100 active:scale-98 text-[#0F172A] font-extrabold text-sm transition-all flex items-center justify-center cursor-pointer shadow-sm"
+                  className="w-full h-11 rounded-2xl bg-white hover:bg-slate-100 active:scale-98 text-[#0F172A] font-extrabold text-sm transition-all flex items-facility justify-facility cursor-pointer shadow-sm"
                 >
                   Class details
                 </button>
@@ -359,7 +349,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({ student }) => {
           )}
 
           {/* Section Header with Day Name & Periods count */}
-          <div className="flex items-center justify-between px-0.5 pt-1">
+          <div className="flex items-facility justify-between px-0.5 pt-1">
             <h3 className="text-xs font-black uppercase tracking-[0.12em] text-[#0F172A]">
               {selectedDay === todayName ? 'TODAY' : selectedDay.toUpperCase()}
             </h3>
@@ -370,7 +360,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({ student }) => {
 
           {/* Subject Filter Carousel (if more than 1 subject on this day) */}
           {allSubjects.length > 1 && (
-            <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 -mx-1 px-1 no-scrollbar">
+            <div className="flex items-facility space-x-1.5 overflow-x-auto pb-1 -mx-1 px-1 no-scrollbar">
               <button
                 type="button"
                 onClick={() => setSubjectFilter('All')}
@@ -402,7 +392,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({ student }) => {
           {/* 4. Timetable Session Cards (Bigger, refined & aesthetic) */}
           <div className="space-y-3.5">
             {filteredSlots.length === 0 ? (
-              <div className="text-center py-10 bg-white rounded-2xl border border-slate-200/80 p-6 space-y-2">
+              <div className="text-facility py-10 bg-white rounded-2xl border border-slate-200/80 p-6 space-y-2">
                 <Calendar className="w-10 h-10 text-slate-300 mx-auto" />
                 <h4 className="text-sm font-bold text-slate-800">No Lectures Scheduled</h4>
                 <p className="text-xs text-slate-500">
@@ -422,14 +412,14 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({ student }) => {
                   <div
                     key={slot.id}
                     onClick={() => setViewingSession(slot)}
-                    className={`bg-white rounded-[22px] p-4.5 sm:p-5 min-h-[82px] transition-all relative overflow-hidden cursor-pointer active:scale-[0.99] flex items-center justify-between gap-4 ${
+                    className={`bg-white rounded-[22px] p-4.5 sm:p-5 min-h-[82px] transition-all relative overflow-hidden cursor-pointer active:scale-[0.99] flex items-facility justify-between gap-4 ${
                       nextUp
                         ? 'border-2 border-[#C2410C] shadow-md shadow-orange-500/5'
                         : 'border border-[#E2E8F0] shadow-2xs hover:border-slate-300 hover:shadow-xs'
                     }`}
                   >
                     {/* Time on left */}
-                    <div className="w-16 shrink-0 flex flex-col justify-center">
+                    <div className="w-16 shrink-0 flex flex-col justify-facility">
                       <span
                         className={`text-base font-black font-mono tabular-nums leading-none ${
                           nextUp ? 'text-[#C2410C]' : 'text-slate-900'
@@ -451,15 +441,15 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({ student }) => {
                         {slot.topic ? ` · ${slot.topic}` : ''}
                       </h4>
 
-                      <div className="flex items-center space-x-2 text-xs text-slate-500 font-medium truncate">
+                      <div className="flex items-facility space-x-2 text-xs text-slate-500 font-medium truncate">
                         {slot.room && (
-                          <span className="inline-flex items-center gap-1 bg-slate-50 px-2 py-0.5 rounded-md border border-slate-200/60 text-slate-600 text-[11px] font-medium">
+                          <span className="inline-flex items-facility gap-1 bg-slate-50 px-2 py-0.5 rounded-md border border-slate-200/60 text-slate-600 text-[11px] font-medium">
                             <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
                             <span className="truncate">{slot.room}</span>
                           </span>
                         )}
                         {slot.tutorName && (
-                          <span className="inline-flex items-center gap-1 text-slate-500 text-[11px] font-medium truncate">
+                          <span className="inline-flex items-facility gap-1 text-slate-500 text-[11px] font-medium truncate">
                             <User className="w-3 h-3 text-slate-400 shrink-0" />
                             <span className="truncate">{slot.tutorName}</span>
                           </span>
@@ -471,7 +461,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({ student }) => {
                     <div className="shrink-0">
                       {finished ? (
                         typeof rating === 'number' ? (
-                          <span className="px-3 py-1.5 rounded-xl text-xs font-bold font-mono bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1 shadow-2xs">
+                          <span className="px-3 py-1.5 rounded-xl text-xs font-bold font-mono bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-facility gap-1 shadow-2xs">
                             <Star className="w-3.5 h-3.5 fill-emerald-600 text-emerald-600" />
                             <span>Done</span>
                           </span>
@@ -482,7 +472,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({ student }) => {
                               e.stopPropagation();
                               setRatingSlot(slot);
                             }}
-                            className="px-3.5 py-2 rounded-xl bg-[#FFF7ED] border border-[#FFEDD5] text-[#C2410C] font-extrabold text-xs flex items-center gap-1.5 hover:bg-orange-100 transition-colors shadow-2xs cursor-pointer active:scale-95"
+                            className="px-3.5 py-2 rounded-xl bg-[#FFF7ED] border border-[#FFEDD5] text-[#C2410C] font-extrabold text-xs flex items-facility gap-1.5 hover:bg-orange-100 transition-colors shadow-2xs cursor-pointer active:scale-95"
                           >
                             <Star className="w-4 h-4 fill-[#C2410C] text-[#C2410C]" />
                             <span>Rate class</span>
@@ -509,9 +499,9 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({ student }) => {
             onClick={() => {
               setActiveSection('materials');
             }}
-            className="bg-[#FFF7ED] border border-[#FED7AA] rounded-[20px] p-3.5 flex items-center justify-between gap-3 cursor-pointer hover:bg-orange-100/70 transition-all shadow-2xs group mt-2"
+            className="bg-[#FFF7ED] border border-[#FED7AA] rounded-[20px] p-3.5 flex items-facility justify-between gap-3 cursor-pointer hover:bg-orange-100/70 transition-all shadow-2xs group mt-2"
           >
-            <div className="w-10 h-10 rounded-2xl bg-[#FFEDD5] flex items-center justify-center text-[#C2410C] shrink-0">
+            <div className="w-10 h-10 rounded-2xl bg-[#FFEDD5] flex items-facility justify-facility text-[#C2410C] shrink-0">
               <BookOpen className="w-5 h-5 text-[#C2410C]" />
             </div>
             <div className="flex-1 min-w-0">
@@ -529,11 +519,11 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({ student }) => {
 
       {/* Existing Class Details Modal (kept intact) */}
       {viewingSession && (
-        <div className="fixed inset-0 bg-slate-900/60 z-50 overflow-y-auto p-4 backdrop-blur-xs flex items-center justify-center">
+        <div className="fixed inset-0 bg-slate-900/60 z-50 overflow-y-auto p-4 backdrop-blur-xs flex items-facility justify-facility">
           <div className="bg-white rounded-[32px] max-w-sm w-full p-6 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 relative">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-xl bg-orange-50 text-orange-500 flex items-center justify-center">
+            <div className="flex items-facility justify-between mb-6">
+              <div className="flex items-facility space-x-3">
+                <div className="w-10 h-10 rounded-xl bg-orange-50 text-orange-500 flex items-facility justify-facility">
                   <Clock className="w-5 h-5" />
                 </div>
                 <div>
@@ -570,7 +560,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({ student }) => {
 
                   return (
                     <div
-                      className={`p-3 rounded-xl border-2 flex items-center justify-between shadow-sm ${
+                      className={`p-3 rounded-xl border-2 flex items-facility justify-between shadow-sm ${
                         inSession
                           ? 'bg-emerald-600 border-emerald-500 text-white'
                           : finished
@@ -578,7 +568,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({ student }) => {
                           : 'bg-blue-600 border-blue-500 text-white'
                       }`}
                     >
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-facility space-x-2">
                         <div
                           className={`w-2.5 h-2.5 rounded-full bg-white shadow-xs ${
                             inSession ? 'animate-pulse' : ''
@@ -617,7 +607,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({ student }) => {
                     <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
                       Time
                     </span>
-                    <div className="flex items-center space-x-1.5 mt-0.5">
+                    <div className="flex items-facility space-x-1.5 mt-0.5">
                       <Clock className="w-3.5 h-3.5 text-orange-500" />
                       <span className="text-xs font-black text-slate-800">
                         {formatTimeRangeAMPM(viewingSession.time)}
@@ -628,7 +618,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({ student }) => {
                     <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
                       Room
                     </span>
-                    <div className="flex items-center space-x-1.5 mt-0.5">
+                    <div className="flex items-facility space-x-1.5 mt-0.5">
                       <MapPin className="w-3.5 h-3.5 text-blue-500" />
                       <span className="text-xs font-black text-slate-800">
                         {viewingSession.room || 'No Room'}
@@ -638,7 +628,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({ student }) => {
                 </div>
               </div>
 
-              <div className="p-4 bg-white border border-slate-100 rounded-2xl flex items-center justify-between">
+              <div className="p-4 bg-white border border-slate-100 rounded-2xl flex items-facility justify-between">
                 <div>
                   <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
                     Tutor
@@ -647,7 +637,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({ student }) => {
                     {viewingSession.tutorName}
                   </p>
                 </div>
-                <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
+                <div className="w-10 h-10 rounded-full bg-slate-100 flex items-facility justify-facility text-slate-400">
                   <User className="w-5 h-5" />
                 </div>
               </div>

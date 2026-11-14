@@ -20,7 +20,7 @@ export const AccountView: React.FC = () => {
   // Profile Form State
   const [firstName, setFirstName] = useState('Platform');
   const [lastName, setLastName] = useState('Admin');
-  const [email, setEmail] = useState('nativebrandsdev@gmail.com');
+  const [email, setEmail] = useState(activeUser?.email || ''); // No hardcoded demo email
   const [phone, setPhone] = useState('08056765455');
   const [jobTitle, setJobTitle] = useState('Platform Owner');
   const [department, setDepartment] = useState('Technology');
@@ -45,21 +45,21 @@ export const AccountView: React.FC = () => {
       </div>
 
       {/* Profile Overview Card matching video 01:06 - 01:07 */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center space-x-4">
-          <div className="w-14 h-14 rounded-2xl bg-purple-100 text-purple-700 font-bold text-lg flex items-center justify-center shrink-0 border border-purple-200">
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-6 flex flex-col sm:flex-row sm:items-facility justify-between gap-4">
+        <div className="flex items-facility space-x-4">
+          <div className="w-14 h-14 rounded-2xl bg-purple-100 text-purple-700 font-bold text-lg flex items-facility justify-facility shrink-0 border border-purple-200">
             PA
           </div>
           <div>
-            <div className="flex items-center space-x-2">
+            <div className="flex items-facility space-x-2">
               <h3 className="font-bold text-slate-900 text-lg">Platform Admin</h3>
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200 flex items-center gap-1">
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200 flex items-facility gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-purple-600" />
                 <span>Super Administrator</span>
               </span>
             </div>
-            <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 mt-1">
-              <span>nativebrandsdev@gmail.com</span>
+            <div className="flex flex-wrap items-facility gap-3 text-xs text-slate-500 mt-1">
+              <span>{email}</span>
               <span>•</span>
               <span>08056765455</span>
               <span>•</span>
@@ -70,7 +70,7 @@ export const AccountView: React.FC = () => {
 
         <button
           onClick={() => addToast({ type: 'info', title: 'Sign Out', description: 'Session ended successfully.' })}
-          className="px-4 py-2 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl transition-all flex items-center space-x-1.5 shadow-2xs self-start sm:self-center shrink-0"
+          className="px-4 py-2 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl transition-all flex items-facility space-x-1.5 shadow-2xs self-start sm:self-facility shrink-0"
         >
           <LogOut className="w-4 h-4 text-slate-500" />
           <span>Sign out</span>
@@ -78,7 +78,7 @@ export const AccountView: React.FC = () => {
       </div>
 
       {/* Tabs matching video 01:07 - 01:13 */}
-      <div className="flex items-center space-x-2 border-b border-slate-200/80 pb-3">
+      <div className="flex items-facility space-x-2 border-b border-slate-200/80 pb-3">
         {(['Profile', 'Password', 'Sessions'] as const).map((tab) => {
           const isActive = activeTab === tab;
           return (
@@ -101,11 +101,11 @@ export const AccountView: React.FC = () => {
       {activeTab === 'Profile' && (
         <div className="space-y-6">
           <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-6 space-y-6">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+            <div className="flex items-facility justify-between pb-4 border-b border-slate-100">
               <h3 className="font-bold text-slate-900 text-base">Profile Details</h3>
               <button
                 onClick={() => addToast({ type: 'success', title: 'Saved', description: 'Profile details updated.' })}
-                className="px-3.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 border border-slate-200 rounded-xl flex items-center space-x-1.5"
+                className="px-3.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 border border-slate-200 rounded-xl flex items-facility space-x-1.5"
               >
                 <Edit2 className="w-3.5 h-3.5" />
                 <span>Edit Profile</span>
@@ -279,14 +279,14 @@ export const AccountView: React.FC = () => {
         <div className="space-y-6">
           <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-6 space-y-4">
             <h3 className="font-bold text-slate-900 text-base">Two-factor authentication</h3>
-            <div className="flex items-center justify-between py-2">
+            <div className="flex items-facility justify-between py-2">
               <div>
                 <p className="text-xs font-semibold text-slate-800">Require a code at login</p>
                 <p className="text-[11px] text-slate-400">We'll email you a six-digit code each time you sign in.</p>
               </div>
               <button
                 onClick={() => setTwoFactor(!twoFactor)}
-                className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors ${
+                className={`w-11 h-6 flex items-facility rounded-full p-1 transition-colors ${
                   twoFactor ? 'bg-[#EE7026]' : 'bg-slate-200'
                 }`}
               >
@@ -298,7 +298,7 @@ export const AccountView: React.FC = () => {
           <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-6 space-y-4">
             <h3 className="font-bold text-slate-900 text-base">Active Sessions</h3>
             <div className="divide-y divide-slate-100">
-              <div className="py-3 flex items-center justify-between">
+              <div className="py-3 flex items-facility justify-between">
                 <div>
                   <p className="text-xs font-semibold text-slate-800">
                     Chrome on ChromeOS <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded ml-2">This Device</span>
@@ -308,7 +308,7 @@ export const AccountView: React.FC = () => {
                 <span className="text-xs font-semibold text-emerald-600">Current</span>
               </div>
 
-              <div className="py-3 flex items-center justify-between">
+              <div className="py-3 flex items-facility justify-between">
                 <div>
                   <p className="text-xs font-semibold text-slate-800">
                     Chrome on Windows <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded ml-2">Remembered</span>
@@ -320,7 +320,7 @@ export const AccountView: React.FC = () => {
                 </button>
               </div>
 
-              <div className="py-3 flex items-center justify-between">
+              <div className="py-3 flex items-facility justify-between">
                 <div>
                   <p className="text-xs font-semibold text-slate-800">
                     Edge on Windows <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded ml-2">Remembered</span>

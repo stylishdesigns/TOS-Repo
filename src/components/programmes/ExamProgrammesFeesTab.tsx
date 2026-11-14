@@ -78,14 +78,14 @@ export const ExamProgrammesFeesTab: React.FC = () => {
     <div className="space-y-6 animate-in fade-in duration-200">
       {/* Exam Programme Fees Table */}
       <div className="bg-white rounded-xl border border-slate-200/90 shadow-xs overflow-hidden">
-        <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50">
+        <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-facility justify-between gap-3 bg-slate-50/50">
           <div>
             <h3 className="font-bold text-slate-900 text-sm">Exam Programmes Fee Schedule</h3>
             <p className="text-xs text-slate-500">
               Tuition, mock examinations, registration, and instalment payment breakdown
             </p>
           </div>
-          <div className="flex items-center space-x-2">
+          <div className="flex items-facility space-x-2">
             <span className="text-xs font-medium px-2.5 py-1 bg-orange-100 text-orange-800 rounded-lg">
               Termly / Session Rates
             </span>
@@ -134,7 +134,7 @@ export const ExamProgrammesFeesTab: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => handleOpenEdit(programme)}
-                      className="px-2.5 py-1 text-xs font-semibold text-orange-700 bg-orange-50 hover:bg-orange-100 rounded-lg border border-orange-200 transition-colors inline-flex items-center space-x-1"
+                      className="px-2.5 py-1 text-xs font-semibold text-orange-700 bg-orange-50 hover:bg-orange-100 rounded-lg border border-orange-200 transition-colors inline-flex items-facility space-x-1"
                     >
                       <Edit2 className="w-3 h-3" />
                       <span>Edit Fee</span>
@@ -149,9 +149,9 @@ export const ExamProgrammesFeesTab: React.FC = () => {
 
       {/* Edit Fee Modal */}
       {editingProg && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-facility justify-facility p-4 backdrop-blur-xs">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div className="flex items-facility justify-between pb-3 border-b border-slate-100">
               <h3 className="font-bold text-base text-slate-900">Configure Programme Fees</h3>
               <button onClick={() => setEditingProg(null)} className="text-slate-400 hover:text-slate-700">
                 <X className="w-5 h-5" />
@@ -214,7 +214,7 @@ export const ExamProgrammesFeesTab: React.FC = () => {
                 </p>
               </div>
 
-              <div className="flex items-center justify-end space-x-2 pt-3 border-t border-slate-100">
+              <div className="flex items-facility justify-end space-x-2 pt-3 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setEditingProg(null)}

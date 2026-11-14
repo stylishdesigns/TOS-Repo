@@ -30,40 +30,35 @@ export const INITIAL_CLASSROOMS: Classroom[] = [
   { id: 'room-2', name: 'Physics & Electronics Lab', code: 'PHY-LAB', capacity: 45, building: 'Science Wing', features: ['Apparatus Benches', 'Oscilloscopes', 'Smart Screen'], isAvailable: true },
   { id: 'room-3', name: 'Chemistry & Biology Lab', code: 'CHM-LAB', capacity: 50, building: 'Science Wing', features: ['Fume Hood', 'Reagent Racks', 'Microscopes'], isAvailable: true },
   { id: 'room-4', name: 'Commercial & Arts Lecture Room 1', code: 'CR-1', capacity: 60, building: 'Annex Block (1st Floor)', features: ['Air Conditioning', 'Whiteboard'], isAvailable: true },
-  { id: 'room-5', name: 'CBT Practice Centre (50 PCs)', code: 'CBT-1', capacity: 50, building: 'ICT Centre', features: ['High-speed LAN', 'Backup Inverter Power', '50 Workstations'], isAvailable: true },
+  { id: 'room-5', name: 'CBT Practice Facility (50 PCs)', code: 'CBT-1', capacity: 50, building: 'ICT Facility', features: ['High-speed LAN', 'Backup Inverter Power', '50 Workstations'], isAvailable: true },
   { id: 'room-6', name: 'Seminar & Revision Room 2', code: 'SEM-2', capacity: 35, building: 'Main Block (2nd Floor)', features: ['Interactive Whiteboard'], isAvailable: true },
 ];
 
 export const INITIAL_SETTINGS: TenantSettings = {
-  centreName: 'Excellence Tutorial Centre',
-  tagline: 'Premier Examination Preparation & Tutorial Academy',
-  logoText: 'EXCELLENCE',
+  centreName: '',
+  tagline: '',
+  logoText: 'TC',
   primaryColor: '#f97316', // Vibrant Amber/Orange like the video design
   secondaryColor: '#0f172a', // Deep slate navy
-  address: '14 Allen Avenue, Ikeja, Lagos State, Nigeria',
-  state: 'Lagos',
-  phone: '+234 805 676 5455',
-  email: 'info@excellencetutorials.ng',
-  whatsapp: '+234 805 676 5455',
-  whatsappNumber: '+234 805 676 5455',
+  address: '',
+  state: '',
+  phone: '',
+  email: '',
+  whatsapp: '',
+  whatsappNumber: '',
   currencySymbol: '₦',
-  academicSession: '2026/2027 Session',
-  activeBranchId: 'branch-1',
-  websiteDomain: 'excellencetutorials.ng',
+  academicSession: '',
+  activeBranchId: '',
+  websiteDomain: '',
   maintenanceMode: false,
   allowPublicAdmissions: true,
   smsNotifications: true,
   emailNotifications: true,
-  bankName: 'Access Bank Plc',
-  bankAccountNumber: '0123456789',
-  bankAccountName: 'Excellence Tutorial Centre Ltd',
-  cashPaymentGuide: 'Please proceed in person to the Centre Accounts Bursar, Mr. Adeleke, at the Admin Office (Reception Block A, 1st Floor). Always collect an official stamped paper receipt upon payment.',
-  academicSessions: [
-    '2025/2026 (Current Active Session)',
-    '2024/2025 (Harmattan & Rain)',
-    '2023/2024 (Full Academic Year)',
-    '2022/2023 (Historical Archives)',
-  ],
+  bankName: '',
+  bankAccountNumber: '',
+  bankAccountName: '',
+  cashPaymentGuide: '',
+  academicSessions: [],
 };
 
 export const INITIAL_BRANCHES: Branch[] = [
@@ -78,7 +73,7 @@ export const INITIAL_BRANCHES: Branch[] = [
   },
   {
     id: 'branch-2',
-    name: 'Yaba Tech Hub Centre',
+    name: 'Yaba Tech Hub Facility',
     state: 'Lagos',
     address: '82 Herbert Macaulay Way, Yaba, Lagos',
     phone: '+234 802 334 1190',
@@ -96,7 +91,7 @@ export const INITIAL_BRANCHES: Branch[] = [
   },
   {
     id: 'branch-4',
-    name: 'Abuja Federal Capital Centre',
+    name: 'Abuja Federal Capital Facility',
     state: 'FCT Abuja',
     address: 'Plot 402 Garki II, Area 11, Abuja',
     phone: '+234 809 111 2233',
@@ -107,10 +102,10 @@ export const INITIAL_BRANCHES: Branch[] = [
 
 export const INITIAL_CMS: CMSContent = {
   hero: {
-    badge: '🏆 #1 RATED TUTORIAL CENTRE IN LAGOS',
+    badge: '🏆 #1 RATED EDUCATION FACILITY IN LAGOS',
     headline: 'Prepare for JAMB, WAEC & A-Levels with Elite Tutors',
     subheadline:
-      'Join Nigeria’s most rigorous examination preparation centre. Over 96% of our registered candidates secure top-tier federal university admissions on their first attempt.',
+      'Join Nigeria’s most rigorous examination preparation facility. Over 96% of our registered candidates secure top-tier federal university admissions on their first attempt.',
     primaryCtaText: 'Register for Admission',
     secondaryCtaText: 'Explore Programmes',
     bannerImage:
@@ -123,9 +118,9 @@ export const INITIAL_CMS: CMSContent = {
     ],
   },
   about: {
-    title: 'Excellence Tutorial Centre — Dedicated to Academic Distinction',
+    title: 'Dedicated to Academic Distinction',
     description:
-      'Founded with the single mission of dismantling exam anxiety and unlocking student potential, Excellence Tutorial Centre delivers structured tutoring, rigorous mock tests, CBT simulations, and holistic mentorship for secondary and post-secondary candidates.',
+      'Founded with the single mission of dismantling exam anxiety and unlocking student potential, we deliver structured tutoring, rigorous mock tests, CBT simulations, and holistic mentorship for secondary and post-secondary candidates.',
     highlights: [
       'Comprehensive syllabus coverage mapped to latest JAMB/WAEC brochures',
       'Fully equipped computer-based testing (CBT) lab with 50+ terminals',
@@ -165,38 +160,7 @@ export const INITIAL_CMS: CMSContent = {
       category: 'Parent Portal',
     },
   ],
-  testimonials: [
-    {
-      id: 't-1',
-      studentName: 'Chiamaka Okafor',
-      programme: 'JAMB Intensive & Post-UTME',
-      achievement: 'Scored 348 in JAMB — Admitted into UNILAG Medicine',
-      quote:
-        'The tutors at Excellence didn’t just teach formulas; they taught examination time management. The weekly CBT drills made the real JAMB feel like just another practice test!',
-      score: '348 / 400',
-      avatar: '',
-    },
-    {
-      id: 't-2',
-      studentName: 'Tunde Adeleke',
-      programme: 'WAEC Special Coaching',
-      achievement: '8 A1s and 1 B2 in May/June WASSCE',
-      quote:
-        'Physics and Further Mathematics were nightmares for me before enrolling at Excellence. Mr. Babatunde broke down electrodynamics and calculus so effortlessly.',
-      score: '8 A1s',
-      avatar: '',
-    },
-    {
-      id: 't-3',
-      studentName: 'Fatima Sanusi',
-      programme: 'Cambridge A-Levels',
-      achievement: 'Straight A*A*A — Admitted to University of Manchester',
-      quote:
-        'The lab facilities and personalized tutor feedback gave me the exact competitive edge needed for high-stakes international qualifications.',
-      score: 'A* A* A',
-      avatar: '',
-    },
-  ],
+  testimonials: [],
   gallery: [
     {
       id: 'g-1',
@@ -421,7 +385,7 @@ export const INITIAL_TIMETABLE: TimetableSlot[] = [
     tutorId: 'tut-1',
     programmeId: 'prog-1',
     programmeName: 'JAMB / UTME 2027 Intensive',
-    room: 'CBT Practice Centre (50 PCs)',
+    room: 'CBT Practice Facility (50 PCs)',
     roomId: 'room-5',
     status: 'active',
     topic: 'Full 180-Question Mock Test with Real-time Stopwatch',
