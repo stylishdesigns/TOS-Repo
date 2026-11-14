@@ -51,11 +51,11 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
     if (!showIOSGuide) return null;
 
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs">
+      <div className="fixed inset-0 z-50 flex items-facility justify-facility p-4 bg-black/70 backdrop-blur-xs">
         <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-slate-200 space-y-4 text-slate-900">
-          <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-            <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 rounded-xl bg-[#EA580C] text-white flex items-center justify-center font-black text-xs shadow-xs">
+          <div className="flex items-facility justify-between pb-2 border-b border-slate-100">
+            <div className="flex items-facility space-x-2">
+              <div className="w-8 h-8 rounded-xl bg-[#EA580C] text-white flex items-facility justify-facility font-black text-xs shadow-xs">
                 EX
               </div>
               <div>
@@ -78,7 +78,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
 
             <div className="bg-slate-50 rounded-2xl p-3.5 border border-slate-200/80 space-y-2.5">
               <div className="flex items-start space-x-3">
-                <div className="w-6 h-6 rounded-lg bg-orange-100 text-[#EA580C] flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
+                <div className="w-6 h-6 rounded-lg bg-orange-100 text-[#EA580C] flex items-facility justify-facility font-bold text-xs shrink-0 mt-0.5">
                   1
                 </div>
                 <div className="text-xs">
@@ -87,7 +87,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
                   </span>
                   <span className="text-[11px] text-slate-500">
                     {isIOS ? (
-                      <span className="inline-flex items-center gap-1">
+                      <span className="inline-flex items-facility gap-1">
                         Tap <Share className="w-3.5 h-3.5 text-blue-600 inline" /> at bottom of screen
                       </span>
                     ) : (
@@ -98,19 +98,19 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
               </div>
 
               <div className="flex items-start space-x-3">
-                <div className="w-6 h-6 rounded-lg bg-orange-100 text-[#EA580C] flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
+                <div className="w-6 h-6 rounded-lg bg-orange-100 text-[#EA580C] flex items-facility justify-facility font-bold text-xs shrink-0 mt-0.5">
                   2
                 </div>
                 <div className="text-xs">
                   <span className="font-bold text-slate-900 block">Select "Add to Home Screen"</span>
-                  <span className="text-[11px] text-slate-500 inline-flex items-center gap-1">
+                  <span className="text-[11px] text-slate-500 inline-flex items-facility gap-1">
                     Tap <PlusSquare className="w-3.5 h-3.5 text-slate-700 inline" /> <strong>Add to Home Screen</strong>
                   </span>
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center space-x-2 text-[11px] text-emerald-700 bg-emerald-50 p-2.5 rounded-xl border border-emerald-200">
+            <div className="flex items-facility space-x-2 text-[11px] text-emerald-700 bg-emerald-50 p-2.5 rounded-xl border border-emerald-200">
               <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
               <span>Launches instantly in standalone app mode with zero URL bar.</span>
             </div>
@@ -134,7 +134,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
         <button
           onClick={handleInstallClick}
           disabled={installing}
-          className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border border-orange-200 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-xs ${className}`}
+          className={`flex items-facility space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border border-orange-200 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-xs ${className}`}
           title="Install the app on your device"
         >
           <Download className="w-3.5 h-3.5" />
@@ -152,7 +152,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
         <button
           onClick={handleInstallClick}
           disabled={installing}
-          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-orange-600 hover:bg-orange-700 text-white shadow-xs transition-all ${className}`}
+          className={`inline-flex items-facility gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-orange-600 hover:bg-orange-700 text-white shadow-xs transition-all ${className}`}
         >
           <Download className="w-3 h-3" />
           <span>Install App</span>
@@ -184,14 +184,14 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
     return (
       <>
         <div
-          className={`rounded-2xl bg-gradient-to-r from-slate-950 via-slate-900 to-[#0F172A] border border-orange-500/30 p-3.5 text-white shadow-md flex items-center justify-between gap-3 ${className}`}
+          className={`rounded-2xl bg-gradient-to-r from-slate-950 via-slate-900 to-[#0F172A] border border-orange-500/30 p-3.5 text-white shadow-md flex items-facility justify-between gap-3 ${className}`}
         >
-          <div className="flex items-center space-x-3 min-w-0">
-            <div className="w-9 h-9 rounded-xl bg-[#EA580C] text-white flex items-center justify-center shrink-0 font-black text-xs shadow-sm">
+          <div className="flex items-facility space-x-3 min-w-0">
+            <div className="w-9 h-9 rounded-xl bg-[#EA580C] text-white flex items-facility justify-facility shrink-0 font-black text-xs shadow-sm">
               <Smartphone className="w-4 h-4" />
             </div>
             <div className="min-w-0">
-              <div className="flex items-center space-x-1.5">
+              <div className="flex items-facility space-x-1.5">
                 <span className="text-xs font-black text-white truncate">Install Student App</span>
                 <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-orange-500/20 text-orange-300 border border-orange-500/30">
                   PWA
@@ -206,7 +206,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
           <button
             onClick={handleInstallClick}
             disabled={installing}
-            className="shrink-0 px-3.5 py-2 rounded-xl bg-[#EA580C] hover:bg-orange-600 text-white text-xs font-bold shadow-xs active:scale-95 transition-all flex items-center space-x-1.5"
+            className="shrink-0 px-3.5 py-2 rounded-xl bg-[#EA580C] hover:bg-orange-600 text-white text-xs font-bold shadow-xs active:scale-95 transition-all flex items-facility space-x-1.5"
           >
             <Download className="w-3.5 h-3.5" />
             <span>Install</span>
@@ -223,7 +223,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
       <button
         onClick={handleInstallClick}
         disabled={installing}
-        className={`w-full py-3 px-4 rounded-xl bg-gradient-to-r from-[#EA580C] to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white font-bold text-xs shadow-sm transition-all flex items-center justify-center space-x-2 ${className}`}
+        className={`w-full py-3 px-4 rounded-xl bg-gradient-to-r from-[#EA580C] to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white font-bold text-xs shadow-sm transition-all flex items-facility justify-facility space-x-2 ${className}`}
       >
         <Download className="w-4 h-4" />
         <span>Install the App to Home Screen</span>

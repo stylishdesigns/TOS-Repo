@@ -70,21 +70,21 @@ export const AccessCodeSettings: React.FC = () => {
 
   return (
     <div className="bg-white/60 backdrop-blur rounded-2xl border border-slate-200/60 p-5">
-      <div className="flex items-center gap-2.5 mb-3">
-        <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center">
+      <div className="flex items-facility gap-2.5 mb-3">
+        <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-facility justify-facility">
           <KeyRound className="w-4 h-4 text-orange-600" />
         </div>
         <div>
           <h3 className="text-sm font-black text-slate-800">Access code</h3>
-          <p className="text-[11px] text-slate-500">Staff and students join your centre with this 6-digit code.</p>
+          <p className="text-[11px] text-slate-500">Staff and students join your facility with this 6-digit code.</p>
         </div>
       </div>
 
       {loading ? (
-        <div className="flex items-center gap-2 text-slate-500 text-sm py-3"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</div>
+        <div className="flex items-facility gap-2 text-slate-500 text-sm py-3"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</div>
       ) : (
         <>
-          <div className="flex items-center gap-3">
+          <div className="flex items-facility gap-3">
             <p className="text-3xl font-black text-slate-900 font-mono tracking-[0.25em]">{code || '—'}</p>
             {code && (
               <button onClick={copy} className="text-slate-400 hover:text-orange-600" title="Copy code">
@@ -105,14 +105,14 @@ export const AccessCodeSettings: React.FC = () => {
             <button
               onClick={() => setConfirming(true)}
               disabled={regenerating}
-              className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-300 hover:border-slate-400 bg-white text-slate-700 font-bold text-xs transition-colors disabled:opacity-50"
+              className="mt-4 inline-flex items-facility gap-2 px-4 py-2 rounded-xl border border-slate-300 hover:border-slate-400 bg-white text-slate-700 font-bold text-xs transition-colors disabled:opacity-50"
             >
               {regenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Generate a new code
             </button>
           ) : (
-            <div className="mt-4 flex flex-wrap items-center gap-2">
+            <div className="mt-4 flex flex-wrap items-facility gap-2">
               <p className="text-xs text-slate-600 font-semibold mr-1">Generate a new code now?</p>
-              <button onClick={regenerate} disabled={regenerating} className="px-3.5 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white font-bold text-xs inline-flex items-center gap-2">
+              <button onClick={regenerate} disabled={regenerating} className="px-3.5 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white font-bold text-xs inline-flex items-facility gap-2">
                 {regenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null} Yes, regenerate
               </button>
               <button onClick={() => setConfirming(false)} className="px-3.5 py-2 rounded-xl border border-slate-300 bg-white text-slate-600 font-bold text-xs">Cancel</button>

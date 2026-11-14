@@ -490,10 +490,10 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
 
   return (
     <div className={`min-h-screen ${pageBackground} overflow-y-auto overflow-x-hidden selection:bg-orange-500 selection:text-white`}>
-      <div className="min-h-screen w-full flex flex-col items-center justify-center py-8 md:py-12 px-4">
+      <div className="min-h-screen w-full flex flex-col items-facility justify-facility py-8 md:py-12 px-4">
         <div className="w-full max-w-md bg-white rounded-[2.5rem] shadow-2xl shadow-black/50 border border-white/10 overflow-hidden animate-in fade-in zoom-in-95 duration-500 relative">
-          <div className={`p-8 ${style.bg} border-b ${style.border} text-center relative`}>
-          <div className={`w-12 h-12 rounded-xl ${style.accent} flex items-center justify-center mx-auto mb-4 shadow-lg shadow-black/5`}>
+          <div className={`p-8 ${style.bg} border-b ${style.border} text-facility relative`}>
+          <div className={`w-12 h-12 rounded-xl ${style.accent} flex items-facility justify-facility mx-auto mb-4 shadow-lg shadow-black/5`}>
             {style.icon}
           </div>
           <h1 className="text-2xl font-bold text-slate-900">{title}</h1>
@@ -523,8 +523,8 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
           )}
 
           {resetSent ? (
-            <div className="text-center py-4 space-y-4">
-              <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
+            <div className="text-facility py-4 space-y-4">
+              <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-facility justify-facility mx-auto">
                 <CheckCircle2 className="w-6 h-6" />
               </div>
               <h3 className="text-lg font-bold text-slate-900">Reset Link Sent</h3>
@@ -636,7 +636,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
               <button
                 type="submit"
                 disabled={isLoading}
-                className={`w-full py-4 rounded-xl text-white font-black text-[10px] uppercase tracking-[0.2em] shadow-xl flex items-center justify-center space-x-2 transition-all ${style.accent} hover:shadow-2xl active:scale-[0.98] disabled:opacity-50 mt-4`}
+                className={`w-full py-4 rounded-xl text-white font-black text-[10px] uppercase tracking-[0.2em] shadow-xl flex items-facility justify-facility space-x-2 transition-all ${style.accent} hover:shadow-2xl active:scale-[0.98] disabled:opacity-50 mt-4`}
               >
                 {isLoading ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -710,7 +710,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
 
                 {!isResetting && (
                   <div className="space-y-1.5">
-                    <div className="flex items-center justify-between px-1">
+                    <div className="flex items-facility justify-between px-1">
                       <label className="text-[10px] font-black text-slate-700 uppercase tracking-[0.2em]">
                         {authMode === 'login' ? 'Password' : 'Choose Password'}
                       </label>
@@ -749,13 +749,13 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
                   type={isResetting ? 'button' : 'submit'}
                   onClick={isResetting ? handleResetPassword : undefined}
                   disabled={isLoading || verifying}
-                  className={`w-full py-4 rounded-xl text-white font-black text-[10px] uppercase tracking-[0.2em] shadow-xl flex items-center justify-center space-x-2 transition-all ${style.accent} hover:shadow-2xl active:scale-[0.98] disabled:opacity-50 disabled:translate-y-0 disabled:shadow-none mt-2`}
+                  className={`w-full py-4 rounded-xl text-white font-black text-[10px] uppercase tracking-[0.2em] shadow-xl flex items-facility justify-facility space-x-2 transition-all ${style.accent} hover:shadow-2xl active:scale-[0.98] disabled:opacity-50 disabled:translate-y-0 disabled:shadow-none mt-2`}
                 >
                   {(isLoading || verifying) ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
                     <>
-                      <span>{verifying ? 'Verifying your centre...' : (isResetting ? 'Send Reset Link' : (authMode === 'signup' ? 'Create My Account' : 'Sign In'))}</span>
+                      <span>{verifying ? 'Verifying your facility...' : (isResetting ? 'Send Reset Link' : (authMode === 'signup' ? 'Create My Account' : 'Sign In'))}</span>
                       {!isResetting && !verifying && <ArrowRight className="w-4 h-4 text-white/50" />}
                     </>
                   )}
@@ -763,10 +763,10 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
 
                 {isStudent && !isResetting && (
                   <div className="relative my-8">
-                    <div className="absolute inset-0 flex items-center">
+                    <div className="absolute inset-0 flex items-facility">
                       <div className="w-full border-t border-slate-100"></div>
                     </div>
-                    <div className="relative flex justify-center text-[10px] uppercase font-black tracking-widest">
+                    <div className="relative flex justify-facility text-[10px] uppercase font-black tracking-widest">
                       <span className="px-4 bg-white text-slate-400">Or continue with</span>
                     </div>
                   </div>
@@ -777,7 +777,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
                     type="button"
                     onClick={handleGoogleLogin}
                     disabled={isLoading}
-                    className="w-full py-4 border border-slate-200 rounded-xl text-slate-700 font-bold text-sm flex items-center justify-center hover:bg-slate-50 transition-all active:scale-[0.98] disabled:opacity-50"
+                    className="w-full py-4 border border-slate-200 rounded-xl text-slate-700 font-bold text-sm flex items-facility justify-facility hover:bg-slate-50 transition-all active:scale-[0.98] disabled:opacity-50"
                   >
                     <GoogleIcon />
                     {authMode === 'login' ? 'Sign in' : 'Sign up'} with Google
@@ -789,7 +789,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
                     type="button"
                     onClick={onChangeAccessCode}
                     disabled={verifying}
-                    className="w-full mt-4 flex items-center justify-center space-x-2 py-3 border border-dashed border-slate-200 rounded-xl text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-all text-[10px] font-black uppercase tracking-widest disabled:opacity-50"
+                    className="w-full mt-4 flex items-facility justify-facility space-x-2 py-3 border border-dashed border-slate-200 rounded-xl text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-all text-[10px] font-black uppercase tracking-widest disabled:opacity-50"
                   >
                     <KeyRound className="w-4 h-4 opacity-50" />
                     <span>Enter another access code</span>
@@ -801,7 +801,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
                     type="button"
                     onClick={onBack}
                     disabled={verifying}
-                    className="w-full mt-2 flex items-center justify-center space-x-2 py-3 border border-dashed border-slate-200 rounded-xl text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-all text-[10px] font-black uppercase tracking-widest disabled:opacity-50"
+                    className="w-full mt-2 flex items-facility justify-facility space-x-2 py-3 border border-dashed border-slate-200 rounded-xl text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-all text-[10px] font-black uppercase tracking-widest disabled:opacity-50"
                   >
                     <ArrowRight className="w-4 h-4 rotate-180 opacity-50" />
                     <span>Back to landing page</span>
@@ -829,10 +829,10 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
       {/* Wrong-centre notice popup: the message with a Cancel button and a
           route to the student login page. */}
       {notice && noticeModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-facility justify-facility p-4 bg-slate-950/60 backdrop-blur-sm">
           <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl border border-slate-100 p-6 space-y-4 animate-in fade-in zoom-in-95 duration-200">
             <div className="flex items-start space-x-3">
-              <div className="w-10 h-10 rounded-xl bg-rose-50 border border-rose-100 flex items-center justify-center shrink-0">
+              <div className="w-10 h-10 rounded-xl bg-rose-50 border border-rose-100 flex items-facility justify-facility shrink-0">
                 <AlertCircle className="w-5 h-5 text-rose-500" />
               </div>
               <div className="space-y-1.5">
@@ -848,7 +848,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="flex items-center space-x-2 pt-1">
+            <div className="flex items-facility space-x-2 pt-1">
               <button
                 type="button"
                 onClick={onNoticeCancel}

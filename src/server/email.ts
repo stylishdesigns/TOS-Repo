@@ -181,7 +181,7 @@ const WRAP = (title: string, body: string) => `
   <p style="font-size:11px;font-weight:800;letter-spacing:.3em;color:#c2410c;margin:0 0 8px;">TUTORIAL OS</p>
   <h1 style="font-size:22px;margin:0 0 16px;">${title}</h1>
   ${body}
-  <p style="font-size:11px;color:#64748b;margin-top:32px;">Tutorial OS &mdash; the school operating system for tutorial centres.</p>
+  <p style="font-size:11px;color:#64748b;margin-top:32px;">Tutorial OS &mdash; the school operating system for education facilities.</p>
 </div>`;
 
 const BOX = (label: string, value: string) => `
@@ -200,7 +200,7 @@ export function buildVerificationEmail(params: { to: string; fullName: string; b
   <p style="font-size:13px;color:#475569;margin:0;">If the button does not work, paste this link into your browser:<br>${params.verifyUrl}</p>`;
   return {
     to: params.to,
-    subject: 'Confirm your email to set up your Tutorial OS centre',
+    subject: 'Confirm your email to set up your Tutorial OS facility',
     html: WRAP('One click to finish', body),
     text: `Hi ${params.fullName},\n\nConfirm this email address to finish setting up ${params.businessName} on Tutorial OS:\n${params.verifyUrl}\n\nYour login details and access code arrive right after.`,
   };

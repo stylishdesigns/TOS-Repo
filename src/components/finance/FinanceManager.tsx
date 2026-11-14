@@ -60,7 +60,7 @@ export const FinanceManager: React.FC = () => {
   const [bankAccountName, setBankAccountName] = useState(settings.bankAccountName || centreName);
   const [cashPaymentGuide, setCashPaymentGuide] = useState(
     settings.cashPaymentGuide ||
-      'Please proceed in person to the Centre Accounts Bursar, Mr. Adeleke, at the Admin Office (Reception Block A, 1st Floor). Always collect an official stamped paper receipt upon payment.'
+      'Please proceed in person to the Facility Accounts Bursar, Mr. Adeleke, at the Admin Office (Reception Block A, 1st Floor). Always collect an official stamped paper receipt upon payment.'
   );
 
   // Preview evidence modal
@@ -119,7 +119,7 @@ export const FinanceManager: React.FC = () => {
     addToast({
       type: 'success',
       title: 'Payment Settings Saved',
-      description: 'Centre bank account details and cash payment instructions updated.',
+      description: 'Facility bank account details and cash payment instructions updated.',
     });
   };
 
@@ -224,7 +224,7 @@ export const FinanceManager: React.FC = () => {
           <div className="mt-3">
             <button
               onClick={() => setShowRecordModal(true)}
-              className="px-4 py-2.5 text-xs font-semibold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg shadow-sm transition-all inline-flex items-center justify-center space-x-2 shrink-0 cursor-pointer"
+              className="px-4 py-2.5 text-xs font-semibold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg shadow-sm transition-all inline-flex items-facility justify-facility space-x-2 shrink-0 cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               <span>Record Payment</span>
@@ -233,14 +233,14 @@ export const FinanceManager: React.FC = () => {
         </div>
 
         {/* "Exam program fee" button placed at the top right corner */}
-        <div className="flex items-center sm:self-start">
+        <div className="flex items-facility sm:self-start">
           <button
             type="button"
             onClick={() => {
               setShowTariffModal(true);
               setEditingProgrammeId(null);
             }}
-            className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-slate-700 bg-white hover:bg-orange-50 hover:text-[#EA580C] hover:border-orange-300 border border-slate-200 rounded-xl shadow-xs transition-all group cursor-pointer"
+            className="inline-flex items-facility gap-2 px-3.5 py-2 text-xs font-bold text-slate-700 bg-white hover:bg-orange-50 hover:text-[#EA580C] hover:border-orange-300 border border-slate-200 rounded-xl shadow-xs transition-all group cursor-pointer"
             title="Configure Exam Program Fees, Bank Details & Cash Guide"
           >
             <Settings className="w-4 h-4 text-slate-400 group-hover:text-[#EA580C] group-hover:rotate-90 transition-transform duration-500" />
@@ -252,7 +252,7 @@ export const FinanceManager: React.FC = () => {
       {/* Financial KPI Cards */}
       <div className="grid grid-cols-2 gap-3 md:gap-4">
         <div className="p-4 sm:p-5 bg-white rounded-xl border border-slate-200 shadow-xs">
-          <div className="flex items-center justify-between text-slate-500 mb-2">
+          <div className="flex items-facility justify-between text-slate-500 mb-2">
             <span className="text-xs font-semibold text-emerald-700">Total Collected</span>
             <CheckCircle className="w-4 h-4 text-emerald-500" />
           </div>
@@ -266,7 +266,7 @@ export const FinanceManager: React.FC = () => {
         </div>
 
         <div className="p-4 sm:p-5 bg-white rounded-xl border border-slate-200 shadow-xs">
-          <div className="flex items-center justify-between text-slate-500 mb-2">
+          <div className="flex items-facility justify-between text-slate-500 mb-2">
             <span className="text-xs font-semibold text-amber-700">Outstanding Balance</span>
             <AlertCircle className="w-4 h-4 text-amber-500" />
           </div>
@@ -281,7 +281,7 @@ export const FinanceManager: React.FC = () => {
       {/* Payments Ledger Table */}
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs space-y-3">
         {/* Responsive Multi-filter Toolbar */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-slate-50/60 p-3 rounded-xl border border-slate-100">
+        <div className="flex flex-col lg:flex-row lg:items-facility justify-between gap-3 bg-slate-50/60 p-3 rounded-xl border border-slate-100">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 w-full lg:w-auto">
             {/* Full / Partial payment filter */}
             <div>
@@ -342,7 +342,7 @@ export const FinanceManager: React.FC = () => {
               <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
                 Month Range
               </label>
-              <div className="flex items-center space-x-1">
+              <div className="flex items-facility space-x-1">
                 <input
                   type="month"
                   value={monthRangeStart}
@@ -365,7 +365,7 @@ export const FinanceManager: React.FC = () => {
           </div>
 
           {/* Search + Clear filters */}
-          <div className="flex items-center space-x-2 w-full lg:w-72 mt-2 lg:mt-0">
+          <div className="flex items-facility space-x-2 w-full lg:w-72 mt-2 lg:mt-0">
             <div className="relative flex-1">
               <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
@@ -400,7 +400,7 @@ export const FinanceManager: React.FC = () => {
         </div>
 
         {pendingPayments.length > 0 && (
-          <div className="flex items-center justify-between gap-3 p-3 mt-2 rounded-lg bg-blue-50 border border-blue-200 text-xs text-blue-900">
+          <div className="flex items-facility justify-between gap-3 p-3 mt-2 rounded-lg bg-blue-50 border border-blue-200 text-xs text-blue-900">
             <span className="font-semibold">
               {pendingPayments.length} student payment{pendingPayments.length === 1 ? '' : 's'} awaiting your confirmation. Balances only change once you confirm.
             </span>
@@ -422,14 +422,14 @@ export const FinanceManager: React.FC = () => {
                 <th className="py-3 px-4">Programme</th>
                 <th className="py-3 px-4">Outstanding Balance</th>
                 <th className="py-3 px-4">Channel</th>
-                <th className="py-3 px-4 text-center">Status</th>
+                <th className="py-3 px-4 text-facility">Status</th>
                 <th className="py-3 px-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs">
               {filteredPayments.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-slate-400 font-medium">
+                  <td colSpan={6} className="py-8 text-facility text-slate-400 font-medium">
                     No payment records match query.
                   </td>
                 </tr>
@@ -437,7 +437,7 @@ export const FinanceManager: React.FC = () => {
                 filteredPayments.map((pay) => (
                   <tr key={pay.id} className="hover:bg-slate-50/80 transition-colors">
                     <td className="py-3 px-4">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-facility gap-2">
                         <span className="font-bold text-slate-900">{pay.studentName}</span>
                         {pay.submittedBy === 'Student' && (
                           <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200">
@@ -459,7 +459,7 @@ export const FinanceManager: React.FC = () => {
                       {(pay.balance || 0).toLocaleString()}
                     </td>
                     <td className="py-3 px-4 text-slate-600">
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-facility gap-1.5">
                         <span>{pay.method}</span>
                         {pay.status === 'Pending' && !pay.evidenceUrl && (
                           <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">
@@ -478,9 +478,9 @@ export const FinanceManager: React.FC = () => {
                         )}
                       </div>
                     </td>
-                    <td className="py-3 px-4 text-center">
+                    <td className="py-3 px-4 text-facility">
                       <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                        className={`inline-flex items-facility px-2 py-0.5 rounded-full text-[10px] font-bold ${
                           pay.status === 'Paid'
                             ? 'bg-emerald-100 text-emerald-800'
                             : pay.status === 'Pending'
@@ -495,7 +495,7 @@ export const FinanceManager: React.FC = () => {
                     </td>
                     <td className="py-3 px-4 text-right">
                       {pay.status === 'Pending' ? (
-                        <div className="flex items-center justify-end gap-1.5">
+                        <div className="flex items-facility justify-end gap-1.5">
                           <button
                             type="button"
                             disabled={busyPaymentId === pay.id}
@@ -520,7 +520,7 @@ export const FinanceManager: React.FC = () => {
                       ) : (
                         <button
                           onClick={() => setSelectedReceipt(pay)}
-                          className="px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 rounded-md border border-slate-200 flex items-center space-x-1 ml-auto cursor-pointer"
+                          className="px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 rounded-md border border-slate-200 flex items-facility space-x-1 ml-auto cursor-pointer"
                         >
                           <Receipt className="w-3 h-3 text-[#EA580C]" />
                           <span>View Detail</span>
@@ -537,9 +537,9 @@ export const FinanceManager: React.FC = () => {
 
       {/* Record Payment Modal */}
       {showRecordModal && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-facility justify-facility p-4 backdrop-blur-xs">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div className="flex items-facility justify-between pb-3 border-b border-slate-100">
               <h3 className="font-extrabold text-slate-900 text-base">Record Tuition Payment</h3>
               <button
                 onClick={() => setShowRecordModal(false)}
@@ -621,7 +621,7 @@ export const FinanceManager: React.FC = () => {
 
       {/* Payment Detail Modal */}
       {selectedReceipt && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-facility justify-facility p-4 backdrop-blur-xs">
           <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95">
             <div className="flex justify-between items-start pb-4 border-b border-slate-100">
               <div>
@@ -639,8 +639,8 @@ export const FinanceManager: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-6">
               {/* Left Column: Student Profile & History */}
               <div className="space-y-6">
-                <div className="flex items-center space-x-4">
-                  <div className="w-16 h-16 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center overflow-hidden shrink-0">
+                <div className="flex items-facility space-x-4">
+                  <div className="w-16 h-16 rounded-2xl bg-slate-100 border border-slate-200 flex items-facility justify-facility overflow-hidden shrink-0">
                     <img 
                       src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${selectedReceipt.studentName}`} 
                       alt={selectedReceipt.studentName}
@@ -650,7 +650,7 @@ export const FinanceManager: React.FC = () => {
                   <div>
                     <h4 className="font-bold text-slate-900 text-base">{selectedReceipt.studentName}</h4>
                     <p className="text-[11px] text-slate-500 font-medium">{selectedReceipt.programmeName}</p>
-                    <span className={`inline-flex mt-1 items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                    <span className={`inline-flex mt-1 items-facility px-2 py-0.5 rounded-full text-[10px] font-bold ${
                       selectedReceipt.status === 'Paid'
                         ? 'bg-emerald-100 text-emerald-800'
                         : 'bg-amber-100 text-amber-800'
@@ -663,8 +663,8 @@ export const FinanceManager: React.FC = () => {
                 <div className="space-y-3">
                   <h5 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Payment History</h5>
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-lg border border-slate-100">
-                      <div className="flex items-center space-x-2">
+                    <div className="flex items-facility justify-between p-2.5 bg-slate-50 rounded-lg border border-slate-100">
+                      <div className="flex items-facility space-x-2">
                         <Clock className="w-3.5 h-3.5 text-slate-400" />
                         <div>
                           <p className="text-[11px] font-bold text-slate-800">{selectedReceipt.date || 'Sep 12, 2026'}</p>
@@ -676,8 +676,8 @@ export const FinanceManager: React.FC = () => {
                       </p>
                     </div>
                     {/* Placeholder for previous installments */}
-                    <div className="flex items-center justify-between p-2.5 bg-slate-50/50 rounded-lg border border-slate-100/50 opacity-60">
-                      <div className="flex items-center space-x-2">
+                    <div className="flex items-facility justify-between p-2.5 bg-slate-50/50 rounded-lg border border-slate-100/50 opacity-60">
+                      <div className="flex items-facility space-x-2">
                         <Clock className="w-3.5 h-3.5 text-slate-300" />
                         <div>
                           <p className="text-[11px] font-bold text-slate-400">Aug 28, 2026</p>
@@ -692,7 +692,7 @@ export const FinanceManager: React.FC = () => {
                 </div>
                 {selectedReceipt.evidenceUrl && (
                   <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-facility justify-between">
                       <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                         Payment Evidence Uploaded
                       </span>
@@ -704,7 +704,7 @@ export const FinanceManager: React.FC = () => {
                             title: `${selectedReceipt.studentName} - Payment Evidence`,
                           })
                         }
-                        className="text-[10px] font-bold text-[#EA580C] hover:underline flex items-center gap-1 cursor-pointer"
+                        className="text-[10px] font-bold text-[#EA580C] hover:underline flex items-facility gap-1 cursor-pointer"
                       >
                         <Eye className="w-3 h-3" />
                         <span>Enlarge</span>
@@ -739,7 +739,7 @@ export const FinanceManager: React.FC = () => {
               {/* Right Column: Balance Summary */}
               <div className="bg-slate-900 rounded-2xl p-5 text-white flex flex-col justify-between">
                 <div>
-                  <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-facility justify-between mb-4">
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Financial Summary</span>
                     <TrendingUp className="w-4 h-4 text-emerald-400" />
                   </div>
@@ -784,23 +784,23 @@ export const FinanceManager: React.FC = () => {
 
       {/* Exam Program Fee & Payment Settings Modal */}
       {showTariffModal && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs animate-in fade-in duration-200">
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-facility justify-facility p-4 backdrop-blur-xs animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-100 max-h-[90vh] flex flex-col">
             {/* Modal Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 shrink-0">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-xl bg-orange-50 border border-orange-100 flex items-center justify-center text-[#EA580C]">
+            <div className="flex items-facility justify-between pb-3 border-b border-slate-100 shrink-0">
+              <div className="flex items-facility space-x-3">
+                <div className="w-10 h-10 rounded-xl bg-orange-50 border border-orange-100 flex items-facility justify-facility text-[#EA580C]">
                   <Settings className="w-5 h-5" />
                 </div>
                 <div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-facility gap-2">
                     <h3 className="font-bold text-base text-slate-900">Exam Program Fee & Payment Settings</h3>
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-100 text-[#EA580C]">
                       {settings.academicSession}
                     </span>
                   </div>
                   <p className="text-xs text-slate-500">
-                    Set up approved tuition fees, centre account details, and cash payment guidelines
+                    Set up approved tuition fees, facility account details, and cash payment guidelines
                   </p>
                 </div>
               </div>
@@ -838,7 +838,7 @@ export const FinanceManager: React.FC = () => {
                     : 'border-transparent text-slate-500 hover:text-slate-800'
                 }`}
               >
-                Center Account & Cash Guide
+                Facility Account & Cash Guide
               </button>
             </div>
 
@@ -850,10 +850,10 @@ export const FinanceManager: React.FC = () => {
                   return (
                     <div
                       key={p.id}
-                      className="p-4 bg-slate-50/80 hover:bg-slate-50 rounded-xl border border-slate-200/80 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                      className="p-4 bg-slate-50/80 hover:bg-slate-50 rounded-xl border border-slate-200/80 transition-all flex flex-col sm:flex-row sm:items-facility justify-between gap-3"
                     >
                       <div className="space-y-1">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-facility gap-2">
                           <span className="font-bold text-slate-900 text-sm">{p.name}</span>
                           <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-slate-200/70 text-slate-700">
                             {p.code}
@@ -865,9 +865,9 @@ export const FinanceManager: React.FC = () => {
                         <p className="text-xs text-slate-500">Duration: {p.duration || 'Full Session'}</p>
                       </div>
 
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-facility gap-3">
                         {isEditing ? (
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-facility gap-2">
                             <div className="relative">
                               <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
                                 {settings.currencySymbol}
@@ -885,7 +885,7 @@ export const FinanceManager: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => handleSaveProgrammeFee(p.id)}
-                              className="px-3 py-1.5 text-xs font-semibold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg shadow-xs transition-colors flex items-center gap-1 cursor-pointer"
+                              className="px-3 py-1.5 text-xs font-semibold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg shadow-xs transition-colors flex items-facility gap-1 cursor-pointer"
                             >
                               <Check className="w-3.5 h-3.5" />
                               <span>Save</span>
@@ -899,7 +899,7 @@ export const FinanceManager: React.FC = () => {
                             </button>
                           </div>
                         ) : (
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-facility gap-3">
                             <div className="text-right">
                               <span className="text-[10px] uppercase font-bold text-slate-400 block leading-tight">Approved Fee</span>
                               <span className="text-base font-black text-slate-900">
@@ -912,7 +912,7 @@ export const FinanceManager: React.FC = () => {
                                 setEditingProgrammeId(p.id);
                                 setTempFeeValue(String(p.fee || 0));
                               }}
-                              className="px-3 py-1.5 text-xs font-semibold text-orange-700 bg-orange-50 hover:bg-orange-100 rounded-lg border border-orange-200 transition-colors flex items-center gap-1.5 cursor-pointer"
+                              className="px-3 py-1.5 text-xs font-semibold text-orange-700 bg-orange-50 hover:bg-orange-100 rounded-lg border border-orange-200 transition-colors flex items-facility gap-1.5 cursor-pointer"
                             >
                               <Edit2 className="w-3.5 h-3.5" />
                               <span>Set Fee</span>
@@ -927,9 +927,9 @@ export const FinanceManager: React.FC = () => {
             ) : (
               <form onSubmit={handleSaveChannelSettings} className="py-4 space-y-4 overflow-y-auto flex-1 pr-1 text-xs">
                 <div className="p-3.5 bg-blue-50/70 border border-blue-200/80 rounded-xl space-y-3">
-                  <div className="flex items-center gap-2 text-blue-900 font-bold">
+                  <div className="flex items-facility gap-2 text-blue-900 font-bold">
                     <Building2 className="w-4 h-4 text-blue-600" />
-                    <span>Centre Official Bank Account Details</span>
+                    <span>Facility Official Bank Account Details</span>
                   </div>
                   <p className="text-[11px] text-blue-700">
                     These account details will be presented to students when making tuition payments via bank transfer or card.
@@ -964,7 +964,7 @@ export const FinanceManager: React.FC = () => {
                         required
                         value={bankAccountName}
                         onChange={(e) => setBankAccountName(e.target.value)}
-                        placeholder="e.g. your centre's registered name"
+                        placeholder="e.g. your facility's registered name"
                         className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-slate-900 font-semibold focus:border-orange-500 outline-none"
                       />
                     </div>
@@ -972,7 +972,7 @@ export const FinanceManager: React.FC = () => {
                 </div>
 
                 <div className="p-3.5 bg-amber-50/70 border border-amber-200/80 rounded-xl space-y-2">
-                  <div className="flex items-center gap-2 text-amber-950 font-bold">
+                  <div className="flex items-facility gap-2 text-amber-950 font-bold">
                     <Banknote className="w-4 h-4 text-amber-600" />
                     <span>Cash Payment Info Guide for Students</span>
                   </div>
@@ -985,7 +985,7 @@ export const FinanceManager: React.FC = () => {
                       required
                       value={cashPaymentGuide}
                       onChange={(e) => setCashPaymentGuide(e.target.value)}
-                      placeholder="e.g. Please proceed in person to the Centre Accounts Bursar, Mr. Adeleke, at the Admin Office (Reception Block A, 1st Floor). Always collect an official stamped paper receipt upon payment."
+                      placeholder="e.g. Please proceed in person to the Facility Accounts Bursar, Mr. Adeleke, at the Admin Office (Reception Block A, 1st Floor). Always collect an official stamped paper receipt upon payment."
                       className="w-full bg-white border border-amber-300 rounded-lg p-2.5 text-xs text-slate-900 font-medium focus:border-orange-500 outline-none"
                     />
                   </div>
@@ -994,7 +994,7 @@ export const FinanceManager: React.FC = () => {
                 <div className="flex justify-end pt-2">
                   <button
                     type="submit"
-                    className="px-4 py-2 text-xs font-bold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg shadow-sm transition-all cursor-pointer flex items-center gap-1.5"
+                    className="px-4 py-2 text-xs font-bold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg shadow-sm transition-all cursor-pointer flex items-facility gap-1.5"
                   >
                     <Check className="w-4 h-4" />
                     <span>Save Channel Details & Cash Guide</span>
@@ -1004,7 +1004,7 @@ export const FinanceManager: React.FC = () => {
             )}
 
             {/* Modal Footer */}
-            <div className="pt-4 border-t border-slate-100 flex items-center justify-between shrink-0">
+            <div className="pt-4 border-t border-slate-100 flex items-facility justify-between shrink-0">
               <span className="text-xs text-slate-500">
                 Session: <strong className="text-slate-800">{settings.academicSession}</strong>
               </span>
@@ -1025,9 +1025,9 @@ export const FinanceManager: React.FC = () => {
 
       {/* Evidence Full Preview Modal */}
       {viewEvidenceModal && (
-        <div className="fixed inset-0 bg-black/80 z-[80] flex items-center justify-center p-4 backdrop-blur-xs animate-in fade-in duration-200">
+        <div className="fixed inset-0 bg-black/80 z-[80] flex items-facility justify-facility p-4 backdrop-blur-xs animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl max-w-lg w-full p-4 shadow-2xl relative flex flex-col max-h-[90vh]">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div className="flex items-facility justify-between pb-3 border-b border-slate-100">
               <h4 className="font-bold text-slate-900 text-sm truncate">{viewEvidenceModal.title}</h4>
               <button
                 onClick={() => setViewEvidenceModal(null)}
@@ -1036,7 +1036,7 @@ export const FinanceManager: React.FC = () => {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="py-3 flex-1 overflow-auto flex items-center justify-center bg-slate-950/5 rounded-xl mt-2">
+            <div className="py-3 flex-1 overflow-auto flex items-facility justify-facility bg-slate-950/5 rounded-xl mt-2">
               <img
                 src={viewEvidenceModal.url}
                 alt="Payment Evidence Proof"

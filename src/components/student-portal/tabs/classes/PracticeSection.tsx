@@ -241,7 +241,7 @@ export const PracticeSection: React.FC<PracticeSectionProps> = ({
   return (
     <div className="space-y-4 animate-in fade-in duration-300">
       {/* Subject Chips (horizontal, height 40, active #C2410C with white text) */}
-      <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 -mx-1 px-1 no-scrollbar">
+      <div className="flex items-facility space-x-1.5 overflow-x-auto pb-1 -mx-1 px-1 no-scrollbar">
         {availableSubjects.map((subject) => {
           const isSelected = selectedSubject === subject;
           return (
@@ -249,7 +249,7 @@ export const PracticeSection: React.FC<PracticeSectionProps> = ({
               key={subject}
               type="button"
               onClick={() => setSelectedSubject(subject)}
-              className={`h-10 px-4 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer flex items-center justify-center border ${
+              className={`h-10 px-4 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer flex items-facility justify-facility border ${
                 isSelected
                   ? 'bg-[#C2410C] text-white border-[#C2410C] shadow-sm font-extrabold'
                   : 'bg-white text-slate-700 border-[#E2E8F0] hover:bg-slate-50'
@@ -262,19 +262,19 @@ export const PracticeSection: React.FC<PracticeSectionProps> = ({
       </div>
 
       {loading && topics.length === 0 ? (
-        <div className="p-8 text-center bg-white rounded-[20px] border border-[#E2E8F0] space-y-2">
+        <div className="p-8 text-facility bg-white rounded-[20px] border border-[#E2E8F0] space-y-2">
           <div className="w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto" />
           <p className="text-xs text-slate-500 font-medium">Loading topics for {selectedSubject}...</p>
         </div>
       ) : topics.length === 0 ? (
         /* Empty State when no questions in bank */
-        <div className="p-8 text-center bg-white rounded-[20px] border border-[#E2E8F0] shadow-2xs space-y-3">
+        <div className="p-8 text-facility bg-white rounded-[20px] border border-[#E2E8F0] shadow-2xs space-y-3">
           <BookOpen className="w-10 h-10 text-slate-300 mx-auto" />
           <h4 className="text-sm font-bold text-slate-900">
             No practice questions for {selectedSubject} yet.
           </h4>
           <p className="text-xs text-slate-500 leading-relaxed max-w-xs mx-auto">
-            Your centre will add them soon. Select another subject above to practice.
+            Your facility will add them soon. Select another subject above to practice.
           </p>
         </div>
       ) : (
@@ -288,8 +288,8 @@ export const PracticeSection: React.FC<PracticeSectionProps> = ({
               }}
               className="rounded-[20px] p-5 border border-[#334155] text-white space-y-3.5"
             >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2 text-[#FDBA74]">
+              <div className="flex items-facility justify-between">
+                <div className="flex items-facility space-x-2 text-[#FDBA74]">
                   <Sparkles className="w-4 h-4 text-orange-400" />
                   <span className="text-[10px] font-extrabold uppercase tracking-wider text-orange-300">
                     SUGGESTED FOR YOU
@@ -317,7 +317,7 @@ export const PracticeSection: React.FC<PracticeSectionProps> = ({
                 <button
                   type="button"
                   onClick={() => handleStartSet(suggestedTopic.topic)}
-                  className="w-full h-11 px-4 rounded-xl bg-[#EA580C] hover:bg-[#C2410C] active:scale-98 text-white font-black text-xs uppercase tracking-wider shadow-sm transition-all flex items-center justify-center space-x-2 cursor-pointer"
+                  className="w-full h-11 px-4 rounded-xl bg-[#EA580C] hover:bg-[#C2410C] active:scale-98 text-white font-black text-xs uppercase tracking-wider shadow-sm transition-all flex items-facility justify-facility space-x-2 cursor-pointer"
                 >
                   <span>Start 10 questions</span>
                   <ArrowRight className="w-4 h-4" />
@@ -328,7 +328,7 @@ export const PracticeSection: React.FC<PracticeSectionProps> = ({
 
           {/* Topic List */}
           <div className="space-y-3">
-            <div className="flex items-center justify-between px-1">
+            <div className="flex items-facility justify-between px-1">
               <h3 className="text-[12px] font-extrabold uppercase tracking-[0.08em] text-[#0F172A]">
                 Topics ({topics.length})
               </h3>
@@ -360,10 +360,10 @@ export const PracticeSection: React.FC<PracticeSectionProps> = ({
                       key={t.topic}
                       type="button"
                       onClick={() => handleStartSet(t.topic)}
-                      className="w-full min-h-[64px] p-4 rounded-2xl bg-white border border-dashed border-slate-300 hover:border-orange-400 hover:bg-orange-50/20 text-left transition-all flex items-center justify-between gap-3 group cursor-pointer shadow-2xs"
+                      className="w-full min-h-[64px] p-4 rounded-2xl bg-white border border-dashed border-slate-300 hover:border-orange-400 hover:bg-orange-50/20 text-left transition-all flex items-facility justify-between gap-3 group cursor-pointer shadow-2xs"
                     >
                       <div className="space-y-1 min-w-0 flex-1">
-                        <div className="flex items-center space-x-2">
+                        <div className="flex items-facility space-x-2">
                           <h4 className="text-xs font-bold text-slate-800 group-hover:text-[#EA580C] transition-colors truncate">
                             {t.topic}
                           </h4>
@@ -387,11 +387,11 @@ export const PracticeSection: React.FC<PracticeSectionProps> = ({
                     onClick={() => handleStartSet(t.topic)}
                     className="w-full min-h-[68px] p-4 rounded-2xl bg-white border border-[#E2E8F0] hover:border-slate-300 text-left transition-all space-y-2.5 group cursor-pointer shadow-2xs"
                   >
-                    <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-facility justify-between gap-2">
                       <h4 className="text-xs font-bold text-slate-900 group-hover:text-[#EA580C] transition-colors truncate flex-1">
                         {t.topic}
                       </h4>
-                      <div className="flex items-center space-x-2 shrink-0">
+                      <div className="flex items-facility space-x-2 shrink-0">
                         <span
                           className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold border font-mono tabular-nums ${badgeColor}`}
                         >
@@ -409,7 +409,7 @@ export const PracticeSection: React.FC<PracticeSectionProps> = ({
                           className={`h-full rounded-full transition-all duration-300 ${barColor}`}
                         />
                       </div>
-                      <div className="flex justify-between items-center text-[10px] text-slate-400 font-medium">
+                      <div className="flex justify-between items-facility text-[10px] text-slate-400 font-medium">
                         <span className="tabular-nums font-mono">
                           {prog.answered} answered ({prog.correct} correct)
                         </span>
@@ -426,7 +426,7 @@ export const PracticeSection: React.FC<PracticeSectionProps> = ({
 
       {/* Educational Note */}
       <div className="pt-2">
-        <p className="text-[11px] text-[#64748B] text-center leading-relaxed">
+        <p className="text-[11px] text-[#64748B] text-facility leading-relaxed">
           Practice drills do not affect your formal examination grades or performance composite.
         </p>
       </div>

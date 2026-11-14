@@ -122,7 +122,7 @@ export const loadBillingMap = async (centreIds: string[]): Promise<Map<string, a
         const snap = await adminDb.collection('centres').doc(id).get();
         if (snap.exists) map.set(id, String((snap.data() as any)?.name || id));
       } catch (e: any) {
-        console.error('[tos directory] centre lookup failed:', e?.message || e);
+        console.error('[tos directory] facility lookup failed:', e?.message || e);
       }
     }));
     return map;
@@ -166,7 +166,7 @@ export function registerTosRoutes2(app: express.Express): void {
       const skipTrial = body.skipTrial === true;
       const tempPassword = String(body.tempPassword || '');
       if (fullName.length < 2 || fullName.length > 100) return res.status(400).json({ error: 'Please give the owner full name.' });
-      if (businessName.length < 2 || businessName.length > 120) return res.status(400).json({ error: 'Please give the centre name.' });
+      if (businessName.length < 2 || businessName.length > 120) return res.status(400).json({ error: 'Please give the facility name.' });
       if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return res.status(400).json({ error: 'That email address does not look right.' });
       if (phoneDigits.length < 7 || phoneDigits.length > 15) return res.status(400).json({ error: 'That phone number does not look right.' });
       // A manual centre starts from a fresh account so the temporary password
@@ -177,7 +177,7 @@ export function registerTosRoutes2(app: express.Express): void {
         return res.status(409).json({ error: 'An account with this email already exists. Pick a different email, or ask the owner to sign in with that account.' });
       } catch (err: any) {
         if (err?.code !== 'auth/user-not-found') {
-          console.error('[tos/centres] auth lookup failed:', err?.code || err);
+          console.error('[tos/facilities] auth lookup failed:', err?.code || err);
           return res.status(500).json({ error: 'Could not look up the account. Please try again.' });
         }
       }
@@ -213,8 +213,8 @@ export function registerTosRoutes2(app: express.Express): void {
       });
     } catch (error: any) {
       if (error?.status) return res.status(error.status).json({ error: error.message });
-      console.error('[tos/centres] create failed:', error?.message || error);
-      res.status(500).json({ error: 'Could not create the centre. Please try again.' });
+      console.error('[tos/facilities] create failed:', error?.message || error);
+      res.status(500).json({ error: 'Could not create the facility. Please try again.' });
     }
   });
 
@@ -315,7 +315,7 @@ export function registerTosRoutes2(app: express.Express): void {
     } catch (error: any) {
       if (error?.status) return res.status(error.status).json({ error: error.message });
       console.error('[tos/owners] failed:', error?.message || error);
-      res.status(500).json({ error: 'Could not load centre owners.' });
+      res.status(500).json({ error: 'Could not load facility owners.' });
     }
   });
 
@@ -427,7 +427,7 @@ export function registerTosRoutes2(app: express.Express): void {
       const centreId = String(req.params.id || '');
       const type = String(req.query.type || 'students');
       const { pageSize, cursor, search } = parseDirectoryQuery(req);
-      if (!centreId) throw httpError(400, 'Centre is required.');
+      if (!centreId) throw httpError(400, 'Facility is required.');
       if (!['owners', 'admins', 'tutors', 'students'].includes(type)) throw httpError(400, 'Unknown people type.');
 
       // Counts and seats first: cheap aggregation reads, no documents fetched.
@@ -554,8 +554,8 @@ export function registerTosRoutes2(app: express.Express): void {
       });
     } catch (error: any) {
       if (error?.status) return res.status(error.status).json({ error: error.message });
-      console.error('[tos/centre-people] failed:', error?.message || error);
-      res.status(500).json({ error: 'Could not load the centre people.' });
+      console.error('[tos/facility-people] failed:', error?.message || error);
+      res.status(500).json({ error: 'Could not load the facility people.' });
     }
   });
 
@@ -572,11 +572,11 @@ export function registerTosRoutes2(app: express.Express): void {
       const action = String(req.body?.action || '');
       const uid = String(req.body?.uid || '');
       const docId = String(req.body?.docId || '') || uid;
-      if (!centreId) throw httpError(400, 'Centre is required.');
+      if (!centreId) throw httpError(400, 'Facility is required.');
       if (!['student', 'tutor', 'admin'].includes(role)) throw httpError(400, 'Unknown member type.');
       if (!['suspend', 'restore', 'remove', 'delete'].includes(action)) throw httpError(400, 'Unknown action.');
       const cDoc = await adminDb.collection('centres').doc(centreId).get();
-      if (!cDoc.exists) throw httpError(404, 'Centre not found.');
+      if (!cDoc.exists) throw httpError(404, 'Facility not found.');
 
       if (role === 'student') {
         if (!uid) throw httpError(400, 'The member id is missing.');
@@ -593,7 +593,7 @@ export function registerTosRoutes2(app: express.Express): void {
         }
         const memRef = adminDb.collection('memberships').doc(`${uid}__${centreId}`);
         const memDoc = await memRef.get();
-        if (!memDoc.exists) throw httpError(404, 'No membership found for that student in this centre.');
+        if (!memDoc.exists) throw httpError(404, 'No membership found for that student in this facility.');
         const wasActive = (memDoc.data() as any)?.status === 'active';
         await adminDb.runTransaction(async (tx) => {
           tx.delete(memRef);
@@ -616,7 +616,7 @@ export function registerTosRoutes2(app: express.Express): void {
         if (!docId) throw httpError(400, 'The member id is missing.');
         const tRef = adminDb.collection('tutors').doc(docId);
         const tDoc = await tRef.get();
-        if (!tDoc.exists) throw httpError(404, 'Tutor not found in this centre.');
+        if (!tDoc.exists) throw httpError(404, 'Tutor not found in this facility.');
         if (action === 'suspend' || action === 'restore') {
           await tRef.update({ status: action === 'suspend' ? 'Suspended' : 'Active', updatedAt: new Date().toISOString() });
           await audit({ actorUid: caller.uid, centreId, action: action === 'suspend' ? 'TUTOR_SUSPENDED' : 'TUTOR_RESTORED', after: { tutorId: docId } });
@@ -631,11 +631,11 @@ export function registerTosRoutes2(app: express.Express): void {
       if (!uid) throw httpError(400, 'The member id is missing.');
       const aRef = adminDb.collection('admins').doc(uid);
       const aDoc = await aRef.get();
-      if (!aDoc.exists) throw httpError(404, 'Admin record not found in this centre.');
+      if (!aDoc.exists) throw httpError(404, 'Admin record not found in this facility.');
       const aData = (aDoc.data() || {}) as any;
       const roleText = `${String(aData?.role || '')} ${String(aData?.jobTitle || '')}`.toLowerCase();
       if (roleText.includes('super administrator') || roleText.includes('super admin') || roleText.includes('owner')) {
-        throw httpError(403, 'The centre owner cannot be suspended or removed here.');
+        throw httpError(403, 'The facility owner cannot be suspended or removed here.');
       }
       if (action === 'suspend' || action === 'restore') {
         await aRef.update({ status: action === 'suspend' ? 'Suspended' : 'Active', updatedAt: new Date().toISOString() });
@@ -670,7 +670,7 @@ const CENTRE_DATA_COLLECTIONS = [
 export async function deleteCentreCascade(centreId: string, actorUid: string, reason: string): Promise<void> {
   const cRef = adminDb.collection('centres').doc(centreId);
   const cDoc = await cRef.get();
-  if (!cDoc.exists) throw httpError(404, 'Centre not found.');
+  if (!cDoc.exists) throw httpError(404, 'Facility not found.');
 
   const writer = adminDb.bulkWriter();
   const wipeQuery = async (col: string): Promise<void> => {

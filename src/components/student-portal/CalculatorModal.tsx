@@ -102,11 +102,11 @@ export const CalculatorModal: React.FC<CalculatorModalProps> = ({ isOpen = true,
   };
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[200] flex items-facility justify-facility p-4 bg-black/60 backdrop-blur-sm">
       <div className="bg-slate-900 text-white rounded-3xl p-5 w-full max-w-[320px] shadow-2xl border border-slate-700 animate-in zoom-in-95 duration-200">
-        <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-lg bg-orange-500 flex items-center justify-center">
+        <div className="flex items-facility justify-between pb-3 border-b border-slate-800">
+          <div className="flex items-facility gap-2">
+            <div className="w-6 h-6 rounded-lg bg-orange-500 flex items-facility justify-facility">
               <span className="text-[10px] font-black">JAMB</span>
             </div>
             <span className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">
@@ -115,7 +115,7 @@ export const CalculatorModal: React.FC<CalculatorModalProps> = ({ isOpen = true,
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-xl bg-slate-800 hover:bg-rose-500/20 hover:text-rose-400 flex items-center justify-center text-slate-300 transition-all"
+            className="w-8 h-8 rounded-xl bg-slate-800 hover:bg-rose-500/20 hover:text-rose-400 flex items-facility justify-facility text-slate-300 transition-all"
           >
             <X className="w-4 h-4" />
           </button>

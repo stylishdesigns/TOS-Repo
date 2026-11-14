@@ -225,8 +225,8 @@ export const SubjectListTab: React.FC = () => {
       </div>
 
       {/* Filter and Action Bar */}
-      <div className="bg-white p-3 md:p-4 rounded-xl border border-slate-200/90 shadow-xs flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center space-x-1 bg-slate-50/80 p-1 rounded-lg border border-slate-200/60 overflow-x-auto">
+      <div className="bg-white p-3 md:p-4 rounded-xl border border-slate-200/90 shadow-xs flex flex-wrap items-facility justify-between gap-3">
+        <div className="flex items-facility space-x-1 bg-slate-50/80 p-1 rounded-lg border border-slate-200/60 overflow-x-auto">
           {(['All', 'General', 'Science', 'Commercial', 'Arts'] as const).map((dept) => (
             <button
               key={dept}
@@ -242,8 +242,8 @@ export const SubjectListTab: React.FC = () => {
           ))}
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <div className="relative flex items-center bg-slate-50/60 border border-slate-200 rounded-lg px-2.5 py-1.5 flex-1 sm:w-56 focus-within:bg-white focus-within:border-orange-500 transition-all shadow-2xs">
+        <div className="flex items-facility gap-2 w-full sm:w-auto">
+          <div className="relative flex items-facility bg-slate-50/60 border border-slate-200 rounded-lg px-2.5 py-1.5 flex-1 sm:w-56 focus-within:bg-white focus-within:border-orange-500 transition-all shadow-2xs">
             <Search className="w-3.5 h-3.5 text-slate-400 mr-2 shrink-0" />
             <input
               type="text"
@@ -256,7 +256,7 @@ export const SubjectListTab: React.FC = () => {
 
           <button
             onClick={() => setShowAddModal(true)}
-            className="px-3 py-1.5 text-xs font-semibold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg shadow-sm transition-all flex items-center space-x-1.5 shrink-0"
+            className="px-3 py-1.5 text-xs font-semibold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg shadow-sm transition-all flex items-facility space-x-1.5 shrink-0"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Add Subject</span>
@@ -295,7 +295,7 @@ export const SubjectListTab: React.FC = () => {
 
             <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">{sub.description}</p>
 
-            <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
+            <div className="pt-2 border-t border-slate-100 flex items-facility justify-between text-[11px]">
               <div>
                 <span className="text-slate-400 block text-[10px]">Assigned Faculty:</span>
                 <p className="font-semibold text-slate-800">{sub.assignedTutors.join(', ')}</p>
@@ -320,9 +320,9 @@ export const SubjectListTab: React.FC = () => {
 
       {/* Add Subject Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-facility justify-facility p-4 backdrop-blur-xs">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div className="flex items-facility justify-between pb-3 border-b border-slate-100">
               <h3 className="font-bold text-base text-slate-900">Add Academic Subject</h3>
               <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-700">
                 <X className="w-5 h-5" />
@@ -384,7 +384,7 @@ export const SubjectListTab: React.FC = () => {
                 />
               </div>
 
-              <div className="flex items-center justify-end space-x-2 pt-3 border-t border-slate-100">
+              <div className="flex items-facility justify-end space-x-2 pt-3 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}

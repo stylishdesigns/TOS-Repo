@@ -108,12 +108,12 @@ const OrangeAction = ({ t, s, w }: { t: string; s: string; w: number }) => (
 );
 
 const STATUS = {
-  admissions: ['2 new applications', 'Reviewing an application', 'Application approved', 'Access code issued', 'New student joins the centre'],
+  admissions: ['2 new applications', 'Reviewing an application', 'Application approved', 'Access code issued', 'New student joins the facility'],
   fees: ['Fees at a glance', 'Payment recorded', 'Payment confirmed', 'Receipt issued', 'Ledger up to date'],
   tutor: ['Tutor home', "Today's classes", 'Taking attendance', '18 of 20 present', 'Attendance saved'],
   cbt: ['Student home', 'Question 3 of 10', 'Answer selected', 'Instant result', 'Leaderboard updated'],
   apps: ['Student home', 'Classes', 'Your results', 'On any phone'],
-  chat: ['Your centre, one chat', 'Class group opened', 'Tutor posts an update', 'You reply', 'Message seen'],
+  chat: ['Your facility, one chat', 'Class group opened', 'Tutor posts an update', 'You reply', 'Message seen'],
 };
 
 function AdmissionsDemo() {
@@ -141,9 +141,9 @@ function AdmissionsDemo() {
       )}
       {b === 3 && (
         <>
-          <Title>Centre access code</Title>
+          <Title>Facility access code</Title>
           <div className="dbig">4 8 2 9 1 3</div>
-          <R>Share this code so the student joins the right centre</R>
+          <R>Share this code so the student joins the right facility</R>
         </>
       )}
       {b === 4 && (
@@ -355,7 +355,7 @@ type Feature = { title: string; body: string; demo: ReactNode };
 const FEATURES: Feature[] = [
   {
     title: 'Admissions and onboarding',
-    body: 'Take applications online, approve students, and give each centre a code so new students and tutors join the right place.',
+    body: 'Take applications online, approve students, and give each facility a code so new students and tutors join the right place.',
     demo: <AdmissionsDemo />,
   },
   {
@@ -379,7 +379,7 @@ const FEATURES: Feature[] = [
     demo: <AppsDemo />,
   },
   {
-    title: 'Chat for your whole centre',
+    title: 'Chat for your whole facility',
     body: 'A chat window where admins, tutors and students talk to each other, with groups for every class.',
     demo: <ChatDemo />,
   },

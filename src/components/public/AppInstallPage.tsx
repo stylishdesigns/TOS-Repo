@@ -72,7 +72,7 @@ export function AppInstallPage() {
           <span className="pill" style={{marginBottom:18}}>Tutorial OS community</span>
           <h1 className="hx" style={{fontSize:'clamp(32px,6vw,46px)'}}>Get the Tutorial OS app</h1>
           <p className="sub" style={{margin:'0 auto 30px'}}>
-            One system for your centre: students, tutors and your dashboard, right on your
+            One system for your facility: students, tutors and your dashboard, right on your
             home screen. Installing takes under a minute.
           </p>
 
@@ -130,7 +130,7 @@ export function AppInstallPage() {
             </span>
             Tutorial OS
           </span>
-          <span style={{fontSize:13, color:'#94A3B8'}}>One system for educational centres.</span>
+          <span style={{fontSize:13, color:'#94A3B8'}}>One system for educational facilities.</span>
         </div>
       </footer>
     </div>

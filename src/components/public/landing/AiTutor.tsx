@@ -17,10 +17,10 @@ type Phase = { kicker: string; q: string; a: string; points: string[] };
 
 const PHASES: Phase[] = [
   {
-    kicker: 'Centre admin',
+    kicker: 'Facility admin',
     q: 'Which students are owing fees?',
     a: 'Three students are behind on fees this term, ₦75,000 in total. Ade B. and Fatima O. owe the most, ₦25,000 each. Want payment reminders drafted for their parents?',
-    points: ['Answers from your centre\u2019s own data', 'Spots strong and struggling students', 'Prepares the report sheets you need'],
+    points: ['Answers from your facility\u2019s own data', 'Spots strong and struggling students', 'Prepares the report sheets you need'],
   },
   {
     kicker: 'Tutors',

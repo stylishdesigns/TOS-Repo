@@ -16,10 +16,10 @@ export function registerLandingRoutes(app: express.Express): void {
     try {
       const centreId = String(req.params.centreId || "");
       if (!/^[a-zA-Z0-9_-]{3,64}$/.test(centreId)) {
-        return res.status(400).json({ error: "A valid centre id is required." });
+        return res.status(400).json({ error: "A valid facility id is required." });
       }
 
-      let centreName = "Our tutorial centre";
+      let centreName = "Our education facility";
       let centrePhone = "";
       try {
         const centreSnap = await adminDb.collection("centres").doc(centreId).get();
@@ -87,7 +87,7 @@ export function registerLandingRoutes(app: express.Express): void {
       return res.json({ ok: true, published, centreName, content, whatsapp });
     } catch (err) {
       console.error("[landing] GET /api/public/landing failed:", err);
-      return res.status(500).json({ error: "Could not load this centre's website." });
+      return res.status(500).json({ error: "Could not load this facility's website." });
     }
   });
 
@@ -113,7 +113,7 @@ export function registerLandingRoutes(app: express.Express): void {
     try {
       const centreId = String(req.params.centreId || "");
       if (!/^[a-zA-Z0-9_-]{3,64}$/.test(centreId)) {
-        return res.status(400).json({ error: "A valid centre is required." });
+        return res.status(400).json({ error: "A valid facility is required." });
       }
       const ip = String(req.headers["x-forwarded-for"] || req.ip || "anon").split(",")[0].trim();
       if (tooManyRequests(ip)) {
@@ -135,7 +135,7 @@ export function registerLandingRoutes(app: express.Express): void {
       }
       const centreSnap = await adminDb.collection("centres").doc(centreId).get();
       if (!centreSnap.exists) {
-        return res.status(404).json({ error: "This centre is not available." });
+        return res.status(404).json({ error: "This facility is not available." });
       }
       const now = new Date().toISOString();
       const ref = await adminDb.collection("centreLandingLeads").add({
@@ -148,7 +148,7 @@ export function registerLandingRoutes(app: express.Express): void {
         createdAt: now,
         source: "landing-page",
       });
-      console.log(`[landing] lead written centre=${centreId} id=${ref.id}`);
+      console.log(`[landing] lead written facility=${centreId} id=${ref.id}`);
       return res.json({ ok: true });
     } catch (err) {
       console.error("[landing] POST lead failed:", err);

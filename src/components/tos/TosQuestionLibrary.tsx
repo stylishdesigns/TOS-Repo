@@ -634,7 +634,7 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number; kind?: 'practice
           )}
           <div className="space-y-2">
             {(imports || []).map((b: any) => (
-              <div key={b.id} className="rounded-2xl border border-slate-700/50 bg-slate-900/40 p-3.5 flex flex-wrap items-center justify-between gap-2">
+              <div key={b.id} className="rounded-2xl border border-slate-700/50 bg-slate-900/40 p-3.5 flex flex-wrap items-facility justify-between gap-2">
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-slate-200">{b.subject} · {b.topic}{b.year ? ` · ${b.year}` : ''}</p>
                   <p className="text-xs text-slate-500">{fmtDate(b.importedAt)} · {b.count} question{b.count === 1 ? '' : 's'} · {b.examType} · {b.importedByEmail || 'TOS admin'}</p>
@@ -779,7 +779,7 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number; kind?: 'practice
                   <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Topics</p>
                   {(screenSubject.topics || []).map((t: any) => (
                     <button key={t.key} onClick={() => openTopicPreview(t)}
-                      className="w-full flex items-center justify-between gap-2 px-3.5 py-3 rounded-xl border border-slate-700/50 bg-slate-900/40 hover:border-orange-500/40 text-left min-h-[52px]">
+                      className="w-full flex items-facility justify-between gap-2 px-3.5 py-3 rounded-xl border border-slate-700/50 bg-slate-900/40 hover:border-orange-500/40 text-left min-h-[52px]">
                       <span className="text-sm font-semibold text-slate-200 truncate">{t.label}</span>
                       <span className="text-xs text-slate-500 shrink-0">{countsHidden ? '–' : t.total}</span>
                     </button>
@@ -871,7 +871,7 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number; kind?: 'practice
                       {(q.options || []).map((o: any) => {
                         const good = o.key === q.correct;
                         return (
-                          <div key={o.key} className={`flex items-center gap-1.5 text-xs rounded-lg px-2.5 py-1.5 border ${good ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-200 font-semibold' : 'border-slate-700/60 text-slate-300'}`}>
+                          <div key={o.key} className={`flex items-facility gap-1.5 text-xs rounded-lg px-2.5 py-1.5 border ${good ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-200 font-semibold' : 'border-slate-700/60 text-slate-300'}`}>
                             <span className="font-bold shrink-0">{o.key}.</span><span>{o.text}</span>
                             {good && <Check className="w-3.5 h-3.5 ml-auto shrink-0" />}
                           </div>
@@ -882,10 +882,10 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number; kind?: 'practice
                     {String(q.explanation || '') && (
                       <p className="text-xs text-slate-400 leading-relaxed"><span className="font-bold text-slate-500">Explanation: </span>{q.explanation}</p>
                     )}
-                    <div className="flex flex-wrap gap-1.5 items-center">
+                    <div className="flex flex-wrap gap-1.5 items-facility">
                       {kind !== 'mock' && q.year != null && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">{q.year}</span>}
                       {kind !== 'mock' && q.difficulty && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">{DIFF_LABELS[q.difficulty] || q.difficulty}</span>}
-                      <button onClick={() => openEditor(q.id)} className="ml-auto text-[11px] font-semibold text-orange-300/90 hover:text-orange-200 flex items-center gap-1">
+                      <button onClick={() => openEditor(q.id)} className="ml-auto text-[11px] font-semibold text-orange-300/90 hover:text-orange-200 flex items-facility gap-1">
                         <Pencil className="w-3 h-3" /> Edit alone
                       </button>
                     </div>
@@ -900,7 +900,7 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number; kind?: 'practice
       {(editor || editorLoading) && (
         <div className="fixed inset-0 z-50 bg-slate-950 lg:bg-slate-950/80 lg:flex lg:justify-end" onClick={() => { if (!saving) setEditor(null); }}>
           <div className="w-full lg:max-w-[520px] h-full bg-slate-950 border-l border-slate-800 overflow-y-auto p-4 lg:p-6 space-y-3" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between">
+            <div className="flex items-facility justify-between">
               <p className="text-sm font-bold text-white">Quick edit</p>
               <button onClick={() => setEditor(null)} disabled={saving} className="p-2 rounded-lg text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
             </div>
@@ -918,7 +918,7 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number; kind?: 'practice
                 {['A', 'B', 'C', 'D'].map((k) => {
                   const opt = (editor.item.options || []).find((o: any) => o.key === k);
                   return (
-                    <div key={k} className="flex items-center gap-2">
+                    <div key={k} className="flex items-facility gap-2">
                       <span className="text-xs font-bold text-slate-500 w-4">{k}</span>
                       <input
                         value={opt?.text || ''}
@@ -946,7 +946,7 @@ export const QuestionLibraryTab: React.FC<{ refreshKey: number; kind?: 'practice
                     {BANK_YEARS.map((y: number) => <option key={y} value={y}>{y}</option>)}
                   </select>
                   )}
-                  <p className="text-[11px] text-slate-500 self-center">Status: {editor.item.status}</p>
+                  <p className="text-[11px] text-slate-500 self-facility">Status: {editor.item.status}</p>
                 </div>
                 <textarea value={editor.item.explanation || ''} onChange={(e) => setEditorField('explanation', e.target.value)} rows={3} placeholder="Explanation (optional)" className={inputCls} />
                 {editorError && <p className="text-sm text-red-300">{editorError}</p>}

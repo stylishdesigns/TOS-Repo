@@ -49,9 +49,9 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/60 z-[200] overflow-y-auto p-4 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="min-h-full flex items-center justify-center py-8">
-        <div className="bg-white rounded-[32px] max-w-sm w-full p-8 shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-300 text-center relative">
-          <div className={`w-16 h-16 ${style.bg} rounded-full flex items-center justify-center mx-auto mb-6`}>
+      <div className="min-h-full flex items-facility justify-facility py-8">
+        <div className="bg-white rounded-[32px] max-w-sm w-full p-8 shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-300 text-facility relative">
+          <div className={`w-16 h-16 ${style.bg} rounded-full flex items-facility justify-facility mx-auto mb-6`}>
             {style.icon}
           </div>
           

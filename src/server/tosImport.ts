@@ -57,7 +57,7 @@ function cleanParams(params: Partial<ImportParams>): Required<Pick<ImportParams,
   const ownerUid = String(params.ownerUid || '').trim();
   const ownerEmail = normalizeEmail(String(params.ownerEmail || ''));
   if (!/^[a-z0-9][a-z0-9_-]{2,60}$/.test(centreId)) {
-    throw httpError(400, 'Enter the centre id (letters, numbers, dashes; 3 to 60 characters).');
+    throw httpError(400, 'Enter the facility id (letters, numbers, dashes; 3 to 60 characters).');
   }
   if (!/^[A-Za-z0-9]{20,64}$/.test(ownerUid)) {
     throw httpError(400, 'Enter the owner uid (the Firebase Auth user id).');
@@ -189,22 +189,22 @@ export async function previewImport(params: Partial<ImportParams>) {
         }
       : {
           action: 'create',
-          note: 'The centre record does not exist yet; the import creates it from the centre name you give.',
+          note: 'The facility record does not exist yet; the import creates it from the facility name you give.',
           requiresCentreName: true,
         },
     centreBilling: centreBilling
-      ? { action: 'overwrite billing fields for this centre', planId: 'centre_plus', trial: 'none (skippedTrial)' }
+      ? { action: 'overwrite billing fields for this facility', planId: 'centre_plus', trial: 'none (skippedTrial)' }
       : { action: 'create', planId: 'centre_plus', trial: 'none (skippedTrial)', seatCapFromPlan: plan?.seatCap ?? null },
     ownerMembership: memberships.some((m) => m.uid === ownerUid && m.role === 'owner')
       ? 'already present; no change'
       : `create memberships/${ownerUid}__${centreId} (role owner, status active)`,
     ownerAdminRecord: ownerAdminRecord
       ? ownerAdminRecord.centreId === centreId
-        ? 'already points at this centre; no change'
+        ? 'already points at this facility; no change'
         : 'adds centreId to the existing admins record (nothing else changes)'
-      : `create admins/${ownerUid} (Super Admin, Active, this centre)`,
+      : `create admins/${ownerUid} (Super Admin, Active, this facility)`,
     accessCodes: {
-      create: 'one fresh random 6-digit code for this centre',
+      create: 'one fresh random 6-digit code for this facility',
       remove: codesForCentre.map((c) => c.code),
       keepOldCodes: params.keepOldCodes === true,
     },
@@ -295,7 +295,7 @@ export async function applyImport(params: Partial<ImportParams> & { actorUid: st
   } else {
     const centreName = String(params.centreName || '').trim();
     if (centreName.length < 2 || centreName.length > 120) {
-      throw httpError(400, 'The centre record does not exist yet, so a centre name is required for the import.');
+      throw httpError(400, 'The facility record does not exist yet, so a facility name is required for the import.');
     }
     await centreRef.set({
       name: centreName,
@@ -321,7 +321,7 @@ export async function applyImport(params: Partial<ImportParams> & { actorUid: st
     skippedTrial: true,
     discountPct: (config as any).skipTrialDiscountPct ?? 0,
     paidThrough: null,
-    notes: 'Imported existing centre on centre_plus without a trial; students wait for the first payment.',
+    notes: 'Imported existing facility on centre_plus without a trial; students wait for the first payment.',
     updatedAt: now.toISOString(),
   });
 

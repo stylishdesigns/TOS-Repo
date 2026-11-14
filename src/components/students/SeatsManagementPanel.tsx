@@ -91,17 +91,17 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 shadow-sm transition-all mb-8">
       {/* Top Header & Overview */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-slate-100 dark:border-slate-800">
+      <div className="flex flex-col md:flex-row md:items-facility justify-between gap-6 pb-6 border-b border-slate-100 dark:border-slate-800">
         <div>
-          <div className="flex items-center gap-3 mb-1">
-            <div className="w-10 h-10 rounded-2xl bg-orange-500/10 text-orange-600 dark:text-orange-400 flex items-center justify-center font-bold">
+          <div className="flex items-facility gap-3 mb-1">
+            <div className="w-10 h-10 rounded-2xl bg-orange-500/10 text-orange-600 dark:text-orange-400 flex items-facility justify-facility font-bold">
               <Users className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-facility gap-2">
                 <span>Student Seats</span>
                 {isTrial && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                  <span className="inline-flex items-facility gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
                     <Sparkles className="w-3 h-3" />
                     Trial Active ({trialDaysLeft} days left)
                   </span>
@@ -115,7 +115,7 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
         </div>
 
         {/* Live Seat Metric Widget */}
-        <div className="flex items-center gap-6 bg-slate-50 dark:bg-slate-800/60 p-4 rounded-2xl border border-slate-100 dark:border-slate-700/60">
+        <div className="flex items-facility gap-6 bg-slate-50 dark:bg-slate-800/60 p-4 rounded-2xl border border-slate-100 dark:border-slate-700/60">
           <div className="text-left">
             <span className="text-xs text-slate-400 dark:text-slate-400 font-medium block">
               Active Seats
@@ -160,8 +160,8 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
 
       {/* Error Notice */}
       {errorMessage && (
-        <div className="mt-4 p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs flex items-center justify-between">
-          <div className="flex items-center gap-2 font-medium">
+        <div className="mt-4 p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs flex items-facility justify-between">
+          <div className="flex items-facility gap-2 font-medium">
             <AlertCircle className="w-4 h-4 shrink-0 text-rose-500" />
             <span>{errorMessage}</span>
           </div>
@@ -175,7 +175,7 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
       )}
 
       {/* Filter and Search controls */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 mb-4">
+      <div className="flex flex-col sm:flex-row items-facility justify-between gap-4 mt-6 mb-4">
         <div className="relative w-full sm:w-72">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
@@ -187,7 +187,7 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
           />
         </div>
 
-        <div className="flex items-center gap-1.5 self-end sm:self-auto bg-slate-100 dark:bg-slate-800 p-1 rounded-xl text-xs">
+        <div className="flex items-facility gap-1.5 self-end sm:self-auto bg-slate-100 dark:bg-slate-800 p-1 rounded-xl text-xs">
           <button
             onClick={() => setFilterMode('all')}
             className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
@@ -229,14 +229,14 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
               <th className="py-3 px-4">Student</th>
               <th className="py-3 px-4">Programme</th>
               <th className="py-3 px-4">Last Status Change</th>
-              <th className="py-3 px-4 text-center">Seat Status</th>
+              <th className="py-3 px-4 text-facility">Seat Status</th>
               <th className="py-3 px-4 text-right">Access Switch</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
             {filteredStudents.length === 0 ? (
               <tr>
-                <td colSpan={5} className="py-8 text-center text-slate-400">
+                <td colSpan={5} className="py-8 text-facility text-slate-400">
                   No students found matching your filter.
                 </td>
               </tr>
@@ -265,8 +265,8 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
                   >
                     {/* Student Info */}
                     <td className="py-3.5 px-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center font-bold text-slate-600 dark:text-slate-300">
+                      <div className="flex items-facility gap-3">
+                        <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-facility justify-facility font-bold text-slate-600 dark:text-slate-300">
                           {student.name.charAt(0)}
                         </div>
                         <div>
@@ -291,9 +291,9 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
                     </td>
 
                     {/* Badge */}
-                    <td className="py-3.5 px-4 text-center">
+                    <td className="py-3.5 px-4 text-facility">
                       <span
-                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold ${
+                        className={`inline-flex items-facility gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold ${
                           isCurrentlyActive
                             ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
                             : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
@@ -339,8 +339,8 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
         </table>
       </div>
 
-      <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-400 flex items-center justify-between">
-        <span className="flex items-center gap-1.5">
+      <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-400 flex items-facility justify-between">
+        <span className="flex items-facility gap-1.5">
           <Info className="w-3.5 h-3.5 text-slate-400" />
           Switching access off frees a seat immediately. Re-activating an account requires an available seat.
         </span>

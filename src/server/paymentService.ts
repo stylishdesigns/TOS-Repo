@@ -204,7 +204,7 @@ export async function decidePayment(
   input: DecidePaymentInput
 ) {
   if (!actor.isAdminCaller) {
-    throw new PaymentError(403, 'Only a centre admin can confirm payments');
+    throw new PaymentError(403, 'Only a facility admin can confirm payments');
   }
   const { paymentId, action, reason } = input;
   const { callerCentreId } = actor;

@@ -125,14 +125,14 @@ export function registerLandingAdminRoutes(app: express.Express): void {
     try {
       requireTos(req);
       const centreId = String(req.params.centreId || '');
-      if (!CENTRE_ID_RE.test(centreId)) return res.status(400).json({ error: 'Invalid centre id.' });
+      if (!CENTRE_ID_RE.test(centreId)) return res.status(400).json({ error: 'Invalid facility id.' });
       const db = adminDb;
       const [centreSnap, pageSnap] = await Promise.all([
         db.collection('centres').doc(centreId).get(),
         db.collection('centreLandingPages').doc(centreId).get(),
       ]);
       const centreName = String((centreSnap.data() as any)?.name || '');
-      if (!centreSnap.exists) return res.status(404).json({ error: 'Centre not found.' });
+      if (!centreSnap.exists) return res.status(404).json({ error: 'Facility not found.' });
       const stored = pageSnap.data() as any;
       const content = isLandingContent(stored?.content) ? stored.content : defaultLandingContent(centreName);
       res.json({
@@ -144,7 +144,7 @@ export function registerLandingAdminRoutes(app: express.Express): void {
       });
     } catch (error: any) {
       console.error('[landing-admin] read failed:', error?.message || error);
-      res.status(500).json({ error: 'Could not load this centre\'s landing content.' });
+      res.status(500).json({ error: 'Could not load this facility\'s landing content.' });
     }
   });
 
@@ -153,10 +153,10 @@ export function registerLandingAdminRoutes(app: express.Express): void {
     try {
       const caller = requireTos(req);
       const centreId = String(req.params.centreId || '');
-      if (!CENTRE_ID_RE.test(centreId)) return res.status(400).json({ error: 'Invalid centre id.' });
+      if (!CENTRE_ID_RE.test(centreId)) return res.status(400).json({ error: 'Invalid facility id.' });
       const db = adminDb;
       const centreSnap = await db.collection('centres').doc(centreId).get();
-      if (!centreSnap.exists) return res.status(404).json({ error: 'Centre not found.' });
+      if (!centreSnap.exists) return res.status(404).json({ error: 'Facility not found.' });
       const body = (req.body || {}) as any;
       const content = sanitizeLandingContent(body.content);
       const published = body.published === true;
@@ -170,7 +170,7 @@ export function registerLandingAdminRoutes(app: express.Express): void {
       res.json({ success: true, published, updatedAt: now });
     } catch (error: any) {
       console.error('[landing-admin] save failed:', error?.message || error);
-      res.status(500).json({ error: 'Could not save this centre\'s landing content.' });
+      res.status(500).json({ error: 'Could not save this facility\'s landing content.' });
     }
   });
 
@@ -181,7 +181,7 @@ export function registerLandingAdminRoutes(app: express.Express): void {
     try {
       requireTos(req);
       const centreId = String(req.params.centreId || '');
-      if (!CENTRE_ID_RE.test(centreId)) return res.status(400).json({ error: 'Invalid centre id.' });
+      if (!CENTRE_ID_RE.test(centreId)) return res.status(400).json({ error: 'Invalid facility id.' });
       const dataUrl = String((req.body as any)?.dataUrl || '');
       const m = /^data:(image\/(?:png|jpe?g|webp));base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl);
       if (!m) return res.status(400).json({ error: 'That file is not a photo this page can use.' });

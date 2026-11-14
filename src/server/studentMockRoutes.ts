@@ -146,9 +146,9 @@ async function requireStudent(req: express.Request): Promise<StudentContext> {
   if (caller.tos) throw httpError(403, 'TOS staff do not take mocks. Use a student account.');
   const memberships = await listActiveMembershipsForUser(caller.uid, caller.email);
   const student = memberships.find((m) => String(m.role) === 'student' && String(m.status) === 'active');
-  if (!student) throw httpError(403, 'You are not an active student of any centre.');
+  if (!student) throw httpError(403, 'You are not an active student of any facility.');
   const centreSnap = await adminDb.collection('centres').doc(student.centreId).get();
-  if (!centreSnap.exists) throw httpError(403, 'Your centre is not available.');
+  if (!centreSnap.exists) throw httpError(403, 'Your facility is not available.');
   const centre = centreSnap.data() as any;
   // The platform's own member gate (same rule as validateActiveCentreService):
   // only a suspended centre loses its students. Trial and awaiting-payment
@@ -156,7 +156,7 @@ async function requireStudent(req: express.Request): Promise<StudentContext> {
   const billing = await getBillingDoc(student.centreId);
   const config = await getPlatformConfig();
   const effStatus = effectiveStatus({ ...centre } as any, billing, config);
-  if (effStatus === 'suspended') throw httpError(403, 'Your centre is not available.');
+  if (effStatus === 'suspended') throw httpError(403, 'Your facility is not available.');
   // The student record keyed by uid: the username register needs its id.
   const stuSnap = await adminDb.collection('students').where('uid', '==', caller.uid).limit(1).get();
   const stuDoc = stuSnap.docs[0];
@@ -593,7 +593,7 @@ export function registerStudentMockRoutes(app: express.Express): void {
       const caller = getCaller(req);
       const memberships = await listActiveMembershipsForUser(caller.uid, caller.email);
       if (!memberships || memberships.length === 0) {
-        throw httpError(403, 'You are not an active student of any centre.');
+        throw httpError(403, 'You are not an active student of any facility.');
       }
       const cloud = String(process.env.CLOUDINARY_CLOUD_NAME || '');
       const preset = String(process.env.CLOUDINARY_UPLOAD_PRESET || '');
@@ -728,7 +728,7 @@ export function registerStudentMockRoutes(app: express.Express): void {
       // it. The paper never rides in this response; answers never leave
       // mockKeys.
       const paperSnap = await adminDb.collection(MOCK_PAPERS).doc(mockId).get();
-      if (!paperSnap.exists) throw httpError(500, 'The frozen paper is missing. Contact your centre.');
+      if (!paperSnap.exists) throw httpError(500, 'The frozen paper is missing. Contact your facility.');
       const paper = paperSnap.data() as any;
       const link = mintPaperLink(mockId, ctx.caller.uid);
 
@@ -783,7 +783,7 @@ export function registerStudentMockRoutes(app: express.Express): void {
         throw httpError(409, 'This attempt is finished. Results arrive at 6:00 am.');
       }
       const paperSnap = await adminDb.collection(MOCK_PAPERS).doc(parsed.mockId).get();
-      if (!paperSnap.exists) throw httpError(500, 'The frozen paper is missing. Contact your centre.');
+      if (!paperSnap.exists) throw httpError(500, 'The frozen paper is missing. Contact your facility.');
       const paper = paperSnap.data() as any;
       res.set('Cache-Control', 'no-store');
       res.json({
@@ -883,7 +883,7 @@ export function registerStudentMockRoutes(app: express.Express): void {
       const nowMs = Date.now();
 
       const keySnap = await adminDb.collection(MOCK_KEYS).doc(mockId).get();
-      if (!keySnap.exists) throw httpError(500, 'The marking key is missing. Contact your centre.');
+      if (!keySnap.exists) throw httpError(500, 'The marking key is missing. Contact your facility.');
       const keyItems = ((keySnap.data() as any)?.items || []) as KeyItem[];
 
       const receipt = await adminDb.runTransaction(async (tx) => {

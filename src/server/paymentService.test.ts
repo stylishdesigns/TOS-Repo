@@ -217,7 +217,7 @@ const test = async (name: string, fn: () => Promise<void>) => {
     assert.equal(db.get('payments', r.payment.id)!.status, 'Rejected');
   });
 
-  await test('an admin from another centre cannot confirm or reject (and nothing changes)', async () => {
+  await test('an admin from another facility cannot confirm or reject (and nothing changes)', async () => {
     const db = fresh();
     const r: any = await claim(db, await as(db, user('u-stu1')), 'stu-1', 40000);
     const other = await as(db, user('u-adm2'));
@@ -227,7 +227,7 @@ const test = async (name: string, fn: () => Promise<void>) => {
     assert.equal(db.get('payments', r.payment.id)!.status, 'Pending');
   });
 
-  await test('an admin with no centre assigned is refused (fails closed)', async () => {
+  await test('an admin with no facility assigned is refused (fails closed)', async () => {
     const db = fresh();
     const r: any = await claim(db, await as(db, user('u-stu1')), 'stu-1', 40000);
     const bad = await as(db, user('u-admNoCentre'));
@@ -235,7 +235,7 @@ const test = async (name: string, fn: () => Promise<void>) => {
     await rejectsWith(claim(db, bad, 'stu-1', 100), 403);
   });
 
-  await test('platform staff (tos) without a centre can act on any centre', async () => {
+  await test('platform staff (tos) without a facility can act on any facility', async () => {
     const db = fresh();
     const r: any = await claim(db, await as(db, user('u-stub')), 'stu-b', 25000);
     const out: any = await decide(db, await as(db, user('u-platform', true)), r.payment.id, 'confirm');
@@ -253,7 +253,7 @@ const test = async (name: string, fn: () => Promise<void>) => {
     await rejectsWith(decide(db, adm, r.payment.id, 'confirm'), 403);
   });
 
-  await test('admin direct record applies immediately, same-centre only, no overpayment', async () => {
+  await test('admin direct record applies immediately, same-facility only, no overpayment', async () => {
     const db = fresh();
     const adm = await as(db, user('u-adm1'));
     const r: any = await claim(db, adm, 'stu-1', 30000);

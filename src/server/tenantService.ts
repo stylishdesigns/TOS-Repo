@@ -376,7 +376,7 @@ export async function requireMembership(
     // TOS staff act platform-wide; still require the centre to exist.
     try {
       const cDoc = await adminDb.collection('centres').doc(centreId).get();
-      if (!cDoc.exists) throw httpError(404, 'Centre not found.');
+      if (!cDoc.exists) throw httpError(404, 'Facility not found.');
     } catch (err: any) {
       if (err?.status) throw err;
       dbFailure('requireMembership(tos)', err);
@@ -394,7 +394,7 @@ export async function requireMembership(
 
   const m = await getMembership(caller.uid, centreId, caller.email);
   if (!m || m.status !== 'active') {
-    throw httpError(403, 'You do not have access to this centre.');
+    throw httpError(403, 'You do not have access to this facility.');
   }
   if (roles && !roles.includes(m.role)) {
     throw httpError(403, 'You do not have permission for this action.');
@@ -537,7 +537,7 @@ export async function enterCentreService(params: {
         if (holder) centreId = fallbackCentreId;
       }
     } catch (err) {
-      dbFailure('enterCentreService(centre-doc fallback)', err);
+      dbFailure('enterCentreService(facility-doc fallback)', err);
     }
   }
 
@@ -588,7 +588,7 @@ export async function enterCentreService(params: {
     } catch { /* audit is best-effort */ }
     const blocked = httpError(
       403,
-      'You cannot access this centre at the moment. Please contact your centre admin for help getting back in.'
+      'You cannot access this facility at the moment. Please contact your facility admin for help getting back in.'
     );
     (blocked as any).whatsapp = await getCentreWhatsApp(centreId);
     throw blocked;
@@ -601,7 +601,7 @@ export async function enterCentreService(params: {
   if (status === 'suspended' && membership.role !== 'owner') {
     throw httpError(
       403,
-      `This centre's access is currently inactive. Please contact the centre administration.`
+      `This facility's access is currently inactive. Please contact the facility administration.`
     );
   }
 
@@ -630,7 +630,7 @@ export async function validateActiveCentreService(params: {
   const caller: Caller = { uid, email: userEmail, tos: Boolean(params.tos), claims: {} };
 
   const centre = await getCentreDoc(centreId);
-  if (!centre) throw httpError(404, 'Active centre not found.');
+  if (!centre) throw httpError(404, 'Active facility not found.');
 
   // No platform-staff shortcut (Prompt E): a `tos` claim alone is not a
   // membership. The session's active centre must belong to the caller.
@@ -638,7 +638,7 @@ export async function validateActiveCentreService(params: {
   if (!membership || membership.status !== 'active') {
     const blocked = httpError(
       403,
-      'You cannot access this centre at the moment. Please contact your centre admin for help getting back in.'
+      'You cannot access this facility at the moment. Please contact your facility admin for help getting back in.'
     );
     (blocked as any).whatsapp = await getCentreWhatsApp(centreId);
     throw blocked;
@@ -650,7 +650,7 @@ export async function validateActiveCentreService(params: {
   if (status === 'suspended' && membership.role !== 'owner') {
     throw httpError(
       403,
-      `This centre's access is currently inactive. Please contact the centre administration.`
+      `This facility's access is currently inactive. Please contact the facility administration.`
     );
   }
 
@@ -693,7 +693,7 @@ export async function listUserCentresService(params: {
         results.push({
           centreId: docSnap.id,
           role: 'owner',
-          centreName: c.name || 'Centre',
+          centreName: c.name || 'Facility',
           logo: c.branding?.logo || '',
         });
       });
@@ -713,7 +713,7 @@ export async function listUserCentresService(params: {
       results.push({
         centreId: m.centreId,
         role: m.role,
-        centreName: centre?.name || 'Centre',
+        centreName: centre?.name || 'Facility',
         logo: centre?.branding?.logo || '',
       });
     }
@@ -740,7 +740,7 @@ export async function listUserCentresService(params: {
         const centre = await getCentreDoc(m.centreId);
         blocked.push({
           centreId: m.centreId,
-          centreName: centre?.name || 'Centre',
+          centreName: centre?.name || 'Facility',
           whatsapp: await getCentreWhatsApp(m.centreId),
         });
       }
@@ -806,11 +806,11 @@ export async function joinCentreService(params: {
   const status = effectiveStatus(centre, billing, config);
 
   if (status === 'suspended' || status === 'pending_payment') {
-    throw httpError(403, `This centre (${centre.name}) is currently not accepting new students.`);
+    throw httpError(403, `This facility (${centre.name}) is currently not accepting new students.`);
   }
   if (status === 'overdue' && !params.tos) {
     // Overdue centres are owner/TOS territory until payment is recorded.
-    throw httpError(403, `This centre (${centre.name}) is currently not accepting new students.`);
+    throw httpError(403, `This facility (${centre.name}) is currently not accepting new students.`);
   }
 
   // 3. Seat cap check and membership write inside one transaction.
@@ -843,7 +843,7 @@ export async function joinCentreService(params: {
       const freshBilling = billingDoc.exists ? (billingDoc.data() as CentreBilling) : billing;
       const freshStatus = effectiveStatus(freshCentre, freshBilling, config);
       if (freshStatus === 'suspended' || freshStatus === 'pending_payment') {
-        throw httpError(403, `This centre (${freshCentre.name}) is currently not accepting new students.`);
+        throw httpError(403, `This facility (${freshCentre.name}) is currently not accepting new students.`);
       }
 
       const freshPlan = freshBilling ? plan : null;
@@ -853,7 +853,7 @@ export async function joinCentreService(params: {
       if (autoApprove && used >= cap) {
         const err = httpError(
           409,
-          `This centre has reached its student limit. Please contact ${freshCentre.name}.`
+          `This facility has reached its student limit. Please contact ${freshCentre.name}.`
         );
         (err as any).code = 'CENTRE_FULL';
         (err as any).centreName = freshCentre.name;
@@ -927,7 +927,7 @@ async function activateStudentTransactional(params: {
     const freshBilling = billingDoc.exists ? (billingDoc.data() as CentreBilling) : billing;
     const status = effectiveStatus(freshCentre, freshBilling, config);
     if (status === 'suspended') {
-      throw httpError(403, 'This centre is currently suspended. Reactivate it before managing seats.');
+      throw httpError(403, 'This facility is currently suspended. Reactivate it before managing seats.');
     }
 
     const current = memDoc.data() as CentreMembership & {
@@ -1159,7 +1159,7 @@ export async function getSeatsSummaryService(centreId: string): Promise<CentreSe
 /** Subscription status for one centre, for use by route middleware. */
 export async function getCentreSubscriptionStatus(centreId: string): Promise<EffectiveStatus> {
   const centre = await getCentreDoc(centreId);
-  if (!centre) throw httpError(404, 'Centre not found.');
+  if (!centre) throw httpError(404, 'Facility not found.');
   const billing = await getBillingDoc(centreId);
   const config = await getPlatformConfig();
   return effectiveStatus(centre, billing, config);

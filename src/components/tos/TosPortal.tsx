@@ -79,7 +79,7 @@ const OverviewTab: React.FC<{ onOpenCentre: (id: string) => void; refreshKey: nu
     setSweepResult('');
     try {
       const r = await api('/api/tos/billing-sweep', { method: 'POST' });
-      setSweepResult(`Checked ${r.scanned} centre${r.scanned === 1 ? '' : 's'}; suspended ${r.suspended.length}.`);
+      setSweepResult(`Checked ${r.scanned} facility${r.scanned === 1 ? '' : 's'}; suspended ${r.suspended.length}.`);
       await load();
     } catch (e: any) {
       setSweepResult(e.message);
@@ -89,14 +89,14 @@ const OverviewTab: React.FC<{ onOpenCentre: (id: string) => void; refreshKey: nu
   };
 
   if (error) return <p className="text-rose-300 text-sm">{error}</p>;
-  if (!data) return <div className="flex items-center gap-2 text-slate-400 text-sm py-10 justify-center"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</div>;
+  if (!data) return <div className="flex items-facility gap-2 text-slate-400 text-sm py-10 justify-facility"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</div>;
 
   const c = data.centres || {};
   const leads = data.leads || {};
   return (
     <div className="space-y-5">
       {noMockToday === true && (
-        <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 flex flex-wrap items-center gap-3">
+        <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 flex flex-wrap items-facility gap-3">
           <AlertTriangle className="w-4 h-4 text-amber-300 shrink-0" />
           <p className="text-xs text-amber-100 flex-1 min-w-[200px]">No mock scheduled for today. Students will see &quot;no mock today&quot;.</p>
           <button onClick={() => window.dispatchEvent(new CustomEvent('tos-open-mocks-new'))}
@@ -110,7 +110,7 @@ const OverviewTab: React.FC<{ onOpenCentre: (id: string) => void; refreshKey: nu
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="bg-slate-900/70 border border-white/10 rounded-2xl p-4">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Centres</p>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Facilities</p>
           <p className="text-2xl font-black text-white mt-1">{c.total ?? 0}</p>
           <p className="text-[11px] text-slate-400 mt-1">{c.active || 0} active · {c.trial || 0} trial</p>
         </div>
@@ -135,9 +135,9 @@ const OverviewTab: React.FC<{ onOpenCentre: (id: string) => void; refreshKey: nu
         <Card title="Trials ending within 7 days">
           <div className="space-y-2">
             {data.trialsEndingSoon.map((t: any) => (
-              <button key={t.centreId} onClick={() => onOpenCentre(t.centreId)} className="w-full flex items-center justify-between bg-slate-950/50 border border-white/5 rounded-xl px-4 py-2.5 hover:border-orange-500/40 transition-colors text-left">
+              <button key={t.centreId} onClick={() => onOpenCentre(t.centreId)} className="w-full flex items-facility justify-between bg-slate-950/50 border border-white/5 rounded-xl px-4 py-2.5 hover:border-orange-500/40 transition-colors text-left">
                 <span className="text-sm text-white font-semibold">{t.name}</span>
-                <span className="text-xs text-amber-300 flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" /> ends {fmtDate(t.endsAt)}</span>
+                <span className="text-xs text-amber-300 flex items-facility gap-1.5"><Clock className="w-3.5 h-3.5" /> ends {fmtDate(t.endsAt)}</span>
               </button>
             ))}
           </div>
@@ -145,12 +145,12 @@ const OverviewTab: React.FC<{ onOpenCentre: (id: string) => void; refreshKey: nu
       )}
 
       <Card title="Platform maintenance">
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-facility gap-3">
           <button onClick={runSweep} disabled={sweeping} className={btnGhost}>
             {sweeping ? <Loader2 className="w-4 h-4 animate-spin" /> : <PlayCircle className="w-4 h-4 text-orange-400" />}
             Run billing sweep
           </button>
-          <p className="text-xs text-slate-500">Suspends centres whose trial or paid period ended plus the grace days. Every suspension is audited. Also runs on the nightly schedule when one is set up.</p>
+          <p className="text-xs text-slate-500">Suspends facilities whose trial or paid period ended plus the grace days. Every suspension is audited. Also runs on the nightly schedule when one is set up.</p>
         </div>
         {sweepResult && <p className="text-xs text-emerald-300 mt-3">{sweepResult}</p>}
       </Card>
@@ -158,7 +158,7 @@ const OverviewTab: React.FC<{ onOpenCentre: (id: string) => void; refreshKey: nu
       <Card title="Recent platform activity">
         <div className="space-y-2">
           {(data.recentAudit || []).map((e: any) => (
-            <div key={e.id} className="flex items-center justify-between bg-slate-950/50 border border-white/5 rounded-xl px-4 py-2.5 text-xs">
+            <div key={e.id} className="flex items-facility justify-between bg-slate-950/50 border border-white/5 rounded-xl px-4 py-2.5 text-xs">
               <span className="font-bold text-white">{String(e.action || '').replace(/_/g, ' ')}</span>
               <span className="text-slate-500">{fmtDateTime(e.at)}</span>
             </div>
@@ -225,7 +225,7 @@ const LeadsTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-facility gap-3">
         <select value={filter} onChange={(e) => setFilter(e.target.value)} className={`${inputCls} max-w-56`}>
           <option value="">All leads</option>
           {Object.entries(LEAD_STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
@@ -234,7 +234,7 @@ const LeadsTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
       </div>
       {error && <p className="text-rose-300 text-sm">{error}</p>}
       {loading && shown.length === 0 ? (
-        <div className="flex items-center gap-2 text-slate-400 text-sm py-10 justify-center"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</div>
+        <div className="flex items-facility gap-2 text-slate-400 text-sm py-10 justify-facility"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</div>
       ) : shown.length === 0 ? (
         <Card><p className="text-slate-400 text-sm">No leads here yet. Sign-ups from the public site land in this list.</p></Card>
       ) : (
@@ -243,7 +243,7 @@ const LeadsTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
             <div key={l.id} className="bg-slate-900/70 border border-white/10 rounded-2xl p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2.5 flex-wrap">
+                  <div className="flex items-facility gap-2.5 flex-wrap">
                     <p className="text-white font-bold">{l.businessName}</p>
                     <StatusPill status={l.status} labels={LEAD_STATUS_LABELS} styles={{ verified: STATUS_STYLES.trial }} />
                   </div>
@@ -252,7 +252,7 @@ const LeadsTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
                     {l.studentCount} students · {l.city}, {l.state} · {(l.examTypes || []).join(', ')} · {l.skipTrial ? 'skipping trial' : 'wants the trial'} · {fmtDate(l.createdAt)}
                   </p>
                 </div>
-                <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-facility gap-2 flex-wrap">
                   {l.status === 'unverified' && (
                     <button onClick={() => act(l, 'resend-verification')} disabled={busyId === l.id} className={btnGhost}>
                       {busyId === l.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} Resend link
@@ -270,7 +270,7 @@ const LeadsTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
                   )}
                   {l.status === 'provisioned' && l.centreId && (
                     <a href={`#/tos`} onClick={() => window.dispatchEvent(new CustomEvent('tos-open-centre', { detail: l.centreId }))} className={btnGhost}>
-                      <ArrowUpRight className="w-4 h-4" /> Open centre
+                      <ArrowUpRight className="w-4 h-4" /> Open facility
                     </a>
                   )}
                 </div>
@@ -289,7 +289,7 @@ const LeadsTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
       )}
 
       {rejecting && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setRejecting(null)}>
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-facility justify-facility p-4" onClick={() => setRejecting(null)}>
           <div className="bg-slate-900 border border-white/10 rounded-3xl p-6 max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-white font-bold mb-2">Reject {rejecting.businessName}?</h3>
             <Field label="Reason (kept in the audit log)">
@@ -300,7 +300,7 @@ const LeadsTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
               <button
                 onClick={async () => { await act(rejecting, 'reject', { reason: rejectReason }); setRejecting(null); }}
                 disabled={!rejectReason.trim()}
-                className="flex-1 inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white font-bold text-sm"
+                className="flex-1 inline-flex items-facility justify-facility px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white font-bold text-sm"
               >
                 Reject lead
               </button>
@@ -359,7 +359,7 @@ const PlansTab: React.FC = () => {
   const setPlan = (id: string, key: string, value: any) =>
     setPlans((ps) => ps.map((p) => (p.id === id ? { ...p, [key]: value } : p)));
 
-  if (loading && plans.length === 0) return <div className="flex items-center gap-2 text-slate-400 text-sm py-10 justify-center"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</div>;
+  if (loading && plans.length === 0) return <div className="flex items-facility gap-2 text-slate-400 text-sm py-10 justify-facility"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</div>;
 
   const configFields: [string, string][] = [
     ['trialDays', 'Trial length (days)'],
@@ -389,7 +389,7 @@ const PlansTab: React.FC = () => {
           </div>
           <div className="flex flex-wrap gap-4 mt-4">
             {[['studentChat', 'Student chat'], ['whatsappNotifications', 'WhatsApp parent notices'], ['aiQuestionGen', 'AI question generation'], ['aiPerformanceAnalysis', 'AI performance analysis']].map(([key, label]) => (
-              <label key={key} className="flex items-center gap-2 text-xs text-slate-300">
+              <label key={key} className="flex items-facility gap-2 text-xs text-slate-300">
                 <input type="checkbox" checked={p[key] === true} onChange={(e) => setPlan(p.id, key, e.target.checked)} className="accent-orange-500 w-4 h-4" />
                 {label}
               </label>
@@ -408,7 +408,7 @@ const PlansTab: React.FC = () => {
         </div>
       </Card>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-facility gap-3">
         <button onClick={save} disabled={saving} className={btnPrimary}>
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} Save plans and settings
         </button>
@@ -447,7 +447,7 @@ const AuditTab: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-facility gap-3">
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -459,14 +459,14 @@ const AuditTab: React.FC = () => {
       </div>
       {error && <p className="text-rose-300 text-sm">{error}</p>}
       {loading ? (
-        <div className="flex items-center gap-2 text-slate-400 text-sm py-10 justify-center"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</div>
+        <div className="flex items-facility gap-2 text-slate-400 text-sm py-10 justify-facility"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</div>
       ) : entries.length === 0 ? (
         <Card><p className="text-slate-400 text-sm">Nothing matches that search.</p></Card>
       ) : (
         <div className="space-y-1.5">
           {entries.map((e) => (
             <div key={e.id} className="bg-slate-900/70 border border-white/10 rounded-xl px-4 py-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-facility justify-between gap-2">
                 <span className="text-xs font-bold text-white">{String(e.action || '').replace(/_/g, ' ')}</span>
                 <span className="text-[11px] text-slate-500">{fmtDateTime(e.at)} · {e.actorUid || '—'}{e.centreId ? ` · ${e.centreId}` : ''}</span>
               </div>
@@ -559,7 +559,7 @@ const TeamTab: React.FC = () => {
       <Card title="Add a platform teammate">
         {created ? (
           <div className="space-y-3">
-            <div className="flex items-center gap-2 text-emerald-300">
+            <div className="flex items-facility gap-2 text-emerald-300">
               <CheckCircle2 className="w-4 h-4" />
               <p className="font-bold">
                 {created.createdAuthUser ? `${created.email} is on the team.` : `${created.email} already had an account and now has platform access.`}
@@ -569,13 +569,13 @@ const TeamTab: React.FC = () => {
               <>
                 <p className="text-xs text-slate-400">Hand these over. They show this once only and are never stored anywhere. They will be asked to change this password at first sign-in.</p>
                 <div className="bg-slate-950/60 border border-white/10 rounded-2xl p-4 space-y-2.5 text-sm">
-                  <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-facility justify-between gap-3">
                     <span className="text-slate-400 text-xs">Login email</span>
                     <span className="text-white font-bold truncate">{created.email}</span>
                   </div>
-                  <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-facility justify-between gap-3">
                     <span className="text-slate-400 text-xs">Temporary password</span>
-                    <span className="flex items-center gap-2">
+                    <span className="flex items-facility gap-2">
                       <span className="text-white font-mono font-bold">{created.tempPassword}</span>
                       <button onClick={copyPassword} className="text-orange-300 hover:text-orange-200" title="Copy password">
                         {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
@@ -616,7 +616,7 @@ const TeamTab: React.FC = () => {
               </button>
               <button onClick={() => set('tempPassword', '')} className={btnGhost}>Clear</button>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-facility gap-3">
               <button onClick={add} disabled={busy || !canAdd} className={btnPrimary}>
                 {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Add teammate
               </button>
@@ -632,11 +632,11 @@ const TeamTab: React.FC = () => {
 
       <Card title={`Platform staff (${staff.length})`}>
         {loading ? (
-          <div className="flex items-center gap-2 text-slate-400 text-sm py-6 justify-center"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</div>
+          <div className="flex items-facility gap-2 text-slate-400 text-sm py-6 justify-facility"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</div>
         ) : (
           <div className="space-y-1.5">
             {staff.map((s) => (
-              <div key={s.uid} className="flex items-center justify-between bg-slate-950/50 border border-white/5 rounded-xl px-4 py-2.5">
+              <div key={s.uid} className="flex items-facility justify-between bg-slate-950/50 border border-white/5 rounded-xl px-4 py-2.5">
                 <span className="text-sm text-white font-semibold">{s.email}</span>
                 <span className="text-[11px] font-bold uppercase tracking-wider text-orange-300">{s.role}</span>
               </div>
@@ -719,11 +719,11 @@ const AccountTab: React.FC = () => {
     <div className="space-y-4 max-w-xl">
       {error && <p className="text-rose-300 text-sm">{error}</p>}
       <Card title="Profile">
-        <div className="flex items-center gap-4">
+        <div className="flex items-facility gap-4">
           {me?.photoUrl ? (
             <img src={me.photoUrl} alt="Profile picture" className="w-16 h-16 rounded-2xl object-cover border border-white/10" />
           ) : (
-            <div className="w-16 h-16 rounded-2xl bg-orange-500/15 border border-orange-500/30 flex items-center justify-center text-orange-300 font-black text-xl">
+            <div className="w-16 h-16 rounded-2xl bg-orange-500/15 border border-orange-500/30 flex items-facility justify-facility text-orange-300 font-black text-xl">
               {(me?.displayName || me?.email || '?').trim().charAt(0).toUpperCase()}
             </div>
           )}
@@ -742,8 +742,8 @@ const AccountTab: React.FC = () => {
         <Field label="Display name">
           <input value={name} onChange={(e) => setName(e.target.value)} className={inputCls} maxLength={60} />
         </Field>
-        <div className="flex items-center gap-3 mt-3">
-          <button onClick={saveName} disabled={nameBusy || name.trim().length < 2} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white text-sm font-bold">
+        <div className="flex items-facility gap-3 mt-3">
+          <button onClick={saveName} disabled={nameBusy || name.trim().length < 2} className="inline-flex items-facility gap-2 px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white text-sm font-bold">
             {nameBusy && <Loader2 className="w-4 h-4 animate-spin" />} Save name
           </button>
           {nameDone && <p className="text-emerald-300 text-xs">{nameDone}</p>}
@@ -759,8 +759,8 @@ const AccountTab: React.FC = () => {
             <Field label="New password"><input type="password" value={pwd.next} onChange={(e) => setPwd({ ...pwd, next: e.target.value })} className={inputCls} autoComplete="new-password" /></Field>
             <Field label="Repeat new password"><input type="password" value={pwd.confirm} onChange={(e) => setPwd({ ...pwd, confirm: e.target.value })} className={inputCls} autoComplete="new-password" /></Field>
             <p className="text-[11px] text-slate-500">You will be asked for the current password again before it changes.</p>
-            <div className="flex items-center gap-3">
-              <button onClick={changePassword} disabled={pwdBusy || !pwd.current || !pwd.next || !pwd.confirm} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white text-sm font-bold">
+            <div className="flex items-facility gap-3">
+              <button onClick={changePassword} disabled={pwdBusy || !pwd.current || !pwd.next || !pwd.confirm} className="inline-flex items-facility gap-2 px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white text-sm font-bold">
                 {pwdBusy && <Loader2 className="w-4 h-4 animate-spin" />} Change password
               </button>
               {pwdDone && <p className="text-emerald-300 text-xs">{pwdDone}</p>}
@@ -786,7 +786,7 @@ const GROUPS = ['Business', 'Content', 'System'] as const;
 const TABS = [
   { id: 'overview', label: 'Overview', mlabel: 'Home', icon: LayoutDashboard, group: 'Business' },
   { id: 'leads', label: 'Leads', mlabel: 'Leads', icon: UserPlus, group: 'Business' },
-  { id: 'centres', label: 'Centres', mlabel: 'Centres', icon: Building2, group: 'Business' },
+  { id: 'centres', label: 'Facilities', mlabel: 'Facilities', icon: Building2, group: 'Business' },
   { id: 'plans', label: 'Plans', mlabel: 'Plans', icon: Wallet, group: 'Business' },
   { id: 'questions', label: 'Question Bank', mlabel: 'Bank', icon: BookOpen, group: 'Content' },
   { id: 'mocks', label: 'Mocks', mlabel: 'Mocks', icon: CalendarDays, group: 'Content' },
@@ -837,14 +837,14 @@ const QbGuidePanel: React.FC<{ open: boolean; onClose: () => void }> = ({ open, 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950 lg:bg-slate-950/80 lg:flex lg:justify-end" onClick={onClose}>
       <div className="w-full lg:max-w-[480px] h-full bg-slate-950 border-l border-slate-800 overflow-y-auto p-5 lg:p-6 space-y-5" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between">
+        <div className="flex items-facility justify-between">
           <p className="text-lg font-black text-white">How this works</p>
           <button onClick={onClose} aria-label="Close the guide" className="p-2 rounded-lg text-slate-400 hover:text-white min-h-[44px] min-w-[44px]"><X className="w-5 h-5" /></button>
         </div>
 
         <div>
           <p className="text-sm font-bold text-orange-300 mb-2">The shelf, top to bottom</p>
-          <div className="flex flex-wrap items-center gap-1.5">
+          <div className="flex flex-wrap items-facility gap-1.5">
             {['Stream', 'Exam', 'Subject', 'Topic', 'Year', 'Question'].map((step, i) => (
               <React.Fragment key={step}>
                 {i > 0 && <ChevronRight className="w-3.5 h-3.5 text-slate-600 shrink-0" />}
@@ -857,7 +857,7 @@ const QbGuidePanel: React.FC<{ open: boolean; onClose: () => void }> = ({ open, 
 
         <div>
           <p className="text-sm font-bold text-orange-300 mb-1">Practice and Mock are two separate banks</p>
-          <p className="text-sm text-slate-300">Practice feeds student practice across every centre. Mock feeds the daily mock exam. Each keeps its own questions, its own counts and its own published file, so switching the stream at the top switches every tab below it.</p>
+          <p className="text-sm text-slate-300">Practice feeds student practice across every facility. Mock feeds the daily mock exam. Each keeps its own questions, its own counts and its own published file, so switching the stream at the top switches every tab below it.</p>
         </div>
 
         <div>
@@ -960,8 +960,8 @@ const QuestionBankShell: React.FC<{ refreshKey: number; onNewMock?: () => void }
   return (
     <div className={`space-y-4 ${isMock ? 'bank-scope-mock' : 'bank-scope-practice'}`}>
       {/* The banner always says which bank this is (design screens 2-7). */}
-      <div className={`rounded-2xl border px-4 py-3.5 flex flex-wrap items-center gap-x-4 gap-y-2 ${isMock ? 'border-amber-400/50 bg-amber-400/10' : 'border-sky-400/50 bg-sky-400/10'}`}>
-        <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-[10px] sm:text-[11px] font-black tracking-wide ${isMock ? 'bg-amber-400 text-slate-950' : 'bg-sky-400 text-slate-950'}`}>
+      <div className={`rounded-2xl border px-4 py-3.5 flex flex-wrap items-facility gap-x-4 gap-y-2 ${isMock ? 'border-amber-400/50 bg-amber-400/10' : 'border-sky-400/50 bg-sky-400/10'}`}>
+        <span className={`inline-flex items-facility px-3 py-1.5 rounded-full text-[10px] sm:text-[11px] font-black tracking-wide ${isMock ? 'bg-amber-400 text-slate-950' : 'bg-sky-400 text-slate-950'}`}>
           YOU ARE IN THE {isMock ? 'MOCK' : 'PRACTICE'} BANK
         </span>
         <p className="text-xs text-slate-300 flex-1 min-w-[220px] leading-relaxed">
@@ -970,13 +970,13 @@ const QuestionBankShell: React.FC<{ refreshKey: number; onNewMock?: () => void }
             : `Students practise from this bank${liveVersion ? `: live version ${liveVersion}` : ''}.`}
         </p>
         <button onClick={() => setMode('hub')}
-          className="text-xs font-bold text-slate-300 hover:text-white inline-flex items-center gap-0.5 min-h-[44px]">
+          className="text-xs font-bold text-slate-300 hover:text-white inline-flex items-facility gap-0.5 min-h-[44px]">
           Switch bank <ChevronRight className="w-4 h-4" />
         </button>
       </div>
 
       <div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-facility gap-2">
           <h2 className="text-lg font-black text-white mr-auto">{isMock ? 'Mock Bank' : 'Practice Bank'}</h2>
           <button onClick={refresh} aria-label="Refresh this bank" title="Refresh"
             className="p-2.5 rounded-xl border border-slate-700/60 text-slate-300 hover:text-white min-h-[44px] min-w-[44px]">
@@ -990,12 +990,12 @@ const QuestionBankShell: React.FC<{ refreshKey: number; onNewMock?: () => void }
         <div className="flex gap-1.5 overflow-x-auto pb-0.5 mt-2">
           {subs.map((t) => (
             <button key={t.id} onClick={() => setSub(t.id)}
-              className={`min-h-[44px] px-5 py-2 rounded-xl text-sm font-bold border transition-all whitespace-nowrap inline-flex items-center gap-2 ${sub === t.id
+              className={`min-h-[44px] px-5 py-2 rounded-xl text-sm font-bold border transition-all whitespace-nowrap inline-flex items-facility gap-2 ${sub === t.id
                 ? (isMock ? 'bg-orange-500/15 text-orange-300 border-orange-500/30' : 'bg-orange-500/15 text-orange-300 border-orange-500/30')
                 : 'text-slate-400 border-white/10 hover:text-white'}`}>
               {t.label}
               {t.id === 'publish' && badge > 0 && (
-                <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded-full text-[10px] font-black ${isMock ? 'bg-amber-400 text-slate-950' : 'bg-orange-500 text-white'}`}>{badge}</span>
+                <span className={`inline-flex items-facility justify-facility px-2 py-0.5 rounded-full text-[10px] font-black ${isMock ? 'bg-amber-400 text-slate-950' : 'bg-orange-500 text-white'}`}>{badge}</span>
               )}
             </button>
           ))}
@@ -1046,8 +1046,8 @@ export const TosPortal: React.FC = () => {
     <div className="min-h-screen w-full bg-slate-950 flex">
       {/* Sidebar */}
       <aside className="hidden md:flex flex-col w-60 shrink-0 border-r border-white/5 bg-slate-950 p-5 sticky top-0 h-screen overflow-hidden">
-        <div className="flex items-center gap-2.5 mb-8">
-          <div className="w-9 h-9 rounded-xl bg-orange-500/15 border border-orange-500/30 flex items-center justify-center">
+        <div className="flex items-facility gap-2.5 mb-8">
+          <div className="w-9 h-9 rounded-xl bg-orange-500/15 border border-orange-500/30 flex items-facility justify-facility">
             <ShieldCheck className="w-5 h-5 text-orange-400" />
           </div>
           <div>
@@ -1064,7 +1064,7 @@ export const TosPortal: React.FC = () => {
                   <button
                     key={t.id}
                     onClick={() => { setTab(t.id); }}
-                    className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-colors ${tab === t.id ? 'bg-orange-500/15 text-orange-300 border border-orange-500/30' : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent'}`}
+                    className={`w-full flex items-facility gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-colors ${tab === t.id ? 'bg-orange-500/15 text-orange-300 border border-orange-500/30' : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent'}`}
                   >
                     <t.icon className="w-4 h-4" /> {t.label}
                   </button>
@@ -1079,7 +1079,7 @@ export const TosPortal: React.FC = () => {
       {tab !== 'channel' && (
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 backdrop-blur border-t border-white/10 flex overflow-x-auto">
         {TABS.map((t) => (
-          <button key={t.id} onClick={() => setTab(t.id)} className={`flex-1 min-w-[64px] min-h-[44px] flex flex-col items-center justify-center gap-1 py-2 text-[10px] font-bold ${tab === t.id ? 'text-orange-300' : 'text-slate-500'}`}>
+          <button key={t.id} onClick={() => setTab(t.id)} className={`flex-1 min-w-[64px] min-h-[44px] flex flex-col items-facility justify-facility gap-1 py-2 text-[10px] font-bold ${tab === t.id ? 'text-orange-300' : 'text-slate-500'}`}>
             <t.icon className="w-4 h-4" /> {t.mlabel}
           </button>
         ))}
@@ -1093,12 +1093,12 @@ export const TosPortal: React.FC = () => {
           <p className="text-slate-400 text-xs mt-1">
             {tab === 'overview' && 'Everything happening across the platform right now.'}
             {tab === 'leads' && 'Sign-ups from the public site. Verify, provision, or decline.'}
-            {tab === 'centres' && 'Every centre, its plan, seats, billing and access code.'}
+            {tab === 'centres' && 'Every facility, its plan, seats, billing and access code.'}
             {tab === 'plans' && 'Pricing, caps and feature flags. All stored as data.'}
             {tab === 'questions' && 'Two separate banks: Practice and Mock. Pick one on the hub to work in.'}
-            {tab === 'mocks' && "One mock a day for every centre's students. Create, freeze and manage them from here."}
+            {tab === 'mocks' && "One mock a day for every facility's students. Create, freeze and manage them from here."}
             {tab === 'chat' && 'The platform channel, chat settings and escalated reports.'}
-            {tab === 'website' && 'Each centre\'s public landing page: template, content and publish.'}
+            {tab === 'website' && 'Each facility\'s public landing page: template, content and publish.'}
             {tab === 'audit' && 'Every privileged action, recorded.'}
             {tab === 'team' && 'The people who run the platform.'}
             {tab === 'account' && 'Your platform profile, password and sign-out.'}

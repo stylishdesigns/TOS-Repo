@@ -12,7 +12,7 @@ import { reconcileFirstTenant } from './firstTenant';
 export const STARTING_PLANS = [
   {
     id: 'centre_standard',
-    name: 'Centre Standard',
+    name: 'Facility Standard',
     price: 3000, // ₦ per student per month
     priceType: 'per_seat',
     seatCap: 100,
@@ -26,7 +26,7 @@ export const STARTING_PLANS = [
   },
   {
     id: 'centre_plus',
-    name: 'Centre Plus',
+    name: 'Facility Plus',
     price: 5000, // ₦ per student per month
     priceType: 'per_seat',
     seatCap: 100,

@@ -39,7 +39,7 @@ export const ChatModeToggle: React.FC<{
             role="tab"
             aria-selected={active}
             onClick={() => onChange(it.key)}
-            className={`relative z-10 flex-1 flex items-center justify-center gap-1.5 h-9 rounded-xl text-xs font-black transition-colors duration-200 cursor-pointer ${
+            className={`relative z-10 flex-1 flex items-facility justify-facility gap-1.5 h-9 rounded-xl text-xs font-black transition-colors duration-200 cursor-pointer ${
               active ? 'text-white' : 'text-slate-500 hover:text-slate-700'
             }`}
           >

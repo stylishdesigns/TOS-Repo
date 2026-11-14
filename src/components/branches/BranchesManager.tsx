@@ -91,7 +91,7 @@ export const BranchesManager: React.FC = () => {
   return (
     <div id="branches-campuses-page" className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
       {/* Header Row */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-facility justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Branches & Campuses</h2>
           <p className="text-xs text-slate-500 mt-1">
@@ -101,7 +101,7 @@ export const BranchesManager: React.FC = () => {
 
         <button
           onClick={() => setShowAddModal(true)}
-          className="px-4 py-2 text-xs font-semibold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg shadow-sm transition-all flex items-center space-x-1.5 self-start sm:self-auto"
+          className="px-4 py-2 text-xs font-semibold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg shadow-sm transition-all flex items-facility space-x-1.5 self-start sm:self-auto"
         >
           <Plus className="w-4 h-4" />
           <span>Add Branch Campus</span>
@@ -111,7 +111,7 @@ export const BranchesManager: React.FC = () => {
       {/* KPI Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-white p-5 rounded-xl border border-slate-200/90 shadow-xs">
-          <div className="flex items-center space-x-2 text-slate-600">
+          <div className="flex items-facility space-x-2 text-slate-600">
             <Building2 className="w-4 h-4 text-[#EA580C]" />
             <span className="text-xs font-semibold text-slate-600">Registered Campuses</span>
           </div>
@@ -121,7 +121,7 @@ export const BranchesManager: React.FC = () => {
         </div>
 
         <div className="bg-white p-5 rounded-xl border border-slate-200/90 shadow-xs">
-          <div className="flex items-center space-x-2 text-blue-600">
+          <div className="flex items-facility space-x-2 text-blue-600">
             <Users className="w-4 h-4 text-blue-600" />
             <span className="text-xs font-semibold text-blue-600">Network Student Capacity</span>
           </div>
@@ -131,7 +131,7 @@ export const BranchesManager: React.FC = () => {
         </div>
 
         <div className="bg-white p-5 rounded-xl border border-slate-200/90 shadow-xs">
-          <div className="flex items-center space-x-2 text-emerald-600">
+          <div className="flex items-facility space-x-2 text-emerald-600">
             <CheckCircle2 className="w-4 h-4 text-emerald-600" />
             <span className="text-xs font-semibold text-emerald-600">Active Operational Hubs</span>
           </div>
@@ -142,9 +142,9 @@ export const BranchesManager: React.FC = () => {
       </div>
 
       {/* Filter Row */}
-      <div className="bg-white p-3 md:p-4 rounded-xl border border-slate-200/90 shadow-xs flex flex-wrap items-center justify-between gap-3">
+      <div className="bg-white p-3 md:p-4 rounded-xl border border-slate-200/90 shadow-xs flex flex-wrap items-facility justify-between gap-3">
         {/* Left: Tab status filters */}
-        <div className="flex items-center space-x-1 bg-slate-50/80 p-1 rounded-lg border border-slate-200/60">
+        <div className="flex items-facility space-x-1 bg-slate-50/80 p-1 rounded-lg border border-slate-200/60">
           {(['All', 'Active', 'Pending'] as const).map((tab) => (
             <button
               key={tab}
@@ -164,7 +164,7 @@ export const BranchesManager: React.FC = () => {
         </div>
 
         {/* Middle & Right: State Filter + Search + Export CSV */}
-        <div className="flex items-center gap-2.5 flex-wrap w-full sm:w-auto">
+        <div className="flex items-facility gap-2.5 flex-wrap w-full sm:w-auto">
           <ModernSelect
             value={selectedState}
             onChange={(val) => {
@@ -181,7 +181,7 @@ export const BranchesManager: React.FC = () => {
             className="w-40"
           />
 
-          <div className="relative flex items-center bg-slate-50/60 border border-slate-200 rounded-lg px-2.5 py-1.5 flex-1 sm:w-56 focus-within:bg-white focus-within:border-orange-500 transition-all">
+          <div className="relative flex items-facility bg-slate-50/60 border border-slate-200 rounded-lg px-2.5 py-1.5 flex-1 sm:w-56 focus-within:bg-white focus-within:border-orange-500 transition-all">
             <Search className="w-3.5 h-3.5 text-slate-400 mr-2 shrink-0" />
             <input
               type="text"
@@ -224,8 +224,8 @@ export const BranchesManager: React.FC = () => {
                   >
                     {/* Campus Name & Code */}
                     <td className="py-3.5 px-5">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 rounded-lg bg-orange-100 text-[#EA580C] font-bold text-xs flex items-center justify-center shrink-0">
+                      <div className="flex items-facility space-x-3">
+                        <div className="w-8 h-8 rounded-lg bg-orange-100 text-[#EA580C] font-bold text-xs flex items-facility justify-facility shrink-0">
                           <Building2 className="w-4 h-4" />
                         </div>
                         <div>
@@ -239,7 +239,7 @@ export const BranchesManager: React.FC = () => {
 
                     {/* Location */}
                     <td className="py-3.5 px-5">
-                      <div className="flex items-center space-x-1.5 text-slate-700">
+                      <div className="flex items-facility space-x-1.5 text-slate-700">
                         <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                         <span>{br.city}, {br.state}</span>
                       </div>
@@ -248,7 +248,7 @@ export const BranchesManager: React.FC = () => {
                     {/* Capacity */}
                     <td className="py-3.5 px-5">
                       <div className="space-y-1">
-                        <div className="flex items-center justify-between text-[11px]">
+                        <div className="flex items-facility justify-between text-[11px]">
                           <span className="font-bold text-slate-800">
                             {branchStudents > 0 ? branchStudents : Math.floor(br.capacity * 0.7)} / {br.capacity}
                           </span>
@@ -277,7 +277,7 @@ export const BranchesManager: React.FC = () => {
 
                     {/* Status */}
                     <td className="py-3.5 px-5">
-                      <span className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      <span className="inline-flex items-facility space-x-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                         <span>Active</span>
                       </span>
@@ -290,16 +290,16 @@ export const BranchesManager: React.FC = () => {
         </div>
 
         {/* Pagination */}
-        <div className="p-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-500">
+        <div className="p-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-facility justify-between gap-3 text-xs text-slate-500">
           <div>
             Page {currentPage} of {totalPages} ({filteredBranches.length} total branches)
           </div>
 
-          <div className="flex items-center space-x-2">
+          <div className="flex items-facility space-x-2">
             <button
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               disabled={currentPage === 1}
-              className="w-7 h-7 rounded-md border border-slate-200 bg-white flex items-center justify-center hover:bg-slate-50 disabled:opacity-40 transition-colors"
+              className="w-7 h-7 rounded-md border border-slate-200 bg-white flex items-facility justify-facility hover:bg-slate-50 disabled:opacity-40 transition-colors"
             >
               <ChevronLeft className="w-3.5 h-3.5" />
             </button>
@@ -321,7 +321,7 @@ export const BranchesManager: React.FC = () => {
             <button
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
-              className="w-7 h-7 rounded-md border border-slate-200 bg-white flex items-center justify-center hover:bg-slate-50 disabled:opacity-40 transition-colors"
+              className="w-7 h-7 rounded-md border border-slate-200 bg-white flex items-facility justify-facility hover:bg-slate-50 disabled:opacity-40 transition-colors"
             >
               <ChevronRight className="w-3.5 h-3.5" />
             </button>
@@ -331,9 +331,9 @@ export const BranchesManager: React.FC = () => {
 
       {/* Modal: Add Branch */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-facility justify-facility p-4 backdrop-blur-xs">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div className="flex items-facility justify-between pb-3 border-b border-slate-100">
               <h3 className="font-bold text-base text-slate-900">Add New Branch Campus</h3>
               <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-700">
                 <X className="w-5 h-5" />
@@ -346,7 +346,7 @@ export const BranchesManager: React.FC = () => {
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Lekki Phase 1 Study Centre"
+                  placeholder="e.g. Lekki Phase 1 Study Facility"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-900 focus:bg-white focus:border-orange-500 outline-none"
@@ -414,7 +414,7 @@ export const BranchesManager: React.FC = () => {
                 </div>
               </div>
 
-              <div className="flex items-center justify-end space-x-2 pt-3 border-t border-slate-100">
+              <div className="flex items-facility justify-end space-x-2 pt-3 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
@@ -436,9 +436,9 @@ export const BranchesManager: React.FC = () => {
 
       {/* Modal: View Branch Details */}
       {selectedBranch && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-facility justify-facility p-4 backdrop-blur-xs">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div className="flex items-facility justify-between pb-3 border-b border-slate-100">
               <h3 className="font-bold text-base text-slate-900">Campus Profile</h3>
               <button onClick={() => setSelectedBranch(null)} className="text-slate-400 hover:text-slate-700">
                 <X className="w-5 h-5" />
@@ -446,8 +446,8 @@ export const BranchesManager: React.FC = () => {
             </div>
 
             <div className="py-4 space-y-3 text-xs">
-              <div className="flex items-center space-x-3.5 pb-3 border-b border-slate-100">
-                <div className="w-12 h-12 rounded-xl bg-orange-100 text-[#EA580C] font-extrabold flex items-center justify-center">
+              <div className="flex items-facility space-x-3.5 pb-3 border-b border-slate-100">
+                <div className="w-12 h-12 rounded-xl bg-orange-100 text-[#EA580C] font-extrabold flex items-facility justify-facility">
                   <Building2 className="w-6 h-6" />
                 </div>
                 <div>
@@ -476,7 +476,7 @@ export const BranchesManager: React.FC = () => {
               </div>
             </div>
 
-            <div className="flex items-center justify-end pt-3 border-t border-slate-100">
+            <div className="flex items-facility justify-end pt-3 border-t border-slate-100">
               <button
                 onClick={() => setSelectedBranch(null)}
                 className="px-4 py-2 text-xs font-semibold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg"

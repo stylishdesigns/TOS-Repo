@@ -63,7 +63,7 @@ const pruneOldImages = (messages: any[], now = Date.now()) =>
 const rateLimitDocId = (key: string) => encodeURIComponent(key).slice(0, 1400);
 
 const SYSTEM_PROMPT = [
-  'You are Tutor AI, the study assistant inside a Nigerian tutorial centre app.',
+  'You are Tutor AI, the study assistant inside a Nigerian education facility app.',
   'You help secondary-school students and their tutors with their studies: explain topics simply,',
   'answer academic questions step by step, help practise, and help with exam preparation for WAEC, NECO and JAMB.',
   'Rules:',
@@ -72,7 +72,7 @@ const SYSTEM_PROMPT = [
   '  ## headings for sections of a longer answer, and bullet or numbered lists for steps. Never use',
   '  code blocks or LaTeX for maths: write mathematics in plain text, x^2, sqrt(x), 2x + 5 = 17, 3/4.',
   '  Avoid unicode superscripts.',
-  '- Never invent facts about the centre, its staff or its students. If unsure, say so.',
+  '- Never invent facts about the facility, its staff or its students. If unsure, say so.',
   '- Never discuss, identify or gossip about other students or staff members.',
   '- Respond in the language the question is written in (English stays English, Yoruba stays Yoruba, and so on).',
   '- Refuse to help cheat in a live exam or produce work meant to deceive teachers; help with real learning instead.',
@@ -391,7 +391,7 @@ async function tutorContext(centreId: string, uid: string, name: string): Promis
   } catch { /* optional */ }
   const agg = await mockAggregateFor(centreId);
   if (agg && agg.attempts > 0) {
-    if (agg.overallPct !== null) lines.push(`Centre mock performance: overall average ${agg.overallPct}% across ${agg.attempts} released mock results.`);
+    if (agg.overallPct !== null) lines.push(`Facility mock performance: overall average ${agg.overallPct}% across ${agg.attempts} released mock results.`);
     if (agg.perSubject.length) {
       lines.push(`Weakest to strongest subjects: ${agg.perSubject.map((v) => `${v.subject} ${v.pct}%`).join(', ')}.`);
     }
@@ -566,7 +566,7 @@ async function studentContextFor(
           const fmt = (t: { name: string; subjects: string[] }) =>
             `${t.name}${t.subjects.length ? ` (${t.subjects.slice(0, 6).join(", ")})` : ""}`;
           if (mine.length) lines.push(`Your tutors (they teach subjects you offer): ${mine.slice(0, 8).map(fmt).join("; ")}.`);
-          if (others.length) lines.push(`Other tutors at your centre: ${others.slice(0, 8).map(fmt).join("; ")}.`);
+          if (others.length) lines.push(`Other tutors at your facility: ${others.slice(0, 8).map(fmt).join("; ")}.`);
         }
       } catch { /* optional */ }
     }
@@ -663,21 +663,21 @@ async function personaFor(centreId: string, caller: Caller): Promise<string> {
     const ctx = await tutorContext(centreId, caller.uid, name);
     if (ctx) {
       lines.push(
-        "You CAN see centre data below: your assigned students (matched by the subjects you cover and their classes) with their attendance and released mock results, plus centre-wide mock averages. Use it for grounded teaching advice. You cannot see students' private practice records or fees.",
-        'Centre data (released mock results only):',
+        "You CAN see facility data below: your assigned students (matched by the subjects you cover and their classes) with their attendance and released mock results, plus facility-wide mock averages. Use it for grounded teaching advice. You cannot see students' private practice records or fees.",
+        'Facility data (released mock results only):',
         ctx,
       );
     } else {
       lines.push(
-        "You cannot see the centre’s records (results, attendance, fees) yet. If asked about a specific student’s performance, say plainly that you cannot see that yet and give guidance based on what they tell you.",
+        "You cannot see the facility’s records (results, attendance, fees) yet. If asked about a specific student’s performance, say plainly that you cannot see that yet and give guidance based on what they tell you.",
       );
     }
     return lines.join('\n');
   }
   if (role === 'owner' || role === 'admin') {
     const lines = [
-      `Who you are talking to: ${name ? `${name}, the administrator of ${centreName || 'a tutorial centre'}.` : `the administrator of ${centreName || 'a tutorial centre'}.`}`,
-      "Treat them as the centre’s manager. Help with running the centre: understanding student performance and attendance patterns, communicating with students and staff, planning academic programmes, exam preparation logistics and getting the most from the platform.",
+      `Who you are talking to: ${name ? `${name}, the administrator of ${centreName || 'a education facility'}.` : `the administrator of ${centreName || 'a education facility'}.`}`,
+      "Treat them as the facility’s manager. Help with running the facility: understanding student performance and attendance patterns, communicating with students and staff, planning academic programmes, exam preparation logistics and getting the most from the platform.",
       name ? `When they greet you (for example "hi"), greet ${name} back by name and offer admin-relevant help.` : 'When they greet you, greet them back warmly and offer admin-relevant help.',
     ];
     // P5: which admin privileges apply? The membership role says owner or
@@ -701,20 +701,20 @@ async function personaFor(centreId: string, caller: Caller): Promise<string> {
     if (actx) {
       if (financeAllowed) {
         lines.push(
-          "You CAN see the centre overview below: enrolment, staff, attendance, released mock performance and finance (billed, collected, outstanding, recent payments). When asked for a payment report, lay it out as a clean list, one student per line with paid and outstanding amounts, and bold the totals. Quote only the figures shown here, never invented ones. You cannot see students' private practice records.",
-          'Centre overview:',
+          "You CAN see the facility overview below: enrolment, staff, attendance, released mock performance and finance (billed, collected, outstanding, recent payments). When asked for a payment report, lay it out as a clean list, one student per line with paid and outstanding amounts, and bold the totals. Quote only the figures shown here, never invented ones. You cannot see students' private practice records.",
+          'Facility overview:',
           actx,
         );
       } else {
         lines.push(
-          "You CAN see the centre overview below: enrolment, staff, attendance and released mock performance. Use it for grounded management advice. You cannot see finance (payments, fees, billing): if asked, say plainly that is outside your access and point them to the centre owner.",
-          'Centre overview:',
+          "You CAN see the facility overview below: enrolment, staff, attendance and released mock performance. Use it for grounded management advice. You cannot see finance (payments, fees, billing): if asked, say plainly that is outside your access and point them to the facility owner.",
+          'Facility overview:',
           actx,
         );
       }
     } else {
       lines.push(
-        "You cannot see the centre’s records (results, attendance, fees) yet. If asked about specific student data, say plainly that you cannot see that yet and give guidance based on what they tell you.",
+        "You cannot see the facility’s records (results, attendance, fees) yet. If asked about specific student data, say plainly that you cannot see that yet and give guidance based on what they tell you.",
       );
     }
     return lines.join('\n');
@@ -728,7 +728,7 @@ async function personaFor(centreId: string, caller: Caller): Promise<string> {
   const data = await studentContextFor(centreId, caller.uid, name);
   if (data) {
     lines.push(
-      "You CAN see this student's own records below: their practice and mock results, the centre's tutors (noted when one teaches subjects this student offers) and their own fee balance. Use them for personal advice: quote their real scores, name their weak topics, and answer questions about their tutors and their own fees. Never mention or share another student's data or anyone else's fees.",
+      "You CAN see this student's own records below: their practice and mock results, the facility's tutors (noted when one teaches subjects this student offers) and their own fee balance. Use them for personal advice: quote their real scores, name their weak topics, and answer questions about their tutors and their own fees. Never mention or share another student's data or anyone else's fees.",
       'Data about this student (their own records only):',
       data,
     );
@@ -800,7 +800,7 @@ export function registerTutorAiRoutes(app: express.Express) {
 
       const status = await getCentreSubscriptionStatus(centreId);
       if (status !== 'active' && status !== 'trial') {
-        throw httpError(403, 'Tutor AI is unavailable while the centre\'s subscription is not active.');
+        throw httpError(403, 'Tutor AI is unavailable while the facility\'s subscription is not active.');
       }
 
       const config = await getPlatformConfig();
@@ -827,7 +827,7 @@ export function registerTutorAiRoutes(app: express.Express) {
         const monthKey = new Date().toISOString().slice(0, 7);
         const monthCount = u && u.monthKey === monthKey ? (u.monthCount || 0) + 1 : 1;
         if (monthCount > monthlyCap) {
-          throw httpError(429, 'Tutor AI has reached its message limit for this centre this month. Ask the centre admin for help.');
+          throw httpError(429, 'Tutor AI has reached its message limit for this facility this month. Ask the facility admin for help.');
         }
         remaining = Math.max(0, monthlyCap - monthCount);
         const data = (convSnap.exists ? convSnap.data() : null) as any;

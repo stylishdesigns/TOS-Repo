@@ -163,7 +163,7 @@ export function ReactionChips({
           key={g.emoji}
           type="button"
           onClick={onToggle ? () => onToggle(g.emoji) : undefined}
-          className={`flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-xs transition ${
+          className={`flex items-facility gap-0.5 rounded-full px-1.5 py-0.5 text-xs transition ${
             g.mine ? 'bg-orange-500/90 text-white ring-1 ring-orange-600' : 'bg-white text-slate-700 ring-1 ring-slate-200'
           }`}
         >
@@ -293,7 +293,7 @@ export function MessageActionSheet({
           </div>
         ) : (
           <>
-            <div className="flex items-center justify-between gap-1 py-1">
+            <div className="flex items-facility justify-between gap-1 py-1">
               {BASIC_EMOJIS.map((e) => (
                 <button
                   key={e}
@@ -309,13 +309,13 @@ export function MessageActionSheet({
                 type="button"
                 disabled={busy}
                 onClick={() => setShowMore(true)}
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200"
+                className="flex h-9 w-9 items-facility justify-facility rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200"
                 aria-label="More reactions"
               >
                 <span className="text-lg leading-none">+</span>
               </button>
             </div>
-            <div className="mt-2 flex items-center justify-around border-t border-slate-100 pt-3">
+            <div className="mt-2 flex items-facility justify-around border-t border-slate-100 pt-3">
               {acts.map((a) => (
                 <button
                   key={a.label}
@@ -325,7 +325,7 @@ export function MessageActionSheet({
                     a.run();
                     onClose();
                   }}
-                  className="flex flex-col items-center gap-1 rounded-lg px-3 py-1.5 text-slate-700 hover:bg-slate-100"
+                  className="flex flex-col items-facility gap-1 rounded-lg px-3 py-1.5 text-slate-700 hover:bg-slate-100"
                 >
                   {a.icon}
                   <span className="text-[10px] font-medium">{a.label}</span>

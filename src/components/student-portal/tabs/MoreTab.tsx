@@ -209,7 +209,7 @@ function buildCardSvg(opts: {
     <rect x="34" y="368" width="632" height="1" fill="#FFFFFF" fill-opacity="0.08"/>
     ${bars.join('')}
     <text x="390" y="408" font-family="Courier New, monospace" font-size="10" fill="#94A3B8" letter-spacing="3">${cardEsc(studentId)}</text>
-    <text x="34" y="404" font-family="Arial, sans-serif" font-size="10" fill="#64748B">Issued by the centre · Verify with the centre office</text>
+    <text x="34" y="404" font-family="Arial, sans-serif" font-size="10" fill="#64748B">Issued by the facility · Verify with the facility office</text>
   </g>
 </svg>`;
 }
@@ -493,7 +493,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
       const initials =
         student.name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase() || '').join('') || '?';
       const svg = buildCardSvg({
-        centreName: centreName || 'Tutorial Centre',
+        centreName: centreName || 'Education facility',
         name: student.name,
         programme: student.programmeName || '',
         department: student.department || '',
@@ -676,7 +676,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
         type: 'success',
         title: result.pending ? 'Payment Sent for Confirmation' : 'Payment Submitted',
         description: result.pending
-          ? `Your payment of ${settings.currencySymbol}${(payAmount || 0).toLocaleString()} via ${paymentMode} was sent to the centre. Your balance updates once the centre confirms it.`
+          ? `Your payment of ${settings.currencySymbol}${(payAmount || 0).toLocaleString()} via ${paymentMode} was sent to the facility. Your balance updates once the facility confirms it.`
           : `Your payment of ${settings.currencySymbol}${(payAmount || 0).toLocaleString()} via ${paymentMode} has been recorded. Receipt ${result.receiptNumber}.`,
       });
 
@@ -717,14 +717,14 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
   return (
     <div className="min-h-full bg-slate-50/70 pb-16 px-4 pt-6 max-w-lg mx-auto">
       {/* 1. Centered Profile Header (Exact Layout from reference video) */}
-      <div className="flex flex-col items-center justify-center text-center">
+      <div className="flex flex-col items-facility justify-facility text-facility">
         <div className="relative">
           <img
             src={studentAvatar}
             alt={student.name}
             className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-md ring-2 ring-orange-500/20"
           />
-          <span className="absolute bottom-1 right-1 w-5 h-5 bg-emerald-500 border-2 border-white rounded-full flex items-center justify-center shadow-xs">
+          <span className="absolute bottom-1 right-1 w-5 h-5 bg-emerald-500 border-2 border-white rounded-full flex items-facility justify-facility shadow-xs">
             <span className="w-2 h-2 bg-white rounded-full" />
           </span>
         </div>
@@ -744,10 +744,10 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
           {/* Item 1: Personal Details */}
           <button
             onClick={() => setActiveModal('personal_details')}
-            className="w-full flex items-center justify-between p-3.5 hover:bg-slate-50/80 active:bg-slate-100/80 transition-colors text-left group"
+            className="w-full flex items-facility justify-between p-3.5 hover:bg-slate-50/80 active:bg-slate-100/80 transition-colors text-left group"
           >
-            <div className="flex items-center space-x-3">
-              <div className="w-9 h-9 rounded-full bg-rose-50 text-rose-500 flex items-center justify-center shrink-0">
+            <div className="flex items-facility space-x-3">
+              <div className="w-9 h-9 rounded-full bg-rose-50 text-rose-500 flex items-facility justify-facility shrink-0">
                 <User className="w-4.5 h-4.5" />
               </div>
               <span className="text-sm font-semibold text-slate-800">Personal Details</span>
@@ -758,10 +758,10 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
           {/* Item 2: Academic Details */}
           <button
             onClick={() => setActiveModal('academic_details')}
-            className="w-full flex items-center justify-between p-3.5 hover:bg-slate-50/80 active:bg-slate-100/80 transition-colors text-left group"
+            className="w-full flex items-facility justify-between p-3.5 hover:bg-slate-50/80 active:bg-slate-100/80 transition-colors text-left group"
           >
-            <div className="flex items-center space-x-3">
-              <div className="w-9 h-9 rounded-full bg-orange-50 text-orange-600 flex items-center justify-center shrink-0">
+            <div className="flex items-facility space-x-3">
+              <div className="w-9 h-9 rounded-full bg-orange-50 text-orange-600 flex items-facility justify-facility shrink-0">
                 <GraduationCap className="w-4.5 h-4.5" />
               </div>
               <span className="text-sm font-semibold text-slate-800">
@@ -774,18 +774,18 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
           {/* Item 3: ID Card */}
           <button
             onClick={() => setActiveModal('id_card')}
-            className="w-full flex items-center justify-between p-3.5 hover:bg-slate-50/80 active:bg-slate-100/80 transition-colors text-left group"
+            className="w-full flex items-facility justify-between p-3.5 hover:bg-slate-50/80 active:bg-slate-100/80 transition-colors text-left group"
           >
-            <div className="flex items-center space-x-3">
-              <div className="w-9 h-9 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+            <div className="flex items-facility space-x-3">
+              <div className="w-9 h-9 rounded-full bg-blue-50 text-blue-600 flex items-facility justify-facility shrink-0">
                 <CreditCard className="w-4.5 h-4.5" />
               </div>
               <span className="text-sm font-semibold text-slate-800">
                 ID Card
               </span>
             </div>
-            <div className="flex items-center space-x-2">
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+            <div className="flex items-facility space-x-2">
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-facility gap-1">
                 <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                 Verified
               </span>
@@ -796,17 +796,17 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
           {/* Item 4: Fees and Payments */}
           <button
             onClick={() => setActiveModal('tuition_statement')}
-            className="w-full flex items-center justify-between p-3.5 hover:bg-slate-50/80 active:bg-slate-100/80 transition-colors text-left group"
+            className="w-full flex items-facility justify-between p-3.5 hover:bg-slate-50/80 active:bg-slate-100/80 transition-colors text-left group"
           >
-            <div className="flex items-center space-x-3">
-              <div className="w-9 h-9 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+            <div className="flex items-facility space-x-3">
+              <div className="w-9 h-9 rounded-full bg-emerald-50 text-emerald-600 flex items-facility justify-facility shrink-0">
                 <Receipt className="w-4.5 h-4.5" />
               </div>
               <span className="text-sm font-semibold text-slate-800">
                 Fees and Payments
               </span>
             </div>
-            <div className="flex items-center space-x-2">
+            <div className="flex items-facility space-x-2">
               <span
                 className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold ${
                   student.outstandingBalance > 0
@@ -834,10 +834,10 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
           {/* Item 1: Change Account PIN */}
           <button
             onClick={() => setActiveModal('change_pin')}
-            className="w-full flex items-center justify-between p-3.5 hover:bg-slate-50/80 active:bg-slate-100/80 transition-colors text-left group"
+            className="w-full flex items-facility justify-between p-3.5 hover:bg-slate-50/80 active:bg-slate-100/80 transition-colors text-left group"
           >
-            <div className="flex items-center space-x-3">
-              <div className="w-9 h-9 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+            <div className="flex items-facility space-x-3">
+              <div className="w-9 h-9 rounded-full bg-amber-50 text-amber-600 flex items-facility justify-facility shrink-0">
                 <Lock className="w-4.5 h-4.5" />
               </div>
               <span className="text-sm font-semibold text-slate-800">Change Account PIN</span>
@@ -848,10 +848,10 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
           {/* Item 2: Change Password */}
           <button
             onClick={() => setActiveModal('change_password')}
-            className="w-full flex items-center justify-between p-3.5 hover:bg-slate-50/80 active:bg-slate-100/80 transition-colors text-left group"
+            className="w-full flex items-facility justify-between p-3.5 hover:bg-slate-50/80 active:bg-slate-100/80 transition-colors text-left group"
           >
-            <div className="flex items-center space-x-3">
-              <div className="w-9 h-9 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+            <div className="flex items-facility space-x-3">
+              <div className="w-9 h-9 rounded-full bg-purple-50 text-purple-600 flex items-facility justify-facility shrink-0">
                 <KeyRound className="w-4.5 h-4.5" />
               </div>
               <span className="text-sm font-semibold text-slate-800">Change Password</span>
@@ -860,9 +860,9 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
           </button>
 
           {/* Item 3: Enable Biometric (Interactive toggle matching video 00:02) */}
-          <div className="w-full flex items-center justify-between p-3.5">
-            <div className="flex items-center space-x-3">
-              <div className="w-9 h-9 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+          <div className="w-full flex items-facility justify-between p-3.5">
+            <div className="flex items-facility space-x-3">
+              <div className="w-9 h-9 rounded-full bg-indigo-50 text-indigo-600 flex items-facility justify-facility shrink-0">
                 <Fingerprint className="w-4.5 h-4.5" />
               </div>
               <span className="text-sm font-semibold text-slate-800">Enable Biometric</span>
@@ -896,15 +896,15 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
           {/* Item 4: Appearance */}
           <button
             onClick={() => setActiveModal('theme_settings')}
-            className="w-full flex items-center justify-between p-3.5 hover:bg-slate-50/80 active:bg-slate-100/80 transition-colors text-left group"
+            className="w-full flex items-facility justify-between p-3.5 hover:bg-slate-50/80 active:bg-slate-100/80 transition-colors text-left group"
           >
-            <div className="flex items-center space-x-3">
-              <div className="w-9 h-9 rounded-full bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
+            <div className="flex items-facility space-x-3">
+              <div className="w-9 h-9 rounded-full bg-sky-50 text-sky-600 flex items-facility justify-facility shrink-0">
                 <Palette className="w-4.5 h-4.5" />
               </div>
               <span className="text-sm font-semibold text-slate-800">Appearance</span>
             </div>
-            <div className="flex items-center space-x-2">
+            <div className="flex items-facility space-x-2">
               <span className="text-xs text-slate-500 font-medium capitalize">
                 {selectedTheme}
               </span>
@@ -924,10 +924,10 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
           {/* Item 1: Help & Support */}
           <button
             onClick={() => setActiveModal('help_support')}
-            className="w-full flex items-center justify-between p-3.5 hover:bg-slate-50/80 active:bg-slate-100/80 transition-colors text-left group"
+            className="w-full flex items-facility justify-between p-3.5 hover:bg-slate-50/80 active:bg-slate-100/80 transition-colors text-left group"
           >
-            <div className="flex items-center space-x-3">
-              <div className="w-9 h-9 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+            <div className="flex items-facility space-x-3">
+              <div className="w-9 h-9 rounded-full bg-emerald-50 text-emerald-600 flex items-facility justify-facility shrink-0">
                 <HelpCircle className="w-4.5 h-4.5" />
               </div>
               <span className="text-sm font-semibold text-slate-800">Help & Support</span>
@@ -938,14 +938,14 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
           {/* Item 2: Centre Policy */}
           <button
             onClick={() => setActiveModal('exam_policy')}
-            className="w-full flex items-center justify-between p-3.5 hover:bg-slate-50/80 active:bg-slate-100/80 transition-colors text-left group"
+            className="w-full flex items-facility justify-between p-3.5 hover:bg-slate-50/80 active:bg-slate-100/80 transition-colors text-left group"
           >
-            <div className="flex items-center space-x-3">
-              <div className="w-9 h-9 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center shrink-0">
+            <div className="flex items-facility space-x-3">
+              <div className="w-9 h-9 rounded-full bg-slate-100 text-slate-700 flex items-facility justify-facility shrink-0">
                 <FileText className="w-4.5 h-4.5" />
               </div>
               <span className="text-sm font-semibold text-slate-800">
-                Centre Policy
+                Facility Policy
               </span>
             </div>
             <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-slate-600 transition-colors" />
@@ -960,10 +960,10 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                 setActiveModal('logout');
               }
             }}
-            className="w-full flex items-center justify-between p-3.5 hover:bg-rose-50/50 active:bg-rose-100/50 transition-colors text-left group"
+            className="w-full flex items-facility justify-between p-3.5 hover:bg-rose-50/50 active:bg-rose-100/50 transition-colors text-left group"
           >
-            <div className="flex items-center space-x-3">
-              <div className="w-9 h-9 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+            <div className="flex items-facility space-x-3">
+              <div className="w-9 h-9 rounded-full bg-rose-50 text-rose-600 flex items-facility justify-facility shrink-0">
                 {isAdmin ? <ShieldCheck className="w-4.5 h-4.5" /> : <LogOut className="w-4.5 h-4.5" />}
               </div>
               <span className="text-sm font-semibold text-rose-600">
@@ -976,7 +976,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
       </div>
 
       {/* 5. Version Footer (Exact look from video) */}
-      <div className="text-center pt-6 pb-4 text-slate-400 text-xs font-medium">
+      <div className="text-facility pt-6 pb-4 text-slate-400 text-xs font-medium">
         {centreName} • Version 1.0.0 (2026)
       </div>
 
@@ -985,7 +985,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
           (Slides up smoothly from the bottom with handle bar, title, subtitle & content)
          ========================================================================= */}
       {activeModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 transition-opacity">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-end sm:items-facility justify-facility p-0 sm:p-4 transition-opacity">
           {/* Backdrop dismissal */}
           <div
             className="absolute inset-0"
@@ -1019,12 +1019,12 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                 </div>
 
                 {/* Profile picture: view it and change it right here, centred. */}
-                <div className="flex flex-col items-center text-center pb-1">
+                <div className="flex flex-col items-facility text-facility pb-1">
                   <div className="relative">
                     {avatarPreview ? (
                       <img src={avatarPreview} alt="" className="w-24 h-24 rounded-full object-cover border-2 border-[#EA580C]" />
                     ) : (
-                      <div className="w-24 h-24 rounded-full bg-orange-50 border-2 border-[#EA580C] flex items-center justify-center text-[#C2410C] text-xl font-black">
+                      <div className="w-24 h-24 rounded-full bg-orange-50 border-2 border-[#EA580C] flex items-facility justify-facility text-[#C2410C] text-xl font-black">
                         {student.name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase() || '').join('') || '?'}
                       </div>
                     )}
@@ -1032,7 +1032,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                       type="button"
                       onClick={() => photoInputRef.current?.click()}
                       disabled={photoBusy}
-                      className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-[#EA580C] text-white flex items-center justify-center shadow-md active:scale-95 transition disabled:opacity-60 cursor-pointer"
+                      className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-[#EA580C] text-white flex items-facility justify-facility shadow-md active:scale-95 transition disabled:opacity-60 cursor-pointer"
                       aria-label="Change profile picture"
                     >
                       <Camera className="w-4 h-4" />
@@ -1274,11 +1274,11 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                 </div>
 
                 {typeof student.attendancePercent === 'number' && (
-                  <div className="bg-emerald-50/80 p-3.5 rounded-xl border border-emerald-200 flex items-center justify-between text-xs">
+                  <div className="bg-emerald-50/80 p-3.5 rounded-xl border border-emerald-200 flex items-facility justify-between text-xs">
                     <div>
                       <span className="font-bold text-emerald-950 block">Attendance Standing</span>
                       <span className="text-[11px] text-emerald-800">
-                        Eligible for official centre mock examinations
+                        Eligible for official facility mock examinations
                       </span>
                     </div>
                     <span className="text-base font-black text-emerald-700">{student.attendancePercent}%</span>
@@ -1290,7 +1290,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                     saving goes through the same server-checked update as
                     before. */}
                 <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100 space-y-2.5">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-facility justify-between">
                     <div>
                       <p className="text-sm font-black text-slate-900">Registered Subjects</p>
                       <p className="text-[11px] text-slate-500 font-medium">
@@ -1310,7 +1310,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
 
                   {registeredNames.length === 0 ? (
                     <p className="text-xs text-slate-500 font-medium leading-relaxed">
-                      You have no registered subjects yet. Choose from your centre's list below.
+                      You have no registered subjects yet. Choose from your facility's list below.
                     </p>
                   ) : (
                     <div className="space-y-2">
@@ -1332,14 +1332,14 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                   {showSubjectsEditor && (
                     centreSubjects.length === 0 ? (
                       <p className="text-xs text-slate-500 font-medium leading-relaxed">
-                        Your centre hasn't set up its subject list yet. Please ask your centre to add subjects.
+                        Your facility hasn't set up its subject list yet. Please ask your facility to add subjects.
                       </p>
                     ) : (
                       <>
                         <input
                           value={subjectSearch}
                           onChange={(e) => setSubjectSearch(e.target.value)}
-                          placeholder="Search your centre's subjects"
+                          placeholder="Search your facility's subjects"
                           className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#EA580C]/30"
                         />
                         <div className="max-h-48 overflow-y-auto rounded-xl border border-slate-100 bg-white divide-y divide-slate-100">
@@ -1350,11 +1350,11 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                                 key={sub.id}
                                 type="button"
                                 onClick={() => toggleDraftSubject(sub.name)}
-                                className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-slate-50/80 active:bg-slate-100/80 transition-colors text-left"
+                                className="w-full flex items-facility justify-between px-3 py-2.5 hover:bg-slate-50/80 active:bg-slate-100/80 transition-colors text-left"
                               >
-                                <div className="flex items-center space-x-2.5 min-w-0">
+                                <div className="flex items-facility space-x-2.5 min-w-0">
                                   <span
-                                    className={`w-4.5 h-4.5 rounded-md border flex items-center justify-center shrink-0 ${
+                                    className={`w-4.5 h-4.5 rounded-md border flex items-facility justify-facility shrink-0 ${
                                       checked ? 'bg-[#EA580C] border-[#EA580C] text-white' : 'border-slate-300 bg-white'
                                     }`}
                                   >
@@ -1370,9 +1370,9 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                             <div className="px-3 py-2.5 text-xs text-slate-400 font-medium">No subjects match your search.</div>
                           ) : null}
                         </div>
-                        <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-facility justify-between gap-2">
                           <span className="text-[11px] font-bold text-slate-500">{draftSubjects.size} selected</span>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-facility gap-2">
                             <button
                               type="button"
                               onClick={() => setShowSubjectsEditor(false)}
@@ -1406,7 +1406,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                   <div>
                     <h3 className="text-lg font-black text-slate-900">ID Card</h3>
                     <p className="text-xs text-slate-500 mt-0.5">
-                      Your centre's official student card, from your own record
+                      Your facility's official student card, from your own record
                     </p>
                   </div>
                   <button
@@ -1418,7 +1418,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                 </div>
 
                 {(() => {
-                  const logoInitials = (centreName || 'Tutorial Centre').trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() || '').join('') || 'TC';
+                  const logoInitials = (centreName || 'Education facility').trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() || '').join('') || 'TC';
                   const cardPhoto = realAvatar(student.avatar);
                   const active = String(student.status || 'Active').toLowerCase() === 'active';
                   const chips = student.subjects || [];
@@ -1429,8 +1429,8 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                     >
                       <div className="p-5">
                         <div className="flex items-start justify-between gap-2">
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-orange-500 to-[#EA580C] flex items-center justify-center text-sm font-black shrink-0">
+                          <div className="flex items-facility gap-3 min-w-0">
+                            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-orange-500 to-[#EA580C] flex items-facility justify-facility text-sm font-black shrink-0">
                               {logoInitials}
                             </div>
                             <div className="min-w-0">
@@ -1438,7 +1438,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                               <p className="text-[10px] text-slate-400 tracking-[0.2em]">STUDENT IDENTITY CARD</p>
                             </div>
                           </div>
-                          <div className="rounded-full border border-[#EA580C]/60 pl-2.5 pr-3 py-1.5 flex items-center gap-1.5 shrink-0">
+                          <div className="rounded-full border border-[#EA580C]/60 pl-2.5 pr-3 py-1.5 flex items-facility gap-1.5 shrink-0">
                             <span className={`w-2 h-2 rounded-full ${active ? 'bg-emerald-500' : 'bg-amber-400'}`} />
                             <span className="text-[10px] font-bold text-orange-300 tracking-wide whitespace-nowrap">
                               {String(student.status || 'Active').toUpperCase()}
@@ -1448,11 +1448,11 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                         </div>
 
                         <div className="flex gap-4 mt-5">
-                          <div className="w-24 h-32 sm:w-[104px] sm:h-[132px] rounded-2xl border-2 border-[#EA580C]/70 bg-[#1B2540] overflow-hidden shrink-0 flex items-center justify-center">
+                          <div className="w-24 h-32 sm:w-[104px] sm:h-[132px] rounded-2xl border-2 border-[#EA580C]/70 bg-[#1B2540] overflow-hidden shrink-0 flex items-facility justify-facility">
                             {cardPhoto ? (
                               <img src={cardPhoto} alt="" className="w-full h-full object-cover" />
                             ) : (
-                              <div className="w-14 h-14 rounded-full bg-slate-600 flex items-center justify-center text-lg font-black text-slate-300">
+                              <div className="w-14 h-14 rounded-full bg-slate-600 flex items-facility justify-facility text-lg font-black text-slate-300">
                                 {student.name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase() || '').join('') || '?'}
                               </div>
                             )}
@@ -1495,7 +1495,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                         </div>
 
                         <div className="mt-4 pt-3 border-t border-white/10 flex items-end justify-between gap-3">
-                          <p className="text-[10px] text-slate-500">Issued by the centre · Verify with the centre office</p>
+                          <p className="text-[10px] text-slate-500">Issued by the facility · Verify with the facility office</p>
                           <div className="text-right shrink-0">
                             <div className="flex items-end justify-end gap-[2px] h-8">
                               {cardBars(student.id).map((bar, i) => (
@@ -1518,7 +1518,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                 >
                   {cardBusy ? 'Preparing the picture…' : 'Download ID Card'}
                 </button>
-                <p className="text-center text-[11px] text-slate-400 font-medium -mt-2">
+                <p className="text-facility text-[11px] text-slate-400 font-medium -mt-2">
                   Saved as a picture in your downloads, your own photo included.
                 </p>
               </div>
@@ -1545,7 +1545,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                 </div>
 
                 {/* Metrics */}
-                <div className="grid grid-cols-3 gap-2 text-center bg-slate-50 p-3.5 rounded-2xl border border-slate-200/80">
+                <div className="grid grid-cols-3 gap-2 text-facility bg-slate-50 p-3.5 rounded-2xl border border-slate-200/80">
                   <div>
                     <span className="text-[10px] text-slate-400 uppercase font-semibold block">
                       Total Tuition
@@ -1591,7 +1591,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                   <button
                     type="button"
                     onClick={() => setActivePaymentSubView('make_payment')}
-                    className={`flex-1 py-2 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                    className={`flex-1 py-2 rounded-lg transition-all cursor-pointer flex items-facility justify-facility gap-1.5 ${
                       activePaymentSubView === 'make_payment'
                         ? 'bg-[#EA580C] text-white shadow-xs'
                         : 'text-[#EA580C] hover:bg-orange-50'
@@ -1606,7 +1606,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                 {activePaymentSubView === 'make_payment' && (
                   <form onSubmit={handleCompletePayment} className="space-y-3.5 pt-1 text-xs">
                     <div>
-                      <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-facility justify-between mb-1">
                         <label className="font-bold text-slate-700">
                           Amount to Pay ({settings.currencySymbol}) *
                         </label>
@@ -1645,7 +1645,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                             key={mode}
                             type="button"
                             onClick={() => setPaymentMode(mode)}
-                            className={`p-2.5 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-1 ${
+                            className={`p-2.5 rounded-xl border text-facility transition-all cursor-pointer flex flex-col items-facility justify-facility gap-1 ${
                               paymentMode === mode
                                 ? 'bg-orange-50 border-orange-500 text-orange-950 font-bold shadow-xs'
                                 : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-600 font-medium'
@@ -1663,22 +1663,22 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                       <div className="space-y-3">
                         {/* Center Account Details */}
                         <div className="p-3.5 bg-blue-50/80 border border-blue-200 rounded-xl space-y-2">
-                          <div className="flex items-center justify-between text-blue-900 font-bold">
-                            <span className="text-[11px] uppercase tracking-wider flex items-center gap-1.5">
+                          <div className="flex items-facility justify-between text-blue-900 font-bold">
+                            <span className="text-[11px] uppercase tracking-wider flex items-facility gap-1.5">
                               <Building2 className="w-3.5 h-3.5 text-blue-600" />
-                              Official Centre Account Details
+                              Official Facility Account Details
                             </span>
                             <span className="text-[10px] font-semibold text-blue-600">Verified</span>
                           </div>
                           
                           <div className="bg-white/90 p-2.5 rounded-lg border border-blue-100 space-y-1">
-                            <div className="flex justify-between items-center text-xs">
+                            <div className="flex justify-between items-facility text-xs">
                               <span className="text-slate-500 font-medium">Bank Name:</span>
                               <span className="font-bold text-slate-900">{settings.bankName || 'Access Bank Plc'}</span>
                             </div>
-                            <div className="flex justify-between items-center text-xs">
+                            <div className="flex justify-between items-facility text-xs">
                               <span className="text-slate-500 font-medium">Account Number:</span>
-                              <div className="flex items-center gap-1.5">
+                              <div className="flex items-facility gap-1.5">
                                 <span className="font-mono font-black text-slate-900 tracking-wider">
                                   {settings.bankAccountNumber || '0123456789'}
                                 </span>
@@ -1696,7 +1696,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                                 </button>
                               </div>
                             </div>
-                            <div className="flex justify-between items-center text-xs">
+                            <div className="flex justify-between items-facility text-xs">
                               <span className="text-slate-500 font-medium">Account Name:</span>
                               <span className="font-bold text-slate-900 truncate max-w-[180px]">
                                 {settings.bankAccountName || centreName}
@@ -1705,7 +1705,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                           </div>
 
                           <p className="text-[10px] text-blue-700 leading-relaxed font-medium">
-                            Please make payment of <strong>{settings.currencySymbol}{(payAmount || 0).toLocaleString()}</strong> to the centre account above, then upload your transaction receipt/screenshot below.
+                            Please make payment of <strong>{settings.currencySymbol}{(payAmount || 0).toLocaleString()}</strong> to the facility account above, then upload your transaction receipt/screenshot below.
                           </p>
                         </div>
 
@@ -1715,8 +1715,8 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                             Upload Payment Evidence / Receipt *
                           </label>
                           {evidenceDataUrl ? (
-                            <div className="p-2.5 rounded-xl border border-emerald-300 bg-emerald-50/50 flex items-center justify-between">
-                              <div className="flex items-center gap-2 overflow-hidden">
+                            <div className="p-2.5 rounded-xl border border-emerald-300 bg-emerald-50/50 flex items-facility justify-between">
+                              <div className="flex items-facility gap-2 overflow-hidden">
                                 <img
                                   src={evidenceDataUrl}
                                   alt="Receipt thumbnail"
@@ -1724,7 +1724,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                                 />
                                 <div className="truncate">
                                   <p className="font-bold text-slate-900 text-xs truncate">{evidenceFileName || 'Payment_Proof.jpg'}</p>
-                                  <span className="text-[10px] text-emerald-700 font-semibold flex items-center gap-1">
+                                  <span className="text-[10px] text-emerald-700 font-semibold flex items-facility gap-1">
                                     <Check className="w-3 h-3" /> Ready to submit
                                   </span>
                                 </div>
@@ -1741,7 +1741,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                               </button>
                             </div>
                           ) : (
-                            <label className="border-2 border-dashed border-slate-300 hover:border-orange-500 rounded-xl p-3.5 flex flex-col items-center justify-center text-center cursor-pointer bg-slate-50 hover:bg-orange-50/40 transition-colors">
+                            <label className="border-2 border-dashed border-slate-300 hover:border-orange-500 rounded-xl p-3.5 flex flex-col items-facility justify-facility text-facility cursor-pointer bg-slate-50 hover:bg-orange-50/40 transition-colors">
                               <Upload className="w-5 h-5 text-slate-400 mb-1" />
                               <span className="text-xs font-bold text-slate-700">Click to upload payment receipt</span>
                               <span className="text-[10px] text-slate-400 mt-0.5">JPG, PNG, WebP or PDF receipt screenshot (Max 5MB)</span>
@@ -1776,13 +1776,13 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                       <div className="space-y-3">
                         {/* Cash Info Guide provided in settings */}
                         <div className="p-3.5 bg-amber-50/80 border border-amber-300 rounded-xl space-y-2">
-                          <div className="flex items-center gap-2 text-amber-950 font-bold text-xs">
+                          <div className="flex items-facility gap-2 text-amber-950 font-bold text-xs">
                             <Banknote className="w-4 h-4 text-amber-600" />
                             <span>Cash Payment Instructions</span>
                           </div>
                           <div className="p-2.5 bg-white/90 rounded-lg border border-amber-200 text-xs text-slate-800 leading-relaxed font-medium">
                             {settings.cashPaymentGuide ||
-                              'Please proceed in person to the Centre Accounts Bursar, Mr. Adeleke, at the Admin Office (Reception Block A, 1st Floor). Always collect an official stamped paper receipt upon payment.'}
+                              'Please proceed in person to the Facility Accounts Bursar, Mr. Adeleke, at the Admin Office (Reception Block A, 1st Floor). Always collect an official stamped paper receipt upon payment.'}
                           </div>
                           <p className="text-[10px] text-amber-800 font-semibold">
                             Notice: Cash must be paid directly to the authorized bursary desk. Keep your paper receipt safely.
@@ -1810,7 +1810,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                             Attach Photo of Paper Cash Receipt (Optional)
                           </label>
                           {evidenceDataUrl ? (
-                            <div className="p-2 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-between text-xs">
+                            <div className="p-2 rounded-xl border border-slate-200 bg-slate-50 flex items-facility justify-between text-xs">
                               <span className="truncate text-slate-700 font-medium">{evidenceFileName || 'Cash_Receipt.jpg'}</span>
                               <button
                                 type="button"
@@ -1824,7 +1824,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                               </button>
                             </div>
                           ) : (
-                            <label className="border border-slate-200 rounded-lg p-2 flex items-center justify-center gap-1.5 text-slate-500 hover:text-slate-700 cursor-pointer text-xs bg-white">
+                            <label className="border border-slate-200 rounded-lg p-2 flex items-facility justify-facility gap-1.5 text-slate-500 hover:text-slate-700 cursor-pointer text-xs bg-white">
                               <Upload className="w-3.5 h-3.5" />
                               <span>Attach paper receipt photo</span>
                               <input
@@ -1851,7 +1851,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                       <button
                         type="submit"
                         disabled={isSubmittingPayment}
-                        className="flex-2 py-2.5 rounded-xl bg-[#EA580C] hover:bg-[#C2410C] text-white font-bold text-xs shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                        className="flex-2 py-2.5 rounded-xl bg-[#EA580C] hover:bg-[#C2410C] text-white font-bold text-xs shadow-xs transition-all flex items-facility justify-facility gap-1.5 cursor-pointer disabled:opacity-50"
                       >
                         <Check className="w-4 h-4" />
                         <span>Confirm & Submit Payment ({settings.currencySymbol}{(payAmount || 0).toLocaleString()})</span>
@@ -1865,7 +1865,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                   <div className="space-y-3 pt-1">
                     {/* Outstanding alert banner */}
                     {student.outstandingBalance > 0 && (
-                      <div className="p-3 bg-orange-50/80 border border-orange-200 rounded-xl flex items-center justify-between gap-2">
+                      <div className="p-3 bg-orange-50/80 border border-orange-200 rounded-xl flex items-facility justify-between gap-2">
                         <div>
                           <p className="text-xs font-bold text-orange-950">Tuition Balance Outstanding</p>
                           <p className="text-[10px] text-orange-800">
@@ -1885,7 +1885,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                       </div>
                     )}
 
-                    <div className="flex items-center justify-between text-slate-500">
+                    <div className="flex items-facility justify-between text-slate-500">
                       <span className="text-[11px] font-bold uppercase tracking-wider">
                         Payment History{student.registrationDate ? ` since ${new Date(student.registrationDate).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}` : ''}
                       </span>
@@ -1905,7 +1905,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                             >
                               <div className="flex items-start justify-between gap-2">
                                 <div>
-                                  <div className="flex items-center gap-2">
+                                  <div className="flex items-facility gap-2">
                                     <span className="font-extrabold text-slate-900 text-sm">
                                       {settings.currencySymbol}{(p.amountPaid || 0).toLocaleString()}
                                     </span>
@@ -1933,7 +1933,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                                   <button
                                     type="button"
                                     onClick={() => setPreviewEvidenceUrl(p.evidenceUrl!)}
-                                    className="px-2 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 text-[10px] font-bold border border-blue-200 flex items-center gap-1 transition-colors cursor-pointer shrink-0"
+                                    className="px-2 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 text-[10px] font-bold border border-blue-200 flex items-facility gap-1 transition-colors cursor-pointer shrink-0"
                                   >
                                     <ImageIcon className="w-3 h-3" />
                                     <span>View Proof</span>
@@ -1954,7 +1954,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                           ))}
                       </div>
                     ) : (
-                      <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 space-y-2">
+                      <div className="p-8 text-facility bg-slate-50 rounded-2xl border border-dashed border-slate-200 space-y-2">
                         <Receipt className="w-8 h-8 text-slate-300 mx-auto" />
                         <p className="text-xs font-bold text-slate-700">No Payment History Yet</p>
                         <p className="text-[11px] text-slate-400 max-w-xs mx-auto">
@@ -1963,7 +1963,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                         <button
                           type="button"
                           onClick={() => setActivePaymentSubView('make_payment')}
-                          className="mt-2 px-4 py-2 text-xs font-bold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg shadow-2xs transition-all inline-flex items-center gap-1.5 cursor-pointer"
+                          className="mt-2 px-4 py-2 text-xs font-bold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg shadow-2xs transition-all inline-flex items-facility gap-1.5 cursor-pointer"
                         >
                           <CreditCard className="w-3.5 h-3.5" />
                           <span>Make Tuition Payment</span>
@@ -1977,9 +1977,9 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
 
             {/* Evidence Preview Modal for Student */}
             {previewEvidenceUrl && (
-              <div className="fixed inset-0 bg-black/80 z-[70] flex items-center justify-center p-4 backdrop-blur-xs animate-in fade-in duration-200">
+              <div className="fixed inset-0 bg-black/80 z-[70] flex items-facility justify-facility p-4 backdrop-blur-xs animate-in fade-in duration-200">
                 <div className="bg-white rounded-2xl max-w-md w-full p-4 shadow-2xl relative flex flex-col max-h-[85vh]">
-                  <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                  <div className="flex items-facility justify-between pb-2 border-b border-slate-100">
                     <h4 className="font-bold text-slate-900 text-xs">Payment Evidence / Receipt</h4>
                     <button
                       onClick={() => setPreviewEvidenceUrl(null)}
@@ -1988,7 +1988,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                       <X className="w-4 h-4" />
                     </button>
                   </div>
-                  <div className="py-2 flex-1 overflow-auto flex items-center justify-center bg-slate-950/5 rounded-xl mt-2">
+                  <div className="py-2 flex-1 overflow-auto flex items-facility justify-facility bg-slate-950/5 rounded-xl mt-2">
                     <img
                       src={previewEvidenceUrl}
                       alt="Uploaded Payment Evidence"
@@ -2003,9 +2003,9 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
             {activeModal === 'change_pin' && (
               <div className="p-6 overflow-y-auto space-y-4">
                 <div className="flex items-start justify-between">
-                  <div className="w-full text-center">
+                  <div className="w-full text-facility">
                     {/* Pink/Rose icon circle */}
-                    <div className="w-14 h-14 rounded-full bg-rose-50 text-rose-500 flex items-center justify-center mx-auto mb-2">
+                    <div className="w-14 h-14 rounded-full bg-rose-50 text-rose-500 flex items-facility justify-facility mx-auto mb-2">
                       <Lock className="w-7 h-7" />
                     </div>
                     <h3 className="text-lg font-black text-slate-900">Current PIN</h3>
@@ -2025,7 +2025,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                 </div>
 
                 {/* 4 PIN Dots */}
-                <div className="flex justify-center items-center space-x-4 my-6">
+                <div className="flex justify-facility items-facility space-x-4 my-6">
                   {[0, 1, 2, 3].map((index) => (
                     <div
                       key={index}
@@ -2061,7 +2061,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                   <button
                     type="button"
                     onClick={handlePinBackspace}
-                    className="py-3.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm active:scale-95 transition-all flex items-center justify-center shadow-2xs"
+                    className="py-3.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm active:scale-95 transition-all flex items-facility justify-facility shadow-2xs"
                     title="Backspace"
                   >
                     <Delete className="w-5 h-5" />
@@ -2226,15 +2226,15 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                           description: `Display theme set to ${item.label}.`,
                         });
                       }}
-                      className={`w-full p-4 rounded-2xl border flex items-center justify-between transition-all ${
+                      className={`w-full p-4 rounded-2xl border flex items-facility justify-between transition-all ${
                         selectedTheme === item.id
                           ? 'bg-orange-50/80 border-orange-400 shadow-xs'
                           : 'bg-white border-slate-200 hover:bg-slate-50'
                       }`}
                     >
-                      <div className="flex items-center space-x-3 text-left">
+                      <div className="flex items-facility space-x-3 text-left">
                         <div
-                          className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${
+                          className={`w-9 h-9 rounded-full flex items-facility justify-facility shrink-0 ${
                             selectedTheme === item.id
                               ? 'bg-orange-600 text-white'
                               : 'bg-slate-100 text-slate-600'
@@ -2251,7 +2251,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                       </div>
 
                       <div
-                        className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                        className={`w-5 h-5 rounded-full border-2 flex items-facility justify-facility ${
                           selectedTheme === item.id
                             ? 'border-orange-600 bg-orange-600 text-white'
                             : 'border-slate-300'
@@ -2290,9 +2290,9 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                   </div>
 
                   {/* Channel 1: Support Email */}
-                  <div className="p-3.5 rounded-2xl border border-slate-200 flex items-center justify-between bg-slate-50/50">
-                    <div className="flex items-center space-x-3 min-w-0">
-                      <div className="w-9 h-9 rounded-full bg-rose-50 text-rose-500 flex items-center justify-center shrink-0">
+                  <div className="p-3.5 rounded-2xl border border-slate-200 flex items-facility justify-between bg-slate-50/50">
+                    <div className="flex items-facility space-x-3 min-w-0">
+                      <div className="w-9 h-9 rounded-full bg-rose-50 text-rose-500 flex items-facility justify-facility shrink-0">
                         <Mail className="w-4.5 h-4.5" />
                       </div>
                       <div className="min-w-0">
@@ -2311,7 +2311,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                           'email'
                         )
                       }
-                      className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-50 flex items-center space-x-1 shrink-0 ml-2"
+                      className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-50 flex items-facility space-x-1 shrink-0 ml-2"
                     >
                       {copiedKey === 'email' ? (
                         <>
@@ -2328,9 +2328,9 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                   </div>
 
                   {/* Channel 2: Academic Advisory */}
-                  <div className="p-3.5 rounded-2xl border border-slate-200 flex items-center justify-between bg-slate-50/50">
-                    <div className="flex items-center space-x-3 min-w-0">
-                      <div className="w-9 h-9 rounded-full bg-orange-50 text-orange-600 flex items-center justify-center shrink-0">
+                  <div className="p-3.5 rounded-2xl border border-slate-200 flex items-facility justify-between bg-slate-50/50">
+                    <div className="flex items-facility space-x-3 min-w-0">
+                      <div className="w-9 h-9 rounded-full bg-orange-50 text-orange-600 flex items-facility justify-facility shrink-0">
                         <GraduationCap className="w-4.5 h-4.5" />
                       </div>
                       <div className="min-w-0">
@@ -2346,7 +2346,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                       onClick={() =>
                         handleCopy('academics@excellencetutorials.ng', 'academics')
                       }
-                      className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-50 flex items-center space-x-1 shrink-0 ml-2"
+                      className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-50 flex items-facility space-x-1 shrink-0 ml-2"
                     >
                       {copiedKey === 'academics' ? (
                         <>
@@ -2363,9 +2363,9 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                   </div>
 
                   {/* Channel 3: Phone Hotline */}
-                  <div className="p-3.5 rounded-2xl border border-slate-200 flex items-center justify-between bg-slate-50/50">
-                    <div className="flex items-center space-x-3 min-w-0">
-                      <div className="w-9 h-9 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                  <div className="p-3.5 rounded-2xl border border-slate-200 flex items-facility justify-between bg-slate-50/50">
+                    <div className="flex items-facility space-x-3 min-w-0">
+                      <div className="w-9 h-9 rounded-full bg-blue-50 text-blue-600 flex items-facility justify-facility shrink-0">
                         <Phone className="w-4.5 h-4.5" />
                       </div>
                       <div className="min-w-0">
@@ -2381,7 +2381,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                       onClick={() =>
                         handleCopy(settings.phone || '+234 805 676 5455', 'phone')
                       }
-                      className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-50 flex items-center space-x-1 shrink-0 ml-2"
+                      className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-50 flex items-facility space-x-1 shrink-0 ml-2"
                     >
                       {copiedKey === 'phone' ? (
                         <>
@@ -2398,9 +2398,9 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                   </div>
 
                   {/* Channel 4: WhatsApp Chat */}
-                  <div className="p-3.5 rounded-2xl border border-slate-200 flex items-center justify-between bg-slate-50/50">
-                    <div className="flex items-center space-x-3 min-w-0">
-                      <div className="w-9 h-9 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                  <div className="p-3.5 rounded-2xl border border-slate-200 flex items-facility justify-between bg-slate-50/50">
+                    <div className="flex items-facility space-x-3 min-w-0">
+                      <div className="w-9 h-9 rounded-full bg-emerald-50 text-emerald-600 flex items-facility justify-facility shrink-0">
                         <MessageSquare className="w-4.5 h-4.5" />
                       </div>
                       <div className="min-w-0">
@@ -2416,21 +2416,21 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                       href={`https://wa.me/${(settings.whatsappNumber || settings.whatsapp || settings.phone).replace(/\D/g, '')}`}
                       target="_blank"
                       rel="noreferrer"
-                      className="px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 flex items-center space-x-1 shrink-0 ml-2 shadow-2xs"
+                      className="px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 flex items-facility space-x-1 shrink-0 ml-2 shadow-2xs"
                     >
                       <span>Chat</span>
                     </a>
                   </div>
 
                   {/* Channel 5: Campus Address */}
-                  <div className="p-3.5 rounded-2xl border border-slate-200 flex items-center justify-between bg-slate-50/50">
-                    <div className="flex items-center space-x-3 min-w-0">
-                      <div className="w-9 h-9 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center shrink-0">
+                  <div className="p-3.5 rounded-2xl border border-slate-200 flex items-facility justify-between bg-slate-50/50">
+                    <div className="flex items-facility space-x-3 min-w-0">
+                      <div className="w-9 h-9 rounded-full bg-slate-100 text-slate-700 flex items-facility justify-facility shrink-0">
                         <MapPin className="w-4.5 h-4.5" />
                       </div>
                       <div className="min-w-0">
                         <span className="text-[10px] text-slate-400 font-semibold block uppercase">
-                          Main Campus Center
+                          Main Campus Facility
                         </span>
                         <span className="text-xs font-bold text-slate-800 line-clamp-1 block">
                           {settings.address || '14 Allen Avenue, Ikeja, Lagos State, Nigeria'}
@@ -2444,7 +2444,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                           'address'
                         )
                       }
-                      className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-50 flex items-center space-x-1 shrink-0 ml-2"
+                      className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-50 flex items-facility space-x-1 shrink-0 ml-2"
                     >
                       {copiedKey === 'address' ? (
                         <>
@@ -2469,10 +2469,10 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                 <div className="flex items-start justify-between">
                   <div>
                     <h3 className="text-lg font-black text-slate-900">
-                      Centre Policy
+                      Facility Policy
                     </h3>
                     <p className="text-xs text-slate-500 mt-0.5">
-                      Your centre’s guidelines and code of conduct
+                      Your facility’s guidelines and code of conduct
                     </p>
                   </div>
                   <button
@@ -2511,7 +2511,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                       3. Data Protection & Parental Transparency
                     </h4>
                     <p>
-                      Candidate performance records, weekly mock scores, and center arrival times are
+                      Candidate performance records, weekly mock scores, and facility arrival times are
                       confidentially shared with designated parents/sponsors via automated SMS and
                       Parent Monitor Portal access.
                     </p>
@@ -2522,8 +2522,8 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
 
             {/* MODAL 10: Log Out */}
             {activeModal === 'logout' && (
-              <div className="p-6 overflow-y-auto space-y-4 text-center">
-                <div className="w-14 h-14 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
+              <div className="p-6 overflow-y-auto space-y-4 text-facility">
+                <div className="w-14 h-14 rounded-full bg-rose-50 text-rose-600 flex items-facility justify-facility mx-auto">
                   <LogOut className="w-7 h-7" />
                 </div>
                 <div>

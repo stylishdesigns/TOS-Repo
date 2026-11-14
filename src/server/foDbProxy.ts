@@ -178,7 +178,7 @@ export function registerFoDbProxy(app: express.Express): void {
         if (before.role === role && before.status === "active") {
           return res.json({ ok: true, already: true, membership: { id: `${uid}__${centreId}`, before: jsonSafe(before) } });
         }
-        return reject(res, 409, `A membership already exists for this uid and centre (role ${String(before.role)}, status ${String(before.status)}); refusing to overwrite it.`);
+        return reject(res, 409, `A membership already exists for this uid and facility (role ${String(before.role)}, status ${String(before.status)}); refusing to overwrite it.`);
       }
       const now = new Date().toISOString();
       const payload = { uid, centreId, role, status: "active", createdAt: now, updatedAt: now };
@@ -217,7 +217,7 @@ export function registerFoDbProxy(app: express.Express): void {
         if (tagged > 0) await batch.commit();
         perCollection[name] = { tagged, alreadyTagged: already, scanned: snap.size };
       }
-      console.log(`[fo-db-proxy] tag-missing-centreid centre=${centreId} ${JSON.stringify(perCollection)}`);
+      console.log(`[fo-db-proxy] tag-missing-centreid facility=${centreId} ${JSON.stringify(perCollection)}`);
       res.json({ ok: true, centreId, perCollection });
     } catch (err: any) {
       console.error(`[fo-db-proxy] tag-missing-centreid failed:`, err?.message || err);
@@ -276,7 +276,7 @@ export function registerFoDbProxy(app: express.Express): void {
         return reject(res, 404, "That admins record does not exist.");
       }
       if (snap.get("centreId")) {
-        return reject(res, 409, "That admins record belongs to a centre; use the TOS console member actions instead.");
+        return reject(res, 409, "That admins record belongs to a facility; use the TOS console member actions instead.");
       }
       const role = snap.get("role") ?? null;
       await ref.delete();
@@ -301,7 +301,7 @@ export function registerFoDbProxy(app: express.Express): void {
     try {
       const centreDoc = await adminDb.collection("centres").doc(centreId).get();
       if (!centreDoc.exists) {
-        return reject(res, 404, "That centre does not exist.");
+        return reject(res, 404, "That facility does not exist.");
       }
       const centre = (centreDoc.data() || {}) as Record<string, unknown>;
       const uid = typeof centre.ownerUid === "string" ? centre.ownerUid : "";
@@ -309,7 +309,7 @@ export function registerFoDbProxy(app: express.Express): void {
       const email = typeof centre.ownerEmail === "string" ? centre.ownerEmail : "";
       const phone = typeof centre.ownerPhone === "string" ? centre.ownerPhone : "";
       if (!uid || !ID_RE.test(uid) || !name || !email) {
-        return reject(res, 409, "The centre doc is missing its owner details; refusing to create people.");
+        return reject(res, 409, "The facility doc is missing its owner details; refusing to create people.");
       }
       const ref = adminDb.collection("admins").doc(uid);
       if ((await ref.get()).exists) {
@@ -384,7 +384,7 @@ export function registerFoDbProxy(app: express.Express): void {
     const body = (req.body || {}) as Record<string, unknown>;
     const centreId = typeof body.centreId === "string" ? body.centreId.trim() : "";
     if (body.confirm !== "DELETE-TEST-CENTRE") {
-      return reject(res, 400, 'Confirm with confirm:"DELETE-TEST-CENTRE".');
+      return reject(res, 400, 'Confirm with confirm:"DELETE-TEST-FACILITY".');
     }
     if (!centreId || centreId.length > 150 || !ID_RE.test(centreId)) {
       return reject(res, 400, "A valid centreId is required.");
@@ -392,7 +392,7 @@ export function registerFoDbProxy(app: express.Express): void {
     try {
       const centreRef = adminDb.collection("centres").doc(centreId);
       const centreSnap = await centreRef.get();
-      if (!centreSnap.exists) return reject(res, 404, "No centre document with this id.");
+      if (!centreSnap.exists) return reject(res, 404, "No facility document with this id.");
       const centre = (centreSnap.data() || {}) as Record<string, unknown>;
       const ownerEmail = String(centre.ownerEmail || "");
       const ownerUid = String(centre.ownerUid || "");
@@ -404,10 +404,10 @@ export function registerFoDbProxy(app: express.Express): void {
         ownerEmail.startsWith(TEST_MAIL_PREFIX) &&
         (localPart === "" || localPart.startsWith("+"));
       if (!onTestMailbox) {
-        return reject(res, 409, "Refusing: this centre\'s owner is not the Fo test mailbox.");
+        return reject(res, 409, "Refusing: this facility\'s owner is not the Fo test mailbox.");
       }
       if (!ownerUid || !ID_RE.test(ownerUid)) {
-        return reject(res, 409, "Refusing: the centre has no usable ownerUid.");
+        return reject(res, 409, "Refusing: the facility has no usable ownerUid.");
       }
       const deleted: string[] = [];
       await centreRef.delete();
@@ -446,10 +446,10 @@ export function registerFoDbProxy(app: express.Express): void {
       } catch {
         // Auth user already gone; the Firestore cleanup still stands.
       }
-      console.log(`[fo-db-proxy] delete-test-centre ${centreId}: deleted ${deleted.length} record(s), authDeleted=${authDeleted}`);
+      console.log(`[fo-db-proxy] delete-test-facility ${centreId}: deleted ${deleted.length} record(s), authDeleted=${authDeleted}`);
       res.json({ ok: true, centreId, deleted, authDeleted });
     } catch (err: any) {
-      console.error(`[fo-db-proxy] delete-test-centre failed:`, err?.message || err);
+      console.error(`[fo-db-proxy] delete-test-facility failed:`, err?.message || err);
       reject(res, 500, "The deletion failed on the server.");
     }
   });

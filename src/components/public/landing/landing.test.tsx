@@ -17,7 +17,7 @@ const has = (...xs: string[]) => xs.forEach((x) => assert.ok(html.includes(x), `
 
 // Structure and copy follow the design artboard (Main.dc.html).
 has(
-  'Run your whole tutorial centre from one place.',
+  'Run your whole education facility from one place.',
   'Try it live as',
   'What you get',
   'One system, three portals.',
@@ -27,7 +27,7 @@ has(
   'Simple pricing, in naira.',
   'Free for 14 days',
   'Questions, answered.',
-  'Ready to run your centre on one system?',
+  'Ready to run your facility on one system?',
   '\u20A62,000',
   '\u20A63,500',
 );

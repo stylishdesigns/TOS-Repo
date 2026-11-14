@@ -83,7 +83,7 @@ function AdminScreen() {
         <i style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#CBD5E1' }} />
         <i style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#CBD5E1' }} />
         <i style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#CBD5E1' }} />
-        <span style={{ marginLeft: '8px', flex: '1', background: '#fff', borderRadius: '8px', padding: '4px 10px', font: '500 12px Inter,sans-serif', color: '#475569' }}>Centre admin</span>
+        <span style={{ marginLeft: '8px', flex: '1', background: '#fff', borderRadius: '8px', padding: '4px 10px', font: '500 12px Inter,sans-serif', color: '#475569' }}>Facility admin</span>
       </div>
       <div style={{ display: 'flex' }}>
         <div className="sd2" style={{ width: '148px', flex: 'none' }}>
@@ -214,7 +214,7 @@ function StudentScreen() {
 
 const PANELS: Array<{ k: string; kicker: string; title: string; bullets: string[]; screen: ReactNode; w: number }> = [
   {
-    k: 'admin', kicker: 'Centre admins', title: 'Run the business', w: 760,
+    k: 'admin', kicker: 'Facility admins', title: 'Run the business', w: 760,
     bullets: [
       'Approve admissions and manage students',
       'Track fees, confirm payments and issue receipts',
@@ -238,7 +238,7 @@ const PANELS: Array<{ k: string; kicker: string; title: string; bullets: string[
     bullets: [
       'See classes, results and resources on your phone',
       'Practise with CBT tests and join mock exams',
-      'Chat with classmates and tutors in your centre',
+      'Chat with classmates and tutors in your facility',
       'Ask the AI study coach what to work on next',
     ],
     screen: <StudentScreen />,

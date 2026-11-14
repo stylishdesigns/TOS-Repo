@@ -61,11 +61,11 @@ export function assertCentreAccess(opts: {
   if (!opts.callerCentreId || !opts.recordCentreId) {
     throw new PaymentError(
       403,
-      'This record has no centre assigned, so it cannot be changed here. Ask platform support to run the centre backfill.'
+      'This record has no facility assigned, so it cannot be changed here. Ask platform support to run the facility backfill.'
     );
   }
   if (opts.callerCentreId !== opts.recordCentreId) {
-    throw new PaymentError(403, 'That record belongs to a different centre');
+    throw new PaymentError(403, 'That record belongs to a different facility');
   }
 }
 
@@ -122,7 +122,7 @@ export function assertPendingCapacity(existingPending: number): void {
   if (existingPending >= MAX_PENDING_PER_STUDENT) {
     throw new PaymentError(
       429,
-      'You already have several payments awaiting confirmation. Wait for the centre to confirm them first.'
+      'You already have several payments awaiting confirmation. Wait for the facility to confirm them first.'
     );
   }
 }

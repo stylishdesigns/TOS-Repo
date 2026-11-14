@@ -55,8 +55,8 @@ export const QuestionBankHub: React.FC<{ summary: Summary; loading: boolean; err
         <div className="rounded-2xl border-2 border-sky-500/40 bg-sky-500/[0.06] p-5 flex flex-col">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-sky-400 text-slate-950 text-[10px] font-black tracking-wider">PRACTICE BANK</span>
-              <p className="text-sm text-slate-300 mt-2.5">Students practise from this bank, across every centre. It publishes to a public file on the CDN.</p>
+              <span className="inline-flex items-facility px-2.5 py-1 rounded-full bg-sky-400 text-slate-950 text-[10px] font-black tracking-wider">PRACTICE BANK</span>
+              <p className="text-sm text-slate-300 mt-2.5">Students practise from this bank, across every facility. It publishes to a public file on the CDN.</p>
             </div>
             <BookOpen className="w-8 h-8 text-sky-300 shrink-0" />
           </div>
@@ -72,7 +72,7 @@ export const QuestionBankHub: React.FC<{ summary: Summary; loading: boolean; err
             <p className="text-[11px] text-slate-500 mt-3">Nothing published yet.</p>
           )}
           <button onClick={() => onOpen('practice')}
-            className="mt-4 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-sm min-h-[44px] transition-colors">
+            className="mt-4 inline-flex items-facility justify-facility gap-2 px-4 py-3 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-sm min-h-[44px] transition-colors">
             <Play className="w-4 h-4" /> Open Practice Bank
           </button>
         </div>
@@ -81,7 +81,7 @@ export const QuestionBankHub: React.FC<{ summary: Summary; loading: boolean; err
         <div className="rounded-2xl border-2 border-amber-500/40 bg-amber-500/[0.06] p-5 flex flex-col">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-amber-400 text-slate-950 text-[10px] font-black tracking-wider">MOCK BANK</span>
+              <span className="inline-flex items-facility px-2.5 py-1 rounded-full bg-amber-400 text-slate-950 text-[10px] font-black tracking-wider">MOCK BANK</span>
               <p className="text-sm text-slate-300 mt-2.5">Feeds the daily mock exam only. Its questions are private: no public file, answers stay on the server.</p>
             </div>
             <Lock className="w-8 h-8 text-amber-300 shrink-0" />
@@ -94,7 +94,7 @@ export const QuestionBankHub: React.FC<{ summary: Summary; loading: boolean; err
           </div>
           <p className="text-[11px] text-slate-500 mt-3">Locking lands with the next step: once a scheduled mock takes questions, editing is stopped on the server.</p>
           <button onClick={() => onOpen('mock')}
-            className="mt-4 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-sm min-h-[44px] transition-colors">
+            className="mt-4 inline-flex items-facility justify-facility gap-2 px-4 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-sm min-h-[44px] transition-colors">
             <Play className="w-4 h-4" /> Open Mock Bank
           </button>
         </div>
@@ -115,7 +115,7 @@ export const QuestionBankHub: React.FC<{ summary: Summary; loading: boolean; err
             <tbody className="text-slate-300">
               <tr className="border-t border-white/5">
                 <td className="py-2.5 pr-3 font-bold text-slate-200">Who uses it</td>
-                <td className="py-2.5 pr-3">Every centre's students, practising any time</td>
+                <td className="py-2.5 pr-3">Every facility's students, practising any time</td>
                 <td className="py-2.5">The daily mock exam only</td>
               </tr>
               <tr className="border-t border-white/5">
@@ -221,7 +221,7 @@ export const MockPapersTab: React.FC<{ refreshKey: number; onNewMock?: () => voi
   if (openId) {
     return (
       <div className="space-y-4">
-        <button onClick={() => setOpenId(null)} className="text-xs font-black text-slate-400 hover:text-white inline-flex items-center gap-1.5" aria-label="Back to all mock papers">
+        <button onClick={() => setOpenId(null)} className="text-xs font-black text-slate-400 hover:text-white inline-flex items-facility gap-1.5" aria-label="Back to all mock papers">
           <ChevronRight className="w-4 h-4 rotate-180" /> All mock papers
         </button>
         <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-5">
@@ -250,19 +250,19 @@ export const MockPapersTab: React.FC<{ refreshKey: number; onNewMock?: () => voi
       </div>
 
       <div className="rounded-2xl border border-white/10 bg-slate-900/50 overflow-hidden">
-        <div className="px-5 pt-4 pb-3 flex items-center justify-between gap-3">
+        <div className="px-5 pt-4 pb-3 flex items-facility justify-between gap-3">
           <p className="text-sm font-black text-white">Papers</p>
-          <div className="flex items-center gap-2">
+          <div className="flex items-facility gap-2">
             {onNewMock && (
               <button onClick={onNewMock}
-                className="inline-flex items-center gap-1.5 text-xs font-black px-3 py-2 rounded-lg bg-orange-500 text-white hover:bg-orange-400 min-h-[36px] shrink-0">
+                className="inline-flex items-facility gap-1.5 text-xs font-black px-3 py-2 rounded-lg bg-orange-500 text-white hover:bg-orange-400 min-h-[36px] shrink-0">
                 <Plus className="w-3.5 h-3.5" /> New mock
               </button>
             )}
             <button onClick={() => setMonth(shiftMonth(month, -1))} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5" aria-label="Previous month">
               <ChevronRight className="w-4 h-4 rotate-180" />
             </button>
-            <p className="text-[11px] text-slate-500 min-w-[130px] text-center">{monthLabel(month)} &middot; Lagos time</p>
+            <p className="text-[11px] text-slate-500 min-w-[130px] text-facility">{monthLabel(month)} &middot; Lagos time</p>
             <button onClick={() => setMonth(shiftMonth(month, 1))} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5" aria-label="Next month">
               <ChevronRight className="w-4 h-4" />
             </button>

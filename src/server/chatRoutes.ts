@@ -214,7 +214,7 @@ async function getCentreChat(centreId: string): Promise<CentreChatSettings> {
     return mergeCentreChat(doc.exists ? (doc.data() as any)?.chat : null);
   } catch (err: any) {
     if (err?.status) throw err;
-    console.error('[chat] centre settings read failed:', err?.message || err);
+    console.error('[chat] facility settings read failed:', err?.message || err);
     throw httpError(500, 'A server error occurred. Please try again.');
   }
 }
@@ -433,11 +433,11 @@ async function studentChatBase(caller: Caller): Promise<{ student: any; centreId
   if (!stuSnap) throw httpError(403, 'No student record is linked to this account.');
   const student = stuSnap.data() as any;
   const centreId = cleanStr(student.centreId, 120);
-  if (!centreId) throw httpError(403, 'No centre is linked to this account.');
+  if (!centreId) throw httpError(403, 'No facility is linked to this account.');
   await requireMembership(caller, centreId);
   const entitlements = await getCentreEntitlements(centreId);
   if (entitlements.chat !== true) {
-    throw httpError(403, 'Chat is not part of your centre\u2019s plan yet.');
+    throw httpError(403, 'Chat is not part of your facility\u2019s plan yet.');
   }
   return { student, centreId };
 }
@@ -487,10 +487,10 @@ async function openPersonalCore(caller: Caller, opts: { role: 'student' | 'staff
   const sameCentre = target.centres.includes(opts.centreId);
   if (!sameCentre) {
     if (staffRole || !target.isStudent) {
-      throw httpError(403, 'Staff can only chat with people in their own centre.');
+      throw httpError(403, 'Staff can only chat with people in their own facility.');
     }
     if (!(await friendshipAccepted(caller.uid, targetUid))) {
-      throw httpError(403, 'You can only chat with students from other centres after you become friends. Send a friend request from the leaderboard.');
+      throw httpError(403, 'You can only chat with students from other facilities after you become friends. Send a friend request from the leaderboard.');
     }
     // The target's own choice: "nobody" closes new cross-centre chats even
     // for existing friends. Chats already opened are untouched.
@@ -503,7 +503,7 @@ async function openPersonalCore(caller: Caller, opts: { role: 'student' | 'staff
   if (!staffRole && target.isStudent && sameCentre) {
     const centreChat = await getCentreChat(opts.centreId);
     if (centreChat.studentsCanChatStudents === false) {
-      throw httpError(403, 'Your centre has turned student-to-student chats off. Ask your centre admin.');
+      throw httpError(403, 'Your facility has turned student-to-student chats off. Ask your facility admin.');
     }
   }
 
@@ -780,11 +780,11 @@ async function studentGroupContext(caller: Caller, groupId: string, forPost: boo
   if (!stuSnap) throw httpError(403, 'No student record is linked to this account.');
   const student = stuSnap.data() as any;
   const centreId = cleanStr(student.centreId, 120);
-  if (!centreId) throw httpError(403, 'No centre is linked to this account.');
+  if (!centreId) throw httpError(403, 'No facility is linked to this account.');
   await requireMembership(caller, centreId);
   const entitlements = await getCentreEntitlements(centreId);
   if (entitlements.chat !== true) {
-    throw httpError(403, 'Chat is not part of your centre\u2019s plan yet.');
+    throw httpError(403, 'Chat is not part of your facility\u2019s plan yet.');
   }
   const group = await loadGroup(groupId);
   const isTosChannel = group.kind === 'tos_channel';
@@ -800,7 +800,7 @@ async function studentGroupContext(caller: Caller, groupId: string, forPost: boo
   }
   const centreChat = isTosChannel || isPersonal ? await getCentreChat(centreId) : await getCentreChat(group.centreId as string);
   if (!isTosChannel && centreChat.paused) {
-    throw httpError(503, 'Chat is paused for your centre right now.');
+    throw httpError(503, 'Chat is paused for your facility right now.');
   }
   const stats = await sevenDayStats(caller.uid, centreId);
   const gate = gateFor(group, centreChat, await getTosChat());
@@ -889,11 +889,11 @@ export function registerChatRoutes(app: express.Express): void {
       if (!stuSnap) return res.status(403).json({ error: 'No student record is linked to this account.' });
       const student = stuSnap.data() as any;
       const centreId = cleanStr(student.centreId, 120);
-      if (!centreId) return res.status(403).json({ error: 'No centre is linked to this account.' });
+      if (!centreId) return res.status(403).json({ error: 'No facility is linked to this account.' });
       await requireMembership(caller, centreId);
       const entitlements = await getCentreEntitlements(centreId);
       if (entitlements.chat !== true) {
-        return res.status(403).json({ error: 'Chat is not part of your centre\u2019s plan yet.' });
+        return res.status(403).json({ error: 'Chat is not part of your facility\u2019s plan yet.' });
       }
       const [centreChat, tosChat] = await Promise.all([getCentreChat(centreId), getTosChat()]);
       const stats = await sevenDayStats(caller.uid, centreId);
@@ -1051,7 +1051,7 @@ export function registerChatRoutes(app: express.Express): void {
         if (ent.chat === true) activeCentreIds.push(cid);
       }
       if (!activeCentreIds.length) {
-        return res.status(403).json({ error: 'Chat is not part of your centre\u2019s plan yet.' });
+        return res.status(403).json({ error: 'Chat is not part of your facility\u2019s plan yet.' });
       }
       res.json(await statusOverviewCore(caller, activeCentreIds, { name: cleanStr(student.name, MAX_NAME_CHARS), username: await usernameFor(caller.uid), avatar: cleanStr(student.avatar, 400) }, { includeTos: true }));
     } catch (error: any) {
@@ -1073,10 +1073,10 @@ export function registerChatRoutes(app: express.Express): void {
       if (!stuSnap) throw httpError(403, 'No student record is linked to this account.');
       const student = stuSnap.data() as any;
       const centreId = cleanStr(student.centreId, 120);
-      if (!centreId) throw httpError(403, 'No centre is linked to this account.');
+      if (!centreId) throw httpError(403, 'No facility is linked to this account.');
       await requireMembership(caller, centreId);
       const entitlements = await getCentreEntitlements(centreId);
-      if (entitlements.chat !== true) throw httpError(403, 'Chat is not part of your centre\u2019s plan yet.');
+      if (entitlements.chat !== true) throw httpError(403, 'Chat is not part of your facility\u2019s plan yet.');
       res.json(await statusPostCore(caller, centreId, body));
     } catch (error: any) {
       handleRouteError(res, error, '[chat] status post failed');
@@ -1095,10 +1095,10 @@ export function registerChatRoutes(app: express.Express): void {
       if (!stuSnap) throw httpError(403, 'No student record is linked to this account.');
       const student = stuSnap.data() as any;
       const centreId = cleanStr(student.centreId, 120);
-      if (!centreId) throw httpError(403, 'No centre is linked to this account.');
+      if (!centreId) throw httpError(403, 'No facility is linked to this account.');
       await requireMembership(caller, centreId);
       const entitlements = await getCentreEntitlements(centreId);
-      if (entitlements.chat !== true) throw httpError(403, 'Chat is not part of your centre\u2019s plan yet.');
+      if (entitlements.chat !== true) throw httpError(403, 'Chat is not part of your facility\u2019s plan yet.');
       res.json(await statusUploadCore(caller, centreId, body));
     } catch (error: any) {
       handleRouteError(res, error, '[chat] status upload failed');
@@ -1115,10 +1115,10 @@ export function registerChatRoutes(app: express.Express): void {
       if (!stuSnap) throw httpError(403, 'No student record is linked to this account.');
       const student = stuSnap.data() as any;
       const centreId = cleanStr(student.centreId, 120);
-      if (!centreId) throw httpError(403, 'No centre is linked to this account.');
+      if (!centreId) throw httpError(403, 'No facility is linked to this account.');
       await requireMembership(caller, centreId);
       const entitlements = await getCentreEntitlements(centreId);
-      if (entitlements.chat !== true) throw httpError(403, 'Chat is not part of your centre\u2019s plan yet.');
+      if (entitlements.chat !== true) throw httpError(403, 'Chat is not part of your facility\u2019s plan yet.');
       res.json(await statusUploadConfigCore(caller, centreId, body));
     } catch (error: any) {
       handleRouteError(res, error, '[chat] status upload config failed');
@@ -1136,7 +1136,7 @@ export function registerChatRoutes(app: express.Express): void {
       if (!stuSnap) return res.status(403).json({ error: 'No student record is linked to this account.' });
       const student = stuSnap.data() as any;
       let centreId = cleanStr(student.centreId, 120);
-      if (!centreId) return res.status(403).json({ error: 'No centre is linked to this account.' });
+      if (!centreId) return res.status(403).json({ error: 'No facility is linked to this account.' });
       // A status may live in any centre the caller belongs to, or in TOS's
       // own feed; the request names the centre it came from.
       const requestedCentre = cleanStr(String((req.query || {}).centreId || ''), 120);
@@ -1144,13 +1144,13 @@ export function registerChatRoutes(app: express.Express): void {
         if (requestedCentre !== TOS_STATUS_CENTRE) {
           await requireMembership(caller, requestedCentre);
           const otherEnt = await getCentreEntitlements(requestedCentre);
-          if (otherEnt.chat !== true) return res.status(403).json({ error: 'Chat is not part of your centre\u2019s plan yet.' });
+          if (otherEnt.chat !== true) return res.status(403).json({ error: 'Chat is not part of your facility\u2019s plan yet.' });
         }
         centreId = requestedCentre;
       } else {
         await requireMembership(caller, centreId);
         const entitlements = await getCentreEntitlements(centreId);
-        if (entitlements.chat !== true) return res.status(403).json({ error: 'Chat is not part of your centre\u2019s plan yet.' });
+        if (entitlements.chat !== true) return res.status(403).json({ error: 'Chat is not part of your facility\u2019s plan yet.' });
       }
       const ownerUid = cleanStr(req.params?.uid, 64);
       if (!ownerUid) return res.status(400).json({ error: 'Which status is this?' });
@@ -1170,7 +1170,7 @@ export function registerChatRoutes(app: express.Express): void {
       if (!stuSnap) return res.status(403).json({ error: 'No student record is linked to this account.' });
       const student = stuSnap.data() as any;
       let centreId = cleanStr(student.centreId, 120);
-      if (!centreId) return res.status(403).json({ error: 'No centre is linked to this account.' });
+      if (!centreId) return res.status(403).json({ error: 'No facility is linked to this account.' });
       // A status may live in any centre the caller belongs to, or in TOS's
       // own feed; the request names the centre it came from.
       const requestedCentre = cleanStr(String((req.query || {}).centreId || ''), 120);
@@ -1178,13 +1178,13 @@ export function registerChatRoutes(app: express.Express): void {
         if (requestedCentre !== TOS_STATUS_CENTRE) {
           await requireMembership(caller, requestedCentre);
           const otherEnt = await getCentreEntitlements(requestedCentre);
-          if (otherEnt.chat !== true) return res.status(403).json({ error: 'Chat is not part of your centre\u2019s plan yet.' });
+          if (otherEnt.chat !== true) return res.status(403).json({ error: 'Chat is not part of your facility\u2019s plan yet.' });
         }
         centreId = requestedCentre;
       } else {
         await requireMembership(caller, centreId);
         const entitlements = await getCentreEntitlements(centreId);
-        if (entitlements.chat !== true) return res.status(403).json({ error: 'Chat is not part of your centre\u2019s plan yet.' });
+        if (entitlements.chat !== true) return res.status(403).json({ error: 'Chat is not part of your facility\u2019s plan yet.' });
       }
       res.json(await statusSeenCore(caller, centreId, body, { name: cleanStr(student.name, MAX_NAME_CHARS), username: await usernameFor(caller.uid) }));
     } catch (error: any) {
@@ -1205,7 +1205,7 @@ export function registerChatRoutes(app: express.Express): void {
       if (!stuSnap) return res.status(403).json({ error: 'No student record is linked to this account.' });
       const student = stuSnap.data() as any;
       let centreId = cleanStr(student.centreId, 120);
-      if (!centreId) return res.status(403).json({ error: 'No centre is linked to this account.' });
+      if (!centreId) return res.status(403).json({ error: 'No facility is linked to this account.' });
       // A status may live in any centre the caller belongs to, or in TOS's
       // own feed; the request names the centre it came from.
       const requestedCentre = cleanStr(String((req.query || {}).centreId || ''), 120);
@@ -1213,13 +1213,13 @@ export function registerChatRoutes(app: express.Express): void {
         if (requestedCentre !== TOS_STATUS_CENTRE) {
           await requireMembership(caller, requestedCentre);
           const otherEnt = await getCentreEntitlements(requestedCentre);
-          if (otherEnt.chat !== true) return res.status(403).json({ error: 'Chat is not part of your centre\u2019s plan yet.' });
+          if (otherEnt.chat !== true) return res.status(403).json({ error: 'Chat is not part of your facility\u2019s plan yet.' });
         }
         centreId = requestedCentre;
       } else {
         await requireMembership(caller, centreId);
         const entitlements = await getCentreEntitlements(centreId);
-        if (entitlements.chat !== true) return res.status(403).json({ error: 'Chat is not part of your centre\u2019s plan yet.' });
+        if (entitlements.chat !== true) return res.status(403).json({ error: 'Chat is not part of your facility\u2019s plan yet.' });
       }
       res.json(await statusReplyCore(caller, centreId, body, { name: cleanStr(student.name, MAX_NAME_CHARS), username: await usernameFor(caller.uid), role: 'student' }));
     } catch (error: any) {
@@ -1237,19 +1237,19 @@ export function registerChatRoutes(app: express.Express): void {
       if (!stuSnap) return res.status(403).json({ error: 'No student record is linked to this account.' });
       const student = stuSnap.data() as any;
       let centreId = cleanStr(student.centreId, 120);
-      if (!centreId) return res.status(403).json({ error: 'No centre is linked to this account.' });
+      if (!centreId) return res.status(403).json({ error: 'No facility is linked to this account.' });
       const requestedCentre = cleanStr(String((req.query || {}).centreId || ''), 120);
       if (requestedCentre && requestedCentre !== centreId) {
         if (requestedCentre !== TOS_STATUS_CENTRE) {
           await requireMembership(caller, requestedCentre);
           const otherEnt = await getCentreEntitlements(requestedCentre);
-          if (otherEnt.chat !== true) return res.status(403).json({ error: 'Chat is not part of your centre\u2019s plan yet.' });
+          if (otherEnt.chat !== true) return res.status(403).json({ error: 'Chat is not part of your facility\u2019s plan yet.' });
         }
         centreId = requestedCentre;
       } else {
         await requireMembership(caller, centreId);
         const entitlements = await getCentreEntitlements(centreId);
-        if (entitlements.chat !== true) return res.status(403).json({ error: 'Chat is not part of your centre\u2019s plan yet.' });
+        if (entitlements.chat !== true) return res.status(403).json({ error: 'Chat is not part of your facility\u2019s plan yet.' });
       }
       res.json(await statusLoveCore(caller, centreId, body, { name: cleanStr(student.name, MAX_NAME_CHARS), username: await usernameFor(caller.uid) }));
     } catch (error: any) {
@@ -1471,7 +1471,7 @@ export function registerChatRoutes(app: express.Express): void {
       const caller = getCaller(req);
       const { centreId } = await studentChatBase(caller);
       const centreChat = await getCentreChat(centreId);
-      if (centreChat.paused) throw httpError(503, 'Chat is paused for your centre right now.');
+      if (centreChat.paused) throw httpError(503, 'Chat is paused for your facility right now.');
       res.json(await openPersonalCore(caller, { role: 'student', centreId, targetUid: String((req.body || {}).uid || '') }));
     } catch (error: any) {
       handleRouteError(res, error, '[chat] personal open failed');
@@ -1487,10 +1487,10 @@ export function registerChatRoutes(app: express.Express): void {
       await requireMembership(caller, centreId, ['owner', 'admin', 'tutor']);
       const entitlements = await getCentreEntitlements(centreId);
       if (entitlements.chat !== true) {
-        throw httpError(403, 'Chat is not part of your centre\u2019s plan yet.');
+        throw httpError(403, 'Chat is not part of your facility\u2019s plan yet.');
       }
       const centreChat = await getCentreChat(centreId);
-      if (centreChat.paused) throw httpError(503, 'Chat is paused for your centre right now.');
+      if (centreChat.paused) throw httpError(503, 'Chat is paused for your facility right now.');
       res.json(await openPersonalCore(caller, { role: 'staff', centreId, targetUid: String(body.uid || '') }));
     } catch (error: any) {
       handleRouteError(res, error, '[chat] staff personal open failed');
@@ -1554,7 +1554,7 @@ export function registerChatRoutes(app: express.Express): void {
       if (!target || !target.isStudent) throw httpError(404, 'No student uses that username on the leaderboard.');
       const targetCentre = target.centres[0] || '';
       if (!targetCentre || targetCentre === centreId) {
-        throw httpError(400, 'You can already chat with students in your centre. Start a chat with them instead.');
+        throw httpError(400, 'You can already chat with students in your facility. Start a chat with them instead.');
       }
       // The target's own privacy choice decides whether this request may
       // even be sent, checked here on the server.
@@ -1690,7 +1690,7 @@ export function registerChatRoutes(app: express.Express): void {
       await requireMembership(caller, centreId, ['owner', 'admin', 'tutor']);
       const entitlements = await getCentreEntitlements(centreId);
       if (entitlements.chat !== true) {
-        throw httpError(403, 'Chat is not part of your centre\u2019s plan yet.');
+        throw httpError(403, 'Chat is not part of your facility\u2019s plan yet.');
       }
       const cloud = String(process.env.CLOUDINARY_CLOUD_NAME || '');
       const preset = String(process.env.CLOUDINARY_UPLOAD_PRESET || '');
@@ -1709,7 +1709,7 @@ export function registerChatRoutes(app: express.Express): void {
       await requireMembership(caller, centreId, ['owner', 'admin', 'tutor']);
       const entitlements = await getCentreEntitlements(centreId);
       if (entitlements.chat !== true) {
-        throw httpError(403, 'Chat is not part of your centre\u2019s plan yet.');
+        throw httpError(403, 'Chat is not part of your facility\u2019s plan yet.');
       }
       res.json(await chatDirectoryFor(centreId, caller.uid));
     } catch (error: any) {
@@ -1812,16 +1812,16 @@ export function registerChatRoutes(app: express.Express): void {
     try {
       const caller = getCaller(req);
       const ctx = await studentGroupContext(caller, String(req.params.id || ''), true);
-      if (ctx.group.kind === 'announcements') throw httpError(403, 'Only your centre can post in Announcements.');
+      if (ctx.group.kind === 'announcements') throw httpError(403, 'Only your facility can post in Announcements.');
       if (ctx.group.kind === 'tos_channel') throw httpError(403, 'Only TOS can post in this channel.');
       if (ctx.lock.locked) {
         throw httpError(403, JSON.stringify({ locked: true, myPercent: ctx.lock.myPercent, thresholdPercent: ctx.lock.thresholdPercent, myAnswers: ctx.lock.myAnswers, minAnswers: ctx.lock.minAnswers }));
       }
-      if (ctx.centreChat.paused) throw httpError(503, 'Chat is paused for your centre right now.');
+      if (ctx.centreChat.paused) throw httpError(503, 'Chat is paused for your facility right now.');
       const mute = await mutedUntil(caller.uid, ctx.centreId);
       if (mute) {
         const days = Math.max(1, Math.ceil((mute - Date.now()) / DAY_MS));
-        throw httpError(403, `You have been muted from this centre's chats for ${days} more day${days === 1 ? '' : 's'}.`);
+        throw httpError(403, `You have been muted from this facility's chats for ${days} more day${days === 1 ? '' : 's'}.`);
       }
       const username = await usernameFor(caller.uid);
       if (!username) throw httpError(403, 'Set your username in your profile before using chat.');
@@ -1980,13 +1980,13 @@ export function registerChatRoutes(app: express.Express): void {
       const v = await loadMessage(fromCtx.group.id, msgId);
       if (v.removed) throw httpError(404, 'That message is no longer available.');
       const toCtx = await studentGroupContext(caller, toId, true);
-      if (toCtx.group.kind === 'announcements') throw httpError(403, 'Only your centre can post in Announcements.');
+      if (toCtx.group.kind === 'announcements') throw httpError(403, 'Only your facility can post in Announcements.');
       if (toCtx.group.kind === 'tos_channel') throw httpError(403, 'Only TOS can post in this channel.');
-      if (toCtx.centreChat.paused) throw httpError(503, 'Chat is paused for your centre right now.');
+      if (toCtx.centreChat.paused) throw httpError(503, 'Chat is paused for your facility right now.');
       const mute = await mutedUntil(caller.uid, toCtx.centreId);
       if (mute) {
         const days = Math.max(1, Math.ceil((mute - Date.now()) / DAY_MS));
-        throw httpError(403, `You have been muted from this centre's chats for ${days} more day${days === 1 ? '' : 's'}.`);
+        throw httpError(403, `You have been muted from this facility's chats for ${days} more day${days === 1 ? '' : 's'}.`);
       }
       const username = await usernameFor(caller.uid);
       if (!username) throw httpError(403, 'Set your username in your profile before using chat.');
@@ -2071,11 +2071,11 @@ export function registerChatRoutes(app: express.Express): void {
 // ---------------------------------------------------------------------------
 
 async function staffGroupContext(caller: Caller, centreId: string, groupId: string) {
-  if (!centreId) throw httpError(400, 'No centre is selected.');
+  if (!centreId) throw httpError(400, 'No facility is selected.');
   const membership = await requireMembership(caller, centreId, ['owner', 'admin', 'tutor']);
   const entitlements = await getCentreEntitlements(centreId);
   if (entitlements.chat !== true) {
-    throw httpError(403, 'Chat is not part of your centre\u2019s plan yet.');
+    throw httpError(403, 'Chat is not part of your facility\u2019s plan yet.');
   }
   const group = await loadGroup(groupId);
   const isPersonal = group.kind === 'personal';
@@ -2870,11 +2870,11 @@ async function statusLoveCore(caller: Caller, centreId: string, body: Record<str
 /** Staff status gate: a centre membership with a staff role plus the chat
  *  entitlement. Same bar the centre staff chat routes use. */
 async function staffStatusContext(caller: Caller, centreId: string) {
-  if (!centreId) throw httpError(400, 'No centre is selected.');
+  if (!centreId) throw httpError(400, 'No facility is selected.');
   const membership = await requireMembership(caller, centreId, ['owner', 'admin', 'tutor']);
   const entitlements = await getCentreEntitlements(centreId);
   if (entitlements.chat !== true) {
-    throw httpError(403, 'Chat is not part of your centre\u2019s plan yet.');
+    throw httpError(403, 'Chat is not part of your facility\u2019s plan yet.');
   }
   return membership;
 }
@@ -2986,11 +2986,11 @@ async function staffStatusContext(caller: Caller, centreId: string) {
       const centreId = cleanStr(String(req.query.centreId || ''), 120);
       const ctx = await staffGroupContext(caller, centreId, String(req.params.id || ''));
       if (ctx.group.kind === 'tos_channel') throw httpError(403, 'Only TOS can post in this channel.');
-      if (ctx.centreChat.paused) throw httpError(503, 'Chat is paused for your centre right now.');
+      if (ctx.centreChat.paused) throw httpError(503, 'Chat is paused for your facility right now.');
       const mute = await mutedUntil(caller.uid, centreId);
       if (mute) {
         const days = Math.max(1, Math.ceil((mute - Date.now()) / DAY_MS));
-        throw httpError(403, `You have been muted from this centre's chats for ${days} more day${days === 1 ? '' : 's'}.`);
+        throw httpError(403, `You have been muted from this facility's chats for ${days} more day${days === 1 ? '' : 's'}.`);
       }
       const tosChat = await getTosChat();
       const body = req.body || {};
@@ -3076,19 +3076,19 @@ async function staffStatusContext(caller: Caller, centreId: string) {
       const fromId = cleanStr(body.fromGroupId, 120);
       const toId = cleanStr(body.toGroupId, 120);
       const msgId = cleanStr(body.msgId, 128);
-      if (!centreId) throw httpError(400, 'No centre is selected.');
+      if (!centreId) throw httpError(400, 'No facility is selected.');
       if (!fromId || !toId || !msgId) throw httpError(400, 'Choose a message and a chat to forward it to.');
       const fromCtx = await staffGroupContext(caller, centreId, fromId);
       const v = await loadMessage(fromCtx.group.id, msgId);
       if (v.removed) throw httpError(404, 'That message is no longer available.');
       const toCtx = await staffGroupContext(caller, centreId, toId);
-      if (toCtx.group.kind === 'announcements') throw httpError(403, 'Only your centre can post in Announcements.');
+      if (toCtx.group.kind === 'announcements') throw httpError(403, 'Only your facility can post in Announcements.');
       if (toCtx.group.kind === 'tos_channel') throw httpError(403, 'Only TOS can post in this channel.');
-      if (toCtx.centreChat.paused) throw httpError(503, 'Chat is paused for your centre right now.');
+      if (toCtx.centreChat.paused) throw httpError(503, 'Chat is paused for your facility right now.');
       const mute = await mutedUntil(caller.uid, centreId);
       if (mute) {
         const days = Math.max(1, Math.ceil((mute - Date.now()) / DAY_MS));
-        throw httpError(403, `You have been muted from this centre's chats for ${days} more day${days === 1 ? '' : 's'}.`);
+        throw httpError(403, `You have been muted from this facility's chats for ${days} more day${days === 1 ? '' : 's'}.`);
       }
       const tosChat = await getTosChat();
       await consumePostRateLimit(caller.uid, tosChat.postRateLimitPerDay);
@@ -3199,13 +3199,13 @@ async function staffStatusContext(caller: Caller, centreId: string) {
       if (!stuSnap) throw httpError(403, 'No student record is linked to this account.');
       const student = stuSnap.data() as any;
       const centreId = cleanStr(student.centreId, 120);
-      if (!centreId) throw httpError(403, 'No centre is linked to this account.');
+      if (!centreId) throw httpError(403, 'No facility is linked to this account.');
       await requireMembership(caller, centreId);
       const entitlements = await getCentreEntitlements(centreId);
-      if (entitlements.chat !== true) throw httpError(403, 'Chat is not part of your centre\u2019s plan yet.');
+      if (entitlements.chat !== true) throw httpError(403, 'Chat is not part of your facility\u2019s plan yet.');
       const centreChat = await getCentreChat(centreId);
-      if (centreChat.paused) throw httpError(503, 'Chat is paused for your centre right now.');
-      if (!centreChat.photosAllowed) throw httpError(403, 'Your centre has turned photo sharing off.');
+      if (centreChat.paused) throw httpError(503, 'Chat is paused for your facility right now.');
+      if (!centreChat.photosAllowed) throw httpError(403, 'Your facility has turned photo sharing off.');
       const url = await uploadChatPhoto(String(req.body?.dataUrl || ''), (await getTosChat()).photoMaxKb);
       res.json({ ok: true, url });
     } catch (error: any) {
@@ -3219,10 +3219,10 @@ async function staffStatusContext(caller: Caller, centreId: string) {
       const centreId = cleanStr(String(req.query.centreId || ''), 120);
       await requireMembership(caller, centreId, ['owner', 'admin', 'tutor']);
       const entitlements = await getCentreEntitlements(centreId);
-      if (entitlements.chat !== true) throw httpError(403, 'Chat is not part of your centre\u2019s plan yet.');
+      if (entitlements.chat !== true) throw httpError(403, 'Chat is not part of your facility\u2019s plan yet.');
       const centreChat = await getCentreChat(centreId);
-      if (centreChat.paused) throw httpError(503, 'Chat is paused for your centre right now.');
-      if (!centreChat.photosAllowed) throw httpError(403, 'Your centre has turned photo sharing off.');
+      if (centreChat.paused) throw httpError(503, 'Chat is paused for your facility right now.');
+      if (!centreChat.photosAllowed) throw httpError(403, 'Your facility has turned photo sharing off.');
       const url = await uploadChatPhoto(String(req.body?.dataUrl || ''), (await getTosChat()).photoMaxKb);
       res.json({ ok: true, url });
     } catch (error: any) {
@@ -3323,7 +3323,7 @@ async function staffStatusContext(caller: Caller, centreId: string) {
         reports,
       });
     } catch (error: any) {
-      handleRouteError(res, error, '[chat] centre bootstrap failed');
+      handleRouteError(res, error, '[chat] facility bootstrap failed');
     }
   });
 
@@ -3386,7 +3386,7 @@ async function staffStatusContext(caller: Caller, centreId: string) {
       await requireMembership(caller, centreId, ['owner', 'admin']);
       res.json({ ok: true, settings: await getCentreChat(centreId) });
     } catch (error: any) {
-      handleRouteError(res, error, '[chat] centre settings read failed');
+      handleRouteError(res, error, '[chat] facility settings read failed');
     }
   });
 
@@ -3404,7 +3404,7 @@ async function staffStatusContext(caller: Caller, centreId: string) {
       );
       res.json({ ok: true, settings: await getCentreChat(centreId) });
     } catch (error: any) {
-      handleRouteError(res, error, '[chat] centre settings save failed');
+      handleRouteError(res, error, '[chat] facility settings save failed');
     }
   });
 
@@ -3421,7 +3421,7 @@ async function staffStatusContext(caller: Caller, centreId: string) {
       const snap = await query.get();
       res.json({ ok: true, reports: snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })) });
     } catch (error: any) {
-      handleRouteError(res, error, '[chat] centre reports read failed');
+      handleRouteError(res, error, '[chat] facility reports read failed');
     }
   });
 
@@ -3441,10 +3441,10 @@ async function staffStatusContext(caller: Caller, centreId: string) {
       const report = reportSnap.data() as any;
       if (report.centreId !== centreId) throw httpError(404, 'Report not found.');
       const action = cleanStr(body.action, 20);
-      if (isTutor && action !== 'remove') throw httpError(403, 'Only centre admins can do that.');
+      if (isTutor && action !== 'remove') throw httpError(403, 'Only facility admins can do that.');
       if (isTutor) {
         const cc = await getCentreChat(centreId);
-        if (!cc.tutorsCanRemove) throw httpError(403, 'Tutors cannot remove messages in your centre.');
+        if (!cc.tutorsCanRemove) throw httpError(403, 'Tutors cannot remove messages in your facility.');
       }
       const now = new Date().toISOString();
       const resolve = (resolution: string) => reportRef.set({
@@ -3456,7 +3456,7 @@ async function staffStatusContext(caller: Caller, centreId: string) {
         const msgSnap = await msgRef.get();
         const msg = msgSnap.val();
         if (!msg) throw httpError(404, 'That message is no longer available.');
-        if (msg.role === 'tos') throw httpError(403, 'Centre admins cannot remove TOS posts.');
+        if (msg.role === 'tos') throw httpError(403, 'Facility admins cannot remove TOS posts.');
         if (msg.role === 'tutor' && membership.role === 'tutor') throw httpError(403, 'Tutors cannot remove tutor messages.');
         await msgRef.set({ ...msg, removed: { by: caller.uid, byRole: membership.role, at: ServerValue.TIMESTAMP } });
         await resolve('message_removed');

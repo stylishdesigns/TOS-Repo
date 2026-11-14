@@ -23,7 +23,7 @@ export const RecentList: React.FC<RecentListProps> = ({
   return (
     <div className="space-y-3">
       {/* Heading Row */}
-      <div className="flex items-center justify-between px-1">
+      <div className="flex items-facility justify-between px-1">
         <h3 className="text-[12px] font-extrabold uppercase tracking-[0.08em] text-[#0F172A]">
           RECENT ASSESSMENTS
         </h3>
@@ -42,10 +42,10 @@ export const RecentList: React.FC<RecentListProps> = ({
               key={item.id}
               type="button"
               onClick={() => onSelectResult(item.rawResult)}
-              className="w-full text-left bg-white border border-[#E2E8F0] rounded-[16px] p-[12px] min-h-[68px] flex items-center justify-between gap-[10px] hover:border-slate-300 active:scale-[0.99] transition-all cursor-pointer group shadow-2xs"
+              className="w-full text-left bg-white border border-[#E2E8F0] rounded-[16px] p-[12px] min-h-[68px] flex items-facility justify-between gap-[10px] hover:border-slate-300 active:scale-[0.99] transition-all cursor-pointer group shadow-2xs"
             >
               {/* Left: 44x44 tile with initials */}
-              <div className="w-[44px] h-[44px] rounded-[12px] bg-[#F1F5F9] flex items-center justify-center shrink-0">
+              <div className="w-[44px] h-[44px] rounded-[12px] bg-[#F1F5F9] flex items-facility justify-facility shrink-0">
                 <span className="text-[12px] font-extrabold text-[#334155] tracking-wider">
                   {item.initials}
                 </span>
@@ -62,9 +62,9 @@ export const RecentList: React.FC<RecentListProps> = ({
               </div>
 
               {/* Right: Percent, Grade, vsClass */}
-              <div className="flex items-center space-x-2 shrink-0">
+              <div className="flex items-facility space-x-2 shrink-0">
                 <div className="text-right">
-                  <div className="flex items-center justify-end space-x-1.5">
+                  <div className="flex items-facility justify-end space-x-1.5">
                     <span className="text-[16px] font-extrabold text-[#0F172A] tabular-nums">
                       {item.percent}%
                     </span>
@@ -105,7 +105,7 @@ export const RecentList: React.FC<RecentListProps> = ({
         <button
           type="button"
           onClick={() => setShowAll((prev) => !prev)}
-          className="w-full h-[48px] rounded-[14px] border border-[#CBD5E1] bg-white hover:bg-slate-50 text-[12px] font-extrabold text-[#0F172A] flex items-center justify-center transition-colors cursor-pointer shadow-2xs active:scale-[0.99]"
+          className="w-full h-[48px] rounded-[14px] border border-[#CBD5E1] bg-white hover:bg-slate-50 text-[12px] font-extrabold text-[#0F172A] flex items-facility justify-facility transition-colors cursor-pointer shadow-2xs active:scale-[0.99]"
         >
           {showAll ? 'Show less' : `View all ${totalCount} assessments`}
         </button>

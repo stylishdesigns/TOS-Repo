@@ -382,7 +382,7 @@ export interface AdminUser {
   name: string;
   email: string;
   phone: string;
-  role: 'Super Admin' | 'Center Admin' | 'Admin Secretary' | 'Finance Admin' | 'Tutor';
+  role: 'Super Admin' | 'Facility Admin' | 'Admin Secretary' | 'Finance Admin' | 'Tutor';
   status: 'Active' | 'Invited' | 'Suspended';
   department: string;
   jobTitle: string;

@@ -80,26 +80,26 @@ const CentreDetail: React.FC<{ centreId: string; onBack: () => void; onDataChang
       onDataChanged();
       onBack();
     } catch (e: any) {
-      setActionError(e.message || 'Could not delete the centre.');
+      setActionError(e.message || 'Could not delete the facility.');
     } finally {
       setBusy('');
     }
   };
 
-  if (error) return <div><button onClick={onBack} className="text-orange-300 text-sm mb-3 inline-flex items-center gap-1.5"><ChevronLeft className="w-4 h-4" /> All centres</button><p className="text-rose-300 text-sm">{error}</p></div>;
-  if (!data) return <div className="flex items-center gap-2 text-slate-400 text-sm py-10 justify-center"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</div>;
+  if (error) return <div><button onClick={onBack} className="text-orange-300 text-sm mb-3 inline-flex items-facility gap-1.5"><ChevronLeft className="w-4 h-4" /> All facilities</button><p className="text-rose-300 text-sm">{error}</p></div>;
+  if (!data) return <div className="flex items-facility gap-2 text-slate-400 text-sm py-10 justify-facility"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</div>;
 
   const { centre, billing, payments } = data;
   const status = centre.billingStatus || centre.status;
 
   return (
     <div className="space-y-5">
-      <button onClick={onBack} className="text-orange-300 text-sm inline-flex items-center gap-1.5 hover:text-orange-200"><ChevronLeft className="w-4 h-4" /> All centres</button>
+      <button onClick={onBack} className="text-orange-300 text-sm inline-flex items-facility gap-1.5 hover:text-orange-200"><ChevronLeft className="w-4 h-4" /> All facilities</button>
 
       <div className="bg-slate-900/70 border border-white/10 rounded-2xl p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-facility justify-between gap-3">
           <div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-facility gap-3">
               <h2 className="text-xl font-black text-white">{centre.name}</h2>
               <StatusPill status={status} />
             </div>
@@ -111,12 +111,12 @@ const CentreDetail: React.FC<{ centreId: string; onBack: () => void; onDataChang
               {centre.contact?.state ? ` · ${centre.contact.city || ''}${centre.contact.city ? ', ' : ''}${centre.contact.state}` : ''}
               {(centre.audienceTypes || []).length ? ` · ${(centre.audienceTypes || []).join(', ')}` : ''}
             </p>
-            <div className="mt-2 flex items-center gap-2">
+            <div className="mt-2 flex items-facility gap-2">
               <a
                 href={`/c/${centreId}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs text-orange-300 hover:text-orange-200 inline-flex items-center gap-1.5"
+                className="text-xs text-orange-300 hover:text-orange-200 inline-flex items-facility gap-1.5"
               >
                 <Globe className="w-3.5 h-3.5" /> Landing page
               </a>
@@ -132,14 +132,14 @@ const CentreDetail: React.FC<{ centreId: string; onBack: () => void; onDataChang
           </div>
         </div>
         {centre.credentialsNotDelivered && (
-          <div className="mt-4 bg-amber-500/10 border border-amber-500/30 rounded-xl p-3.5 flex flex-wrap items-center justify-between gap-3">
+          <div className="mt-4 bg-amber-500/10 border border-amber-500/30 rounded-xl p-3.5 flex flex-wrap items-facility justify-between gap-3">
             <div className="flex items-start gap-2">
               <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
-              <p className="text-amber-200 text-xs leading-relaxed">Login email could not be delivered for this centre (no email provider configured when it was created). Resend the credentials to hand them over.</p>
+              <p className="text-amber-200 text-xs leading-relaxed">Login email could not be delivered for this facility (no email provider configured when it was created). Resend the credentials to hand them over.</p>
             </div>
           </div>
         )}
-        <div className="mt-3 flex flex-wrap items-center gap-2">
+        <div className="mt-3 flex flex-wrap items-facility gap-2">
           <button
             onClick={() => doAction('resend-credentials', {}, (r) => {
               if (r.tempPassword) {
@@ -214,29 +214,29 @@ const CentreDetail: React.FC<{ centreId: string; onBack: () => void; onDataChang
             <div className="pt-2 border-t border-white/5 flex flex-wrap gap-2">
               {status === 'suspended' ? (
                 <button onClick={() => { setConfirmStatus('reactivate'); setReason(''); }} className={btnPrimary}>
-                  <CheckCircle2 className="w-4 h-4" /> Reactivate centre
+                  <CheckCircle2 className="w-4 h-4" /> Reactivate facility
                 </button>
               ) : (
                 <button onClick={() => { setConfirmStatus('suspend'); setReason(''); }} className={btnGhost}>
-                  <Ban className="w-4 h-4 text-rose-400" /> Suspend centre
+                  <Ban className="w-4 h-4 text-rose-400" /> Suspend facility
                 </button>
               )}
             </div>
               <button onClick={() => { setConfirmDelete(true); setDeleteName(''); setDeleteReason(''); }} disabled={busy !== ''} className={btnGhost}>
-                <Trash2 className="w-4 h-4 text-rose-400" /> Delete centre
+                <Trash2 className="w-4 h-4 text-rose-400" /> Delete facility
               </button>
           </div>
         </Card>
 
         <Card title="Access code">
           <div className="space-y-3">
-            <div className="flex items-center gap-3">
+            <div className="flex items-facility gap-3">
               <p className="text-2xl font-black text-white font-mono tracking-[0.2em]">{centre.accessCode || '—'}</p>
               <button onClick={() => navigator.clipboard?.writeText(centre.accessCode || '').catch(() => {})} className="text-slate-400 hover:text-orange-300" title="Copy"><Copy className="w-4 h-4" /></button>
             </div>
             <p className="text-xs text-slate-500">Staff and students join with this code. Regenerating invalidates the old code immediately; existing members stay signed in, and the owner is notified.</p>
             <button onClick={() => setConfirmCode(true)} disabled={busy !== ''} className={btnGhost}><RefreshCw className="w-4 h-4" /> Generate a new code</button>
-            <p className="text-[11px] text-slate-500">Codes are system-generated only, so there is never a mix-up between centres.</p>
+            <p className="text-[11px] text-slate-500">Codes are system-generated only, so there is never a mix-up between facilities.</p>
           </div>
         </Card>
 
@@ -271,7 +271,7 @@ const CentreDetail: React.FC<{ centreId: string; onBack: () => void; onDataChang
             {(payments || []).length > 0 && (
               <div className="pt-3 border-t border-white/5 space-y-1.5">
                 {payments.map((p: any) => (
-                  <div key={p.id} className="flex items-center justify-between text-xs">
+                  <div key={p.id} className="flex items-facility justify-between text-xs">
                     <span className="text-white font-bold">{money(p.amount)}</span>
                     <span className="text-slate-400">covers to {fmtDate(p.periodCoveredUntil)} · {p.method || '—'} · {fmtDateTime(p.at)}</span>
                   </div>
@@ -302,8 +302,8 @@ const CentreDetail: React.FC<{ centreId: string; onBack: () => void; onDataChang
         <ConfirmModal
           title={confirmStatus === 'suspend' ? `Suspend ${centre.name}?` : `Reactivate ${centre.name}?`}
           body={confirmStatus === 'suspend'
-            ? 'Suspended centres cannot be entered by anyone except the owner, who sees payment instructions. Add the reason for the record.'
-            : 'The centre becomes active again right away. Add the reason for the record.'}
+            ? 'Suspended facilities cannot be entered by anyone except the owner, who sees payment instructions. Add the reason for the record.'
+            : 'The facility becomes active again right away. Add the reason for the record.'}
           confirmLabel={confirmStatus === 'suspend' ? 'Suspend' : 'Reactivate'}
           busy={busy === 'suspend' || busy === 'reactivate'}
           requireReason
@@ -317,17 +317,17 @@ const CentreDetail: React.FC<{ centreId: string; onBack: () => void; onDataChang
         />
       )}
       {confirmDelete && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setConfirmDelete(false)}>
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-facility justify-facility p-4" onClick={() => setConfirmDelete(false)}>
           <div className="bg-slate-900 border border-rose-500/30 rounded-3xl p-6 max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start gap-3 mb-3">
-              <div className="w-9 h-9 rounded-xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center shrink-0"><AlertTriangle className="w-4.5 h-4.5 text-rose-400" /></div>
+              <div className="w-9 h-9 rounded-xl bg-rose-500/15 border border-rose-500/30 flex items-facility justify-facility shrink-0"><AlertTriangle className="w-4.5 h-4.5 text-rose-400" /></div>
               <h3 className="text-white font-bold pt-1">Delete {centre.name}?</h3>
             </div>
             <p className="text-slate-400 text-xs leading-relaxed">
-              The centre, its people records, exams, timetable, results, attendance, ratings, programmes, subjects, billing, payments, settings and access codes are all removed. This cannot be undone. Type the centre name to confirm, and add a reason for the record.
+              The facility, its people records, exams, timetable, results, attendance, ratings, programmes, subjects, billing, payments, settings and access codes are all removed. This cannot be undone. Type the facility name to confirm, and add a reason for the record.
             </p>
             <div className="mt-3 space-y-2">
-              <Field label="Type the centre name to confirm">
+              <Field label="Type the facility name to confirm">
                 <input value={deleteName} onChange={(e) => setDeleteName(e.target.value)} className={inputCls} placeholder={centre.name} />
               </Field>
               <Field label="Reason">
@@ -340,7 +340,7 @@ const CentreDetail: React.FC<{ centreId: string; onBack: () => void; onDataChang
               <button
                 onClick={deleteCentreNow}
                 disabled={busy !== '' || deleteName !== centre.name || !deleteReason.trim()}
-                className="flex-1 inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white font-bold text-sm"
+                className="flex-1 inline-flex items-facility justify-facility px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white font-bold text-sm"
               >
                 {busy === 'delete-centre' ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Delete permanently'}
               </button>
@@ -356,10 +356,10 @@ const ConfirmModal: React.FC<{
   title: string; body: string; confirmLabel: string; busy: boolean; requireReason?: boolean;
   reason?: string; onReasonChange?: (v: string) => void; onCancel: () => void; onConfirm: () => void;
 }> = ({ title, body, confirmLabel, busy, requireReason, reason, onReasonChange, onCancel, onConfirm }) => (
-  <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={onCancel}>
+  <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-facility justify-facility p-4" onClick={onCancel}>
     <div className="bg-slate-900 border border-white/10 rounded-3xl p-6 max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
       <div className="flex items-start gap-3 mb-3">
-        <div className="w-9 h-9 rounded-xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center shrink-0"><AlertTriangle className="w-4.5 h-4.5 text-rose-400" /></div>
+        <div className="w-9 h-9 rounded-xl bg-rose-500/15 border border-rose-500/30 flex items-facility justify-facility shrink-0"><AlertTriangle className="w-4.5 h-4.5 text-rose-400" /></div>
         <h3 className="text-white font-bold pt-1">{title}</h3>
       </div>
       <p className="text-slate-400 text-xs leading-relaxed">{body}</p>
@@ -370,7 +370,7 @@ const ConfirmModal: React.FC<{
       )}
       <div className="flex gap-2 mt-5">
         <button onClick={onCancel} className={`${btnGhost} flex-1`}>Cancel</button>
-        <button onClick={onConfirm} disabled={busy || (requireReason && !(reason || '').trim())} className="flex-1 inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white font-bold text-sm">
+        <button onClick={onConfirm} disabled={busy || (requireReason && !(reason || '').trim())} className="flex-1 inline-flex items-facility justify-facility px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white font-bold text-sm">
           {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : confirmLabel}
         </button>
       </div>
@@ -416,14 +416,14 @@ export const CentresTab: React.FC<{ refreshKey: number; openCentreId: string; on
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-facility gap-3">
         <input value={query} onChange={(e) => setQuery(e.target.value)} className={`${inputCls} max-w-xs`} placeholder="Search name or owner email…" />
         <select value={status} onChange={(e) => setStatus(e.target.value)} className={`${inputCls} max-w-52`}>
           <option value="">All statuses</option>
           {Object.entries(STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </select>
         <button onClick={load} className={btnGhost}><RefreshCw className="w-4 h-4" /> Refresh</button>
-        <button onClick={() => setAdding(true)} className={btnPrimary}><Plus className="w-4 h-4" /> Add centre</button>
+        <button onClick={() => setAdding(true)} className={btnPrimary}><Plus className="w-4 h-4" /> Add facility</button>
       </div>
       {adding && (
         <AddCentreModal
@@ -433,15 +433,15 @@ export const CentresTab: React.FC<{ refreshKey: number; openCentreId: string; on
       )}
       {error && <p className="text-rose-300 text-sm">{error}</p>}
       {loading ? (
-        <div className="flex items-center gap-2 text-slate-400 text-sm py-10 justify-center"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</div>
+        <div className="flex items-facility gap-2 text-slate-400 text-sm py-10 justify-facility"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</div>
       ) : shown.length === 0 ? (
-        <Card><p className="text-slate-400 text-sm">No centres match. New centres appear here the moment they are provisioned.</p></Card>
+        <Card><p className="text-slate-400 text-sm">No facilities match. New facilities appear here the moment they are provisioned.</p></Card>
       ) : (
         <div className="bg-slate-900/70 border border-white/10 rounded-2xl overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-[10px] uppercase tracking-wider text-slate-500">
-                <th className="px-4 py-3 font-bold">Centre</th>
+                <th className="px-4 py-3 font-bold">Facility</th>
                 <th className="px-4 py-3 font-bold">Status</th>
                 <th className="px-4 py-3 font-bold">Plan</th>
                 <th className="px-4 py-3 font-bold">Seats</th>
@@ -455,10 +455,10 @@ export const CentresTab: React.FC<{ refreshKey: number; openCentreId: string; on
                   <td className="px-4 py-3">
                     <p className="text-white font-bold">{c.name}</p>
                     <p className="text-xs text-slate-500">{c.ownerEmail || 'no owner email'}</p>
-                    {c.credentialsNotDelivered && <span className="inline-flex items-center gap-1 text-[11px] text-amber-300 mt-0.5"><AlertTriangle className="w-3 h-3" /> credentials undelivered</span>}
+                    {c.credentialsNotDelivered && <span className="inline-flex items-facility gap-1 text-[11px] text-amber-300 mt-0.5"><AlertTriangle className="w-3 h-3" /> credentials undelivered</span>}
                   </td>
                   <td className="px-4 py-3"><StatusPill status={c.billingStatus} /></td>
-                  <td className="px-4 py-3 text-xs text-slate-300">{c.planId ? c.planId.replace('centre_', 'Centre ').replace('_', ' ') : 'no plan'}{c.trialEndsAt && c.billingStatus === 'trial' ? <span className="block text-slate-500">trial ends {fmtDate(c.trialEndsAt)}</span> : null}</td>
+                  <td className="px-4 py-3 text-xs text-slate-300">{c.planId ? c.planId.replace('centre_', 'Facility ').replace('_', ' ') : 'no plan'}{c.trialEndsAt && c.billingStatus === 'trial' ? <span className="block text-slate-500">trial ends {fmtDate(c.trialEndsAt)}</span> : null}</td>
                   <td className="px-4 py-3 text-xs text-slate-300">{c.seatsUsed ?? 0} / {c.seatCap ?? '—'}</td>
                   <td className="px-4 py-3 text-xs text-slate-500">{c.createdAt ? fmtDate(c.createdAt) : '—'}</td>
                   <td className="px-4 py-3 text-right"><span className="text-[11px] font-bold text-orange-300">Open →</span></td>

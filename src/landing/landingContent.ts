@@ -68,7 +68,7 @@ export type LandingContent = {
  * edits these fields.
  */
 export function defaultLandingContent(centreName: string): LandingContent {
-  const name = centreName || 'Our tutorial centre';
+  const name = centreName || 'Our education facility';
   return {
     templateId: 'classic-orange',
     accent: '#EA580C',

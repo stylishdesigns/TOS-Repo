@@ -85,10 +85,10 @@ import { setLastGoodOwner, clearAllLastGood } from '../lib/lastGood';
 // -------------------------------------------------------------------------
 const ROLE_MAP: Record<string, string> = {
   'Super Administrator': 'Super Admin',
-  'Centre Administrator': 'Center Admin',
+  'Facility Administrator': 'Facility Admin',
   'Admission Officer': 'Admin Secretary',
   'Accountant': 'Finance Admin',
-  'Reviewer': 'Center Admin',
+  'Reviewer': 'Facility Admin',
 };
 
 // -------------------------------------------------------------------------
@@ -958,7 +958,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               name: u.displayName || adminData?.name || 'Administrator',
               email: u.email || '',
               phone: u.phoneNumber || '',
-              role: ROLE_MAP[adminData?.role] || adminData?.role || 'Center Admin',
+              role: ROLE_MAP[adminData?.role] || adminData?.role || 'Facility Admin',
               status: 'Active',
               department: 'Management',
               jobTitle: adminData?.jobTitle || 'Admin Staff',
@@ -1112,7 +1112,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               setUserCentres(data.centres);
             }
           })
-          .catch((e) => console.warn('my-centres error:', e));
+          .catch((e) => console.warn('my-facilities error:', e));
 
         // 3. Check & Validate activeCentreId from sessionStorage (Part A, point 4)
         const savedCentreId = sessionStorage.getItem('tos_activeCentreId');
@@ -1281,7 +1281,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       sessionStorage.setItem('tos_activeCentreId', targetCentreId);
       addToast({
         type: 'success',
-        title: 'Switched Centre',
+        title: 'Switched Facility',
         description: `Now viewing ${data.centre.name}.`,
       });
       refreshSeatsSummary(targetCentreId);
@@ -1303,7 +1303,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const res = await fetch('/api/auth/my-centres', {
       headers: { Authorization: `Bearer ${token}` },
     });
-    if (!res.ok) throw new Error('Could not verify your centre memberships.');
+    if (!res.ok) throw new Error('Could not verify your facility memberships.');
     const data = await res.json().catch(() => ({}));
     const centres: any[] = (data && data.success && Array.isArray(data.centres)) ? data.centres : [];
     return centres.map((c: any) => String(c.centreId || '')).filter(Boolean);
@@ -1326,11 +1326,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             return {
               entered: false,
               count: 1,
-              error: `You cannot access ${b.centreName || 'your centre'} at the moment. Please contact your centre admin for help getting back in.`,
+              error: `You cannot access ${b.centreName || 'your facility'} at the moment. Please contact your facility admin for help getting back in.`,
               whatsapp: b.whatsapp,
             };
           }
-          return { entered: false, count: 1, error: 'No centre is linked to this account yet. Please contact your centre admin to be added.' };
+          return { entered: false, count: 1, error: 'No facility is linked to this account yet. Please contact your facility admin to be added.' };
         }
         return { entered: false, count: centres.length };
       }
@@ -1358,7 +1358,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       else setViewMode('portal');
       return { entered: true, count: 1 };
     } catch (e) {
-      return { entered: false, count: 1, error: 'Your centre could not be opened automatically. Please try again.' };
+      return { entered: false, count: 1, error: 'Your facility could not be opened automatically. Please try again.' };
     }
   };
 
@@ -1382,7 +1382,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const toggleStudentAccess = async (studentUid: string, active: boolean) => {
     if (!user) throw new Error('You must be signed in.');
     const token = await user.getIdToken();
-    if (!activeCentreId) throw new Error('Select your centre first.');
+    if (!activeCentreId) throw new Error('Select your facility first.');
     const cId = activeCentreId;
     const res = await fetch('/api/centre/students/toggle-access', {
       method: 'POST',
@@ -1413,7 +1413,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const activateStudentMembership = async (studentUid: string) => {
     if (!user) throw new Error('You must be signed in.');
     const token = await user.getIdToken();
-    if (!activeCentreId) throw new Error('Select your centre first.');
+    if (!activeCentreId) throw new Error('Select your facility first.');
     const cId = activeCentreId;
     const res = await fetch('/api/centre/students/activate', {
       method: 'POST',
@@ -1524,22 +1524,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (newSettings.whatsapp && !newSettings.whatsappNumber) {
         updated.whatsappNumber = newSettings.whatsapp;
       }
-      if (!activeCentreId) throw new Error('Select your centre before saving settings.');
+      if (!activeCentreId) throw new Error('Select your facility before saving settings.');
       await setDoc(doc(db, 'centreSettings', `${activeCentreId}__global`), updated);
       setSettingsState(updated);
       addToast({
         type: 'success',
         title: 'Settings Updated',
-        description: 'Tutorial centre configuration updated successfully.',
+        description: 'Education facility configuration updated successfully.',
       });
       logActivity({
-        title: 'Centre Configuration Modified',
+        title: 'Facility Configuration Modified',
         subtitle: `Updated by ${activeUser?.name || 'Admin'}`,
         category: 'CMS',
         type: 'info',
       });
     } catch (e) {
-      handleFirestoreError(e, OperationType.UPDATE, 'your centre settings');
+      handleFirestoreError(e, OperationType.UPDATE, 'your facility settings');
     }
   };
 
@@ -1572,13 +1572,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateCMS = async (newCms: Partial<CMSContent>) => {
     try {
       const updated = { ...cms, ...newCms };
-      if (!activeCentreId) throw new Error('Select your centre before saving website content.');
+      if (!activeCentreId) throw new Error('Select your facility before saving website content.');
       await setDoc(doc(db, 'centreSettings', `${activeCentreId}__cms`), updated);
       setCmsState(updated);
       addToast({
         type: 'success',
         title: 'Website CMS Saved',
-        description: 'Changes are now live on your public tutorial centre website.',
+        description: 'Changes are now live on your public education facility website.',
       });
       logActivity({
         title: 'Live Website Content Published',
@@ -1764,7 +1764,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         // A centre with no settings yet starts from neutral defaults.
         setSettingsState(INITIAL_SETTINGS);
       }
-    }, (error) => handleFirestoreError(error, OperationType.GET, 'centre settings')) : () => {};
+    }, (error) => handleFirestoreError(error, OperationType.GET, 'facility settings')) : () => {};
 
     const attendanceRef = activeCentreId ? doc(db, 'centreSettings', `${activeCentreId}__attendance`) : null;
     const unsubAttendanceSettings = attendanceRef ? onSnapshot(attendanceRef, (snapshot) => {
@@ -1773,7 +1773,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } else {
         setAttendanceSettings(INITIAL_ATTENDANCE_SETTINGS);
       }
-    }, (error) => handleFirestoreError(error, OperationType.GET, 'centre attendance settings')) : () => {};
+    }, (error) => handleFirestoreError(error, OperationType.GET, 'facility attendance settings')) : () => {};
 
     // Payments listener: admins load their centre's payment records. A
     // non-admin's own fees are loaded by the dedicated listener below once
@@ -1809,7 +1809,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         // A centre with no website content yet starts from neutral defaults.
         setCmsState(INITIAL_CMS);
       }
-    }, (error) => handleFirestoreError(error, OperationType.GET, 'centre website content')) : () => {};
+    }, (error) => handleFirestoreError(error, OperationType.GET, 'facility website content')) : () => {};
 
     // Attendance Logs listener
     let qAttendance = query(collection(db, 'attendance_logs'));
@@ -1941,7 +1941,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const addStudent = async (studentData: Omit<Student, 'id' | 'registrationDate'>) => {
     try {
       const id = `stu-${Date.now()}`;
-      if (!activeCentreId) throw new Error('Select your centre first.');
+      if (!activeCentreId) throw new Error('Select your facility first.');
       const cId = activeCentreId;
 
       // SERVER SEAT ENFORCEMENT: Verify cap in transaction and activate membership
@@ -2048,7 +2048,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (!app) return;
 
       const studentId = `stu-${Date.now()}`;
-      if (!activeCentreId) throw new Error('Select your centre first.');
+      if (!activeCentreId) throw new Error('Select your facility first.');
       const cId = activeCentreId;
 
       // SERVER SEAT ENFORCEMENT: Verify cap in transaction and activate membership
@@ -2093,7 +2093,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         programmeId: app.programmeId,
         programmeName: prog.name,
         branchId: app.branchId || 'branch-1',
-        branchName: branch?.name || 'Main Tutorial Centre',
+        branchName: branch?.name || 'Main Education facility',
         subjects: app.subjects.length > 0 ? app.subjects : (prog?.subjects || []),
         notes: app.notes,
         registrationDate: new Date().toISOString().split('T')[0],
@@ -2595,7 +2595,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateAttendanceSettings = async (timing: Partial<AttendanceSettings>) => {
     try {
-      if (!activeCentreId) throw new Error('Select your centre before saving attendance times.');
+      if (!activeCentreId) throw new Error('Select your facility before saving attendance times.');
       await setDoc(doc(db, 'centreSettings', `${activeCentreId}__attendance`), timing, { merge: true });
       setAttendanceSettings((prev) => ({ ...prev, ...timing }));
     } catch (e) {

@@ -104,7 +104,7 @@ export const PublicLandingPage: React.FC<{ centreId: string }> = ({ centreId }) 
     return (
       <div className="plp-root">
         <div className="plp-shell" style={{ paddingTop: 80, paddingBottom: 80, textAlign: 'center' }}>
-          <h1 style={{ fontSize: 22 }}>This centre's website is not available right now.</h1>
+          <h1 style={{ fontSize: 22 }}>This facility's website is not available right now.</h1>
           <p style={{ color: '#64748b', marginTop: 10 }}>Please check the address or try again shortly.</p>
         </div>
       </div>
@@ -197,7 +197,7 @@ export const PublicLandingPage: React.FC<{ centreId: string }> = ({ centreId }) 
           </div>
           <div className="plp-heroart">
             {c.hero.photoUrl ? (
-              <img className="plp-heroimg" src={c.hero.photoUrl} alt={data.centreName || 'Centre photo'} />
+              <img className="plp-heroimg" src={c.hero.photoUrl} alt={data.centreName || 'Facility photo'} />
             ) : (
               <>
                 <div className="plp-line" />
@@ -280,7 +280,7 @@ export const PublicLandingPage: React.FC<{ centreId: string }> = ({ centreId }) 
       <section className="plp-sec plp-tint" id="enquiry">
         <div className="plp-shell">
           <h2>Send us an enquiry</h2>
-          <p className="plp-lead">Ask about classes, fees or anything else. The centre gets your message straight away.</p>
+          <p className="plp-lead">Ask about classes, fees or anything else. The facility gets your message straight away.</p>
           {sent ? (
             <div className="plp-formdone">
               <b>Thank you{form.name.trim() ? `, ${form.name.trim().split(' ')[0]}` : ''}.</b>
@@ -326,7 +326,7 @@ export const PublicLandingPage: React.FC<{ centreId: string }> = ({ centreId }) 
                   value={form.message}
                   maxLength={1000}
                   rows={4}
-                  placeholder="Tell the centre about your child, the class you are interested in, or ask a question."
+                  placeholder="Tell the facility about your child, the class you are interested in, or ask a question."
                   onChange={(e) => setField('message', e.target.value)}
                 />
               </label>

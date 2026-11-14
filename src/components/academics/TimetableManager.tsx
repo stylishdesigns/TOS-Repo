@@ -357,7 +357,7 @@ export const TimetableManager: React.FC = () => {
   return (
     <div id="timetable-management-page" className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
       {/* Header Row */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-facility justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-900 tracking-tight uppercase">
             Timetable
@@ -367,7 +367,7 @@ export const TimetableManager: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center space-x-3">
+        <div className="flex items-facility space-x-3">
           <div className="text-right hidden md:block">
             <span className="px-3 py-1.5 rounded-lg bg-orange-50 text-[11px] font-black text-[#EA580C] uppercase tracking-wider">{settings.academicSession}</span>
           </div>
@@ -384,7 +384,7 @@ export const TimetableManager: React.FC = () => {
 
         <button
           onClick={() => setShowCalendar(true)}
-          className="px-3 sm:px-5 py-3 text-[9px] sm:text-[10px] font-black text-white bg-slate-900 hover:bg-black rounded-xl shadow-lg shadow-slate-200 transition-all uppercase tracking-widest flex items-center justify-center space-x-2"
+          className="px-3 sm:px-5 py-3 text-[9px] sm:text-[10px] font-black text-white bg-slate-900 hover:bg-black rounded-xl shadow-lg shadow-slate-200 transition-all uppercase tracking-widest flex items-facility justify-facility space-x-2"
         >
           <LayoutGrid className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-orange-500" />
           <span>Calendar</span>
@@ -393,7 +393,7 @@ export const TimetableManager: React.FC = () => {
 
       {/* Filters Section (Programme & Status Toggle Side-by-Side) */}
       <div className="grid grid-cols-2 gap-3 sm:gap-4">
-        <div className="bg-slate-50 p-1.5 rounded-2xl border border-slate-200 flex items-center">
+        <div className="bg-slate-50 p-1.5 rounded-2xl border border-slate-200 flex items-facility">
           <ModernSelect
             value={selectedProgramme}
             onChange={setSelectedProgramme}
@@ -405,7 +405,7 @@ export const TimetableManager: React.FC = () => {
           />
         </div>
 
-        <div className="bg-white p-1.5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-center overflow-hidden">
+        <div className="bg-white p-1.5 rounded-2xl border border-slate-200 shadow-xs flex items-facility justify-facility overflow-hidden">
           <div className="flex flex-nowrap overflow-x-auto gap-1 scrollbar-none">
             {[
               { id: 'All', label: 'All' },
@@ -431,7 +431,7 @@ export const TimetableManager: React.FC = () => {
 
       <button
         onClick={handleOpenAdd}
-        className="w-full py-2.5 text-sm font-black text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-2xl shadow-lg shadow-orange-200/50 transition-all flex items-center justify-center space-x-2"
+        className="w-full py-2.5 text-sm font-black text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-2xl shadow-lg shadow-orange-200/50 transition-all flex items-facility justify-facility space-x-2"
       >
         <Plus className="w-5 h-5" />
         <span>SCHEDULE CLASS</span>
@@ -439,7 +439,7 @@ export const TimetableManager: React.FC = () => {
 
       {/* Day Selection Tabs */}
       <div className="space-y-4">
-        <div className="flex items-center space-x-1 overflow-x-auto pb-2 scrollbar-none">
+        <div className="flex items-facility space-x-1 overflow-x-auto pb-2 scrollbar-none">
           <button
             onClick={() => setSelectedDay('All')}
             className={`px-4 py-2 text-[10px] font-black rounded-lg transition-all uppercase tracking-widest whitespace-nowrap border-2 ${
@@ -451,7 +451,7 @@ export const TimetableManager: React.FC = () => {
           {daysList.map((day) => {
             const daySessionsCount = filteredSessions.filter((s) => s.day === day).length;
             return (
-              <div key={day} className="flex flex-col items-center">
+              <div key={day} className="flex flex-col items-facility">
                 <button
                   onClick={() => setSelectedDay(day)}
                   className={`px-4 py-2 text-[10px] font-black rounded-lg transition-all uppercase tracking-widest whitespace-nowrap border-2 ${
@@ -481,7 +481,7 @@ export const TimetableManager: React.FC = () => {
 
             return (
               <div key={day} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
-                <div className="px-5 py-3 bg-slate-50/80 border-b border-slate-100 flex items-center justify-between">
+                <div className="px-5 py-3 bg-slate-50/80 border-b border-slate-100 flex items-facility justify-between">
                   <h3 className="font-black text-xs text-slate-900 uppercase tracking-widest">{day} Class</h3>
                 </div>
 
@@ -501,10 +501,10 @@ export const TimetableManager: React.FC = () => {
                       <React.Fragment key={sess.id}>
                         {idx > 0 && (
                           <div className="relative py-6">
-                            <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                            <div className="absolute inset-0 flex items-facility" aria-hidden="true">
                               <div className="w-full border-t-8 border-slate-100" />
                             </div>
-                            <div className="relative flex justify-center">
+                            <div className="relative flex justify-facility">
                               <span className="bg-slate-900 px-6 text-[9px] font-black text-white uppercase tracking-[0.2em] rounded-full py-1 shadow-sm">Next Period</span>
                             </div>
                           </div>
@@ -514,8 +514,8 @@ export const TimetableManager: React.FC = () => {
                           className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-all cursor-pointer group"
                         >
                           {/* Top Tip Header (Status Colored) */}
-                          <div className={`px-4 py-2.5 flex items-center justify-between ${statusColor}`}>
-                            <div className="flex items-center space-x-2">
+                          <div className={`px-4 py-2.5 flex items-facility justify-between ${statusColor}`}>
+                            <div className="flex items-facility space-x-2">
                               {!finished && (inSession || isUpcoming) && (
                                 <span className="px-2 py-0.5 rounded bg-white/20 border border-white/30 text-[8px] font-black uppercase text-white tracking-widest">
                                   {sess.status === 'active' ? 'Approval' : 
@@ -526,9 +526,9 @@ export const TimetableManager: React.FC = () => {
                               <h4 className="text-[10px] font-black text-white uppercase tracking-widest">{day} Class</h4>
                             </div>
                             
-                            <div className="flex items-center space-x-2">
+                            <div className="flex items-facility space-x-2">
                               {inSession && (
-                                <div className="flex items-center space-x-1 bg-white/20 px-2 py-0.5 rounded text-[8px] font-black text-white uppercase animate-pulse">
+                                <div className="flex items-facility space-x-1 bg-white/20 px-2 py-0.5 rounded text-[8px] font-black text-white uppercase animate-pulse">
                                   <span className="w-1 h-1 rounded-full bg-white" />
                                   <span>Live</span>
                                 </div>
@@ -539,16 +539,16 @@ export const TimetableManager: React.FC = () => {
                             </div>
                           </div>
 
-                          <div className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                          <div className="p-5 flex flex-col md:flex-row md:items-facility justify-between gap-4">
                             <div className="flex items-start space-x-4">
-                              <div className={`w-14 h-14 rounded-2xl border flex flex-col items-center justify-center shrink-0 ${finished ? 'bg-slate-50 border-slate-100 text-slate-400' : 'bg-orange-50 border-orange-100 text-[#EA580C]'}`}>
+                              <div className={`w-14 h-14 rounded-2xl border flex flex-col items-facility justify-facility shrink-0 ${finished ? 'bg-slate-50 border-slate-100 text-slate-400' : 'bg-orange-50 border-orange-100 text-[#EA580C]'}`}>
                                  <Clock className="w-4 h-4 mb-1" />
                                  <span className="text-[9px] font-black">
                                    {new Date(sess.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
                                  </span>
                               </div>
                               <div>
-                                <div className="flex items-center space-x-2">
+                                <div className="flex items-facility space-x-2">
                                    <h4 className={`font-black text-sm leading-tight ${finished ? 'text-slate-400' : 'text-slate-900'}`}>{sess.subject}</h4>
                                    {finished && (
                                      <span className="px-2 py-0.5 rounded-full text-[8px] font-black uppercase bg-slate-100 text-slate-400 border border-slate-200">
@@ -557,18 +557,18 @@ export const TimetableManager: React.FC = () => {
                                    )}
                                 </div>
                                 {sess.topic && <p className={`text-[10px] font-bold mt-1 ${finished ? 'text-slate-400' : 'text-slate-500'}`}>Topic: {sess.topic}</p>}
-                                 <div className="grid grid-cols-2 sm:flex sm:items-center gap-x-4 gap-y-1 mt-2 text-[11px]">
-                                   <div className={`flex items-center space-x-1.5 font-bold ${finished ? 'text-slate-400' : 'text-slate-700'}`}>
+                                 <div className="grid grid-cols-2 sm:flex sm:items-facility gap-x-4 gap-y-1 mt-2 text-[11px]">
+                                   <div className={`flex items-facility space-x-1.5 font-bold ${finished ? 'text-slate-400' : 'text-slate-700'}`}>
                                       <GraduationCap className="w-3.5 h-3.5 text-slate-400" />
                                       <span>{sess.tutorName}</span>
                                    </div>
                                    {sess.room && (
-                                     <div className={`flex items-center space-x-1.5 font-bold ${finished ? 'text-slate-400' : 'text-slate-500'}`}>
+                                     <div className={`flex items-facility space-x-1.5 font-bold ${finished ? 'text-slate-400' : 'text-slate-500'}`}>
                                         <MapPin className="w-3.5 h-3.5 text-slate-400" />
                                         <span>{sess.room}</span>
                                      </div>
                                    )}
-                                   <div className={`col-span-2 sm:col-span-1 flex items-center space-x-1.5 font-bold ${finished ? 'text-slate-400' : 'text-orange-600'}`}>
+                                   <div className={`col-span-2 sm:col-span-1 flex items-facility space-x-1.5 font-bold ${finished ? 'text-slate-400' : 'text-orange-600'}`}>
                                       <CheckCircle className="w-3.5 h-3.5 opacity-50" />
                                       <span>{sess.programmeName}</span>
                                    </div>
@@ -576,7 +576,7 @@ export const TimetableManager: React.FC = () => {
                               </div>
                             </div>
 
-                            <div className="flex items-center justify-between mt-4 md:mt-0 w-full md:w-auto space-x-2">
+                            <div className="flex items-facility justify-between mt-4 md:mt-0 w-full md:w-auto space-x-2">
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -612,9 +612,9 @@ export const TimetableManager: React.FC = () => {
       {/* Add/Edit Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/60 z-50 overflow-y-auto p-4 backdrop-blur-xs">
-          <div className="min-h-full flex items-center justify-center py-8">
+          <div className="min-h-full flex items-facility justify-facility py-8">
             <div className="bg-white rounded-3xl max-w-md w-full p-8 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 relative">
-              <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div className="flex items-facility justify-between pb-4 border-b border-slate-100">
               <h3 className="font-black text-lg text-slate-900 uppercase tracking-tight">
                 {editingSession ? 'Modify Period' : 'New Schedule'}
               </h3>
@@ -644,7 +644,7 @@ export const TimetableManager: React.FC = () => {
               </div>
 
               {!editingSession && (
-                <div className="flex items-center space-x-2 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                <div className="flex items-facility space-x-2 bg-slate-50 p-3 rounded-xl border border-slate-200">
                   <input
                     type="checkbox"
                     id="repeatForMonth"
@@ -722,7 +722,7 @@ export const TimetableManager: React.FC = () => {
 
               {/* Dynamic Notification Instruction */}
               <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start space-x-3">
-                <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center shrink-0 shadow-sm">
+                <div className="w-8 h-8 rounded-lg bg-white flex items-facility justify-facility shrink-0 shadow-sm">
                   <Bell className="w-4 h-4 text-amber-600 animate-bounce" />
                 </div>
                 <p className="text-[10px] font-bold text-amber-800 leading-relaxed">
@@ -737,7 +737,7 @@ export const TimetableManager: React.FC = () => {
                     <button
                       type="submit"
                       disabled={isSaving}
-                      className="w-full py-3 bg-slate-900 text-white font-black uppercase tracking-widest rounded-xl shadow-xl hover:bg-slate-800 transition-all disabled:opacity-50 flex items-center justify-center space-x-2"
+                      className="w-full py-3 bg-slate-900 text-white font-black uppercase tracking-widest rounded-xl shadow-xl hover:bg-slate-800 transition-all disabled:opacity-50 flex items-facility justify-facility space-x-2"
                     >
                       {isSaving ? (
                         <>
@@ -777,7 +777,7 @@ export const TimetableManager: React.FC = () => {
       {/* Postpone Modal */}
       {postponingSession && (
         <div className="fixed inset-0 bg-black/60 z-50 overflow-y-auto p-4 backdrop-blur-xs">
-          <div className="min-h-full flex items-center justify-center py-8">
+          <div className="min-h-full flex items-facility justify-facility py-8">
             <div className="bg-white rounded-3xl max-w-md w-full p-8 shadow-2xl animate-in fade-in zoom-in-95 relative">
               <h3 className="font-black text-lg text-slate-900 uppercase">Postpone Class</h3>
             <p className="text-xs text-slate-500 mt-1">Reason or New Date for "{postponingSession.subject}"</p>
@@ -803,7 +803,7 @@ export const TimetableManager: React.FC = () => {
         isOpen={showCalendar}
         onClose={() => setShowCalendar(false)}
         slots={timetable}
-        title="Centre Master Timetable"
+        title="Facility Master Timetable"
       />
 
       {/* View Session Modal */}
@@ -813,11 +813,11 @@ export const TimetableManager: React.FC = () => {
 
         return (
           <div className="fixed inset-0 bg-black/60 z-50 overflow-y-auto p-4 backdrop-blur-xs">
-          <div className="min-h-full flex items-center justify-center py-8">
+          <div className="min-h-full flex items-facility justify-facility py-8">
             <div className="bg-white rounded-3xl max-w-md w-full p-8 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 relative">
-               <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center space-x-3">
-                   <div className="w-10 h-10 rounded-xl bg-orange-50 text-orange-500 flex items-center justify-center">
+               <div className="flex items-facility justify-between mb-6">
+                <div className="flex items-facility space-x-3">
+                   <div className="w-10 h-10 rounded-xl bg-orange-50 text-orange-500 flex items-facility justify-facility">
                       <CalendarClock className="w-5 h-5" />
                    </div>
                    <div>
@@ -845,14 +845,14 @@ export const TimetableManager: React.FC = () => {
                    <div className="grid grid-cols-2 gap-4 pt-2">
                       <div>
                          <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Time</span>
-                         <div className="flex items-center space-x-1.5 mt-0.5">
+                         <div className="flex items-facility space-x-1.5 mt-0.5">
                             <Clock className="w-3.5 h-3.5 text-orange-500" />
                             <span className="text-xs font-black text-slate-800">{formatTimeRangeAMPM(viewingSession.time)}</span>
                          </div>
                       </div>
                       <div>
                          <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Room</span>
-                         <div className="flex items-center space-x-1.5 mt-0.5">
+                         <div className="flex items-facility space-x-1.5 mt-0.5">
                             <MapPin className="w-3.5 h-3.5 text-slate-400" />
                             <span className="text-xs font-black text-slate-800">{viewingSession.room || 'No Room'}</span>
                          </div>
@@ -861,21 +861,21 @@ export const TimetableManager: React.FC = () => {
                 </div>
 
                 <div className="space-y-4">
-                   <div className="flex items-center justify-between">
+                   <div className="flex items-facility justify-between">
                       <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tutor Assigned</span>
                       <span className="text-lg font-black text-orange-600 bg-orange-50 px-3 py-1 rounded-xl">{viewingSession.tutorName}</span>
                    </div>
                    
                    <div className="pt-4 border-t border-slate-100">
                       <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Schedule Status</span>
-                       <div className={`p-3 rounded-xl border-2 flex items-center justify-between shadow-sm ${
+                       <div className={`p-3 rounded-xl border-2 flex items-facility justify-between shadow-sm ${
                           inSession ? 'bg-emerald-600 border-emerald-500 text-white' :
                           finished ? 'bg-slate-400 border-slate-300 text-white' :
                           isNextUp(viewingSession.time, viewingSession.date) ? 'bg-blue-600 border-blue-500 text-white' :
                           viewingSession.status === 'pending_tutor_consent' ? 'bg-amber-500 border-amber-400 text-white' :
                           'bg-orange-600 border-orange-500 text-white'
                        }`}>
-                          <div className="flex items-center space-x-2">
+                          <div className="flex items-facility space-x-2">
                              <div className={`w-2.5 h-2.5 rounded-full bg-white shadow-xs ${
                                 (inSession || viewingSession.status === 'pending_tutor_consent') ? 'animate-pulse' : ''
                              }`} />

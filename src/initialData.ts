@@ -30,7 +30,7 @@ export const INITIAL_CLASSROOMS: Classroom[] = [
   { id: 'room-2', name: 'Physics & Electronics Lab', code: 'PHY-LAB', capacity: 45, building: 'Science Wing', features: ['Apparatus Benches', 'Oscilloscopes', 'Smart Screen'], isAvailable: true },
   { id: 'room-3', name: 'Chemistry & Biology Lab', code: 'CHM-LAB', capacity: 50, building: 'Science Wing', features: ['Fume Hood', 'Reagent Racks', 'Microscopes'], isAvailable: true },
   { id: 'room-4', name: 'Commercial & Arts Lecture Room 1', code: 'CR-1', capacity: 60, building: 'Annex Block (1st Floor)', features: ['Air Conditioning', 'Whiteboard'], isAvailable: true },
-  { id: 'room-5', name: 'CBT Practice Centre (50 PCs)', code: 'CBT-1', capacity: 50, building: 'ICT Centre', features: ['High-speed LAN', 'Backup Inverter Power', '50 Workstations'], isAvailable: true },
+  { id: 'room-5', name: 'CBT Practice Facility (50 PCs)', code: 'CBT-1', capacity: 50, building: 'ICT Facility', features: ['High-speed LAN', 'Backup Inverter Power', '50 Workstations'], isAvailable: true },
   { id: 'room-6', name: 'Seminar & Revision Room 2', code: 'SEM-2', capacity: 35, building: 'Main Block (2nd Floor)', features: ['Interactive Whiteboard'], isAvailable: true },
 ];
 
@@ -73,7 +73,7 @@ export const INITIAL_BRANCHES: Branch[] = [
   },
   {
     id: 'branch-2',
-    name: 'Yaba Tech Hub Centre',
+    name: 'Yaba Tech Hub Facility',
     state: 'Lagos',
     address: '82 Herbert Macaulay Way, Yaba, Lagos',
     phone: '+234 802 334 1190',
@@ -91,7 +91,7 @@ export const INITIAL_BRANCHES: Branch[] = [
   },
   {
     id: 'branch-4',
-    name: 'Abuja Federal Capital Centre',
+    name: 'Abuja Federal Capital Facility',
     state: 'FCT Abuja',
     address: 'Plot 402 Garki II, Area 11, Abuja',
     phone: '+234 809 111 2233',
@@ -102,10 +102,10 @@ export const INITIAL_BRANCHES: Branch[] = [
 
 export const INITIAL_CMS: CMSContent = {
   hero: {
-    badge: '🏆 #1 RATED TUTORIAL CENTRE IN LAGOS',
+    badge: '🏆 #1 RATED EDUCATION FACILITY IN LAGOS',
     headline: 'Prepare for JAMB, WAEC & A-Levels with Elite Tutors',
     subheadline:
-      'Join Nigeria’s most rigorous examination preparation centre. Over 96% of our registered candidates secure top-tier federal university admissions on their first attempt.',
+      'Join Nigeria’s most rigorous examination preparation facility. Over 96% of our registered candidates secure top-tier federal university admissions on their first attempt.',
     primaryCtaText: 'Register for Admission',
     secondaryCtaText: 'Explore Programmes',
     bannerImage:
@@ -385,7 +385,7 @@ export const INITIAL_TIMETABLE: TimetableSlot[] = [
     tutorId: 'tut-1',
     programmeId: 'prog-1',
     programmeName: 'JAMB / UTME 2027 Intensive',
-    room: 'CBT Practice Centre (50 PCs)',
+    room: 'CBT Practice Facility (50 PCs)',
     roomId: 'room-5',
     status: 'active',
     topic: 'Full 180-Question Mock Test with Real-time Stopwatch',

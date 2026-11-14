@@ -53,7 +53,7 @@ export function registerLandingLeadRoutes(app: express.Express): void {
       if (!caller) return res.status(401).json({ error: "Unauthorized" });
       const centreId = await centreIdForCaller(caller);
       if (!centreId) {
-        return res.status(403).json({ error: "Only a centre admin can view website enquiries." });
+        return res.status(403).json({ error: "Only a facility admin can view website enquiries." });
       }
       const snap = await adminDb
         .collection("centreLandingLeads")
@@ -89,7 +89,7 @@ export function registerLandingLeadRoutes(app: express.Express): void {
       if (!caller) return res.status(401).json({ error: "Unauthorized" });
       const centreId = await centreIdForCaller(caller);
       if (!centreId) {
-        return res.status(403).json({ error: "Only a centre admin can manage website enquiries." });
+        return res.status(403).json({ error: "Only a facility admin can manage website enquiries." });
       }
       const id = String(req.params.id || "");
       if (!/^[a-zA-Z0-9_-]{1,64}$/.test(id)) {
@@ -101,7 +101,7 @@ export function registerLandingLeadRoutes(app: express.Express): void {
       const snap = await ref.get();
       if (!snap.exists) return res.status(404).json({ error: "This enquiry no longer exists." });
       if ((snap.data() as Record<string, unknown>)?.centreId !== centreId) {
-        return res.status(403).json({ error: "This enquiry belongs to a different centre." });
+        return res.status(403).json({ error: "This enquiry belongs to a different facility." });
       }
       await ref.set({ status, updatedAt: new Date().toISOString(), updatedBy: caller.uid }, { merge: true });
       return res.json({ ok: true, status });

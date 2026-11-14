@@ -107,7 +107,7 @@ export async function provisionCentre(
   const dupEmail = await adminDb.collection('centres').where('ownerEmail', '==', email).limit(1).get();
   const dupPhone = await adminDb.collection('centres').where('ownerPhone', '==', phone).limit(1).get();
   if (!dupEmail.empty || !dupPhone.empty) {
-    throw httpError(409, 'A centre already exists for these details. Sign in instead, or contact Tutorial OS support.');
+    throw httpError(409, 'A facility already exists for these details. Sign in instead, or contact Tutorial OS support.');
   }
   const dupName = await adminDb.collection('centres').where('name', '==', businessName).limit(1).get();
   if (!dupName.empty) {
@@ -149,7 +149,7 @@ export async function provisionCentre(
     const candidate = `${slug}-${crypto.randomBytes(2).toString('hex')}`;
     if (!(await adminDb.collection('centres').doc(candidate).get()).exists) centreId = candidate;
   }
-  if (!centreId) throw httpError(500, 'Could not allocate a centre id. Please try again.');
+  if (!centreId) throw httpError(500, 'Could not allocate a facility id. Please try again.');
 
   const config = await getPlatformConfig();
   const planId = params.planId || 'centre_standard';
@@ -296,10 +296,10 @@ export async function provisionCentre(
 /** TOS action: fresh temporary password for the owner, sent (or shown once). */
 export async function resendCredentials(centreId: string, actorUid: string): Promise<{ delivered: boolean; tempPassword?: string }> {
   const cDoc = await adminDb.collection('centres').doc(centreId).get();
-  if (!cDoc.exists) throw httpError(404, 'Centre not found.');
+  if (!cDoc.exists) throw httpError(404, 'Facility not found.');
   const centre = cDoc.data() as any;
   const email = normalizeEmail(centre?.ownerEmail || '');
-  if (!email) throw httpError(400, 'This centre has no owner email on file.');
+  if (!email) throw httpError(400, 'This facility has no owner email on file.');
 
   let user;
   try {
@@ -349,7 +349,7 @@ export async function regenerateAccessCode(
 ): Promise<{ accessCode: string; previousCode: string | null }> {
   const cRef = adminDb.collection('centres').doc(centreId);
   const cDoc = await cRef.get();
-  if (!cDoc.exists) throw httpError(404, 'Centre not found.');
+  if (!cDoc.exists) throw httpError(404, 'Facility not found.');
   const centre = cDoc.data() as any;
   const previousCode: string | null = centre?.accessCode || null;
 
@@ -442,7 +442,7 @@ export async function runBillingSweep(): Promise<{
       }
     } catch (err: any) {
       errors++;
-      console.error('[billing-sweep] centre failed:', doc.id, err?.message || err);
+      console.error('[billing-sweep] facility failed:', doc.id, err?.message || err);
     }
   }
 

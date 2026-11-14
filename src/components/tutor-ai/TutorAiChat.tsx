@@ -440,7 +440,7 @@ const TutorAiChat: React.FC<Props> = ({
   const renderBubble = (m: TitoMessage, optimistic = false, key?: React.Key, typewriter?: string | null) => (
     <div key={key} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
       {m.role === 'ai' && (
-        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-orange-500 to-orange-700 flex items-center justify-center shrink-0 mt-1 mr-2 shadow">
+        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-orange-500 to-orange-700 flex items-facility justify-facility shrink-0 mt-1 mr-2 shadow">
           <Sparkles className="w-3.5 h-3.5 text-white" />
         </div>
       )}
@@ -481,7 +481,7 @@ const TutorAiChat: React.FC<Props> = ({
     if (dk !== lastDay) {
       lastDay = dk;
       rendered.push(
-        <div key={`d${i}`} className="flex items-center justify-center py-1">
+        <div key={`d${i}`} className="flex items-facility justify-facility py-1">
           <span className={`text-[10px] font-black uppercase tracking-widest rounded-full px-3 py-1 ${th.dayChip}`}>
             {dayLabel(m.at)}
           </span>
@@ -537,7 +537,7 @@ const TutorAiChat: React.FC<Props> = ({
           <div
             className={`relative w-72 max-w-[80%] h-full border-r flex flex-col animate-in slide-in-from-left duration-200 ${th.drawer}`}
           >
-            <div className={`shrink-0 px-4 pt-4 pb-3 flex items-center justify-between border-b ${th.drawer}`}>
+            <div className={`shrink-0 px-4 pt-4 pb-3 flex items-facility justify-between border-b ${th.drawer}`}>
               <p className={`text-sm font-black ${th.drawerText}`}>Your chats</p>
               <button
                 type="button"
@@ -552,7 +552,7 @@ const TutorAiChat: React.FC<Props> = ({
               <button
                 type="button"
                 onClick={startNewChat}
-                className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-[13px] font-bold transition-all cursor-pointer ${th.drawerNew}`}
+                className={`w-full flex items-facility gap-2 px-3 py-2.5 rounded-xl text-[13px] font-bold transition-all cursor-pointer ${th.drawerNew}`}
               >
                 <MessageSquarePlus className="w-4 h-4" />
                 New chat
@@ -583,7 +583,7 @@ const TutorAiChat: React.FC<Props> = ({
       )}
 
       {/* Pinned header */}
-      <div className={`shrink-0 backdrop-blur-md border-b px-4 py-3 flex items-center gap-3 ${th.header}`}>
+      <div className={`shrink-0 backdrop-blur-md border-b px-4 py-3 flex items-facility gap-3 ${th.header}`}>
         {onBack && (
           <button
             type="button"
@@ -594,7 +594,7 @@ const TutorAiChat: React.FC<Props> = ({
             <ArrowLeft className="w-5 h-5" />
           </button>
         )}
-        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-500 to-orange-700 flex items-center justify-center shrink-0 shadow">
+        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-500 to-orange-700 flex items-facility justify-facility shrink-0 shadow">
           <Sparkles className="w-5 h-5 text-white" />
         </div>
         <div className="min-w-0 flex-1">
@@ -620,7 +620,7 @@ const TutorAiChat: React.FC<Props> = ({
       <div ref={listRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
         {all.length === 0 && loaded && (
           <div className="flex justify-start">
-            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-orange-500 to-orange-700 flex items-center justify-center shrink-0 mt-1 mr-2 shadow">
+            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-orange-500 to-orange-700 flex items-facility justify-facility shrink-0 mt-1 mr-2 shadow">
               <Sparkles className="w-3.5 h-3.5 text-white" />
             </div>
             <div className={`max-w-[85%] px-4 py-2.5 rounded-2xl rounded-tl-md ${th.aiBubble}`}>
@@ -635,10 +635,10 @@ const TutorAiChat: React.FC<Props> = ({
         {rendered}
         {busy && (
           <div className="flex justify-start">
-            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-orange-500 to-orange-700 flex items-center justify-center shrink-0 mt-1 mr-2 shadow">
+            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-orange-500 to-orange-700 flex items-facility justify-facility shrink-0 mt-1 mr-2 shadow">
               <Sparkles className="w-3.5 h-3.5 text-white" />
             </div>
-            <div className={`px-4 py-3 rounded-2xl rounded-tl-md flex items-center gap-1.5 ${th.aiBubble}`}>
+            <div className={`px-4 py-3 rounded-2xl rounded-tl-md flex items-facility gap-1.5 ${th.aiBubble}`}>
               {[0, 150, 300].map((d) => (
                 <span
                   key={d}
@@ -727,7 +727,7 @@ const TutorAiChat: React.FC<Props> = ({
       {/* Photo preview sheet: shows the photo without its filename, with a
           field for a question to send along with the photo. */}
       {preview && (
-        <div className={`absolute inset-0 z-50 flex items-center justify-center p-5 ${th.overlay}`}>
+        <div className={`absolute inset-0 z-50 flex items-facility justify-facility p-5 ${th.overlay}`}>
           <div className={`border rounded-3xl p-4 max-w-sm w-full ${th.overlayPanel}`}>
             <img src={preview.thumb || preview.full} alt="Photo to send" className="rounded-2xl max-h-[40vh] w-auto mx-auto mb-3" />
             <input

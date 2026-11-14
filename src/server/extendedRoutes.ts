@@ -119,7 +119,7 @@ function validateLeadBody(body: any): Record<string, any> | string {
   const skipTrial = body.skipTrial === true;
   const phoneDigits = phoneRaw.replace(/\D/g, '');
   if (fullName.length < 2 || fullName.length > 100) return 'Please give your full name.';
-  if (businessName.length < 2 || businessName.length > 120) return 'Please give your centre name.';
+  if (businessName.length < 2 || businessName.length > 120) return 'Please give your facility name.';
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return 'That email address does not look right.';
   if (phoneDigits.length < 7 || phoneDigits.length > 15) return 'That phone number does not look right.';
   if (!studentCount) return 'How many students does your facility have?';
@@ -355,7 +355,7 @@ export function registerExtendedRoutes(app: express.Express): void {
         text: 'Tutorial OS email delivery test: the welcome template. If you can read this, delivery works.',
         mergeFields: {
           full_name: 'Test Trigger',
-          centre_name: 'TOS Test Centre',
+          centre_name: 'TOS Test Facility',
           access_code: '123456',
           login_email: to,
           temp_password: 'Test-1234',
@@ -381,7 +381,7 @@ export function registerExtendedRoutes(app: express.Express): void {
     try {
       const code = String(req.query.code || '').trim();
       if (!/^\d{6}$/.test(code)) {
-        return res.status(400).json({ error: 'Enter the 6-digit centre code.' });
+        return res.status(400).json({ error: 'Enter the 6-digit facility code.' });
       }
       const ip = clientIp(req);
       if (!(await countRateLimit(`code-lookup-${ip.replace(/\W/g, '')}`, 60, 15 * 60 * 1000))) {
@@ -400,20 +400,20 @@ export function registerExtendedRoutes(app: express.Express): void {
         if (matches.length === 1) centreId = matches[0].id;
       }
       if (!centreId) {
-        return res.status(404).json({ error: 'That code did not match any centre. Check it and try again.' });
+        return res.status(404).json({ error: 'That code did not match any facility. Check it and try again.' });
       }
       const cDoc = await adminDb.collection('centres').doc(centreId).get();
       if (!cDoc.exists) {
-        return res.status(404).json({ error: 'That code did not match any centre. Check it and try again.' });
+        return res.status(404).json({ error: 'That code did not match any facility. Check it and try again.' });
       }
       const c = cDoc.data() as any;
       res.json({
         centreId,
-        centreName: c.name || 'Tutorial Centre',
+        centreName: c.name || 'Education facility',
         suspended: c.status === 'suspended' || c.status === 'closed',
       });
     } catch (error: any) {
-      console.error('[centre-by-code] lookup failed:', error?.message || error);
+      console.error('[facility-by-code] lookup failed:', error?.message || error);
       res.status(500).json({ error: 'Could not look up that code. Please try again.' });
     }
   });
@@ -539,7 +539,7 @@ export function registerExtendedRoutes(app: express.Express): void {
       if (!centreId) return res.status(400).json({ error: 'centreId is required.' });
       await requireMembership(caller, centreId, ['owner']);
       const cDoc = await adminDb.collection('centres').doc(centreId).get();
-      if (!cDoc.exists) return res.status(404).json({ error: 'Centre not found.' });
+      if (!cDoc.exists) return res.status(404).json({ error: 'Facility not found.' });
       let accessCode = (cDoc.data() as any)?.accessCode;
       if (!accessCode) {
         const regenerated = await regenerateAccessCode(centreId, caller.uid, 'owner');
@@ -750,15 +750,15 @@ export function registerExtendedRoutes(app: express.Express): void {
         .sort((a: any, b: any) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
       res.json({ centres });
     } catch (error: any) {
-      console.error('[tos/centres] failed:', error?.message || error);
-      res.status(500).json({ error: 'Could not load centres.' });
+      console.error('[tos/facilities] failed:', error?.message || error);
+      res.status(500).json({ error: 'Could not load facilities.' });
     }
   });
 
   app.get('/api/tos/centres/:id', async (req, res) => {
     try {
       const cDoc = await adminDb.collection('centres').doc(req.params.id).get();
-      if (!cDoc.exists) return res.status(404).json({ error: 'Centre not found.' });
+      if (!cDoc.exists) return res.status(404).json({ error: 'Facility not found.' });
       const bDoc = await adminDb.collection('centreBilling').doc(req.params.id).get();
       const paymentsSnap = await adminDb.collection('billingPayments').where('centreId', '==', req.params.id).limit(100).get();
       const auditSnap = await adminDb.collection('auditLogs').where('centreId', '==', req.params.id).limit(50).get();
@@ -773,8 +773,8 @@ export function registerExtendedRoutes(app: express.Express): void {
           .sort((a: any, b: any) => String(b.at || '').localeCompare(String(a.at || ''))),
       });
     } catch (error: any) {
-      console.error('[tos/centres] detail failed:', error?.message || error);
-      res.status(500).json({ error: 'Could not load the centre.' });
+      console.error('[tos/facilities] detail failed:', error?.message || error);
+      res.status(500).json({ error: 'Could not load the facility.' });
     }
   });
 
@@ -783,7 +783,7 @@ export function registerExtendedRoutes(app: express.Express): void {
       const caller = requireTos(req);
       const cRef = adminDb.collection('centres').doc(req.params.id);
       const cDoc = await cRef.get();
-      if (!cDoc.exists) return res.status(404).json({ error: 'Centre not found.' });
+      if (!cDoc.exists) return res.status(404).json({ error: 'Facility not found.' });
       const bRef = adminDb.collection('centreBilling').doc(req.params.id);
       const bDoc = await bRef.get();
       const type = String(req.body?.type || '');
@@ -817,7 +817,7 @@ export function registerExtendedRoutes(app: express.Express): void {
         const days = Number(req.body?.days);
         if (!Number.isInteger(days) || days < 1 || days > 365) return res.status(400).json({ error: 'Days must be between 1 and 365.' });
         const billing = (bDoc.data() || {}) as any;
-        if (billing.skippedTrial) return res.status(400).json({ error: 'This centre skipped the trial; there is no trial to extend.' });
+        if (billing.skippedTrial) return res.status(400).json({ error: 'This facility skipped the trial; there is no trial to extend.' });
         const current = billing.trialEndsAt ? new Date(billing.trialEndsAt).getTime() : Date.now();
         const base = Math.max(current, Date.now());
         const trialEndsAt = new Date(base + days * DAY_MS).toISOString();
@@ -850,7 +850,7 @@ export function registerExtendedRoutes(app: express.Express): void {
         const note = String(req.body?.note || '').trim().slice(0, 500);
         if (!Number.isFinite(amount) || amount <= 0) return res.status(400).json({ error: 'Enter a payment amount.' });
         if (!periodEnd || isNaN(new Date(periodEnd).getTime())) return res.status(400).json({ error: 'Enter the period the payment covers.' });
-        if (!bDoc.exists) return res.status(400).json({ error: 'This centre has no billing document yet.' });
+        if (!bDoc.exists) return res.status(400).json({ error: 'This facility has no billing document yet.' });
         await adminDb.collection('billingPayments').add({
           centreId: req.params.id,
           amount,
@@ -875,7 +875,7 @@ export function registerExtendedRoutes(app: express.Express): void {
       }
       if (type === 'delete-centre') {
         const reason = String(req.body?.reason || '').trim().slice(0, 300);
-        if (!reason) return res.status(400).json({ error: 'A reason is required to delete a centre.' });
+        if (!reason) return res.status(400).json({ error: 'A reason is required to delete a facility.' });
         await deleteCentreCascade(req.params.id, caller.uid, reason);
         return res.json({ success: true });
       }
@@ -889,7 +889,7 @@ export function registerExtendedRoutes(app: express.Express): void {
       return res.status(400).json({ error: 'Unknown action.' });
     } catch (error: any) {
       if (error?.status) return res.status(error.status).json({ error: error.message });
-      console.error('[tos/centres] action failed:', error?.message || error);
+      console.error('[tos/facilities] action failed:', error?.message || error);
       res.status(500).json({ error: 'Action failed.' });
     }
   });

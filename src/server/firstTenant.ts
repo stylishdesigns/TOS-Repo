@@ -15,7 +15,7 @@ const FIRST_TENANT = {
   centreId: 'centre-excellence',
   ownerUid: 'BGQSmv8YPfhJb1VE4bG3SaM1XVx1',
   ownerEmail: 'superadmin@mailto.plus',
-  centreName: 'Excellence Tutorial Centre',
+  centreName: 'Excellence Education facility',
 };
 
 export async function reconcileFirstTenant(): Promise<void> {
