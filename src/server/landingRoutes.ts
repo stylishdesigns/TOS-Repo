@@ -19,10 +19,27 @@ export function registerLandingRoutes(app: express.Express): void {
         return res.status(400).json({ error: "A valid facility id is required." });
       }
 
+      // The facility's link may arrive as its name slug (the same value the
+      // signup pages use for the subdomain) rather than a Firestore doc id.
+      // Resolve the slug to the centre document so /c/<facility-name> works
+      // on the main domain while subdomain DNS is not in place yet.
+      let resolvedId = centreId;
+      try {
+        const direct = await adminDb.collection("centres").doc(centreId).get();
+        if (!direct.exists) {
+          const slug = String(centreId).toLowerCase().replace(/[^a-z0-9]+/g, "");
+          const snap = await adminDb.collection("centres").limit(200).get();
+          const match = snap.docs.find((d) => String((d.data() as any)?.name || "").toLowerCase().replace(/[^a-z0-9]+/g, "") === slug);
+          if (match) resolvedId = match.id;
+        }
+      } catch {
+        // Resolution failure must not break the page; fall back to the raw id.
+      }
+
       let centreName = "Our education facility";
       let centrePhone = "";
       try {
-        const centreSnap = await adminDb.collection("centres").doc(centreId).get();
+        const centreSnap = await adminDb.collection("centres").doc(resolvedId).get();
         if (centreSnap.exists) {
           const data = centreSnap.data() as Record<string, unknown> | undefined;
           if (data && typeof data.name === "string" && data.name.trim()) {
@@ -40,7 +57,7 @@ export function registerLandingRoutes(app: express.Express): void {
       // WhatsApp button; nothing private leaves the server here.
       let whatsapp = "";
       try {
-        const wsSnap = await adminDb.collection("centreSettings").doc(`${centreId}__global`).get();
+        const wsSnap = await adminDb.collection("centreSettings").doc(`${resolvedId}__global`).get();
         if (wsSnap.exists) {
           const ws = wsSnap.data() as Record<string, unknown> | undefined;
           const raw = (ws?.whatsappNumber || ws?.whatsapp || ws?.phone || "") as string;
@@ -55,7 +72,7 @@ export function registerLandingRoutes(app: express.Express): void {
       let published = false;
 
       try {
-        const snap = await adminDb.collection("centreLandingPages").doc(centreId).get();
+        const snap = await adminDb.collection("centreLandingPages").doc(resolvedId).get();
         if (snap.exists) {
           const data = snap.data() as Record<string, unknown> | undefined;
           if (data && data.published === true && isLandingContent(data.content)) {
