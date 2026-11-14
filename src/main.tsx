@@ -41,7 +41,7 @@ try {
     if (raw) centre = String((JSON.parse(raw) as { domain?: string }).domain || '').split('.')[0];
   }
   const link = document.querySelector('link[rel="manifest"]') as HTMLLinkElement | null;
-  if (centre && link) link.href = `/api/pwa/manifest?centre=${encodeURIComponent(centre)}`;
+  if (centre && link) link.href = `/api/public/pwa-manifest?centre=${encodeURIComponent(centre)}`;
 } catch { /* branding fallback: the default manifest stays. */ }
 
 // When a new build deploys, the hashed asset files this open tab remembers

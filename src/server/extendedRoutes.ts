@@ -225,7 +225,7 @@ export function registerExtendedRoutes(app: express.Express): void {
   // logo, and the installed app opens on the access-code page, never the
   // platform landing page.
   // ==========================================================================
-  app.get('/api/pwa/manifest', async (req, res) => {
+  app.get('/api/public/pwa-manifest', async (req, res) => {
     try {
       const slug = slugifyName(String(req.query.centre || '').trim());
       if (!slug) return res.status(400).json({ error: 'Missing facility.' });
