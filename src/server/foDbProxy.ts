@@ -453,4 +453,69 @@ export function registerFoDbProxy(app: express.Express): void {
       reject(res, 500, "The deletion failed on the server.");
     }
   });
+
+  // 10. Platform plan rename/reprice (user-approved, 2026-11-14): aligns the
+  //     two platformPlans documents and the trial-day config with the landing
+  //     page. Writes ONLY whitelisted fields on the two whitelisted plan ids,
+  //     refuses when a plan document is missing, and logs every change to
+  //     auditLogs the same way the TOS console does.
+  const PLAN_IDS = ["centre_standard", "centre_plus"];
+  const PLAN_NUMERIC = ["price", "trialDays", "trialSeatCap"];
+  app.post("/api/internal/fs/update-platform-plan", async (req, res) => {
+    const body = (req.body || {}) as Record<string, unknown>;
+    const plans = Array.isArray(body.plans) ? (body.plans as Record<string, unknown>[]) : [];
+    const configIn = body.config && typeof body.config === "object" ? (body.config as Record<string, unknown>) : null;
+    if (plans.length === 0 && !configIn) return reject(res, 400, "Nothing to update was provided.");
+    const results: Record<string, unknown>[] = [];
+    try {
+      for (const plan of plans) {
+        const id = typeof plan.id === "string" ? plan.id : "";
+        if (!PLAN_IDS.includes(id)) return reject(res, 400, "Only the two platform plans can be updated here.");
+        const update: Record<string, unknown> = {};
+        if (plan.name !== undefined) {
+          const name = String(plan.name).trim();
+          if (!name) return reject(res, 400, "A plan name cannot be empty.");
+          update.name = name.slice(0, 80);
+        }
+        for (const k of PLAN_NUMERIC) {
+          if (plan[k] !== undefined) {
+            const n = Number(plan[k]);
+            if (!Number.isFinite(n) || n < 0) return reject(res, 400, `${k} must be zero or more.`);
+            update[k] = n;
+          }
+        }
+        if (Object.keys(update).length === 0) continue;
+        const ref = adminDb.collection("platformPlans").doc(id);
+        const snap = await ref.get();
+        if (!snap.exists) return reject(res, 404, `The ${id} plan document is missing.`);
+        const before = jsonSafe(snap.data());
+        await ref.update(update);
+        await adminDb
+          .collection("auditLogs")
+          .add({ actorUid: "fo-db-proxy", action: "PLAN_UPDATED", before: { id, ...(before as object) }, after: { id, ...update }, at: new Date().toISOString() })
+          .catch((err) => console.error("[fo-db-proxy] audit write failed:", err?.message || err));
+        console.log(`[fo-db-proxy] update-platform-plan ${id}: ${Object.keys(update).join(", ")}`);
+        results.push({ id, before, after: update });
+      }
+      if (configIn && configIn.trialDays !== undefined) {
+        const n = Number(configIn.trialDays);
+        if (!Number.isFinite(n) || n < 0) return reject(res, 400, "trialDays must be zero or more.");
+        const ref = adminDb.collection("platformConfig").doc("global");
+        const snap = await ref.get();
+        if (!snap.exists) return reject(res, 404, "The platform config document is missing.");
+        const before = jsonSafe(snap.data());
+        await ref.update({ trialDays: n });
+        await adminDb
+          .collection("auditLogs")
+          .add({ actorUid: "fo-db-proxy", action: "CONFIG_UPDATED", before: { trialDays: (before as Record<string, unknown>).trialDays }, after: { trialDays: n }, at: new Date().toISOString() })
+          .catch((err) => console.error("[fo-db-proxy] audit write failed:", err?.message || err));
+        console.log("[fo-db-proxy] update-platform-plan config: trialDays");
+        results.push({ id: "platformConfig/global", before: { trialDays: (before as Record<string, unknown>).trialDays }, after: { trialDays: n } });
+      }
+      res.json({ ok: true, updated: results });
+    } catch (err: any) {
+      console.error("[fo-db-proxy] update-platform-plan failed:", err?.message || err);
+      reject(res, 500, "The plan update failed on the server.");
+    }
+  });
 }
