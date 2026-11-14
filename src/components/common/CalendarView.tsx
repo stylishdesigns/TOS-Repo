@@ -64,8 +64,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ isOpen, onClose, slo
 
       calendarDays.push(
         <div key={d} className={`min-h-[100px] p-2 border border-slate-100 hover:bg-slate-50 transition-colors ${isToday ? 'bg-orange-50/30 ring-1 ring-orange-200 ring-inset' : 'bg-white'}`}>
-          <div className="flex items-facility justify-between mb-1">
-            <span className={`text-[10px] font-bold ${isToday ? 'bg-orange-500 text-white w-5 h-5 rounded-full flex items-facility justify-facility' : 'text-slate-400'}`}>{d}</span>
+          <div className="flex items-center justify-between mb-1">
+            <span className={`text-[10px] font-bold ${isToday ? 'bg-orange-500 text-white w-5 h-5 rounded-full flex items-center justify-center' : 'text-slate-400'}`}>{d}</span>
           </div>
           <div className="space-y-1">
             {daySlots.slice(0, 3).map((slot) => (
@@ -78,7 +78,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ isOpen, onClose, slo
               </div>
             ))}
             {daySlots.length > 3 && (
-              <div className="text-[7px] font-black text-slate-400 text-facility uppercase tracking-tighter">
+              <div className="text-[7px] font-black text-slate-400 text-center uppercase tracking-tighter">
                 + {daySlots.length - 3} more periods
               </div>
             )}
@@ -91,20 +91,20 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ isOpen, onClose, slo
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-facility justify-facility p-4">
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
       <div className="bg-white w-full max-w-5xl rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="p-6 border-b border-slate-100 flex items-facility justify-between shrink-0">
+        <div className="p-6 border-b border-slate-100 flex items-center justify-between shrink-0">
           <div>
             <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight">{title}</h2>
             <p className="text-xs text-slate-400 font-bold uppercase mt-1">Interactive Monthly Schedule</p>
           </div>
-          <div className="flex items-facility space-x-4">
-            <div className="flex items-facility bg-slate-100 rounded-xl p-1">
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center bg-slate-100 rounded-xl p-1">
               <button onClick={prevMonth} className="p-2 hover:bg-white hover:shadow-sm rounded-lg transition-all text-slate-600">
                 <ChevronLeft className="w-5 h-5" />
               </button>
-              <span className="px-4 text-xs font-black text-slate-900 min-w-[140px] text-facility uppercase">{monthName}</span>
+              <span className="px-4 text-xs font-black text-slate-900 min-w-[140px] text-center uppercase">{monthName}</span>
               <button onClick={nextMonth} className="p-2 hover:bg-white hover:shadow-sm rounded-lg transition-all text-slate-600">
                 <ChevronRight className="w-5 h-5" />
               </button>
@@ -119,7 +119,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ isOpen, onClose, slo
         <div className="flex-1 overflow-y-auto p-6 bg-slate-50/30">
           <div className="grid grid-cols-7 gap-px">
             {dayLabels.map(day => (
-              <div key={day} className="py-2 text-facility text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 mb-2">
+              <div key={day} className="py-2 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 mb-2">
                 {day}
               </div>
             ))}
@@ -128,16 +128,16 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ isOpen, onClose, slo
         </div>
 
         {/* Legend */}
-        <div className="p-4 bg-white border-t border-slate-100 flex items-facility justify-facility space-x-6 text-[10px] font-black uppercase tracking-widest shrink-0">
-           <div className="flex items-facility space-x-2">
+        <div className="p-4 bg-white border-t border-slate-100 flex items-center justify-center space-x-6 text-[10px] font-black uppercase tracking-widest shrink-0">
+           <div className="flex items-center space-x-2">
               <div className="w-2.5 h-2.5 rounded-full bg-emerald-500"></div>
               <span className="text-slate-500">Active</span>
            </div>
-           <div className="flex items-facility space-x-2">
+           <div className="flex items-center space-x-2">
               <div className="w-2.5 h-2.5 rounded-full bg-amber-500"></div>
               <span className="text-slate-500">Pending Consent</span>
            </div>
-           <div className="flex items-facility space-x-2">
+           <div className="flex items-center space-x-2">
               <div className="w-2.5 h-2.5 rounded-full bg-rose-500"></div>
               <span className="text-slate-500">Cancelled / Postponed</span>
            </div>

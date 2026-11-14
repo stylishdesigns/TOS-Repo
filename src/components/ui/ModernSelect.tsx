@@ -81,7 +81,7 @@ export const ModernSelect: React.FC<ModernSelectProps> = ({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 font-bold outline-none focus:bg-white focus:border-orange-500 transition-all flex items-facility justify-between shadow-sm hover:shadow-md active:scale-[0.98]"
+        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 font-bold outline-none focus:bg-white focus:border-orange-500 transition-all flex items-center justify-between shadow-sm hover:shadow-md active:scale-[0.98]"
       >
         <span className={`truncate mr-2 ${((multiple && Array.isArray(value) && value.length > 0) || (!multiple && value)) ? 'text-slate-900' : 'text-slate-400'}`}>
           {getLabel()}
@@ -97,7 +97,7 @@ export const ModernSelect: React.FC<ModernSelectProps> = ({
                 key={option.value}
                 type="button"
                 onClick={() => handleSelect(option.value)}
-                className={`w-full flex items-facility justify-between px-3.5 py-2.5 text-sm rounded-xl transition-all ${
+                className={`w-full flex items-center justify-between px-3.5 py-2.5 text-sm rounded-xl transition-all ${
                   isSelected(option.value)
                     ? 'bg-orange-50 text-[#EA580C] font-black'
                     : 'text-slate-700 hover:bg-slate-50 font-bold'
@@ -105,7 +105,7 @@ export const ModernSelect: React.FC<ModernSelectProps> = ({
               >
                 <span>{option.label}</span>
                 {isSelected(option.value) && (
-                  <div className="w-5 h-5 rounded-full bg-orange-500 flex items-facility justify-facility">
+                  <div className="w-5 h-5 rounded-full bg-orange-500 flex items-center justify-center">
                     <Check className="w-3 h-3 text-white" />
                   </div>
                 )}

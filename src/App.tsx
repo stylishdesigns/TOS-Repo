@@ -20,7 +20,7 @@ import { AlertCircle, MessageCircle, ShieldCheck } from 'lucide-react';
 
 // The #tos door shows nothing to anyone who is not platform staff.
 const TosNotFound: React.FC = () => (
-  <div className="min-h-screen w-full bg-slate-950 flex flex-col items-facility justify-facility text-facility p-6">
+  <div className="min-h-screen w-full bg-slate-950 flex flex-col items-center justify-center text-center p-6">
     <p className="text-6xl font-black text-slate-800 mb-3">404</p>
     <p className="text-slate-400 text-sm">There is nothing here.</p>
   </div>
@@ -295,15 +295,15 @@ const MainLayout: React.FC = () => {
   const claimsPending = !!currentUser && !tosClaimsSettled;
   if (isAuthLoading || claimsPending) {
     return (
-      <div className="h-screen w-full flex flex-col items-facility justify-facility bg-slate-900 text-white">
+      <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-900 text-white">
         <div className="relative w-24 h-24 mb-8">
           <div className="absolute inset-0 border-4 border-orange-500/20 rounded-full" />
           <div className="absolute inset-0 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
-          <div className="absolute inset-4 bg-orange-500/10 rounded-full flex items-facility justify-facility">
+          <div className="absolute inset-4 bg-orange-500/10 rounded-full flex items-center justify-center">
              <span className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" />
           </div>
         </div>
-        <div className="space-y-2 text-facility">
+        <div className="space-y-2 text-center">
           <h2 className="text-xl font-black tracking-widest uppercase text-orange-500">{activeCentre?.name || ''}</h2>
           <p className="text-xs text-slate-400 font-medium animate-pulse">Synchronizing academic records...</p>
         </div>
@@ -326,15 +326,15 @@ const MainLayout: React.FC = () => {
   // the public pages, which read as having been logged out.
   if (currentUser && !isTosAdmin && tosDoorError && !centreAppRequested && !activeCentreId && !pendingCentre && !centreEntryBusy) {
     return (
-      <div className="min-h-screen w-full bg-slate-950 flex flex-col items-facility justify-facility text-facility p-6">
-        <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-facility justify-facility mb-5">
+      <div className="min-h-screen w-full bg-slate-950 flex flex-col items-center justify-center text-center p-6">
+        <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center mb-5">
           <AlertCircle className="w-7 h-7 text-amber-400" />
         </div>
         <h1 className="text-xl font-bold text-white mb-2">You are still signed in</h1>
         <p className="text-slate-400 text-sm mb-6 max-w-sm">
           The connection is too weak to verify your account right now, so your page cannot open yet. Your sign-in was not lost. Tap retry, or try again in a moment.
         </p>
-        <div className="flex flex-wrap items-facility justify-facility gap-3">
+        <div className="flex flex-wrap items-center justify-center gap-3">
           <button
             onClick={() => { setTosDoorError(false); setTosClaimsSettled(false); setTosDoorAttempt((a) => a + 1); }}
             className="px-4 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-sm font-bold transition-colors"
@@ -357,8 +357,8 @@ const MainLayout: React.FC = () => {
   // explain the way to test a centre instead of showing code entry.
   if (currentUser && isTosAdmin && !activeCentreId) {
     return (
-      <div className="min-h-screen w-full bg-slate-950 flex flex-col items-facility justify-facility text-facility p-6">
-        <div className="w-14 h-14 rounded-2xl bg-orange-500/10 border border-orange-500/30 flex items-facility justify-facility mb-5">
+      <div className="min-h-screen w-full bg-slate-950 flex flex-col items-center justify-center text-center p-6">
+        <div className="w-14 h-14 rounded-2xl bg-orange-500/10 border border-orange-500/30 flex items-center justify-center mb-5">
           <ShieldCheck className="w-7 h-7 text-orange-400" />
         </div>
         <h1 className="text-xl font-bold text-white mb-2">You are signed in as platform staff</h1>
@@ -366,7 +366,7 @@ const MainLayout: React.FC = () => {
           Facility access codes are for facility accounts, not platform staff. To look around a facility,
           sign out and sign in with that facility&apos;s own admin, tutor or student account.
         </p>
-        <div className="flex flex-wrap items-facility justify-facility gap-3">
+        <div className="flex flex-wrap items-center justify-center gap-3">
           <button
             onClick={() => { window.location.hash = ''; }}
             className="px-4 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-sm font-bold transition-colors"
@@ -392,13 +392,13 @@ const MainLayout: React.FC = () => {
     if (currentUser && !isTosAdmin) {
       if (tosDoorError) {
         return (
-          <div className="min-h-screen w-full bg-slate-950 flex flex-col items-facility justify-facility text-facility p-6">
-            <div className="w-14 h-14 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-facility justify-facility mb-5">
+          <div className="min-h-screen w-full bg-slate-950 flex flex-col items-center justify-center text-center p-6">
+            <div className="w-14 h-14 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center mb-5">
               <AlertCircle className="w-7 h-7 text-rose-400" />
             </div>
             <h1 className="text-xl font-bold text-white mb-2">Could not verify your platform access</h1>
             <p className="text-slate-400 text-sm mb-6 max-w-sm">Try again. If it keeps failing, the platform backend may be starting or misconfigured.</p>
-            <div className="flex items-facility gap-3">
+            <div className="flex items-center gap-3">
               <button
                 onClick={() => { setTosDoorError(false); setTosClaimsSettled(false); setTosDoorAttempt((a) => a + 1); }}
                 className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold transition-colors"
@@ -486,15 +486,15 @@ const MainLayout: React.FC = () => {
   // Shown after belonging is confirmed (centreSplash) and while an automatic
   // centre entry runs for a restored session.
   const centreSpinnerScreen = (
-    <div className="h-screen w-full flex flex-col items-facility justify-facility bg-slate-900 text-white">
+    <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-900 text-white">
       <div className="relative w-24 h-24 mb-8">
         <div className="absolute inset-0 border-4 border-orange-500/20 rounded-full" />
         <div className="absolute inset-0 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
-        <div className="absolute inset-4 bg-orange-500/10 rounded-full flex items-facility justify-facility">
+        <div className="absolute inset-4 bg-orange-500/10 rounded-full flex items-center justify-center">
            <span className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" />
         </div>
       </div>
-      <div className="space-y-2 text-facility">
+      <div className="space-y-2 text-center">
         <h2 className="text-xl font-black tracking-widest uppercase text-orange-500">{pendingCentre?.centreName || centreName}</h2>
         <p className="text-xs text-slate-400 font-medium animate-pulse">Taking you to your dashboard...</p>
       </div>
@@ -558,10 +558,10 @@ const MainLayout: React.FC = () => {
         ? `https://wa.me/${waDigits}?text=${encodeURIComponent(`Hello, I am a student of ${pendingCentre?.centreName || centreName}. I cannot access the portal at the moment. Please help me regain access. Thank you.`)}`
         : '';
       return (
-        <div className="h-screen w-full flex flex-col items-facility justify-facility bg-slate-900 text-white px-6 text-facility">
+        <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-900 text-white px-6 text-center">
           <div className={accessBlocked
-            ? "w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-facility justify-facility text-amber-400 mb-5"
-            : "w-14 h-14 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-facility justify-facility text-rose-400 mb-5"}>
+            ? "w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 mb-5"
+            : "w-14 h-14 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 mb-5"}>
             <AlertCircle className="w-7 h-7" />
           </div>
           <h2 className="text-xl font-black tracking-widest uppercase text-orange-500 mb-3">{pendingCentre?.centreName || centreName}</h2>
@@ -578,13 +578,13 @@ const MainLayout: React.FC = () => {
               href={waHref}
               target="_blank"
               rel="noreferrer"
-              className="mb-3 inline-flex items-facility gap-2 px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold transition-colors"
+              className="mb-3 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold transition-colors"
             >
               <MessageCircle className="w-4 h-4" />
               Contact the admin on WhatsApp
             </a>
           ) : null}
-          <div className="flex items-facility gap-3">
+          <div className="flex items-center gap-3">
             <button onClick={retryCentreEntry} className="px-5 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold transition-colors">
               Try again
             </button>
@@ -847,8 +847,8 @@ class ErrorBoundary extends Component<any, any> {
         }
       };
       return (
-        <div className="h-screen w-full flex flex-col items-facility justify-facility bg-slate-50 p-6 text-facility">
-          <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-2xl flex items-facility justify-facility mb-4">
+        <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-50 p-6 text-center">
+          <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-2xl flex items-center justify-center mb-4">
             <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
@@ -860,7 +860,7 @@ class ErrorBoundary extends Component<any, any> {
           <pre className="mb-5 w-full max-w-md max-h-40 overflow-auto rounded-xl bg-slate-100 p-3 text-left text-[11px] text-rose-700 whitespace-pre-wrap break-words">
             {message}
           </pre>
-          <div className="flex flex-wrap items-facility justify-facility gap-3">
+          <div className="flex flex-wrap items-center justify-center gap-3">
             <button
               onClick={() => window.location.reload()}
               className="px-6 py-2 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-slate-800 transition-all"

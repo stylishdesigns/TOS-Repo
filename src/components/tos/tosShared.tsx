@@ -105,7 +105,7 @@ export const StatusPill: React.FC<{ status: string; labels?: Record<string, stri
   labels = STATUS_LABELS,
   styles = STATUS_STYLES,
 }) => (
-  <span className={`inline-flex items-facility px-2.5 py-1 rounded-full border text-[11px] font-bold whitespace-nowrap ${styles[status] || 'bg-slate-700/40 text-slate-300 border-slate-600/40'}`}>
+  <span className={`inline-flex items-center px-2.5 py-1 rounded-full border text-[11px] font-bold whitespace-nowrap ${styles[status] || 'bg-slate-700/40 text-slate-300 border-slate-600/40'}`}>
     {labels[status] || status}
   </span>
 );
@@ -128,9 +128,9 @@ export const inputCls =
   'w-full bg-slate-950/60 border border-white/10 focus:border-orange-500/60 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder:text-slate-600 outline-none transition-colors';
 
 export const btnPrimary =
-  'inline-flex items-facility justify-facility gap-2 px-4 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white font-bold text-sm transition-all';
+  'inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white font-bold text-sm transition-all';
 export const btnGhost =
-  'inline-flex items-facility justify-facility gap-2 px-4 py-2.5 rounded-xl border border-white/10 hover:border-white/25 bg-slate-950/40 disabled:opacity-50 text-slate-200 font-semibold text-sm transition-all';
+  'inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-white/10 hover:border-white/25 bg-slate-950/40 disabled:opacity-50 text-slate-200 font-semibold text-sm transition-all';
 
 // ---------------------------------------------------------------------------
 // Credentials modal: a temporary password is shown exactly once, here, and
@@ -146,11 +146,11 @@ export const CredentialsModal: React.FC<{ details: { email: string; password?: s
     } catch { /* clipboard unavailable */ }
   };
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-facility justify-facility p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-slate-900 border border-white/10 rounded-3xl p-7 max-w-md w-full shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between mb-4">
-          <div className="flex items-facility gap-3">
-            <div className="w-10 h-10 rounded-xl bg-orange-500/15 border border-orange-500/30 flex items-facility justify-facility">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-orange-500/15 border border-orange-500/30 flex items-center justify-center">
               <KeyRound className="w-5 h-5 text-orange-400" />
             </div>
             <div>
@@ -167,14 +167,14 @@ export const CredentialsModal: React.FC<{ details: { email: string; password?: s
           </p>
         </div>
         <div className="space-y-3">
-          <div className="flex items-facility justify-between bg-slate-950/60 border border-white/10 rounded-xl px-4 py-3">
+          <div className="flex items-center justify-between bg-slate-950/60 border border-white/10 rounded-xl px-4 py-3">
             <div>
               <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Login email</p>
               <p className="text-white text-sm font-semibold">{details.email}</p>
             </div>
           </div>
           {details.password && (
-            <div className="flex items-facility justify-between bg-slate-950/60 border border-white/10 rounded-xl px-4 py-3">
+            <div className="flex items-center justify-between bg-slate-950/60 border border-white/10 rounded-xl px-4 py-3">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Temporary password</p>
                 <p className="text-white text-sm font-mono font-bold tracking-wider">{details.password}</p>
@@ -185,7 +185,7 @@ export const CredentialsModal: React.FC<{ details: { email: string; password?: s
             </div>
           )}
           {details.accessCode && (
-            <div className="flex items-facility justify-between bg-slate-950/60 border border-white/10 rounded-xl px-4 py-3">
+            <div className="flex items-center justify-between bg-slate-950/60 border border-white/10 rounded-xl px-4 py-3">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Access code</p>
                 <p className="text-white text-sm font-mono font-bold tracking-wider">{details.accessCode}</p>

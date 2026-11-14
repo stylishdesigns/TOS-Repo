@@ -267,10 +267,10 @@ export const TextComposer: React.FC<{
       aria-modal="true"
       aria-label="Add a text status"
     >
-      <div className="flex items-facility justify-between p-4">
+      <div className="flex items-center justify-between p-4">
         <button
           onClick={onClose}
-          className="w-9 h-9 rounded-xl flex items-facility justify-facility active:scale-95 transition"
+          className="w-9 h-9 rounded-xl flex items-center justify-center active:scale-95 transition"
           style={{ color: dark ? '#FFFFFF' : '#0F172A', backgroundColor: dark ? 'rgba(255,255,255,0.15)' : 'rgba(15,23,42,0.08)' }}
           aria-label="Discard update"
         >
@@ -285,21 +285,21 @@ export const TextComposer: React.FC<{
           {busy ? 'Sharing...' : 'Share'}
         </button>
       </div>
-      <div className="flex-1 flex items-facility justify-facility px-8">
+      <div className="flex-1 flex items-center justify-center px-8">
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value.slice(0, settings.maxTextChars))}
           placeholder="Type an update"
           rows={4}
-          className="w-full bg-transparent text-facility text-2xl font-black tracking-tight resize-none outline-none placeholder:opacity-40"
+          className="w-full bg-transparent text-center text-2xl font-black tracking-tight resize-none outline-none placeholder:opacity-40"
           style={{ color: dark ? '#FFFFFF' : '#0F172A' }}
         />
       </div>
       {err && (
-        <p className="px-6 pb-2 text-xs font-bold text-facility" style={{ color: dark ? '#FFFFFF' : '#B91C1C' }}>{err}</p>
+        <p className="px-6 pb-2 text-xs font-bold text-center" style={{ color: dark ? '#FFFFFF' : '#B91C1C' }}>{err}</p>
       )}
       <div className="p-5 pb-8 space-y-3">
-        <div className="flex items-facility justify-facility gap-2.5">
+        <div className="flex items-center justify-center gap-2.5">
           {STATUS_BG.map((c) => (
             <button
               key={c}
@@ -311,7 +311,7 @@ export const TextComposer: React.FC<{
             />
           ))}
         </div>
-        <p className="text-facility text-[11px] font-bold" style={{ color: dark ? 'rgba(255,255,255,0.7)' : 'rgba(15,23,42,0.5)' }}>
+        <p className="text-center text-[11px] font-bold" style={{ color: dark ? 'rgba(255,255,255,0.7)' : 'rgba(15,23,42,0.5)' }}>
           {text.length}/{settings.maxTextChars}
         </p>
       </div>
@@ -535,11 +535,11 @@ export const MediaComposer: React.FC<{
       aria-modal="true"
       aria-label={kind === 'photo' ? 'Add a photo status' : kind === 'video' ? 'Add a video status' : 'Add a music status'}
     >
-      <div className="flex items-facility justify-between p-4">
+      <div className="flex items-center justify-between p-4">
         <button
           onClick={onClose}
           disabled={busy}
-          className="w-9 h-9 rounded-xl flex items-facility justify-facility active:scale-95 transition disabled:opacity-40"
+          className="w-9 h-9 rounded-xl flex items-center justify-center active:scale-95 transition disabled:opacity-40"
           style={{ color: '#FFFFFF', backgroundColor: 'rgba(255,255,255,0.15)' }}
           aria-label="Discard update"
         >
@@ -554,9 +554,9 @@ export const MediaComposer: React.FC<{
           {busy ? (progress > 0 && progress < 100 ? `Uploading ${progress}%...` : 'Sharing...') : 'Share'}
         </button>
       </div>
-      <div className="flex-1 flex items-facility justify-facility px-6 min-h-0">
+      <div className="flex-1 flex items-center justify-center px-6 min-h-0">
         {fatal ? (
-          <div className="text-facility space-y-3">
+          <div className="text-center space-y-3">
             <p className="text-sm font-bold" style={{ color: '#FFFFFF' }}>{fatal}</p>
             <button
               onClick={onClose}
@@ -572,10 +572,10 @@ export const MediaComposer: React.FC<{
           <video src={preview} controls playsInline className="max-h-full max-w-full rounded-2xl" />
         ) : kind === 'music' ? (
           <div className="w-full max-w-sm rounded-3xl p-6 space-y-4" style={{ backgroundColor: 'rgba(255,255,255,0.12)' }}>
-            <div className="w-16 h-16 rounded-2xl mx-auto flex items-facility justify-facility" style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}>
+            <div className="w-16 h-16 rounded-2xl mx-auto flex items-center justify-center" style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}>
               <Music className="w-8 h-8 text-white" />
             </div>
-            <p className="text-sm font-black text-white text-facility truncate">{file.name}</p>
+            <p className="text-sm font-black text-white text-center truncate">{file.name}</p>
             {preview && <audio src={preview} controls className="w-full" />}
           </div>
         ) : (
@@ -583,10 +583,10 @@ export const MediaComposer: React.FC<{
         )}
       </div>
       {err && (
-        <p className="px-6 pb-2 text-xs font-bold text-facility" style={{ color: '#FCA5A5' }}>{err}</p>
+        <p className="px-6 pb-2 text-xs font-bold text-center" style={{ color: '#FCA5A5' }}>{err}</p>
       )}
       <div className="p-5 pb-8">
-        <p className="text-facility text-[11px] font-bold mb-1" style={{ color: 'rgba(255,255,255,0.6)' }}>
+        <p className="text-center text-[11px] font-bold mb-1" style={{ color: 'rgba(255,255,255,0.6)' }}>
           {kind === 'photo'
             ? `Photos can be up to ${settings.photoMaxKb} KB`
             : kind === 'video'
@@ -600,7 +600,7 @@ export const MediaComposer: React.FC<{
           className="w-full h-11 rounded-full px-4 text-sm font-medium outline-none"
           style={{ color: '#FFFFFF', backgroundColor: 'rgba(255,255,255,0.15)' }}
         />
-        <p className="text-facility text-[11px] font-bold mt-2" style={{ color: 'rgba(255,255,255,0.6)' }}>
+        <p className="text-center text-[11px] font-bold mt-2" style={{ color: 'rgba(255,255,255,0.6)' }}>
           {caption.length}/{settings.maxTextChars}
         </p>
       </div>
@@ -905,13 +905,13 @@ export const StatusViewer: React.FC<{
     >
       {/* Top bar: close, who, when, and the tap-through dots. */}
       <div className="p-4 space-y-2">
-        <div className="flex items-facility justify-between">
-          <div className="flex items-facility gap-2.5 min-w-0">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5 min-w-0">
             {person.avatar ? (
               <img src={person.avatar} alt="" className="w-9 h-9 rounded-full object-cover shrink-0" />
             ) : (
               <div
-                className="w-9 h-9 rounded-full flex items-facility justify-facility text-xs font-black shrink-0"
+                className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-black shrink-0"
                 style={{ color: dark ? '#FFFFFF' : '#0F172A', backgroundColor: dark ? 'rgba(255,255,255,0.2)' : 'rgba(15,23,42,0.08)' }}
               >
                 {initials(person.name || person.username)}
@@ -926,11 +926,11 @@ export const StatusViewer: React.FC<{
               </p>
             </div>
           </div>
-          <div className="flex items-facility gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
             {current?.kind === 'video' && (
               <button
                 onClick={toggleVideoSound}
-                className="w-9 h-9 rounded-xl flex items-facility justify-facility active:scale-95 transition shrink-0"
+                className="w-9 h-9 rounded-xl flex items-center justify-center active:scale-95 transition shrink-0"
                 style={{ color: dark ? '#FFFFFF' : '#0F172A', backgroundColor: dark ? 'rgba(255,255,255,0.15)' : 'rgba(15,23,42,0.08)' }}
                 aria-label={vidMuted ? 'Turn the sound on' : 'Turn the sound off'}
               >
@@ -939,7 +939,7 @@ export const StatusViewer: React.FC<{
             )}
             <button
               onClick={onClose}
-              className="w-9 h-9 rounded-xl flex items-facility justify-facility active:scale-95 transition shrink-0"
+              className="w-9 h-9 rounded-xl flex items-center justify-center active:scale-95 transition shrink-0"
               style={{ color: dark ? '#FFFFFF' : '#0F172A', backgroundColor: dark ? 'rgba(255,255,255,0.15)' : 'rgba(15,23,42,0.08)' }}
               aria-label="Close status"
             >
@@ -948,7 +948,7 @@ export const StatusViewer: React.FC<{
           </div>
         </div>
         {total > 0 && (
-          <div className="flex items-facility gap-1">
+          <div className="flex items-center gap-1">
             {statuses!.map((st, i) => (
               <div
                 key={st.statusId}
@@ -972,7 +972,7 @@ export const StatusViewer: React.FC<{
       {/* The update itself, with tap-through when there is more than one.
           Holding a finger on it pauses the progress line until it lifts. */}
       <div
-        className="flex-1 flex items-facility justify-facility px-8 relative"
+        className="flex-1 flex items-center justify-center px-8 relative"
         onPointerDown={() => {
           pausedRef.current = true;
           if (current?.kind === 'video' && videoRef.current) videoRef.current.pause();
@@ -1015,7 +1015,7 @@ export const StatusViewer: React.FC<{
         onTouchCancel={() => { swipeFired.current = false; }}
       >
         {current && current.kind === 'text' && (
-          <p className="text-facility text-2xl font-black tracking-tight" style={{ color: dark ? '#FFFFFF' : '#0F172A' }}>
+          <p className="text-center text-2xl font-black tracking-tight" style={{ color: dark ? '#FFFFFF' : '#0F172A' }}>
             {current.text}
           </p>
         )}
@@ -1030,7 +1030,7 @@ export const StatusViewer: React.FC<{
               className="absolute inset-0 w-full h-full object-contain pointer-events-none"
             />
             {!mediaReady && (
-              <span className="absolute inset-0 flex items-facility justify-facility pointer-events-none">
+              <span className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <Loader2 className="w-6 h-6 animate-spin" style={{ color: dark ? 'rgba(255,255,255,0.8)' : 'rgba(15,23,42,0.6)' }} />
               </span>
             )}
@@ -1052,13 +1052,13 @@ export const StatusViewer: React.FC<{
           />
         )}
         {current && current.kind === 'video' && current.videoUrl && !mediaReady && (
-          <span className="absolute inset-0 flex items-facility justify-facility pointer-events-none">
+          <span className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <Loader2 className="w-6 h-6 animate-spin text-white/80" />
           </span>
         )}
         {current && current.kind === 'music' && current.audioUrl && (
           <div className="w-full max-w-sm rounded-3xl p-6 space-y-4" style={{ backgroundColor: 'rgba(255,255,255,0.12)' }}>
-            <div className="w-16 h-16 rounded-2xl mx-auto flex items-facility justify-facility" style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}>
+            <div className="w-16 h-16 rounded-2xl mx-auto flex items-center justify-center" style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}>
               <Music className="w-8 h-8 text-white" />
             </div>
             <audio src={current.audioUrl} controls className="w-full" onEnded={() => advance(1)} />
@@ -1083,7 +1083,7 @@ export const StatusViewer: React.FC<{
           </>
         )}
         {!current && statuses && statuses.length === 0 && (
-          <div className="text-facility space-y-2">
+          <div className="text-center space-y-2">
             <p className="text-sm font-bold" style={{ color: dark ? '#FFFFFF' : '#0F172A' }}>
               {mine ? 'You have no status up right now.' : 'This status is no longer available.'}
             </p>
@@ -1095,7 +1095,7 @@ export const StatusViewer: React.FC<{
           </div>
         )}
         {!statuses && !err && (
-          <p className="text-facility text-sm font-bold" style={{ color: dark ? 'rgba(255,255,255,0.7)' : 'rgba(15,23,42,0.5)' }}>
+          <p className="text-center text-sm font-bold" style={{ color: dark ? 'rgba(255,255,255,0.7)' : 'rgba(15,23,42,0.5)' }}>
             Loading...
           </p>
         )}
@@ -1105,7 +1105,7 @@ export const StatusViewer: React.FC<{
       {current && current.kind !== 'text' && current.text && (
         <div className="px-6 pb-2">
           <p
-            className="mx-auto max-w-md rounded-2xl px-4 py-2 text-sm font-bold text-facility"
+            className="mx-auto max-w-md rounded-2xl px-4 py-2 text-sm font-bold text-center"
             style={{ color: '#FFFFFF', backgroundColor: 'rgba(15,23,42,0.55)' }}
           >
             {current.text}
@@ -1116,48 +1116,48 @@ export const StatusViewer: React.FC<{
       {/* Bottom: the owner sees who has seen it and the replies; everyone
           else sees the reply box when replies are switched on. */}
       {err && (
-        <p className="px-6 pb-2 text-xs font-bold text-facility" style={{ color: dark ? '#FFFFFF' : '#B91C1C' }}>{err}</p>
+        <p className="px-6 pb-2 text-xs font-bold text-center" style={{ color: dark ? '#FFFFFF' : '#B91C1C' }}>{err}</p>
       )}
       {mine && current && (
         <>
           <button
             onClick={() => setOwnerSheet('viewers')}
             aria-label="People who have seen this update"
-            className="absolute bottom-7 left-4 w-12 h-12 rounded-full bg-white text-[#0F172A] shadow-xl flex items-facility justify-facility active:scale-95 transition z-10"
+            className="absolute bottom-7 left-4 w-12 h-12 rounded-full bg-white text-[#0F172A] shadow-xl flex items-center justify-center active:scale-95 transition z-10"
           >
             <Eye className="w-5 h-5" />
-            <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#EA580C] text-white text-[9px] font-black flex items-facility justify-facility">
+            <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#EA580C] text-white text-[9px] font-black flex items-center justify-center">
               {current.views || 0}
             </span>
           </button>
           <button
             onClick={() => setOwnerSheet('replies')}
             aria-label="Replies and loves on this update"
-            className="absolute bottom-7 right-4 w-12 h-12 rounded-full bg-white text-[#0F172A] shadow-xl flex items-facility justify-facility active:scale-95 transition z-10"
+            className="absolute bottom-7 right-4 w-12 h-12 rounded-full bg-white text-[#0F172A] shadow-xl flex items-center justify-center active:scale-95 transition z-10"
           >
             <MessageCircle className="w-5 h-5" />
-            <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#EA580C] text-white text-[9px] font-black flex items-facility justify-facility">
+            <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#EA580C] text-white text-[9px] font-black flex items-center justify-center">
               {typeof current.replyCount === 'number' ? current.replyCount + (current.loves || []).length : (current.replies || []).length + (current.loves || []).length}
             </span>
           </button>
         </>
       )}
       {!mine && current && settings.allowReplies && (
-        <div className="p-4 pb-8 space-y-2 flex items-facility gap-2">
+        <div className="p-4 pb-8 space-y-2 flex items-center gap-2">
           <button
             onClick={toggleLove}
             disabled={lovingBusy}
             aria-label={current.lovedByMe ? 'Remove your love' : 'Love this update'}
-            className="w-11 h-11 rounded-full flex items-facility justify-facility active:scale-95 transition shrink-0 disabled:opacity-50"
+            className="w-11 h-11 rounded-full flex items-center justify-center active:scale-95 transition shrink-0 disabled:opacity-50"
             style={{ backgroundColor: current.lovedByMe ? '#FEE2E2' : (dark ? 'rgba(255,255,255,0.15)' : 'rgba(15,23,42,0.06)') }}
           >
             <Heart className={`w-5 h-5 ${current.lovedByMe ? 'text-red-500 fill-red-500' : (dark ? 'text-white' : 'text-[#0F172A]')}`} />
           </button>
           <div className="flex-1 space-y-2 min-w-0">
           {replyNote && (
-            <p className="text-[11px] font-bold text-facility" style={{ color: dark ? '#FFFFFF' : '#0F172A' }}>{replyNote}</p>
+            <p className="text-[11px] font-bold text-center" style={{ color: dark ? '#FFFFFF' : '#0F172A' }}>{replyNote}</p>
           )}
-          <div className="flex items-facility gap-2">
+          <div className="flex items-center gap-2">
             <input
               ref={replyInputRef}
               value={replyText}
@@ -1187,23 +1187,23 @@ export const StatusViewer: React.FC<{
         </div>
       )}
       {ownerSheet && mine && current && (
-        <div className="fixed inset-0 z-[60] bg-slate-950/50 flex items-end justify-facility" onClick={() => setOwnerSheet(null)}>
+        <div className="fixed inset-0 z-[60] bg-slate-950/50 flex items-end justify-center" onClick={() => setOwnerSheet(null)}>
           <div className="w-full max-w-lg bg-white rounded-t-3xl p-5 space-y-3 max-h-[70vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-facility justify-between shrink-0">
+            <div className="flex items-center justify-between shrink-0">
               <p className="text-sm font-black text-slate-900">
                 {ownerSheet === 'viewers' ? `Seen by ${current.views || 0}` : 'Replies and loves'}
               </p>
-              <button onClick={() => setOwnerSheet(null)} className="w-8 h-8 rounded-lg bg-slate-100 flex items-facility justify-facility text-slate-500" aria-label="Close">
+              <button onClick={() => setOwnerSheet(null)} className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500" aria-label="Close">
                 <X className="w-4 h-4" />
               </button>
             </div>
             <div className="overflow-y-auto space-y-2 min-h-0">
               {ownerSheet === 'viewers' && (current.viewers || []).length === 0 && (
-                <p className="text-xs text-slate-500 font-medium py-4 text-facility">No one has seen it yet.</p>
+                <p className="text-xs text-slate-500 font-medium py-4 text-center">No one has seen it yet.</p>
               )}
               {ownerSheet === 'viewers' && (current.viewers || []).map((vp) => (
-                <div key={vp.uid} className="flex items-facility gap-3 py-1">
-                  <div className="w-9 h-9 rounded-full bg-[#FFF7ED] text-[#C2410C] border border-[#EA580C]/30 flex items-facility justify-facility text-[10px] font-black shrink-0">
+                <div key={vp.uid} className="flex items-center gap-3 py-1">
+                  <div className="w-9 h-9 rounded-full bg-[#FFF7ED] text-[#C2410C] border border-[#EA580C]/30 flex items-center justify-center text-[10px] font-black shrink-0">
                     {initials(vp.name || (vp.username ? `@${vp.username}` : 'Student'))}
                   </div>
                   <div className="min-w-0 flex-1">
@@ -1221,11 +1221,11 @@ export const StatusViewer: React.FC<{
                 ];
                 rows.sort((a, b) => b.at - a.at);
                 if (rows.length === 0) {
-                  return <p className="text-xs text-slate-500 font-medium py-4 text-facility">No replies or loves yet.</p>;
+                  return <p className="text-xs text-slate-500 font-medium py-4 text-center">No replies or loves yet.</p>;
                 }
                 return rows.map((row) => (
                   <div key={row.key} className="flex items-start gap-3 py-1.5">
-                    <div className="w-9 h-9 rounded-full bg-[#FFF7ED] text-[#C2410C] border border-[#EA580C]/30 flex items-facility justify-facility text-[10px] font-black shrink-0">
+                    <div className="w-9 h-9 rounded-full bg-[#FFF7ED] text-[#C2410C] border border-[#EA580C]/30 flex items-center justify-center text-[10px] font-black shrink-0">
                       {initials(row.name || (row.username ? `@${row.username}` : 'Student'))}
                     </div>
                     <div className="min-w-0 flex-1">
@@ -1242,12 +1242,12 @@ export const StatusViewer: React.FC<{
         </div>
       )}
       {!mine && current && !settings.allowReplies && (
-        <div className="p-4 pb-8 flex justify-facility">
+        <div className="p-4 pb-8 flex justify-center">
           <button
             onClick={toggleLove}
             disabled={lovingBusy}
             aria-label={current.lovedByMe ? 'Remove your love' : 'Love this update'}
-            className="w-12 h-12 rounded-full bg-white shadow-xl flex items-facility justify-facility active:scale-95 transition disabled:opacity-50"
+            className="w-12 h-12 rounded-full bg-white shadow-xl flex items-center justify-center active:scale-95 transition disabled:opacity-50"
           >
             <Heart className={`w-5 h-5 ${current.lovedByMe ? 'text-red-500 fill-red-500' : 'text-[#0F172A]'}`} />
           </button>
@@ -1275,7 +1275,7 @@ const StatusBubble: React.FC<{ entry: StatusEntry; dimmed?: boolean; now: number
   const f = Math.max(0, Math.min(1, remain / life));
   const ring = dimmed ? '#CBD5E1' : '#EA580C';
   const inside = (
-    <span className="w-full h-full flex items-facility justify-facility overflow-hidden rounded-full">
+    <span className="w-full h-full flex items-center justify-center overflow-hidden rounded-full">
       <StatusThumb kind={entry.kind} photoUrl={entry.photoUrl} videoUrl={entry.videoUrl} />
     </span>
   );
@@ -1284,7 +1284,7 @@ const StatusBubble: React.FC<{ entry: StatusEntry; dimmed?: boolean; now: number
       type="button"
       onClick={onPress}
       aria-label={`Status, ${statusLeftLabel(remain)} left`}
-      className="shrink-0 flex flex-col items-facility gap-1 cursor-pointer active:scale-95 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 rounded-full"
+      className="shrink-0 flex flex-col items-center gap-1 cursor-pointer active:scale-95 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 rounded-full"
     >
       <span className={`relative block w-14 h-14 ${dimmed ? 'opacity-70' : ''}`}>
         <svg viewBox="0 0 64 64" className="w-14 h-14" aria-hidden="true">
@@ -1296,7 +1296,7 @@ const StatusBubble: React.FC<{ entry: StatusEntry; dimmed?: boolean; now: number
             transform="rotate(-90 32 32)"
           />
         </svg>
-        <span className="absolute inset-[5px] rounded-full overflow-hidden bg-[#FFF7ED] text-[#C2410C] border border-[#EA580C]/30 flex items-facility justify-facility">
+        <span className="absolute inset-[5px] rounded-full overflow-hidden bg-[#FFF7ED] text-[#C2410C] border border-[#EA580C]/30 flex items-center justify-center">
           {inside}
         </span>
       </span>
@@ -1337,9 +1337,9 @@ const StatusRail: React.FC<{ label: string; items: StatusEntry[]; dimmed?: boole
             key={g.key}
             className={`shrink-0 bg-white rounded-2xl border border-slate-200/90 shadow-sm p-3 ${dimmed ? 'opacity-75' : ''}`}
           >
-            <div className="flex items-facility gap-2 max-w-[168px]">
+            <div className="flex items-center gap-2 max-w-[168px]">
               <div
-                className={`w-7 h-7 rounded-full text-[10px] font-black flex items-facility justify-facility shrink-0 ${dimmed ? 'bg-slate-100 text-slate-400 border border-slate-200' : 'bg-[#FFF7ED] text-[#C2410C] border border-[#EA580C]/40'}`}
+                className={`w-7 h-7 rounded-full text-[10px] font-black flex items-center justify-center shrink-0 ${dimmed ? 'bg-slate-100 text-slate-400 border border-slate-200' : 'bg-[#FFF7ED] text-[#C2410C] border border-[#EA580C]/40'}`}
                 aria-hidden="true"
               >
                 {initials(g.name)}
@@ -1476,7 +1476,7 @@ export const StatusScreenCore: React.FC<{ call: (path: string, opts?: any) => Pr
   const staff = variant === 'staff';
   return (
     <div className={staff ? 'space-y-5 px-4 sm:px-5 animate-in fade-in duration-300' : 'space-y-5 animate-in fade-in duration-300'}>
-      <div className={`flex items-facility justify-between ${staff ? 'pt-2' : ''}`}>
+      <div className={`flex items-center justify-between ${staff ? 'pt-2' : ''}`}>
         <h2 className="text-2xl font-black text-slate-900 tracking-tight">Status</h2>
         {staff && data?.settings && data.enabled !== false && (
           <button
@@ -1484,7 +1484,7 @@ export const StatusScreenCore: React.FC<{ call: (path: string, opts?: any) => Pr
             aria-label={fanOpen ? 'Close add menu' : 'Add a status update'}
             aria-expanded={fanOpen}
             onClick={() => setFanOpen((o) => !o)}
-            className="relative z-10 w-10 h-10 rounded-xl bg-[#EA580C] text-white flex items-facility justify-facility shadow-md shrink-0 active:scale-95 transition"
+            className="relative z-10 w-10 h-10 rounded-xl bg-[#EA580C] text-white flex items-center justify-center shadow-md shrink-0 active:scale-95 transition"
           >
             {fanOpen ? <X className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
           </button>
@@ -1503,7 +1503,7 @@ export const StatusScreenCore: React.FC<{ call: (path: string, opts?: any) => Pr
               type="button"
               disabled={it.disabled}
               onClick={it.disabled ? undefined : it.onPick}
-              className={`px-3.5 py-2.5 rounded-2xl bg-white border border-slate-200 shadow-sm text-xs font-black text-slate-700 flex items-facility gap-1.5 active:scale-95 transition ${it.disabled ? 'opacity-40' : ''}`}
+              className={`px-3.5 py-2.5 rounded-2xl bg-white border border-slate-200 shadow-sm text-xs font-black text-slate-700 flex items-center gap-1.5 active:scale-95 transition ${it.disabled ? 'opacity-40' : ''}`}
             >
               {it.key === 'text' ? <span className="text-sm font-black leading-none">Aa</span> : it.key === 'photo' ? <ImageIcon className="w-4 h-4" /> : <Film className="w-4 h-4" />}
               {it.label}
@@ -1513,7 +1513,7 @@ export const StatusScreenCore: React.FC<{ call: (path: string, opts?: any) => Pr
       )}
 
       {data && data.enabled === false && (
-        <div className="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-sm text-facility space-y-2">
+        <div className="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-sm text-center space-y-2">
           <h3 className="text-base font-black text-slate-900 tracking-tight">Status is off</h3>
           <p className="text-xs text-slate-500 leading-relaxed font-medium">
             Status updates are not turned on for now.
@@ -1527,8 +1527,8 @@ export const StatusScreenCore: React.FC<{ call: (path: string, opts?: any) => Pr
               update with its own seen and reply counts. Posting happens
               through the orange + button in the corner, never here. */}
           {mineRows.length === 0 ? (
-            <div className="w-full bg-white rounded-3xl p-4 border border-slate-200/90 shadow-sm flex items-facility gap-3">
-              <div className="w-12 h-12 rounded-full bg-[#FFF7ED] border-2 border-[#EA580C] flex items-facility justify-facility text-[#C2410C] text-sm font-black shrink-0">
+            <div className="w-full bg-white rounded-3xl p-4 border border-slate-200/90 shadow-sm flex items-center gap-3">
+              <div className="w-12 h-12 rounded-full bg-[#FFF7ED] border-2 border-[#EA580C] flex items-center justify-center text-[#C2410C] text-sm font-black shrink-0">
                 {initials(me?.name || fallbackName)}
               </div>
               <div className="min-w-0 flex-1">
@@ -1543,9 +1543,9 @@ export const StatusScreenCore: React.FC<{ call: (path: string, opts?: any) => Pr
                   key={m.statusId}
                   onClick={() => setViewer({ person: { uid, name: me?.name || fallbackName, username: me?.username || '', avatar: me?.avatar, centreId: m.centreId }, mine: true, startStatusId: m.statusId, seed: mineRows.map(toViewerStatus) })}
                   role="button"
-                  className="w-full text-left bg-white rounded-3xl p-4 border border-slate-200/90 shadow-sm flex items-facility gap-3 active:scale-[0.99] transition cursor-pointer"
+                  className="w-full text-left bg-white rounded-3xl p-4 border border-slate-200/90 shadow-sm flex items-center gap-3 active:scale-[0.99] transition cursor-pointer"
                 >
-                  <div className="w-12 h-12 rounded-full bg-[#FFF7ED] border-2 border-[#EA580C] flex items-facility justify-facility text-[#C2410C] shrink-0 overflow-hidden">
+                  <div className="w-12 h-12 rounded-full bg-[#FFF7ED] border-2 border-[#EA580C] flex items-center justify-center text-[#C2410C] shrink-0 overflow-hidden">
                     <StatusThumb kind={m.kind} photoUrl={m.photoUrl} videoUrl={m.videoUrl} />
                   </div>
                   <div className="min-w-0 flex-1">
@@ -1563,7 +1563,7 @@ export const StatusScreenCore: React.FC<{ call: (path: string, opts?: any) => Pr
           )}
 
           {!showLists && (
-            <div className="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-sm text-facility">
+            <div className="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-sm text-center">
               <p className="text-xs text-slate-500 font-medium">No updates from your facility yet.</p>
             </div>
           )}
@@ -1585,13 +1585,13 @@ export const StatusScreenCore: React.FC<{ call: (path: string, opts?: any) => Pr
             />
           )}
           {fanOpen && (
-            <div className="absolute bottom-[168px] right-4 flex flex-col items-facility gap-3 pointer-events-auto">
+            <div className="absolute bottom-[168px] right-4 flex flex-col items-center gap-3 pointer-events-auto">
               {([
                 { key: 'text', label: 'Text', disabled: !data.settings.allowText, render: () => <span className="text-sm font-black leading-none">Aa</span>, onPick: () => { setFanOpen(false); setComposing(true); } },
                 { key: 'photo', label: 'Photo', disabled: !data.settings.allowPhoto, render: () => <ImageIcon className="w-5 h-5" />, onPick: () => { setFanOpen(false); photoInputRef.current?.click(); } },
                 { key: 'video', label: 'Video', disabled: !data.settings.allowVideo, render: () => <Film className="w-5 h-5" />, onPick: () => { setFanOpen(false); videoInputRef.current?.click(); } },
               ] as const).map((it, i) => (
-                <div key={it.key} className="flex items-facility gap-2">
+                <div key={it.key} className="flex items-center gap-2">
                   <span className="text-[11px] font-bold text-white drop-shadow whitespace-nowrap">{it.label}</span>
                   <button
                     type="button"
@@ -1599,7 +1599,7 @@ export const StatusScreenCore: React.FC<{ call: (path: string, opts?: any) => Pr
                     disabled={it.disabled}
                     title={it.disabled ? 'Off in TOS settings' : undefined}
                     onClick={it.disabled ? undefined : it.onPick}
-                    className={`w-12 h-12 rounded-full bg-white text-slate-800 shadow-lg flex items-facility justify-facility cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 ${it.disabled ? 'opacity-40' : 'active:scale-95 transition'} ${prefersReducedMotion ? '' : 'animate-in fade-in zoom-in-95 duration-200'}`}
+                    className={`w-12 h-12 rounded-full bg-white text-slate-800 shadow-lg flex items-center justify-center cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 ${it.disabled ? 'opacity-40' : 'active:scale-95 transition'} ${prefersReducedMotion ? '' : 'animate-in fade-in zoom-in-95 duration-200'}`}
                     style={prefersReducedMotion ? undefined : { animationDelay: `${i * 40}ms` }}
                   >
                     {it.render()}
@@ -1613,7 +1613,7 @@ export const StatusScreenCore: React.FC<{ call: (path: string, opts?: any) => Pr
             aria-label={fanOpen ? 'Close add menu' : 'Add a status update'}
             aria-expanded={fanOpen}
             onClick={() => setFanOpen((o) => !o)}
-            className={`absolute bottom-24 right-4 w-14 h-14 rounded-full text-white flex items-facility justify-facility shadow-xl cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-200 pointer-events-auto active:scale-95 transition ${prefersReducedMotion ? '' : 'animate-in fade-in zoom-in-95 duration-200'}`}
+            className={`absolute bottom-24 right-4 w-14 h-14 rounded-full text-white flex items-center justify-center shadow-xl cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-200 pointer-events-auto active:scale-95 transition ${prefersReducedMotion ? '' : 'animate-in fade-in zoom-in-95 duration-200'}`}
             style={{ background: 'linear-gradient(145deg, #EA580C, #9A3412)' }}
           >
             {fanOpen ? <X className="w-7 h-7" /> : <Plus className="w-7 h-7" />}
@@ -1669,7 +1669,7 @@ export const StatusScreenCore: React.FC<{ call: (path: string, opts?: any) => Pr
       )}
 
       {!data && failed && (
-        <div className="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-sm text-facility">
+        <div className="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-sm text-center">
           <p className="text-xs text-slate-500 font-medium">Status could not load. Try again in a moment.</p>
         </div>
       )}

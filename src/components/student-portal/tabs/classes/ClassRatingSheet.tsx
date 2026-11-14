@@ -100,7 +100,7 @@ export const ClassRatingSheet: React.FC<ClassRatingSheetProps> = ({
       role="dialog"
       aria-modal="true"
       aria-label="Rate this class"
-      className="fixed inset-0 z-50 flex items-end sm:items-facility justify-facility bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div
@@ -128,23 +128,23 @@ export const ClassRatingSheet: React.FC<ClassRatingSheetProps> = ({
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="w-11 h-11 -mt-1 -mr-1 rounded-xl bg-[#F1F5F9] text-[#334155] hover:bg-slate-200 flex items-facility justify-facility transition-colors cursor-pointer shrink-0"
+            className="w-11 h-11 -mt-1 -mr-1 rounded-xl bg-[#F1F5F9] text-[#334155] hover:bg-slate-200 flex items-center justify-center transition-colors cursor-pointer shrink-0"
           >
             <X className="w-4.5 h-4.5" />
           </button>
         </div>
 
         {/* Question */}
-        <p className="text-sm font-bold text-facility text-[#0F172A] pt-1">
+        <p className="text-sm font-bold text-center text-[#0F172A] pt-1">
           How was the class?
         </p>
 
         {/* Star Rating Buttons (52px tap targets) */}
-        <div className="space-y-2 py-0.5 text-facility">
+        <div className="space-y-2 py-0.5 text-center">
           <div
             role="radiogroup"
             aria-label="Rating from 1 to 5 stars"
-            className="flex items-facility justify-facility space-x-1.5"
+            className="flex items-center justify-center space-x-1.5"
           >
             {[1, 2, 3, 4, 5].map((star) => {
               const isSelected = selectedStars === star;
@@ -160,7 +160,7 @@ export const ClassRatingSheet: React.FC<ClassRatingSheetProps> = ({
                   onMouseEnter={() => setHoveredStars(star)}
                   onMouseLeave={() => setHoveredStars(null)}
                   onClick={() => setSelectedStars(star)}
-                  className={`w-[52px] h-[52px] rounded-[14px] flex items-facility justify-facility transition-all cursor-pointer active:scale-95 disabled:cursor-not-allowed ${
+                  className={`w-[52px] h-[52px] rounded-[14px] flex items-center justify-center transition-all cursor-pointer active:scale-95 disabled:cursor-not-allowed ${
                     isSelected ? 'bg-[#FFFBEB] text-[#F59E0B]' : 'bg-transparent text-slate-300 hover:text-amber-400'
                   }`}
                 >
@@ -176,7 +176,7 @@ export const ClassRatingSheet: React.FC<ClassRatingSheetProps> = ({
             })}
           </div>
 
-          <div className="text-facility mt-1 text-[13px] font-extrabold text-[#B45309]">
+          <div className="text-center mt-1 text-[13px] font-extrabold text-[#B45309]">
             {ratingText}
           </div>
         </div>
@@ -187,7 +187,7 @@ export const ClassRatingSheet: React.FC<ClassRatingSheetProps> = ({
         </div>
 
         {isPast24Hours && (
-          <p className="text-[11px] text-rose-600 font-semibold text-facility">
+          <p className="text-[11px] text-rose-600 font-semibold text-center">
             Ratings can only be updated within 24 hours of submission.
           </p>
         )}
@@ -198,7 +198,7 @@ export const ClassRatingSheet: React.FC<ClassRatingSheetProps> = ({
             type="button"
             disabled={submitting || isPast24Hours || selectedStars === null}
             onClick={handleSubmit}
-            className="w-full h-[52px] bg-[#C2410C] hover:bg-[#EA580C] text-white font-extrabold text-sm rounded-[14px] shadow-sm active:scale-98 transition-all flex items-facility justify-facility space-x-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full h-[52px] bg-[#C2410C] hover:bg-[#EA580C] text-white font-extrabold text-sm rounded-[14px] shadow-sm active:scale-98 transition-all flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <span>{submitting ? 'Submitting...' : selectedStars === null ? 'Select a rating to submit' : 'Submit rating'}</span>
           </button>
@@ -206,7 +206,7 @@ export const ClassRatingSheet: React.FC<ClassRatingSheetProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="w-full h-11 text-slate-600 hover:text-slate-900 font-bold text-xs transition-colors cursor-pointer flex items-facility justify-facility"
+            className="w-full h-11 text-slate-600 hover:text-slate-900 font-bold text-xs transition-colors cursor-pointer flex items-center justify-center"
           >
             Not now
           </button>

@@ -203,10 +203,10 @@ const MockForm: React.FC<{
         </div>
       </Field>
       <div>
-        <div className="flex items-facility justify-between mb-1.5">
+        <div className="flex items-center justify-between mb-1.5">
           <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Subjects</span>
           {isJamb && (
-            <button type="button" onClick={() => setRows([...rows, { subject: '', count: '', ids: '' }])} className="text-xs font-bold text-orange-300 hover:text-orange-200 inline-flex items-facility gap-1">
+            <button type="button" onClick={() => setRows([...rows, { subject: '', count: '', ids: '' }])} className="text-xs font-bold text-orange-300 hover:text-orange-200 inline-flex items-center gap-1">
               <Plus className="w-3.5 h-3.5" /> Add subject
             </button>
           )}
@@ -279,7 +279,7 @@ const PaperPreview: React.FC<{ mockId: string }> = ({ mockId }) => {
   }, [mockId]);
   useEffect(() => { setPaper(null); load(); }, [load]);
 
-  if (loading) return <div className="flex items-facility gap-2 text-slate-400 text-sm py-4"><Loader2 className="w-4 h-4 animate-spin" /> Loading the paper…</div>;
+  if (loading) return <div className="flex items-center gap-2 text-slate-400 text-sm py-4"><Loader2 className="w-4 h-4 animate-spin" /> Loading the paper…</div>;
   if (error) return (
     <div className="space-y-2">
       <p className="text-rose-300 text-sm">{error}</p>
@@ -312,14 +312,14 @@ const PaperPreview: React.FC<{ mockId: string }> = ({ mockId }) => {
 const WORKFLOW_STEPS = ['Draft', 'Publish', 'Scheduled (students can take it)'];
 const WorkflowStrip: React.FC<{ active: number }> = ({ active }) => (
   <div className="space-y-1.5">
-    <div className="flex items-facility gap-1.5 flex-wrap">
+    <div className="flex items-center gap-1.5 flex-wrap">
       {WORKFLOW_STEPS.map((label, i) => {
         const done = i < active;
         const now = i === active;
         return (
           <React.Fragment key={label}>
             {i > 0 && <span className="text-slate-600 text-xs" aria-hidden="true">&#8594;</span>}
-            <span className={`inline-flex items-facility gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-bold ${done ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-300' : now ? 'border-orange-400/60 bg-orange-500/15 text-orange-300' : 'border-white/10 bg-slate-950/40 text-slate-500'}`}>
+            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-bold ${done ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-300' : now ? 'border-orange-400/60 bg-orange-500/15 text-orange-300' : 'border-white/10 bg-slate-950/40 text-slate-500'}`}>
               {done ? <CheckCircle2 className="w-3.5 h-3.5" /> : <span>{i + 1}</span>}
               {label}
             </span>
@@ -457,7 +457,7 @@ export const MockDetail: React.FC<{ mockId: string; onChanged: () => void; onClo
       <button onClick={() => { load(); }} className={btnGhost}><RefreshCw className="w-4 h-4" /> Try again</button>
     </div>
   );
-  if (!mock) return <div className="flex items-facility gap-2 text-slate-400 text-sm py-4"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</div>;
+  if (!mock) return <div className="flex items-center gap-2 text-slate-400 text-sm py-4"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</div>;
 
   const isDraft = mock.status === 'draft';
   const isScheduled = mock.status === 'scheduled';
@@ -530,7 +530,7 @@ export const MockDetail: React.FC<{ mockId: string; onChanged: () => void; onClo
           {readiness && (
             <Card title="Readiness check">
               <div className="space-y-2">
-                {readiness.warnings.length === 0 && <p className="text-sm text-emerald-300 inline-flex items-facility gap-1.5"><CheckCircle2 className="w-4 h-4" /> Ready to schedule.</p>}
+                {readiness.warnings.length === 0 && <p className="text-sm text-emerald-300 inline-flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4" /> Ready to schedule.</p>}
                 {errors.map((w: Json, i: number) => (
                   <p key={i} className="text-sm text-rose-300 inline-flex items-start gap-1.5"><AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" /> {w.message}</p>
                 ))}
@@ -608,7 +608,7 @@ export const MockDetail: React.FC<{ mockId: string; onChanged: () => void; onClo
               {['scheduled', 'released'].includes(mock.status) && confirming !== 'void' && (
                 <button onClick={() => setConfirming('void')} className={btnGhost}>Void this mock</button>
               )}
-              <p className="text-xs text-slate-500 self-facility">A {STATUS_LABELS[mock.status] || mock.status} mock is read-only here.</p>
+              <p className="text-xs text-slate-500 self-center">A {STATUS_LABELS[mock.status] || mock.status} mock is read-only here.</p>
             </div>
           )}
           {!isDraft && !isScheduled && showPaper && <Card title="Frozen paper"><PaperPreview mockId={mockId} /></Card>}
@@ -734,9 +734,9 @@ const SeriesPanel: React.FC<{ onCreated: () => void }> = ({ onCreated }) => {
             <input className={inputCls} value={titlePrefix} onChange={(e) => setTitlePrefix(e.target.value)} placeholder="e.g. WAEC series" maxLength={80} />
           </Field>
           <div>
-            <div className="flex items-facility justify-between mb-1.5">
+            <div className="flex items-center justify-between mb-1.5">
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Extra subjects beyond the compulsory ones</span>
-              <button type="button" onClick={() => setExtras([...extras, ''])} className="text-xs font-bold text-orange-300 hover:text-orange-200 inline-flex items-facility gap-1">
+              <button type="button" onClick={() => setExtras([...extras, ''])} className="text-xs font-bold text-orange-300 hover:text-orange-200 inline-flex items-center gap-1">
                 <Plus className="w-3.5 h-3.5" /> Add
               </button>
             </div>
@@ -770,7 +770,7 @@ const SeriesPanel: React.FC<{ onCreated: () => void }> = ({ onCreated }) => {
             <Card title={`Review · ${preview.total} papers · ${preview.firstDate} to ${preview.lastDate}`}>
               <div className="space-y-1.5 max-h-[320px] overflow-y-auto pr-1">
                 {preview.plan.map((p: Json) => (
-                  <div key={p.date} className="flex items-facility justify-between gap-2 bg-slate-950/40 border border-white/5 rounded-xl px-3 py-2">
+                  <div key={p.date} className="flex items-center justify-between gap-2 bg-slate-950/40 border border-white/5 rounded-xl px-3 py-2">
                     <span className="text-sm text-white">{p.date} · {p.subject}</span>
                     <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-lg border ${p.existing && p.existing !== 'cancelled' ? 'bg-amber-500/15 text-amber-300 border-amber-400/30' : 'bg-emerald-500/15 text-emerald-300 border-emerald-400/30'}`}>
                       {p.existing === 'cancelled' ? 'Reuse cancelled slot' : p.existing ? `Skip: ${p.existing} mock there` : 'Will create'}
@@ -788,7 +788,7 @@ const SeriesPanel: React.FC<{ onCreated: () => void }> = ({ onCreated }) => {
       )}
       {result && (
         <div className="space-y-3">
-          <p className="text-sm text-emerald-300 inline-flex items-facility gap-1.5"><CheckCircle2 className="w-4 h-4" /> {result.created.length} of {result.total} drafts created.</p>
+          <p className="text-sm text-emerald-300 inline-flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4" /> {result.created.length} of {result.total} drafts created.</p>
           {(result.skipped || []).length > 0 && (
             <div className="space-y-1">
               <p className="text-xs font-bold uppercase tracking-wider text-amber-300">Skipped</p>
@@ -833,7 +833,7 @@ const BoardView: React.FC<{ mockId: string }> = ({ mockId }) => {
   }, [mockId]);
   useEffect(() => { setBoard(null); load(); }, [load]);
 
-  if (loading) return <div className="flex items-facility gap-2 text-slate-400 text-sm py-4"><Loader2 className="w-4 h-4 animate-spin" /> Loading the board…</div>;
+  if (loading) return <div className="flex items-center gap-2 text-slate-400 text-sm py-4"><Loader2 className="w-4 h-4 animate-spin" /> Loading the board…</div>;
   if (error) return (
     <div className="space-y-2">
       <p className="text-rose-300 text-sm">{error}</p>
@@ -849,7 +849,7 @@ const BoardView: React.FC<{ mockId: string }> = ({ mockId }) => {
       {entries.length === 0 && <p className="text-sm text-slate-400">No entries on this board.</p>}
       <div className="max-h-[380px] overflow-y-auto pr-1 space-y-1.5">
         {entries.map((e: Json, i: number) => (
-          <div key={i} className="flex items-facility gap-3 bg-slate-950/40 border border-white/5 rounded-xl px-3 py-2">
+          <div key={i} className="flex items-center gap-3 bg-slate-950/40 border border-white/5 rounded-xl px-3 py-2">
             <span className="text-sm font-black text-orange-300 w-12 shrink-0">#{e.rank}</span>
             <span className="text-sm text-white flex-1 truncate">{e.username}</span>
             <span className="text-sm text-slate-300 shrink-0">{e.score}</span>
@@ -943,7 +943,7 @@ const UsernamePanel: React.FC = () => {
       {entries && entries.length === 0 && <p className="text-sm text-slate-400">No usernames match yet. Assign the first one above.</p>}
       <div className="space-y-1.5">
         {(entries || []).map((e: Json, i: number) => (
-          <div key={i} className="flex items-facility gap-3 bg-slate-950/40 border border-white/5 rounded-xl px-3 py-2">
+          <div key={i} className="flex items-center gap-3 bg-slate-950/40 border border-white/5 rounded-xl px-3 py-2">
             <span className="text-sm font-black text-orange-300 flex-1 truncate">{e.username}</span>
             <span className="text-xs text-slate-400 flex-1 truncate">{e.studentName || e.studentId}</span>
             <span className="text-[11px] text-slate-500 shrink-0">{e.centreId || '—'}</span>
@@ -1037,7 +1037,7 @@ const SettingsPanel: React.FC = () => {
     finally { setBusy(false); }
   };
 
-  if (loading) return <div className="flex items-facility gap-2 text-slate-400 text-sm py-4"><Loader2 className="w-4 h-4 animate-spin" /> Loading settings…</div>;
+  if (loading) return <div className="flex items-center gap-2 text-slate-400 text-sm py-4"><Loader2 className="w-4 h-4 animate-spin" /> Loading settings…</div>;
   if (error && !s) return (
     <div className="space-y-2">
       <p className="text-rose-300 text-sm">{error}</p>
@@ -1192,7 +1192,7 @@ const CorrectPanel: React.FC<{ mockId: string; released: boolean }> = ({ mockId,
     finally { setBusy(false); }
   };
 
-  if (loading) return <div className="flex items-facility gap-2 text-slate-400 text-sm py-4"><Loader2 className="w-4 h-4 animate-spin" /> Loading the paper…</div>;
+  if (loading) return <div className="flex items-center gap-2 text-slate-400 text-sm py-4"><Loader2 className="w-4 h-4 animate-spin" /> Loading the paper…</div>;
   if (error) return (
     <div className="space-y-2">
       <p className="text-rose-300 text-sm">{error}</p>
@@ -1217,7 +1217,7 @@ const CorrectPanel: React.FC<{ mockId: string; released: boolean }> = ({ mockId,
             {pageSlice.length === 0 && <p className="text-sm text-slate-400">Nothing matches that search.</p>}
           </div>
           {filtered.length > 25 && (
-            <div className="flex items-facility gap-2">
+            <div className="flex items-center gap-2">
               <button onClick={() => setPage(Math.max(0, page - 1))} disabled={page === 0} className={btnGhost}>Back</button>
               <span className="text-xs text-slate-500">Page {page + 1} of {Math.ceil(filtered.length / 25)}</span>
               <button onClick={() => setPage(page + 1)} disabled={(page + 1) * 25 >= filtered.length} className={btnGhost}>Next</button>
@@ -1234,7 +1234,7 @@ const CorrectPanel: React.FC<{ mockId: string; released: boolean }> = ({ mockId,
           <div className="space-y-1.5">
             <p className="text-xs text-slate-400">Options (text only; the count stays the same)</p>
             {form.options.map((o: string, j: number) => (
-              <div key={j} className="flex items-facility gap-2">
+              <div key={j} className="flex items-center gap-2">
                 <span className="text-xs font-bold text-slate-400 w-4">{String.fromCharCode(65 + j)}</span>
                 <input className={inputCls} value={o} onChange={(e) => setOpt(j, e.target.value)} maxLength={300} />
               </div>
@@ -1294,7 +1294,7 @@ const UpcomingMocks: React.FC<{
           return (
             <button key={date} onClick={() => onPick(date, mk)}
               className={`w-full text-left rounded-xl border px-3 py-2.5 transition-colors ${mk ? `${STATUS_STYLES[mk.status]} hover:brightness-125` : 'border-white/5 bg-white/[0.02] hover:border-orange-500/40'}`}>
-              <div className="flex items-facility gap-2 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className={`text-xs font-black shrink-0 ${mk ? 'text-white' : 'text-slate-500'}`}>{label}</span>
                 {mk ? (
                   <>
@@ -1332,7 +1332,7 @@ const MocksGuidePanel: React.FC<{ open: boolean; onClose: () => void }> = ({ ope
   return (
     <div className="fixed inset-0 z-50 bg-slate-950 lg:bg-slate-950/80 lg:flex lg:justify-end" onClick={onClose}>
       <div className="w-full lg:max-w-[480px] h-full bg-slate-950 border-l border-slate-800 overflow-y-auto p-5 lg:p-6 space-y-5" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-facility justify-between">
+        <div className="flex items-center justify-between">
           <p className="text-lg font-black text-white">How this works</p>
           <button onClick={onClose} aria-label="Close the guide" className="p-2 rounded-lg text-slate-400 hover:text-white min-h-[44px] min-w-[44px]"><X className="w-5 h-5" /></button>
         </div>
@@ -1463,7 +1463,7 @@ export const MocksTab: React.FC<{ refreshKey: number; openCreateSignal?: number 
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-facility gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <button onClick={() => createOn(todayStr())} className={btnPrimary}>
           <Plus className="w-4 h-4" /> New mock
         </button>
@@ -1473,7 +1473,7 @@ export const MocksTab: React.FC<{ refreshKey: number; openCreateSignal?: number 
         </button>
       </div>
       {!byDate[today] && (
-        <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 flex flex-wrap items-facility gap-3">
+        <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 flex flex-wrap items-center gap-3">
           <AlertTriangle className="w-4 h-4 text-amber-300 shrink-0" />
           <p className="text-xs text-amber-100 flex-1 min-w-[200px]">No mock scheduled for today. Students will see &quot;no mock today&quot;.</p>
           <button onClick={() => createOn(today)}
@@ -1490,8 +1490,8 @@ export const MocksTab: React.FC<{ refreshKey: number; openCreateSignal?: number 
       {subTab === 'calendar' && (
     <div className="grid lg:grid-cols-[1fr_380px] gap-5 items-start">
       <Card>
-        <div className="flex items-facility justify-between mb-4">
-          <div className="flex items-facility gap-1">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-1">
             <button onClick={() => setMonth(shiftMonth(month, -1))} className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-white/5" aria-label="Previous month"><ChevronLeft className="w-4 h-4" /></button>
             <button onClick={() => setMonth(shiftMonth(month, 1))} className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-white/5" aria-label="Next month"><ChevronRight className="w-4 h-4" /></button>
             <p className="text-sm font-black text-white ml-2">{monthLabel}</p>
@@ -1501,7 +1501,7 @@ export const MocksTab: React.FC<{ refreshKey: number; openCreateSignal?: number 
         {error && <p className="text-rose-300 text-sm mb-3">{error}</p>}
         <div className="grid grid-cols-7 gap-1.5">
           {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d) => (
-            <p key={d} className="text-[10px] font-bold uppercase tracking-wider text-slate-500 text-facility py-1">{d}</p>
+            <p key={d} className="text-[10px] font-bold uppercase tracking-wider text-slate-500 text-center py-1">{d}</p>
           ))}
           {cells.map((c, i) => (
             <div key={i} className="min-h-[64px]">
@@ -1530,7 +1530,7 @@ export const MocksTab: React.FC<{ refreshKey: number; openCreateSignal?: number 
       {panel && (
         <div className="fixed inset-0 z-50 bg-slate-950 lg:bg-slate-950/80 lg:flex lg:justify-end" onClick={() => { if (!creating) setPanel(null); }}>
           <div ref={drawerRef} className="w-full lg:max-w-[480px] h-full bg-slate-950 border-l border-slate-800 overflow-y-auto p-5 lg:p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-facility justify-between">
+            <div className="flex items-center justify-between">
               <p className="text-lg font-black text-white">{panel.mode === 'create' ? `New mock · ${panel.date}` : 'Mock'}</p>
               <button onClick={() => setPanel(null)} aria-label="Close panel" className="p-2 rounded-lg text-slate-400 hover:text-white min-h-[44px] min-w-[44px]"><X className="w-5 h-5" /></button>
             </div>

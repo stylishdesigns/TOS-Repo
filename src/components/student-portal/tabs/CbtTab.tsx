@@ -555,11 +555,11 @@ export const CbtTab: React.FC<CbtTabProps> = ({
     <>
       {/* Result Metrics Modal - Official Slip Style */}
       {showResultMetrics && (
-        <div className="fixed inset-0 z-[150] flex items-facility justify-facility p-3 bg-black/80 backdrop-blur-sm overflow-y-auto font-sans">
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-3 bg-black/80 backdrop-blur-sm overflow-y-auto font-sans">
           <div className="bg-white rounded-[32px] max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden my-6 animate-in fade-in zoom-in-95 duration-300">
             {/* Modal Header */}
-            <div className="bg-slate-900 text-white p-3.5 flex items-facility justify-between print:hidden">
-              <div className="flex items-facility space-x-2">
+            <div className="bg-slate-900 text-white p-3.5 flex items-center justify-between print:hidden">
+              <div className="flex items-center space-x-2">
                 <BarChart2 className="w-4 h-4 text-orange-400" />
                 <span className="text-[10px] font-black uppercase tracking-widest text-slate-300">
                   Performance Analytics
@@ -576,8 +576,8 @@ export const CbtTab: React.FC<CbtTabProps> = ({
             {/* Printable Slip Paper Body */}
             <div className="p-6 space-y-6 bg-white text-slate-900">
               {/* Slip Header */}
-              <div className="text-facility pb-5 border-b-2 border-slate-900 space-y-1.5">
-                <div className="w-12 h-12 rounded-2xl bg-[#EA580C] text-white flex items-facility justify-facility font-black text-xl mx-auto mb-2 shadow-lg shadow-orange-100">
+              <div className="text-center pb-5 border-b-2 border-slate-900 space-y-1.5">
+                <div className="w-12 h-12 rounded-2xl bg-[#EA580C] text-white flex items-center justify-center font-black text-xl mx-auto mb-2 shadow-lg shadow-orange-100">
                   EX
                 </div>
                 <h2 className="text-lg font-black tracking-tight uppercase text-slate-900">
@@ -610,8 +610,8 @@ export const CbtTab: React.FC<CbtTabProps> = ({
                   <thead className="bg-slate-900 text-white font-black uppercase tracking-widest">
                     <tr>
                       <th className="p-3">Subject</th>
-                      <th className="p-3 text-facility">Max</th>
-                      <th className="p-3 text-facility">Score</th>
+                      <th className="p-3 text-center">Max</th>
+                      <th className="p-3 text-center">Score</th>
                       <th className="p-3 text-right">Grade</th>
                     </tr>
                   </thead>
@@ -635,8 +635,8 @@ export const CbtTab: React.FC<CbtTabProps> = ({
                             <td className="p-3">
                               <span className="font-black text-slate-800">{displaySubject}</span>
                             </td>
-                            <td className="p-3 text-facility font-mono text-slate-500">{s.maxScore}</td>
-                            <td className="p-3 text-facility font-mono font-black text-[#EA580C]">
+                            <td className="p-3 text-center font-mono text-slate-500">{s.maxScore}</td>
+                            <td className="p-3 text-center font-mono font-black text-[#EA580C]">
                               {s.score}
                             </td>
                             <td className="p-3 text-right font-black text-emerald-700">
@@ -661,7 +661,7 @@ export const CbtTab: React.FC<CbtTabProps> = ({
                     : 'bg-orange-50 text-orange-700 border-orange-200';
 
                 return (
-                  <div className="flex items-facility justify-facility pt-2">
+                  <div className="flex items-center justify-center pt-2">
                     <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] border shadow-xs ${tagClass}`}>
                       {tagLabel}
                     </span>
@@ -683,10 +683,10 @@ export const CbtTab: React.FC<CbtTabProps> = ({
       {showCalculator && <CalculatorModal isOpen={showCalculator} onClose={() => setShowCalculator(false)} />}
       
       {showSubmitModal && (
-        <div className="fixed inset-0 z-[200] flex items-facility justify-facility p-4 bg-slate-950/90 backdrop-blur-md animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md animate-in fade-in duration-200">
           <div className="w-full max-w-sm bg-white rounded-[32px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
-            <div className="p-8 text-facility space-y-4">
-              <div className="w-20 h-20 bg-orange-50 text-orange-600 rounded-3xl flex items-facility justify-facility mx-auto shadow-inner">
+            <div className="p-8 text-center space-y-4">
+              <div className="w-20 h-20 bg-orange-50 text-orange-600 rounded-3xl flex items-center justify-center mx-auto shadow-inner">
                 <AlertCircle className="w-10 h-10" />
               </div>
               <div className="space-y-2">
@@ -737,7 +737,7 @@ export const CbtTab: React.FC<CbtTabProps> = ({
         {(isMock || showArchive) && (
           <div className={`absolute top-[-1000px] left-0 right-0 h-[1000px] ${showArchive ? 'bg-slate-50' : 'bg-[#EA580C]'} -z-10`} />
         )}
-        <div className="flex items-facility justify-between">
+        <div className="flex items-center justify-between">
           {!showArchive ? (
             <div className={activeFrequency === 'Mock' ? 'text-white' : ''}>
               <h2 className="text-xl font-black tracking-tight">
@@ -745,10 +745,10 @@ export const CbtTab: React.FC<CbtTabProps> = ({
               </h2>
             </div>
           ) : (
-            <div className="flex items-facility space-x-3">
+            <div className="flex items-center space-x-3">
               <button 
                 onClick={() => setShowArchive(false)}
-                className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-facility justify-facility hover:bg-slate-200 transition-all"
+                className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center hover:bg-slate-200 transition-all"
               >
                 <ChevronLeft className="w-5 h-5" />
               </button>
@@ -759,7 +759,7 @@ export const CbtTab: React.FC<CbtTabProps> = ({
           {!showArchive && activeFrequency !== 'Mock' && (
             <button 
               onClick={() => setShowArchive(true)}
-              className="px-3 py-1.5 rounded-xl border text-[10px] font-black uppercase tracking-widest transition-all flex items-facility space-x-2 bg-white text-slate-600 border-slate-200 shadow-sm"
+              className="px-3 py-1.5 rounded-xl border text-[10px] font-black uppercase tracking-widest transition-all flex items-center space-x-2 bg-white text-slate-600 border-slate-200 shadow-sm"
             >
               <Archive className="w-3.5 h-3.5" />
               <span>Archive</span>
@@ -791,16 +791,16 @@ export const CbtTab: React.FC<CbtTabProps> = ({
 
         {showArchive && (
           <div className="grid grid-cols-2 gap-3 mb-4">
-            <div className="bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs flex items-facility justify-between">
+            <div className="bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs flex items-center justify-between">
               <div>
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Archive</p>
                 <p className="text-xl font-black text-slate-900 mt-0.5">{allArchiveExams.length}</p>
               </div>
-              <div className="w-9 h-9 rounded-xl bg-orange-50 border border-orange-100 flex items-facility justify-facility text-[#EA580C]">
+              <div className="w-9 h-9 rounded-xl bg-orange-50 border border-orange-100 flex items-center justify-center text-[#EA580C]">
                 <Archive className="w-4 h-4" />
               </div>
             </div>
-            <div className="bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs flex items-facility justify-between">
+            <div className="bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs flex items-center justify-between">
               <div>
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Not Attempted</p>
                 <p className="text-xl font-black text-rose-600 mt-0.5">
@@ -810,7 +810,7 @@ export const CbtTab: React.FC<CbtTabProps> = ({
                   }).length}
                 </p>
               </div>
-              <div className="w-9 h-9 rounded-xl bg-rose-50 border border-rose-100 flex items-facility justify-facility text-rose-500">
+              <div className="w-9 h-9 rounded-xl bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-500">
                 <AlertCircle className="w-4 h-4" />
               </div>
             </div>
@@ -857,7 +857,7 @@ export const CbtTab: React.FC<CbtTabProps> = ({
           return (
             <div className="space-y-3">
               {displayedExams.length === 0 ? (
-                <div className="text-facility py-12 bg-white rounded-3xl border border-dashed border-slate-200">
+                <div className="text-center py-12 bg-white rounded-3xl border border-dashed border-slate-200">
                   <Laptop className="w-12 h-12 text-slate-200 mx-auto mb-3" />
                   <p className="text-xs text-slate-500 font-medium">No {showArchive ? 'previous' : 'active'} assessments found.</p>
                 </div>
@@ -886,7 +886,7 @@ export const CbtTab: React.FC<CbtTabProps> = ({
                       ) : null}
                       <div className="flex items-start justify-between gap-2 mt-2">
                         <div className="space-y-2">
-                          <div className="flex flex-wrap gap-1.5 items-facility">
+                          <div className="flex flex-wrap gap-1.5 items-center">
                             {isLive && !hasAttempted && (
                               <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-700 text-[8px] font-black uppercase border border-emerald-200">Live Now</span>
                             )}
@@ -919,22 +919,22 @@ export const CbtTab: React.FC<CbtTabProps> = ({
                     </div>
                   </div>
 
-                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-facility justify-between">
-                    <div className="flex items-facility space-x-3 text-xs text-slate-500">
-                      <span className="flex items-facility space-x-1">
+                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
+                    <div className="flex items-center space-x-3 text-xs text-slate-500">
+                      <span className="flex items-center space-x-1">
                         <BookOpen className="w-3.5 h-3.5 text-slate-400" />
                         <strong className="text-slate-700">{exam.questionCount}</strong> Qs 
                         <span className="ml-1 px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 text-[8px] font-black uppercase border border-slate-200">
                           {exam.mode}
                         </span>
                       </span>
-                      <span className="flex items-facility space-x-1">
+                      <span className="flex items-center space-x-1">
                         <Clock className="w-3.5 h-3.5 text-slate-400" />
                         <strong className="text-slate-700">{exam.durationMinutes}</strong> Mins
                       </span>
                     </div>
 
-                    <div className="flex items-facility gap-2">
+                    <div className="flex items-center gap-2">
                       {hasAttempted && (
                         <>
                           <button
@@ -998,7 +998,7 @@ export const CbtTab: React.FC<CbtTabProps> = ({
 
               {/* Archive Pagination Controls */}
               {showArchive && totalArchivePages > 1 && (
-                <div className="flex items-facility justify-between pt-4 pb-2 text-xs">
+                <div className="flex items-center justify-between pt-4 pb-2 text-xs">
                   <button
                     onClick={() => setArchivePage(p => Math.max(1, p - 1))}
                     disabled={archivePage === 1}
@@ -1034,8 +1034,8 @@ export const CbtTab: React.FC<CbtTabProps> = ({
       <div className="fixed inset-0 z-50 bg-slate-950 text-white flex flex-col overflow-y-auto pb-32 animate-in fade-in duration-300">
         {renderModals()}
         <div className="max-w-3xl mx-auto w-full p-4 space-y-6">
-          <div className="bg-slate-900/80 rounded-3xl p-6 text-white text-facility shadow-2xl border border-slate-800 space-y-4">
-            <div className="w-16 h-16 rounded-2xl bg-orange-500/20 border border-orange-500/40 flex items-facility justify-facility mx-auto text-orange-400">
+          <div className="bg-slate-900/80 rounded-3xl p-6 text-white text-center shadow-2xl border border-slate-800 space-y-4">
+            <div className="w-16 h-16 rounded-2xl bg-orange-500/20 border border-orange-500/40 flex items-center justify-center mx-auto text-orange-400">
               <Award className="w-8 h-8" />
             </div>
             <div>
@@ -1044,14 +1044,14 @@ export const CbtTab: React.FC<CbtTabProps> = ({
             </div>
             
             <div className="flex flex-col space-y-2">
-              <div className="inline-flex items-baseline justify-facility space-x-2 bg-white/5 px-6 py-3 rounded-2xl border border-white/10">
+              <div className="inline-flex items-baseline justify-center space-x-2 bg-white/5 px-6 py-3 rounded-2xl border border-white/10">
                 <span className="text-3xl font-black text-amber-400">{score}</span>
                 <span className="text-slate-400 text-sm font-bold">/ {total} Total Marks</span>
                 <span className="text-xs font-black text-emerald-400 ml-2">({pct}%)</span>
               </div>
 
               {(mcqTotal > 0 || essayTotal > 0) && (
-                <div className="flex items-facility justify-facility gap-3">
+                <div className="flex items-center justify-center gap-3">
                   {mcqTotal > 0 && (
                     <div className="px-3 py-1.5 bg-white/5 rounded-xl border border-white/5 text-[10px] font-bold text-slate-400">
                       MCQ: <span className="text-white">{mcqScore}/{mcqTotal}</span>
@@ -1074,7 +1074,7 @@ export const CbtTab: React.FC<CbtTabProps> = ({
                   onHideBottomNav?.(false);
                   onExitReview?.();
                 }}
-                className="w-full py-4 bg-[#EA580C] text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-2xl shadow-orange-950/40 hover:scale-105 active:scale-95 transition-all flex items-facility justify-facility gap-2 border border-orange-400/20"
+                className="w-full py-4 bg-[#EA580C] text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-2xl shadow-orange-950/40 hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2 border border-orange-400/20"
               >
                 <RotateCcw className="w-4 h-4" />
                 <span>Back to CBT</span>
@@ -1083,7 +1083,7 @@ export const CbtTab: React.FC<CbtTabProps> = ({
           </div>
 
           <div className="space-y-4">
-            <h3 className="text-xs font-black uppercase tracking-widest text-white px-1 flex items-facility gap-2">
+            <h3 className="text-xs font-black uppercase tracking-widest text-white px-1 flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-[#EA580C]" />
               Explanations & Corrections
             </h3>
@@ -1091,8 +1091,8 @@ export const CbtTab: React.FC<CbtTabProps> = ({
               <div key={idx}>
                 {q.type === 'MCQ' || (q.options && q.options.length > 0) ? (
                   <div className="bg-slate-900/60 rounded-3xl p-6 border border-white/10 shadow-sm space-y-4">
-                    <div className="flex items-facility justify-between border-b border-white/5 pb-3">
-                      <span className="text-xs font-black uppercase text-white tracking-wider flex items-facility gap-2">
+                    <div className="flex items-center justify-between border-b border-white/5 pb-3">
+                      <span className="text-xs font-black uppercase text-white tracking-wider flex items-center gap-2">
                         <span className="w-2.5 h-2.5 rounded-full bg-[#EA580C]" />
                         Question {idx + 1}
                       </span>
@@ -1110,13 +1110,13 @@ export const CbtTab: React.FC<CbtTabProps> = ({
                         return (
                           <div
                             key={oIdx}
-                            className={`p-3.5 rounded-xl text-[12px] font-bold border flex items-facility gap-3 ${
+                            className={`p-3.5 rounded-xl text-[12px] font-bold border flex items-center gap-3 ${
                               isCorrect ? 'bg-emerald-500/15 border-emerald-500 text-emerald-300' : 
                               isSelected ? 'bg-rose-500/15 border-rose-500 text-rose-300' :
                               'bg-white/5 border-white/10 text-slate-300'
                             }`}
                           >
-                            <span className={`w-6 h-6 rounded-lg flex items-facility justify-facility text-[10px] font-black ${
+                            <span className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-black ${
                               isCorrect ? 'bg-emerald-500 text-white' : 
                               isSelected ? 'bg-rose-500 text-white' :
                               'bg-white/10 text-slate-300 border border-white/10'
@@ -1131,7 +1131,7 @@ export const CbtTab: React.FC<CbtTabProps> = ({
                     </div>
                     {/* Explicit Correct Answer & Explanation Box */}
                     <div className="mt-3 p-4 bg-white/5 rounded-2xl border border-white/10 space-y-2">
-                      <div className="flex items-facility space-x-2 text-emerald-400">
+                      <div className="flex items-center space-x-2 text-emerald-400">
                         <CheckCircle2 className="w-4 h-4 shrink-0" />
                         <span className="text-xs font-black uppercase tracking-wider">
                           Correct Answer: Option {typeof q.correctAnswer === 'number' && q.correctAnswer >= 0 ? String.fromCharCode(65 + q.correctAnswer) : (q.correctAnswer || 'A')}
@@ -1173,10 +1173,10 @@ export const CbtTab: React.FC<CbtTabProps> = ({
 
   if (isSubmitting) {
     return (
-      <div className="fixed inset-0 z-[300] bg-slate-950 flex flex-col items-facility justify-facility p-8 text-facility space-y-6">
+      <div className="fixed inset-0 z-[300] bg-slate-950 flex flex-col items-center justify-center p-8 text-center space-y-6">
         <div className="relative">
           <div className="w-24 h-24 rounded-full border-4 border-orange-500/20 border-t-orange-500 animate-spin" />
-          <div className="absolute inset-0 flex items-facility justify-facility">
+          <div className="absolute inset-0 flex items-center justify-center">
             <Cpu className="w-8 h-8 text-orange-500 animate-pulse" />
           </div>
         </div>
@@ -1193,9 +1193,9 @@ export const CbtTab: React.FC<CbtTabProps> = ({
   if (isReviewMode) {
     return (
       <div className="fixed inset-0 z-50 bg-slate-950 flex flex-col">
-        <div className="bg-slate-900/50 backdrop-blur-xl text-white p-4 flex items-facility justify-between border-b border-white/5 shrink-0">
-          <div className="flex items-facility space-x-3">
-            <div className="w-8 h-8 rounded-lg bg-[#EA580C] flex items-facility justify-facility">
+        <div className="bg-slate-900/50 backdrop-blur-xl text-white p-4 flex items-center justify-between border-b border-white/5 shrink-0">
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 rounded-lg bg-[#EA580C] flex items-center justify-center">
               <BookOpen className="w-5 h-5 text-white" />
             </div>
             <div>
@@ -1207,7 +1207,7 @@ export const CbtTab: React.FC<CbtTabProps> = ({
 
         <div className="flex-1 overflow-y-auto pb-10 bg-slate-950 scroll-smooth">
           <div className="max-w-3xl mx-auto p-4 space-y-6 pt-6">
-            <div className="bg-orange-500/10 border border-orange-500/20 rounded-2xl p-4 text-facility mb-8">
+            <div className="bg-orange-500/10 border border-orange-500/20 rounded-2xl p-4 text-center mb-8">
                <span className="text-[10px] font-black text-orange-400 uppercase tracking-[0.2em]">
                  Correct answers are highlighted in green
                </span>
@@ -1215,15 +1215,15 @@ export const CbtTab: React.FC<CbtTabProps> = ({
 
             {selectedExam.questions.map((q, idx) => (
               <div key={idx} className="space-y-2">
-                <div className="flex items-facility justify-between px-4 pb-1">
-                   <span className="text-sm sm:text-base font-black uppercase text-white tracking-wider flex items-facility gap-2">
+                <div className="flex items-center justify-between px-4 pb-1">
+                   <span className="text-sm sm:text-base font-black uppercase text-white tracking-wider flex items-center gap-2">
                      <span className="w-2.5 h-2.5 rounded-full bg-[#EA580C]" />
                      Question {idx + 1}
                    </span>
                 </div>
                 {q.type === 'MCQ' || (q.options && q.options.length > 0) ? (
                   <div className="bg-slate-900/40 rounded-[32px] p-6 sm:p-10 border border-white/5 shadow-2xl space-y-6 backdrop-blur-sm">
-                    <div className="flex items-facility justify-between pb-4 border-b border-white/5">
+                    <div className="flex items-center justify-between pb-4 border-b border-white/5">
                       <span className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em]">
                         Multiple Choice
                       </span>
@@ -1245,13 +1245,13 @@ export const CbtTab: React.FC<CbtTabProps> = ({
                         return (
                           <div
                             key={oIdx}
-                            className={`w-full p-4 rounded-2xl text-left text-[13px] font-bold border transition-all flex items-facility space-x-4 ${
+                            className={`w-full p-4 rounded-2xl text-left text-[13px] font-bold border transition-all flex items-center space-x-4 ${
                               isCorrect ? 'bg-emerald-500/15 border-emerald-500 text-emerald-300' : 
                               isSelected ? 'bg-rose-500/15 border-rose-500 text-rose-300' :
                               'bg-white/5 border-white/10 text-slate-300'
                             }`}
                           >
-                            <span className={`w-7 h-7 rounded-lg flex items-facility justify-facility font-mono text-xs shrink-0 transition-all ${
+                            <span className={`w-7 h-7 rounded-lg flex items-center justify-center font-mono text-xs shrink-0 transition-all ${
                               isCorrect ? 'bg-emerald-500 text-white font-black' : 
                               isSelected ? 'bg-rose-500 text-white font-black' :
                               'bg-white/10 text-slate-300 font-bold border border-white/10'
@@ -1267,7 +1267,7 @@ export const CbtTab: React.FC<CbtTabProps> = ({
 
                     {/* MCQ Correct Answer & Explanation in Review Mode */}
                     <div className="p-5 bg-white/5 border border-white/10 rounded-2xl space-y-3 mt-4">
-                      <div className="flex items-facility space-x-2 text-emerald-400">
+                      <div className="flex items-center space-x-2 text-emerald-400">
                         <CheckCircle2 className="w-4 h-4 shrink-0" />
                         <span className="text-xs font-black uppercase tracking-wider">
                           Correct Answer: Option {typeof q.correctAnswer === 'number' && q.correctAnswer >= 0 ? String.fromCharCode(65 + q.correctAnswer) : (q.correctAnswer || 'A')}
@@ -1311,7 +1311,7 @@ export const CbtTab: React.FC<CbtTabProps> = ({
               onHideBottomNav?.(false);
               onExitReview?.();
             }}
-            className="w-full py-4 bg-[#EA580C] text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-2xl shadow-orange-950/40 hover:scale-105 active:scale-95 transition-all flex items-facility justify-facility space-x-2 border border-orange-400/20"
+            className="w-full py-4 bg-[#EA580C] text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-2xl shadow-orange-950/40 hover:scale-105 active:scale-95 transition-all flex items-center justify-center space-x-2 border border-orange-400/20"
           >
             <ChevronLeft className="w-3.5 h-3.5" />
             <span>Back to CBT</span>
@@ -1336,21 +1336,21 @@ export const CbtTab: React.FC<CbtTabProps> = ({
   return (
     <div className="fixed inset-0 z-50 bg-slate-950 flex flex-col">
       {renderModals()}
-      <div className="bg-slate-900/50 backdrop-blur-xl text-white p-4 flex items-facility justify-between border-b border-white/5 shrink-0">
-        <div className="flex items-facility space-x-3">
-          <div className="w-8 h-8 rounded-lg bg-orange-500 flex items-facility justify-facility">
+      <div className="bg-slate-900/50 backdrop-blur-xl text-white p-4 flex items-center justify-between border-b border-white/5 shrink-0">
+        <div className="flex items-center space-x-3">
+          <div className="w-8 h-8 rounded-lg bg-orange-500 flex items-center justify-center">
             <Laptop className="w-5 h-5 text-white" />
           </div>
           <h2 className="text-sm font-black uppercase tracking-tight">
             {selectedExam.frequency === 'Mock' ? 'CBT Mock' : 'Tutors Assessments'}
           </h2>
         </div>
-        <div className="flex items-facility space-x-3">
+        <div className="flex items-center space-x-3">
           <button onClick={() => setShowCalculator(true)} className="p-2 rounded-xl bg-white/5 text-slate-400 hover:text-white transition-colors">
             <Calculator className="w-4 h-4" />
           </button>
           {!isReviewMode && (
-            <div className="flex items-facility space-x-1.5 px-3 py-1.5 bg-white/5 rounded-xl font-mono text-xs font-black border border-white/10 text-amber-400">
+            <div className="flex items-center space-x-1.5 px-3 py-1.5 bg-white/5 rounded-xl font-mono text-xs font-black border border-white/10 text-amber-400">
               <Clock className="w-4 h-4" />
               <span>{formatTime(timeLeft)}</span>
             </div>
@@ -1368,8 +1368,8 @@ export const CbtTab: React.FC<CbtTabProps> = ({
         <div className="max-w-4xl mx-auto p-4 space-y-6">
           {currentQ.options.length > 0 ? (
             <div className="bg-slate-900/40 rounded-[32px] p-6 sm:p-10 border border-white/5 shadow-2xl space-y-8 backdrop-blur-sm">
-              <div className="flex items-facility justify-between pb-6 border-b border-white/5">
-                <span className="text-sm sm:text-base font-black uppercase text-white tracking-wider flex items-facility gap-2">
+              <div className="flex items-center justify-between pb-6 border-b border-white/5">
+                <span className="text-sm sm:text-base font-black uppercase text-white tracking-wider flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-[#EA580C]" />
                   Question {currentIndex + 1} <span className="mx-1 text-slate-500 font-bold">/</span> <span className="text-slate-300 font-bold">{selectedExam.questionCount}</span>
                 </span>
@@ -1388,14 +1388,14 @@ export const CbtTab: React.FC<CbtTabProps> = ({
                       key={oIdx}
                       disabled={isReviewMode}
                       onClick={() => handleSelectOption(oIdx)}
-                      className={`w-full p-5 rounded-2xl text-left text-[13px] font-bold border transition-all flex items-facility space-x-4 ${
+                      className={`w-full p-5 rounded-2xl text-left text-[13px] font-bold border transition-all flex items-center space-x-4 ${
                         isCorrect ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400' :
                         isWrong ? 'bg-rose-500/10 border-rose-500 text-rose-400' :
                         isSelected ? 'bg-orange-500/10 border-orange-500 text-orange-400' : 
                         'bg-white/5 border-white/10 text-slate-300 hover:bg-white/[0.08]'
                       }`}
                     >
-                      <span className={`w-7 h-7 rounded-lg flex items-facility justify-facility font-mono text-xs shrink-0 transition-all ${
+                      <span className={`w-7 h-7 rounded-lg flex items-center justify-center font-mono text-xs shrink-0 transition-all ${
                         isCorrect ? 'bg-emerald-500 text-white font-black' :
                         isWrong ? 'bg-rose-500 text-white font-black' :
                         isSelected ? 'bg-orange-500 text-white shadow-lg shadow-orange-900/40 font-black' : 
@@ -1422,7 +1422,7 @@ export const CbtTab: React.FC<CbtTabProps> = ({
           )}
 
           <div className="text-center">
-            <div className="inline-flex items-facility space-x-2 px-4 py-1.5 bg-white/5 rounded-full border border-white/5">
+            <div className="inline-flex items-center space-x-2 px-4 py-1.5 bg-white/5 rounded-full border border-white/5">
               <div className="w-1.5 h-1.5 rounded-full bg-orange-500" />
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                 {attemptedCount} Attempted <span className="mx-1 text-slate-700">•</span> {selectedExam.questionCount} Total
@@ -1443,7 +1443,7 @@ export const CbtTab: React.FC<CbtTabProps> = ({
                   <button
                     key={idx}
                     onClick={() => setCurrentIndex(idx)}
-                    className={`h-10 rounded-lg flex items-facility justify-facility text-xs font-black transition-all border ${
+                    className={`h-10 rounded-lg flex items-center justify-center text-xs font-black transition-all border ${
                       isActive 
                         ? 'bg-orange-500 text-white border-orange-500 scale-110 shadow-lg shadow-orange-900/20 z-10' 
                         : isAnswered 
@@ -1460,7 +1460,7 @@ export const CbtTab: React.FC<CbtTabProps> = ({
         </div>
       </div>
 
-      <div className="bg-slate-900/80 backdrop-blur-xl border-t border-white/5 p-4 flex items-facility justify-between gap-4 shrink-0">
+      <div className="bg-slate-900/80 backdrop-blur-xl border-t border-white/5 p-4 flex items-center justify-between gap-4 shrink-0">
         <button
           onClick={() => setCurrentIndex(prev => Math.max(0, prev - 1))}
           disabled={currentIndex === 0}

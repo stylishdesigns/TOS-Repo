@@ -68,7 +68,7 @@ export const EssayQuestion: React.FC<EssayQuestionProps> = ({
     return (
       <div key={part.key || pLabel} className={`rounded-2xl border p-4 sm:p-6 space-y-4 ${cardClasses}`}>
         <div className="flex items-start gap-3">
-          <span className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-facility justify-facility text-xs font-black uppercase tracking-tight ${
+          <span className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-xs font-black uppercase tracking-tight ${
             isDark 
               ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30' 
               : 'bg-indigo-100 text-indigo-800 border border-indigo-200'
@@ -128,7 +128,7 @@ export const EssayQuestion: React.FC<EssayQuestionProps> = ({
                 key={s}
                 type="button"
                 onClick={() => insertSymbol(key, s)}
-                className={`w-8 h-8 rounded-lg flex items-facility justify-facility text-sm font-bold border transition-all ${
+                className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold border transition-all ${
                   isDark ? 'bg-white/10 border-white/10 text-white hover:bg-white/20' : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'
                 }`}
               >
@@ -138,7 +138,7 @@ export const EssayQuestion: React.FC<EssayQuestionProps> = ({
             <button
               type="button"
               onClick={() => insertSymbol(key, '[ a b ; c d ]')}
-              className={`px-2 h-8 rounded-lg flex items-facility justify-facility text-[10px] font-bold border transition-all ${
+              className={`px-2 h-8 rounded-lg flex items-center justify-center text-[10px] font-bold border transition-all ${
                 isDark ? 'bg-white/10 border-white/10 text-white hover:bg-white/20' : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'
               }`}
             >
@@ -170,8 +170,8 @@ export const EssayQuestion: React.FC<EssayQuestionProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
             {/* User Answer */}
             <div className={`p-4 rounded-xl border ${isDark ? 'bg-white/5 border-white/10' : 'bg-slate-50 border-slate-100'}`}>
-              <div className="flex items-facility justify-between mb-2">
-                <div className="flex items-facility gap-2">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
                   <FileText className={`w-3 h-3 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
                   <span className={`text-[9px] font-black uppercase tracking-widest ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Your Answer</span>
                 </div>
@@ -188,7 +188,7 @@ export const EssayQuestion: React.FC<EssayQuestionProps> = ({
 
             {/* Answer */}
             <div className={`p-4 rounded-xl border ${isDark ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-emerald-50 border-emerald-100'}`}>
-              <div className="flex items-facility gap-2 mb-2">
+              <div className="flex items-center gap-2 mb-2">
                 <CheckCircle2 className="w-3 h-3 text-emerald-500" />
                 <span className={`text-[9px] font-black uppercase tracking-widest ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>Answer</span>
               </div>
@@ -199,7 +199,7 @@ export const EssayQuestion: React.FC<EssayQuestionProps> = ({
           {/* Explanation below the Answer */}
           {leafScore?.feedback && (
             <div className={`p-3.5 rounded-xl border ${isDark ? 'bg-blue-500/5 border-blue-500/10' : 'bg-blue-50 border-blue-100'}`}>
-              <div className="flex items-facility gap-1.5 mb-1.5">
+              <div className="flex items-center gap-1.5 mb-1.5">
                 <HelpCircle className="w-3 h-3 text-blue-500" />
                 <span className={`text-[9px] font-black uppercase tracking-widest ${isDark ? 'text-blue-400' : 'text-blue-700'}`}>Explanation</span>
               </div>
@@ -214,7 +214,7 @@ export const EssayQuestion: React.FC<EssayQuestionProps> = ({
     return (
       <div className="space-y-3">
         <div className={`p-4 rounded-xl border ${isDark ? 'bg-blue-500/5 border-blue-500/20' : 'bg-blue-50 border-blue-100'}`}>
-          <div className="flex items-facility gap-2 mb-2">
+          <div className="flex items-center gap-2 mb-2">
             <HelpCircle className="w-3 h-3 text-blue-500" />
             <span className={`text-[9px] font-black uppercase tracking-widest ${isDark ? 'text-blue-400' : 'text-blue-600'}`}>Answer</span>
           </div>
@@ -241,8 +241,8 @@ export const EssayQuestion: React.FC<EssayQuestionProps> = ({
     <div className="space-y-4">
       {/* Status Bar (attempt parts count, score, or mark allocation) */}
       {((mode === 'attempt' && totalPartsCount > 0) || (mode === 'review' && score) || (alloc !== undefined)) && (
-        <div className="flex items-facility justify-between pb-1">
-          <div className="flex items-facility gap-2">
+        <div className="flex items-center justify-between pb-1">
+          <div className="flex items-center gap-2">
             {mode === 'attempt' && totalPartsCount > 0 && (
               <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border ${
                 isDark ? 'border-white/10 text-slate-400 bg-white/5' : 'border-slate-200 text-slate-600 bg-slate-50'
@@ -276,7 +276,7 @@ export const EssayQuestion: React.FC<EssayQuestionProps> = ({
           {/* Legacy Answer Block for Review Mode */}
           {mode === 'review' && legacyAnswer && (
             <div className={`mt-4 p-5 rounded-2xl border ${isDark ? 'bg-orange-500/5 border-orange-500/20' : 'bg-orange-50 border-orange-100'}`}>
-               <div className="flex items-facility gap-2 mb-2">
+               <div className="flex items-center gap-2 mb-2">
                  <FileText className="w-4 h-4 text-orange-500" />
                  <span className={`text-[10px] font-black uppercase tracking-widest ${isDark ? 'text-orange-400' : 'text-orange-600'}`}>Overall Response</span>
                </div>

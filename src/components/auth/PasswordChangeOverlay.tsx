@@ -67,14 +67,14 @@ export const PasswordChangeOverlay: React.FC<PasswordChangeOverlayProps> = ({
 
   return (
     <div className="fixed inset-0 z-[100] bg-slate-950/98 backdrop-blur-2xl overflow-y-auto selection:bg-orange-500 selection:text-white">
-      <div className="min-h-full w-full flex flex-col items-facility justify-facility py-12 px-4">
+      <div className="min-h-full w-full flex flex-col items-center justify-center py-12 px-4">
         <div className="w-full max-w-md bg-white rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-500 relative">
-          <div className="bg-[#EA580C] p-8 text-white text-facility relative overflow-hidden">
+          <div className="bg-[#EA580C] p-8 text-white text-center relative overflow-hidden">
             <div className="absolute top-0 right-0 -mr-8 -mt-8 w-32 h-32 bg-white/10 rounded-full blur-3xl" />
             <div className="absolute bottom-0 left-0 -ml-8 -mb-8 w-32 h-32 bg-orange-400/20 rounded-full blur-2xl" />
             
             <div className="relative z-10">
-              <div className="w-16 h-16 bg-white/20 rounded-2xl backdrop-blur-md flex items-facility justify-facility mx-auto mb-4 border border-white/30">
+              <div className="w-16 h-16 bg-white/20 rounded-2xl backdrop-blur-md flex items-center justify-center mx-auto mb-4 border border-white/30">
                 <GraduationCap className="w-8 h-8 text-white" />
               </div>
               <h3 className="text-2xl font-black mb-2">Welcome, {userName}!</h3>
@@ -143,7 +143,7 @@ export const PasswordChangeOverlay: React.FC<PasswordChangeOverlayProps> = ({
               <button
                 type="submit"
                 disabled={isChangingPassword}
-                className="w-full py-4 bg-[#EA580C] hover:bg-[#C2410C] text-white rounded-2xl font-black shadow-lg shadow-orange-200/50 transition-all active:scale-95 flex items-facility justify-facility space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full py-4 bg-[#EA580C] hover:bg-[#C2410C] text-white rounded-2xl font-black shadow-lg shadow-orange-200/50 transition-all active:scale-95 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isChangingPassword ? (
                   <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -156,18 +156,18 @@ export const PasswordChangeOverlay: React.FC<PasswordChangeOverlayProps> = ({
               </button>
             </div>
 
-            <div className="pt-4 border-t border-slate-100 text-facility">
+            <div className="pt-4 border-t border-slate-100 text-center">
               <button
                 type="button"
                 onClick={onLogout}
-                className="flex items-facility space-x-2 text-slate-400 hover:text-slate-600 transition-colors mx-auto"
+                className="flex items-center space-x-2 text-slate-400 hover:text-slate-600 transition-colors mx-auto"
               >
                 <LogOut className="w-3.5 h-3.5 rotate-180" />
                 <span className="text-[10px] font-black uppercase tracking-widest">Back to Login / Sign Out</span>
               </button>
             </div>
 
-            <p className="text-[10px] text-facility text-slate-400 leading-relaxed px-4 font-medium">
+            <p className="text-[10px] text-center text-slate-400 leading-relaxed px-4 font-medium">
               By activating your account, you agree to our terms of service and internal academic guidelines.
             </p>
           </form>

@@ -25,7 +25,7 @@ const SEAT_STATUS_STYLES: Record<string, string> = {
 };
 
 const LoadingRow: React.FC = () => (
-  <div className="flex items-facility gap-2 text-slate-400 text-sm py-10 justify-facility">
+  <div className="flex items-center gap-2 text-slate-400 text-sm py-10 justify-center">
     <Loader2 className="w-4 h-4 animate-spin" /> Loading…
   </div>
 );
@@ -141,7 +141,7 @@ export const CentrePeople: React.FC<{ centreId: string }> = ({ centreId }) => {
           <td className="py-2.5 pr-3 text-xs text-slate-400">{item.registrationDate ? fmtDate(item.registrationDate) : '—'}</td>
           <td className="py-2.5 text-right">
             {uid ? (
-              <div className="flex items-facility justify-end gap-1.5">
+              <div className="flex items-center justify-end gap-1.5">
                 {item.seatStatus === 'active' ? (
                   <button onClick={() => setPending({ role: 'student', item, action: 'suspend' })} disabled={busy} className="px-2.5 py-1.5 rounded-lg border border-white/10 text-[11px] font-bold text-slate-300 hover:border-amber-500/40 hover:text-amber-300 disabled:opacity-40" title="Suspend access">Suspend</button>
                 ) : (
@@ -163,7 +163,7 @@ export const CentrePeople: React.FC<{ centreId: string }> = ({ centreId }) => {
           <td className="py-2.5 pr-3"><span className={`text-[11px] font-bold ${item.status === 'Suspended' ? 'text-rose-300' : 'text-emerald-300'}`}>{item.status || '—'}</span></td>
           <td className="py-2.5 text-right">
             {docId ? (
-              <div className="flex items-facility justify-end gap-1.5">
+              <div className="flex items-center justify-end gap-1.5">
                 {item.status === 'Suspended' ? (
                   <button onClick={() => setPending({ role: 'tutor', item, action: 'restore' })} disabled={busy} className="px-2.5 py-1.5 rounded-lg border border-white/10 text-[11px] font-bold text-slate-300 hover:border-emerald-500/40 hover:text-emerald-300 disabled:opacity-40">Restore</button>
                 ) : (
@@ -189,7 +189,7 @@ export const CentrePeople: React.FC<{ centreId: string }> = ({ centreId }) => {
         <td className="py-2.5 pr-3 text-xs text-slate-400">{item.lastSignInTime ? fmtDateTime(item.lastSignInTime) : 'never'}</td>
         <td className="py-2.5 text-right">
           {!isOwner && uid ? (
-            <div className="flex items-facility justify-end gap-1.5">
+            <div className="flex items-center justify-end gap-1.5">
               {item.status === 'Suspended' ? (
                 <button onClick={() => setPending({ role: 'admin', item, action: 'restore' })} disabled={busy} className="px-2.5 py-1.5 rounded-lg border border-white/10 text-[11px] font-bold text-slate-300 hover:border-emerald-500/40 hover:text-emerald-300 disabled:opacity-40">Restore</button>
               ) : (
@@ -214,7 +214,7 @@ export const CentrePeople: React.FC<{ centreId: string }> = ({ centreId }) => {
   return (
     <div className="space-y-3">
       {counts && (
-        <div className="flex flex-wrap items-facility gap-2 text-[11px]">
+        <div className="flex flex-wrap items-center gap-2 text-[11px]">
           <span className="px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-slate-300">Owners {counts.owners}</span>
           <span className="px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-slate-300">Admins {counts.admins}</span>
           <span className="px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-slate-300">Tutors {counts.tutors}</span>
@@ -226,7 +226,7 @@ export const CentrePeople: React.FC<{ centreId: string }> = ({ centreId }) => {
           )}
         </div>
       )}
-      <div className="flex flex-wrap items-facility gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {PEOPLE_TYPES.map((t) => (
           <button
             key={t.id}
@@ -250,7 +250,7 @@ export const CentrePeople: React.FC<{ centreId: string }> = ({ centreId }) => {
             </thead>
             <tbody>{shown.map(renderRow)}</tbody>
           </table>
-          <div className="flex justify-facility pt-3">
+          <div className="flex justify-center pt-3">
             {canSeeAll && (
               <button onClick={seeAll} disabled={moreBusy} className={btnGhost}>
                 {moreBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
@@ -262,7 +262,7 @@ export const CentrePeople: React.FC<{ centreId: string }> = ({ centreId }) => {
       )}
 
       {pending && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-facility justify-facility p-4" onClick={() => setPending(null)}>
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setPending(null)}>
           <div className="bg-slate-900 border border-white/10 rounded-3xl p-6 max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between gap-3 mb-2">
               <h3 className="text-white font-bold capitalize">
@@ -278,7 +278,7 @@ export const CentrePeople: React.FC<{ centreId: string }> = ({ centreId }) => {
               <button
                 onClick={() => runAction(pending.role, pending.item, pending.action)}
                 disabled={busyKey !== ''}
-                className={`flex-1 inline-flex items-facility justify-facility px-4 py-2.5 rounded-xl ${pending.action === 'delete' ? 'bg-rose-600 hover:bg-rose-500' : 'bg-orange-600 hover:bg-orange-500'} disabled:opacity-50 text-white font-bold text-sm`}
+                className={`flex-1 inline-flex items-center justify-center px-4 py-2.5 rounded-xl ${pending.action === 'delete' ? 'bg-rose-600 hover:bg-rose-500' : 'bg-orange-600 hover:bg-orange-500'} disabled:opacity-50 text-white font-bold text-sm`}
               >
                 {busyKey !== '' ? <Loader2 className="w-4 h-4 animate-spin" /> : `${pending.action.charAt(0).toUpperCase()}${pending.action.slice(1)}`}
               </button>

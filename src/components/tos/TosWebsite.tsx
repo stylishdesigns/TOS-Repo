@@ -66,8 +66,8 @@ function toState(raw: any): LandingState {
 }
 
 const SectionHead: React.FC<{ n: number; title: string }> = ({ n, title }) => (
-  <h3 className="text-sm font-bold text-white flex items-facility gap-2">
-    <span className="w-5 h-5 rounded-md bg-orange-500/20 text-orange-300 text-[11px] font-black flex items-facility justify-facility">{n}</span>
+  <h3 className="text-sm font-bold text-white flex items-center gap-2">
+    <span className="w-5 h-5 rounded-md bg-orange-500/20 text-orange-300 text-[11px] font-black flex items-center justify-center">{n}</span>
     {title}
   </h3>
 );
@@ -158,27 +158,27 @@ export const WebsiteTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => 
   const liveUrl = centreId ? `${window.location.origin}/c/${centreId}` : '';
 
   if (!centres.length && !err) {
-    return <div className="flex items-facility gap-2 text-slate-400 text-sm py-10 justify-facility"><Loader2 className="w-4 h-4 animate-spin" /> Loading facilities…</div>;
+    return <div className="flex items-center gap-2 text-slate-400 text-sm py-10 justify-center"><Loader2 className="w-4 h-4 animate-spin" /> Loading facilities…</div>;
   }
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-facility gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <select value={centreId} onChange={(e) => setCentreId(e.target.value)} className={`${inputCls} max-w-[320px] min-h-[44px]`} aria-label="Choose a facility">
           {centres.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
         {liveUrl ? (
-          <a href={liveUrl} target="_blank" rel="noreferrer" className={`${btnGhost} min-h-[44px] inline-flex items-facility gap-2`}>
+          <a href={liveUrl} target="_blank" rel="noreferrer" className={`${btnGhost} min-h-[44px] inline-flex items-center gap-2`}>
             <ExternalLink className="w-4 h-4" /> View {centreName || "live"} page
           </a>
         ) : null}
       </div>
 
       {err && <div className="rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-xs text-rose-100">{err}</div>}
-      {msg && <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-xs text-emerald-100 flex items-facility gap-2"><Check className="w-3.5 h-3.5" /> {msg}</div>}
+      {msg && <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-xs text-emerald-100 flex items-center gap-2"><Check className="w-3.5 h-3.5" /> {msg}</div>}
 
       {loading || !content ? (
-        <div className="flex items-facility gap-2 text-slate-400 text-sm py-10 justify-facility"><Loader2 className="w-4 h-4 animate-spin" /> Loading content…</div>
+        <div className="flex items-center gap-2 text-slate-400 text-sm py-10 justify-center"><Loader2 className="w-4 h-4 animate-spin" /> Loading content…</div>
       ) : (
         <div className="grid lg:grid-cols-[1fr_340px] gap-5 items-start">
           <div className="space-y-5">
@@ -215,13 +215,13 @@ export const WebsiteTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => 
                   <textarea className={`${inputCls} min-h-[80px]`} maxLength={500} value={content.hero.subText} onChange={(e) => setHero({ subText: e.target.value })} />
                 </Field>
                 <Field label="Hero photo (optional)">
-                  <div className="flex items-facility gap-3 flex-wrap">
+                  <div className="flex items-center gap-3 flex-wrap">
                     {content.hero.photoUrl ? (
                       <img src={content.hero.photoUrl} alt="Hero preview" className="h-16 w-24 rounded-lg object-cover border border-white/10" />
                     ) : (
-                      <div className="h-16 w-24 rounded-lg bg-slate-800 border border-white/10 flex items-facility justify-facility text-slate-500"><ImageIcon className="w-5 h-5" /></div>
+                      <div className="h-16 w-24 rounded-lg bg-slate-800 border border-white/10 flex items-center justify-center text-slate-500"><ImageIcon className="w-5 h-5" /></div>
                     )}
-                    <label className="inline-flex items-facility gap-2 text-xs font-bold px-3 py-2.5 rounded-lg bg-slate-800 border border-white/10 text-white hover:bg-slate-700 cursor-pointer min-h-[44px]">
+                    <label className="inline-flex items-center gap-2 text-xs font-bold px-3 py-2.5 rounded-lg bg-slate-800 border border-white/10 text-white hover:bg-slate-700 cursor-pointer min-h-[44px]">
                       {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImageIcon className="w-4 h-4" />}
                       {content.hero.photoUrl ? 'Replace photo' : 'Upload photo'}
                       <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadHero(f); e.currentTarget.value = ''; }} />
@@ -245,7 +245,7 @@ export const WebsiteTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => 
                 <Field label="Exam badges">
                   <div className="flex flex-wrap gap-2">
                     {content.hero.badges.map((b, i) => (
-                      <span key={i} className="inline-flex items-facility gap-1.5 rounded-full bg-orange-500/15 text-orange-200 text-xs font-semibold px-3 py-1.5">
+                      <span key={i} className="inline-flex items-center gap-1.5 rounded-full bg-orange-500/15 text-orange-200 text-xs font-semibold px-3 py-1.5">
                         {b}
                         <button onClick={() => setHero({ badges: content.hero.badges.filter((_, j) => j !== i) })} aria-label={`Remove badge ${b}`}><Trash2 className="w-3 h-3" /></button>
                       </span>
@@ -268,10 +268,10 @@ export const WebsiteTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => 
             <Card title="Numbers strip">
               <div className="space-y-3">
                 {content.stats.map((s, i) => (
-                  <div key={i} className="grid grid-cols-[110px_1fr_auto] gap-2 items-facility">
+                  <div key={i} className="grid grid-cols-[110px_1fr_auto] gap-2 items-center">
                     <input className={inputCls} maxLength={12} value={s.value} onChange={(e) => { const stats = [...content.stats]; stats[i] = { ...s, value: e.target.value }; set({ stats }); }} placeholder="500+" aria-label={`Stat ${i + 1} value`} />
                     <input className={inputCls} maxLength={60} value={s.label} onChange={(e) => { const stats = [...content.stats]; stats[i] = { ...s, label: e.target.value }; set({ stats }); }} placeholder="students taught" aria-label={`Stat ${i + 1} label`} />
-                    <button onClick={() => set({ stats: content.stats.filter((_, j) => j !== i) })} className="text-rose-300 hover:text-rose-200 p-2 min-h-[44px] min-w-[44px] flex items-facility justify-facility" aria-label={`Remove stat ${i + 1}`}><Trash2 className="w-4 h-4" /></button>
+                    <button onClick={() => set({ stats: content.stats.filter((_, j) => j !== i) })} className="text-rose-300 hover:text-rose-200 p-2 min-h-[44px] min-w-[44px] flex items-center justify-center" aria-label={`Remove stat ${i + 1}`}><Trash2 className="w-4 h-4" /></button>
                   </div>
                 ))}
                 {content.stats.length < 4 ? <AddChip label="Add number" onAdd={(v) => { const [value, ...rest] = v.split('|'); set({ stats: [...content.stats, { value: (value || '').trim().slice(0, 12), label: rest.join('|').trim().slice(0, 60) }] }); }} placeholder="96% | exam pass rate" /> : null}
@@ -316,7 +316,7 @@ export const WebsiteTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => 
                     <div className="grid grid-cols-[1fr_1fr_auto] gap-2">
                       <input className={inputCls} maxLength={60} value={q.name} onChange={(e) => { const quotes = [...content.testimonials.quotes]; quotes[i] = { ...q, name: e.target.value }; set({ testimonials: { ...content.testimonials, quotes } }); }} placeholder="Name" aria-label={`Name for quote ${i + 1}`} />
                       <input className={inputCls} maxLength={80} value={q.role || ''} onChange={(e) => { const quotes = [...content.testimonials.quotes]; quotes[i] = { ...q, role: e.target.value }; set({ testimonials: { ...content.testimonials, quotes } }); }} placeholder="Role (optional)" aria-label={`Role for quote ${i + 1}`} />
-                      <button onClick={() => set({ testimonials: { ...content.testimonials, quotes: content.testimonials.quotes.filter((_, j) => j !== i) } })} className="text-rose-300 hover:text-rose-200 p-2 min-h-[44px] min-w-[44px] flex items-facility justify-facility" aria-label={`Remove quote ${i + 1}`}><Trash2 className="w-4 h-4" /></button>
+                      <button onClick={() => set({ testimonials: { ...content.testimonials, quotes: content.testimonials.quotes.filter((_, j) => j !== i) } })} className="text-rose-300 hover:text-rose-200 p-2 min-h-[44px] min-w-[44px] flex items-center justify-center" aria-label={`Remove quote ${i + 1}`}><Trash2 className="w-4 h-4" /></button>
                     </div>
                   </div>
                 ))}
@@ -352,7 +352,7 @@ export const WebsiteTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => 
               </div>
             </Card>
 
-            <div className="flex flex-wrap items-facility gap-3 pb-4">
+            <div className="flex flex-wrap items-center gap-3 pb-4">
               <button onClick={() => save(false)} disabled={saving} className={`${btnGhost} min-h-[44px]`}>{saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save draft'}</button>
               <button onClick={() => save(true)} disabled={saving} className={`${btnPrimary} min-h-[44px]`}>{saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save & publish'}</button>
               <span className={`text-xs ${published ? 'text-emerald-300' : 'text-slate-400'}`}>{published ? 'Live: this page is published' : 'Not published: the live page still shows the day-one version'}</span>
@@ -373,10 +373,10 @@ const AddChip: React.FC<{ label: string; onAdd: (value: string) => void; placeho
   const [v, setV] = useState('');
   const [open, setOpen] = useState(false);
   if (!open) {
-    return <button onClick={() => setOpen(true)} className="inline-flex items-facility gap-1.5 text-xs font-bold text-orange-300 hover:text-orange-200 px-3 py-2.5 min-h-[44px]"><Plus className="w-3.5 h-3.5" /> {label}</button>;
+    return <button onClick={() => setOpen(true)} className="inline-flex items-center gap-1.5 text-xs font-bold text-orange-300 hover:text-orange-200 px-3 py-2.5 min-h-[44px]"><Plus className="w-3.5 h-3.5" /> {label}</button>;
   }
   return (
-    <span className="inline-flex items-facility gap-1.5">
+    <span className="inline-flex items-center gap-1.5">
       <input autoFocus className={inputCls + ' !w-44 !min-h-[40px]'} value={v} placeholder={placeholder} onChange={(e) => setV(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && v.trim()) { onAdd(v.trim()); setV(''); setOpen(false); } if (e.key === 'Escape') { setV(''); setOpen(false); } }} />
       <button onClick={() => { if (v.trim()) { onAdd(v.trim()); setV(''); setOpen(false); } }} className="text-emerald-300 p-2 min-h-[44px] min-w-[44px]" aria-label={`Confirm ${label}`}><Check className="w-4 h-4" /></button>
       <button onClick={() => { setV(''); setOpen(false); }} className="text-slate-400 p-2 min-h-[44px] min-w-[44px]" aria-label="Cancel"><Trash2 className="w-4 h-4" /></button>
@@ -391,7 +391,7 @@ const CardEditor: React.FC<{ card: LandingCard; index: number; onChange: (c: Lan
         {ICON_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
       <input className={inputCls} maxLength={60} value={card.title} onChange={(e) => onChange({ ...card, title: e.target.value })} placeholder="Card title" aria-label={`Title for card ${index + 1}`} />
-      <button onClick={onRemove} className="text-rose-300 hover:text-rose-200 p-2 min-h-[44px] min-w-[44px] flex items-facility justify-facility" aria-label={`Remove card ${index + 1}`}><Trash2 className="w-4 h-4" /></button>
+      <button onClick={onRemove} className="text-rose-300 hover:text-rose-200 p-2 min-h-[44px] min-w-[44px] flex items-center justify-center" aria-label={`Remove card ${index + 1}`}><Trash2 className="w-4 h-4" /></button>
     </div>
     <textarea className={`${inputCls} min-h-[56px]`} maxLength={300} value={card.text} onChange={(e) => onChange({ ...card, text: e.target.value })} placeholder="Card text" aria-label={`Text for card ${index + 1}`} />
   </div>
@@ -402,8 +402,8 @@ const PhonePreview: React.FC<{ content: LandingState; centreName: string; accent
   return (
     <div className="rounded-[2rem] border border-white/15 bg-slate-950 p-2 shadow-xl" style={accentStyle}>
       <div className="rounded-[1.6rem] overflow-hidden bg-white text-slate-800" style={{ height: 560, overflowY: 'auto' }}>
-        <div className="flex items-facility gap-2 px-3 py-2.5 border-b border-slate-200 sticky top-0 bg-white">
-          <span className="w-7 h-7 rounded-lg text-white text-[11px] font-black flex items-facility justify-facility" style={{ background: accent }}>{(centreName || 'T')[0]}</span>
+        <div className="flex items-center gap-2 px-3 py-2.5 border-b border-slate-200 sticky top-0 bg-white">
+          <span className="w-7 h-7 rounded-lg text-white text-[11px] font-black flex items-center justify-center" style={{ background: accent }}>{(centreName || 'T')[0]}</span>
           <span className="text-[11px] font-bold truncate flex-1">{centreName || 'Facility'}</span>
           <span className="text-[9px] font-bold text-white rounded-md px-2 py-1" style={{ background: accent }}>Sign up</span>
         </div>
@@ -419,7 +419,7 @@ const PhonePreview: React.FC<{ content: LandingState; centreName: string; accent
         </div>
         {content.hero.photoUrl ? <img src={content.hero.photoUrl} alt="Hero" className="w-full h-28 object-cover" /> : null}
         {content.stats.length ? (
-          <div className="grid grid-cols-3 text-facility py-3 border-y" style={{ borderColor: '#fee2e2' }}>
+          <div className="grid grid-cols-3 text-center py-3 border-y" style={{ borderColor: '#fee2e2' }}>
             {content.stats.map((s, i) => (
               <div key={i}>
                 <p className="text-[12px] font-extrabold" style={{ color: accent }}>{s.value}</p>
@@ -463,12 +463,12 @@ const PhonePreview: React.FC<{ content: LandingState; centreName: string; accent
               ))}
             </div>
           </div>
-          <div className="rounded-xl p-3 text-facility text-white" style={{ background: `linear-gradient(135deg, ${accent}, color-mix(in srgb, ${accent} 70%, black))` }}>
+          <div className="rounded-xl p-3 text-center text-white" style={{ background: `linear-gradient(135deg, ${accent}, color-mix(in srgb, ${accent} 70%, black))` }}>
             <p className="text-[12px] font-extrabold">{content.contact.title}</p>
             <p className="text-[8.5px] opacity-85 mt-1">{content.contact.text}</p>
             <span className="inline-block bg-white text-[9px] font-bold px-2.5 py-1.5 rounded-md mt-2" style={{ color: accent }}>{content.contact.ctaLabel}</span>
           </div>
-          <p className="text-facility text-[7.5px] text-slate-400">{content.footer.copyright} · Powered by TutorialOS</p>
+          <p className="text-center text-[7.5px] text-slate-400">{content.footer.copyright} · Powered by TutorialOS</p>
         </div>
       </div>
     </div>

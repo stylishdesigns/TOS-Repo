@@ -9,9 +9,9 @@ export const EmptyState: React.FC<EmptyStateProps> = ({ onGoToCbt }) => {
   return (
     <div className="space-y-4 animate-in fade-in duration-200">
       {/* Dashed Ghost Container */}
-      <div className="bg-white rounded-3xl p-6 sm:p-7 border-2 border-dashed border-slate-200/90 text-facility space-y-5 shadow-2xs">
+      <div className="bg-white rounded-3xl p-6 sm:p-7 border-2 border-dashed border-slate-200/90 text-center space-y-5 shadow-2xs">
         {/* Ghost Bar Chart Illustration */}
-        <div className="flex items-end justify-facility space-x-2.5 h-20 pt-2 opacity-65">
+        <div className="flex items-end justify-center space-x-2.5 h-20 pt-2 opacity-65">
           {[35, 52, 40, 68, 55, 82, 70].map((h, i) => (
             <div
               key={i}
@@ -34,7 +34,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({ onGoToCbt }) => {
           <button
             type="button"
             onClick={onGoToCbt}
-            className="w-full min-h-[44px] px-5 py-3 rounded-2xl bg-[#EA580C] hover:bg-[#C2410C] text-white font-bold text-xs shadow-sm hover:shadow transition-all inline-flex items-facility justify-facility space-x-2 cursor-pointer active:scale-98"
+            className="w-full min-h-[44px] px-5 py-3 rounded-2xl bg-[#EA580C] hover:bg-[#C2410C] text-white font-bold text-xs shadow-sm hover:shadow transition-all inline-flex items-center justify-center space-x-2 cursor-pointer active:scale-98"
           >
             <span>Go to CBT</span>
             <ArrowRight className="w-4 h-4" />
@@ -50,7 +50,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({ onGoToCbt }) => {
 
         <div className="space-y-3">
           <div className="flex items-start space-x-3 text-xs">
-            <div className="w-8 h-8 rounded-xl bg-orange-50 text-[#EA580C] flex items-facility justify-facility shrink-0 mt-0.5 border border-orange-100">
+            <div className="w-8 h-8 rounded-xl bg-orange-50 text-[#EA580C] flex items-center justify-center shrink-0 mt-0.5 border border-orange-100">
               <TrendingUp className="w-4 h-4" />
             </div>
             <div>
@@ -62,7 +62,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({ onGoToCbt }) => {
           </div>
 
           <div className="flex items-start space-x-3 text-xs">
-            <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-facility justify-facility shrink-0 mt-0.5 border border-blue-100">
+            <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 mt-0.5 border border-blue-100">
               <BookOpen className="w-4 h-4" />
             </div>
             <div>
@@ -74,7 +74,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({ onGoToCbt }) => {
           </div>
 
           <div className="flex items-start space-x-3 text-xs">
-            <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-facility justify-facility shrink-0 mt-0.5 border border-purple-100">
+            <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0 mt-0.5 border border-purple-100">
               <Sparkles className="w-4 h-4" />
             </div>
             <div>

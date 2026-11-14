@@ -89,7 +89,7 @@ export const TosAdminLogin: React.FC<TosAdminLoginProps> = ({ onBack }) => {
   };
 
   return (
-    <div className="min-h-screen w-full bg-slate-950 flex items-facility justify-facility p-4 relative overflow-hidden selection:bg-indigo-500 selection:text-white">
+    <div className="min-h-screen w-full bg-slate-950 flex items-center justify-center p-4 relative overflow-hidden selection:bg-indigo-500 selection:text-white">
       {/* Platform backdrop: indigo/violet, deliberately not any centre's orange */}
       <div className="absolute top-[-20%] left-[-10%] w-[55%] h-[55%] bg-indigo-600/15 rounded-full blur-[150px]" />
       <div className="absolute bottom-[-20%] right-[-10%] w-[55%] h-[55%] bg-violet-600/10 rounded-full blur-[150px]" />
@@ -97,10 +97,10 @@ export const TosAdminLogin: React.FC<TosAdminLoginProps> = ({ onBack }) => {
 
       <div className="w-full max-w-md relative z-10">
         {/* Platform lockup */}
-        <div className="text-facility mb-10 animate-in fade-in slide-in-from-top-4 duration-700">
+        <div className="text-center mb-10 animate-in fade-in slide-in-from-top-4 duration-700">
           <div className="w-16 h-16 mx-auto mb-6 relative">
             <div className="absolute inset-0 bg-indigo-500/20 rounded-2xl rotate-6" />
-            <div className="absolute inset-0 bg-slate-900 rounded-2xl flex items-facility justify-facility border border-indigo-500/30">
+            <div className="absolute inset-0 bg-slate-900 rounded-2xl flex items-center justify-center border border-indigo-500/30">
               <ShieldCheck className="w-8 h-8 text-indigo-400" />
             </div>
           </div>
@@ -114,8 +114,8 @@ export const TosAdminLogin: React.FC<TosAdminLoginProps> = ({ onBack }) => {
         {/* Sign-in card */}
         <div className="bg-slate-900/80 backdrop-blur border border-white/10 rounded-3xl p-8 shadow-2xl shadow-indigo-950/50 animate-in fade-in slide-in-from-bottom-6 duration-700">
           {resetSent ? (
-            <div className="text-facility py-4">
-              <div className="w-12 h-12 mx-auto mb-4 rounded-2xl bg-indigo-500/15 border border-indigo-500/30 flex items-facility justify-facility">
+            <div className="text-center py-4">
+              <div className="w-12 h-12 mx-auto mb-4 rounded-2xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center">
                 <Mail className="w-6 h-6 text-indigo-400" />
               </div>
               <h2 className="text-lg font-bold text-white mb-2">Check your email</h2>
@@ -131,12 +131,12 @@ export const TosAdminLogin: React.FC<TosAdminLoginProps> = ({ onBack }) => {
               <button
                 onClick={handleGoogleLogin}
                 disabled={isLoading || isGoogleLoading}
-                className="w-full flex items-facility justify-facility px-4 py-3.5 rounded-xl bg-white hover:bg-slate-100 disabled:opacity-50 text-slate-800 font-semibold text-sm transition-all duration-300"
+                className="w-full flex items-center justify-center px-4 py-3.5 rounded-xl bg-white hover:bg-slate-100 disabled:opacity-50 text-slate-800 font-semibold text-sm transition-all duration-300"
               >
                 {isGoogleLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <><GoogleIcon /> Continue with Google</>}
               </button>
 
-              <div className="flex items-facility my-6">
+              <div className="flex items-center my-6">
                 <div className="h-px flex-1 bg-white/10" />
                 <span className="px-4 text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">or email</span>
                 <div className="h-px flex-1 bg-white/10" />
@@ -186,13 +186,13 @@ export const TosAdminLogin: React.FC<TosAdminLoginProps> = ({ onBack }) => {
                 <button
                   type="submit"
                   disabled={isLoading || isGoogleLoading}
-                  className="w-full flex items-facility justify-facility px-4 py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-bold text-sm transition-all duration-300 group"
+                  className="w-full flex items-center justify-center px-4 py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-bold text-sm transition-all duration-300 group"
                 >
                   {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>Sign in to Platform <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" /></>}
                 </button>
               </form>
 
-              <div className="mt-5 flex items-facility justify-between">
+              <div className="mt-5 flex items-center justify-between">
                 <button onClick={handleReset} className="text-slate-500 hover:text-indigo-300 text-xs font-medium">
                   Forgot password?
                 </button>
@@ -203,7 +203,7 @@ export const TosAdminLogin: React.FC<TosAdminLoginProps> = ({ onBack }) => {
         </div>
 
         {onBack && (
-          <div className="text-facility mt-8 animate-in fade-in duration-700">
+          <div className="text-center mt-8 animate-in fade-in duration-700">
             <button onClick={onBack} className="text-slate-500 hover:text-slate-300 text-xs font-medium transition-colors">
               Back to the public site
             </button>

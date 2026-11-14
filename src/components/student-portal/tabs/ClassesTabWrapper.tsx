@@ -45,7 +45,7 @@ export const ClassesTabWrapper: React.FC<ClassesTabWrapperProps> = ({
       <button
         type="button"
         onClick={() => onAssessmentViewChange('assessments')}
-        className={`h-10 rounded-[10px] text-xs font-extrabold transition-all flex items-facility justify-facility cursor-pointer ${
+        className={`h-10 rounded-[10px] text-xs font-extrabold transition-all flex items-center justify-center cursor-pointer ${
           assessmentView === 'assessments'
             ? 'bg-[#0F172A] text-white shadow-xs'
             : 'text-[#64748B] hover:text-[#0F172A]'
@@ -56,7 +56,7 @@ export const ClassesTabWrapper: React.FC<ClassesTabWrapperProps> = ({
       <button
         type="button"
         onClick={() => onAssessmentViewChange('performance')}
-        className={`h-10 rounded-[10px] text-xs font-extrabold transition-all flex items-facility justify-facility cursor-pointer ${
+        className={`h-10 rounded-[10px] text-xs font-extrabold transition-all flex items-center justify-center cursor-pointer ${
           assessmentView === 'performance'
             ? 'bg-[#0F172A] text-white shadow-xs'
             : 'text-[#64748B] hover:text-[#0F172A]'
@@ -91,7 +91,7 @@ export const ClassesTabWrapper: React.FC<ClassesTabWrapperProps> = ({
   return (
     <div className="space-y-4 max-w-lg mx-auto animate-in fade-in duration-300">
       <div className="px-4 pt-4 space-y-3">
-        <div className="flex items-facility justify-between">
+        <div className="flex items-center justify-between">
           <h2 className="text-xl font-black tracking-tight text-[#0F172A]">
             Assessment Performance
           </h2>

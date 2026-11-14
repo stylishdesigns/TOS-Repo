@@ -707,11 +707,11 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
     <div className={`transition-all duration-500 min-h-screen relative ${activeTab === 'Performance' ? 'bg-slate-950 -m-5 p-5' : 'bg-slate-50 p-5'} ${showArchive ? 'bg-white p-5' : ''}`}>
       {/* Tutor Override Modal */}
       {showOverrideModal && (
-        <div className="fixed inset-0 z-[200] flex items-facility justify-facility p-4 bg-slate-950/90 backdrop-blur-md animate-in fade-in duration-200 overflow-y-auto">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md animate-in fade-in duration-200 overflow-y-auto">
           <div className="w-full max-w-2xl bg-white rounded-[32px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 my-8">
-            <div className="bg-slate-900 p-6 flex items-facility justify-between text-white">
-              <div className="flex items-facility gap-3">
-                <div className="w-10 h-10 rounded-xl bg-orange-500 flex items-facility justify-facility">
+            <div className="bg-slate-900 p-6 flex items-center justify-between text-white">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-orange-500 flex items-center justify-center">
                   <Pencil className="w-5 h-5" />
                 </div>
                 <div>
@@ -737,9 +737,9 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
 
                 return (
                   <div key={qIdx} className="bg-slate-50 rounded-2xl p-4 border border-slate-200 space-y-3">
-                    <div className="flex items-facility justify-between">
+                    <div className="flex items-center justify-between">
                       <span className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Question {idx + 1}</span>
-                      <div className="flex items-facility gap-2">
+                      <div className="flex items-center gap-2">
                          <span className="text-[10px] font-black text-slate-400 uppercase">Max: {score.max}</span>
                          <input 
                             type="number" 
@@ -754,7 +754,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
                                   [qIdx]: { ...score, got: val }
                                }));
                             }}
-                            className="w-16 px-2 py-1 rounded-lg border border-slate-200 text-facility font-black text-slate-900 bg-white"
+                            className="w-16 px-2 py-1 rounded-lg border border-slate-200 text-center font-black text-slate-900 bg-white"
                          />
                       </div>
                     </div>
@@ -762,12 +762,12 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
                     
                     <div className="grid grid-cols-1 gap-2 mt-2">
                        {Object.entries(score.leaves || {}).map(([lKey, l]: [string, any]) => (
-                          <div key={lKey} className="bg-white p-3 rounded-xl border border-slate-100 shadow-sm flex items-facility justify-between">
+                          <div key={lKey} className="bg-white p-3 rounded-xl border border-slate-100 shadow-sm flex items-center justify-between">
                              <div className="flex-1">
                                 <span className="text-[9px] font-black text-slate-400 uppercase block tracking-tighter">Leaf: {lKey}</span>
                                 <p className="text-[11px] font-medium text-slate-600 italic">"{l.feedback || 'No AI feedback'}"</p>
                              </div>
-                             <div className="flex items-facility gap-2">
+                             <div className="flex items-center gap-2">
                                 <span className="text-[10px] font-black text-slate-400 uppercase">Points</span>
                                 <input 
                                    type="number" 
@@ -784,7 +784,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
                                          [qIdx]: { ...score, got: newTotalGot, leaves: newLeaves }
                                       }));
                                    }}
-                                   className="w-14 px-1.5 py-1 rounded-lg border border-slate-200 text-facility font-bold text-slate-800 bg-slate-50"
+                                   className="w-14 px-1.5 py-1 rounded-lg border border-slate-200 text-center font-bold text-slate-800 bg-slate-50"
                                 />
                              </div>
                           </div>
@@ -805,7 +805,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
               <button 
                 onClick={handleSaveOverride}
                 disabled={isSaving}
-                className="flex-[2] py-4 rounded-2xl bg-slate-900 text-white font-black text-[10px] uppercase tracking-[0.2em] shadow-xl hover:bg-black transition-all active:scale-95 disabled:opacity-50 flex items-facility justify-facility gap-2"
+                className="flex-[2] py-4 rounded-2xl bg-slate-900 text-white font-black text-[10px] uppercase tracking-[0.2em] shadow-xl hover:bg-black transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
                 <span>Save Manual Grades</span>
@@ -818,11 +818,11 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
       {(activeTab === 'Performance' || showArchive) && (
         <div className={`absolute top-[-1000px] left-0 right-0 h-[1000px] ${showArchive ? 'bg-white' : 'bg-slate-950'} -z-10`} />
       )}
-      <div className="flex items-facility justify-between relative h-12 mb-6">
+      <div className="flex items-center justify-between relative h-12 mb-6">
         {activeTab === 'Assessment' && !showArchive && (
           <button 
             onClick={handleOpenSetup}
-            className="w-10 h-10 rounded-xl bg-[#EA580C] text-white flex items-facility justify-facility shadow-lg shadow-orange-100 absolute left-0"
+            className="w-10 h-10 rounded-xl bg-[#EA580C] text-white flex items-center justify-center shadow-lg shadow-orange-100 absolute left-0"
           >
             <Plus className="w-5 h-5" />
           </button>
@@ -831,13 +831,13 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
         {showArchive && (
           <button 
             onClick={() => setShowArchive(false)}
-            className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-facility justify-facility hover:bg-slate-200 transition-all absolute left-0"
+            className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center hover:bg-slate-200 transition-all absolute left-0"
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
         )}
         
-        <div className="flex-1 text-facility">
+        <div className="flex-1 text-center">
           <h2 className={`text-xl font-black tracking-tight ${activeTab === 'Performance' ? 'text-white' : 'text-slate-900'}`}>
             {activeTab === 'Performance' ? 'Performance Analytics' : (showArchive ? 'Assessment Archive' : 'Tutor Assessments')}
           </h2>
@@ -849,7 +849,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
         {activeTab === 'Assessment' && !showArchive && (
           <button 
             onClick={() => setShowArchive(true)}
-            className="w-10 h-10 rounded-xl flex items-facility justify-facility transition-all absolute right-0 border bg-white text-slate-400 border-slate-200"
+            className="w-10 h-10 rounded-xl flex items-center justify-center transition-all absolute right-0 border bg-white text-slate-400 border-slate-200"
             title="View Archive"
           >
             <History className="w-5 h-5" />
@@ -860,8 +860,8 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
       {/* KPI Cards - Only for Assessments, Hidden in Archive */}
       {activeTab === 'Assessment' && !showArchive && (
         <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-6">
-          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-facility sm:space-x-4">
-            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-orange-50 text-[#EA580C] flex items-facility justify-facility shrink-0 mb-2 sm:mb-0">
+          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center sm:space-x-4">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-orange-50 text-[#EA580C] flex items-center justify-center shrink-0 mb-2 sm:mb-0">
               <BookOpen className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
             <div>
@@ -872,8 +872,8 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
             </div>
           </div>
 
-          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-facility sm:space-x-4">
-            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-blue-50 text-blue-600 flex items-facility justify-facility shrink-0 mb-2 sm:mb-0">
+          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center sm:space-x-4">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 mb-2 sm:mb-0">
               <Laptop className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
             <div>
@@ -903,8 +903,8 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
 
       {!showArchive && (
         <div className="flex flex-col gap-4 mb-6">
-          <div className="flex items-facility justify-between gap-3">
-            <div className={`flex items-facility space-x-1 p-1.5 rounded-2xl flex-1 border transition-all ${activeTab === 'Performance' ? 'bg-white/5 border-white/10' : 'bg-slate-100 border-slate-200'}`}>
+          <div className="flex items-center justify-between gap-3">
+            <div className={`flex items-center space-x-1 p-1.5 rounded-2xl flex-1 border transition-all ${activeTab === 'Performance' ? 'bg-white/5 border-white/10' : 'bg-slate-100 border-slate-200'}`}>
               {(['Assessment', 'Performance'] as const).map((tab) => (
                 <button
                   key={tab}
@@ -939,8 +939,8 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
 
           if (displayedExams.length === 0) {
             return (
-              <div className={`py-12 rounded-3xl border border-dashed text-facility space-y-3 ${activeTab === 'Performance' || showArchive ? 'bg-white/5 border-white/10' : 'bg-white border-slate-200'}`}>
-                 <div className={`w-16 h-16 rounded-2xl flex items-facility justify-facility mx-auto ${activeTab === 'Performance' || showArchive ? 'bg-white/5' : 'bg-slate-50'}`}>
+              <div className={`py-12 rounded-3xl border border-dashed text-center space-y-3 ${activeTab === 'Performance' || showArchive ? 'bg-white/5 border-white/10' : 'bg-white border-slate-200'}`}>
+                 <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mx-auto ${activeTab === 'Performance' || showArchive ? 'bg-white/5' : 'bg-slate-50'}`}>
                     <Laptop className={`w-8 h-8 ${activeTab === 'Performance' || showArchive ? 'text-slate-600' : 'text-slate-300'}`} />
                  </div>
                  <p className={`text-xs font-medium ${activeTab === 'Performance' || showArchive ? 'text-slate-500' : 'text-slate-400'}`}>No assessments found in this category.</p>
@@ -961,14 +961,14 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
                   return (
                     <div key={exam.id} className="bg-white border border-slate-200 rounded-2xl overflow-hidden transition-all shadow-lg hover:border-orange-200 relative">
                        {/* Top Right Corner - Created Date */}
-                       <div className="absolute top-0 right-0 px-3 py-1 bg-slate-700 text-white text-[8px] font-black uppercase tracking-widest flex items-facility gap-1 border-b border-l border-slate-600 rounded-bl-lg z-10">
+                       <div className="absolute top-0 right-0 px-3 py-1 bg-slate-700 text-white text-[8px] font-black uppercase tracking-widest flex items-center gap-1 border-b border-l border-slate-600 rounded-bl-lg z-10">
                           <Clock className="w-2.5 h-2.5 text-orange-400" />
                           <span>Created: <span className="text-orange-300">{exam.createdAt ? new Date(exam.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : (exam.startTime ? new Date(exam.startTime).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A')}</span></span>
                        </div>
 
-                       <div className="p-5 pt-6 flex items-facility justify-between gap-4">
+                       <div className="p-5 pt-6 flex items-center justify-between gap-4">
                           <div className="flex-1 min-w-0">
-                             <div className="flex items-facility gap-2 mb-1.5">
+                             <div className="flex items-center gap-2 mb-1.5">
                                 <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest ${isPast ? 'bg-slate-100 text-slate-500' : 'bg-emerald-50 text-emerald-600'}`}>
                                    {isPast ? 'Finished' : 'Live Now'}
                                 </span>
@@ -987,14 +987,14 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
                          <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter mt-1">{exam.targetExam}</p>
                       </div>
 
-                      <div className="flex items-facility gap-6 shrink-0">
+                      <div className="flex items-center gap-6 shrink-0">
                          <div className="text-right border-l border-slate-100 pl-6">
                             <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest block">Students</span>
                             <span className="text-lg font-black text-slate-900">{examResults.length}</span>
                          </div>
                          <button
                             onClick={() => setExpandedExamId(expandedExamId === exam.id ? null : exam.id)}
-                            className={`w-10 h-10 rounded-xl flex items-facility justify-facility transition-all ${expandedExamId === exam.id ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
+                            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${expandedExamId === exam.id ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
                          >
                             <ChevronDown className={`w-5 h-5 transition-transform duration-300 ${expandedExamId === exam.id ? 'rotate-180' : 'rotate-0'}`} />
                          </button>
@@ -1009,14 +1009,14 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
                                  <tr className="text-slate-400 font-black uppercase tracking-[0.2em] border-b border-slate-200">
                                     <th className="px-4 py-3 w-16">Rank</th>
                                     <th className="px-4 py-3">Student</th>
-                                    <th className="px-4 py-3 text-facility">Duration</th>
+                                    <th className="px-4 py-3 text-center">Duration</th>
                                     <th className="px-4 py-3 text-right">Score</th>
                                  </tr>
                               </thead>
                               <tbody className="divide-y divide-slate-100">
                                  {examResults.length === 0 ? (
                                     <tr>
-                                       <td colSpan={4} className="px-4 py-12 text-facility text-slate-400 font-bold italic">
+                                       <td colSpan={4} className="px-4 py-12 text-center text-slate-400 font-bold italic">
                                           Gathering participation data... No attempts recorded yet.
                                        </td>
                                     </tr>
@@ -1026,7 +1026,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
                                        return (
                                           <tr key={res.id} className="hover:bg-white transition-colors group">
                                              <td className="px-4 py-4">
-                                                <span className={`flex items-facility justify-facility w-6 h-6 rounded-lg text-[10px] font-black ${
+                                                <span className={`flex items-center justify-center w-6 h-6 rounded-lg text-[10px] font-black ${
                                                    rIdx === 0 ? 'bg-amber-100 text-amber-700 shadow-sm' : 
                                                    rIdx === 1 ? 'bg-slate-100 text-slate-600' :
                                                    rIdx === 2 ? 'bg-orange-50 text-orange-700' : 'text-slate-400'
@@ -1035,11 +1035,11 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
                                                 </span>
                                              </td>
                                              <td className="px-4 py-4">
-                                                <div className="flex items-facility gap-3">
+                                                <div className="flex items-center gap-3">
                                                    <span className="font-black text-slate-900 transition-colors">{res.studentName}</span>
                                                 </div>
                                              </td>
-                                             <td className="px-4 py-4 text-facility">
+                                             <td className="px-4 py-4 text-center">
                                                 <span className="px-2.5 py-1 rounded-md bg-white border border-slate-100 text-[9px] font-black uppercase text-slate-500 tracking-tighter">
                                                    {res.timeTakenSeconds ? (
                                                      `${Math.floor(res.timeTakenSeconds / 60)}m ${res.timeTakenSeconds % 60}s`
@@ -1050,7 +1050,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
                                              </td>
                                              <td className="px-4 py-4 text-right">
                                                 <div className="flex flex-col items-end">
-                                                   <div className="flex items-facility gap-2">
+                                                   <div className="flex items-center gap-2">
                                                       {res.essayScores && Object.keys(res.essayScores).length > 0 && (
                                                          <button
                                                             onClick={() => {
@@ -1109,7 +1109,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
                       </div>
 
                       {/* Top Right Tip - Start Time or Created Date (Deep Grey Color) */}
-                      <div className="absolute top-0 right-0 px-3 py-1 bg-slate-700 text-white text-[8px] font-black uppercase tracking-widest flex items-facility gap-1 border-b border-l border-slate-600">
+                      <div className="absolute top-0 right-0 px-3 py-1 bg-slate-700 text-white text-[8px] font-black uppercase tracking-widest flex items-center gap-1 border-b border-l border-slate-600">
                         <Clock className="w-2.5 h-2.5 text-orange-500" />
                         {isActuallyPast 
                           ? <span>Created: <span className="text-orange-300">{exam.createdAt ? new Date(exam.createdAt).toLocaleDateString() : 'N/A'}</span></span>
@@ -1125,14 +1125,14 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
                 })()}
 
                 <div>
-                  <div className="flex items-facility justify-between">
-                    <div className="flex items-facility gap-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
                       <span className="px-3 py-1 rounded-lg text-[10px] font-black bg-slate-50 text-slate-600 border border-slate-200 uppercase tracking-tighter">
                         {exam.targetExam}
                       </span>
                     </div>
 
-                    <div className="flex items-facility space-x-1.5 text-xs text-slate-500 font-bold">
+                    <div className="flex items-center space-x-1.5 text-xs text-slate-500 font-bold">
                       <Clock className="w-3.5 h-3.5 text-slate-400" />
                       <span>{exam.durationMinutes} MINS</span>
                     </div>
@@ -1143,14 +1143,14 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
                       {exam.title.replace(/General Assessment/g, 'CBT Assessment').replace(/General/g, 'CBT')}
                     </h3>
                     {exam.topic && (
-                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tight flex items-facility gap-1">
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tight flex items-center gap-1">
                         <FileText className="w-3 h-3 text-orange-500" />
                         Topic: {exam.topic}
                       </p>
                     )}
                   </div>
 
-                  <div className="flex flex-wrap items-facility gap-2 mt-3">
+                  <div className="flex flex-wrap items-center gap-2 mt-3">
                     {exam.subjects.map((sub, idx) => (
                       <span
                         key={idx}
@@ -1171,14 +1171,14 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
                     )}
                   </div>
                   
-                  <div className="flex items-facility gap-1.5 mt-3 text-[10px] font-bold text-slate-400">
+                  <div className="flex items-center gap-1.5 mt-3 text-[10px] font-bold text-slate-400">
                     <Users className="w-3.5 h-3.5 text-slate-400" />
                     <span className="uppercase tracking-tight">Tutor: {tutor.name}</span>
                   </div>
                 </div>
 
-                <div className="pt-5 border-t border-slate-100 flex items-facility justify-between relative">
-                  <div className="flex items-facility space-x-4">
+                <div className="pt-5 border-t border-slate-100 flex items-center justify-between relative">
+                  <div className="flex items-center space-x-4">
                     <div className="flex flex-col">
                       <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">Attempts</span>
                       <span className="text-sm font-black text-slate-700">
@@ -1188,11 +1188,11 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
                   </div>
 
                   {/* Mode Tag at Bottom - Q Count ONLY (Mode differentiated in Performance) */}
-                  <div className="absolute left-1/2 -translate-x-1/2 -bottom-6 px-4 py-2 bg-slate-50 text-slate-600 text-[9px] font-black uppercase tracking-[0.2em] rounded-b-md border-x border-b border-slate-100 shadow-sm flex items-facility gap-2 whitespace-nowrap">
+                  <div className="absolute left-1/2 -translate-x-1/2 -bottom-6 px-4 py-2 bg-slate-50 text-slate-600 text-[9px] font-black uppercase tracking-[0.2em] rounded-b-md border-x border-b border-slate-100 shadow-sm flex items-center gap-2 whitespace-nowrap">
                     <span className="text-[#EA580C] uppercase">{exam.questions?.length || exam.questionCount || 0} Qs</span>
                   </div>
 
-                  <div className="flex items-facility space-x-2">
+                  <div className="flex items-center space-x-2">
                     {activeTab === 'Assessment' ? (
                       <>
                         <button
@@ -1214,7 +1214,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
                         
                         <button
                           onClick={() => handleStartExam(exam)}
-                          className="px-5 py-2.5 text-xs font-black text-white rounded-xl shadow-lg transition-all flex items-facility space-x-2 bg-slate-900 hover:bg-slate-800"
+                          className="px-5 py-2.5 text-xs font-black text-white rounded-xl shadow-lg transition-all flex items-center space-x-2 bg-slate-900 hover:bg-slate-800"
                         >
                           <span className="leading-none">
                             Review
@@ -1225,7 +1225,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
                     ) : (
                       <button
                         onClick={() => setExpandedExamId(expandedExamId === exam.id ? null : exam.id)}
-                        className={`px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all flex items-facility space-x-2 ${
+                        className={`px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all flex items-center space-x-2 ${
                           expandedExamId === exam.id 
                             ? 'bg-rose-50 text-rose-600 border border-rose-100' 
                             : 'bg-blue-50 text-blue-600 border border-blue-100'
@@ -1241,8 +1241,8 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
                 {/* Consolidated Collapsible Leaderboard for ALL modes */}
                 {expandedExamId === exam.id && (
                   <div className="mt-4 pt-4 border-t border-slate-100 animate-in slide-in-from-top-4 duration-300">
-                    <div className="flex items-facility justify-between mb-4">
-                       <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-900 flex items-facility gap-2">
+                    <div className="flex items-center justify-between mb-4">
+                       <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-900 flex items-center gap-2">
                           <Users className="w-4 h-4 text-[#EA580C]" />
                           Student Participation
                        </h4>
@@ -1255,7 +1255,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
                             <tr>
                               <th className="px-4 py-3 w-16">Rank</th>
                               <th className="px-4 py-3">Student</th>
-                              <th className="px-4 py-3 text-facility">Duration</th>
+                              <th className="px-4 py-3 text-center">Duration</th>
                               <th className="px-4 py-3 text-right">Score</th>
                             </tr>
                           </thead>
@@ -1268,7 +1268,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
                               if (examResults.length === 0) {
                                 return (
                                   <tr>
-                                    <td colSpan={4} className="px-4 py-8 text-facility text-slate-400 font-medium italic">
+                                    <td colSpan={4} className="px-4 py-8 text-center text-slate-400 font-medium italic">
                                       No students have attempted this assessment yet.
                                     </td>
                                   </tr>
@@ -1279,7 +1279,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
                                 return (
                                   <tr key={res.id} className="hover:bg-white transition-colors group/row">
                                     <td className="px-4 py-3">
-                                      <span className={`flex items-facility justify-facility w-6 h-6 rounded-lg text-[10px] font-black ${
+                                      <span className={`flex items-center justify-center w-6 h-6 rounded-lg text-[10px] font-black ${
                                         rIdx === 0 ? 'bg-yellow-50 text-yellow-600' :
                                         rIdx === 1 ? 'bg-slate-100 text-slate-600' :
                                         rIdx === 2 ? 'bg-orange-50 text-orange-600' :
@@ -1291,7 +1291,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
                                     <td className="px-4 py-3 font-black text-slate-900">
                                       {res.studentName}
                                     </td>
-                                    <td className="px-4 py-3 text-facility">
+                                    <td className="px-4 py-3 text-center">
                                       <span className="px-2.5 py-1 rounded-md bg-white border border-slate-100 text-[9px] font-black uppercase text-slate-500 tracking-tighter">
                                          {res.timeTakenSeconds ? (
                                            `${Math.floor(res.timeTakenSeconds / 60)}m ${res.timeTakenSeconds % 60}s`
@@ -1321,7 +1321,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
           })}
 
           {isPaginated && totalPages > 1 && (
-            <div className="flex items-facility justify-between pt-6 pb-2 text-xs">
+            <div className="flex items-center justify-between pt-6 pb-2 text-xs">
               <button
                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
@@ -1356,11 +1356,11 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
 
       {showSetupModal && (
         <div className="fixed inset-0 bg-slate-950/60 z-50 overflow-y-auto p-4 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="min-h-full flex items-facility justify-facility py-8">
+          <div className="min-h-full flex items-center justify-center py-8">
             <div className="bg-white rounded-[32px] max-w-3xl w-full p-6 sm:p-8 shadow-2xl animate-in zoom-in-95 duration-300 relative">
-              <div className="flex items-facility justify-between mb-8 border-b border-slate-100 pb-4">
-                <div className="flex items-facility space-x-3">
-                   <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-facility justify-facility text-[#EA580C]">
+              <div className="flex items-center justify-between mb-8 border-b border-slate-100 pb-4">
+                <div className="flex items-center space-x-3">
+                   <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center text-[#EA580C]">
                       <Laptop className="w-6 h-6" />
                    </div>
                    <div>
@@ -1417,9 +1417,9 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
                         />
                       </div>
 
-                      <div className="flex flex-row items-facility gap-6 py-2">
-                         <label className={`flex items-facility space-x-2.5 cursor-pointer group transition-all ${setupData.isAssignment ? 'opacity-40 grayscale' : 'opacity-100'}`}>
-                            <div className={`w-5 h-5 rounded-lg border-2 flex items-facility justify-facility transition-all ${setupData.isClasswork ? 'bg-orange-500 border-orange-500 shadow-md scale-110' : 'border-slate-300 group-hover:border-orange-400'}`}>
+                      <div className="flex flex-row items-center gap-6 py-2">
+                         <label className={`flex items-center space-x-2.5 cursor-pointer group transition-all ${setupData.isAssignment ? 'opacity-40 grayscale' : 'opacity-100'}`}>
+                            <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${setupData.isClasswork ? 'bg-orange-500 border-orange-500 shadow-md scale-110' : 'border-slate-300 group-hover:border-orange-400'}`}>
                                {setupData.isClasswork && <CheckCircle2 className="w-3.5 h-3.5 text-white" />}
                             </div>
                             <input 
@@ -1432,8 +1432,8 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
                             <span className="font-black text-slate-700 uppercase tracking-widest text-[9px]">Classwork</span>
                          </label>
 
-                         <label className={`flex items-facility space-x-2.5 cursor-pointer group transition-all ${setupData.isClasswork ? 'opacity-40 grayscale' : 'opacity-100'}`}>
-                            <div className={`w-5 h-5 rounded-lg border-2 flex items-facility justify-facility transition-all ${setupData.isAssignment ? 'bg-blue-600 border-blue-600 shadow-md scale-110' : 'border-slate-300 group-hover:border-blue-400'}`}>
+                         <label className={`flex items-center space-x-2.5 cursor-pointer group transition-all ${setupData.isClasswork ? 'opacity-40 grayscale' : 'opacity-100'}`}>
+                            <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${setupData.isAssignment ? 'bg-blue-600 border-blue-600 shadow-md scale-110' : 'border-slate-300 group-hover:border-blue-400'}`}>
                                {setupData.isAssignment && <CheckCircle2 className="w-3.5 h-3.5 text-white" />}
                             </div>
                             <input 
@@ -1472,7 +1472,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
                       <div className="grid grid-cols-2 gap-4">
                           <div className="flex flex-col">
                             <label className="block font-black text-slate-700 uppercase tracking-widest mb-1.5 text-[10px]">Start Window</label>
-                            <div className="relative flex items-facility group/input">
+                            <div className="relative flex items-center group/input">
                               <input
                                 type="datetime-local"
                                 value={setupData.startTime || ''}
@@ -1482,7 +1482,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
                               <button
                                 type="button"
                                 onClick={() => (document.activeElement as HTMLElement)?.blur()}
-                                className="absolute right-1 top-1/2 -translate-y-1/2 px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all flex items-facility gap-1 shadow-lg active:scale-95 z-20 border border-emerald-500"
+                                className="absolute right-1 top-1/2 -translate-y-1/2 px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all flex items-center gap-1 shadow-lg active:scale-95 z-20 border border-emerald-500"
                                 title="Confirm Time"
                               >
                                 <span className="text-[10px] font-black uppercase tracking-tighter">ok</span>
@@ -1492,7 +1492,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
                           </div>
                           <div className="flex flex-col">
                             <label className="block font-black text-slate-700 uppercase tracking-widest mb-1.5 text-[10px]">End Window</label>
-                            <div className="relative flex items-facility group/input">
+                            <div className="relative flex items-center group/input">
                               <input
                                 type="datetime-local"
                                 value={setupData.endTime || ''}
@@ -1502,7 +1502,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
                               <button
                                 type="button"
                                 onClick={() => (document.activeElement as HTMLElement)?.blur()}
-                                className="absolute right-1 top-1/2 -translate-y-1/2 px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all flex items-facility gap-1 shadow-lg active:scale-95 z-20 border border-emerald-500"
+                                className="absolute right-1 top-1/2 -translate-y-1/2 px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all flex items-center gap-1 shadow-lg active:scale-95 z-20 border border-emerald-500"
                                 title="Confirm Time"
                               >
                                 <span className="text-[10px] font-black uppercase tracking-tighter">ok</span>
@@ -1573,11 +1573,11 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
 
                   <div className="space-y-3">
                     <label className="block font-black text-slate-700 uppercase tracking-widest text-[10px]">Question Acquisition Mode</label>
-                    <div className="flex items-facility space-x-3">
+                    <div className="flex items-center space-x-3">
                       <button
                         type="button"
                         onClick={() => setSetupData({...setupData, questionInputMode: 'Paste'})}
-                        className={`flex-1 p-4 rounded-2xl border-2 flex flex-col items-facility space-y-2 transition-all ${setupData.questionInputMode === 'Paste' ? 'border-[#EA580C] bg-orange-50 text-[#EA580C]' : 'border-slate-100 bg-slate-50 text-slate-400'}`}
+                        className={`flex-1 p-4 rounded-2xl border-2 flex flex-col items-center space-y-2 transition-all ${setupData.questionInputMode === 'Paste' ? 'border-[#EA580C] bg-orange-50 text-[#EA580C]' : 'border-slate-100 bg-slate-50 text-slate-400'}`}
                       >
                         <FileText className="w-6 h-6" />
                         <span className="text-[10px] font-black uppercase tracking-widest">Paste Copied Text</span>
@@ -1585,7 +1585,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
                       <button
                         type="button"
                         onClick={() => setSetupData({...setupData, questionInputMode: 'AI'})}
-                        className={`flex-1 p-4 rounded-2xl border-2 flex flex-col items-facility space-y-2 transition-all ${setupData.questionInputMode === 'AI' ? 'border-[#EA580C] bg-orange-50 text-[#EA580C]' : 'border-slate-100 bg-slate-50 text-slate-400'}`}
+                        className={`flex-1 p-4 rounded-2xl border-2 flex flex-col items-center space-y-2 transition-all ${setupData.questionInputMode === 'AI' ? 'border-[#EA580C] bg-orange-50 text-[#EA580C]' : 'border-slate-100 bg-slate-50 text-slate-400'}`}
                       >
                         <Cpu className="w-6 h-6" />
                         <span className="text-[10px] font-black uppercase tracking-widest">AI Generation</span>
@@ -1595,15 +1595,15 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
 
                   {setupData.questionInputMode === 'AI' ? (
                     <div className="p-5 bg-orange-50 border border-orange-100 rounded-2xl space-y-4 animate-in slide-in-from-top-2">
-                       <div className="flex items-facility justify-between">
-                         <div className="flex items-facility gap-2">
+                       <div className="flex items-center justify-between">
+                         <div className="flex items-center gap-2">
                            <Sparkles className="w-4 h-4 text-[#EA580C]" />
                            <label className="block font-black text-orange-950 uppercase tracking-widest text-[10px]">AI Instruction Prompt</label>
                          </div>
                          <button
                            type="button"
                            onClick={handleAutoFillPrompt}
-                           className="px-3 py-1.5 bg-white text-[#EA580C] hover:bg-orange-100/60 border border-orange-200 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-facility gap-1.5 transition-all shadow-xs active:scale-95"
+                           className="px-3 py-1.5 bg-white text-[#EA580C] hover:bg-orange-100/60 border border-orange-200 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all shadow-xs active:scale-95"
                            title="Auto-fill dynamic prompt from current setup settings"
                          >
                            <Wand2 className="w-3.5 h-3.5" />
@@ -1636,7 +1636,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
                              type="button"
                              disabled={generatingAI}
                              onClick={handleGenerateAIQuestions}
-                             className={`w-full py-3 text-white font-black uppercase tracking-widest rounded-xl flex items-facility justify-facility gap-2 shadow-md transition-all disabled:opacity-50 ${
+                             className={`w-full py-3 text-white font-black uppercase tracking-widest rounded-xl flex items-center justify-center gap-2 shadow-md transition-all disabled:opacity-50 ${
                                hasGeneratedBefore ? 'bg-slate-900 hover:bg-slate-800' : 'bg-[#EA580C] hover:bg-orange-600'
                              }`}
                            >
@@ -1708,8 +1708,8 @@ Number of Questions: ${setupData.questionCount}`;
                             >
                               <Copy className="w-3.5 h-3.5" />
                             </button>
-                            <div className="flex items-facility justify-between">
-                                <span className="font-black uppercase tracking-widest text-slate-900 flex items-facility gap-2 text-[10px]">
+                            <div className="flex items-center justify-between">
+                                <span className="font-black uppercase tracking-widest text-slate-900 flex items-center gap-2 text-[10px]">
                                   <FileText className="w-4 h-4 text-[#EA580C]" />
                                   MCQ AI Prompt Guide
                                 </span>
@@ -1765,8 +1765,8 @@ Number of Questions: ${setupData.questionCount}`;
                             >
                               <Copy className="w-3.5 h-3.5" />
                             </button>
-                            <div className="flex items-facility justify-between">
-                                <span className="font-black uppercase tracking-widest text-slate-900 flex items-facility gap-2 text-[10px]">
+                            <div className="flex items-center justify-between">
+                                <span className="font-black uppercase tracking-widest text-slate-900 flex items-center gap-2 text-[10px]">
                                   <FileText className="w-4 h-4 text-blue-600" />
                                   Essay AI Prompt Guide
                                 </span>
@@ -1788,7 +1788,7 @@ Number of Questions: ${setupData.questionCount}`;
                       </div>
 
                       <div className="space-y-4">
-                        <div className="flex items-facility justify-between">
+                        <div className="flex items-center justify-between">
                            <label className="font-black text-slate-700 uppercase tracking-widest text-[10px]">Paste Content Below</label>
                            <button type="button" onClick={() => {setPastedText(''); setParsedQuestions([]);}} className="text-[10px] font-black text-rose-500 uppercase hover:underline">
                               Clear All
@@ -1804,7 +1804,7 @@ Number of Questions: ${setupData.questionCount}`;
                         <button 
                           type="button"
                           onClick={() => parsePastedQuestions(pastedText)}
-                          className="w-full py-4 bg-slate-900 text-white font-black uppercase tracking-widest rounded-xl hover:bg-slate-800 transition-all flex items-facility justify-facility gap-2 shadow-lg"
+                          className="w-full py-4 bg-slate-900 text-white font-black uppercase tracking-widest rounded-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-2 shadow-lg"
                         >
                           <Plus className="w-4 h-4" />
                           Process & Parse Questions
@@ -1815,7 +1815,7 @@ Number of Questions: ${setupData.questionCount}`;
 
                   {(parsedQuestions.length > 0 || generatedQuestions.length > 0) && (
                     <div className="space-y-4 pt-4">
-                      <div className="flex items-facility justify-between bg-blue-50 p-4 rounded-xl border border-blue-100">
+                      <div className="flex items-center justify-between bg-blue-50 p-4 rounded-xl border border-blue-100">
                           <span className="font-black uppercase tracking-widest text-blue-600 text-[10px]">Ready for Professional Preview ({parsedQuestions.length || generatedQuestions.length})</span>
                           <button type="button" onClick={() => {setParsedQuestions([]); setGeneratedQuestions([]);}} className="text-[10px] font-black text-rose-500 uppercase">Clear All</button>
                       </div>
@@ -1823,7 +1823,7 @@ Number of Questions: ${setupData.questionCount}`;
                       <div className="grid grid-cols-1 gap-6 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
                         {(parsedQuestions.length > 0 ? parsedQuestions : generatedQuestions).map((q, i) => (
                           <div key={i} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm transition-all hover:shadow-md space-y-4">
-                            <div className="flex items-facility justify-between border-b border-slate-100 pb-3">
+                            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                               <span className="font-black text-blue-600 uppercase tracking-widest text-lg">Question {i + 1}</span>
                               <span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest ${q.type === 'Essay' ? 'text-blue-600 bg-blue-50' : 'text-emerald-600 bg-emerald-50'}`}>
                                   {q.type || 'MCQ'} Mode
@@ -1843,8 +1843,8 @@ Number of Questions: ${setupData.questionCount}`;
                                   {q.options && q.options.length > 0 && (
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                       {q.options.map((opt, optIdx) => (
-                                        <div key={optIdx} className={`p-3 rounded-xl border text-xs font-semibold flex items-facility gap-2 ${q.correctAnswer === optIdx ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-slate-50 border-slate-100 text-slate-500'}`}>
-                                          <span className={`w-6 h-6 rounded-lg flex items-facility justify-facility text-[10px] ${q.correctAnswer === optIdx ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-600'}`}>
+                                        <div key={optIdx} className={`p-3 rounded-xl border text-xs font-semibold flex items-center gap-2 ${q.correctAnswer === optIdx ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-slate-50 border-slate-100 text-slate-500'}`}>
+                                          <span className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] ${q.correctAnswer === optIdx ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-600'}`}>
                                             {String.fromCharCode(65 + optIdx)}
                                           </span>
                                           <MathText text={cleanOptionText(opt)} />
@@ -1867,7 +1867,7 @@ Number of Questions: ${setupData.questionCount}`;
                   )}
                 </div>
 
-                <div className="pt-8 border-t border-slate-100 flex items-facility justify-between">
+                <div className="pt-8 border-t border-slate-100 flex items-center justify-between">
                   <button 
                     type="button" 
                     onClick={() => setShowSetupModal(false)} 
@@ -1878,7 +1878,7 @@ Number of Questions: ${setupData.questionCount}`;
                   <button 
                     type="submit" 
                     disabled={isSaving || (parsedQuestions.length === 0 && generatedQuestions.length === 0)}
-                    className="px-10 py-3.5 bg-[#EA580C] text-white font-black text-[12px] uppercase tracking-widest rounded-xl shadow-xl shadow-orange-100 disabled:opacity-50 transition-all active:scale-95 flex items-facility justify-facility gap-2 min-w-[160px]"
+                    className="px-10 py-3.5 bg-[#EA580C] text-white font-black text-[12px] uppercase tracking-widest rounded-xl shadow-xl shadow-orange-100 disabled:opacity-50 transition-all active:scale-95 flex items-center justify-center gap-2 min-w-[160px]"
                   >
                     {isSaving ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -1894,11 +1894,11 @@ Number of Questions: ${setupData.questionCount}`;
 
       {/* Live CBT Simulator Modal (Scrollable Review Mode) */}
       {activeQuizModal && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-facility justify-facility p-4 backdrop-blur-xs">
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
           <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 overflow-hidden">
-            <div className="flex items-facility justify-between p-6 border-b border-slate-200 shrink-0">
-              <div className="flex items-facility space-x-3">
-                <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-facility justify-facility">
+            <div className="flex items-center justify-between p-6 border-b border-slate-200 shrink-0">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center">
                   <Laptop className="w-5 h-5 text-[#EA580C]" />
                 </div>
                 <div>
@@ -1906,7 +1906,7 @@ Number of Questions: ${setupData.questionCount}`;
                   <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">{activeQuizModal.targetExam} • {activeQuizModal.questions.length} QUESTIONS</p>
                 </div>
               </div>
-              <div className="flex items-facility space-x-4">
+              <div className="flex items-center space-x-4">
                 <div className="hidden sm:flex flex-col items-end">
                   <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Assessment Duration</span>
                   <span className="text-sm font-black text-slate-900">{activeQuizModal.durationMinutes} Minutes</span>
@@ -1919,7 +1919,7 @@ Number of Questions: ${setupData.questionCount}`;
 
             <div className="flex-1 overflow-y-auto p-6 space-y-8 scrollbar-thin scrollbar-thumb-slate-200">
                {activeQuizModal.questions.length === 0 ? (
-                 <div className="flex flex-col items-facility justify-facility py-20 text-slate-400">
+                 <div className="flex flex-col items-center justify-center py-20 text-slate-400">
                     <AlertCircle className="w-12 h-12 mb-3" />
                     <p className="font-black uppercase tracking-widest text-sm">No Questions Loaded</p>
                  </div>
@@ -1928,7 +1928,7 @@ Number of Questions: ${setupData.questionCount}`;
                    <div key={idx} className="space-y-4 pb-8 border-b border-slate-100 last:border-0">
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1">
-                          <div className="flex items-facility gap-2 mb-2">
+                          <div className="flex items-center gap-2 mb-2">
                              <span className="px-2 py-0.5 bg-slate-900 text-white text-[10px] font-black rounded-md">Q{idx + 1}</span>
                              <span className={`px-2 py-0.5 text-[10px] font-black rounded-md uppercase tracking-widest ${(q as any).type === 'Essay' ? 'bg-blue-50 text-blue-600 border border-blue-100' : 'bg-orange-50 text-orange-600 border border-orange-100'}`}>
                                 {(q as any).type || (activeQuizModal.mode === 'Essay' ? 'Essay' : 'MCQ')}
@@ -1951,9 +1951,9 @@ Number of Questions: ${setupData.questionCount}`;
                               {q.options.map((opt, optIdx) => {
                                 const isCorrect = q.correctAnswer === optIdx;
                                 return (
-                                  <div key={optIdx} className={`p-3.5 rounded-xl border flex items-facility justify-between text-xs sm:text-sm ${isCorrect ? 'bg-emerald-50 border-emerald-500 text-emerald-900 font-bold' : 'bg-slate-50 border-slate-200 text-slate-500'}`}>
-                                    <div className="flex items-facility space-x-3">
-                                      <span className={`w-6 h-6 rounded-full flex items-facility justify-facility font-bold text-xs shrink-0 ${isCorrect ? 'bg-emerald-600 text-white' : 'bg-white text-slate-400 border border-slate-200'}`}>{String.fromCharCode(65 + optIdx)}</span>
+                                  <div key={optIdx} className={`p-3.5 rounded-xl border flex items-center justify-between text-xs sm:text-sm ${isCorrect ? 'bg-emerald-50 border-emerald-500 text-emerald-900 font-bold' : 'bg-slate-50 border-slate-200 text-slate-500'}`}>
+                                    <div className="flex items-center space-x-3">
+                                      <span className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${isCorrect ? 'bg-emerald-600 text-white' : 'bg-white text-slate-400 border border-slate-200'}`}>{String.fromCharCode(65 + optIdx)}</span>
                                       <MathText text={cleanOptionText(opt)} className="flex-1 font-bold" />
                                     </div>
                                     {isCorrect && <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 ml-2" />}
@@ -1965,7 +1965,7 @@ Number of Questions: ${setupData.questionCount}`;
 
                           {/* MCQ Correct Answer & Explanation */}
                           <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl space-y-1.5 mt-3">
-                            <div className="flex items-facility space-x-2 text-emerald-800">
+                            <div className="flex items-center space-x-2 text-emerald-800">
                               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                               <span className="text-xs font-black uppercase tracking-wider">
                                 Correct Answer: Option {typeof q.correctAnswer === 'number' && q.correctAnswer >= 0 ? String.fromCharCode(65 + q.correctAnswer) : (q.correctAnswer || 'A')}
@@ -1980,7 +1980,7 @@ Number of Questions: ${setupData.questionCount}`;
 
                           {q.explanation && (
                             <div className="p-4 rounded-xl border bg-slate-50 border-slate-200 mt-2">
-                              <div className="flex items-facility space-x-2 mb-1.5">
+                              <div className="flex items-center space-x-2 mb-1.5">
                                  <HelpCircle className="w-4 h-4 text-slate-500" />
                                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-600">
                                     Explanation & Solution
@@ -1996,7 +1996,7 @@ Number of Questions: ${setupData.questionCount}`;
                 )}
             </div>
 
-            <div className="p-4 md:p-6 border-t border-slate-200 flex items-facility justify-end shrink-0 bg-slate-50/50">
+            <div className="p-4 md:p-6 border-t border-slate-200 flex items-center justify-end shrink-0 bg-slate-50/50">
                <button 
                  onClick={() => {
                    setActiveQuizModal(null);
@@ -2012,11 +2012,11 @@ Number of Questions: ${setupData.questionCount}`;
       )}
       {/* Assessment Insights Modal - Mirroring Admin Portal Style */}
       {showAnalyticsModal && (
-        <div className="fixed inset-0 bg-black/60 z-[70] flex items-facility justify-facility p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 bg-black/60 z-[70] flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-slate-100 overflow-hidden animate-in fade-in zoom-in-95">
             <div className="bg-blue-600 p-6 text-white relative">
-              <div className="flex items-facility space-x-3">
-                <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-facility justify-facility backdrop-blur-md">
+              <div className="flex items-center space-x-3">
+                <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-md">
                   <BarChart2 className="w-6 h-6 text-white" />
                 </div>
                 <div>
@@ -2108,11 +2108,11 @@ Number of Questions: ${setupData.questionCount}`;
 
       {/* Student Result Detailed Slip Modal - Reuse the style from student portal */}
       {selectedStudentResult && (
-        <div className="fixed inset-0 z-[70] flex items-facility justify-facility p-3 bg-black/90 backdrop-blur-md overflow-y-auto">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-3 bg-black/90 backdrop-blur-md overflow-y-auto">
           <div className="bg-white rounded-[32px] max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden my-6 animate-in fade-in zoom-in-95 duration-300">
             {/* Modal Header */}
-            <div className="bg-slate-950 text-white p-4 flex items-facility justify-between">
-              <div className="flex items-facility space-x-2">
+            <div className="bg-slate-950 text-white p-4 flex items-center justify-between">
+              <div className="flex items-center space-x-2">
                 <BarChart2 className="w-4 h-4 text-orange-400" />
                 <span className="text-[10px] font-black uppercase tracking-widest text-slate-300">
                   Official Performance Analytics
@@ -2129,8 +2129,8 @@ Number of Questions: ${setupData.questionCount}`;
             {/* Printable Slip Paper Body */}
             <div className="p-6 space-y-6 bg-white text-slate-900">
               {/* Slip Header */}
-              <div className="text-facility pb-5 border-b-2 border-slate-900 space-y-1.5">
-                <div className="w-12 h-12 rounded-2xl bg-[#EA580C] text-white flex items-facility justify-facility font-black text-xl mx-auto mb-2 shadow-lg shadow-orange-100">
+              <div className="text-center pb-5 border-b-2 border-slate-900 space-y-1.5">
+                <div className="w-12 h-12 rounded-2xl bg-[#EA580C] text-white flex items-center justify-center font-black text-xl mx-auto mb-2 shadow-lg shadow-orange-100">
                   EX
                 </div>
                 <h2 className="text-lg font-black tracking-tight uppercase text-slate-900">
@@ -2163,8 +2163,8 @@ Number of Questions: ${setupData.questionCount}`;
                   <thead className="bg-slate-900 text-white font-black uppercase tracking-widest">
                     <tr>
                       <th className="p-3">Subject</th>
-                      <th className="p-3 text-facility">Max</th>
-                      <th className="p-3 text-facility">Score</th>
+                      <th className="p-3 text-center">Max</th>
+                      <th className="p-3 text-center">Score</th>
                       <th className="p-3 text-right">Grade</th>
                     </tr>
                   </thead>
@@ -2180,8 +2180,8 @@ Number of Questions: ${setupData.questionCount}`;
                           <td className="p-3 font-black text-slate-800">
                             {displaySubject}
                           </td>
-                          <td className="p-3 text-facility font-mono text-slate-500">{s.maxScore}</td>
-                          <td className="p-3 text-facility font-mono font-black text-[#EA580C]">
+                          <td className="p-3 text-center font-mono text-slate-500">{s.maxScore}</td>
+                          <td className="p-3 text-center font-mono font-black text-[#EA580C]">
                             {s.score}
                           </td>
                           <td className="p-3 text-right font-black text-emerald-700">
@@ -2194,8 +2194,8 @@ Number of Questions: ${setupData.questionCount}`;
                 </table>
               </div>
 
-              <div className="flex items-facility justify-facility pt-2">
-                <div className="text-facility p-3 rounded-2xl border-2 border-dashed border-slate-200 text-slate-400 bg-slate-50/50">
+              <div className="flex items-center justify-center pt-2">
+                <div className="text-center p-3 rounded-2xl border-2 border-dashed border-slate-200 text-slate-400 bg-slate-50/50">
                   <span className="text-[9px] font-black uppercase tracking-widest block">
                     Official Performance Record
                   </span>

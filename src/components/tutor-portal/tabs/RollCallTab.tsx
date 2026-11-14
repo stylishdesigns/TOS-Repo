@@ -43,20 +43,20 @@ export const RollCallTab: React.FC = () => {
 
   return (
     <div className="p-5 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex items-facility justify-between">
+      <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-black text-slate-900 tracking-tight">Daily Roll Call</h2>
           <p className="text-[11px] text-slate-500 font-medium">Mark attendance for General Mathematics (9:00 AM)</p>
         </div>
         <button 
           onClick={handleSave}
-          className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-facility justify-facility shadow-sm"
+          className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center shadow-sm"
         >
           <Save className="w-5 h-5" />
         </button>
       </div>
 
-      <div className="flex items-facility space-x-2">
+      <div className="flex items-center space-x-2">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input 
@@ -77,8 +77,8 @@ export const RollCallTab: React.FC = () => {
           const status = attendance[student.id] || 'Present';
           
           return (
-            <div key={student.id} className="bg-white rounded-2xl p-4 border border-slate-200 shadow-2xs flex items-facility justify-between transition-all hover:border-orange-200">
-              <div className="flex items-facility space-x-3">
+            <div key={student.id} className="bg-white rounded-2xl p-4 border border-slate-200 shadow-2xs flex items-center justify-between transition-all hover:border-orange-200">
+              <div className="flex items-center space-x-3">
                 <div className="w-10 h-10 rounded-full overflow-hidden border border-slate-100 shrink-0">
                   <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${student.name}`} alt={student.name} />
                 </div>
@@ -88,7 +88,7 @@ export const RollCallTab: React.FC = () => {
                 </div>
               </div>
 
-              <div className="flex items-facility space-x-1.5">
+              <div className="flex items-center space-x-1.5">
                 <button 
                   onClick={() => handleUpdate(student.id, 'Present')}
                   className={`p-2 rounded-xl transition-all ${
@@ -128,7 +128,7 @@ export const RollCallTab: React.FC = () => {
       <div className="pt-4">
         <button 
           onClick={handleSave}
-          className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black text-sm shadow-xl shadow-slate-200 flex items-facility justify-facility space-x-2 active:scale-[0.98] transition-all"
+          className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black text-sm shadow-xl shadow-slate-200 flex items-center justify-center space-x-2 active:scale-[0.98] transition-all"
         >
           <Save className="w-4 h-4 text-orange-400" />
           <span>Finalize Class Attendance</span>

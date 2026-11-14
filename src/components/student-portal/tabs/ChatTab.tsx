@@ -357,7 +357,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
           <h2 className="text-xl font-black text-[#0F172A] tracking-tight">Student Chat</h2>
         </div>
         <div className="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-sm space-y-4">
-          <div className="w-12 h-12 rounded-2xl bg-orange-50 border border-orange-100 text-[#EA580C] flex items-facility justify-facility">
+          <div className="w-12 h-12 rounded-2xl bg-orange-50 border border-orange-100 text-[#EA580C] flex items-center justify-center">
             <MessageSquare className="w-6 h-6" />
           </div>
           <h3 className="text-lg font-black text-slate-900 tracking-tight">House rules</h3>
@@ -388,7 +388,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
   return (
     <div className="p-4 sm:p-5 max-w-lg mx-auto space-y-4 animate-in fade-in duration-300">
       <div className="pt-1 flex items-end justify-between gap-2">
-        <div className="flex items-facility gap-2 min-w-0">
+        <div className="flex items-center gap-2 min-w-0">
           <div className="min-w-0">
             <h2 className="text-xl font-black text-[#0F172A] tracking-tight">
               {'Chats'}
@@ -401,14 +401,14 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
         <div className="flex gap-2">
           <button
             onClick={() => setStarredOpen(true)}
-            className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-facility justify-facility text-slate-500 active:scale-95 transition"
+            className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-500 active:scale-95 transition"
             aria-label="Favourites"
           >
             <Star className="w-4 h-4" />
           </button>
           <button
             onClick={() => setSettingsOpen(true)}
-            className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-facility justify-facility text-slate-500 active:scale-95 transition"
+            className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-500 active:scale-95 transition"
             aria-label="Chat settings"
           >
             <Settings2 className="w-4 h-4" />
@@ -448,7 +448,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
 
       {error && (
         <div className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-sm space-y-2">
-          <div className="flex items-facility gap-2 text-rose-600">
+          <div className="flex items-center gap-2 text-rose-600">
             <AlertTriangle className="w-4 h-4" />
             <span className="text-sm font-bold">Chat is unavailable</span>
           </div>
@@ -457,7 +457,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
       )}
 
       {!error && overview && !overview.username && (
-        <div className="bg-orange-50 rounded-3xl p-4 border border-orange-100 flex items-facility gap-3">
+        <div className="bg-orange-50 rounded-3xl p-4 border border-orange-100 flex items-center gap-3">
           <Info className="w-5 h-5 text-[#EA580C] shrink-0" />
           <div className="flex-1">
             <p className="text-xs font-bold text-slate-800">Set your username first</p>
@@ -475,15 +475,15 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
       )}
 
       {!error && overview?.paused && (
-        <div className="bg-amber-50 rounded-3xl p-4 border border-amber-100 flex items-facility gap-3">
+        <div className="bg-amber-50 rounded-3xl p-4 border border-amber-100 flex items-center gap-3">
           <ShieldAlert className="w-5 h-5 text-amber-600 shrink-0" />
           <p className="text-xs font-bold text-amber-800">Chat is paused for your facility right now.</p>
         </div>
       )}
 
       {!error && overview && (view === 'channels' || chatFilter === 'channels') && listForView.length === 0 && (
-        <div className="bg-white rounded-3xl p-8 border border-slate-200/90 shadow-sm text-facility space-y-2">
-          <div className="w-14 h-14 rounded-2xl bg-violet-50 border border-violet-100 text-violet-600 flex items-facility justify-facility mx-auto">
+        <div className="bg-white rounded-3xl p-8 border border-slate-200/90 shadow-sm text-center space-y-2">
+          <div className="w-14 h-14 rounded-2xl bg-violet-50 border border-violet-100 text-violet-600 flex items-center justify-center mx-auto">
             <Zap className="w-7 h-7" />
           </div>
           <h3 className="text-base font-black text-slate-900 tracking-tight">No channels yet</h3>
@@ -496,7 +496,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
       {!error && view !== 'channels' && chatFilter === 'personal' && (
         <button
           onClick={() => setPickerOpen(true)}
-          className="fixed bottom-24 right-4 z-40 w-14 h-14 rounded-full text-white flex items-facility justify-facility shadow-xl active:scale-95 transition"
+          className="fixed bottom-24 right-4 z-40 w-14 h-14 rounded-full text-white flex items-center justify-center shadow-xl active:scale-95 transition"
           style={{ background: 'linear-gradient(145deg, #EA580C, #9A3412)' }}
           aria-label="Start a new chat"
         >
@@ -512,17 +512,17 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
             tabIndex={0}
             onClick={() => setActiveGroupId(g.id)}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActiveGroupId(g.id); } }}
-            className={`w-full text-left rounded-2xl p-3.5 shadow-sm flex items-facility gap-3 active:scale-[0.99] transition cursor-pointer ${
+            className={`w-full text-left rounded-2xl p-3.5 shadow-sm flex items-center gap-3 active:scale-[0.99] transition cursor-pointer ${
               follows[g.id]
                 ? 'bg-white border border-slate-200/90'
                 : 'bg-violet-50/50 border border-dashed border-violet-300'
             }`}
           >
-            <div className="w-11 h-11 rounded-2xl bg-violet-50 border border-violet-100 text-violet-600 flex items-facility justify-facility shrink-0">
+            <div className="w-11 h-11 rounded-2xl bg-violet-50 border border-violet-100 text-violet-600 flex items-center justify-center shrink-0">
               {groupIcon(g.kind, 'w-5 h-5')}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="flex items-facility gap-1.5">
+              <div className="flex items-center gap-1.5">
                 <p className="text-sm font-black text-slate-900 truncate">{g.name}</p>
                 <span className="text-[9px] font-black uppercase tracking-wider text-violet-700 bg-violet-50 px-1.5 py-0.5 rounded-full shrink-0">Channel</span>
               </div>
@@ -544,7 +544,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
                 {follows[g.id] ? 'Following' : 'Follow'}
               </button>
               {g.unread > 0 && (
-                <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-[#EA580C] text-white text-[10px] font-black flex items-facility justify-facility">
+                <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-[#EA580C] text-white text-[10px] font-black flex items-center justify-center">
                   {g.unread > 99 ? '99+' : g.unread}
                 </span>
               )}
@@ -555,11 +555,11 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
         <button
           key={g.id}
           onClick={() => setActiveGroupId(g.id)}
-          className="w-full text-left bg-white rounded-2xl p-3.5 border border-slate-200/90 shadow-sm flex items-facility gap-3 active:scale-[0.99] transition"
+          className="w-full text-left bg-white rounded-2xl p-3.5 border border-slate-200/90 shadow-sm flex items-center gap-3 active:scale-[0.99] transition"
         >
           <div
             onClick={(e) => { if (g.kind === 'personal') { e.stopPropagation(); if (g.peerAvatar) { setListImage(g.peerAvatar); } else { setListImageName(g.name); } } }}
-            className={`w-11 h-11 rounded-2xl flex items-facility justify-facility shrink-0 border ${
+            className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 border ${
               g.kind === 'announcements'
                 ? 'bg-amber-50 border-amber-100 text-amber-600'
                 : g.kind === 'tos_channel'
@@ -578,7 +578,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
             ) : groupIcon(g.kind, 'w-5 h-5')}
           </div>
           <div className="flex-1 min-w-0">
-            <div className="flex items-facility gap-1.5">
+            <div className="flex items-center gap-1.5">
               <p className="text-sm font-black text-slate-900 truncate">{g.name}</p>
               {g.kind === 'announcements' && (
                 <span className="text-[9px] font-black uppercase tracking-wider text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-full shrink-0">Read only</span>
@@ -593,7 +593,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
           <div className="flex flex-col items-end gap-1 shrink-0">
             <span className="text-[10px] text-slate-400 font-bold">{g.lastMessage ? fmtListTime(g.lastMessage.at) : ''}</span>
             {g.unread > 0 && (
-              <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-[#EA580C] text-white text-[10px] font-black flex items-facility justify-facility">
+              <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-[#EA580C] text-white text-[10px] font-black flex items-center justify-center">
                 {g.unread > 99 ? '99+' : g.unread}
               </span>
             )}
@@ -604,19 +604,19 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
       ))}
 
       {loading && !overview && !error && (
-        <div className="bg-white rounded-3xl p-8 border border-slate-200/90 shadow-sm flex items-facility justify-facility">
+        <div className="bg-white rounded-3xl p-8 border border-slate-200/90 shadow-sm flex items-center justify-center">
           <Loader2 className="w-6 h-6 animate-spin text-[#EA580C]" />
         </div>
       )}
       {(listImage || listImageName) && (
-        <div className="fixed inset-0 z-[60] bg-black flex items-facility justify-facility">
-          <button onClick={() => { setListImage(''); setListImageName(''); }} className="absolute top-3 left-3 z-10 w-10 h-10 rounded-xl bg-white/15 flex items-facility justify-facility text-white active:scale-95 transition" aria-label="Back">
+        <div className="fixed inset-0 z-[60] bg-black flex items-center justify-center">
+          <button onClick={() => { setListImage(''); setListImageName(''); }} className="absolute top-3 left-3 z-10 w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center text-white active:scale-95 transition" aria-label="Back">
             <ChevronLeft className="w-5 h-5" />
           </button>
           {listImage ? (
             <img src={listImage} alt="Profile photo" className="max-h-full max-w-full object-contain" />
           ) : (
-            <div className="w-40 h-40 rounded-3xl bg-orange-50 border-2 border-orange-200 flex items-facility justify-facility">
+            <div className="w-40 h-40 rounded-3xl bg-orange-50 border-2 border-orange-200 flex items-center justify-center">
               <span className="text-5xl font-black text-[#EA580C]">{initialsOf(listImageName)}</span>
             </div>
           )}
@@ -1091,15 +1091,15 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
     // background first, the messages settle in underneath. No blank card.
     return (
       <div className="fixed inset-0 z-40 flex flex-col bg-[#FFF3E7] animate-in fade-in duration-300" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-        <div className="px-3 sm:px-5 py-2.5 flex items-facility gap-2 bg-[#EA580C] shadow-sm shrink-0">
-          <button onClick={onBack} className="w-9 h-9 rounded-xl bg-white/15 flex items-facility justify-facility text-white active:scale-95 transition shrink-0" aria-label="Back">
+        <div className="px-3 sm:px-5 py-2.5 flex items-center gap-2 bg-[#EA580C] shadow-sm shrink-0">
+          <button onClick={onBack} className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center text-white active:scale-95 transition shrink-0" aria-label="Back">
             <ChevronLeft className="w-4 h-4" />
           </button>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-black text-white truncate">{group?.name || 'Chat'}</p>
           </div>
         </div>
-        <div className="flex-1 flex items-facility justify-facility">
+        <div className="flex-1 flex items-center justify-center">
           <Loader2 className="w-5 h-5 animate-spin text-[#EA580C]" />
         </div>
       </div>
@@ -1112,11 +1112,11 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
   if (resp?.locked) {
     return (
       <div className="p-4 sm:p-5 max-w-lg mx-auto animate-in fade-in duration-300">
-        <button onClick={onBack} className="flex items-facility gap-1 text-slate-500 text-xs font-bold mb-4">
+        <button onClick={onBack} className="flex items-center gap-1 text-slate-500 text-xs font-bold mb-4">
           <ChevronLeft className="w-4 h-4" /> Back
         </button>
-        <div className="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-sm space-y-4 text-facility">
-          <div className="w-14 h-14 rounded-2xl bg-slate-100 border border-slate-200 text-slate-400 flex items-facility justify-facility mx-auto">
+        <div className="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-sm space-y-4 text-center">
+          <div className="w-14 h-14 rounded-2xl bg-slate-100 border border-slate-200 text-slate-400 flex items-center justify-center mx-auto">
             <Lock className="w-7 h-7" />
           </div>
           <h3 className="text-lg font-black text-slate-900 tracking-tight">{resp.groupName || group?.name || 'Group'} is locked</h3>
@@ -1227,7 +1227,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
             </div>
           )}
           {!m.mine && (m.username || chip) && (
-            <div className="flex items-facility gap-1.5 mb-0.5 flex-wrap">
+            <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
               {m.username && <span className="text-[10px] font-black text-slate-500">{m.username}</span>}
               {chip && (
                 <span className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full ${chipStyle(m)}`}>
@@ -1256,7 +1256,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
                 className="w-full h-full object-cover cursor-pointer block"
               />
               {uploading && (
-                <span className="absolute inset-0 bg-black/45 flex items-facility justify-facility text-white text-xs font-black">{m.progress ?? 0}%</span>
+                <span className="absolute inset-0 bg-black/45 flex items-center justify-center text-white text-xs font-black">{m.progress ?? 0}%</span>
               )}
             </span>
           )}
@@ -1264,24 +1264,24 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
             <span className="relative block">
               <button
                 onClick={() => { if (!m.pending) openVideo(mediaUrl as string); }}
-                className="relative rounded-xl overflow-hidden w-44 h-64 bg-slate-900 flex items-facility justify-facility"
+                className="relative rounded-xl overflow-hidden w-44 h-64 bg-slate-900 flex items-center justify-center"
                 aria-label="Play video"
               >
                 <video src={mediaUrl} preload="metadata" muted playsInline tabIndex={-1} aria-hidden="true" className="absolute inset-0 w-full h-full object-cover" />
-                <span className="relative w-12 h-12 rounded-full bg-black/40 border border-white/50 flex items-facility justify-facility">
+                <span className="relative w-12 h-12 rounded-full bg-black/40 border border-white/50 flex items-center justify-center">
                   <Play className="w-5 h-5 text-white ml-0.5" fill="currentColor" />
                 </span>
                 <span className="absolute bottom-1.5 right-2 text-[9px] font-bold text-white/90 bg-black/50 rounded px-1">Video</span>
               </button>
               {uploading && (
-                <span className="absolute inset-0 rounded-xl bg-black/45 flex items-facility justify-facility text-white text-xs font-black pointer-events-none">{m.progress ?? 0}%</span>
+                <span className="absolute inset-0 rounded-xl bg-black/45 flex items-center justify-center text-white text-xs font-black pointer-events-none">{m.progress ?? 0}%</span>
               )}
             </span>
           )}
           {!m.removed && mediaUrl && mediaKind !== 'image' && mediaKind !== 'video' && (
             <span className="relative block">
-              <a href={mediaUrl} target="_blank" rel="noreferrer" className="flex items-facility gap-2.5 rounded-xl px-3 py-2 max-w-[250px] bg-white/10 border border-white/20">
-                <span className="w-8 h-8 rounded-lg bg-white/15 flex items-facility justify-facility shrink-0 text-white font-black text-[10px] uppercase">{(m.fileName || 'file').split('.').pop()?.slice(0, 4)}</span>
+              <a href={mediaUrl} target="_blank" rel="noreferrer" className="flex items-center gap-2.5 rounded-xl px-3 py-2 max-w-[250px] bg-white/10 border border-white/20">
+                <span className="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center shrink-0 text-white font-black text-[10px] uppercase">{(m.fileName || 'file').split('.').pop()?.slice(0, 4)}</span>
                 <span className="min-w-0 flex-1">
                   <span className="block text-[12px] font-bold text-white truncate">{m.fileName || 'File'}</span>
                   <span className="block text-[10px] font-medium text-white/70">{uploading ? `Uploading ${m.progress ?? 0}%` : 'Tap to open'}</span>
@@ -1290,7 +1290,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
               </a>
             </span>
           )}
-          <div className={`flex items-facility justify-end gap-1 mt-1 ${m.mine ? 'text-orange-100' : 'text-slate-400'}`}>
+          <div className={`flex items-center justify-end gap-1 mt-1 ${m.mine ? 'text-orange-100' : 'text-slate-400'}`}>
             <span className="text-[9px] font-bold">{fmtTime(m.at)}</span>
             {m.mine && !m.removed && (
               m.pending ? (
@@ -1311,7 +1311,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
         {!m.removed && resp?.kind === 'tos_channel' && resp.commentsEnabled === true && (
           <button
             onClick={() => openComments(m)}
-            className="mt-1 flex items-facility gap-1.5 px-2.5 py-1.5 rounded-lg bg-orange-50 border border-orange-100 text-[10px] font-black text-[#C2410C] active:scale-95 transition"
+            className="mt-1 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-orange-50 border border-orange-100 text-[10px] font-black text-[#C2410C] active:scale-95 transition"
             aria-label="Comments"
           >
             <MessageSquare className="w-3 h-3" />
@@ -1326,17 +1326,17 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
   // pinned, and only the messages scroll between them.
   return (
     <div className="fixed inset-0 z-40 flex flex-col bg-[#FFF3E7] animate-in fade-in duration-300" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-      <div className="px-3 sm:px-5 py-2.5 flex items-facility gap-2 bg-[#EA580C] shadow-sm shrink-0">
+      <div className="px-3 sm:px-5 py-2.5 flex items-center gap-2 bg-[#EA580C] shadow-sm shrink-0">
         <button
           onClick={onBack}
-          className="w-9 h-9 rounded-xl bg-white/15 flex items-facility justify-facility text-white active:scale-95 transition shrink-0"
+          className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center text-white active:scale-95 transition shrink-0"
           aria-label="Back"
         >
           <ChevronLeft className="w-4 h-4" />
         </button>
-        <div className="flex-1 min-w-0 flex items-facility gap-2.5">
+        <div className="flex-1 min-w-0 flex items-center gap-2.5">
           {isPersonal && (
-            <span className="w-8 h-8 rounded-full bg-white/20 text-white flex items-facility justify-facility text-[11px] font-black overflow-hidden shrink-0">
+            <span className="w-8 h-8 rounded-full bg-white/20 text-white flex items-center justify-center text-[11px] font-black overflow-hidden shrink-0">
               {(resp as any)?.peerAvatar || group?.peerAvatar ? <img src={((resp as any)?.peerAvatar || group?.peerAvatar) as string} alt="" className="w-full h-full object-cover" /> : initialsOf(resp?.groupName || group?.name || '')}
             </span>
           )}
@@ -1345,7 +1345,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
         </div>
         <button
           onClick={() => setShowInfo(true)}
-          className="w-9 h-9 rounded-xl bg-white/15 flex items-facility justify-facility text-white active:scale-95 transition shrink-0"
+          className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center text-white active:scale-95 transition shrink-0"
           aria-label="Group info"
         >
           <Info className="w-4 h-4" />
@@ -1366,7 +1366,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 sm:px-5 py-2 space-y-2.5">
         {hasOlder && (
-          <div className="flex justify-facility py-1">
+          <div className="flex justify-center py-1">
             <button
               onClick={loadOlder}
               disabled={loadingOlder}
@@ -1377,7 +1377,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
           </div>
         )}
         {messages.length === 0 && !error && (
-          <div className="text-facility py-10">
+          <div className="text-center py-10">
             <p className="text-xs text-slate-400 font-medium">No messages yet. Say hello.</p>
           </div>
         )}
@@ -1387,7 +1387,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
         {dayGroups(messages).map((g) => (
           <div key={g.key} className="space-y-2.5">
             {g.label && (
-              <div className="sticky top-0 z-20 flex justify-facility py-1">
+              <div className="sticky top-0 z-20 flex justify-center py-1">
                 <span className="bg-slate-900/85 text-white text-[10px] font-bold px-3 py-1 rounded-full shadow">
                   {g.label}
                 </span>
@@ -1421,7 +1421,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
             <input ref={docRef} type="file" className="hidden" onChange={(e) => { setAttachSheet(false); onFileChosen(e.target.files && e.target.files[0]); e.target.value = ''; }} />
             <button
               onClick={() => setAttachSheet(true)}
-              className="w-11 h-11 rounded-2xl bg-slate-100 border border-slate-200 text-slate-600 flex items-facility justify-facility active:scale-95 transition shrink-0"
+              className="w-11 h-11 rounded-2xl bg-slate-100 border border-slate-200 text-slate-600 flex items-center justify-center active:scale-95 transition shrink-0"
               aria-label="Attach a file"
             >
               <Plus className="w-5 h-5" />
@@ -1437,14 +1437,14 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
             <button
               onClick={send}
               disabled={!text.trim() && !attachFile}
-              className="w-11 h-11 rounded-2xl bg-[#EA580C] text-white flex items-facility justify-facility shadow-sm shadow-orange-200 active:scale-95 transition disabled:opacity-50 shrink-0"
+              className="w-11 h-11 rounded-2xl bg-[#EA580C] text-white flex items-center justify-center shadow-sm shadow-orange-200 active:scale-95 transition disabled:opacity-50 shrink-0"
               aria-label="Send"
             >
               <Send className="w-4 h-4" />
             </button>
           </div>
         ) : (
-          <div className="bg-amber-50 border border-amber-100 rounded-2xl p-3 text-facility">
+          <div className="bg-amber-50 border border-amber-100 rounded-2xl p-3 text-center">
             <p className="text-[11px] font-bold text-amber-800">{readOnlyBanner}</p>
           </div>
         )}
@@ -1466,11 +1466,11 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
       )}
 
       {forwardMsg && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-end justify-facility" onClick={() => { if (!actionBusy) setForwardMsg(null); }}>
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-end justify-center" onClick={() => { if (!actionBusy) setForwardMsg(null); }}>
           <div className="w-full max-w-lg bg-white rounded-t-3xl p-5 space-y-3" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-facility justify-between">
+            <div className="flex items-center justify-between">
               <p className="text-sm font-black text-slate-900">Forward to which group?</p>
-              <button onClick={() => setForwardMsg(null)} className="w-8 h-8 rounded-lg bg-slate-100 flex items-facility justify-facility text-slate-500" aria-label="Close">
+              <button onClick={() => setForwardMsg(null)} className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500" aria-label="Close">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -1483,7 +1483,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
                   key={g.id}
                   disabled={actionBusy}
                   onClick={() => doForward(forwardMsg, g)}
-                  className="w-full flex items-facility justify-between px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 text-left active:scale-[0.99] transition disabled:opacity-60"
+                  className="w-full flex items-center justify-between px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 text-left active:scale-[0.99] transition disabled:opacity-60"
                 >
                   <span className="text-sm font-bold text-slate-800">{g.name}</span>
                   <Send className="w-4 h-4 text-[#EA580C]" />
@@ -1495,21 +1495,21 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
       )}
 
       {showInfo && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-end justify-facility" onClick={() => setShowInfo(false)}>
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-end justify-center" onClick={() => setShowInfo(false)}>
           <div className="w-full max-w-lg bg-white rounded-t-3xl p-5 space-y-3" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-facility justify-between">
-              <div className="flex items-facility gap-2 text-slate-800">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-slate-800">
                 <Info className="w-4 h-4 text-[#EA580C]" />
                 <span className="text-sm font-black">{isPersonal ? 'Contact info' : 'About this group'}</span>
               </div>
-              <button onClick={() => setShowInfo(false)} className="w-8 h-8 rounded-lg bg-slate-100 flex items-facility justify-facility text-slate-500" aria-label="Close">
+              <button onClick={() => setShowInfo(false)} className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500" aria-label="Close">
                 <X className="w-4 h-4" />
               </button>
             </div>
             {isPersonal ? (
               <div className="bg-slate-50 rounded-2xl p-3.5 space-y-2">
-                <div className="flex items-facility gap-3">
-                  <span className="w-12 h-12 rounded-full bg-orange-50 border border-orange-100 text-[#EA580C] flex items-facility justify-facility text-sm font-black overflow-hidden shrink-0">
+                <div className="flex items-center gap-3">
+                  <span className="w-12 h-12 rounded-full bg-orange-50 border border-orange-100 text-[#EA580C] flex items-center justify-center text-sm font-black overflow-hidden shrink-0">
                     {((resp as any)?.peerAvatar || group?.peerAvatar) ? <img src={((resp as any)?.peerAvatar || group?.peerAvatar) as string} alt="" className="w-full h-full object-cover" /> : initialsOf(resp?.groupName || group?.name || '')}
                   </span>
                   <div className="min-w-0">
@@ -1524,7 +1524,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
               </div>
             ) : (
               <div className="bg-slate-50 rounded-2xl p-3.5 space-y-2">
-                <div className="flex items-facility gap-2">
+                <div className="flex items-center gap-2">
                   {groupIcon(resp?.kind || 'custom', 'w-4 h-4 text-[#EA580C]')}
                   <p className="text-sm font-black text-slate-900">{resp?.groupName || group?.name}</p>
                 </div>
@@ -1548,11 +1548,11 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
       {attachModal && (
         <div className="fixed inset-0 z-[55] bg-black/85 flex flex-col" role="dialog" aria-label="Attachment preview">
           <div className="flex justify-end p-3">
-            <button onClick={closeAttachModal} className="w-10 h-10 rounded-full bg-white/10 text-white flex items-facility justify-facility active:scale-95 transition" aria-label="Cancel">
+            <button onClick={closeAttachModal} className="w-10 h-10 rounded-full bg-white/10 text-white flex items-center justify-center active:scale-95 transition" aria-label="Cancel">
               <X className="w-5 h-5" />
             </button>
           </div>
-          <div className="flex-1 min-h-0 flex items-facility justify-facility px-4">
+          <div className="flex-1 min-h-0 flex items-center justify-center px-4">
             {attachModal.kind === 'image' && (
               <img src={attachModal.url} alt="Attachment preview" className="max-h-[70vh] max-w-full rounded-2xl object-contain" />
             )}
@@ -1560,7 +1560,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
               <video src={attachModal.url} controls autoPlay playsInline className="max-h-[70vh] max-w-full rounded-2xl" />
             )}
             {attachModal.kind === 'file' && (
-              <div className="w-28 h-28 rounded-3xl bg-white/10 flex flex-col items-facility justify-facility gap-2 text-white">
+              <div className="w-28 h-28 rounded-3xl bg-white/10 flex flex-col items-center justify-center gap-2 text-white">
                 <Paperclip className="w-9 h-9" />
                 <span className="text-[11px] font-bold">Ready to send</span>
               </div>
@@ -1586,7 +1586,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
                 setAttachCaption('');
                 send({ file: cur.file, text: attachCaption.trim() });
               }}
-              className="px-5 py-3 rounded-2xl bg-[#EA580C] text-white text-xs font-black flex items-facility gap-2 active:scale-95 transition"
+              className="px-5 py-3 rounded-2xl bg-[#EA580C] text-white text-xs font-black flex items-center gap-2 active:scale-95 transition"
             >
               <Send className="w-4 h-4" /> Send
             </button>
@@ -1595,19 +1595,19 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
       )}
 
       {attachSheet && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-end justify-facility" onClick={() => setAttachSheet(false)}>
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-end justify-center" onClick={() => setAttachSheet(false)}>
           <div className="w-full max-w-lg bg-white rounded-t-3xl p-5 space-y-2" onClick={(e) => e.stopPropagation()}>
             <p className="text-sm font-black text-slate-900 mb-1">Attach</p>
-            <button onClick={() => photoRef.current?.click()} className="w-full flex items-facility gap-3 px-4 py-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-left active:scale-[0.99] transition">
-              <span className="w-9 h-9 rounded-xl bg-orange-50 flex items-facility justify-facility text-[#C2410C]"><ImageIcon className="w-4 h-4" /></span>
+            <button onClick={() => photoRef.current?.click()} className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-left active:scale-[0.99] transition">
+              <span className="w-9 h-9 rounded-xl bg-orange-50 flex items-center justify-center text-[#C2410C]"><ImageIcon className="w-4 h-4" /></span>
               <span className="text-sm font-bold text-slate-800">Photo</span>
             </button>
-            <button onClick={() => videoRef.current?.click()} className="w-full flex items-facility gap-3 px-4 py-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-left active:scale-[0.99] transition">
-              <span className="w-9 h-9 rounded-xl bg-orange-50 flex items-facility justify-facility text-[#C2410C]"><Play className="w-4 h-4" /></span>
+            <button onClick={() => videoRef.current?.click()} className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-left active:scale-[0.99] transition">
+              <span className="w-9 h-9 rounded-xl bg-orange-50 flex items-center justify-center text-[#C2410C]"><Play className="w-4 h-4" /></span>
               <span className="text-sm font-bold text-slate-800">Video</span>
             </button>
-            <button onClick={() => docRef.current?.click()} className="w-full flex items-facility gap-3 px-4 py-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-left active:scale-[0.99] transition">
-              <span className="w-9 h-9 rounded-xl bg-orange-50 flex items-facility justify-facility text-[#C2410C]"><Plus className="w-4 h-4" /></span>
+            <button onClick={() => docRef.current?.click()} className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-left active:scale-[0.99] transition">
+              <span className="w-9 h-9 rounded-xl bg-orange-50 flex items-center justify-center text-[#C2410C]"><Plus className="w-4 h-4" /></span>
               <span className="text-sm font-bold text-slate-800">Document</span>
             </button>
           </div>
@@ -1616,10 +1616,10 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
 
       {videoUrl && (
         <div className="fixed inset-0 z-[60] bg-black flex flex-col">
-          <button onClick={() => setVideoUrl('')} className="absolute top-3 left-3 z-10 w-10 h-10 rounded-xl bg-white/15 flex items-facility justify-facility text-white active:scale-95 transition" aria-label="Back">
+          <button onClick={() => setVideoUrl('')} className="absolute top-3 left-3 z-10 w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center text-white active:scale-95 transition" aria-label="Back">
             <ChevronLeft className="w-5 h-5" />
           </button>
-          <div className="flex-1 w-full flex items-facility justify-facility cursor-pointer" onClick={toggleVv} aria-label={vvPlaying ? 'Pause video' : 'Play video'}>
+          <div className="flex-1 w-full flex items-center justify-center cursor-pointer" onClick={toggleVv} aria-label={vvPlaying ? 'Pause video' : 'Play video'}>
             <video
               ref={vvRef}
               src={videoUrl}
@@ -1634,12 +1634,12 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
               onEnded={() => setVvPlaying(false)}
             />
             {!vvPlaying && (
-              <span className="absolute w-16 h-16 rounded-full bg-black/40 border border-white/50 flex items-facility justify-facility pointer-events-none">
+              <span className="absolute w-16 h-16 rounded-full bg-black/40 border border-white/50 flex items-center justify-center pointer-events-none">
                 <Play className="w-7 h-7 text-white ml-1" fill="currentColor" />
               </span>
             )}
           </div>
-          <div className="w-full px-4 pb-5 pt-3 flex items-facility gap-2" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full px-4 pb-5 pt-3 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
             <span className="text-[10px] font-bold text-white/80 tabular-nums">{fmtVvTime(vvAt)}</span>
             <input
               type="range"
@@ -1661,8 +1661,8 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
       )}
 
       {imageViewerUrl && (
-        <div className="fixed inset-0 z-[60] bg-black flex items-facility justify-facility">
-          <button onClick={() => setImageViewerUrl('')} className="absolute top-3 left-3 z-10 w-10 h-10 rounded-xl bg-white/15 flex items-facility justify-facility text-white active:scale-95 transition" aria-label="Back">
+        <div className="fixed inset-0 z-[60] bg-black flex items-center justify-center">
+          <button onClick={() => setImageViewerUrl('')} className="absolute top-3 left-3 z-10 w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center text-white active:scale-95 transition" aria-label="Back">
             <ChevronLeft className="w-5 h-5" />
           </button>
           <img src={imageViewerUrl} alt="Shared photo" className="max-h-full max-w-full object-contain" />
@@ -1670,20 +1670,20 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
       )}
 
       {commentsFor && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-end justify-facility" onClick={() => setCommentsFor(null)}>
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-end justify-center" onClick={() => setCommentsFor(null)}>
           <div className="w-full max-w-lg bg-white rounded-t-3xl flex flex-col max-h-[80vh]" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-facility justify-between px-5 pt-4 pb-2">
+            <div className="flex items-center justify-between px-5 pt-4 pb-2">
               <p className="text-sm font-black text-slate-900">Comments</p>
-              <button onClick={() => setCommentsFor(null)} className="w-8 h-8 rounded-lg bg-slate-100 flex items-facility justify-facility text-slate-500" aria-label="Close">
+              <button onClick={() => setCommentsFor(null)} className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500" aria-label="Close">
                 <X className="w-4 h-4" />
               </button>
             </div>
             <div className="flex-1 min-h-0 overflow-y-auto px-5 py-2 space-y-3">
               {comments === null && (
-                <div className="flex items-facility justify-facility py-6"><Loader2 className="w-5 h-5 animate-spin text-[#EA580C]" /></div>
+                <div className="flex items-center justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-[#EA580C]" /></div>
               )}
               {comments !== null && comments.length === 0 && (
-                <p className="text-xs text-slate-400 font-medium py-4 text-facility">No comments yet. Be the first.</p>
+                <p className="text-xs text-slate-400 font-medium py-4 text-center">No comments yet. Be the first.</p>
               )}
               {comments !== null && comments.map((c) => (
                 <div key={c.id} className="flex items-start gap-2">
@@ -1709,7 +1709,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
               <button
                 onClick={postComment}
                 disabled={!commentText.trim() || postingComment}
-                className="w-11 h-11 rounded-2xl bg-[#EA580C] text-white flex items-facility justify-facility active:scale-95 transition disabled:opacity-50 shrink-0"
+                className="w-11 h-11 rounded-2xl bg-[#EA580C] text-white flex items-center justify-center active:scale-95 transition disabled:opacity-50 shrink-0"
                 aria-label="Send comment"
               >
                 {postingComment ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
@@ -1720,7 +1720,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
       )}
 
       {confirmDelete && (
-        <div className="fixed inset-0 z-[60] bg-slate-950/50 flex items-facility justify-facility p-6" onClick={() => { if (!actionBusy) setConfirmDelete(null); }}>
+        <div className="fixed inset-0 z-[60] bg-slate-950/50 flex items-center justify-center p-6" onClick={() => { if (!actionBusy) setConfirmDelete(null); }}>
           <div className="w-full max-w-xs bg-white rounded-3xl p-5 space-y-3 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <p className="text-sm font-black text-slate-900">Delete this message?</p>
             <p className="text-xs text-slate-500 font-medium leading-relaxed">It will be removed for everyone in this chat, you and them. This cannot be undone.</p>
@@ -1744,8 +1744,8 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
       )}
 
       {toast && (
-        <div className="fixed bottom-28 left-0 right-0 flex justify-facility z-50 pointer-events-none">
-          <div className="bg-slate-900 text-white text-xs font-bold px-4 py-2.5 rounded-full shadow-lg max-w-[85%] text-facility">{toast}</div>
+        <div className="fixed bottom-28 left-0 right-0 flex justify-center z-50 pointer-events-none">
+          <div className="bg-slate-900 text-white text-xs font-bold px-4 py-2.5 rounded-full shadow-lg max-w-[85%] text-center">{toast}</div>
         </div>
       )}
 
@@ -1787,10 +1787,10 @@ const StarredScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
   return (
     <div className="p-4 sm:p-5 max-w-lg mx-auto space-y-4 animate-in fade-in duration-300">
-      <div className="pt-1 flex items-facility gap-2">
+      <div className="pt-1 flex items-center gap-2">
         <button
           onClick={onBack}
-          className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-facility justify-facility text-slate-600 active:scale-95 transition shrink-0"
+          className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 active:scale-95 transition shrink-0"
           aria-label="Back"
         >
           <ChevronLeft className="w-4 h-4" />
@@ -1810,7 +1810,7 @@ const StarredScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       )}
 
       {items && items.length === 0 && (
-        <div className="text-facility py-14">
+        <div className="text-center py-14">
           <Star className="w-8 h-8 mx-auto text-slate-300" />
           <p className="mt-3 text-xs text-slate-400 font-medium">No favourites yet. Long-press a message and star it.</p>
         </div>
@@ -1821,7 +1821,7 @@ const StarredScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
           {items.map((it) => (
             <div key={it.key} className="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-3 flex items-start gap-3">
               <div className="min-w-0 flex-1">
-                <div className="flex items-facility gap-1.5 mb-0.5 flex-wrap">
+                <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
                   <span className="text-[10px] font-black text-[#C2410C]">{it.groupName}</span>
                   <span className="text-[10px] font-black text-slate-400">·</span>
                   <span className="text-[10px] font-black text-slate-500">{it.username}</span>
@@ -1836,7 +1836,7 @@ const StarredScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
               <button
                 onClick={() => unstar(it)}
                 disabled={busyKey === it.key}
-                className="shrink-0 w-9 h-9 rounded-xl bg-amber-50 border border-amber-100 flex items-facility justify-facility text-amber-500 active:scale-95 transition disabled:opacity-60"
+                className="shrink-0 w-9 h-9 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-500 active:scale-95 transition disabled:opacity-60"
                 aria-label="Remove from favourites"
               >
                 {busyKey === it.key ? <Loader2 className="w-4 h-4 animate-spin" /> : <Star className="w-4 h-4 fill-amber-400" />}
@@ -1968,7 +1968,7 @@ const ChatSettingsSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-facility" role="dialog" aria-modal="true" aria-label="Chat settings">
+    <div className="fixed inset-0 z-50 flex items-end justify-center" role="dialog" aria-modal="true" aria-label="Chat settings">
       <div className="absolute inset-0 bg-slate-950/50 animate-in fade-in duration-100" onClick={onClose} aria-hidden="true" />
       <div className="relative w-full max-w-lg bg-slate-50 rounded-t-3xl shadow-2xl max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom-2 fade-in duration-150 p-5 pb-8 space-y-4">
         <div className="w-10 h-1.5 rounded-full bg-slate-300 mx-auto" />
@@ -1979,7 +1979,7 @@ const ChatSettingsSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           </div>
           <button
             onClick={onClose}
-            className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-facility justify-facility text-slate-500 active:scale-95 transition shrink-0"
+            className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-500 active:scale-95 transition shrink-0"
             aria-label="Close chat settings"
           >
             <X className="w-4 h-4" />

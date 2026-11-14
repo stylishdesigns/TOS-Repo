@@ -110,15 +110,15 @@ export const EnterAccessCodeScreen: React.FC<EnterAccessCodeScreenProps> = ({
   };
 
   return (
-    <div className="min-h-screen w-full flex items-facility justify-facility bg-slate-950 p-4 relative overflow-hidden select-none">
+    <div className="min-h-screen w-full flex items-center justify-center bg-slate-950 p-4 relative overflow-hidden select-none">
       {/* Dynamic ambient backdrop */}
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[550px] h-[550px] bg-orange-600/10 rounded-full blur-[140px] pointer-events-none" />
       <div className="absolute bottom-10 right-10 w-80 h-80 bg-blue-600/10 rounded-full blur-[120px] pointer-events-none" />
 
       <div className="w-full max-w-md bg-slate-900/90 border border-slate-800/80 rounded-3xl p-8 backdrop-blur-xl shadow-2xl relative z-10">
         {/* Header Icon */}
-        <div className="flex flex-col items-facility text-facility mb-8">
-          <div className="w-16 h-16 rounded-2xl bg-orange-500/10 border border-orange-500/20 flex items-facility justify-facility text-orange-500 shadow-inner shadow-orange-500/20 mb-4">
+        <div className="flex flex-col items-center text-center mb-8">
+          <div className="w-16 h-16 rounded-2xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-500 shadow-inner shadow-orange-500/20 mb-4">
             <Lock className="w-8 h-8" />
           </div>
 
@@ -130,7 +130,7 @@ export const EnterAccessCodeScreen: React.FC<EnterAccessCodeScreenProps> = ({
           </p>
 
           {userName && (
-            <div className="mt-3 inline-flex items-facility gap-1.5 px-3 py-1 rounded-full bg-slate-800/80 border border-slate-700/60 text-xs text-slate-300">
+            <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800/80 border border-slate-700/60 text-xs text-slate-300">
               <UserCheck className="w-3.5 h-3.5 text-orange-400" />
               <span>Signed in as <strong className="text-white">{userName}</strong></span>
             </div>
@@ -148,7 +148,7 @@ export const EnterAccessCodeScreen: React.FC<EnterAccessCodeScreenProps> = ({
           )}
 
           {/* 6 Digit Numeric Boxes */}
-          <div className="flex justify-between items-facility gap-2 sm:gap-3 py-2">
+          <div className="flex justify-between items-center gap-2 sm:gap-3 py-2">
             {digits.map((digit, idx) => (
               <input
                 key={idx}
@@ -162,7 +162,7 @@ export const EnterAccessCodeScreen: React.FC<EnterAccessCodeScreenProps> = ({
                 onKeyDown={(e) => handleKeyDown(idx, e)}
                 onPaste={handlePaste}
                 autoComplete="one-time-code"
-                className={`w-12 h-14 sm:w-13 sm:h-16 text-facility text-2xl font-black rounded-2xl border transition-all duration-200 outline-none
+                className={`w-12 h-14 sm:w-13 sm:h-16 text-center text-2xl font-black rounded-2xl border transition-all duration-200 outline-none
                   ${
                     digit
                       ? 'border-orange-500 bg-orange-500/10 text-white shadow-lg shadow-orange-500/10'
@@ -176,7 +176,7 @@ export const EnterAccessCodeScreen: React.FC<EnterAccessCodeScreenProps> = ({
           <button
             type="submit"
             disabled={!isComplete || isLoading}
-            className={`w-full py-4 rounded-2xl font-bold text-sm tracking-wide transition-all duration-200 flex items-facility justify-facility gap-2 shadow-lg
+            className={`w-full py-4 rounded-2xl font-bold text-sm tracking-wide transition-all duration-200 flex items-center justify-center gap-2 shadow-lg
               ${
                 isComplete && !isLoading
                   ? 'bg-orange-600 hover:bg-orange-500 text-white shadow-orange-600/30 cursor-pointer active:scale-[0.98]'
@@ -198,12 +198,12 @@ export const EnterAccessCodeScreen: React.FC<EnterAccessCodeScreenProps> = ({
         </form>
 
         {/* Footer Actions */}
-        <div className="mt-8 pt-6 border-t border-slate-800/80 flex flex-col items-facility gap-3">
+        <div className="mt-8 pt-6 border-t border-slate-800/80 flex flex-col items-center gap-3">
           {onSwitchToJoin && (
             <button
               type="button"
               onClick={onSwitchToJoin}
-              className="text-xs text-orange-400 hover:text-orange-300 font-semibold transition-colors flex items-facility gap-1.5 cursor-pointer"
+              className="text-xs text-orange-400 hover:text-orange-300 font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
             >
               <Building2 className="w-3.5 h-3.5" />
               <span>Joining a new facility or tutor? Enter code here</span>
@@ -213,7 +213,7 @@ export const EnterAccessCodeScreen: React.FC<EnterAccessCodeScreenProps> = ({
           <button
             type="button"
             onClick={onSignOut}
-            className="text-xs text-slate-500 hover:text-slate-400 font-medium transition-colors flex items-facility gap-1.5 cursor-pointer mt-1"
+            className="text-xs text-slate-500 hover:text-slate-400 font-medium transition-colors flex items-center gap-1.5 cursor-pointer mt-1"
           >
             <LogOut className="w-3.5 h-3.5" />
             <span>Sign out</span>

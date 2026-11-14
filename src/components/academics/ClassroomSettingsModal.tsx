@@ -116,11 +116,11 @@ export const ClassroomSettingsModal: React.FC<Props> = ({ isOpen, onClose }) => 
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-facility justify-facility p-4 backdrop-blur-xs overflow-hidden">
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs overflow-hidden">
       <div className="bg-white rounded-2xl max-w-3xl w-full p-6 sm:p-7 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 space-y-6 max-h-[90vh] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-200">
         {/* Header */}
-        <div className="flex items-facility justify-between border-b border-slate-100 pb-4">
-          <div className="flex items-facility space-x-3">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+          <div className="flex items-center space-x-3">
             <div className="p-2.5 bg-orange-50 text-[#EA580C] rounded-xl border border-orange-100">
               <Building2 className="w-5 h-5" />
             </div>
@@ -140,7 +140,7 @@ export const ClassroomSettingsModal: React.FC<Props> = ({ isOpen, onClose }) => 
         </div>
 
         {/* Action button to reveal add form */}
-        <div className="flex items-facility justify-between">
+        <div className="flex items-center justify-between">
           <p className="text-xs font-semibold text-slate-600">
             Current Venues ({classrooms.length})
           </p>
@@ -158,7 +158,7 @@ export const ClassroomSettingsModal: React.FC<Props> = ({ isOpen, onClose }) => 
                 });
                 setShowAddForm(true);
               }}
-              className="px-3 py-1.5 text-xs font-semibold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg shadow-sm transition-all flex items-facility space-x-1.5"
+              className="px-3 py-1.5 text-xs font-semibold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg shadow-sm transition-all flex items-center space-x-1.5"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Add New Room</span>
@@ -172,7 +172,7 @@ export const ClassroomSettingsModal: React.FC<Props> = ({ isOpen, onClose }) => 
             onSubmit={handleSave}
             className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3.5 text-xs"
           >
-            <div className="flex items-facility justify-between font-bold text-slate-900 border-b border-slate-200 pb-2">
+            <div className="flex items-center justify-between font-bold text-slate-900 border-b border-slate-200 pb-2">
               <span>{editingRoom ? 'Edit Room Specifications' : 'New Room Specifications'}</span>
               <button
                 type="button"
@@ -252,17 +252,17 @@ export const ClassroomSettingsModal: React.FC<Props> = ({ isOpen, onClose }) => 
                   </div>
                 </div>
 
-                <div className="flex items-facility space-x-3 text-xs text-slate-600">
-                  <span className="flex items-facility space-x-1 font-semibold text-slate-800">
+                <div className="flex items-center space-x-3 text-xs text-slate-600">
+                  <span className="flex items-center space-x-1 font-semibold text-slate-800">
                     <Users className="w-3.5 h-3.5 text-slate-400" />
                     <span>{room.capacity} Desks Capacity</span>
                   </span>
                 </div>
 
-                <div className="flex items-facility justify-end space-x-2 pt-2 border-t border-slate-100 text-[11px]">
+                <div className="flex items-center justify-end space-x-2 pt-2 border-t border-slate-100 text-[11px]">
                   <button
                     onClick={() => handleStartEdit(room)}
-                    className="px-2 py-1 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded inline-flex items-facility space-x-1 font-medium"
+                    className="px-2 py-1 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded inline-flex items-center space-x-1 font-medium"
                   >
                     <Edit2 className="w-3 h-3" />
                     <span>Edit</span>
@@ -284,7 +284,7 @@ export const ClassroomSettingsModal: React.FC<Props> = ({ isOpen, onClose }) => 
                         description: `${room.name} removed from inventory.`,
                       });
                     }}
-                    className="px-2 py-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded inline-flex items-facility space-x-1 font-medium"
+                    className="px-2 py-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded inline-flex items-center space-x-1 font-medium"
                   >
                     <Trash2 className="w-3 h-3" />
                     <span>Delete</span>

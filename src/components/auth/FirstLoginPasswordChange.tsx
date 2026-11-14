@@ -89,22 +89,22 @@ export const FirstLoginPasswordChange: React.FC<{ onDone: () => void }> = ({ onD
 
   if (checking) {
     return (
-      <div className="min-h-screen w-full bg-slate-950 flex items-facility justify-facility">
+      <div className="min-h-screen w-full bg-slate-950 flex items-center justify-center">
         <Loader2 className="w-6 h-6 text-orange-400 animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen w-full bg-slate-950 flex items-facility justify-facility p-4 relative overflow-hidden">
+    <div className="min-h-screen w-full bg-slate-950 flex items-center justify-center p-4 relative overflow-hidden">
       <div className="absolute top-[-20%] left-[-10%] w-[55%] h-[55%] bg-orange-600/10 rounded-full blur-[150px]" />
       <div className="absolute bottom-[-20%] right-[-10%] w-[55%] h-[55%] bg-amber-600/10 rounded-full blur-[150px]" />
 
       <div className="w-full max-w-md relative z-10">
-        <div className="text-facility mb-8">
+        <div className="text-center mb-8">
           <div className="w-16 h-16 mx-auto mb-6 relative">
             <div className="absolute inset-0 bg-orange-500/20 rounded-2xl rotate-6" />
-            <div className="absolute inset-0 bg-slate-900 rounded-2xl flex items-facility justify-facility border border-orange-500/30">
+            <div className="absolute inset-0 bg-slate-900 rounded-2xl flex items-center justify-center border border-orange-500/30">
               <ShieldCheck className="w-8 h-8 text-orange-400" />
             </div>
           </div>
@@ -167,7 +167,7 @@ export const FirstLoginPasswordChange: React.FC<{ onDone: () => void }> = ({ onD
               <button
                 type="submit"
                 disabled={busy}
-                className="w-full flex items-facility justify-facility px-4 py-3.5 rounded-xl bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white font-bold text-sm transition-all"
+                className="w-full flex items-center justify-center px-4 py-3.5 rounded-xl bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white font-bold text-sm transition-all"
               >
                 {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <><KeyRound className="w-4 h-4 mr-2" /> Set my password</>}
               </button>
@@ -176,7 +176,7 @@ export const FirstLoginPasswordChange: React.FC<{ onDone: () => void }> = ({ onD
         )}
 
         {done && (
-          <div className="bg-slate-900/80 border border-emerald-500/30 rounded-3xl p-8 text-facility">
+          <div className="bg-slate-900/80 border border-emerald-500/30 rounded-3xl p-8 text-center">
             <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto mb-3" />
             <p className="text-white font-bold">Password set. Taking you into your facility…</p>
           </div>

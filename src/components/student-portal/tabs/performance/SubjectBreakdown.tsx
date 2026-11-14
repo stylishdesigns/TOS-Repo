@@ -20,13 +20,13 @@ export const SubjectBreakdown: React.FC<SubjectBreakdownProps> = ({
   return (
     <div className="bg-white rounded-[20px] p-4 border border-[#E2E8F0] shadow-2xs space-y-4">
       {/* Header & Legend */}
-      <div className="flex items-facility justify-between">
+      <div className="flex items-center justify-between">
         <h3 className="text-[12px] font-extrabold uppercase tracking-[0.08em] text-[#0F172A]">
           SUBJECT BREAKDOWN
         </h3>
 
         {/* Legend */}
-        <div className="flex items-facility space-x-1.5">
+        <div className="flex items-center space-x-1.5">
           <span className="w-[2px] h-[12px] bg-[#0F172A] inline-block rounded-full" />
           <span className="text-[10px] font-semibold text-[#64748B]">
             Class average
@@ -50,20 +50,20 @@ export const SubjectBreakdown: React.FC<SubjectBreakdownProps> = ({
               className="w-full text-left p-0 cursor-pointer min-h-[44px] group block focus:outline-hidden"
             >
               {/* Top line of row: Name, Needs Focus, Percent, Grade */}
-              <div className="flex items-facility justify-between mb-1.5">
-                <div className="flex items-facility space-x-2 min-w-0">
+              <div className="flex items-center justify-between mb-1.5">
+                <div className="flex items-center space-x-2 min-w-0">
                   <span className="text-[13px] font-bold text-[#0F172A] group-hover:text-[#C2410C] transition-colors truncate">
                     {item.subject}
                   </span>
 
                   {item.needsFocus && (
-                    <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-[#FFF1F2] text-[#BE123C] border border-[#F43F5E]/20 inline-flex items-facility shrink-0">
+                    <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-[#FFF1F2] text-[#BE123C] border border-[#F43F5E]/20 inline-flex items-center shrink-0">
                       Needs focus
                     </span>
                   )}
                 </div>
 
-                <div className="flex items-facility space-x-2 shrink-0">
+                <div className="flex items-center space-x-2 shrink-0">
                   <span className="text-[14px] font-extrabold text-[#0F172A] tabular-nums">
                     {item.meanPercent}%
                   </span>
@@ -104,11 +104,11 @@ export const SubjectBreakdown: React.FC<SubjectBreakdownProps> = ({
               </div>
 
               {/* Line under the bar */}
-              <div className="text-[11px] text-[#64748B] mt-[6px] flex items-facility gap-1.5 flex-wrap leading-tight">
+              <div className="text-[11px] text-[#64748B] mt-[6px] flex items-center gap-1.5 flex-wrap leading-tight">
                 {isSingleResult ? (
                   <span>First test</span>
                 ) : (
-                  <span className="inline-flex items-facility gap-0.5">
+                  <span className="inline-flex items-center gap-0.5">
                     {delta! >= 0 ? (
                       <ArrowUp className="w-3 h-3 text-[#047857]" />
                     ) : (

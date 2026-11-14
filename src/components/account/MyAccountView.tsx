@@ -68,29 +68,29 @@ export const MyAccountView: React.FC = () => {
   return (
     <div id="my-account-page" className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
       {/* Top Header Card (video 01:06 - 01:08) */}
-      <div className="bg-white p-6 rounded-xl border border-slate-200/90 shadow-xs flex flex-col md:flex-row md:items-facility justify-between gap-5">
-        <div className="flex items-facility space-x-4">
-          <div className="w-14 h-14 rounded-xl bg-[#FED7AA] text-[#C2410C] font-extrabold text-xl flex items-facility justify-facility shrink-0">
+      <div className="bg-white p-6 rounded-xl border border-slate-200/90 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-5">
+        <div className="flex items-center space-x-4">
+          <div className="w-14 h-14 rounded-xl bg-[#FED7AA] text-[#C2410C] font-extrabold text-xl flex items-center justify-center shrink-0">
             PA
           </div>
           <div>
-            <div className="flex items-facility space-x-2.5">
+            <div className="flex items-center space-x-2.5">
               <h2 className="text-xl font-bold text-slate-900">{firstName} {lastName}</h2>
-              <span className="inline-flex items-facility px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200">
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200">
                 <span className="w-1.5 h-1.5 rounded-full bg-purple-500 mr-1.5" />
                 Super Administrator
               </span>
             </div>
-            <div className="flex flex-wrap items-facility gap-y-1 gap-x-4 text-xs text-slate-500 mt-1.5">
-              <span className="flex items-facility space-x-1">
+            <div className="flex flex-wrap items-center gap-y-1 gap-x-4 text-xs text-slate-500 mt-1.5">
+              <span className="flex items-center space-x-1">
                 <Mail className="w-3.5 h-3.5 text-slate-400" />
                 <span>{email}</span>
               </span>
-              <span className="flex items-facility space-x-1">
+              <span className="flex items-center space-x-1">
                 <Phone className="w-3.5 h-3.5 text-slate-400" />
                 <span>{phone}</span>
               </span>
-              <span className="flex items-facility space-x-1">
+              <span className="flex items-center space-x-1">
                 <Calendar className="w-3.5 h-3.5 text-slate-400" />
                 <span>Administrator since Aug 2026</span>
               </span>
@@ -106,7 +106,7 @@ export const MyAccountView: React.FC = () => {
               description: 'You have been safely signed out.',
             });
           }}
-          className="px-4 py-2 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-2xs transition-all flex items-facility space-x-2 self-start md:self-auto"
+          className="px-4 py-2 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-2xs transition-all flex items-center space-x-2 self-start md:self-auto"
         >
           <LogOut className="w-3.5 h-3.5 text-slate-500" />
           <span>Sign out</span>
@@ -114,7 +114,7 @@ export const MyAccountView: React.FC = () => {
       </div>
 
       {/* Tabs Row (video 01:06 - 01:08) */}
-      <div className="flex items-facility space-x-1.5">
+      <div className="flex items-center space-x-1.5">
         {(['Profile', 'Password', 'Sessions'] as const).map((tab) => (
           <button
             key={tab}
@@ -135,7 +135,7 @@ export const MyAccountView: React.FC = () => {
         <div className="space-y-6">
           {/* Profile Details Card */}
           <div className="bg-white p-6 rounded-xl border border-slate-200/90 shadow-xs">
-            <div className="flex items-facility justify-between pb-4 border-b border-slate-100">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <h3 className="font-bold text-base text-slate-900">Profile Details</h3>
               <button
                 onClick={() => {
@@ -148,7 +148,7 @@ export const MyAccountView: React.FC = () => {
                     });
                   }
                 }}
-                className="px-3.5 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-2xs transition-all flex items-facility space-x-1.5"
+                className="px-3.5 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-2xs transition-all flex items-center space-x-1.5"
               >
                 <Edit2 className="w-3 h-3 text-slate-500" />
                 <span>{isEditingProfile ? 'Save Profile' : 'Edit Profile'}</span>
@@ -329,7 +329,7 @@ export const MyAccountView: React.FC = () => {
       {activeTab === 'Sessions' && (
         <div className="space-y-6">
           {/* Two-factor authentication (video 01:14 - 01:16) */}
-          <div className="bg-white p-6 rounded-xl border border-slate-200/90 shadow-xs flex items-facility justify-between">
+          <div className="bg-white p-6 rounded-xl border border-slate-200/90 shadow-xs flex items-center justify-between">
             <div>
               <h3 className="font-bold text-sm text-slate-900">Two-factor authentication</h3>
               <p className="text-xs font-medium text-slate-800 mt-1">Require a code at login</p>
@@ -345,7 +345,7 @@ export const MyAccountView: React.FC = () => {
                   description: twoFactorEnabled ? 'Two-factor auth disabled.' : 'Two-factor auth enabled.',
                 });
               }}
-              className={`w-11 h-6 flex items-facility rounded-full p-1 transition-colors ${
+              className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors ${
                 twoFactorEnabled ? 'bg-[#EA580C]' : 'bg-slate-200'
               }`}
             >
@@ -363,9 +363,9 @@ export const MyAccountView: React.FC = () => {
 
             <div className="space-y-3">
               {/* Session 1 (Current) */}
-              <div className="p-3.5 bg-slate-50/70 rounded-xl flex items-facility justify-between">
+              <div className="p-3.5 bg-slate-50/70 rounded-xl flex items-center justify-between">
                 <div>
-                  <div className="flex items-facility space-x-2">
+                  <div className="flex items-center space-x-2">
                     <p className="text-xs font-bold text-slate-900">Chrome on ChromeOS</p>
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-200 text-slate-700">
                       This Device
@@ -377,9 +377,9 @@ export const MyAccountView: React.FC = () => {
               </div>
 
               {/* Session 2 */}
-              <div className="p-3.5 bg-white border border-slate-100 rounded-xl flex items-facility justify-between">
+              <div className="p-3.5 bg-white border border-slate-100 rounded-xl flex items-center justify-between">
                 <div>
-                  <div className="flex items-facility space-x-2">
+                  <div className="flex items-center space-x-2">
                     <p className="text-xs font-bold text-slate-900">Chrome on Windows</p>
                     <span className="text-[10px] text-slate-400">Remembered</span>
                   </div>
@@ -391,9 +391,9 @@ export const MyAccountView: React.FC = () => {
               </div>
 
               {/* Session 3 */}
-              <div className="p-3.5 bg-white border border-slate-100 rounded-xl flex items-facility justify-between">
+              <div className="p-3.5 bg-white border border-slate-100 rounded-xl flex items-center justify-between">
                 <div>
-                  <div className="flex items-facility space-x-2">
+                  <div className="flex items-center space-x-2">
                     <p className="text-xs font-bold text-slate-900">Edge on Windows</p>
                     <span className="text-[10px] text-slate-400">Remembered</span>
                   </div>

@@ -15,8 +15,8 @@ export const TimeManagementCard: React.FC<TimeManagementCardProps> = ({ stats })
   return (
     <div className="bg-white rounded-[20px] p-4 border border-[#E2E8F0] shadow-2xs space-y-3.5">
       {/* Header with 32x32 rounded square */}
-      <div className="flex items-facility space-x-2.5">
-        <div className="w-[32px] h-[32px] rounded-xl bg-[#F1F5F9] text-[#0F172A] flex items-facility justify-facility shrink-0">
+      <div className="flex items-center space-x-2.5">
+        <div className="w-[32px] h-[32px] rounded-xl bg-[#F1F5F9] text-[#0F172A] flex items-center justify-center shrink-0">
           <Clock className="w-4 h-4 text-[#0F172A]" />
         </div>
         <h3 className="text-[12px] font-extrabold uppercase tracking-[0.08em] text-[#0F172A]">

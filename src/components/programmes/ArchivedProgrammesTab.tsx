@@ -6,8 +6,8 @@ import { Archive } from 'lucide-react';
  * archives a program there is simply nothing to show.
  */
 export const ArchivedProgrammesTab: React.FC = () => (
-  <div className="bg-white p-12 rounded-xl border border-slate-200/90 text-facility space-y-3 animate-in fade-in duration-200">
-    <div className="w-12 h-12 bg-slate-100 text-slate-400 rounded-full flex items-facility justify-facility mx-auto">
+  <div className="bg-white p-12 rounded-xl border border-slate-200/90 text-center space-y-3 animate-in fade-in duration-200">
+    <div className="w-12 h-12 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto">
       <Archive className="w-6 h-6" />
     </div>
     <h3 className="font-bold text-slate-800 text-base">No Archived Exam Programs Yet</h3>

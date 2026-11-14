@@ -58,17 +58,17 @@ export const StudentDetailModal: React.FC = () => {
   return (
     <div
       id="student-detail-modal-backdrop"
-      className="fixed inset-0 bg-black/60 z-50 flex items-facility justify-facility p-4 backdrop-blur-xs overflow-y-auto"
+      className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs overflow-y-auto"
     >
       <div className="bg-white rounded-2xl max-w-3xl w-full p-6 shadow-2xl border border-slate-200 my-6 max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-start justify-between pb-4 border-b border-slate-100">
-          <div className="flex items-facility space-x-3.5">
-            <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 font-extrabold text-base flex items-facility justify-facility">
+          <div className="flex items-center space-x-3.5">
+            <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 font-extrabold text-base flex items-center justify-center">
               {selectedStudent.name.split(' ').map((n) => n[0]).join('').substring(0, 2)}
             </div>
             <div>
-              <div className="flex items-facility space-x-2">
+              <div className="flex items-center space-x-2">
                 <h3 className="text-lg font-extrabold text-slate-900">
                   {selectedStudent.name}
                 </h3>
@@ -143,7 +143,7 @@ export const StudentDetailModal: React.FC = () => {
           {/* Payment Form (if triggered) */}
           {showPaymentForm && (
             <div className="p-4 bg-amber-50 rounded-xl border border-amber-200 space-y-3">
-              <div className="flex items-facility justify-between">
+              <div className="flex items-center justify-between">
                 <h4 className="text-xs font-bold text-amber-900">
                   Record Fee Payment for {selectedStudent.name}
                 </h4>
@@ -202,15 +202,15 @@ export const StudentDetailModal: React.FC = () => {
               <h4 className="font-extrabold text-slate-800 text-[11px] uppercase tracking-wider">
                 Candidate Details
               </h4>
-              <div className="flex items-facility justify-between py-1 border-b border-slate-100">
+              <div className="flex items-center justify-between py-1 border-b border-slate-100">
                 <span className="text-slate-500">Phone:</span>
                 <span className="font-semibold text-slate-800">{selectedStudent.phone}</span>
               </div>
-              <div className="flex items-facility justify-between py-1 border-b border-slate-100">
+              <div className="flex items-center justify-between py-1 border-b border-slate-100">
                 <span className="text-slate-500">Email:</span>
                 <span className="font-semibold text-slate-800">{selectedStudent.email}</span>
               </div>
-              <div className="flex items-facility justify-between py-1">
+              <div className="flex items-center justify-between py-1">
                 <span className="text-slate-500">Residential Address:</span>
                 <span className="font-semibold text-slate-800 truncate max-w-[180px]">
                   {selectedStudent.address}
@@ -222,15 +222,15 @@ export const StudentDetailModal: React.FC = () => {
               <h4 className="font-extrabold text-slate-800 text-[11px] uppercase tracking-wider">
                 Parent / Guardian Contact
               </h4>
-              <div className="flex items-facility justify-between py-1 border-b border-slate-100">
+              <div className="flex items-center justify-between py-1 border-b border-slate-100">
                 <span className="text-slate-500">Parent Name:</span>
                 <span className="font-semibold text-slate-800">{selectedStudent.parentName}</span>
               </div>
-              <div className="flex items-facility justify-between py-1 border-b border-slate-100">
+              <div className="flex items-center justify-between py-1 border-b border-slate-100">
                 <span className="text-slate-500">Parent WhatsApp:</span>
                 <span className="font-semibold text-slate-800">{selectedStudent.parentWhatsApp}</span>
               </div>
-              <div className="flex items-facility justify-between py-1">
+              <div className="flex items-center justify-between py-1">
                 <span className="text-slate-500">Enrolment Date:</span>
                 <span className="font-semibold text-slate-800">
                   {selectedStudent.registrationDate}
@@ -241,7 +241,7 @@ export const StudentDetailModal: React.FC = () => {
 
         </div>
 
-        <div className="pt-4 border-t border-slate-100 flex items-facility justify-end">
+        <div className="pt-4 border-t border-slate-100 flex items-center justify-end">
           <button
             onClick={() => setSelectedStudent(null)}
             className="px-4 py-2 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-lg"

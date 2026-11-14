@@ -248,8 +248,8 @@ export const PracticeAnalytics: React.FC<PracticeAnalyticsProps> = ({ onStartPra
 
   if (status === 'error' && !summary) {
     return (
-      <div className="bg-white rounded-3xl p-8 border border-slate-200/90 shadow-sm text-facility space-y-4" data-testid="practice-analytics-error">
-        <div className="w-16 h-16 rounded-2xl bg-orange-50 border border-orange-100 text-[#EA580C] flex items-facility justify-facility mx-auto shadow-sm">
+      <div className="bg-white rounded-3xl p-8 border border-slate-200/90 shadow-sm text-center space-y-4" data-testid="practice-analytics-error">
+        <div className="w-16 h-16 rounded-2xl bg-orange-50 border border-orange-100 text-[#EA580C] flex items-center justify-center mx-auto shadow-sm">
           <TrendingUp className="w-8 h-8" />
         </div>
         <h3 className="text-lg font-black text-slate-900 tracking-tight">Practice Analytics</h3>
@@ -269,12 +269,12 @@ export const PracticeAnalytics: React.FC<PracticeAnalyticsProps> = ({ onStartPra
 
   if (!view || !view.hasData) {
     return (
-      <div className="bg-white rounded-3xl p-8 border border-slate-200/90 shadow-sm text-facility space-y-4" data-testid="practice-analytics-empty">
-        <div className="w-16 h-16 rounded-2xl bg-orange-50 border border-orange-100 text-[#EA580C] flex items-facility justify-facility mx-auto shadow-sm">
+      <div className="bg-white rounded-3xl p-8 border border-slate-200/90 shadow-sm text-center space-y-4" data-testid="practice-analytics-empty">
+        <div className="w-16 h-16 rounded-2xl bg-orange-50 border border-orange-100 text-[#EA580C] flex items-center justify-center mx-auto shadow-sm">
           <TrendingUp className="w-8 h-8" />
         </div>
         <div className="space-y-1.5 max-w-xs mx-auto">
-          <div className="inline-flex items-facility gap-1.5 px-2.5 py-0.5 rounded-full bg-orange-100/60 text-[#C2410C] text-[10px] font-extrabold uppercase tracking-wider mb-1">
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-orange-100/60 text-[#C2410C] text-[10px] font-extrabold uppercase tracking-wider mb-1">
             <Sparkles className="w-3 h-3" />
             <span>Progress Insights</span>
           </div>
@@ -325,7 +325,7 @@ export const PracticeAnalytics: React.FC<PracticeAnalyticsProps> = ({ onStartPra
           <h4 className="text-sm font-extrabold text-slate-900">Worth another look</h4>
           <div className="space-y-2">
             {view.needsWork.map((r) => (
-              <div key={`${r.subject}__${r.topic}`} className="flex items-facility gap-3 bg-slate-50 rounded-2xl px-3 py-2.5">
+              <div key={`${r.subject}__${r.topic}`} className="flex items-center gap-3 bg-slate-50 rounded-2xl px-3 py-2.5">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-bold text-slate-900 truncate">{r.topic}</p>
                   <p className="text-xs text-slate-500 font-medium truncate">
@@ -351,7 +351,7 @@ export const PracticeAnalytics: React.FC<PracticeAnalyticsProps> = ({ onStartPra
           <h4 className="text-sm font-extrabold text-slate-900">Doing well</h4>
           <div className="space-y-2">
             {view.doingWell.map((r) => (
-              <div key={`${r.subject}__${r.topic}`} className="flex items-facility gap-3 bg-orange-50/60 rounded-2xl px-3 py-2.5">
+              <div key={`${r.subject}__${r.topic}`} className="flex items-center gap-3 bg-orange-50/60 rounded-2xl px-3 py-2.5">
                 <CheckCircle className="w-4 h-4 shrink-0 text-[#C2410C]" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-bold text-slate-900 truncate">{r.topic}</p>
@@ -376,7 +376,7 @@ export const PracticeAnalytics: React.FC<PracticeAnalyticsProps> = ({ onStartPra
                   <button
                     type="button"
                     onClick={() => toggleSubject(s.key)}
-                    className="w-full flex items-facility gap-3 px-3 py-3 text-left cursor-pointer active:bg-slate-50"
+                    className="w-full flex items-center gap-3 px-3 py-3 text-left cursor-pointer active:bg-slate-50"
                     aria-expanded={open}
                   >
                     <div className="flex-1 min-w-0">
@@ -388,7 +388,7 @@ export const PracticeAnalytics: React.FC<PracticeAnalyticsProps> = ({ onStartPra
                   {open && s.topics.length > 0 && (
                     <div className="px-3 pb-3 space-y-1.5">
                       {s.topics.map((t) => (
-                        <div key={t.key} className="flex items-facility gap-3 bg-slate-50 rounded-xl px-3 py-2">
+                        <div key={t.key} className="flex items-center gap-3 bg-slate-50 rounded-xl px-3 py-2">
                           <p className="flex-1 min-w-0 text-xs font-bold text-slate-800 truncate">{t.name}</p>
                           <p className="shrink-0 text-xs text-slate-500 font-medium">
                             {pct(t.correct, t.answered)}% · {t.answered} answered
@@ -407,11 +407,11 @@ export const PracticeAnalytics: React.FC<PracticeAnalyticsProps> = ({ onStartPra
       {/* Last 7 days + streak */}
       <div className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-sm space-y-3" data-testid="practice-week">
         <h4 className="text-sm font-extrabold text-slate-900">Last 7 days</h4>
-        <div className="flex items-facility gap-1.5">
+        <div className="flex items-center gap-1.5">
           {view.weekStrip.map((d) => (
             <div
               key={d.day}
-              className={`flex-1 flex flex-col items-facility gap-1 rounded-xl py-2 ${
+              className={`flex-1 flex flex-col items-center gap-1 rounded-xl py-2 ${
                 d.practised ? 'bg-[#EA580C]/10 text-[#C2410C]' : 'bg-slate-50 text-slate-300'
               }`}
               title={d.day}
@@ -434,7 +434,7 @@ export const PracticeAnalytics: React.FC<PracticeAnalyticsProps> = ({ onStartPra
           <h4 className="text-sm font-extrabold text-slate-900">Recent practice</h4>
           <div className="space-y-2">
             {view.recent.map((r, i) => (
-              <div key={`${r.at}__${i}`} className="flex items-facility gap-3 bg-slate-50 rounded-2xl px-3 py-2.5">
+              <div key={`${r.at}__${i}`} className="flex items-center gap-3 bg-slate-50 rounded-2xl px-3 py-2.5">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-bold text-slate-900 truncate">
                     {r.subject || 'Practice'}{r.topic && r.topic !== 'All topics' ? ` · ${r.topic}` : ''}

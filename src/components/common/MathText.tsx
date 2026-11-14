@@ -52,7 +52,7 @@ export const MathText: React.FC<MathTextProps> = ({ text, className = "" }) => {
             return (
               <div
                 key={index}
-                className="my-2 flex justify-facility overflow-x-auto"
+                className="my-2 flex justify-center overflow-x-auto"
                 dangerouslySetInnerHTML={{
                   __html: katex.renderToString(formula, {
                     displayMode: true,

@@ -264,7 +264,7 @@ export const QuestionBankTab: React.FC<{ refreshKey: number; view?: 'edit' | 'pu
   };
 
   if (error) return <p className="text-rose-300 text-sm">{error}</p>;
-  if (!data) return <div className="flex items-facility gap-2 text-slate-400 text-sm py-10 justify-facility"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</div>;
+  if (!data) return <div className="flex items-center gap-2 text-slate-400 text-sm py-10 justify-center"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</div>;
 
   // Dropdown options for the editor's subject: the catalogue plus, when the
   // question carries a subject outside it, that subject itself so legacy
@@ -285,7 +285,7 @@ export const QuestionBankTab: React.FC<{ refreshKey: number; view?: 'edit' | 'pu
           <Card title="Publish">
             {Number(kindCounts.total) > 0 ? (
               <>
-                <div className="flex flex-col sm:flex-row sm:items-facility gap-3 mb-3">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-3">
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-bold text-white">
                       {kindMeta.currentVersion
@@ -300,15 +300,15 @@ export const QuestionBankTab: React.FC<{ refreshKey: number; view?: 'edit' | 'pu
                           : 'Publish to make your questions live for students.'}
                     </p>
                   </div>
-                  <button onClick={openPublish} className="inline-flex items-facility justify-facility gap-2 px-5 py-3 rounded-xl border border-orange-500/50 bg-orange-500/10 hover:bg-orange-500/20 disabled:opacity-50 text-orange-300 font-bold text-sm transition-all shrink-0">
+                  <button onClick={openPublish} className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl border border-orange-500/50 bg-orange-500/10 hover:bg-orange-500/20 disabled:opacity-50 text-orange-300 font-bold text-sm transition-all shrink-0">
                     <Send className="w-4 h-4" /> Publish changes
                   </button>
                 </div>
                 <p className="text-sm text-slate-500">Publishing writes one versioned file to Cloudinary and marks every change live. You preview the change list first; nothing writes until you confirm.</p>
               </>
             ) : (
-              <div className="text-facility py-10">
-                <div className="w-12 h-12 rounded-2xl bg-slate-800/60 border border-white/10 flex items-facility justify-facility mx-auto mb-3">
+              <div className="text-center py-10">
+                <div className="w-12 h-12 rounded-2xl bg-slate-800/60 border border-white/10 flex items-center justify-center mx-auto mb-3">
                   <Send className="w-5 h-5 text-slate-500" />
                 </div>
                 <p className="text-sm font-bold text-white">Nothing to publish yet</p>
@@ -334,7 +334,7 @@ export const QuestionBankTab: React.FC<{ refreshKey: number; view?: 'edit' | 'pu
         {/* Step 1: where the batch goes */}
         <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
           <div className="flex items-start gap-3 mb-3">
-            <span className="w-8 h-8 rounded-xl bg-orange-500/15 border border-orange-500/30 text-orange-300 text-sm font-black flex items-facility justify-facility shrink-0">1</span>
+            <span className="w-8 h-8 rounded-xl bg-orange-500/15 border border-orange-500/30 text-orange-300 text-sm font-black flex items-center justify-center shrink-0">1</span>
             <div>
               <p className="text-sm font-bold text-white">Where these questions go</p>
               <p className="text-xs text-slate-400 mt-0.5">One choice for the whole batch: every question pasted below arrives with this subject, topic, year and pipeline. A question can carry its own Year: or Difficulty: line to override the batch choice.</p>
@@ -385,18 +385,18 @@ export const QuestionBankTab: React.FC<{ refreshKey: number; view?: 'edit' | 'pu
         {/* Step 2: paste */}
         <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4 mt-3">
           <div className="flex items-start gap-3 mb-3">
-            <span className="w-8 h-8 rounded-xl bg-orange-500/15 border border-orange-500/30 text-orange-300 text-sm font-black flex items-facility justify-facility shrink-0">2</span>
+            <span className="w-8 h-8 rounded-xl bg-orange-500/15 border border-orange-500/30 text-orange-300 text-sm font-black flex items-center justify-center shrink-0">2</span>
             <div>
               <p className="text-sm font-bold text-white">Paste the questions</p>
               <p className="text-xs text-slate-400 mt-0.5">Paste only the questions into the box, not the setup lines. Numbered questions, A to D options, an Answer line, an Explanation line. Optional per-question Year: and Difficulty: lines are honoured.</p>
             </div>
           </div>
 
-          <div className="flex items-facility justify-between mb-2">
-            <button onClick={() => setShowGuide(!showGuide)} className="text-[11px] font-bold text-orange-300 hover:text-orange-200 flex items-facility gap-1.5">
+          <div className="flex items-center justify-between mb-2">
+            <button onClick={() => setShowGuide(!showGuide)} className="text-[11px] font-bold text-orange-300 hover:text-orange-200 flex items-center gap-1.5">
               <FileText className="w-3.5 h-3.5" /> {showGuide ? 'Hide format guide' : 'Show format guide'}
             </button>
-            <button onClick={copyGuide} className="text-[11px] text-slate-400 hover:text-orange-300 flex items-facility gap-1.5"><Copy className="w-3.5 h-3.5" /> Copy guide</button>
+            <button onClick={copyGuide} className="text-[11px] text-slate-400 hover:text-orange-300 flex items-center gap-1.5"><Copy className="w-3.5 h-3.5" /> Copy guide</button>
           </div>
           {showGuide && (
             <pre className="bg-slate-950/80 border border-white/10 rounded-xl p-4 text-[11px] text-slate-300 leading-relaxed overflow-x-auto whitespace-pre-wrap mb-3">{dynamicGuide}</pre>
@@ -414,14 +414,14 @@ export const QuestionBankTab: React.FC<{ refreshKey: number; view?: 'edit' | 'pu
         {/* Step 3: preview */}
         <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4 mt-3">
           <div className="flex items-start gap-3 mb-3">
-            <span className="w-8 h-8 rounded-xl bg-orange-500/15 border border-orange-500/30 text-orange-300 text-sm font-black flex items-facility justify-facility shrink-0">3</span>
+            <span className="w-8 h-8 rounded-xl bg-orange-500/15 border border-orange-500/30 text-orange-300 text-sm font-black flex items-center justify-center shrink-0">3</span>
             <div>
               <p className="text-sm font-bold text-white">Check the preview</p>
               <p className="text-xs text-slate-400 mt-0.5">The parsing engine reads the paste and shows every question it found. Fix anything the preview flags before importing.</p>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-facility gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button onClick={runParse} disabled={!pasteText.trim()} className={btnGhost}><Eye className="w-4 h-4" /> Parse & preview</button>
             {parsed && (
               <span className="px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-300 text-xs font-bold">{parsed.questions.length} parsed</span>
@@ -468,14 +468,14 @@ export const QuestionBankTab: React.FC<{ refreshKey: number; view?: 'edit' | 'pu
         {/* Step 4: import */}
         <div className="rounded-2xl border border-orange-500/25 bg-white/[0.02] p-4 mt-3">
           <div className="flex items-start gap-3 mb-3">
-            <span className="w-8 h-8 rounded-xl bg-orange-500/15 border border-orange-500/30 text-orange-300 text-sm font-black flex items-facility justify-facility shrink-0">4</span>
+            <span className="w-8 h-8 rounded-xl bg-orange-500/15 border border-orange-500/30 text-orange-300 text-sm font-black flex items-center justify-center shrink-0">4</span>
             <div>
               <p className="text-sm font-bold text-white">Import as drafts</p>
               <p className="text-xs text-slate-400 mt-0.5">The whole batch goes in with the Step 1 choices. Drafts are not live for students; the Publish tab makes them live.</p>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-facility gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button onClick={runImport} disabled={importing || !parsed} className={btnPrimary}>
               {importing ? <Loader2 className="w-4 h-4 animate-spin" /> : <ClipboardPaste className="w-4 h-4" />}
               {parsed ? `Import all ${parsed.questions.length}` : 'Import'}
@@ -552,13 +552,13 @@ export const QuestionBankTab: React.FC<{ refreshKey: number; view?: 'edit' | 'pu
 
       {/* Publish review modal */}
       {previewLoading && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-facility justify-facility p-4">
-          <div className="flex items-facility gap-2 text-slate-300 text-sm"><Loader2 className="w-4 h-4 animate-spin" /> Building the publish preview…</div>
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="flex items-center gap-2 text-slate-300 text-sm"><Loader2 className="w-4 h-4 animate-spin" /> Building the publish preview…</div>
         </div>
       )}
       {preview && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm overflow-y-auto" onClick={() => setPreview(null)}>
-          <div className="min-h-full flex items-facility justify-facility p-4">
+          <div className="min-h-full flex items-center justify-center p-4">
             <div className="bg-slate-900 border border-white/10 rounded-3xl p-5 sm:p-7 max-w-3xl w-full shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between mb-5">
               <h3 className="text-white font-bold text-lg capitalize">Review before publishing {preview.kind === 'practice' ? 'practice' : 'mock'}</h3>
@@ -616,10 +616,10 @@ export const QuestionBankTab: React.FC<{ refreshKey: number; view?: 'edit' | 'pu
 
       {/* Publish result */}
       {publishResult && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-facility justify-facility p-4" onClick={() => setPublishResult(null)}>
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setPublishResult(null)}>
           <div className="bg-slate-900 border border-white/10 rounded-3xl p-5 sm:p-7 max-w-md w-full shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-facility gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-facility justify-facility"><CheckCircle2 className="w-5 h-5 text-emerald-400" /></div>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center"><CheckCircle2 className="w-5 h-5 text-emerald-400" /></div>
               <div>
                 <h3 className="text-white font-bold capitalize">{publishResult.kind === 'practice' ? 'Practice' : 'Mock'} v{publishResult.version} published</h3>
                 <p className="text-slate-400 text-xs">{publishResult.counts.live} questions live</p>

@@ -75,7 +75,7 @@ export const SubjectSheet: React.FC<SubjectSheetProps> = ({
       role="dialog"
       aria-modal="true"
       aria-label={`${subject.subject} Performance Overview`}
-      className="fixed inset-0 z-50 flex items-end sm:items-facility justify-facility bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div
@@ -85,7 +85,7 @@ export const SubjectSheet: React.FC<SubjectSheetProps> = ({
         {/* Sheet Drag Indicator & Header */}
         <div className="p-5 pb-3 border-b border-slate-100 flex items-start justify-between shrink-0">
           <div>
-            <div className="flex items-facility space-x-2">
+            <div className="flex items-center space-x-2">
               <span className="text-[10px] font-extrabold uppercase text-[#EA580C] tracking-wider block">
                 Subject Deep Dive
               </span>
@@ -104,7 +104,7 @@ export const SubjectSheet: React.FC<SubjectSheetProps> = ({
             type="button"
             onClick={onClose}
             aria-label="Close Subject Overview"
-            className="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-facility justify-facility transition-colors cursor-pointer shrink-0"
+            className="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors cursor-pointer shrink-0"
           >
             <X className="w-5 h-5" />
           </button>
@@ -142,14 +142,14 @@ export const SubjectSheet: React.FC<SubjectSheetProps> = ({
 
           {/* SVG Line Chart: Scores vs Class Average vs 50% Pass Mark */}
           <div className="bg-white rounded-2xl p-4 border border-slate-200/80 space-y-2">
-            <div className="flex items-facility justify-between text-xs">
+            <div className="flex items-center justify-between text-xs">
               <span className="font-bold text-slate-800">Trajectory vs Class Average</span>
               <span className="text-[10px] text-slate-400 font-mono">
                 {historyPoints.length} {historyPoints.length === 1 ? 'Assessment' : 'Assessments'}
               </span>
             </div>
 
-            <div className="w-full flex justify-facility pt-2">
+            <div className="w-full flex justify-center pt-2">
               <svg
                 width={chartWidth}
                 height={chartHeight}
@@ -237,7 +237,7 @@ export const SubjectSheet: React.FC<SubjectSheetProps> = ({
 
           {/* Assessment Attempts List (Only three recent assessments) */}
           <div className="space-y-2.5">
-            <div className="flex items-facility justify-between">
+            <div className="flex items-center justify-between">
               <span className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider block">
                 Recent Assessments ({matchingResults.length})
               </span>
@@ -257,7 +257,7 @@ export const SubjectSheet: React.FC<SubjectSheetProps> = ({
                     key={result.id}
                     type="button"
                     onClick={() => onSelectResult(result)}
-                    className="w-full text-left min-h-[44px] p-3 rounded-2xl hover:bg-slate-50 active:bg-slate-100 transition-colors border border-slate-200/80 flex items-facility justify-between gap-3 group cursor-pointer"
+                    className="w-full text-left min-h-[44px] p-3 rounded-2xl hover:bg-slate-50 active:bg-slate-100 transition-colors border border-slate-200/80 flex items-center justify-between gap-3 group cursor-pointer"
                   >
                     <div className="space-y-0.5 min-w-0 flex-1">
                       <span className="text-[10px] font-mono text-slate-400 block">{result.date}</span>
@@ -266,7 +266,7 @@ export const SubjectSheet: React.FC<SubjectSheetProps> = ({
                       </h4>
                     </div>
 
-                    <div className="flex items-facility space-x-2 shrink-0">
+                    <div className="flex items-center space-x-2 shrink-0">
                       <span className="text-xs font-black text-slate-900 tabular-nums">
                         {scorePct}%
                       </span>

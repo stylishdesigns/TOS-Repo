@@ -118,11 +118,11 @@ export const TutorHistoryView: React.FC<TutorHistoryViewProps> = ({ tutor, onBac
   return (
     <div className="p-4 sm:p-5 max-w-lg mx-auto space-y-4 animate-in fade-in duration-200 pb-20">
       {/* Header with Back Navigation */}
-      <div className="flex items-facility justify-between">
+      <div className="flex items-center justify-between">
         <button
           type="button"
           onClick={onBack}
-          className="inline-flex items-facility space-x-1.5 px-3 py-1.5 rounded-xl bg-white border border-[#E2E8F0] text-slate-700 hover:bg-slate-50 font-bold text-xs shadow-2xs transition-all cursor-pointer active:scale-95"
+          className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-white border border-[#E2E8F0] text-slate-700 hover:bg-slate-50 font-bold text-xs shadow-2xs transition-all cursor-pointer active:scale-95"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
           <span>Active Classes</span>
@@ -179,7 +179,7 @@ export const TutorHistoryView: React.FC<TutorHistoryViewProps> = ({ tutor, onBac
               ))}
             </div>
 
-            <span className="inline-flex items-facility gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/18 text-[#6EE7B7] border border-emerald-500/30">
+            <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/18 text-[#6EE7B7] border border-emerald-500/30">
               <TrendingUp className="w-3 h-3" />
               <span>{stats.changeVsLastMonth} vs last month</span>
             </span>
@@ -197,7 +197,7 @@ export const TutorHistoryView: React.FC<TutorHistoryViewProps> = ({ tutor, onBac
           {([5, 4, 3, 2, 1] as const).map((starNum) => {
             const row = stats.distribution[starNum];
             return (
-              <div key={starNum} className="flex items-facility gap-2 text-[11px] font-bold text-[#CBD5E1]">
+              <div key={starNum} className="flex items-center gap-2 text-[11px] font-bold text-[#CBD5E1]">
                 <span className="w-5 text-left">{starNum}</span>
                 <span className="flex-1 h-1.5 rounded-full bg-white/12 overflow-hidden">
                   <span
@@ -228,7 +228,7 @@ export const TutorHistoryView: React.FC<TutorHistoryViewProps> = ({ tutor, onBac
       </div>
 
       {/* 3. Past Classes Header */}
-      <div className="flex items-facility justify-between pt-1">
+      <div className="flex items-center justify-between pt-1">
         <span className="text-xs font-extrabold tracking-[0.08em] uppercase text-[#0F172A]">
           Past classes ({weekSlots.length})
         </span>
@@ -240,7 +240,7 @@ export const TutorHistoryView: React.FC<TutorHistoryViewProps> = ({ tutor, onBac
       {/* 4. Past Classes List */}
       <div className="flex flex-col gap-2.5">
         {weekSlots.length === 0 ? (
-          <div className="p-8 text-facility bg-white rounded-2xl border border-slate-200/80 space-y-2">
+          <div className="p-8 text-center bg-white rounded-2xl border border-slate-200/80 space-y-2">
             <Info className="w-8 h-8 text-slate-300 mx-auto" />
             <h4 className="text-xs font-extrabold text-slate-700">No classes found in this week</h4>
             <p className="text-[11px] text-slate-400">Select another academic week to view your schedule history.</p>
@@ -279,14 +279,14 @@ export const TutorHistoryView: React.FC<TutorHistoryViewProps> = ({ tutor, onBac
                 </div>
 
                 {/* Bottom: Student ratings given to the tutor */}
-                <div className="pt-2.5 border-t border-slate-100 flex items-facility justify-between">
+                <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between">
                   <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                     Student Rating
                   </span>
 
                   {classRating.hasEnoughRatings ? (
-                    <div className="flex items-facility gap-2">
-                      <div className="flex items-facility gap-1 text-sm font-extrabold font-mono text-[#0F172A] tabular-nums">
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1 text-sm font-extrabold font-mono text-[#0F172A] tabular-nums">
                         <Star className="w-4 h-4 fill-[#F59E0B] text-[#F59E0B]" />
                         <span>{classRating.averageRating.toFixed(1)}</span>
                         <span className="text-slate-400 font-semibold text-xs">/ 5.0</span>
@@ -296,7 +296,7 @@ export const TutorHistoryView: React.FC<TutorHistoryViewProps> = ({ tutor, onBac
                       </span>
                     </div>
                   ) : classRating.totalRatings > 0 ? (
-                    <div className="flex items-facility gap-2">
+                    <div className="flex items-center gap-2">
                       <span className="text-xs font-bold text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded-full">
                         Not enough yet
                       </span>
@@ -305,7 +305,7 @@ export const TutorHistoryView: React.FC<TutorHistoryViewProps> = ({ tutor, onBac
                       </span>
                     </div>
                   ) : (
-                    <div className="flex items-facility gap-1.5 text-slate-400 text-xs">
+                    <div className="flex items-center gap-1.5 text-slate-400 text-xs">
                       <Star className="w-3.5 h-3.5 text-slate-300" />
                       <span>No ratings yet</span>
                     </div>

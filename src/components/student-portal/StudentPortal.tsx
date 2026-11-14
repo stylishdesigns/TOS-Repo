@@ -536,7 +536,7 @@ export const StudentPortal: React.FC = () => {
 
   if (!isAdmin && (authLoading || profileLoading)) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-facility justify-facility">
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
         <div className="w-12 h-12 border-4 border-orange-500/30 border-t-orange-500 rounded-full animate-spin" />
       </div>
     );
@@ -561,9 +561,9 @@ export const StudentPortal: React.FC = () => {
     <div className="h-[100dvh] overflow-hidden bg-slate-50 flex flex-col justify-between selection:bg-orange-500 selection:text-white sm:h-auto sm:min-h-screen sm:overflow-visible">
       {/* 1. Top Desktop Control Bar */}
       <header className="bg-slate-950 text-white px-4 py-3 z-40 sticky top-0 overflow-hidden shadow-md">
-        <div className="max-w-7xl mx-auto flex items-facility justify-between gap-3 relative">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-3 relative">
           {/* Brand / Tutorial App Name */}
-          <div className="flex items-facility space-x-2.5">
+          <div className="flex items-center space-x-2.5">
             <span className="w-2.5 h-2.5 rounded-full bg-orange-500 animate-pulse shrink-0 shadow-sm shadow-orange-500" />
             <span className="font-black text-sm uppercase tracking-[0.2em]">
               {centreName}
@@ -574,7 +574,7 @@ export const StudentPortal: React.FC = () => {
           {isRunningLate && (
             <div
               onClick={() => { setChatFanOpen(false); setTitoOpen(false); setStatusScreenOpen(false); setActiveTab('home'); }}
-              className="absolute left-1/2 -translate-x-1/2 top-full bg-rose-600 px-4 py-2 rounded-b-2xl shadow-xl border border-white/10 animate-in slide-in-from-top-full duration-700 cursor-pointer flex items-facility space-x-2 group active:scale-95"
+              className="absolute left-1/2 -translate-x-1/2 top-full bg-rose-600 px-4 py-2 rounded-b-2xl shadow-xl border border-white/10 animate-in slide-in-from-top-full duration-700 cursor-pointer flex items-center space-x-2 group active:scale-95"
             >
               <div className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
               <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap">
@@ -584,7 +584,7 @@ export const StudentPortal: React.FC = () => {
           )}
 
           {/* PWA Icon Button beside banner */}
-          <div className="flex items-facility">
+          <div className="flex items-center">
             <PWAInstallButton
               variant="icon"
               className="!bg-white/10 !border-white/10 hover:!bg-white/20"
@@ -594,7 +594,7 @@ export const StudentPortal: React.FC = () => {
       </header>
 
       {/* 2. Main Body: Phone Shell Container */}
-      <main className="flex-1 min-h-0 flex items-facility justify-facility p-0 sm:py-6 sm:px-4">
+      <main className="flex-1 min-h-0 flex items-center justify-center p-0 sm:py-6 sm:px-4">
         <div
           className={`w-full transition-all duration-300 ${
             desktopViewMode === 'mobile_frame'
@@ -604,8 +604,8 @@ export const StudentPortal: React.FC = () => {
         >
           {/* Parent Mode Indicator Notification if active */}
           {portalMode === 'parent' && (
-            <div className="bg-blue-600 text-white px-4 py-2 text-xs font-bold flex items-facility justify-between shrink-0 shadow-xs">
-              <div className="flex items-facility space-x-1.5">
+            <div className="bg-blue-600 text-white px-4 py-2 text-xs font-bold flex items-center justify-between shrink-0 shadow-xs">
+              <div className="flex items-center space-x-1.5">
                 <ShieldCheck className="w-4 h-4" />
                 <span>Parent Oversight Mode: Monitoring {activeStudent.name}</span>
               </div>
@@ -803,12 +803,12 @@ export const StudentPortal: React.FC = () => {
               aria-label="Student Mobile Navigation"
               className="relative z-40 shrink-0 bg-slate-950/95 backdrop-blur-md border-t border-slate-800 py-1.5 px-2 shadow-2xl"
             >
-              <div className="max-w-md mx-auto grid grid-cols-5 gap-1 items-facility">
+              <div className="max-w-md mx-auto grid grid-cols-5 gap-1 items-center">
                 {/* 1: Home */}
                 <button
                   type="button"
                   onClick={() => { setChatFanOpen(false); setTitoOpen(false); setStatusScreenOpen(false); setActiveTab('home'); }}
-                  className={`flex flex-col items-facility justify-facility py-1.5 px-1 rounded-2xl transition-all cursor-pointer ${
+                  className={`flex flex-col items-center justify-center py-1.5 px-1 rounded-2xl transition-all cursor-pointer ${
                     activeTab === 'home'
                       ? 'text-orange-400 font-black'
                       : 'text-slate-400 hover:text-slate-200 font-semibold'
@@ -828,7 +828,7 @@ export const StudentPortal: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleNavClassesClick}
-                  className={`flex flex-col items-facility justify-facility py-1.5 px-1 rounded-2xl transition-all cursor-pointer ${
+                  className={`flex flex-col items-center justify-center py-1.5 px-1 rounded-2xl transition-all cursor-pointer ${
                     activeTab === 'classes'
                       ? 'text-orange-400 font-black'
                       : 'text-slate-400 hover:text-slate-200 font-semibold'
@@ -854,7 +854,7 @@ export const StudentPortal: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleNavCbtClick}
-                  className={`flex flex-col items-facility justify-facility py-1.5 px-1 rounded-2xl transition-all cursor-pointer ${
+                  className={`flex flex-col items-center justify-center py-1.5 px-1 rounded-2xl transition-all cursor-pointer ${
                     activeTab === 'cbt'
                       ? 'text-orange-400 font-black'
                       : 'text-slate-400 hover:text-slate-200 font-semibold'
@@ -874,7 +874,7 @@ export const StudentPortal: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => { setChatFanOpen(false); setTitoOpen(false); setStatusScreenOpen(false); setActiveTab('more'); }}
-                  className={`flex flex-col items-facility justify-facility py-1.5 px-1 rounded-2xl transition-all cursor-pointer ${
+                  className={`flex flex-col items-center justify-center py-1.5 px-1 rounded-2xl transition-all cursor-pointer ${
                     activeTab === 'more'
                       ? 'text-orange-400 font-black'
                       : 'text-slate-400 hover:text-slate-200 font-semibold'
@@ -923,7 +923,7 @@ export const StudentPortal: React.FC = () => {
                     <ChatOrbIcon className="w-8 h-8 text-white" />
                   )}
                   {orbBadgeText && !chatFanOpen && (
-                    <span className="absolute -top-0.5 -right-0.5 min-w-[22px] h-[22px] px-1 rounded-full bg-white text-[#EA580C] text-[11px] font-black flex items-facility justify-facility border border-orange-200 shadow-sm">
+                    <span className="absolute -top-0.5 -right-0.5 min-w-[22px] h-[22px] px-1 rounded-full bg-white text-[#EA580C] text-[11px] font-black flex items-center justify-center border border-orange-200 shadow-sm">
                       {orbBadgeText}
                     </span>
                   )}
@@ -941,7 +941,7 @@ export const StudentPortal: React.FC = () => {
                     role="menuitem"
                     onClick={fanWing(openStatusScreen)}
                     aria-label="Status"
-                    className={`absolute w-12 h-12 rounded-full bg-white text-[#EA580C] flex items-facility justify-facility shadow-lg cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 ${prefersReducedMotion ? '' : 'animate-in fade-in zoom-in-95 duration-200'}`}
+                    className={`absolute w-12 h-12 rounded-full bg-white text-[#EA580C] flex items-center justify-center shadow-lg cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 ${prefersReducedMotion ? '' : 'animate-in fade-in zoom-in-95 duration-200'}`}
                     style={{ left: -72, top: -42, transform: 'translate(-50%, -50%)' }}
                   >
                     <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden="true">
@@ -959,7 +959,7 @@ export const StudentPortal: React.FC = () => {
                     role="menuitem"
                     onClick={fanWing(() => openChatSection('chats'))}
                     aria-label="Chats"
-                    className={`absolute w-14 h-14 rounded-full text-white flex items-facility justify-facility shadow-xl cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-200 ${prefersReducedMotion ? '' : 'animate-in fade-in zoom-in-95 duration-200'}`}
+                    className={`absolute w-14 h-14 rounded-full text-white flex items-center justify-center shadow-xl cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-200 ${prefersReducedMotion ? '' : 'animate-in fade-in zoom-in-95 duration-200'}`}
                     style={{ left: 0, top: -84, transform: 'translate(-50%, -50%)', background: 'linear-gradient(145deg, #EA580C, #9A3412)' }}
                   >
                     <MessageCircle className="w-7 h-7" />
@@ -973,7 +973,7 @@ export const StudentPortal: React.FC = () => {
                     role="menuitem"
                     onClick={fanWing(openTito)}
                     aria-label="Tutor AI"
-                    className={`absolute w-12 h-12 rounded-full bg-white text-[#EA580C] flex items-facility justify-facility shadow-lg cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 ${prefersReducedMotion ? '' : 'animate-in fade-in zoom-in-95 duration-200'}`}
+                    className={`absolute w-12 h-12 rounded-full bg-white text-[#EA580C] flex items-center justify-center shadow-lg cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 ${prefersReducedMotion ? '' : 'animate-in fade-in zoom-in-95 duration-200'}`}
                     style={{ left: 72, top: -42, transform: 'translate(-50%, -50%)' }}
                   >
                     <Sparkles className="w-6 h-6" />

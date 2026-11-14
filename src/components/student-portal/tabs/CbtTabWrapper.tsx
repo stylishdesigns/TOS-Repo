@@ -45,7 +45,7 @@ export const CbtTabWrapper: React.FC<CbtTabWrapperProps> = ({
             <button
               type="button"
               onClick={() => onMockViewChange('mock')}
-              className={`h-10 rounded-[10px] text-xs font-extrabold transition-all flex items-facility justify-facility cursor-pointer ${
+              className={`h-10 rounded-[10px] text-xs font-extrabold transition-all flex items-center justify-center cursor-pointer ${
                 mockView === 'mock'
                   ? 'bg-[#0F172A] text-white shadow-xs'
                   : 'text-[#64748B] hover:text-[#0F172A]'
@@ -56,7 +56,7 @@ export const CbtTabWrapper: React.FC<CbtTabWrapperProps> = ({
             <button
               type="button"
               onClick={() => onMockViewChange('leaderboard')}
-              className={`h-10 rounded-[10px] text-xs font-extrabold transition-all flex items-facility justify-facility cursor-pointer ${
+              className={`h-10 rounded-[10px] text-xs font-extrabold transition-all flex items-center justify-center cursor-pointer ${
                 mockView === 'leaderboard'
                   ? 'bg-[#0F172A] text-white shadow-xs'
                   : 'text-[#64748B] hover:text-[#0F172A]'
@@ -90,7 +90,7 @@ export const CbtTabWrapper: React.FC<CbtTabWrapperProps> = ({
           <button
             type="button"
             onClick={() => onPracticeViewChange('practice')}
-            className={`h-10 rounded-[10px] text-xs font-extrabold transition-all flex items-facility justify-facility cursor-pointer ${
+            className={`h-10 rounded-[10px] text-xs font-extrabold transition-all flex items-center justify-center cursor-pointer ${
               practiceView === 'practice'
                 ? 'bg-[#0F172A] text-white shadow-xs'
                 : 'text-[#64748B] hover:text-[#0F172A]'
@@ -101,7 +101,7 @@ export const CbtTabWrapper: React.FC<CbtTabWrapperProps> = ({
           <button
             type="button"
             onClick={() => onPracticeViewChange('analytics')}
-            className={`h-10 rounded-[10px] text-xs font-extrabold transition-all flex items-facility justify-facility cursor-pointer ${
+            className={`h-10 rounded-[10px] text-xs font-extrabold transition-all flex items-center justify-center cursor-pointer ${
               practiceView === 'analytics'
                 ? 'bg-[#0F172A] text-white shadow-xs'
                 : 'text-[#64748B] hover:text-[#0F172A]'

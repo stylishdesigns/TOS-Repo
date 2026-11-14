@@ -183,25 +183,25 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
         <div className="absolute bottom-0 left-10 w-24 h-24 bg-amber-500/10 rounded-full blur-xl pointer-events-none" />
 
         <div className="relative z-10 flex items-start justify-between gap-3">
-          <div className="flex items-facility space-x-3.5">
+          <div className="flex items-center space-x-3.5">
             <div className="relative">
               <img
                 src={studentAvatar}
                 alt={student.name}
                 className="w-14 h-14 rounded-2xl object-cover border-2 border-orange-500/70 shadow-md"
               />
-              <span className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 border-2 border-slate-900 rounded-full flex items-facility justify-facility">
+              <span className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 border-2 border-slate-900 rounded-full flex items-center justify-center">
                 <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
               </span>
             </div>
             <div>
-              <div className="flex items-facility space-x-1.5">
+              <div className="flex items-center space-x-1.5">
                 <span className="text-xs text-orange-400 font-semibold">{timeGreeting},</span>
               </div>
               <h2 className="text-lg font-black tracking-tight text-white line-clamp-1">
                 {student.name}
               </h2>
-              <p className="text-[10px] font-bold text-slate-400 mt-0.5 flex items-facility gap-1">
+              <p className="text-[10px] font-bold text-slate-400 mt-0.5 flex items-center gap-1">
                 <Calendar className="w-3 h-3 text-orange-400" />
                 <span>Day: {dateStr}</span>
               </p>
@@ -218,8 +218,8 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
         </div>
 
         {/* Programme Banner Pill */}
-        <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-facility justify-between text-xs">
-          <div className="flex items-facility space-x-1.5 text-slate-300">
+        <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs">
+          <div className="flex items-center space-x-1.5 text-slate-300">
             <BookOpen className="w-3.5 h-3.5 text-orange-400" />
             <span className="font-semibold">{student.programmeName}</span>
           </div>
@@ -228,8 +228,8 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
 
       {/* Attendance Clock In/Out Card */}
       <div className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-sm relative overflow-hidden">
-        <div className="flex items-facility justify-between mb-4">
-          <div className="flex items-facility space-x-2">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center space-x-2">
             <div className={`p-2 rounded-xl transition-colors ${student.attendancePercent > 90 ? 'bg-emerald-50 text-emerald-600' : 'bg-orange-50 text-orange-600'}`}>
               <ShieldCheck className="w-4 h-4" />
             </div>
@@ -254,7 +254,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
         </div>
 
         {/* Compact Controls */}
-        <div className="relative flex items-facility justify-between px-2 py-2">
+        <div className="relative flex items-center justify-between px-2 py-2">
             {/* Progress Connecting Line (Improved Visuals) */}
             <div className="absolute top-[33px] left-[45px] right-[45px] h-[6px] bg-slate-200 rounded-full z-0 overflow-hidden shadow-inner">
               <div 
@@ -264,11 +264,11 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
             </div>
 
             {/* Clock In Button */}
-            <div className="flex flex-col items-facility z-10">
+            <div className="flex flex-col items-center z-10">
               <button 
                 onClick={handleClockInAction}
                 disabled={!!clockedInAt}
-                className={`w-14 h-14 rounded-full flex flex-col items-facility justify-facility shadow-md active:scale-95 transition-all border-4 border-white ${
+                className={`w-14 h-14 rounded-full flex flex-col items-center justify-center shadow-md active:scale-95 transition-all border-4 border-white ${
                   clockedInAt 
                     ? 'bg-slate-700 text-white' 
                     : 'bg-[#475569] text-white'
@@ -278,7 +278,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
                 <span className="text-[10px] font-black">IN</span>
                 <span className="text-[7px] font-bold opacity-80 uppercase tracking-tighter">{attendanceSettings.resumptionTime || '8:00 AM'}</span>
               </button>
-              <div className="mt-1 h-3 flex items-facility justify-facility">
+              <div className="mt-1 h-3 flex items-center justify-center">
                 {isLate && clockedInAt && (
                   <span className="text-[7px] font-black uppercase text-amber-600">Late Arrival</span>
                 )}
@@ -286,8 +286,8 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
             </div>
 
             {/* Current Time Indicator (Compact) */}
-            <div className="flex flex-col items-facility justify-facility z-10">
-              <div className="w-12 h-12 rounded-full border-4 border-white bg-slate-50 flex flex-col items-facility justify-facility shadow-md ring-1 ring-slate-100">
+            <div className="flex flex-col items-center justify-center z-10">
+              <div className="w-12 h-12 rounded-full border-4 border-white bg-slate-50 flex flex-col items-center justify-center shadow-md ring-1 ring-slate-100">
                 <span className="text-slate-900 text-[9px] font-black">
                   {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
                 </span>
@@ -296,11 +296,11 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
             </div>
 
             {/* Clock Out Button */}
-            <div className="flex flex-col items-facility z-10">
+            <div className="flex flex-col items-center z-10">
               <button 
                 onClick={handleClockOutAction}
                 disabled={!clockedInAt || clockedOutAt || !isClosingTime}
-                className={`w-14 h-14 rounded-full flex flex-col items-facility justify-facility shadow-md active:scale-95 transition-all border-4 border-white ${
+                className={`w-14 h-14 rounded-full flex flex-col items-center justify-center shadow-md active:scale-95 transition-all border-4 border-white ${
                   clockedOutAt
                     ? 'bg-emerald-600 text-white'
                     : clockedInAt && isClosingTime
@@ -312,7 +312,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
                 <span className="text-[10px] font-black">OUT</span>
                 <span className="text-[7px] font-bold opacity-80 uppercase tracking-tighter">{attendanceSettings.closingTime || '03:30 PM'}</span>
               </button>
-              <div className="mt-1 h-3 flex items-facility justify-facility">
+              <div className="mt-1 h-3 flex items-center justify-center">
                 {clockedInAt && !isClosingTime && !clockedOutAt && (
                   <span className="text-[7px] font-bold text-slate-400 uppercase italic">On-going</span>
                 )}
@@ -326,7 +326,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
         <div className="absolute -right-4 -bottom-4 opacity-15">
           <Flame className="w-28 h-28" />
         </div>
-        <div className="relative z-10 flex items-facility justify-between">
+        <div className="relative z-10 flex items-center justify-between">
           <div className="space-y-0.5">
             <span className="text-[10px] font-bold tracking-wider uppercase opacity-90">
               Target Examination Milestone
@@ -334,7 +334,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
             <h3 className="text-base font-black">JAMB UTME 2026</h3>
             <p className="text-xs text-orange-100">Intensive cohort syllabus is 74% complete</p>
           </div>
-          <div className="text-facility bg-black/20 backdrop-blur-xs px-3.5 py-2 rounded-xl border border-white/20">
+          <div className="text-center bg-black/20 backdrop-blur-xs px-3.5 py-2 rounded-xl border border-white/20">
             <span className="text-2xl font-black block leading-none">{daysLeft}</span>
             <span className="text-[9px] uppercase tracking-wider font-bold text-orange-100">Days Left</span>
           </div>
@@ -348,8 +348,8 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
           onClick={() => onNavigateTab('results')}
           className="text-left bg-white p-4 sm:p-4.5 rounded-2xl border border-slate-200/90 shadow-sm hover:border-orange-400 hover:shadow-md transition-all active:scale-98 flex flex-col justify-between min-h-[112px] group"
         >
-          <div className="flex items-facility justify-between text-slate-400 mb-2">
-            <div className="w-8 h-8 rounded-xl bg-orange-50 flex items-facility justify-facility text-orange-600 group-hover:scale-105 transition-transform">
+          <div className="flex items-center justify-between text-slate-400 mb-2">
+            <div className="w-8 h-8 rounded-xl bg-orange-50 flex items-center justify-center text-orange-600 group-hover:scale-105 transition-transform">
               <TrendingUp className="w-4.5 h-4.5" />
             </div>
             {latestMock && latestMock.rank > 0 ? (
@@ -375,8 +375,8 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
           onClick={() => onNavigateTab('more')}
           className="text-left bg-white p-4 sm:p-4.5 rounded-2xl border border-slate-200/90 shadow-sm hover:border-emerald-400 hover:shadow-md transition-all active:scale-98 flex flex-col justify-between min-h-[112px] group"
         >
-          <div className="flex items-facility justify-between text-slate-400 mb-2">
-            <div className="w-8 h-8 rounded-xl bg-emerald-50 flex items-facility justify-facility text-emerald-600 group-hover:scale-105 transition-transform">
+          <div className="flex items-center justify-between text-slate-400 mb-2">
+            <div className="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 group-hover:scale-105 transition-transform">
               <CheckCircle2 className="w-4.5 h-4.5" />
             </div>
             <span className="text-[10px] font-black px-2 py-0.5 bg-emerald-100/80 text-emerald-800 rounded-lg">
@@ -396,8 +396,8 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
           onClick={() => onNavigateTab('more')}
           className="text-left bg-white p-4 sm:p-4.5 rounded-2xl border border-slate-200/90 shadow-sm hover:border-blue-400 hover:shadow-md transition-all active:scale-98 flex flex-col justify-between min-h-[112px] group"
         >
-          <div className="flex items-facility justify-between text-slate-400 mb-2">
-            <div className="w-8 h-8 rounded-xl bg-blue-50 flex items-facility justify-facility text-blue-600 group-hover:scale-105 transition-transform">
+          <div className="flex items-center justify-between text-slate-400 mb-2">
+            <div className="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 group-hover:scale-105 transition-transform">
               <CreditCard className="w-4.5 h-4.5" />
             </div>
             <span
@@ -425,8 +425,8 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
           onClick={() => setShowCalendar(true)}
           className="text-left bg-white p-4 sm:p-4.5 rounded-2xl border border-slate-200/90 shadow-sm hover:border-[#EA580C] hover:shadow-md transition-all active:scale-98 flex flex-col justify-between min-h-[112px] group cursor-pointer"
         >
-          <div className="flex items-facility justify-between text-slate-400 mb-2">
-            <div className="w-8 h-8 rounded-xl bg-orange-50 flex items-facility justify-facility text-[#EA580C] group-hover:scale-105 transition-transform">
+          <div className="flex items-center justify-between text-slate-400 mb-2">
+            <div className="w-8 h-8 rounded-xl bg-orange-50 flex items-center justify-center text-[#EA580C] group-hover:scale-105 transition-transform">
               <Calendar className="w-4.5 h-4.5" />
             </div>
             <span className="text-[10px] font-black px-2 py-0.5 bg-orange-100 text-[#C2410C] rounded-lg">
@@ -446,10 +446,10 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
       <div className="grid grid-cols-2 gap-3">
         <button
           onClick={() => onNavigateTab('cbt')}
-          className="flex items-facility justify-between p-4 bg-gradient-to-br from-orange-50 via-amber-50/70 to-orange-50 rounded-2xl border border-orange-200/90 hover:border-orange-400 hover:shadow-md transition-all text-left shadow-2xs group active:scale-98"
+          className="flex items-center justify-between p-4 bg-gradient-to-br from-orange-50 via-amber-50/70 to-orange-50 rounded-2xl border border-orange-200/90 hover:border-orange-400 hover:shadow-md transition-all text-left shadow-2xs group active:scale-98"
         >
           <div className="space-y-1">
-            <div className="flex items-facility space-x-2 text-sm font-black text-orange-950">
+            <div className="flex items-center space-x-2 text-sm font-black text-orange-950">
               <Laptop className="w-5 h-5 text-[#EA580C]" />
               <span>Launch CBT</span>
             </div>
@@ -460,10 +460,10 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
 
         <button
           onClick={() => onNavigateTab('classes')}
-          className="flex items-facility justify-between p-4 bg-gradient-to-br from-slate-50 via-slate-100/70 to-slate-50 rounded-2xl border border-slate-200/90 hover:border-slate-300 hover:shadow-md transition-all text-left shadow-2xs group active:scale-98"
+          className="flex items-center justify-between p-4 bg-gradient-to-br from-slate-50 via-slate-100/70 to-slate-50 rounded-2xl border border-slate-200/90 hover:border-slate-300 hover:shadow-md transition-all text-left shadow-2xs group active:scale-98"
         >
           <div className="space-y-1">
-            <div className="flex items-facility space-x-2 text-sm font-black text-slate-900">
+            <div className="flex items-center space-x-2 text-sm font-black text-slate-900">
               <Calendar className="w-5 h-5 text-slate-700" />
               <span>Timetable</span>
             </div>
@@ -475,8 +475,8 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
 
       {/* 5. Today's Lectures Widget */}
       <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs space-y-3">
-        <div className="flex items-facility justify-between">
-          <div className="flex items-facility space-x-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
             <Clock className="w-4 h-4 text-[#EA580C]" />
             <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
               Today's Lectures ({todayClasses.length})
@@ -492,7 +492,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
 
         <div className="space-y-2">
           {todayClasses.length === 0 ? (
-            <p className="text-xs text-slate-400 text-facility py-4">No classes scheduled for today.</p>
+            <p className="text-xs text-slate-400 text-center py-4">No classes scheduled for today.</p>
           ) : (
             todayClasses.map((slot) => {
               const inSession = isInSession(slot.time, slot.date);
@@ -503,25 +503,25 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
                 <div
                   key={slot.id}
                   onClick={() => onNavigateTab('classes')}
-                  className={`p-3 rounded-xl border flex items-facility justify-between transition-all cursor-pointer ${
+                  className={`p-3 rounded-xl border flex items-center justify-between transition-all cursor-pointer ${
                     inSession
                       ? 'bg-emerald-50 border-emerald-200 shadow-2xs'
                       : finished ? 'bg-slate-50 border-slate-100 opacity-60' : 'bg-white border-slate-200/70 hover:border-orange-200'
                   }`}
                 >
                   <div className="space-y-0.5">
-                    <div className="flex items-facility space-x-2">
+                    <div className="flex items-center space-x-2">
                       <span className="text-xs font-black text-slate-900">{slot.subject}</span>
                       {inSession ? (
-                        <span className="inline-flex items-facility px-2 py-1 rounded-full text-[9px] font-black uppercase bg-emerald-600 text-white border-2 border-emerald-500 shadow-sm animate-pulse">
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-[9px] font-black uppercase bg-emerald-600 text-white border-2 border-emerald-500 shadow-sm animate-pulse">
                           ● In-Session
                         </span>
                       ) : finished ? (
-                        <span className="inline-flex items-facility px-2 py-1 rounded-full text-[9px] font-black uppercase bg-slate-200 text-slate-600 border border-slate-300">
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-[9px] font-black uppercase bg-slate-200 text-slate-600 border border-slate-300">
                           Completed
                         </span>
                       ) : isNextUp(slot.time, slot.date) ? (
-                        <span className="inline-flex items-facility px-2 py-1 rounded-full text-[9px] font-black uppercase bg-blue-600 text-white border-2 border-blue-500 shadow-sm">
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-[9px] font-black uppercase bg-blue-600 text-white border-2 border-blue-500 shadow-sm">
                           Next Up
                         </span>
                       ) : null}
@@ -567,10 +567,10 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
         href={`https://wa.me/${(settings.whatsappNumber || settings.whatsapp || settings.phone).replace(/\D/g, '')}`}
         target="_blank"
         rel="noreferrer"
-        className="flex items-facility justify-between p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-emerald-900 hover:bg-emerald-100/80 transition-all shadow-2xs"
+        className="flex items-center justify-between p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-emerald-900 hover:bg-emerald-100/80 transition-all shadow-2xs"
       >
-        <div className="flex items-facility space-x-3">
-          <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-facility justify-facility shrink-0">
+        <div className="flex items-center space-x-3">
+          <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0">
             <MessageSquare className="w-5 h-5" />
           </div>
           <div>

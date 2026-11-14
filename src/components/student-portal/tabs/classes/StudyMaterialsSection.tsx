@@ -126,7 +126,7 @@ export const StudyMaterialsSection: React.FC<StudyMaterialsSectionProps> = ({
       </div>
 
       {/* Subject Filter Pills */}
-      <div className="flex items-facility space-x-1.5 overflow-x-auto pb-1 -mx-1 px-1 no-scrollbar">
+      <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 -mx-1 px-1 no-scrollbar">
         <button
           type="button"
           onClick={() => setSelectedSubject('All')}
@@ -161,8 +161,8 @@ export const StudyMaterialsSection: React.FC<StudyMaterialsSectionProps> = ({
       {/* Materials List */}
       <div className="space-y-3">
         {filteredMaterials.length === 0 ? (
-          <div className="text-facility py-12 bg-white rounded-2xl border border-slate-200/90 p-6 space-y-3">
-            <div className="w-12 h-12 rounded-2xl bg-orange-50 border border-orange-100 text-[#EA580C] flex items-facility justify-facility mx-auto">
+          <div className="text-center py-12 bg-white rounded-2xl border border-slate-200/90 p-6 space-y-3">
+            <div className="w-12 h-12 rounded-2xl bg-orange-50 border border-orange-100 text-[#EA580C] flex items-center justify-center mx-auto">
               <BookOpen className="w-6 h-6" />
             </div>
             <h4 className="text-sm font-black text-slate-900">No Study Materials Found</h4>
@@ -175,7 +175,7 @@ export const StudyMaterialsSection: React.FC<StudyMaterialsSectionProps> = ({
               <button
                 type="button"
                 onClick={onSwitchToTimetable}
-                className="inline-flex items-facility space-x-1.5 px-4 py-2 rounded-xl bg-slate-900 text-white font-extrabold text-xs shadow-sm hover:bg-slate-800 transition-all cursor-pointer"
+                className="inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-slate-900 text-white font-extrabold text-xs shadow-sm hover:bg-slate-800 transition-all cursor-pointer"
               >
                 <span>View Timetable</span>
               </button>
@@ -196,14 +196,14 @@ export const StudyMaterialsSection: React.FC<StudyMaterialsSectionProps> = ({
                 className="bg-white rounded-[20px] p-4.5 border border-[#E2E8F0] shadow-2xs hover:border-slate-300 transition-all cursor-pointer space-y-3 group active:scale-[0.99]"
               >
                 {/* Top Row: Subject Badge + File Type/Size */}
-                <div className="flex items-facility justify-between gap-2">
+                <div className="flex items-center justify-between gap-2">
                   <span
-                    className={`inline-flex items-facility px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider border ${style.bg} ${style.text} ${style.border}`}
+                    className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider border ${style.bg} ${style.text} ${style.border}`}
                   >
                     {material.subject}
                   </span>
 
-                  <span className="text-[11px] font-mono font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded-md border border-slate-200/60 flex items-facility gap-1">
+                  <span className="text-[11px] font-mono font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded-md border border-slate-200/60 flex items-center gap-1">
                     <FileText className="w-3 h-3 text-slate-400" />
                     <span>{material.fileType || 'PDF'}</span>
                     {material.fileSize && <span>· {material.fileSize}</span>}
@@ -228,8 +228,8 @@ export const StudyMaterialsSection: React.FC<StudyMaterialsSectionProps> = ({
                 </div>
 
                 {/* Footer Row: Tutor info & Action buttons */}
-                <div className="pt-2 border-t border-slate-100 flex items-facility justify-between gap-3 text-xs">
-                  <div className="flex items-facility space-x-1.5 text-slate-500 font-medium truncate">
+                <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center space-x-1.5 text-slate-500 font-medium truncate">
                     <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                     <span className="truncate">{material.tutorName || 'Course Tutor'}</span>
                     <span className="text-slate-300">·</span>
@@ -238,11 +238,11 @@ export const StudyMaterialsSection: React.FC<StudyMaterialsSectionProps> = ({
                     </span>
                   </div>
 
-                  <div className="flex items-facility space-x-2 shrink-0">
+                  <div className="flex items-center space-x-2 shrink-0">
                     <button
                       type="button"
                       onClick={(e) => handleDownload(material, e)}
-                      className="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-[11px] flex items-facility space-x-1 cursor-pointer transition-colors active:scale-95"
+                      className="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-[11px] flex items-center space-x-1 cursor-pointer transition-colors active:scale-95"
                       title="Download PDF Handout"
                     >
                       <Download className="w-3 h-3 text-slate-500" />
@@ -252,7 +252,7 @@ export const StudyMaterialsSection: React.FC<StudyMaterialsSectionProps> = ({
                     <button
                       type="button"
                       onClick={() => setReadingMaterial(material)}
-                      className="px-3 py-1.5 rounded-lg bg-[#C2410C] hover:bg-[#EA580C] text-white font-extrabold text-[11px] flex items-facility space-x-1 shadow-2xs cursor-pointer transition-all active:scale-95"
+                      className="px-3 py-1.5 rounded-lg bg-[#C2410C] hover:bg-[#EA580C] text-white font-extrabold text-[11px] flex items-center space-x-1 shadow-2xs cursor-pointer transition-all active:scale-95"
                     >
                       <span>Read</span>
                     </button>
@@ -270,7 +270,7 @@ export const StudyMaterialsSection: React.FC<StudyMaterialsSectionProps> = ({
           role="dialog"
           aria-modal="true"
           aria-label={readingMaterial.title}
-          className="fixed inset-0 z-50 flex items-facility justify-facility p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-200"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-200"
           onClick={() => setReadingMaterial(null)}
         >
           <div
@@ -295,7 +295,7 @@ export const StudyMaterialsSection: React.FC<StudyMaterialsSectionProps> = ({
                 type="button"
                 onClick={() => setReadingMaterial(null)}
                 aria-label="Close"
-                className="w-9 h-9 rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-facility justify-facility cursor-pointer shrink-0 transition-colors"
+                className="w-9 h-9 rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center cursor-pointer shrink-0 transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -304,7 +304,7 @@ export const StudyMaterialsSection: React.FC<StudyMaterialsSectionProps> = ({
             {/* Modal Content Scroll */}
             <div className="flex-1 overflow-y-auto py-4 space-y-4 text-xs text-slate-700 leading-relaxed font-medium">
               <div className="p-3.5 bg-orange-50/60 rounded-2xl border border-orange-100 space-y-1">
-                <h4 className="text-xs font-black text-[#C2410C] uppercase tracking-wider flex items-facility gap-1.5">
+                <h4 className="text-xs font-black text-[#C2410C] uppercase tracking-wider flex items-center gap-1.5">
                   <Sparkles className="w-3.5 h-3.5" />
                   <span>Overview & Objectives</span>
                 </h4>
@@ -315,7 +315,7 @@ export const StudyMaterialsSection: React.FC<StudyMaterialsSectionProps> = ({
               </div>
 
               <div className="space-y-2">
-                <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-facility gap-1.5">
+                <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
                   <BookOpen className="w-3.5 h-3.5 text-slate-500" />
                   <span>Key Points & Summary</span>
                 </h4>
@@ -335,7 +335,7 @@ export const StudyMaterialsSection: React.FC<StudyMaterialsSectionProps> = ({
             </div>
 
             {/* Modal Footer */}
-            <div className="pt-3 border-t border-slate-100 flex items-facility justify-between gap-3">
+            <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-3">
               <button
                 type="button"
                 onClick={() => setReadingMaterial(null)}
@@ -347,7 +347,7 @@ export const StudyMaterialsSection: React.FC<StudyMaterialsSectionProps> = ({
               <button
                 type="button"
                 onClick={() => handleDownload(readingMaterial)}
-                className="h-11 px-5 rounded-xl bg-[#C2410C] hover:bg-[#EA580C] text-white font-extrabold text-xs flex items-facility space-x-2 shadow-sm transition-all cursor-pointer active:scale-95"
+                className="h-11 px-5 rounded-xl bg-[#C2410C] hover:bg-[#EA580C] text-white font-extrabold text-xs flex items-center space-x-2 shadow-sm transition-all cursor-pointer active:scale-95"
               >
                 <Download className="w-4 h-4" />
                 <span>Download Full Handout ({readingMaterial.fileSize || '2.4 MB'})</span>

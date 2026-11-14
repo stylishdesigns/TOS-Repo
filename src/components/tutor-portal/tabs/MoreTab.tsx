@@ -115,11 +115,11 @@ export const MoreTab: React.FC<MoreTabProps> = ({ tutor, onExit }) => {
   return (
     <div className="p-5 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-32">
       {/* 1. Header Profile */}
-      <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-2xs flex flex-col items-facility text-facility space-y-3">
+      <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-2xs flex flex-col items-center text-center space-y-3">
         <div className="relative">
           <button
             onClick={() => avatarRef.current?.click()}
-            className="w-20 h-20 rounded-full bg-slate-100 border-4 border-white shadow-md flex items-facility justify-facility text-2xl font-black text-slate-400 overflow-hidden active:scale-95 transition"
+            className="w-20 h-20 rounded-full bg-slate-100 border-4 border-white shadow-md flex items-center justify-center text-2xl font-black text-slate-400 overflow-hidden active:scale-95 transition"
             aria-label="Change profile photo"
           >
             {tutor.avatar ? (
@@ -129,11 +129,11 @@ export const MoreTab: React.FC<MoreTabProps> = ({ tutor, onExit }) => {
             )}
           </button>
           {uploadingAvatar ? (
-            <div className="absolute inset-0 rounded-full bg-slate-900/40 flex items-facility justify-facility">
+            <div className="absolute inset-0 rounded-full bg-slate-900/40 flex items-center justify-center">
               <Loader2 className="w-6 h-6 animate-spin text-white" />
             </div>
           ) : (
-            <div className="absolute bottom-0 right-0 w-7 h-7 bg-[#EA580C] border-2 border-white rounded-full shadow-sm flex items-facility justify-facility">
+            <div className="absolute bottom-0 right-0 w-7 h-7 bg-[#EA580C] border-2 border-white rounded-full shadow-sm flex items-center justify-center">
               <Camera className="w-3.5 h-3.5 text-white" />
             </div>
           )}
@@ -158,9 +158,9 @@ export const MoreTab: React.FC<MoreTabProps> = ({ tutor, onExit }) => {
       <div className="space-y-2">
         <button
           onClick={() => { setDraftName(tutor.name); setDraftPhone(tutor.phone || ''); setDraftBio(tutor.bio || ''); setEditOpen(true); }}
-          className="w-full bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs flex items-facility justify-between group active:scale-[0.98] transition-all"
+          className="w-full bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs flex items-center justify-between group active:scale-[0.98] transition-all"
         >
-          <div className="flex items-facility space-x-3">
+          <div className="flex items-center space-x-3">
             <div className="p-2 rounded-xl bg-orange-50 text-orange-500">
               <User className="w-5 h-5" />
             </div>
@@ -171,15 +171,15 @@ export const MoreTab: React.FC<MoreTabProps> = ({ tutor, onExit }) => {
 
         <button
           onClick={() => setThemeOpen(true)}
-          className="w-full bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs flex items-facility justify-between group active:scale-[0.98] transition-all"
+          className="w-full bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs flex items-center justify-between group active:scale-[0.98] transition-all"
         >
-          <div className="flex items-facility space-x-3">
+          <div className="flex items-center space-x-3">
             <div className="p-2 rounded-xl bg-violet-50 text-violet-500">
               <Palette className="w-5 h-5" />
             </div>
             <span className="text-xs font-black text-slate-700 tracking-tight">Appearance</span>
           </div>
-          <span className="flex items-facility gap-2">
+          <span className="flex items-center gap-2">
             <span className="text-[10px] font-bold text-slate-400 capitalize">{selectedTheme}</span>
             <ChevronRightSpacer />
           </span>
@@ -189,8 +189,8 @@ export const MoreTab: React.FC<MoreTabProps> = ({ tutor, onExit }) => {
       {/* 3. My Centres Switcher */}
       {userCentres.length > 0 && (
         <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-2xs space-y-3">
-          <div className="flex items-facility justify-between">
-            <span className="text-xs font-black text-slate-800 tracking-tight flex items-facility gap-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-black text-slate-800 tracking-tight flex items-center gap-2">
               <Building2 className="w-4 h-4 text-orange-500" />
               <span>My Facilities</span>
             </span>
@@ -206,14 +206,14 @@ export const MoreTab: React.FC<MoreTabProps> = ({ tutor, onExit }) => {
                 <button
                   key={centre.centreId}
                   onClick={() => !isActive && switchCentre(centre.centreId)}
-                  className={`w-full p-3 rounded-2xl border text-left flex items-facility justify-between transition-all ${
+                  className={`w-full p-3 rounded-2xl border text-left flex items-center justify-between transition-all ${
                     isActive
                       ? 'border-orange-500/50 bg-orange-50/50 text-slate-900 cursor-default'
                       : 'border-slate-100 hover:border-slate-300 hover:bg-slate-50 text-slate-600 cursor-pointer active:scale-[0.98]'
                   }`}
                 >
-                  <div className="flex items-facility space-x-3">
-                    <div className={`w-8 h-8 rounded-xl flex items-facility justify-facility font-bold text-xs ${
+                  <div className="flex items-center space-x-3">
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs ${
                       isActive ? 'bg-orange-500 text-white' : 'bg-slate-100 text-slate-500'
                     }`}>
                       {centre.centreName.charAt(0)}
@@ -224,7 +224,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ tutor, onExit }) => {
                     </div>
                   </div>
                   {isActive ? (
-                    <span className="px-2 py-0.5 rounded-full bg-emerald-500 text-white text-[10px] font-bold flex items-facility gap-1">
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-500 text-white text-[10px] font-bold flex items-center gap-1">
                       <Check className="w-3 h-3" />
                       Active
                     </span>
@@ -244,9 +244,9 @@ export const MoreTab: React.FC<MoreTabProps> = ({ tutor, onExit }) => {
       <div className="pt-2">
         <button
           onClick={onExit}
-          className="w-full p-4 rounded-2xl border border-rose-100 bg-rose-50 flex items-facility justify-between group active:scale-[0.98] transition-all"
+          className="w-full p-4 rounded-2xl border border-rose-100 bg-rose-50 flex items-center justify-between group active:scale-[0.98] transition-all"
         >
-          <div className="flex items-facility space-x-3">
+          <div className="flex items-center space-x-3">
             <div className="p-2 rounded-xl bg-rose-500 text-white">
               <LogOut className="w-5 h-5" />
             </div>
@@ -260,9 +260,9 @@ export const MoreTab: React.FC<MoreTabProps> = ({ tutor, onExit }) => {
       {editOpen && (
         <div className="fixed inset-0 z-[80] bg-slate-950/50 flex flex-col justify-end" onClick={() => { if (!saving) setEditOpen(false); }}>
           <div className="bg-white rounded-t-3xl max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="sticky top-0 bg-white rounded-t-3xl border-b border-slate-100 px-5 pt-4 pb-3 flex items-facility justify-between">
+            <div className="sticky top-0 bg-white rounded-t-3xl border-b border-slate-100 px-5 pt-4 pb-3 flex items-center justify-between">
               <h3 className="text-base font-black text-slate-900">Profile setup</h3>
-              <button onClick={() => setEditOpen(false)} className="w-8 h-8 rounded-full bg-slate-100 flex items-facility justify-facility text-slate-500" aria-label="Close">
+              <button onClick={() => setEditOpen(false)} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500" aria-label="Close">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -311,7 +311,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ tutor, onExit }) => {
               <button
                 onClick={saveProfile}
                 disabled={saving}
-                className="w-full py-3.5 rounded-2xl bg-[#EA580C] text-white text-sm font-black active:scale-[0.99] transition disabled:opacity-60 flex items-facility justify-facility gap-2"
+                className="w-full py-3.5 rounded-2xl bg-[#EA580C] text-white text-sm font-black active:scale-[0.99] transition disabled:opacity-60 flex items-center justify-center gap-2"
               >
                 {saving && <Loader2 className="w-4 h-4 animate-spin" />} Save changes
               </button>
@@ -324,9 +324,9 @@ export const MoreTab: React.FC<MoreTabProps> = ({ tutor, onExit }) => {
       {themeOpen && (
         <div className="fixed inset-0 z-[80] bg-slate-950/50 flex flex-col justify-end" onClick={() => setThemeOpen(false)}>
           <div className="bg-white rounded-t-3xl" onClick={(e) => e.stopPropagation()}>
-            <div className="px-5 pt-4 pb-2 flex items-facility justify-between">
+            <div className="px-5 pt-4 pb-2 flex items-center justify-between">
               <h3 className="text-lg font-black text-slate-900">Appearance</h3>
-              <button onClick={() => setThemeOpen(false)} className="w-8 h-8 rounded-full bg-slate-100 flex items-facility justify-facility text-slate-500" aria-label="Close">
+              <button onClick={() => setThemeOpen(false)} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500" aria-label="Close">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -338,11 +338,11 @@ export const MoreTab: React.FC<MoreTabProps> = ({ tutor, onExit }) => {
                   <button
                     key={item.id}
                     onClick={() => applyTheme(item.id)}
-                    className={`w-full flex items-facility gap-3 px-4 py-3.5 rounded-2xl border text-left transition ${
+                    className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border text-left transition ${
                       active ? 'border-orange-400 bg-orange-50' : 'border-slate-200 bg-white active:scale-[0.99]'
                     }`}
                   >
-                    <span className={`w-10 h-10 rounded-xl flex items-facility justify-facility ${active ? 'bg-orange-500 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                    <span className={`w-10 h-10 rounded-xl flex items-center justify-center ${active ? 'bg-orange-500 text-white' : 'bg-slate-100 text-slate-500'}`}>
                       <item.icon className="w-5 h-5" />
                     </span>
                     <span className="flex-1 min-w-0">
@@ -353,7 +353,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ tutor, onExit }) => {
                   </button>
                 );
               })}
-              <p className="text-[10px] text-slate-400 font-medium pt-1 flex items-facility gap-1.5">
+              <p className="text-[10px] text-slate-400 font-medium pt-1 flex items-center gap-1.5">
                 <Monitor className="w-3.5 h-3.5" /> Dark mode dims the screens that support it.
               </p>
             </div>

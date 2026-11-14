@@ -96,13 +96,13 @@ export const CentreCodeGate: React.FC<CentreCodeGateProps> = ({ onProceed, onBac
   };
 
   return (
-    <div className="min-h-screen w-full flex items-facility justify-facility bg-slate-950 p-4 relative overflow-hidden select-none">
+    <div className="min-h-screen w-full flex items-center justify-center bg-slate-950 p-4 relative overflow-hidden select-none">
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[550px] h-[550px] bg-orange-600/10 rounded-full blur-[140px] pointer-events-none" />
       <div className="absolute bottom-10 right-10 w-80 h-80 bg-blue-600/10 rounded-full blur-[120px] pointer-events-none" />
 
       <div className="w-full max-w-md bg-slate-900/90 border border-slate-800/80 rounded-3xl p-8 backdrop-blur-xl shadow-2xl relative z-10">
-        <div className="flex flex-col items-facility text-facility mb-8">
-          <div className="w-16 h-16 rounded-2xl bg-orange-500/10 border border-orange-500/20 flex items-facility justify-facility text-orange-500 shadow-inner shadow-orange-500/20 mb-4">
+        <div className="flex flex-col items-center text-center mb-8">
+          <div className="w-16 h-16 rounded-2xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-500 shadow-inner shadow-orange-500/20 mb-4">
             <Building2 className="w-8 h-8" />
           </div>
           <h1 className="text-2xl font-black tracking-tight text-white mb-2">Which facility?</h1>
@@ -120,7 +120,7 @@ export const CentreCodeGate: React.FC<CentreCodeGateProps> = ({ onProceed, onBac
 
         {!centre ? (
           <form onSubmit={handleLookup} className="space-y-6">
-            <div className="flex justify-between items-facility gap-2 sm:gap-3 py-2">
+            <div className="flex justify-between items-center gap-2 sm:gap-3 py-2">
               {digits.map((digit, idx) => (
                 <input
                   key={idx}
@@ -134,7 +134,7 @@ export const CentreCodeGate: React.FC<CentreCodeGateProps> = ({ onProceed, onBac
                   onKeyDown={(e) => handleKeyDown(idx, e)}
                   onPaste={handlePaste}
                   autoComplete="one-time-code"
-                  className={`w-12 h-14 sm:w-13 sm:h-16 text-facility text-2xl font-black rounded-2xl border transition-all duration-200 outline-none
+                  className={`w-12 h-14 sm:w-13 sm:h-16 text-center text-2xl font-black rounded-2xl border transition-all duration-200 outline-none
                     ${
                       digit
                         ? 'border-orange-500 bg-orange-500/10 text-white shadow-lg shadow-orange-500/10'
@@ -147,7 +147,7 @@ export const CentreCodeGate: React.FC<CentreCodeGateProps> = ({ onProceed, onBac
             <button
               type="submit"
               disabled={!isComplete || checking}
-              className={`w-full py-4 rounded-2xl font-bold text-sm tracking-wide transition-all duration-200 flex items-facility justify-facility gap-2 shadow-lg
+              className={`w-full py-4 rounded-2xl font-bold text-sm tracking-wide transition-all duration-200 flex items-center justify-center gap-2 shadow-lg
                 ${
                   isComplete && !checking
                     ? 'bg-orange-600 hover:bg-orange-500 text-white shadow-orange-600/30 cursor-pointer active:scale-[0.98]'
@@ -169,8 +169,8 @@ export const CentreCodeGate: React.FC<CentreCodeGateProps> = ({ onProceed, onBac
           </form>
         ) : (
           <div className="space-y-6">
-            <div className="p-5 rounded-2xl bg-slate-800/60 border border-slate-700/60 text-facility">
-              <div className="w-12 h-12 mx-auto rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-facility justify-facility text-orange-400 mb-3">
+            <div className="p-5 rounded-2xl bg-slate-800/60 border border-slate-700/60 text-center">
+              <div className="w-12 h-12 mx-auto rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-400 mb-3">
                 <Building2 className="w-6 h-6" />
               </div>
               <p className="text-[11px] uppercase tracking-widest text-slate-500 font-bold mb-1">You are entering</p>
@@ -186,7 +186,7 @@ export const CentreCodeGate: React.FC<CentreCodeGateProps> = ({ onProceed, onBac
               type="button"
               disabled={!!centre.suspended}
               onClick={() => onProceed(pendingCode, centre.centreName, centre.centreId)}
-              className={`w-full py-4 rounded-2xl font-bold text-sm tracking-wide transition-all duration-200 flex items-facility justify-facility gap-2 shadow-lg
+              className={`w-full py-4 rounded-2xl font-bold text-sm tracking-wide transition-all duration-200 flex items-center justify-center gap-2 shadow-lg
                 ${
                   centre.suspended
                     ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700/50'
@@ -200,7 +200,7 @@ export const CentreCodeGate: React.FC<CentreCodeGateProps> = ({ onProceed, onBac
             <button
               type="button"
               onClick={reset}
-              className="w-full text-xs text-slate-400 hover:text-slate-300 font-semibold transition-colors flex items-facility justify-facility gap-1.5 cursor-pointer"
+              className="w-full text-xs text-slate-400 hover:text-slate-300 font-semibold transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <RefreshCw className="w-3.5 h-3.5" />
               <span>Wrong facility? Change the code</span>
@@ -208,11 +208,11 @@ export const CentreCodeGate: React.FC<CentreCodeGateProps> = ({ onProceed, onBac
           </div>
         )}
 
-        <div className="mt-8 pt-6 border-t border-slate-800/80 flex flex-col items-facility gap-2">
+        <div className="mt-8 pt-6 border-t border-slate-800/80 flex flex-col items-center gap-2">
           <button
             type="button"
             onClick={onBack}
-            className="text-[11px] text-slate-600 hover:text-slate-400 font-medium transition-colors flex items-facility gap-1.5 cursor-pointer"
+            className="text-[11px] text-slate-600 hover:text-slate-400 font-medium transition-colors flex items-center gap-1.5 cursor-pointer"
           >
             <ArrowRight className="w-3.5 h-3.5 rotate-180" />
             <span>Back to landing page</span>

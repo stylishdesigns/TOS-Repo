@@ -272,20 +272,20 @@ const ChannelTab: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
   };
 
   if (loading && !state) {
-    return <div className="py-14 flex items-facility justify-facility text-slate-400"><Loader2 className="w-5 h-5 animate-spin" /></div>;
+    return <div className="py-14 flex items-center justify-center text-slate-400"><Loader2 className="w-5 h-5 animate-spin" /></div>;
   }
 
   if (!state || !state.channel) {
     return (
       <Card>
         <div className="flex items-start gap-3">
-          <div className="w-9 h-9 rounded-xl bg-orange-500/15 flex items-facility justify-facility shrink-0"><Megaphone className="w-4.5 h-4.5 text-orange-300" /></div>
+          <div className="w-9 h-9 rounded-xl bg-orange-500/15 flex items-center justify-center shrink-0"><Megaphone className="w-4.5 h-4.5 text-orange-300" /></div>
           <div className="min-w-0 flex-1">
             <p className="text-sm font-bold text-slate-100">No channels yet</p>
             <p className="text-xs text-slate-400 mt-1">Each channel reaches one audience: students, tutors or facility admins. Only TOS posts; that audience reads. Create as many as you need.</p>
             <div className="mt-3 flex gap-2">
               <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Channel name, e.g. Mock and Practice" className="flex-1 min-w-0 bg-slate-950/60 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:border-orange-400/60 focus:outline-none" />
-              <button onClick={createChannel} disabled={busy} className="inline-flex items-facility gap-2 px-4 py-2 rounded-xl text-sm font-bold bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-50 shrink-0">
+              <button onClick={createChannel} disabled={busy} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-50 shrink-0">
                 {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Create
               </button>
             </div>
@@ -300,9 +300,9 @@ const ChannelTab: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
     <div className="space-y-4">
       <Card>
         <div className="space-y-2.5">
-          <div className="flex items-facility justify-between gap-3 flex-wrap">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
             <p className="text-sm font-bold text-slate-100">{state.channel.name}</p>
-            <button onClick={load} className="inline-flex items-facility gap-2 px-3 py-2 rounded-xl text-xs font-bold text-slate-300 border border-white/10 hover:border-white/25"><RefreshCw className="w-3.5 h-3.5" /> Refresh</button>
+            <button onClick={load} className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold text-slate-300 border border-white/10 hover:border-white/25"><RefreshCw className="w-3.5 h-3.5" /> Refresh</button>
           </div>
           <p className="text-xs text-slate-400">Each channel reaches one audience (students, tutors or facility admins). Only TOS posts.</p>
           {channels.length > 0 && (
@@ -326,11 +326,11 @@ const ChannelTab: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
             <select value={createAudience} onChange={(e) => setCreateAudience(e.target.value)} className="shrink-0 bg-slate-950/60 border border-white/10 rounded-xl px-2 py-2 text-xs text-slate-100 focus:outline-none" aria-label="Who this channel reaches">
               {audienceOptions}
             </select>
-            <button onClick={createChannel} disabled={busy || !newName.trim()} className="inline-flex items-facility gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-orange-500 text-white disabled:opacity-50 shrink-0">
+            <button onClick={createChannel} disabled={busy || !newName.trim()} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-orange-500 text-white disabled:opacity-50 shrink-0">
               {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />} Add channel
             </button>
           </div>
-          <label className="flex items-facility gap-2 text-xs text-slate-300 font-medium cursor-pointer select-none w-fit">
+          <label className="flex items-center gap-2 text-xs text-slate-300 font-medium cursor-pointer select-none w-fit">
             <input type="checkbox" checked={createComments} onChange={(e) => setCreateComments(e.target.checked)} className="accent-orange-500 w-4 h-4" />
             New channel: allow comments on posts
           </label>
@@ -342,11 +342,11 @@ const ChannelTab: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
               <select value={editAudience} onChange={(e) => setEditAudience(e.target.value)} className="shrink-0 bg-slate-950/60 border border-white/10 rounded-xl px-2 py-2 text-xs text-slate-100 focus:outline-none" aria-label="Who this channel reaches">
                 {audienceOptions}
               </select>
-              <button onClick={saveChannel} disabled={savingChannel} className="inline-flex items-facility gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-orange-500 text-white disabled:opacity-50 shrink-0">
+              <button onClick={saveChannel} disabled={savingChannel} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-orange-500 text-white disabled:opacity-50 shrink-0">
                 {savingChannel ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null} Save
               </button>
             </div>
-            <label className="flex items-facility gap-2 text-xs text-slate-300 font-medium cursor-pointer select-none w-fit">
+            <label className="flex items-center gap-2 text-xs text-slate-300 font-medium cursor-pointer select-none w-fit">
               <input type="checkbox" checked={editComments} onChange={(e) => setEditComments(e.target.checked)} className="accent-orange-500 w-4 h-4" />
               Selected channel: allow comments on posts
             </label>
@@ -356,13 +356,13 @@ const ChannelTab: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
       </Card>
       <Card>
         <div ref={listRef} className="h-[calc(100dvh-330px)] min-h-[320px] overflow-y-auto space-y-2.5 pr-1">
-          {state.messages.length === 0 && <p className="text-xs text-slate-500 py-6 text-facility">No messages yet.</p>}
+          {state.messages.length === 0 && <p className="text-xs text-slate-500 py-6 text-center">No messages yet.</p>}
           {state.messages.slice().sort((a, b) => a.at - b.at).map((m) => {
             const removed = removedOf(m);
             const press = makeLongPress(() => { if (!removed) setActionMsg(m); });
             return (
               <div key={m.id} className={`rounded-xl px-3 py-2 border ${removed ? 'border-red-400/20 bg-red-500/5' : m.role === 'tos' ? 'border-orange-400/25 bg-orange-500/10' : 'border-white/10 bg-slate-950/40'}`}>
-                <div className="flex items-facility gap-2 flex-wrap">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-xs font-bold text-slate-100">{m.username || 'Member'}</span>
                   {m.role === 'tos' && <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-300">TOS</span>}
                   <span className="text-[10px] text-slate-500">{fmtWhen(m.at)}</span>
@@ -401,7 +401,7 @@ const ChannelTab: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
         )}
         <div className="mt-3 flex items-end gap-2">
           <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={2} placeholder="Write to every facility..." className={inputCls + ' resize-none'} />
-          <button onClick={post} disabled={posting || !draft.trim()} className="shrink-0 inline-flex items-facility gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-40">
+          <button onClick={post} disabled={posting || !draft.trim()} className="shrink-0 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-40">
             {posting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} Post
           </button>
         </div>
@@ -487,7 +487,7 @@ const SettingsTab: React.FC<{ onSaved: () => void }> = ({ onSaved }) => {
   if (!s) {
     return error
       ? <Card><p className="text-xs text-red-300">{error}</p></Card>
-      : <div className="py-14 flex items-facility justify-facility text-slate-400"><Loader2 className="w-5 h-5 animate-spin" /></div>;
+      : <div className="py-14 flex items-center justify-center text-slate-400"><Loader2 className="w-5 h-5 animate-spin" /></div>;
   }
 
   const changed = true; // Settings are guarded by the APPLY confirmation, not a dirty check.
@@ -604,7 +604,7 @@ const SettingsTab: React.FC<{ onSaved: () => void }> = ({ onSaved }) => {
             <Label>Confirmation</Label>
             <input value={confirmText} onChange={(e) => { setConfirmText(e.target.value); setDone(false); }} placeholder="APPLY" className={inputCls} />
           </div>
-          <button onClick={save} disabled={busy || confirmText.trim() !== 'APPLY' || !changed} className="inline-flex items-facility gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-40">
+          <button onClick={save} disabled={busy || confirmText.trim() !== 'APPLY' || !changed} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-40">
             {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} Apply settings
           </button>
           {done && <span className="text-xs font-bold text-emerald-300 pb-2.5">Saved.</span>}
@@ -655,28 +655,28 @@ const EscalationsTab: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
   if (reports === null) {
     return error
       ? <Card><p className="text-xs text-red-300">{error}</p></Card>
-      : <div className="py-14 flex items-facility justify-facility text-slate-400"><Loader2 className="w-5 h-5 animate-spin" /></div>;
+      : <div className="py-14 flex items-center justify-center text-slate-400"><Loader2 className="w-5 h-5 animate-spin" /></div>;
   }
 
   return (
     <div className="space-y-4">
       <Card>
-        <div className="flex items-facility justify-between gap-3 flex-wrap">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
             <p className="text-sm font-bold text-slate-100">Escalated to TOS</p>
             <p className="text-xs text-slate-400">Reports facility admins chose to escalate. You see the reported message, the reason, and the facility's name. Nothing else.</p>
           </div>
-          <button onClick={load} className="inline-flex items-facility gap-2 px-3 py-2 rounded-xl text-xs font-bold text-slate-300 border border-white/10 hover:border-white/25"><RefreshCw className="w-3.5 h-3.5" /> Refresh</button>
+          <button onClick={load} className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold text-slate-300 border border-white/10 hover:border-white/25"><RefreshCw className="w-3.5 h-3.5" /> Refresh</button>
         </div>
       </Card>
       {reports.length === 0 && (
-        <Card><p className="text-xs text-slate-500 py-6 text-facility">Nothing escalated right now.</p></Card>
+        <Card><p className="text-xs text-slate-500 py-6 text-center">Nothing escalated right now.</p></Card>
       )}
       {reports.map((rep) => (
         <Card key={rep.id}>
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div className="min-w-0">
-              <div className="flex items-facility gap-2 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs font-bold text-slate-100">{rep.centreName || 'Unknown facility'}</span>
                 <span className="text-[10px] text-slate-500">{fmtWhen(Number(new Date(rep.createdAt).getTime() || 0))}</span>
               </div>
@@ -688,10 +688,10 @@ const EscalationsTab: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
               </div>
             </div>
             <div className="flex flex-col gap-2 shrink-0">
-              <button onClick={() => act(rep, 'remove')} disabled={busyId === rep.id} className="inline-flex items-facility gap-2 px-3 py-2 rounded-xl text-xs font-bold text-red-200 border border-red-400/30 hover:bg-red-500/10 disabled:opacity-40">
+              <button onClick={() => act(rep, 'remove')} disabled={busyId === rep.id} className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold text-red-200 border border-red-400/30 hover:bg-red-500/10 disabled:opacity-40">
                 {busyId === rep.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Ban className="w-3.5 h-3.5" />} Remove the message
               </button>
-              <button onClick={() => act(rep, 'dismiss')} disabled={busyId === rep.id} className="inline-flex items-facility gap-2 px-3 py-2 rounded-xl text-xs font-bold text-slate-300 border border-white/10 hover:border-white/25 disabled:opacity-40">
+              <button onClick={() => act(rep, 'dismiss')} disabled={busyId === rep.id} className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold text-slate-300 border border-white/10 hover:border-white/25 disabled:opacity-40">
                 <Check className="w-3.5 h-3.5" /> Dismiss
               </button>
             </div>
@@ -752,7 +752,7 @@ const TosStatusCircle: React.FC<{ latest: { statusId: string; kind: string; at: 
         <circle cx="32" cy="32" r="30" fill="none" stroke="#334155" strokeWidth="3.5" />
         <circle cx="32" cy="32" r="30" fill="none" stroke="#EA580C" strokeWidth="3.5" strokeLinecap="round" strokeDasharray={RING} strokeDashoffset={RING * (1 - f)} transform="rotate(-90 32 32)" />
       </svg>
-      <span className="absolute inset-[5px] rounded-full overflow-hidden bg-orange-500/15 border border-orange-500/40 flex items-facility justify-facility text-[10px] font-black text-orange-200">
+      <span className="absolute inset-[5px] rounded-full overflow-hidden bg-orange-500/15 border border-orange-500/40 flex items-center justify-center text-[10px] font-black text-orange-200">
         {latest.kind === 'text' ? 'Aa' : latest.kind === 'photo' ? 'Pic' : 'Vid'}
       </span>
     </span>
@@ -828,7 +828,7 @@ const TosStatusTab: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
             onClick={() => { if (myUid) setViewing(true); }}
             onKeyDown={(e) => { if (e.key === 'Enter' && myUid) setViewing(true); }}
           >
-            <div className="flex items-facility gap-3">
+            <div className="flex items-center gap-3">
               <TosStatusCircle latest={latest} />
               <div className="min-w-0">
                 <p className="text-xs text-slate-300 truncate">
@@ -837,7 +837,7 @@ const TosStatusTab: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
                 <p className="text-[11px] text-slate-500">Live in every student's status feed until it expires. Tap to view it the way students see it.</p>
               </div>
             </div>
-            <button type="button" onClick={removeLatest} className="inline-flex items-facility gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border border-red-500/40 text-red-300 hover:bg-red-500/10 transition-colors cursor-pointer">
+            <button type="button" onClick={removeLatest} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border border-red-500/40 text-red-300 hover:bg-red-500/10 transition-colors cursor-pointer">
               <Ban className="w-3.5 h-3.5" /> Remove
             </button>
           </div>
@@ -933,7 +933,7 @@ export const TosChat: React.FC<TosChatProps> = ({ refreshKey }) => {
     <div className="space-y-4">
       <div className="flex gap-2 flex-wrap">
         {tabs.map((t) => (
-          <button key={t.id} onClick={() => setTab(t.id)} className={`inline-flex items-facility gap-2 px-4 py-2.5 rounded-xl text-sm font-bold border transition-colors ${tab === t.id ? 'bg-orange-500/15 text-orange-300 border-orange-500/40' : 'text-slate-300 border-white/10 hover:border-white/25 bg-slate-950/40'}`}>
+          <button key={t.id} onClick={() => setTab(t.id)} className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold border transition-colors ${tab === t.id ? 'bg-orange-500/15 text-orange-300 border-orange-500/40' : 'text-slate-300 border-white/10 hover:border-white/25 bg-slate-950/40'}`}>
             <t.icon className="w-4 h-4" /> {t.label}
           </button>
         ))}
@@ -943,7 +943,7 @@ export const TosChat: React.FC<TosChatProps> = ({ refreshKey }) => {
       {tab === 'settings' && <SettingsTab onSaved={() => setRefreshTick((k) => k + 1)} />}
       {tab === 'escalations' && <EscalationsTab onChanged={() => setRefreshTick((k) => k + 1)} />}
       {refreshTick < 0 && null}
-      <p className="text-[11px] text-slate-500 flex items-facility gap-1.5"><Users className="w-3 h-3" /> Escalations counts towards the platform's report totals on the Overview screen.</p>
+      <p className="text-[11px] text-slate-500 flex items-center gap-1.5"><Users className="w-3 h-3" /> Escalations counts towards the platform's report totals on the Overview screen.</p>
     </div>
   );
 };

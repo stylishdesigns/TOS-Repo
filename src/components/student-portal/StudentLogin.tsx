@@ -50,10 +50,10 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onSuccess }) => {
   };
 
   return (
-    <div className="flex flex-col items-facility justify-facility min-h-[600px] p-6 bg-slate-50">
+    <div className="flex flex-col items-center justify-center min-h-[600px] p-6 bg-slate-50">
       <div className="w-full max-w-sm bg-white rounded-3xl shadow-xl border border-slate-100 p-8">
-        <div className="text-facility mb-8">
-          <div className="w-16 h-16 bg-orange-100 rounded-2xl flex items-facility justify-facility mx-auto mb-4">
+        <div className="text-center mb-8">
+          <div className="w-16 h-16 bg-orange-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <LogIn className="w-8 h-8 text-orange-600" />
           </div>
           <h2 className="text-2xl font-black text-slate-900">
@@ -115,7 +115,7 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onSuccess }) => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-orange-500/30 transition-all flex items-facility justify-facility space-x-2 disabled:opacity-50"
+            className="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-orange-500/30 transition-all flex items-center justify-center space-x-2 disabled:opacity-50"
           >
             {loading ? (
               <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -128,8 +128,8 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onSuccess }) => {
           </button>
         </form>
 
-        <div className="relative my-8 text-facility">
-          <div className="absolute inset-0 flex items-facility">
+        <div className="relative my-8 text-center">
+          <div className="absolute inset-0 flex items-center">
             <div className="w-full border-t border-slate-100"></div>
           </div>
           <span className="relative bg-white px-4 text-slate-400 text-[10px] font-bold uppercase tracking-widest">
@@ -139,13 +139,13 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onSuccess }) => {
 
         <button
           onClick={handleGoogleLogin}
-          className="w-full bg-white hover:bg-slate-50 text-slate-700 font-bold py-3 rounded-xl border border-slate-200 shadow-sm transition-all flex items-facility justify-facility space-x-2"
+          className="w-full bg-white hover:bg-slate-50 text-slate-700 font-bold py-3 rounded-xl border border-slate-200 shadow-sm transition-all flex items-center justify-center space-x-2"
         >
           <Globe className="w-4 h-4 text-orange-600" />
           <span>Google Account</span>
         </button>
 
-        <p className="text-facility mt-8 text-sm text-slate-500">
+        <p className="text-center mt-8 text-sm text-slate-500">
           {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}
           <button
             onClick={() => setIsSignUp(!isSignUp)}

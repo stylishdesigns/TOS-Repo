@@ -64,7 +64,7 @@ export const PracticeSummary: React.FC<PracticeSummaryProps> = ({
         }}
         className="rounded-[20px] p-5 border border-[#334155] text-white space-y-4"
       >
-        <div className="flex items-facility justify-between">
+        <div className="flex items-center justify-between">
           <span className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#CBD5E1]">
             SESSION RESULT
           </span>
@@ -99,9 +99,9 @@ export const PracticeSummary: React.FC<PracticeSummaryProps> = ({
         </div>
 
         {/* Accuracy Progression */}
-        <div className="pt-3 border-t border-white/10 flex items-facility justify-between text-xs">
+        <div className="pt-3 border-t border-white/10 flex items-center justify-between text-xs">
           <span className="text-slate-400 font-medium">Topic accuracy</span>
-          <div className="flex items-facility space-x-2 font-mono font-bold">
+          <div className="flex items-center space-x-2 font-mono font-bold">
             <span className="text-slate-400 tabular-nums">{prevAccuracy}%</span>
             <span className="text-orange-400">→</span>
             <span className="text-emerald-400 tabular-nums">{newAccuracy}%</span>
@@ -112,7 +112,7 @@ export const PracticeSummary: React.FC<PracticeSummaryProps> = ({
       {/* Review Missed Questions */}
       {missedResults.length > 0 ? (
         <div className="bg-white rounded-[20px] p-4 border border-[#E2E8F0] shadow-2xs space-y-3">
-          <div className="flex items-facility justify-between">
+          <div className="flex items-center justify-between">
             <h3 className="text-[12px] font-extrabold uppercase tracking-[0.08em] text-[#0F172A]">
               Review Missed Questions ({missedResults.length})
             </h3>
@@ -138,10 +138,10 @@ export const PracticeSummary: React.FC<PracticeSummaryProps> = ({
                   <button
                     type="button"
                     onClick={() => setExpandedMissedIndex(isExpanded ? null : index)}
-                    className="w-full text-left p-3.5 bg-slate-50 hover:bg-slate-100/80 transition-colors flex items-facility justify-between gap-3 cursor-pointer min-h-[44px]"
+                    className="w-full text-left p-3.5 bg-slate-50 hover:bg-slate-100/80 transition-colors flex items-center justify-between gap-3 cursor-pointer min-h-[44px]"
                   >
-                    <div className="flex items-facility space-x-2.5 min-w-0">
-                      <span className="w-5 h-5 rounded-full bg-rose-100 text-rose-700 font-bold flex items-facility justify-facility shrink-0 text-[10px]">
+                    <div className="flex items-center space-x-2.5 min-w-0">
+                      <span className="w-5 h-5 rounded-full bg-rose-100 text-rose-700 font-bold flex items-center justify-center shrink-0 text-[10px]">
                         {index + 1}
                       </span>
                       <p className="font-bold text-slate-800 truncate">
@@ -205,8 +205,8 @@ export const PracticeSummary: React.FC<PracticeSummaryProps> = ({
           </div>
         </div>
       ) : (
-        <div className="bg-emerald-50 rounded-[20px] p-5 border border-emerald-200 text-facility space-y-2">
-          <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-700 mx-auto flex items-facility justify-facility">
+        <div className="bg-emerald-50 rounded-[20px] p-5 border border-emerald-200 text-center space-y-2">
+          <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-700 mx-auto flex items-center justify-center">
             <CheckCircle2 className="w-5 h-5 text-emerald-600" />
           </div>
           <h4 className="text-sm font-black text-emerald-950">
@@ -223,7 +223,7 @@ export const PracticeSummary: React.FC<PracticeSummaryProps> = ({
         <button
           type="button"
           onClick={onBackToTopics}
-          className="min-h-[48px] px-4 py-3 rounded-2xl bg-white border border-[#E2E8F0] text-slate-800 font-bold text-xs uppercase tracking-wider hover:bg-slate-50 active:scale-98 transition-all flex items-facility justify-facility space-x-2 cursor-pointer shadow-2xs"
+          className="min-h-[48px] px-4 py-3 rounded-2xl bg-white border border-[#E2E8F0] text-slate-800 font-bold text-xs uppercase tracking-wider hover:bg-slate-50 active:scale-98 transition-all flex items-center justify-center space-x-2 cursor-pointer shadow-2xs"
         >
           <span>Back to topics</span>
         </button>
@@ -231,7 +231,7 @@ export const PracticeSummary: React.FC<PracticeSummaryProps> = ({
         <button
           type="button"
           onClick={onAnotherSet}
-          className="min-h-[48px] px-4 py-3 rounded-2xl bg-[#EA580C] hover:bg-[#C2410C] text-white font-extrabold text-xs uppercase tracking-wider active:scale-98 transition-all flex items-facility justify-facility space-x-2 cursor-pointer shadow-sm"
+          className="min-h-[48px] px-4 py-3 rounded-2xl bg-[#EA580C] hover:bg-[#C2410C] text-white font-extrabold text-xs uppercase tracking-wider active:scale-98 transition-all flex items-center justify-center space-x-2 cursor-pointer shadow-sm"
         >
           <RotateCcw className="w-3.5 h-3.5" />
           <span>Another 10</span>

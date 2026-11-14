@@ -11,9 +11,9 @@ export const OfflineIndicator: React.FC = () => {
     <div
       role="status"
       aria-live="polite"
-      className="fixed bottom-20 sm:bottom-4 left-4 right-4 sm:right-auto z-50 flex items-facility justify-between sm:justify-start gap-2.5 rounded-2xl bg-slate-900/95 text-white px-4 py-2.5 shadow-2xl border border-amber-500/40 backdrop-blur-md"
+      className="fixed bottom-20 sm:bottom-4 left-4 right-4 sm:right-auto z-50 flex items-center justify-between sm:justify-start gap-2.5 rounded-2xl bg-slate-900/95 text-white px-4 py-2.5 shadow-2xl border border-amber-500/40 backdrop-blur-md"
     >
-      <div className="flex items-facility gap-2">
+      <div className="flex items-center gap-2">
         <span className="relative flex h-2.5 w-2.5">
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
           <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
@@ -23,7 +23,7 @@ export const OfflineIndicator: React.FC = () => {
           Offline Mode
         </span>
       </div>
-      <span className="text-[11px] text-slate-300 flex items-facility gap-1 border-l border-slate-700 pl-2.5">
+      <span className="text-[11px] text-slate-300 flex items-center gap-1 border-l border-slate-700 pl-2.5">
         <Database className="w-3 h-3 text-amber-400" />
         Cached Data Active
       </span>
