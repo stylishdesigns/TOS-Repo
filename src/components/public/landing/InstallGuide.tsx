@@ -57,9 +57,9 @@ const CAPTIONS: Record<'a' | 'i', Array<[string, string]>> = {
   ],
 };
 
-const Pointer: React.FC<{ x: string; y: string }> = ({ x, y }) => (
+const Pointer: React.FC<{ x: string; y: string; accent: string }> = ({ x, y, accent }) => (
   <span
-    style={{ position: 'absolute', left: x, top: y, width: 18, height: 18, borderRadius: '50%', border: '3px solid #FFFFFF', background: ACCENT, boxShadow: '0 0 0 3px rgba(15,23,42,.35)', animation: 'igPoint 1.4s ease-in-out infinite', pointerEvents: 'none' }}
+    style={{ position: 'absolute', left: x, top: y, width: 18, height: 18, borderRadius: '50%', border: '3px solid #FFFFFF', background: accent, boxShadow: '0 0 0 3px rgba(15,23,42,.35)', animation: 'igPoint 1.4s ease-in-out infinite', pointerEvents: 'none' }}
   />
 );
 
@@ -177,6 +177,7 @@ export const InstallGuide: React.FC<InstallGuideProps> = ({ centreName, url, acc
   const [platform, setPlatform] = React.useState<'a' | 'i'>(detected);
   const [idx, setIdx] = React.useState(0);
   const [playing, setPlaying] = React.useState(true);
+  const [menuHelp, setMenuHelp] = React.useState(false);
   const ini = initialsOf(centreName);
 
   React.useEffect(() => {
@@ -233,7 +234,7 @@ export const InstallGuide: React.FC<InstallGuideProps> = ({ centreName, url, acc
     return (
       <div style={{ position: 'relative', width: 250, height: 470, borderRadius: 30, border: '9px solid #0F172A', background: '#F8FAFC', overflow: 'hidden', margin: '0 auto', flex: 'none' }}>
         <div style={{ position: 'absolute', inset: 0 }}>{body}</div>
-        {platform === 'a' && idx === 0 ? <Pointer x="50%" y="48%" /> : null}
+        {platform === 'a' && idx === 0 ? <Pointer x="50%" y="48%" accent={accent} /> : null}
         {platform === 'a' && idx === 1 ? <InstallDialog ini={ini} name={centreName} accent={accent} /> : null}
         {platform === 'a' && idx === 2 ? <HomeGrid ini={ini} name={centreName} accent={accent} /> : null}
         {platform === 'a' && idx === 3 ? (
@@ -242,7 +243,7 @@ export const InstallGuide: React.FC<InstallGuideProps> = ({ centreName, url, acc
             <Splash ini={ini} name={centreName} accent={accent} />
           </>
         ) : null}
-        {platform === 'i' && idx === 0 ? <Pointer x="50%" y="88%" /> : null}
+        {platform === 'i' && idx === 0 ? <Pointer x="50%" y="88%" accent={accent} /> : null}
         {platform === 'i' && idx === 1 ? <ShareSheet accent={accent} /> : null}
         {platform === 'i' && idx === 2 ? <AddToHomeDialog ini={ini} name={centreName} url={url} accent={accent} /> : null}
         {platform === 'i' && idx === 3 ? (
@@ -269,12 +270,8 @@ export const InstallGuide: React.FC<InstallGuideProps> = ({ centreName, url, acc
         </>
       ) : null}
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '24px', alignItems: 'flex-start', margin: '16px 0 0' }}>
-        <div style={{ flex: 'none', margin: '0 auto' }}>
-          {scene()}
-        </div>
-        <div style={{ flex: '1 1 300px', minWidth: 290 }}>
-      <div style={{ display: 'flex', gap: 8, margin: '0', background: '#F1F5F9', borderRadius: 12, padding: 4 }}>
+      <style>{'.igRow{display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start}.igScreen{width:250px;flex:none;margin:0 auto}.igSide{flex:1 1 300px;min-width:290px}@media (max-width:660px){.igRow{gap:12px}.igScreen{width:138px;height:260px}.igScreen>div{transform:scale(.55);transform-origin:top left}.igSide{flex:1;min-width:0}.igSide h3{font-size:15px !important}.igSide p{font-size:12px !important}}'}</style>
+      <div style={{ display: 'flex', gap: 8, margin: '16px 0 0', background: '#F1F5F9', borderRadius: 12, padding: 4 }}>
         {([['a', 'Android'], ['i', 'iPhone']] as const).map(([id, label]) => (
           <button
             key={id}
@@ -288,6 +285,11 @@ export const InstallGuide: React.FC<InstallGuideProps> = ({ centreName, url, acc
         ))}
       </div>
 
+      <div className="igRow">
+        <div className="igScreen">
+          {scene()}
+        </div>
+        <div className="igSide">
       <div style={{ textAlign: 'center', margin: '18px 0 0' }}>
         <span style={{ font: '700 11px Inter, sans-serif', letterSpacing: '0.06em', textTransform: 'uppercase', color: accent }}>Step {idx + 1} of 4</span>
         <h3 style={{ font: '800 17px Inter, sans-serif', margin: '6px 0 4px' }}>{captions[idx][0]}</h3>
@@ -303,8 +305,18 @@ export const InstallGuide: React.FC<InstallGuideProps> = ({ centreName, url, acc
 
       {platform === 'a' ? (
         <div style={{ marginTop: 16 }}>
-          <button type="button" onClick={() => { if (onInstall) onInstall(); }} style={{ width: '100%', border: 'none', borderRadius: 12, padding: '15px 0', background: accent, color: '#fff', font: '800 16px Inter, sans-serif', cursor: 'pointer' }}>↓ Install app</button>
-          <p style={{ font: '500 12.5px/1.55 Inter, sans-serif', color: MUT, margin: '8px 0 0', textAlign: 'center' }}>{canPrompt ? 'Tap the button and your phone will ask you to confirm.' : 'If nothing pops up: tap the ⋮ menu in Chrome, then Install app.'}</p>
+          <button type="button" onClick={() => { if (canPrompt && onInstall) onInstall(); else setMenuHelp((p) => !p); }} style={{ width: '100%', border: 'none', borderRadius: 12, padding: '15px 0', background: accent, color: '#fff', font: '800 16px Inter, sans-serif', cursor: 'pointer' }}>↓ Install app</button>
+          <p style={{ font: '500 12.5px/1.55 Inter, sans-serif', color: MUT, margin: '8px 0 0', textAlign: 'center' }}>{canPrompt ? 'Tap the button and your phone will ask you to confirm.' : 'If nothing pops up, tap Install app again for the menu steps.'}</p>
+          {menuHelp && (
+            <div style={{ marginTop: 10, background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 12, padding: '12px 14px', textAlign: 'left' }}>
+              <b style={{ display: 'block', font: '800 13px Inter, sans-serif', color: INK }}>Install from your browser menu</b>
+              <p style={{ font: '500 12.5px/1.6 Inter, sans-serif', color: MUT, margin: '6px 0 0' }}>
+                1. Tap the ⋮ menu at the top corner of Chrome.
+                <br />2. Tap Install app (or Add to Home screen).
+                <br />3. Confirm, and the app lands on your home screen.
+              </p>
+            </div>
+          )}
         </div>
       ) : (
         <div style={{ marginTop: 16 }}>

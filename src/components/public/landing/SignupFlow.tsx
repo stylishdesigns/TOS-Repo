@@ -42,6 +42,7 @@ const ACCENT_PRESETS: Array<{ hex: string; name: string }> = [
   { hex: '#0E7490', name: 'Teal' },
   { hex: '#B91C1C', name: 'Red' },
   { hex: '#334155', name: 'Slate' },
+  { hex: '#111827', name: 'Black' },
 ];
 
 // Branded primary button for the flow pages (Nov 16): the old inline styling
@@ -830,6 +831,7 @@ export const SignupAppPage: React.FC = () => {
             variant="inline"
             centreName={facility?.name || 'Your facility'}
             url={facility ? `tutorialos.com/${slugForName(facility.name)}` : 'tutorialos.com'}
+            accent={facility?.accent || '#EA580C'}
             onInstall={install}
             canPrompt={Boolean(deferred)}
             onDone={() => setJustInstalled(true)}
