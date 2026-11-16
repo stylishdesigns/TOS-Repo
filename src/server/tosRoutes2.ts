@@ -665,24 +665,38 @@ export function registerTosRoutes2(app: express.Express): void {
 const CENTRE_DATA_COLLECTIONS = [
   'students', 'tutors', 'cbt_exams', 'timetable', 'results',
   'attendance_logs', 'classRatings', 'programmes', 'subjects',
+  'chatGroups', 'chatReports', 'chatFriendRequests', 'chatMutes', 'chatFollows',
+  'tutorAiConversations', 'tutorAiUsage', 'practiceStats', 'usernames',
+  'payments', 'mockAttempts', 'mockScoreTally', 'qbMeta', 'centreLandingLeads',
 ];
 
-export async function deleteCentreCascade(centreId: string, actorUid: string, reason: string): Promise<void> {
+export async function deleteCentreCascade(
+  centreId: string,
+  actorUid: string,
+  reason: string,
+  opts?: { audit?: boolean; purgeAudit?: boolean }
+): Promise<void> {
   const cRef = adminDb.collection('centres').doc(centreId);
   const cDoc = await cRef.get();
   if (!cDoc.exists) throw httpError(404, 'Facility not found.');
 
   const writer = adminDb.bulkWriter();
+  const authUids = new Set<string>();
   const wipeQuery = async (col: string): Promise<void> => {
     for (;;) {
       const snap = await adminDb.collection(col).where('centreId', '==', centreId).limit(400).get();
       if (snap.empty) break;
-      snap.docs.forEach((d) => writer.delete(d.ref));
+      snap.docs.forEach((d) => {
+        const uid = String((d.data() as any)?.uid || '');
+        if (uid) authUids.add(uid);
+        writer.delete(d.ref);
+      });
       if (snap.size < 400) break;
     }
   };
   for (const col of CENTRE_DATA_COLLECTIONS) await wipeQuery(col);
   await wipeQuery('memberships');
+  await wipeQuery('admins');
   await wipeQuery('billingPayments');
   const codesSnap = await adminDb.collection('accessCodes').where('centreId', '==', centreId).get();
   codesSnap.docs.forEach((d) => writer.delete(d.ref));
@@ -690,8 +704,39 @@ export async function deleteCentreCascade(centreId: string, actorUid: string, re
     writer.delete(adminDb.collection('centreSettings').doc(`${centreId}__${suffix}`));
   }
   writer.delete(adminDb.collection('centreBilling').doc(centreId));
+  const landingRef = adminDb.collection('centreLandingPages').doc(centreId);
+  if ((await landingRef.get()).exists) writer.delete(landingRef);
   await writer.close();
   await cRef.delete();
+
+  // Sign-in accounts: every member collected above plus anyone whose auth
+  // claim points at this facility. Nothing survives the deletion.
+  let pageToken: string | undefined;
+  for (;;) {
+    const page = await adminAuth.listUsers(1000, pageToken);
+    for (const u of page.users) {
+      const claims = (u.customClaims || {}) as Record<string, any>;
+      if (claims.centreId === centreId || claims.centre_id === centreId) authUids.add(u.uid);
+    }
+    if (!page.pageToken) break;
+    pageToken = page.pageToken;
+  }
+  for (const uid of authUids) {
+    try { await adminAuth.deleteUser(uid); } catch { /* already gone */ }
+  }
+
+  if (opts?.purgeAudit) {
+    // Bulk deletions leave no trace at all, the platform's own audit trail
+    // included: every audit row that referenced the facility goes too.
+    for (;;) {
+      const snap = await adminDb.collection('auditLogs').where('centreId', '==', centreId).limit(400).get();
+      if (snap.empty) break;
+      snap.docs.forEach((d) => writer.delete(d.ref));
+      if (snap.size < 400) break;
+    }
+    await writer.close();
+    return;
+  }
 
   await audit({
     actorUid,

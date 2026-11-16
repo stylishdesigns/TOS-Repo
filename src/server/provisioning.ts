@@ -388,6 +388,20 @@ export async function regenerateAccessCode(
 export async function completeFirstLogin(uid: string): Promise<{ ok: true; changed: boolean }> {
   const user = await adminAuth.getUser(uid);
   const claims = (user.customClaims || {}) as Record<string, any>;
+  // Leads become facilities the moment the owner sets their own password:
+  // mark the facility onboarded and flip the owner's staff record so the
+  // Tutorial OS console can split leads from facilities.
+  try {
+    const adminDoc = await adminDb.collection('admins').doc(uid).get();
+    const ownerCentreId = adminDoc.exists ? String((adminDoc.data() as any).centreId || '') : '';
+    if (ownerCentreId) {
+      const nowIso = new Date().toISOString();
+      await adminDoc.ref.update({ hasChangedPassword: true, updatedAt: nowIso });
+      await adminDb.collection('centres').doc(ownerCentreId).set({ ownerOnboardedAt: nowIso }, { merge: true });
+    }
+  } catch (err: any) {
+    console.error('[first-login] onboarding flag failed:', err?.message || err);
+  }
   if (!claims.mustChangePassword) return { ok: true, changed: false };
   const next = { ...claims };
   delete next.mustChangePassword;

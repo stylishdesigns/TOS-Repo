@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, Building2, Wallet, ScrollText, UserPlus, Loader2,
   RefreshCw, Send, Ban, CheckCircle2, PlayCircle, Check, Plus, ShieldCheck,
   Clock, ArrowUpRight, UserRound, BookOpen, CalendarDays, Copy, HelpCircle,
-  AlertTriangle, X, ChevronRight, MessageSquare, Globe,
+  AlertTriangle, X, ChevronRight, MessageSquare, Globe, Trash2,
 } from 'lucide-react';
 import {
   api, fmtDate, fmtDateTime, LEAD_STATUS_LABELS, STATUS_STYLES, Json,
@@ -12,7 +12,7 @@ import {
 } from './tosShared';
 import { loadLastGood, saveLastGood } from '../../lib/lastGood';
 import { CentrePeople } from './TosDirectory';
-import { CentresTab } from './TosCentres';
+import { CentresTab, CentreDetail, CentreSlideOver, ConfirmBulkDelete } from './TosCentres';
 import { QuestionBankTab } from './TosQuestionBank';
 import { QuestionLibraryTab } from './TosQuestionLibrary';
 import { QuestionBankHub, MockPapersTab } from './TosQuestionHub';
@@ -174,22 +174,26 @@ const OverviewTab: React.FC<{ onOpenCentre: (id: string) => void; refreshKey: nu
 // LEADS
 // ---------------------------------------------------------------------------
 const LeadsTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
+  // Leads: owners who started a free trial but have not signed in and set
+  // their own password yet. They move to Facilities the moment they do.
   const [leads, setLeads] = useState<any[]>(() => loadLastGood<any[]>('tos:leads') || []);
-  const [filter, setFilter] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [busyId, setBusyId] = useState('');
-  const [credentials, setCredentials] = useState<any | null>(null);
-  const [rejecting, setRejecting] = useState<any | null>(null);
-  const [rejectReason, setRejectReason] = useState('');
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [openId, setOpenId] = useState('');
+  const [confirming, setConfirming] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [actionError, setActionError] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const d = await api('/api/tos/leads');
-      setLeads(d.leads || []);
-      saveLastGood('tos:leads', d.leads || []);
+      const d = await api('/api/tos/centres');
+      const list = (d.centres || []).filter((c: any) => !c.ownerOnboarded);
+      setLeads(list);
+      saveLastGood('tos:leads', list);
+      setPicked(new Set());
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -199,115 +203,98 @@ const LeadsTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
 
   useEffect(() => { load(); }, [load, refreshKey]);
 
-  const act = async (lead: any, type: string, extra?: any) => {
-    setBusyId(lead.id);
-    setError('');
+  const toggle = (id: string) => setPicked((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const allPicked = leads.length > 0 && leads.every((c) => picked.has(c.id));
+  const toggleAll = () => setPicked(allPicked ? new Set() : new Set(leads.map((c) => c.id)));
+
+  const deleteNow = async () => {
+    setDeleting(true);
+    setActionError('');
     try {
-      const r = await api(`/api/tos/leads/${lead.id}/action`, { method: 'POST', body: { type, ...extra } });
-      if (type === 'provision') {
-        setCredentials({
-          centreName: lead.businessName,
-          email: lead.email,
-          password: r.tempPassword,
-          accessCode: r.accessCode,
-          delivered: r.welcomeDelivered,
-        });
-      }
+      const r = await api('/api/tos/centres/bulk-delete', { method: 'POST', body: { ids: Array.from(picked) } });
+      const failed = (r.results || []).filter((x: any) => !x.ok);
+      setActionError(failed.length ? `${failed.length} could not be deleted: ${failed.map((f: any) => f.error).join('; ')}` : '');
+      setConfirming(false);
       await load();
     } catch (e: any) {
-      setError(e.message);
+      setActionError(e.message);
+      setConfirming(false);
     } finally {
-      setBusyId('');
+      setDeleting(false);
     }
   };
-
-  const shown = filter ? leads.filter((l) => l.status === filter) : leads;
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
-        <select value={filter} onChange={(e) => setFilter(e.target.value)} className={`${inputCls} max-w-56`}>
-          <option value="">All leads</option>
-          {Object.entries(LEAD_STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-        </select>
         <button onClick={load} className={btnGhost}><RefreshCw className="w-4 h-4" /> Refresh</button>
+        <p className="text-xs text-slate-500">Owners on a free trial who have not signed in and set their own password yet. Each one becomes a facility once they do.</p>
       </div>
       {error && <p className="text-rose-300 text-sm">{error}</p>}
-      {loading && shown.length === 0 ? (
+      {loading && leads.length === 0 ? (
         <div className="flex items-center gap-2 text-slate-400 text-sm py-10 justify-center"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</div>
-      ) : shown.length === 0 ? (
-        <Card><p className="text-slate-400 text-sm">No leads here yet. Sign-ups from the public site land in this list.</p></Card>
+      ) : leads.length === 0 ? (
+        <Card><p className="text-slate-400 text-sm">No leads yet. Every new free trial lands here until its owner signs in and sets their own password.</p></Card>
       ) : (
-        <div className="space-y-2">
-          {shown.map((l) => (
-            <div key={l.id} className="bg-slate-900/70 border border-white/10 rounded-2xl p-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2.5 flex-wrap">
-                    <p className="text-white font-bold">{l.businessName}</p>
-                    <StatusPill status={l.status} labels={LEAD_STATUS_LABELS} styles={{ verified: STATUS_STYLES.trial }} />
-                  </div>
-                  <p className="text-xs text-slate-400 mt-1">{l.fullName} · {l.email} · {l.phone}</p>
-                  <p className="text-[11px] text-slate-500 mt-1">
-                    {l.studentCount} students · {l.city}, {l.state} · {(l.examTypes || []).join(', ')} · {l.skipTrial ? 'skipping trial' : 'wants the trial'} · {fmtDate(l.createdAt)}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  {l.status === 'unverified' && (
-                    <button onClick={() => act(l, 'resend-verification')} disabled={busyId === l.id} className={btnGhost}>
-                      {busyId === l.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} Resend link
-                    </button>
-                  )}
-                  {(l.status === 'unverified' || l.status === 'verified') && (
-                    <>
-                      <button onClick={() => act(l, 'provision')} disabled={busyId === l.id} className={btnPrimary}>
-                        {busyId === l.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />} Provision now
-                      </button>
-                      <button onClick={() => { setRejecting(l); setRejectReason(''); }} disabled={busyId === l.id} className={btnGhost}>
-                        <Ban className="w-4 h-4 text-rose-400" /> Reject
-                      </button>
-                    </>
-                  )}
-                  {l.status === 'provisioned' && l.centreId && (
-                    <a href={`#/tos`} onClick={() => window.dispatchEvent(new CustomEvent('tos-open-centre', { detail: l.centreId }))} className={btnGhost}>
-                      <ArrowUpRight className="w-4 h-4" /> Open facility
-                    </a>
-                  )}
-                </div>
-              </div>
-              {l.rejectedReason && <p className="text-xs text-rose-300/80 mt-2">Rejected: {l.rejectedReason}</p>}
-            </div>
-          ))}
+        <div className="bg-slate-900/70 border border-white/10 rounded-2xl overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-[10px] uppercase tracking-wider text-slate-500">
+                <th className="px-3 py-3"><input type="checkbox" checked={allPicked} onChange={toggleAll} aria-label="Select all leads" className="w-4 h-4 accent-orange-500" /></th>
+                <th className="px-3 py-3 font-bold">#</th>
+                <th className="px-4 py-3 font-bold">Facility</th>
+                <th className="px-4 py-3 font-bold">Status</th>
+                <th className="px-4 py-3 font-bold">Trial ends</th>
+                <th className="px-4 py-3 font-bold">Started</th>
+              </tr>
+            </thead>
+            <tbody>
+              {leads.map((c, i) => (
+                <tr key={c.id} onClick={() => setOpenId(c.id)} className="border-t border-white/5 hover:bg-white/[0.03] cursor-pointer transition-colors">
+                  <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+                    <input type="checkbox" checked={picked.has(c.id)} onChange={() => toggle(c.id)} aria-label={`Select ${c.name}`} className="w-4 h-4 accent-orange-500" />
+                  </td>
+                  <td className="px-3 py-3 text-xs font-black text-orange-300">{i + 1}</td>
+                  <td className="px-4 py-3">
+                    <p className="text-white font-bold">{c.name}</p>
+                    <p className="text-xs text-slate-500">{c.ownerName || '—'} · {c.ownerEmail || 'no owner email'}</p>
+                  </td>
+                  <td className="px-4 py-3"><StatusPill status={c.billingStatus} /></td>
+                  <td className="px-4 py-3 text-xs text-slate-300">{c.trialEndsAt && c.billingStatus === 'trial' ? fmtDate(c.trialEndsAt) : '—'}</td>
+                  <td className="px-4 py-3 text-xs text-slate-500">{c.createdAt ? fmtDate(c.createdAt) : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {actionError && <p className="text-rose-300 text-sm">{actionError}</p>}
+
+      {picked.size > 0 && (
+        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl px-4 py-3 flex items-center gap-3">
+          <span className="text-sm text-white font-bold whitespace-nowrap">{picked.size} selected</span>
+          <button onClick={() => setPicked(new Set())} className={btnGhost}>Clear</button>
+          <button onClick={() => setConfirming(true)} className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-sm">
+            <Trash2 className="w-4 h-4" /> Delete permanently
+          </button>
         </div>
       )}
 
-      {credentials && (
-        <CredentialsModal
-          details={credentials}
-          onClose={() => setCredentials(null)}
+      {confirming && (
+        <ConfirmBulkDelete
+          count={picked.size}
+          label={picked.size === 1 ? 'lead' : 'leads'}
+          busy={deleting}
+          onCancel={() => setConfirming(false)}
+          onConfirm={deleteNow}
         />
       )}
 
-      {rejecting && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setRejecting(null)}>
-          <div className="bg-slate-900 border border-white/10 rounded-3xl p-6 max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-white font-bold mb-2">Reject {rejecting.businessName}?</h3>
-            <Field label="Reason (kept in the audit log)">
-              <input value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} className={inputCls} placeholder="Why this lead is being declined" />
-            </Field>
-            <div className="flex gap-2 mt-5">
-              <button onClick={() => setRejecting(null)} className={`${btnGhost} flex-1`}>Cancel</button>
-              <button
-                onClick={async () => { await act(rejecting, 'reject', { reason: rejectReason }); setRejecting(null); }}
-                disabled={!rejectReason.trim()}
-                className="flex-1 inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white font-bold text-sm"
-              >
-                Reject lead
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {openId ? (
+        <CentreSlideOver onClose={() => setOpenId('')}>
+          <CentreDetail centreId={openId} onBack={() => setOpenId('')} onDataChanged={load} backLabel="All leads" />
+        </CentreSlideOver>
+      ) : null}
     </div>
   );
 };
@@ -1118,8 +1105,8 @@ export const TosPortal: React.FC = () => {
           <h1 className="text-2xl font-black text-white tracking-tight capitalize">{TABS.find((t) => t.id === tab)?.label}</h1>
           <p className="text-slate-400 text-xs mt-1">
             {tab === 'overview' && 'Everything happening across the platform right now.'}
-            {tab === 'leads' && 'Sign-ups from the public site. Verify, provision, or decline.'}
-            {tab === 'centres' && 'Every facility, its plan, seats, billing and access code.'}
+            {tab === 'leads' && 'Trial owners who have not yet signed in and set their own password.'}
+            {tab === 'centres' && 'Facilities whose owners have set their own password. Plan, seats, billing and access code.'}
             {tab === 'plans' && 'Pricing, caps and feature flags. All stored as data.'}
             {tab === 'questions' && 'Two separate banks: Practice and Mock. Pick one on the hub to work in.'}
             {tab === 'mocks' && "One mock a day for every facility's students. Create, freeze and manage them from here."}

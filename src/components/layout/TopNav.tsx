@@ -38,6 +38,7 @@ export const TopNav: React.FC<TopNavProps> = ({ onToggleMobileMenu }) => {
     activeUser,
     viewMode,
     setViewMode,
+    activeCentre,
     addToast,
     bgTheme,
     toggleBgTheme,
@@ -127,7 +128,12 @@ export const TopNav: React.FC<TopNavProps> = ({ onToggleMobileMenu }) => {
       {/* Right controls */}
       <div className="flex items-center space-x-3 md:space-x-4 shrink-0 ml-4">
         {/* PWA Install Button */}
-        <PWAInstallButton variant="compact" className="hidden lg:flex" />
+        <PWAInstallButton
+          variant="compact"
+          className="hidden lg:flex"
+          centreName={activeCentre?.name || undefined}
+          guideUrl={activeCentre ? `${window.location.origin}/${String(activeCentre.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '')}` : undefined}
+        />
 
         {/* Switcher Button: Public Website */}
         <button

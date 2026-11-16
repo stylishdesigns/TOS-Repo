@@ -17,7 +17,7 @@ import { AddCentreModal } from './TosAddCentre';
 // ---------------------------------------------------------------------------
 // CENTRES
 // ---------------------------------------------------------------------------
-const CentreDetail: React.FC<{ centreId: string; onBack: () => void; onDataChanged: () => void }> = ({ centreId, onBack, onDataChanged }) => {
+export const CentreDetail: React.FC<{ centreId: string; onBack: () => void; onDataChanged: () => void; backLabel?: string }> = ({ centreId, onBack, onDataChanged, backLabel = 'All facilities' }) => {
   const [data, setData] = useState<Json | null>(() => loadLastGood<Json>(`tos:centre:${centreId}`));
   const [plans, setPlans] = useState<any[]>([]);
   const [error, setError] = useState('');
@@ -86,7 +86,7 @@ const CentreDetail: React.FC<{ centreId: string; onBack: () => void; onDataChang
     }
   };
 
-  if (error) return <div><button onClick={onBack} className="text-orange-300 text-sm mb-3 inline-flex items-center gap-1.5"><ChevronLeft className="w-4 h-4" /> All facilities</button><p className="text-rose-300 text-sm">{error}</p></div>;
+  if (error) return <div><button onClick={onBack} className="text-orange-300 text-sm mb-3 inline-flex items-center gap-1.5"><ChevronLeft className="w-4 h-4" /> {backLabel}</button><p className="text-rose-300 text-sm">{error}</p></div>;
   if (!data) return <div className="flex items-center gap-2 text-slate-400 text-sm py-10 justify-center"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</div>;
 
   const { centre, billing, payments } = data;
@@ -94,7 +94,7 @@ const CentreDetail: React.FC<{ centreId: string; onBack: () => void; onDataChang
 
   return (
     <div className="space-y-5">
-      <button onClick={onBack} className="text-orange-300 text-sm inline-flex items-center gap-1.5 hover:text-orange-200"><ChevronLeft className="w-4 h-4" /> All facilities</button>
+      <button onClick={onBack} className="text-orange-300 text-sm inline-flex items-center gap-1.5 hover:text-orange-200"><ChevronLeft className="w-4 h-4" /> {backLabel}</button>
 
       <div className="bg-slate-900/70 border border-white/10 rounded-2xl p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -352,6 +352,44 @@ const CentreDetail: React.FC<{ centreId: string; onBack: () => void; onDataChang
   );
 };
 
+// Right-hand side panel for facility details: clicking a row anywhere in the
+// console slides this in from the right instead of replacing the page.
+export const CentreSlideOver: React.FC<{ onClose: () => void; children: React.ReactNode }> = ({ onClose, children }) => (
+  <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex justify-end" onClick={onClose}>
+    <style>{'@keyframes tos-slide-in { from { transform: translateX(30px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }'}</style>
+    <div
+      className="h-full w-full sm:max-w-md bg-[#020617] border-l border-white/10 shadow-2xl overflow-y-auto"
+      onClick={(e) => e.stopPropagation()}
+      style={{ animation: 'tos-slide-in .22s ease-out' }}
+    >
+      <div className="p-4 sm:p-5">{children}</div>
+    </div>
+  </div>
+);
+
+// Confirmation for permanent multi-delete. The warning spells out that
+// nothing is kept, because the deletion removes every record and sign-in
+// account tied to the selection.
+export const ConfirmBulkDelete: React.FC<{ count: number; label: string; busy: boolean; onCancel: () => void; onConfirm: () => void }> = ({ count, label, busy, onCancel, onConfirm }) => (
+  <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={onCancel}>
+    <div className="bg-slate-900 border border-rose-500/30 rounded-3xl p-6 max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
+      <div className="flex items-start gap-3 mb-3">
+        <div className="w-9 h-9 rounded-xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center shrink-0"><AlertTriangle className="w-4.5 h-4.5 text-rose-400" /></div>
+        <h3 className="text-white font-bold pt-1">Delete {count} {label} permanently?</h3>
+      </div>
+      <p className="text-slate-400 text-xs leading-relaxed">
+        Every record for the {count === 1 ? 'selected item' : 'selected items'} is removed for good: the facility, its people, students, tutors, chats, exams, results, landing page, enquiries, billing, access codes and every sign-in account tied to it. Nothing is kept and this cannot be undone.
+      </p>
+      <div className="flex gap-2 mt-5">
+        <button onClick={onCancel} className={`${btnGhost} flex-1`}>Cancel</button>
+        <button onClick={onConfirm} disabled={busy} className="flex-1 inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white font-bold text-sm">
+          {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Delete permanently'}
+        </button>
+      </div>
+    </div>
+  </div>
+);
+
 const ConfirmModal: React.FC<{
   title: string; body: string; confirmLabel: string; busy: boolean; requireReason?: boolean;
   reason?: string; onReasonChange?: (v: string) => void; onCancel: () => void; onConfirm: () => void;
@@ -386,6 +424,10 @@ export const CentresTab: React.FC<{ refreshKey: number; openCentreId: string; on
   const [error, setError] = useState('');
   const [selected, setSelected] = useState<string | null>(openCentreId || null);
   const [adding, setAdding] = useState(false);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [confirming, setConfirming] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [actionError, setActionError] = useState('');
 
   useEffect(() => { if (openCentreId) setSelected(openCentreId); }, [openCentreId]);
 
@@ -395,6 +437,7 @@ export const CentresTab: React.FC<{ refreshKey: number; openCentreId: string; on
     try {
       const d = await api('/api/tos/centres');
       setCentres(d.centres || []);
+      setPicked(new Set());
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -404,11 +447,32 @@ export const CentresTab: React.FC<{ refreshKey: number; openCentreId: string; on
 
   useEffect(() => { load(); }, [load, refreshKey]);
 
-  if (selected) {
-    return <CentreDetail centreId={selected} onBack={() => { setSelected(null); onClearOpenCentre(); }} onDataChanged={onDataChanged} />;
-  }
+  // Facilities: centres whose owner set their own password and fully
+  // onboarded. Everyone else sits under Leads until they do.
+  const facilities = centres.filter((c: any) => c.ownerOnboarded);
 
-  const shown = centres.filter((c) => {
+  const toggle = (id: string) => setPicked((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const allPicked = facilities.length > 0 && facilities.every((c: any) => picked.has(c.id));
+  const toggleAll = () => setPicked(allPicked ? new Set() : new Set(facilities.map((c: any) => c.id)));
+
+  const bulkDeleteNow = async () => {
+    setDeleting(true);
+    setActionError('');
+    try {
+      const r = await api('/api/tos/centres/bulk-delete', { method: 'POST', body: { ids: Array.from(picked) } });
+      const failed = (r.results || []).filter((x: any) => !x.ok);
+      setActionError(failed.length ? `${failed.length} could not be deleted: ${failed.map((f: any) => f.error).join('; ')}` : '');
+      setConfirming(false);
+      await load();
+    } catch (e: any) {
+      setActionError(e.message);
+      setConfirming(false);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const shown = facilities.filter((c) => {
     if (status && c.billingStatus !== status) return false;
     if (query && !`${c.name} ${c.ownerEmail}`.toLowerCase().includes(query.toLowerCase())) return false;
     return true;
@@ -441,6 +505,8 @@ export const CentresTab: React.FC<{ refreshKey: number; openCentreId: string; on
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-[10px] uppercase tracking-wider text-slate-500">
+                <th className="px-3 py-3"><input type="checkbox" checked={allPicked} onChange={toggleAll} aria-label="Select all facilities" className="w-4 h-4 accent-orange-500" /></th>
+                <th className="px-3 py-3 font-bold">#</th>
                 <th className="px-4 py-3 font-bold">Facility</th>
                 <th className="px-4 py-3 font-bold">Status</th>
                 <th className="px-4 py-3 font-bold">Plan</th>
@@ -450,8 +516,12 @@ export const CentresTab: React.FC<{ refreshKey: number; openCentreId: string; on
               </tr>
             </thead>
             <tbody>
-              {shown.map((c) => (
+              {shown.map((c, i) => (
                 <tr key={c.id} onClick={() => setSelected(c.id)} className="border-t border-white/5 hover:bg-white/[0.03] cursor-pointer transition-colors">
+                  <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+                    <input type="checkbox" checked={picked.has(c.id)} onChange={() => toggle(c.id)} aria-label={`Select ${c.name}`} className="w-4 h-4 accent-orange-500" />
+                  </td>
+                  <td className="px-3 py-3 text-xs font-black text-orange-300">{i + 1}</td>
                   <td className="px-4 py-3">
                     <p className="text-white font-bold">{c.name}</p>
                     <p className="text-xs text-slate-500">{c.ownerEmail || 'no owner email'}</p>
@@ -468,6 +538,33 @@ export const CentresTab: React.FC<{ refreshKey: number; openCentreId: string; on
           </table>
         </div>
       )}
+      {actionError && <p className="text-rose-300 text-sm">{actionError}</p>}
+
+      {picked.size > 0 && (
+        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl px-4 py-3 flex items-center gap-3">
+          <span className="text-sm text-white font-bold whitespace-nowrap">{picked.size} selected</span>
+          <button onClick={() => setPicked(new Set())} className={btnGhost}>Clear</button>
+          <button onClick={() => setConfirming(true)} className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-sm">
+            <Trash2 className="w-4 h-4" /> Delete permanently
+          </button>
+        </div>
+      )}
+
+      {confirming && (
+        <ConfirmBulkDelete
+          count={picked.size}
+          label={picked.size === 1 ? 'facility' : 'facilities'}
+          busy={deleting}
+          onCancel={() => setConfirming(false)}
+          onConfirm={bulkDeleteNow}
+        />
+      )}
+
+      {selected ? (
+        <CentreSlideOver onClose={() => { setSelected(null); onClearOpenCentre(); }}>
+          <CentreDetail centreId={selected} onBack={() => { setSelected(null); onClearOpenCentre(); }} onDataChanged={onDataChanged} />
+        </CentreSlideOver>
+      ) : null}
     </div>
   );
 };

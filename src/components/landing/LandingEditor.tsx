@@ -76,7 +76,7 @@ const SectionHead: React.FC<{ n: number; title: string }> = ({ n, title }) => (
   </h3>
 );
 
-export const LandingEditor: React.FC<{ apiPath: string; refreshKey?: number }> = ({ apiPath, refreshKey = 0 }) => {
+export const LandingEditor: React.FC<{ apiPath: string; refreshKey?: number; showViewButton?: boolean }> = ({ apiPath, refreshKey = 0, showViewButton = true }) => {
   const [centreId, setCentreId] = useState('');
   const [content, setContent] = useState<LandingState | null>(null);
   const [published, setPublished] = useState(false);
@@ -152,7 +152,7 @@ export const LandingEditor: React.FC<{ apiPath: string; refreshKey?: number }> =
 
   return (
     <div className="space-y-5">
-      {liveUrl ? (
+      {showViewButton && liveUrl ? (
         <div className="flex flex-wrap items-center gap-3">
           <a href={liveUrl} target="_blank" rel="noreferrer" className={`${btnGhost} min-h-[44px] inline-flex items-center gap-2`}>
             <ExternalLink className="w-4 h-4" /> View {centreName || 'live'} page

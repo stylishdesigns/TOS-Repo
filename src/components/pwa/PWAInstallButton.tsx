@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { usePWAInstall } from '../../hooks/usePWAInstall';
+import { InstallGuide } from '../public/landing/InstallGuide';
 import {
   Download,
   Smartphone,
@@ -14,15 +15,23 @@ interface PWAInstallButtonProps {
   variant?: 'compact' | 'full' | 'banner' | 'pill' | 'icon';
   className?: string;
   onInstalled?: () => void;
+  /** Facility name: when set, the install button opens the facility's own
+   * animated install guide instead of the old static one. */
+  centreName?: string;
+  /** The facility's public address the guide shows on its phone mock-ups. */
+  guideUrl?: string;
 }
 
 export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
   variant = 'compact',
   className = '',
   onInstalled,
+  centreName,
+  guideUrl,
 }) => {
   const { isInstallable, isInstalled, isIOS, install } = usePWAInstall();
   const [showIOSGuide, setShowIOSGuide] = useState(false);
+  const [showNewGuide, setShowNewGuide] = useState(false);
   const [installing, setInstalling] = useState(false);
 
   // If already installed and running standalone, suppress prompt
@@ -31,6 +40,10 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
   }
 
   const handleInstallClick = async () => {
+    if (centreName) {
+      setShowNewGuide(true);
+      return;
+    }
     if (isInstallable) {
       setInstalling(true);
       const success = await install();
@@ -44,6 +57,24 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
       // In desktop preview or browser where beforeinstallprompt hasn't fired yet
       setShowIOSGuide(true);
     }
+  };
+
+  // The facility's animated install guide when it has one, the static
+  // fallback otherwise.
+  const renderGuide = () => {
+    if (showNewGuide && centreName) {
+      return (
+        <InstallGuide
+          centreName={centreName}
+          url={guideUrl || `${window.location.origin}/`}
+          variant="overlay"
+          canPrompt={isInstallable}
+          onInstall={() => { install(); }}
+          onClose={() => setShowNewGuide(false)}
+        />
+      );
+    }
+    return renderGuideModal();
   };
 
   // Render modal for iOS or manual install guidance
@@ -140,7 +171,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
           <Download className="w-3.5 h-3.5" />
           <span>Install App</span>
         </button>
-        {renderGuideModal()}
+        {renderGuide()}
       </>
     );
   }
@@ -157,7 +188,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
           <Download className="w-3 h-3" />
           <span>Install App</span>
         </button>
-        {renderGuideModal()}
+        {renderGuide()}
       </>
     );
   }
@@ -174,7 +205,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
         >
           <Download className="w-4 h-4" />
         </button>
-        {renderGuideModal()}
+        {renderGuide()}
       </>
     );
   }
@@ -212,7 +243,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
             <span>Install</span>
           </button>
         </div>
-        {renderGuideModal()}
+        {renderGuide()}
       </>
     );
   }
@@ -228,7 +259,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
         <Download className="w-4 h-4" />
         <span>Install the App to Home Screen</span>
       </button>
-      {renderGuideModal()}
+      {renderGuide()}
     </>
   );
 };

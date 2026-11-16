@@ -763,6 +763,14 @@ export function registerExtendedRoutes(app: express.Express): void {
       const statusFilter = String(req.query.status || '');
       const centresSnap = await adminDb.collection('centres').limit(200).get();
       const billingMap = await loadBillingMap(centresSnap.docs.map((d) => d.id));
+      // Leads vs facilities: a facility is onboarded once its owner set their
+      // own password (ownerOnboardedAt, or the owner's staff record).
+      const adminsSnap = await adminDb.collection('admins').limit(500).get();
+      const onboardedByCentre = new Map<string, { uid: string; changed: boolean }>();
+      for (const a of adminsSnap.docs) {
+        const ad = a.data() as any;
+        if (ad.centreId) onboardedByCentre.set(String(ad.centreId), { uid: String(ad.uid || a.id), changed: ad.hasChangedPassword === true });
+      }
       const centres = centresSnap.docs
         .map((d) => {
           const centre = { id: d.id, ...(d.data() as any) };
@@ -779,6 +787,7 @@ export function registerExtendedRoutes(app: express.Express): void {
             seatCap: billing?.seatCap ?? null,
             trialEndsAt: billing?.trialEndsAt || null,
             credentialsNotDelivered: !!centre.credentialsNotDelivered,
+            ownerOnboarded: !!centre.ownerOnboardedAt || (onboardedByCentre.get(d.id)?.changed === true),
             createdAt: centre.createdAt,
           };
         })
@@ -788,10 +797,54 @@ export function registerExtendedRoutes(app: express.Express): void {
           return true;
         })
         .sort((a: any, b: any) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+      // Self-heal for facilities whose owner already set their own password
+      // before this flag existed: one Auth read per unflagged facility, and
+      // the flag is written once so later loads cost nothing extra.
+      const needsCheck = centres.filter((c) => {
+        if (c.ownerOnboarded) return false;
+        const a = onboardedByCentre.get(String(c.id));
+        return !!a?.uid;
+      }).slice(0, 20);
+      for (const c of needsCheck) {
+        try {
+          const owner = await adminAuth.getUser(onboardedByCentre.get(String(c.id))!.uid);
+          const ownerClaims = (owner.customClaims || {}) as Record<string, any>;
+          if (!ownerClaims.mustChangePassword) {
+            await adminDb.collection('centres').doc(String(c.id)).set({ ownerOnboardedAt: new Date().toISOString() }, { merge: true });
+            c.ownerOnboarded = true;
+          }
+        } catch { /* keep it as a lead when the lookup fails */ }
+      }
       res.json({ centres });
     } catch (error: any) {
       console.error('[tos/facilities] failed:', error?.message || error);
       res.status(500).json({ error: 'Could not load facilities.' });
+    }
+  });
+
+  // Bulk-delete facilities permanently: every facility-owned record, the
+  // owner's and members' sign-in accounts included, with no trace left
+  // behind (the platform's own audit trail for these facilities goes too).
+  app.post('/api/tos/centres/bulk-delete', async (req, res) => {
+    try {
+      const caller = requireTos(req);
+      const raw = Array.isArray(req.body?.ids) ? req.body.ids : [];
+      const ids = raw.map((v: any) => String(v || '')).filter((v: string) => /^[A-Za-z0-9_-]{3,160}$/.test(v)).slice(0, 20);
+      if (!ids.length) return res.status(400).json({ error: 'Select the facilities to delete first.' });
+      const results: Array<{ id: string; ok: boolean; error?: string }> = [];
+      for (const id of ids) {
+        try {
+          await deleteCentreCascade(id, caller.uid, 'Bulk delete from the Tutorial OS console', { audit: false, purgeAudit: true });
+          results.push({ id, ok: true });
+        } catch (err: any) {
+          console.error('[tos/facilities] bulk delete failed:', id, err?.message || err);
+          results.push({ id, ok: false, error: err?.message || 'Deletion failed.' });
+        }
+      }
+      res.json({ results, deleted: results.filter((r) => r.ok).length });
+    } catch (error: any) {
+      console.error('[tos/facilities] bulk delete failed:', error?.message || error);
+      res.status(500).json({ error: 'Could not delete the selected facilities.' });
     }
   });
 
