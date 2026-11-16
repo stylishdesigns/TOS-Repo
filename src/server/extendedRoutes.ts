@@ -196,13 +196,13 @@ export function registerExtendedRoutes(app: express.Express): void {
   // ==========================================================================
   // PUBLIC: facility-name availability for the signup pages. The facility
   // page checks live while the owner types their facility name, so the
-  // subdomain they will get (slug.tutorialos.com) is known before they
-  // continue. The WHOLE name is used with every space and symbol removed
-  // ("Peace Academy" -> peaceacademy); only the 63-character DNS label limit
-  // ever shortens it. Taken means a centre already carries that name.
+  // address they will get (tutorialos.com/<facility-name>) is known before
+  // they continue. The WHOLE name is used with every space and symbol
+  // removed ("Peace Academy" -> peaceacademy) and is never shortened.
+  // Taken means a centre already carries that name.
   // ==========================================================================
   const slugifyName = (raw: string) =>
-    String(raw || '').toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 63);
+    String(raw || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
   app.get('/api/public/name-check', async (req, res) => {
     try {
       const raw = String(req.query.name || '').trim();
@@ -212,7 +212,7 @@ export function registerExtendedRoutes(app: express.Express): void {
       if (!slug) return res.json({ ok: false, reason: 'too-short' });
       const snap = await adminDb.collection('centres').limit(200).get();
       const taken = snap.docs.some((d) => slugifyName(String((d.data() as any)?.name || '')) === slug);
-      res.json({ ok: true, slug, domain: `${slug}.tutorialos.com`, taken });
+      res.json({ ok: true, slug, domain: `tutorialos.com/${slug}`, taken });
     } catch (error: any) {
       console.error('[name-check] failed:', error?.message || error);
       res.status(500).json({ error: 'Name check failed. Please try again.' });

@@ -1,5 +1,5 @@
 import * as crypto from 'crypto';
-import { APP_INSTALL_URL, WHATSAPP_GROUP_URL, renderWelcomeTemplate } from './welcomeTemplate';
+import { WHATSAPP_GROUP_URL, renderWelcomeTemplate } from './welcomeTemplate';
 import { adminAuth, adminDb } from './firebaseAdmin';
 import {
   effectiveStatus,
@@ -256,7 +256,7 @@ export async function provisionCentre(
       login_email: email,
       temp_password: tempPassword || '',
       sign_in_url: `${appBase}/c/${centreId}`,
-      app_url: `${APP_INSTALL_URL}?centre=${String(businessName || '').toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 63)}`,
+      app_url: `${appBase}/${String(businessName || '').toLowerCase().replace(/[^a-z0-9]+/g, '')}`,
       whatsapp_url: WHATSAPP_GROUP_URL,
     },
   });

@@ -162,7 +162,7 @@ export const PublicLandingPage: React.FC<{ centreId: string }> = ({ centreId }) 
   };
 
   return (
-    <LandingBody installCentre={data.appSlug || centreId}
+    <LandingBody installCentre={data.appSlug || centreId} installUrl={data.appSlug ? `tutorialos.com/${data.appSlug}` : undefined}
       content={c}
       centreName={data.centreName}
       waHrefFor={waHrefFor}

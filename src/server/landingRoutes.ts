@@ -15,7 +15,7 @@ export function registerLandingRoutes(app: express.Express): void {
   app.get("/api/public/landing/:centreId", async (req, res) => {
     try {
       const centreId = String(req.params.centreId || "");
-      if (!/^[a-zA-Z0-9_-]{3,64}$/.test(centreId)) {
+      if (!/^[a-zA-Z0-9_-]{3,160}$/.test(centreId)) {
         return res.status(400).json({ error: "A valid facility id is required." });
       }
 
@@ -59,7 +59,7 @@ export function registerLandingRoutes(app: express.Express): void {
       let appSlug = "";
       let appIcon = "";
       try {
-        appSlug = centreName.toLowerCase().replace(/[^a-z0-9]+/g, "").slice(0, 63);
+        appSlug = centreName.toLowerCase().replace(/[^a-z0-9]+/g, "");
         const m = logoUrl.match(/^(https:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/)(.+)$/);
         if (m) appIcon = `${m[1]}w_512,h_512,c_pad,b_white,f_png/${m[2]}`;
       } catch {
@@ -144,7 +144,7 @@ export function registerLandingRoutes(app: express.Express): void {
   app.post("/api/public/landing/:centreId/lead", async (req, res) => {
     try {
       const centreId = String(req.params.centreId || "");
-      if (!/^[a-zA-Z0-9_-]{3,64}$/.test(centreId)) {
+      if (!/^[a-zA-Z0-9_-]{3,160}$/.test(centreId)) {
         return res.status(400).json({ error: "A valid facility is required." });
       }
       const ip = String(req.headers["x-forwarded-for"] || req.ip || "anon").split(",")[0].trim();

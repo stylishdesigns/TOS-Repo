@@ -686,8 +686,26 @@ const MainLayout: React.FC = () => {
     );
   }
 
-  // If user toggles to the Public-facing Website view
+  // If user toggles to the Public-facing Website view. A facility admin sees
+  // their OWN landing page, always live from the server, so every template
+  // change is visible the moment it is saved. Platform (TOS) staff without a
+  // facility selected keep the generic Tutorial OS site.
   if (viewMode === 'website') {
+    if (activeCentreId) {
+      return (
+        <>
+          <Suspense fallback={null}><PublicLandingPageLazy centreId={activeCentreId} /></Suspense>
+          <button
+            onClick={() => setViewMode('portal')}
+            style={{ position: 'fixed', top: 14, left: 14, zIndex: 60, display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 999, border: '1px solid #CBD5E1', background: '#FFFFFF', color: '#334155', font: '700 13px Inter, sans-serif', cursor: 'pointer', boxShadow: '0 4px 14px rgba(15,23,42,.14)' }}
+          >
+            &larr; Back to admin
+          </button>
+          <OfflineIndicator />
+          <ToastContainer />
+        </>
+      );
+    }
     return (
       <>
         <PublicWebsite />
@@ -782,6 +800,7 @@ const StaffRolesManager = lazy(() => import('./components/staff/StaffRolesManage
 const SettingsView = lazy(() => import('./components/settings/SettingsView').then((m) => ({ default: m.SettingsView })));
 const StudentDetailModal = lazy(() => import('./components/modals/StudentDetailModal').then((m) => ({ default: m.StudentDetailModal })));
 const TosPortal = lazy(() => import('./components/tos/TosPortal').then((m) => ({ default: m.TosPortal })));
+const PublicLandingPageLazy = lazy(() => import('./components/landing/PublicLandingPage').then((m) => ({ default: m.PublicLandingPage })));
 
 const PageFallback = () => (
   <div className="p-6 space-y-4 animate-pulse" aria-busy="true" aria-label="Loading page">

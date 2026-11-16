@@ -1,4 +1,5 @@
 import React from 'react';
+import { InstallGuide } from '../components/public/landing/InstallGuide';
 import {
   LandingContent,
   LandingCard,
@@ -46,10 +47,13 @@ const LandingInstallPill: React.FC<{
   accent: string;
   on: string;
   radius: number;
-}> = ({ centreName, accent, on, radius }) => {
-  const [sheet, setSheet] = React.useState(false);
+  installUrl?: string;
+}> = ({ centreName, accent, on, radius, installUrl }) => {
+  // Tapping Install app always opens the animated install guide first; the
+  // guide's own Install app button fires the native install prompt.
+  const [guide, setGuide] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
-  const openInstall = () => {
+  const doInstall = () => {
     if (installPromptEvent) {
       try {
         installPromptEvent.prompt();
@@ -59,10 +63,9 @@ const LandingInstallPill: React.FC<{
       installPromptEvent = null;
       setBusy(true);
       window.setTimeout(() => setBusy(false), 2000);
-    } else {
-      setSheet(true);
     }
   };
+  const openInstall = () => setGuide(true);
   return (
     <>
       <button
@@ -89,32 +92,15 @@ const LandingInstallPill: React.FC<{
         <span aria-hidden={true} style={{ fontSize: 15 }}>{busy ? '\u23F3' : '\u2B07'}</span>
         {busy ? 'Installing…' : 'Install app'}
       </button>
-      {sheet ? (
-        <div
-          role="dialog"
-          aria-label="How to install the app"
-          onClick={() => setSheet(false)}
-          style={{ position: 'fixed', inset: 0, zIndex: 80, background: 'rgba(2,6,23,0.55)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: 16 }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{ background: '#ffffff', color: '#0f172a', borderRadius: 16, maxWidth: 430, width: '100%', padding: '20px 22px 24px' }}
-          >
-            <p style={{ fontSize: 17, fontWeight: 800, margin: 0 }}>Install the {centreName} app</p>
-            <p style={{ fontSize: 14, lineHeight: 1.6, color: '#475569', marginTop: 8 }}>
-              On iPhone: tap the Share button in Safari, then choose Add to Home Screen.
-              <br />
-              On Android: tap the three-dot menu in Chrome, then choose Install app.
-            </p>
-            <button
-              type="button"
-              onClick={() => setSheet(false)}
-              style={{ marginTop: 14, width: '100%', padding: '13px 0', borderRadius: 10, border: 'none', background: accent, color: on, fontWeight: 700, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' }}
-            >
-              Got it
-            </button>
-          </div>
-        </div>
+      {guide ? (
+        <InstallGuide
+          centreName={centreName}
+          url={installUrl || 'tutorialos.com'}
+          accent={accent}
+          canPrompt={Boolean(installPromptEvent)}
+          onInstall={doInstall}
+          onClose={() => setGuide(false)}
+        />
       ) : null}
     </>
   );
@@ -174,13 +160,14 @@ export const LandingBody: React.FC<{
   centreName: string;
   waHrefFor: (href: string) => string;
   installCentre?: string;
+  installUrl?: string;
   formApi: LandingFormApi;
   /** Shows the floating WhatsApp button when set; pass the wa.me link. */
   waFab?: string;
   /** 'fixed' floats over the whole page (public page); 'sticky' floats
    *  inside the scrolling preview frame. */
   fabMode?: 'fixed' | 'sticky';
-}> = ({ content: c, centreName, waHrefFor, formApi, waFab, fabMode = 'fixed', installCentre }) => {
+}> = ({ content: c, centreName, waHrefFor, formApi, waFab, fabMode = 'fixed', installCentre, installUrl }) => {
   const tpl = normalizeTemplateId(c.templateId);
   const preset = templatePreset(tpl);
   const accent = /^#[0-9a-fA-F]{6}$/.test(c.accent) ? c.accent : preset.accent;
@@ -435,7 +422,7 @@ export const LandingBody: React.FC<{
         </nav>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
           {installCentre ? (
-            <LandingInstallPill centreName={name} accent={accent} on={on} radius={isObsidian ? 0 : smallRad} />
+            <LandingInstallPill centreName={name} accent={accent} on={on} radius={isObsidian ? 0 : smallRad} installUrl={installUrl} />
           ) : null}
           {c.hero.buttons[0]?.label ? (
             <a className="lpb-navcta" {...btnProps(c.hero.buttons[0], true)}>{c.hero.buttons[0].label}</a>

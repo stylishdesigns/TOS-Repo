@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { InstallGuide } from './InstallGuide';
 
 /**
  * SignupFlow (2026-11-13): the trial signup as separate pages instead of the
@@ -24,7 +25,7 @@ export interface FlowResult { startedAt: number; domain: string; }
 // slugifyName): the whole name with every space and symbol removed, nothing
 // shortened apart from the 63-character DNS label limit.
 export const slugForName = (raw: string) =>
-  String(raw || '').toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 63);
+  String(raw || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
 
 const readJSON = <T,>(key: string): T | null => {
   try {
@@ -70,16 +71,21 @@ const FlowHeader: React.FC = () => (
 );
 
 const StepStrip: React.FC<{ current: number }> = ({ current }) => (
-  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', margin: '26px 0 6px' }}>
+  <div style={{ display: 'flex', alignItems: 'flex-start', margin: '26px 0 10px', overflowX: 'auto' }}>
     {STEPS.map((s, i) => {
       const n = i + 1;
       const done = n < current;
       const on = n === current;
       return (
-        <span key={s} style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', font: '700 12.5px Inter, sans-serif', color: on ? '#C2410C' : done ? '#15803D' : '#94A3B8', background: on ? '#FFF7ED' : 'transparent', border: on ? '1px solid #FDBA74' : '1px solid transparent', borderRadius: '99px', padding: '7px 12px', whiteSpace: 'nowrap' }}>
-          <span style={{ width: '20px', height: '20px', borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', color: '#fff', background: on ? '#EA580C' : done ? '#15803D' : '#CBD5E1', flex: 'none' }}>{done ? '✓' : n}</span>
-          {s}
-        </span>
+        <React.Fragment key={s}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', flex: 'none' }}>
+            <span style={{ width: 30, height: 30, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, color: '#fff', background: on ? '#EA580C' : done ? '#15803D' : '#CBD5E1', animation: on ? 'ssPulse 2.4s ease-in-out infinite' : undefined, flex: 'none' }}>{done ? '✓' : n}</span>
+            <span style={{ font: '600 11px Inter, sans-serif', color: on ? '#C2410C' : done ? '#15803D' : '#94A3B8', whiteSpace: 'nowrap' }}>{s}</span>
+          </div>
+          {i < STEPS.length - 1 ? (
+            <span style={{ flex: 1, minWidth: 20, height: 3, marginTop: 13, borderRadius: 2, background: n < current ? '#EA580C' : '#E2E8F0', transition: 'background .4s ease' }} />
+          ) : null}
+        </React.Fragment>
       );
     })}
   </div>
@@ -113,6 +119,7 @@ type NameState = { status: 'idle' | 'checking' | 'available' | 'taken'; domain: 
 // ---------------------------------------------------------------------------
 export const SignupStartPage: React.FC = () => {
   const [owner] = useState<FlowOwner | null>(() => readJSON<FlowOwner>(OWNER_KEY));
+  const [facility] = useState<FlowFacility | null>(() => readJSON<FlowFacility>(FACILITY_KEY));
   const draft = readJSON<FlowFacility>(FACILITY_KEY);
   const [name, setName] = useState(draft?.name || '');
   const [logoUrl, setLogoUrl] = useState(draft?.logoUrl || '');
@@ -253,7 +260,7 @@ export const SignupStartPage: React.FC = () => {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Could not start your trial. Please try again.');
       try {
-        sessionStorage.setItem(RESULT_KEY, JSON.stringify({ startedAt: Date.now(), domain: nameState.domain || `${slugForName(name)}.tutorialos.com` }));
+        sessionStorage.setItem(RESULT_KEY, JSON.stringify({ startedAt: Date.now(), domain: nameState.domain || `tutorialos.com/${slugForName(name)}` }));
       } catch { /* ignore */ }
       window.location.assign('/start/confirm');
     } catch (err: unknown) {
@@ -278,7 +285,7 @@ export const SignupStartPage: React.FC = () => {
   return (
     <div className="pg">
       <FlowHeader />
-      <main style={{ maxWidth: 680, margin: '0 auto', padding: '0 20px 72px' }}>
+      <main style={{ maxWidth: 680, margin: '0 auto', padding: '0 20px 72px', animation: 'riseIn .45s ease both' }}>
         <StepStrip current={2} />
         <p style={{ margin: '0 0 16px' }}><a href="/#trial" style={{ font: '600 14px Inter, sans-serif', color: '#C2410C', textDecoration: 'underline' }}>&larr; Back</a></p>
         <h1 style={h1Style}>About your education facility</h1>
@@ -420,7 +427,7 @@ export const SignupConfirmPage: React.FC = () => {
   if (!owner || !facility || !result) return null;
 
   const endsOn = new Date(result.startedAt + 14 * 24 * 3600 * 1000).toLocaleDateString('en-NG', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-  const domain = result.domain || `${slugForName(facility.name)}.tutorialos.com`;
+  const domain = result.domain || `tutorialos.com/${slugForName(facility.name)}`;
   const firstName = t(owner.fullName).split(/\s+/)[0] || 'there';
   const [copied, setCopied] = useState(false);
   const copy = async () => {
@@ -442,7 +449,7 @@ export const SignupConfirmPage: React.FC = () => {
     <div className="pg">
       <Confetti />
       <FlowHeader />
-      <main style={{ maxWidth: 680, margin: '0 auto', padding: '0 20px 72px' }}>
+      <main style={{ maxWidth: 680, margin: '0 auto', padding: '0 20px 72px', animation: 'riseIn .45s ease both' }}>
         <StepStrip current={3} />
         <p style={{ margin: '0 0 16px' }}><a href="/start" style={{ font: '600 14px Inter, sans-serif', color: '#C2410C', textDecoration: 'underline' }}>&larr; Back</a></p>
         <div role="status" style={{ background: 'linear-gradient(135deg, #FFF7ED, #FEF3C7)', border: '1px solid #FDBA74', borderRadius: '20px', padding: '22px 20px', display: 'flex', gap: '14px', alignItems: 'center', marginTop: '14px' }}>
@@ -517,6 +524,7 @@ type InstallPromptEvent = Event & {
 
 export const SignupAppPage: React.FC = () => {
   const [owner] = useState<FlowOwner | null>(() => readJSON<FlowOwner>(OWNER_KEY));
+  const [facility] = useState<FlowFacility | null>(() => readJSON<FlowFacility>(FACILITY_KEY));
   const [deferred, setDeferred] = useState<InstallPromptEvent | null>(null);
   const [installed, setInstalled] = useState(
     () => window.matchMedia('(display-mode: standalone)').matches || (window.navigator as Navigator & { standalone?: boolean }).standalone === true,
@@ -567,7 +575,7 @@ export const SignupAppPage: React.FC = () => {
   return (
     <div className="pg">
       <FlowHeader />
-      <main style={{ maxWidth: 680, margin: '0 auto', padding: '0 20px 72px' }}>
+      <main style={{ maxWidth: 680, margin: '0 auto', padding: '0 20px 72px', animation: 'riseIn .45s ease both' }}>
         <StepStrip current={4} />
         <p style={{ margin: '0 0 16px' }}><a href="/start/confirm" style={{ font: '600 14px Inter, sans-serif', color: '#C2410C', textDecoration: 'underline' }}>&larr; Back</a></p>
         <h1 style={{ ...h1Style, margin: '12px 0 10px' }}>Get your own branded app</h1>
@@ -591,26 +599,14 @@ export const SignupAppPage: React.FC = () => {
             </p>
           )}
 
-          <div style={{ display: 'grid', gap: '14px', marginTop: '16px' }}>
-            <div style={{ border: '1px solid #E2E8F0', borderRadius: '16px', padding: '16px' }}>
-              <b style={{ font: '700 15px Inter, sans-serif', color: '#0F172A', display: 'block', marginBottom: '10px' }}>Android phones</b>
-              <ol style={{ margin: 0, paddingLeft: '20px', font: '400 14px/1.7 Inter, sans-serif', color: '#334155' }}>
-                <li>Open Tutorial OS in Chrome on your phone.</li>
-                <li>Tap the three-dot menu at the top right.</li>
-                <li>Tap <b>Install app</b> or <b>Add to Home screen</b>.</li>
-                <li>Confirm. Your app icon appears on your home screen.</li>
-              </ol>
-            </div>
-            <div style={{ border: '1px solid #E2E8F0', borderRadius: '16px', padding: '16px' }}>
-              <b style={{ font: '700 15px Inter, sans-serif', color: '#0F172A', display: 'block', marginBottom: '10px' }}>iPhone and iPad</b>
-              <ol style={{ margin: 0, paddingLeft: '20px', font: '400 14px/1.7 Inter, sans-serif', color: '#334155' }}>
-                <li>Open Tutorial OS in Safari on your phone.</li>
-                <li>Tap the Share button at the bottom.</li>
-                <li>Tap <b>Add to Home Screen</b>.</li>
-                <li>Confirm. Your app icon appears on your home screen.</li>
-              </ol>
-            </div>
-          </div>
+          <InstallGuide
+            variant="inline"
+            centreName={facility?.name || 'Your facility'}
+            url={facility ? `tutorialos.com/${slugForName(facility.name)}` : 'tutorialos.com'}
+            onInstall={install}
+            canPrompt={Boolean(deferred)}
+            onDone={() => setJustInstalled(true)}
+          />
         </div>
 
         <div role="status" style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '14px', padding: '12px 14px', marginTop: '16px', font: '500 14px/1.5 Inter, sans-serif', color: '#166534' }}>
