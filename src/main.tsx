@@ -38,7 +38,12 @@ try {
   let centre = new URLSearchParams(window.location.search).get('centre') || '';
   if (!centre) {
     const raw = sessionStorage.getItem('tos:signup-result');
-    if (raw) centre = String((JSON.parse(raw) as { domain?: string }).domain || '').split('.')[0];
+    if (raw) {
+      const domain = String((JSON.parse(raw) as { domain?: string }).domain || '');
+      centre = domain.includes('/')
+        ? domain.split('/').pop() || ''
+        : domain.split('.')[0];
+    }
   }
   const link = document.querySelector('link[rel="manifest"]') as HTMLLinkElement | null;
   if (centre && link) link.href = `/api/public/pwa-manifest?centre=${encodeURIComponent(centre)}`;

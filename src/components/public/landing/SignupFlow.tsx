@@ -749,10 +749,18 @@ type InstallPromptEvent = Event & {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 };
 
+let pendingInstall: InstallPromptEvent | null = null;
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    pendingInstall = e as InstallPromptEvent;
+  });
+}
+
 export const SignupAppPage: React.FC = () => {
   const [owner] = useState<FlowOwner | null>(() => readJSON<FlowOwner>(OWNER_KEY));
   const [facility] = useState<FlowFacility | null>(() => readJSON<FlowFacility>(FACILITY_KEY));
-  const [deferred, setDeferred] = useState<InstallPromptEvent | null>(null);
+  const [deferred, setDeferred] = useState<InstallPromptEvent | null>(() => pendingInstall);
   const [installed, setInstalled] = useState(
     () => window.matchMedia('(display-mode: standalone)').matches || (window.navigator as Navigator & { standalone?: boolean }).standalone === true,
   );
@@ -780,12 +788,14 @@ export const SignupAppPage: React.FC = () => {
   if (!owner) return null;
 
   const install = async () => {
-    if (!deferred) return;
-    await deferred.prompt();
-    const choice = await deferred.userChoice;
+    const evt = deferred || pendingInstall;
+    if (!evt) return;
+    await evt.prompt();
+    const choice = await evt.userChoice;
     if (choice.outcome === 'accepted') {
       setJustInstalled(true);
       setDeferred(null);
+      pendingInstall = null;
     }
   };
 

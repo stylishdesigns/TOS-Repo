@@ -177,7 +177,6 @@ export const InstallGuide: React.FC<InstallGuideProps> = ({ centreName, url, acc
   const [platform, setPlatform] = React.useState<'a' | 'i'>(detected);
   const [idx, setIdx] = React.useState(0);
   const [playing, setPlaying] = React.useState(true);
-  const [menuHelp, setMenuHelp] = React.useState(false);
   const ini = initialsOf(centreName);
 
   React.useEffect(() => {
@@ -257,7 +256,7 @@ export const InstallGuide: React.FC<InstallGuideProps> = ({ centreName, url, acc
   };
 
   const card = (
-    <div style={{ background: '#fff', color: INK, borderRadius: 24, maxWidth: 780, width: '100%', margin: '0 auto', padding: '22px 22px 26px', maxHeight: '94vh', overflowY: 'auto' }}>
+    <div className="igCard" style={{ background: '#fff', color: INK, borderRadius: 24, maxWidth: 780, width: '100%', margin: '0 auto', padding: '22px 22px 26px', maxHeight: '94vh', overflowY: 'auto' }}>
       {variant === 'overlay' ? (
         <>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
@@ -270,7 +269,7 @@ export const InstallGuide: React.FC<InstallGuideProps> = ({ centreName, url, acc
         </>
       ) : null}
 
-      <style>{'.igRow{display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start}.igScreen{width:250px;flex:none;margin:0 auto}.igSide{flex:1 1 300px;min-width:290px}@media (max-width:660px){.igRow{gap:12px}.igScreen{width:138px;height:260px}.igScreen>div{transform:scale(.55);transform-origin:top left}.igSide{flex:1;min-width:0}.igSide h3{font-size:15px !important}.igSide p{font-size:12px !important}}'}</style>
+      <style>{'.igRow{display:flex;gap:24px;align-items:flex-start;margin-top:16px}.igScreen{width:288px;height:541px;flex:none;margin:0 auto;position:relative}.igScreen>div{transform:scale(1.15);transform-origin:top left}.igSide{flex:1;min-width:220px}@media (max-width:660px){.igRow{gap:10px}.igScreen{width:186px;height:348px}.igScreen>div{transform:scale(.74)}.igSide{min-width:0}.igSide h3{font-size:14px !important}.igSide p{font-size:11.5px !important}.igCard{padding:16px 14px !important}}'}</style>
       <div style={{ display: 'flex', gap: 8, margin: '16px 0 0', background: '#F1F5F9', borderRadius: 12, padding: 4 }}>
         {([['a', 'Android'], ['i', 'iPhone']] as const).map(([id, label]) => (
           <button
@@ -290,10 +289,13 @@ export const InstallGuide: React.FC<InstallGuideProps> = ({ centreName, url, acc
           {scene()}
         </div>
         <div className="igSide">
-      <div style={{ textAlign: 'center', margin: '18px 0 0' }}>
+        <div style={{ textAlign: 'center', margin: '8px 0 0' }}>
         <span style={{ font: '700 11px Inter, sans-serif', letterSpacing: '0.06em', textTransform: 'uppercase', color: accent }}>Step {idx + 1} of 4</span>
         <h3 style={{ font: '800 17px Inter, sans-serif', margin: '6px 0 4px' }}>{captions[idx][0]}</h3>
         <p style={{ font: '500 13.5px/1.6 Inter, sans-serif', color: MUT, margin: 0 }}>{captions[idx][1]}</p>
+      </div>
+
+        </div>
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 10, margin: '14px 0 0' }}>
@@ -305,18 +307,8 @@ export const InstallGuide: React.FC<InstallGuideProps> = ({ centreName, url, acc
 
       {platform === 'a' ? (
         <div style={{ marginTop: 16 }}>
-          <button type="button" onClick={() => { if (canPrompt && onInstall) onInstall(); else setMenuHelp((p) => !p); }} style={{ width: '100%', border: 'none', borderRadius: 12, padding: '15px 0', background: accent, color: '#fff', font: '800 16px Inter, sans-serif', cursor: 'pointer' }}>↓ Install app</button>
-          <p style={{ font: '500 12.5px/1.55 Inter, sans-serif', color: MUT, margin: '8px 0 0', textAlign: 'center' }}>{canPrompt ? 'Tap the button and your phone will ask you to confirm.' : 'If nothing pops up, tap Install app again for the menu steps.'}</p>
-          {menuHelp && (
-            <div style={{ marginTop: 10, background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 12, padding: '12px 14px', textAlign: 'left' }}>
-              <b style={{ display: 'block', font: '800 13px Inter, sans-serif', color: INK }}>Install from your browser menu</b>
-              <p style={{ font: '500 12.5px/1.6 Inter, sans-serif', color: MUT, margin: '6px 0 0' }}>
-                1. Tap the ⋮ menu at the top corner of Chrome.
-                <br />2. Tap Install app (or Add to Home screen).
-                <br />3. Confirm, and the app lands on your home screen.
-              </p>
-            </div>
-          )}
+          <button type="button" onClick={() => { if (onInstall) onInstall(); }} style={{ width: '100%', border: 'none', borderRadius: 12, padding: '15px 0', background: accent, color: '#fff', font: '800 16px Inter, sans-serif', cursor: 'pointer' }}>↓ Install app</button>
+          <p style={{ font: '500 12.5px/1.55 Inter, sans-serif', color: MUT, margin: '8px 0 0', textAlign: 'center' }}>Tap the button and your phone will ask you to confirm.</p>
         </div>
       ) : (
         <div style={{ marginTop: 16 }}>
@@ -329,8 +321,6 @@ export const InstallGuide: React.FC<InstallGuideProps> = ({ centreName, url, acc
         We detected: <b style={{ color: INK }}>{isIOSDevice() ? 'iPhone' : isAndroidDevice() ? 'Android phone' : 'a computer'}</b>
         {warning ? <><br />{warning}</> : null}
       </p>
-        </div>
-      </div>
     </div>
   );
 
