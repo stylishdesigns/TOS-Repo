@@ -441,3 +441,20 @@ span.text-slate-600:not(.dark-bg-mode *) {
 
 /* Inside the installed app (standalone) the way back to the public site is hidden: the access-code page is the first thing the app shows. */
 @media (display-mode: standalone){ [data-gate-back]{display:none!important} }
+
+/* Landing page piece 5: five shared template skins (LandingBody) */
+.lpb{container-type:inline-size;min-height:100vh}
+.lpb h1,.lpb h2,.lpb h3{font-family:var(--lp-hf);letter-spacing:-.02em;font-weight:700}
+.lpb-navlink:hover{color:var(--lp-ink,var(--lp-ac))}
+.lpb-social:hover{background:var(--lp-ac);color:var(--lp-on)}
+.lpb input::placeholder,.lpb textarea::placeholder{color:color-mix(in srgb,var(--lp-on) 55%,transparent)}
+.lpb input:focus,.lpb textarea:focus{outline:2px solid var(--lp-on);outline-offset:-1px}
+@container (max-width:760px){
+  .lpb-sec{padding:44px 20px !important}
+  .lpb-g2{grid-template-columns:1fr !important}
+  .lpb-h1{font-size:34px !important}
+  .lpb-h2{font-size:26px !important}
+  .lpb-navl{display:none !important}
+  .lpb-encard{padding:28px 20px !important;border-radius:min(28px,28px) !important}
+  .lpb-encard .lpb-h2{font-size:26px !important}
+}

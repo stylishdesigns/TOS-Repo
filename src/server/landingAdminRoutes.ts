@@ -1,6 +1,6 @@
 import express from 'express';
 import { adminDb } from './firebaseAdmin';
-import { defaultLandingContent, isLandingContent, LandingContent } from '../landing/landingContent';
+import { defaultLandingContent, isLandingContent, LandingContent, TEMPLATE_PRESETS, normalizeTemplateId } from '../landing/landingContent';
 import { Caller } from './tenantService';
 import { centreIdForCaller } from './landingLeadRoutes';
 
@@ -56,8 +56,8 @@ function sanitizeLandingContent(raw: unknown): LandingContent {
   const photoUrl = str(hero.photoUrl, 600);
 
   const out: LandingContent = {
-    templateId: 'classic-orange',
-    accent: HEX_RE.test(str(v.accent, 9)) ? str(v.accent, 9) : '#EA580C',
+    templateId: normalizeTemplateId(v.templateId && typeof v.templateId === 'string' && TEMPLATE_PRESETS.some((tp) => tp.id === v.templateId) ? v.templateId : v.templateId === 'classic-orange' ? 'classic-orange' : 'scholar'),
+    accent: HEX_RE.test(str(v.accent, 9)) ? str(v.accent, 9) : '#F2A93B',
     ribbon: str(v.ribbon, 120) || undefined,
     hero: {
       headline: str(hero.headline, 140) || 'Learn. Excel. Succeed with us.',

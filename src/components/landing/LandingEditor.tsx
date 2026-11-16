@@ -3,7 +3,8 @@ import {
   ExternalLink, Loader2, Plus, Trash2, Check, Image as ImageIcon,
 } from 'lucide-react';
 import { api, Card, Field, inputCls, btnPrimary, btnGhost } from '../tos/tosShared';
-import { LandingContent, LandingCard, LandingTestimonial } from '../../landing/landingContent';
+import { LandingContent, LandingCard, LandingTestimonial, TEMPLATE_PRESETS, normalizeTemplateId } from '../../landing/landingContent';
+import { LandingBody, LandingFormApi } from '../../landing/LandingBody';
 
 /**
  * Landing-page editor shared by the TOS dashboard (Website tab) and the
@@ -37,7 +38,7 @@ const asQuotes = (raw: any): LandingTestimonial[] =>
 
 function toState(raw: any): LandingState {
   return {
-    templateId: 'classic-orange',
+    templateId: normalizeTemplateId(raw?.templateId),
     accent: raw?.accent || '#EA580C',
     ribbon: raw?.ribbon || '',
     hero: {
@@ -168,22 +169,30 @@ export const LandingEditor: React.FC<{ apiPath: string; refreshKey?: number }> =
         <div className="grid lg:grid-cols-[1fr_340px] gap-5 items-start">
           <div className="space-y-5">
             <Card title="Template">
-              <div className="grid sm:grid-cols-3 gap-3">
-                <div className="rounded-xl border-2 border-orange-500/60 bg-orange-500/10 p-4">
-                  <div className="h-10 rounded-lg bg-gradient-to-br from-orange-500 to-amber-600 mb-3" />
-                  <p className="text-sm font-bold text-white">Classic Orange</p>
-                  <p className="text-[11px] text-orange-300 mt-0.5">In use</p>
-                </div>
-                <div className="rounded-xl border border-white/10 bg-slate-950/40 p-4 opacity-60">
-                  <div className="h-10 rounded-lg bg-slate-700 mb-3" />
-                  <p className="text-sm font-bold text-white">Classic Blue</p>
-                  <p className="text-[11px] text-slate-400 mt-0.5">Coming soon</p>
-                </div>
-                <div className="rounded-xl border border-white/10 bg-slate-950/40 p-4 opacity-60">
-                  <div className="h-10 rounded-lg bg-slate-700 mb-3" />
-                  <p className="text-sm font-bold text-white">Classic Green</p>
-                  <p className="text-[11px] text-slate-400 mt-0.5">Coming soon</p>
-                </div>
+              <p className="text-[12px] text-slate-500 mb-3">Pick a look for your website. Your text, photos and details stay exactly as they are; each look brings its own fonts, corners and colour mood. You can still fine-tune the accent colour under Top of page.</p>
+              <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                {TEMPLATE_PRESETS.map((p) => {
+                  const on = content.templateId === p.id;
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => set({ templateId: p.id, accent: p.accent })}
+                      className={`text-left rounded-xl p-4 border transition ${on ? 'border-orange-400 bg-orange-500/10' : 'border-white/10 bg-slate-950/40 hover:border-white/25'}`}
+                    >
+                      <div className="flex h-10 rounded-lg overflow-hidden mb-3">
+                        <span className="flex-[2]" style={{ background: p.swatch[0] }} />
+                        <span className="flex-[3]" style={{ background: p.swatch[1] }} />
+                        <span className="flex-[2]" style={{ background: p.swatch[2] }} />
+                      </div>
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-bold text-white">{p.name}</p>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-none ${on ? 'bg-orange-500 text-white' : 'bg-slate-700 text-slate-300'}`}>{on ? 'In use' : 'Use'}</span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 mt-1 leading-snug">{p.desc}</p>
+                    </button>
+                  );
+                })}
               </div>
             </Card>
 
@@ -346,7 +355,7 @@ export const LandingEditor: React.FC<{ apiPath: string; refreshKey?: number }> =
 
           <div className="lg:sticky lg:top-4">
             <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">Phone preview</p>
-            <PhonePreview content={content} centreName={centreName} accent={content.accent} />
+            <PhonePreview content={content} centreName={centreName} />
           </div>
         </div>
       )}
@@ -382,80 +391,26 @@ const CardEditor: React.FC<{ card: LandingCard; index: number; onChange: (c: Lan
   </div>
 );
 
-const PhonePreview: React.FC<{ content: LandingState; centreName: string; accent: string }> = ({ content, centreName, accent }) => {
-  const accentStyle = { ['--pa' as string]: accent };
-  return (
-    <div className="rounded-[2rem] border border-white/15 bg-slate-950 p-2 shadow-xl" style={accentStyle}>
-      <div className="rounded-[1.6rem] overflow-hidden bg-white text-slate-800" style={{ height: 560, overflowY: 'auto' }}>
-        <div className="flex items-center gap-2 px-3 py-2.5 border-b border-slate-200 sticky top-0 bg-white">
-          <span className="w-7 h-7 rounded-lg text-white text-[11px] font-black flex items-center justify-center" style={{ background: accent }}>{(centreName || 'T')[0]}</span>
-          <span className="text-[11px] font-bold truncate flex-1">{centreName || 'Facility'}</span>
-          <span className="text-[9px] font-bold text-white rounded-md px-2 py-1" style={{ background: accent }}>Sign up</span>
-        </div>
-        <div className="px-4 pt-5 pb-4" style={{ background: 'linear-gradient(180deg,#fff7ed,#fff)' }}>
-          {content.ribbon ? <span className="inline-block text-[9px] font-semibold px-2 py-1 rounded-full mb-2" style={{ background: '#ffedd5', color: '#9a3412' }}>{content.ribbon}</span> : null}
-          <p className="text-[17px] font-extrabold leading-snug">{content.hero.headline || 'Headline'}</p>
-          <p className="text-[10px] text-slate-500 mt-1.5 leading-relaxed">{content.hero.subText}</p>
-          <div className="flex gap-1.5 mt-2.5 flex-wrap">
-            {content.hero.buttons.map((b, i) => (
-              <span key={i} className="text-[9px] font-bold px-2.5 py-1.5 rounded-md" style={b.kind === 'ghost' ? { color: accent, border: `1px solid ${accent}` } : { background: accent, color: '#fff' }}>{b.label}</span>
-            ))}
-          </div>
-        </div>
-        {content.hero.photoUrl ? <img src={content.hero.photoUrl} alt="Hero" className="w-full h-28 object-cover" /> : null}
-        {content.stats.length ? (
-          <div className="grid grid-cols-3 text-center py-3 border-y" style={{ borderColor: '#fee2e2' }}>
-            {content.stats.map((s, i) => (
-              <div key={i}>
-                <p className="text-[12px] font-extrabold" style={{ color: accent }}>{s.value}</p>
-                <p className="text-[8px] text-slate-500">{s.label}</p>
-              </div>
-            ))}
-          </div>
-        ) : null}
-        <div className="px-4 py-4 space-y-4">
-          <div>
-            <p className="text-[13px] font-extrabold">{content.programs.title}</p>
-            <p className="text-[9px] text-slate-500">{content.programs.lead}</p>
-            <div className="mt-2 space-y-1.5">
-              {content.programs.cards.map((c, i) => (
-                <div key={i} className="rounded-lg border border-slate-200 p-2">
-                  <p className="text-[10px] font-bold">{c.title}</p>
-                  <p className="text-[8px] text-slate-500 leading-snug">{c.text}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div>
-            <p className="text-[13px] font-extrabold">{content.whyUs.title}</p>
-            <div className="mt-2 space-y-1.5">
-              {content.whyUs.cards.map((c, i) => (
-                <div key={i} className="rounded-lg p-2" style={{ background: '#fff7ed' }}>
-                  <p className="text-[10px] font-bold">{c.title}</p>
-                  <p className="text-[8px] text-slate-500 leading-snug">{c.text}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div>
-            <p className="text-[13px] font-extrabold">{content.testimonials.title}</p>
-            <div className="mt-2 space-y-1.5">
-              {content.testimonials.quotes.map((q, i) => (
-                <div key={i} className="rounded-lg border-l-2 p-2" style={{ borderColor: accent, background: '#fffbf7' }}>
-                  <p className="text-[8.5px] text-slate-600 leading-snug">"{q.quote}"</p>
-                  <p className="text-[8px] font-bold mt-1">{q.name}{q.role ? <span className="text-slate-400 font-normal"> · {q.role}</span> : null}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="rounded-xl p-3 text-center text-white" style={{ background: `linear-gradient(135deg, ${accent}, color-mix(in srgb, ${accent} 70%, black))` }}>
-            <p className="text-[12px] font-extrabold">{content.contact.title}</p>
-            <p className="text-[8.5px] opacity-85 mt-1">{content.contact.text}</p>
-            <span className="inline-block bg-white text-[9px] font-bold px-2.5 py-1.5 rounded-md mt-2" style={{ color: accent }}>{content.contact.ctaLabel}</span>
-          </div>
-          <p className="text-center text-[7.5px] text-slate-400">{content.footer.copyright} · Powered by TutorialOS</p>
-        </div>
-      </div>
-    </div>
-  );
+const previewForm: LandingFormApi = {
+  form: { name: '', phone: '', email: '', message: '' },
+  sending: false,
+  sent: false,
+  error: '',
+  set: () => {},
+  submit: (e) => e.preventDefault(),
 };
+
+const PhonePreview: React.FC<{ content: LandingState; centreName: string }> = ({ content, centreName }) => (
+  <div className="rounded-[2rem] border border-white/15 bg-slate-950 p-2 shadow-xl">
+    <div className="rounded-[1.6rem] overflow-hidden" style={{ height: 560, overflowY: 'auto' }}>
+      <LandingBody
+        content={content}
+        centreName={centreName || 'Your facility'}
+        waHrefFor={(href) => (href === '#whatsapp' ? '#enquiry' : href.startsWith('#') ? href : '#enquiry')}
+        formApi={previewForm}
+        waFab="#whatsapp"
+        fabMode="sticky"
+      />
+    </div>
+  </div>
+);
