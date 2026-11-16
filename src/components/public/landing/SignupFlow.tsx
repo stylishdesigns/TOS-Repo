@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { InstallGuide } from './InstallGuide';
+import { FlowSelect } from './FlowSelect';
 
 /**
  * SignupFlow (2026-11-13): the trial signup as separate pages instead of the
@@ -17,8 +18,44 @@ const RESULT_KEY = 'tos:signup-result';
 
 const WHATSAPP_URL = 'https://chat.whatsapp.com/CfaN0Rt2J9IFZLsBkUUS2N?s=cl&p=a&iam=2';
 
+const LOCKED_KEY = 'tos:signup-locked';
+
+// Once the facility has been provisioned, everything already filled in is
+// locked: the owner can walk back through the pages but cannot change the
+// saved details, only continue forward.
+const isLocked = () => {
+  try {
+    return sessionStorage.getItem(LOCKED_KEY) === '1';
+  } catch {
+    return false;
+  }
+};
+
+// Accent colours an owner can pick for their app (Nov 16). Stored on the
+// facility record and used wherever the app shows its own brand colour.
+const ACCENT_PRESETS: Array<{ hex: string; name: string }> = [
+  { hex: '#EA580C', name: 'Orange' },
+  { hex: '#1D4ED8', name: 'Blue' },
+  { hex: '#047857', name: 'Green' },
+  { hex: '#6D28D9', name: 'Purple' },
+  { hex: '#DB2777', name: 'Pink' },
+  { hex: '#0E7490', name: 'Teal' },
+  { hex: '#B91C1C', name: 'Red' },
+  { hex: '#334155', name: 'Slate' },
+];
+
+// Branded primary button for the flow pages (Nov 16): the old inline styling
+// over .btn pr read oversized and off-brand.
+const CTA = {
+  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
+  width: '100%', minHeight: '48px', borderRadius: '14px', border: 'none',
+  background: 'linear-gradient(135deg, #F97316, #EA580C)', color: '#fff',
+  font: '800 15px Inter, sans-serif', letterSpacing: '0.01em', cursor: 'pointer',
+  boxShadow: '0 10px 26px -12px rgba(234, 88, 12, 0.65)',
+} as const;
+
 export interface FlowOwner { fullName: string; email: string; phone: string; state: string; }
-export interface FlowFacility { name: string; logoUrl: string; logoName: string; teachers: string; address: string; exams: string[]; students: string; consent: boolean; }
+export interface FlowFacility { name: string; logoUrl: string; logoName: string; teachers: string; address: string; exams: string[]; students: string; consent: boolean; accent: string; }
 export interface FlowResult { startedAt: number; domain: string; }
 
 // Same rule the server applies when it mints the subdomain (extendedRoutes
@@ -46,6 +83,8 @@ const h2Style = { fontFamily: HF, fontWeight: 800, fontSize: 19, lineHeight: 1.2
 const L = { display: 'block', font: '600 13px Inter, sans-serif', color: '#334155', marginBottom: '7px' } as const;
 const IN = (err?: boolean) =>
   ({ width: '100%', minHeight: '48px', borderRadius: '12px', border: err ? '1px solid #DC2626' : '1px solid #CBD5E1', padding: '10px 14px', font: '500 15px Inter, sans-serif', color: '#0F172A', background: '#fff' } as const);
+const RO = (err?: boolean) =>
+  ({ ...IN(err), background: '#F1F5F9', color: '#475569', cursor: 'default' } as const);
 const CARD = { background: '#fff', border: '1px solid #E2E8F0', borderRadius: '20px', padding: '24px 22px', marginTop: '16px' } as const;
 const NOTE = '400 13px/1.55 Inter, sans-serif';
 
@@ -65,7 +104,7 @@ const FlowHeader: React.FC = () => (
         </span>
         Tutorial OS
       </a>
-      <span style={{ font: '600 13px Inter, sans-serif', color: '#94A3B8' }}>Free 14-day trial</span>
+      <span style={{ font: '600 13px Inter, sans-serif', color: '#94A3B8', marginInline: 'auto' }}>Free 14-day trial</span>
     </div>
   </header>
 );
@@ -112,6 +151,77 @@ const Confetti: React.FC = () => {
   );
 };
 
+// Build animation (Nov 16): after Continue on the facility page, a short
+// pop-up walks the owner through what is being put together (landing page,
+// admin portal, student portal, then everything assembled) while the real
+// provisioning runs behind it. No check marks; a Done button appears at the
+// end and continues to the confirm page.
+const BUILD_STAGES = ['Building your landing page', 'Building the admin portal', 'Building the student portal', 'Putting it all together'];
+const BuildOverlay: React.FC<{
+  accent: string;
+  centreName: string;
+  logoUrl?: string;
+  ready: boolean;
+  failed: boolean;
+  error: string;
+  onDone: () => void;
+  onClose: () => void;
+}> = ({ accent, centreName, logoUrl, ready, failed, error, onDone, onClose }) => {
+  const [stage, setStage] = useState(0);
+  useEffect(() => {
+    const t = window.setInterval(() => setStage((v) => Math.min(v + 1, BUILD_STAGES.length)), 1700);
+    return () => window.clearInterval(t);
+  }, []);
+  const finished = stage >= BUILD_STAGES.length;
+  const ini = ((String(centreName || '').trim().split(/\s+/).filter(Boolean).slice(0, 2).map((w) => Array.from(w)[0]).join('')) || 'TO').toUpperCase();
+  return (
+    <div role="alertdialog" aria-label="Building your facility" style={{ position: 'fixed', inset: 0, zIndex: 80, background: 'rgba(2,6,23,.62)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px 14px' }}>
+      <style>{'@keyframes bsRing{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}@keyframes bsFill{0%{width:8%}100%{width:100%}}@keyframes bsRise{0%{opacity:0;transform:translateY(10px)}100%{opacity:1;transform:translateY(0)}}'}</style>
+      <div style={{ background: '#fff', color: '#0F172A', borderRadius: '24px', width: '100%', maxWidth: 400, padding: '26px 24px', textAlign: 'center', animation: 'bsRise .35s ease both', boxShadow: '0 30px 80px rgba(2,6,23,.35)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
+          {logoUrl ? (
+            <img src={logoUrl} alt="" style={{ width: '42px', height: '42px', borderRadius: '12px', objectFit: 'contain', background: '#F8FAFC', border: '1px solid #E2E8F0', padding: '4px', flex: 'none' }} />
+          ) : (
+            <span style={{ width: '42px', height: '42px', borderRadius: '12px', background: accent, color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', font: '800 15px "Plus Jakarta Sans", Inter, sans-serif', flex: 'none' }}>{ini}</span>
+          )}
+          <h2 style={{ font: '800 18px "Plus Jakarta Sans", Inter, sans-serif', margin: '0', textAlign: 'left' }}>Setting up {centreName}</h2>
+        </div>
+        <p style={{ font: '500 13.5px/1.55 Inter, sans-serif', color: '#64748B', margin: '10px 0 0' }}>Your facility is being put together. This takes a moment.</p>
+        <div style={{ margin: '18px 0 0', display: 'grid', gap: '10px', textAlign: 'left' }}>
+          {BUILD_STAGES.map((label, i) => {
+            const active = i === stage && !finished;
+            const past = finished || i < stage;
+            return (
+              <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '11px 12px', borderRadius: '14px', border: active ? `1.5px solid ${accent}` : '1px solid #E2E8F0', background: active ? '#FFF7ED' : '#F8FAFC', opacity: past || active ? 1 : 0.55 }}>
+                <span style={{ width: 26, height: 26, borderRadius: '50%', flex: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: past ? 'none' : '2px dashed #94A3B8', background: past ? '#0F172A' : 'transparent', animation: active ? 'bsRing 1.2s linear infinite' : undefined }}>
+                  {past ? <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#fff', display: 'block' }} /> : null}
+                </span>
+                <span style={{ font: '600 14px Inter, sans-serif', color: active ? '#9A3412' : past ? '#0F172A' : '#64748B', flex: 1 }}>{label}</span>
+              </div>
+            );
+          })}
+        </div>
+        {!finished && (
+          <div style={{ marginTop: '16px', height: '6px', borderRadius: '4px', background: '#E2E8F0', overflow: 'hidden' }}>
+            <span style={{ display: 'block', height: '100%', borderRadius: '4px', background: accent, animation: 'bsFill 6.8s linear both' }} />
+          </div>
+        )}
+        {finished && failed && (
+          <>
+            <p role="alert" style={{ font: '600 14px Inter, sans-serif', color: '#DC2626', margin: '16px 0 0' }}>{error || 'Could not start your trial. Please try again.'}</p>
+            <button type="button" onClick={onClose} style={{ ...CTA, marginTop: '14px' }}>Close</button>
+          </>
+        )}
+        {finished && !failed && (
+          <button type="button" onClick={onDone} disabled={!ready} style={{ ...CTA, marginTop: '16px', opacity: ready ? 1 : 0.65, animation: 'bsRise .35s ease both' }}>
+            {ready ? 'Done' : 'Finishing up...'}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
+
 type NameState = { status: 'idle' | 'checking' | 'available' | 'taken'; domain: string };
 
 // ---------------------------------------------------------------------------
@@ -131,10 +241,15 @@ export const SignupStartPage: React.FC = () => {
     const saved = draft?.exams || [];
     return { jamb: saved.includes('JAMB'), waec: saved.includes('WAEC'), neco: saved.includes('NECO'), post: saved.includes('Post-UTME'), custom: saved.some((x) => !['JAMB', 'WAEC', 'NECO', 'Post-UTME'].includes(x)) };
   });
-  const [customExam, setCustomExam] = useState(() => {
+  const [customExams, setCustomExams] = useState<string[]>(() => {
     const saved = draft?.exams || [];
-    return saved.filter((x) => !['JAMB', 'WAEC', 'NECO', 'Post-UTME'].includes(x)).join(', ');
+    return saved.filter((x) => !['JAMB', 'WAEC', 'NECO', 'Post-UTME'].includes(x));
   });
+  const [customDraft, setCustomDraft] = useState('');
+  const [accent, setAccent] = useState(draft?.accent || '');
+  const [locked] = useState(() => isLocked());
+  const [building, setBuilding] = useState(false);
+  const [postState, setPostState] = useState<'running' | 'ok' | 'failed'>('running');
   const [students, setStudents] = useState(draft?.students || '');
   const [consent, setConsent] = useState(draft?.consent || false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -171,16 +286,25 @@ export const SignupStartPage: React.FC = () => {
     ex.waec ? 'WAEC' : '',
     ex.neco ? 'NECO' : '',
     ex.post ? 'Post-UTME' : '',
-    t(customExam),
+    ...customExams,
   ].filter(Boolean);
+
+  const addCustom = () => {
+    const v = t(customDraft);
+    if (!v || customExams.length >= 3) return;
+    if (customExams.some((c) => c.toLowerCase() === v.toLowerCase())) { setCustomDraft(''); return; }
+    setCustomExams((p) => [...p, v]);
+    setCustomDraft('');
+    setErrors((e2) => ({ ...e2, customExam: '' }));
+  };
 
   // Keep the draft on the device so a refresh on this page loses nothing.
   useEffect(() => {
     try {
-      sessionStorage.setItem(FACILITY_KEY, JSON.stringify({ name, logoUrl, logoName, teachers, address, exams: examTypes(), students, consent }));
+      sessionStorage.setItem(FACILITY_KEY, JSON.stringify({ name, logoUrl, logoName, teachers, address, exams: examTypes(), students, consent, accent }));
     } catch { /* storage unavailable: the form still works, it just will not survive a refresh. */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [name, logoUrl, logoName, teachers, address, ex, customExam, students, consent]);
+  }, [name, logoUrl, logoName, teachers, address, ex, customExams, students, consent, accent]);
 
   const pickLogo = async (file: File | null) => {
     setFormError('');
@@ -222,21 +346,30 @@ export const SignupStartPage: React.FC = () => {
     if (!t(owner?.state)) e.state = 'Please choose a state on the first step.';
     if (!t(address) || t(address).length > 200) e.address = 'Please give your facility address.';
     if (!students) e.students = 'Please choose how many students your facility has.';
-    if (ex.custom && !t(customExam)) e.customExam = 'Please type the exams you prepare students for.';
+    if (ex.custom && customExams.length === 0) e.customExam = 'Please add at least one custom exam.';
     if (!ex.jamb && !ex.waec && !ex.neco && !ex.post && !ex.custom) e.exams = 'Choose at least one exam.';
     if (!consent) e.consent = 'Consent is required.';
     return e;
   };
 
-  const submit = async () => {
+  // The details were already provisioned: walking back shows them read-only
+  // and Continue just moves forward without touching anything.
+  const startBuild = async () => {
     setFormError('');
+    if (locked) {
+      if (readJSON<FlowResult>(RESULT_KEY)) {
+        window.location.assign('/start/confirm');
+        return;
+      }
+    }
     const e = validate();
     if (Object.keys(e).length) {
       setErrors(e);
       return;
     }
     setErrors({});
-    setSending(true);
+    setBuilding(true);
+    setPostState('running');
     try {
       const res = await fetch('/api/public/trial', {
         method: 'POST',
@@ -253,6 +386,7 @@ export const SignupStartPage: React.FC = () => {
           logoUrl,
           teacherCount: teachers,
           examTypes: examTypes(),
+          accentColor: accent,
           consent: true,
           website: '', // honeypot: real visitors leave it empty
         }),
@@ -261,12 +395,12 @@ export const SignupStartPage: React.FC = () => {
       if (!res.ok) throw new Error(data.error || 'Could not start your trial. Please try again.');
       try {
         sessionStorage.setItem(RESULT_KEY, JSON.stringify({ startedAt: Date.now(), domain: nameState.domain || `tutorialos.com/${slugForName(name)}` }));
+        sessionStorage.setItem(LOCKED_KEY, '1');
       } catch { /* ignore */ }
-      window.location.assign('/start/confirm');
+      setPostState('ok');
     } catch (err: unknown) {
+      setPostState('failed');
       setFormError((err as Error)?.message || 'Could not start your trial. Please try again.');
-    } finally {
-      setSending(false);
     }
   };
 
@@ -275,19 +409,42 @@ export const SignupStartPage: React.FC = () => {
   }, [owner]);
   if (!owner) return null;
 
-  const chip = (key: keyof typeof ex, label: string) => (
-    <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', border: ex[key] ? '1.5px solid #EA580C' : '1px solid #CBD5E1', borderRadius: '12px', padding: '10px 14px', font: '600 14px Inter, sans-serif', color: ex[key] ? '#9A3412' : '#334155', background: ex[key] ? '#FFF7ED' : '#fff', minHeight: '46px', cursor: 'pointer' }}>
-      <input type="checkbox" checked={ex[key]} onChange={() => { setEx((p) => ({ ...p, [key]: !p[key] })); setErrors((e2) => ({ ...e2, exams: '' })); }} style={{ width: '18px', height: '18px' }} />
-      {label}
-    </label>
-  );
+  const chip = (key: keyof typeof ex, label: string) => {
+    const base = { display: 'inline-flex', alignItems: 'center', gap: '8px', border: ex[key] ? '1.5px solid #EA580C' : '1px solid #CBD5E1', borderRadius: '12px', padding: '10px 14px', font: '600 14px Inter, sans-serif', color: ex[key] ? '#9A3412' : '#334155', background: ex[key] ? '#FFF7ED' : '#fff', minHeight: '46px' } as const;
+    if (locked) {
+      return (
+        <span style={{ ...base, cursor: 'default' }}>
+          <input type="checkbox" checked={ex[key]} readOnly style={{ width: '18px', height: '18px', pointerEvents: 'none' }} />
+          {label}
+        </span>
+      );
+    }
+    return (
+      <label style={{ ...base, cursor: 'pointer' }}>
+        <input type="checkbox" checked={ex[key]} onChange={() => { setEx((p) => ({ ...p, [key]: !p[key] })); setErrors((e2) => ({ ...e2, exams: '' })); }} style={{ width: '18px', height: '18px' }} />
+        {label}
+      </label>
+    );
+  };
 
   return (
     <div className="pg">
       <FlowHeader />
+      {building && (
+        <BuildOverlay
+          accent={accent || '#EA580C'}
+          centreName={name || 'your facility'}
+          logoUrl={logoUrl}
+          ready={postState === 'ok'}
+          failed={postState === 'failed'}
+          error={formError}
+          onDone={() => window.location.assign('/start/confirm')}
+          onClose={() => setBuilding(false)}
+        />
+      )}
       <main style={{ maxWidth: 680, margin: '0 auto', padding: '0 20px 72px', animation: 'riseIn .45s ease both' }}>
+        <p style={{ margin: '0' }}><a href="/#trial" style={{ font: '600 14px Inter, sans-serif', color: '#C2410C', textDecoration: 'underline' }}>&larr; Back</a></p>
         <StepStrip current={2} />
-        <p style={{ margin: '0 0 16px' }}><a href="/#trial" style={{ font: '600 14px Inter, sans-serif', color: '#C2410C', textDecoration: 'underline' }}>&larr; Back</a></p>
         <h1 style={h1Style}>About your education facility</h1>
         <p style={{ font: '500 15px/1.6 Inter, sans-serif', color: '#475569', margin: '10px 0 0' }}>
           Signing up as <b>{owner.fullName}</b> ({owner.email}). Not you? <a href="/" style={{ textDecoration: 'underline', color: '#C2410C' }}>Go back</a>.
@@ -297,7 +454,7 @@ export const SignupStartPage: React.FC = () => {
           <div style={{ display: 'grid', gap: '16px' }}>
             <div>
               <label htmlFor="w1-name" style={L}>Name of your education facility</label>
-              <input id="w1-name" type="text" value={name} onChange={(ev) => setName(ev.target.value)} aria-invalid={errors.name ? true : false} style={IN(!!errors.name)} />
+              <input id="w1-name" type="text" value={name} onChange={(ev) => setName(ev.target.value)} readOnly={locked} aria-invalid={errors.name ? true : false} style={locked ? RO(!!errors.name) : IN(!!errors.name)} />
               {nameState.status !== 'idle' && nameState.domain && (
                 <p style={{ margin: '8px 0 0', font: '600 13.5px Inter, sans-serif', color: nameState.status === 'available' ? '#15803D' : nameState.status === 'taken' ? '#DC2626' : '#64748B' }}>
                   {nameState.status === 'checking' && `Checking ${nameState.domain}...`}
@@ -310,13 +467,13 @@ export const SignupStartPage: React.FC = () => {
 
             <div>
               <span style={L}>Facility logo</span>
-              <label htmlFor="w1-logo" style={{ display: 'block', border: logoUrl ? '1.5px solid #BBF7D0' : '2px dashed #CBD5E1', borderRadius: '16px', padding: logoUrl ? '14px' : '26px 18px', textAlign: 'center', cursor: 'pointer', background: logoUrl ? '#F0FDF4' : '#F8FAFC' }}>
+              <label htmlFor="w1-logo" style={{ display: 'block', border: logoUrl ? '1.5px solid #BBF7D0' : '2px dashed #CBD5E1', borderRadius: '16px', padding: logoUrl ? '14px' : '26px 18px', textAlign: 'center', cursor: locked ? 'default' : 'pointer', background: logoUrl ? '#F0FDF4' : '#F8FAFC' }}>
                 {logoUrl ? (
                   <span style={{ display: 'flex', alignItems: 'center', gap: '14px', textAlign: 'left' }}>
                     <img src={logoUrl} alt="Facility logo preview" style={{ width: '72px', height: '72px', objectFit: 'contain', borderRadius: '12px', background: '#fff', border: '1px solid #E2E8F0', padding: '6px', flex: 'none' }} />
                     <span>
                       <b style={{ display: 'block', font: '700 15px Inter, sans-serif', color: '#166534' }}>Logo added</b>
-                      <span style={{ display: 'block', font: '500 13px/1.5 Inter, sans-serif', color: '#475569', marginTop: '3px' }}>{logoName || 'Your image'} · click to replace it</span>
+                      <span style={{ display: 'block', font: '500 13px/1.5 Inter, sans-serif', color: '#475569', marginTop: '3px' }}>{logoName || 'Your image'}{locked ? '' : ' · click to replace it'}</span>
                     </span>
                   </span>
                 ) : (
@@ -327,7 +484,9 @@ export const SignupStartPage: React.FC = () => {
                   </>
                 )}
               </label>
-              <input id="w1-logo" type="file" accept="image/png,image/jpeg,image/webp" onChange={(ev) => { const file = ev.target.files && ev.target.files[0] ? ev.target.files[0] : null; ev.target.value = ''; pickLogo(file); }} style={{ position: 'absolute', width: '1px', height: '1px', overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap' }} />
+              {!locked && (
+                <input id="w1-logo" type="file" accept="image/png,image/jpeg,image/webp" onChange={(ev) => { const file = ev.target.files && ev.target.files[0] ? ev.target.files[0] : null; ev.target.value = ''; pickLogo(file); }} style={{ position: 'absolute', width: '1px', height: '1px', overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap' }} />
+              )}
               {uploadingLogo && <p style={{ margin: '8px 0 0', font: '600 13px Inter, sans-serif', color: '#C2410C' }}>Uploading your logo...</p>}
               {ERR(errors.logo)}
             </div>
@@ -335,29 +494,41 @@ export const SignupStartPage: React.FC = () => {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
               <div>
                 <label htmlFor="w1-teachers" style={L}>Number of teachers</label>
-                <select id="w1-teachers" value={teachers} onChange={(ev) => setTeachers(ev.target.value)} aria-invalid={errors.teachers ? true : false} style={{ ...IN(!!errors.teachers), background: '#fff' }}>
-                  <option value="">Choose one</option>
-                  <option value="1-5">1 to 5 teachers</option>
-                  <option value="6-10">6 to 10 teachers</option>
-                  <option value="11-20">11 to 20 teachers</option>
-                  <option value="21-50">21 to 50 teachers</option>
-                  <option value="50+">More than 50 teachers</option>
-                </select>
+                <FlowSelect
+                  id="w1-teachers"
+                  value={teachers}
+                  onChange={(v) => { setTeachers(v); setErrors((e2) => ({ ...e2, teachers: '' })); }}
+                  disabled={locked}
+                  invalid={!!errors.teachers}
+                  options={[
+                    { value: '', label: 'Choose one' },
+                    { value: '1-5', label: '1 to 5 teachers' },
+                    { value: '6-10', label: '6 to 10 teachers' },
+                    { value: '11-20', label: '11 to 20 teachers' },
+                    { value: '21-50', label: '21 to 50 teachers' },
+                    { value: '50+', label: 'More than 50 teachers' },
+                  ]}
+                />
                 {ERR(errors.teachers)}
               </div>
 
               <div>
                 <label htmlFor="w1-state" style={L}>State</label>
-                <select id="w1-state" value={owner.state} disabled aria-readonly="true" style={{ width: '100%', minHeight: '48px', borderRadius: '12px', border: '1px solid #E2E8F0', padding: '10px 14px', font: '500 15px Inter, sans-serif', color: '#475569', background: '#F1F5F9' }}>
-                  <option value={owner.state}>{owner.state || 'Chosen on the first step'}</option>
-                </select>
+                <FlowSelect
+                  id="w1-state"
+                  value={owner.state}
+                  onChange={() => { /* read-only: chosen on the first step */ }}
+                  disabled
+                  ariaLabel="State chosen on the first step"
+                  options={[{ value: owner.state, label: owner.state || 'Chosen on the first step' }]}
+                />
                 <p style={{ margin: '6px 0 0', font: '400 12px Inter, sans-serif', color: '#64748B' }}>You chose your state on the first step.</p>
               </div>
             </div>
 
             <div>
               <label htmlFor="w1-address" style={L}>Facility address</label>
-              <input id="w1-address" type="text" value={address} onChange={(ev) => setAddress(ev.target.value)} aria-invalid={errors.address ? true : false} style={IN(!!errors.address)} />
+              <input id="w1-address" type="text" value={address} onChange={(ev) => setAddress(ev.target.value)} readOnly={locked} aria-invalid={errors.address ? true : false} style={locked ? RO(!!errors.address) : IN(!!errors.address)} />
               {ERR(errors.address)}
             </div>
 
@@ -372,7 +543,33 @@ export const SignupStartPage: React.FC = () => {
               </div>
               {ex.custom && (
                 <div style={{ marginTop: '10px' }}>
-                  <input type="text" placeholder="Type the exams you prepare students for, e.g. IGCSE, A-Level" value={customExam} onChange={(ev) => setCustomExam(ev.target.value)} aria-invalid={errors.customExam ? true : false} style={IN(!!errors.customExam)} />
+                  {customExams.length > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '10px' }}>
+                      {customExams.map((c, i) => (
+                        <span key={`${c}-${i}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', border: '1.5px solid #EA580C', borderRadius: '12px', padding: '8px 12px', font: '600 14px Inter, sans-serif', color: '#9A3412', background: '#FFF7ED' }}>
+                          {c}
+                          {!locked && (
+                            <button type="button" aria-label={`Remove ${c}`} onClick={() => setCustomExams((p) => p.filter((_, j) => j !== i))} style={{ border: 'none', background: 'transparent', color: '#C2410C', font: '800 13px Inter, sans-serif', cursor: 'pointer', padding: 0, lineHeight: 1 }}>✕</button>
+                          )}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {!locked && customExams.length < 3 && (
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <input
+                        type="text"
+                        placeholder="Type an exam, e.g. IGCSE, A-Level"
+                        value={customDraft}
+                        onChange={(ev) => setCustomDraft(ev.target.value)}
+                        onKeyDown={(ev) => { if (ev.key === 'Enter') { ev.preventDefault(); addCustom(); } }}
+                        aria-invalid={errors.customExam ? true : false}
+                        style={{ ...IN(!!errors.customExam), flex: 1 }}
+                      />
+                      <button type="button" onClick={addCustom} style={{ minHeight: '48px', padding: '0 16px', borderRadius: '12px', border: '1.5px solid #EA580C', background: '#FFF7ED', color: '#C2410C', font: '800 14px Inter, sans-serif', cursor: 'pointer', flex: 'none' }}>Add</button>
+                    </div>
+                  )}
+                  {!locked && <p style={{ margin: '6px 0 0', font: '400 12px Inter, sans-serif', color: '#64748B' }}>Up to 3 custom exams.</p>}
                   {ERR(errors.customExam)}
                 </div>
               )}
@@ -381,21 +578,49 @@ export const SignupStartPage: React.FC = () => {
 
             <div>
               <label htmlFor="w1-students" style={L}>How many students does your facility have?</label>
-              <select id="w1-students" value={students} onChange={(ev) => setStudents(ev.target.value)} aria-invalid={errors.students ? true : false} style={{ ...IN(!!errors.students), background: '#fff' }}>
-                <option value="">Choose one</option>
-                <option value="1 to 10">1 to 10 students</option>
-                <option value="11 to 20">11 to 20 students</option>
-                <option value="21 to 30">21 to 30 students</option>
-                <option value="31 to 50">31 to 50 students</option>
-                <option value="51 to 100">51 to 100 students</option>
-                <option value="More than 100">More than 100 students</option>
-              </select>
+              <FlowSelect
+                id="w1-students"
+                value={students}
+                onChange={(v) => { setStudents(v); setErrors((e2) => ({ ...e2, students: '' })); }}
+                disabled={locked}
+                invalid={!!errors.students}
+                options={[
+                  { value: '', label: 'Choose one' },
+                  { value: '1 to 10', label: '1 to 10 students' },
+                  { value: '11 to 20', label: '11 to 20 students' },
+                  { value: '21 to 30', label: '21 to 30 students' },
+                  { value: '31 to 50', label: '31 to 50 students' },
+                  { value: '51 to 100', label: '51 to 100 students' },
+                  { value: 'More than 100', label: 'More than 100 students' },
+                ]}
+              />
               {ERR(errors.students)}
             </div>
 
             <div>
-              <label style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', font: '500 14px/1.45 Inter, sans-serif', color: '#334155', cursor: 'pointer' }}>
-                <input type="checkbox" checked={consent} onChange={() => { setConsent((p) => !p); setErrors((e2) => ({ ...e2, consent: '' })); }} aria-invalid={errors.consent ? true : false} style={{ width: '20px', height: '20px', marginTop: '2px', flex: 'none' }} />
+              <span style={L}>Pick your app's accent colour</span>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                {ACCENT_PRESETS.map((p) => {
+                  const on = accent === p.hex;
+                  return (
+                    <button
+                      key={p.hex}
+                      type="button"
+                      aria-label={`${p.name} accent`}
+                      aria-pressed={on}
+                      disabled={locked}
+                      onClick={() => setAccent(p.hex)}
+                      style={{ width: '44px', height: '44px', borderRadius: '50%', border: on ? '3px solid #0F172A' : '3px solid #fff', boxShadow: '0 0 0 2px #CBD5E1', background: p.hex, cursor: locked ? 'not-allowed' : 'pointer', padding: 0, opacity: locked ? 0.85 : 1 }}
+                    />
+                  );
+                })}
+              </div>
+              <p style={{ margin: '6px 0 0', font: '400 12px Inter, sans-serif', color: '#64748B' }}>Used on your app, portals and landing page.</p>
+            </div>
+
+            <div>
+              <label style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', font: '500 14px/1.45 Inter, sans-serif', color: '#334155', cursor: locked ? 'default' : 'pointer' }}>
+                <input type="checkbox" checked={consent} onChange={() => { if (locked) return; setConsent((p) => !p); setErrors((e2) => ({ ...e2, consent: '' })); }} aria-invalid={errors.consent ? true : false} style={{ width: '20px', height: '20px', marginTop: '2px', flex: 'none', pointerEvents: locked ? 'none' : 'auto' }} />
                 I agree to be contacted about my request and to the Privacy policy and Terms.
               </label>
               {ERR(errors.consent)}
@@ -403,8 +628,8 @@ export const SignupStartPage: React.FC = () => {
           </div>
 
           {formError && <p role="alert" style={{ margin: '14px 0 0', font: '600 14px Inter, sans-serif', color: '#DC2626' }}>{formError}</p>}
-          <button type="button" className="btn pr" onClick={submit} disabled={sending} style={{ marginTop: '20px', width: '100%', minHeight: '50px', border: 'none', background: sending ? '#FB923C' : '#EA580C', cursor: sending ? 'wait' : 'pointer' }}>
-            {sending ? 'Setting up your facility...' : 'Continue'}
+          <button type="button" onClick={startBuild} disabled={building} style={{ ...CTA, marginTop: '20px', opacity: building ? 0.75 : 1 }}>
+            {building ? 'Building your facility...' : 'Continue'}
           </button>
         </div>
       </main>
@@ -450,8 +675,8 @@ export const SignupConfirmPage: React.FC = () => {
       <Confetti />
       <FlowHeader />
       <main style={{ maxWidth: 680, margin: '0 auto', padding: '0 20px 72px', animation: 'riseIn .45s ease both' }}>
+        <p style={{ margin: '0' }}><a href="/start" style={{ font: '600 14px Inter, sans-serif', color: '#C2410C', textDecoration: 'underline' }}>&larr; Back</a></p>
         <StepStrip current={3} />
-        <p style={{ margin: '0 0 16px' }}><a href="/start" style={{ font: '600 14px Inter, sans-serif', color: '#C2410C', textDecoration: 'underline' }}>&larr; Back</a></p>
         <div role="status" style={{ background: 'linear-gradient(135deg, #FFF7ED, #FEF3C7)', border: '1px solid #FDBA74', borderRadius: '20px', padding: '22px 20px', display: 'flex', gap: '14px', alignItems: 'center', marginTop: '14px' }}>
           <span style={{ width: '46px', height: '46px', borderRadius: '50%', background: '#16A34A', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}>
             <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5 9-10" /></svg>
@@ -474,6 +699,7 @@ export const SignupConfirmPage: React.FC = () => {
             {row('Teachers', facility.teachers)}
             {row('Students', facility.students)}
             {row('Exams', facility.exams.join(', '))}
+            {row('Accent', <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}><span style={{ width: 14, height: 14, borderRadius: '50%', background: facility.accent || '#EA580C', display: 'inline-block', flex: 'none' }} />{(facility.accent || '#EA580C').toUpperCase()}</span>)}
           </div>
         </div>
 
@@ -504,7 +730,7 @@ export const SignupConfirmPage: React.FC = () => {
           <p style={{ font: '500 15px/1.6 Inter, sans-serif', color: '#334155' }}>
             You are the owner and admin of {facility.name}. You can log in to your facility's portal through the app, using the login details we sent to {owner.email}.
           </p>
-          <button type="button" className="btn pr" onClick={() => window.location.assign('/start/app')} style={{ marginTop: '16px', width: '100%', minHeight: '50px', border: 'none' }}>
+          <button type="button" onClick={() => window.location.assign('/start/app')} style={{ ...CTA, marginTop: '16px' }}>
             Continue to the app download
           </button>
         </div>
@@ -568,6 +794,7 @@ export const SignupAppPage: React.FC = () => {
       sessionStorage.removeItem(FACILITY_KEY);
       sessionStorage.removeItem(RESULT_KEY);
       sessionStorage.removeItem('tos:signup-owner-draft');
+      sessionStorage.removeItem(LOCKED_KEY);
     } catch { /* ignore */ }
     window.location.assign('/');
   };
@@ -576,8 +803,8 @@ export const SignupAppPage: React.FC = () => {
     <div className="pg">
       <FlowHeader />
       <main style={{ maxWidth: 680, margin: '0 auto', padding: '0 20px 72px', animation: 'riseIn .45s ease both' }}>
+        <p style={{ margin: '0' }}><a href="/start/confirm" style={{ font: '600 14px Inter, sans-serif', color: '#C2410C', textDecoration: 'underline' }}>&larr; Back</a></p>
         <StepStrip current={4} />
-        <p style={{ margin: '0 0 16px' }}><a href="/start/confirm" style={{ font: '600 14px Inter, sans-serif', color: '#C2410C', textDecoration: 'underline' }}>&larr; Back</a></p>
         <h1 style={{ ...h1Style, margin: '12px 0 10px' }}>Get your own branded app</h1>
         <p style={{ font: '500 15px/1.6 Inter, sans-serif', color: '#475569' }}>
           Everything your facility runs on works best on the app: your name, your logo and your colours on every screen your students and tutors see.

@@ -2,7 +2,8 @@ import React from 'react';
 
 /**
  * Animated install guide (Nov 16). Opens when someone taps "Install app" on a
- * facility landing page and renders inline on the signup app page. Five
+ * facility landing page and renders inline on the signup app page (inline:
+ * phone screen on the left, guide on the right, no heading of its own). Four
  * auto-playing scenes per platform (Android Chrome / iPhone Safari) with step
  * captions, dots and pause/play, adapted from the owner's HTML guide. Android
  * installs right from the guide; iPhone walks Safari Add to Home Screen.
@@ -43,14 +44,12 @@ const isNotSafari = () => /CriOS|FxiOS|EdgiOS|OPiOS|GSA/.test(navigator.userAgen
 
 const CAPTIONS: Record<'a' | 'i', Array<[string, string]>> = {
   a: [
-    ['Open your link in Chrome', 'Use Chrome on your Android phone. Open the address we email you, or open this page.'],
     ['Tap Install app', 'Tap the orange Install app button right below this guide.'],
     ['Confirm the pop-up', 'Android asks "Install app?" Tap Install.'],
     ['Find your app', "Your facility's icon is now on your home screen."],
     ['Open it and sign in', 'Open it like any other app. There is no browser bar and no typing a web address.'],
   ],
   i: [
-    ['Open the link in Safari', 'Installing only works from Safari on iPhone. If you are in another browser, copy the link and open it in Safari.'],
     ['Tap the Share button', 'It is the square with an arrow at the bottom of the screen.'],
     ['Tap Add to Home Screen', 'Scroll down the list that appears and tap Add to Home Screen.'],
     ['Tap Add', 'Check the name, then tap Add in the top corner.'],
@@ -182,7 +181,7 @@ export const InstallGuide: React.FC<InstallGuideProps> = ({ centreName, url, acc
 
   React.useEffect(() => {
     if (!playing) return;
-    const t = window.setInterval(() => setIdx((v) => (v + 1) % 5), 5000);
+    const t = window.setInterval(() => setIdx((v) => (v + 1) % 4), 5000);
     return () => window.clearInterval(t);
   }, [playing, platform]);
 
@@ -199,7 +198,7 @@ export const InstallGuide: React.FC<InstallGuideProps> = ({ centreName, url, acc
         : '';
 
   const scene = () => {
-    const dim = platform === 'a' ? (idx === 2 ? 'brightness(.55)' : 'none') : idx >= 2 && idx <= 3 ? 'brightness(.55)' : 'none';
+    const dim = platform === 'a' ? (idx === 1 ? 'brightness(.55)' : 'none') : idx >= 1 && idx <= 2 ? 'brightness(.55)' : 'none';
     const body = (
       <div style={{ filter: dim, height: '100%', display: 'flex', flexDirection: 'column' }}>
         <StatusBar />
@@ -209,7 +208,7 @@ export const InstallGuide: React.FC<InstallGuideProps> = ({ centreName, url, acc
               <div style={{ background: '#F1F5F9', borderRadius: 999, padding: '7px 12px', fontSize: 11, color: '#334155', textAlign: 'center', overflow: 'hidden', whiteSpace: 'nowrap' }}>{url}</div>
             </div>
             <MiniWeb ini={ini} accent={accent} />
-            {idx === 1 ? (
+            {idx === 0 ? (
               <div style={{ padding: '16px 14px 0', textAlign: 'center' }}>
                 <span style={{ display: 'inline-block', background: accent, color: '#fff', fontWeight: 800, fontSize: 12, padding: '10px 18px', borderRadius: 999 }}>↓ Install app</span>
               </div>
@@ -234,19 +233,19 @@ export const InstallGuide: React.FC<InstallGuideProps> = ({ centreName, url, acc
     return (
       <div style={{ position: 'relative', width: 250, height: 470, borderRadius: 30, border: '9px solid #0F172A', background: '#F8FAFC', overflow: 'hidden', margin: '0 auto', flex: 'none' }}>
         <div style={{ position: 'absolute', inset: 0 }}>{body}</div>
-        {platform === 'a' && idx === 1 ? <Pointer x="50%" y="48%" /> : null}
-        {platform === 'a' && idx === 2 ? <InstallDialog ini={ini} name={centreName} accent={accent} /> : null}
-        {platform === 'a' && idx === 3 ? <HomeGrid ini={ini} name={centreName} accent={accent} /> : null}
-        {platform === 'a' && idx === 4 ? (
+        {platform === 'a' && idx === 0 ? <Pointer x="50%" y="48%" /> : null}
+        {platform === 'a' && idx === 1 ? <InstallDialog ini={ini} name={centreName} accent={accent} /> : null}
+        {platform === 'a' && idx === 2 ? <HomeGrid ini={ini} name={centreName} accent={accent} /> : null}
+        {platform === 'a' && idx === 3 ? (
           <>
             <HomeGrid ini={ini} name={centreName} accent={accent} />
             <Splash ini={ini} name={centreName} accent={accent} />
           </>
         ) : null}
-        {platform === 'i' && idx === 1 ? <Pointer x="50%" y="88%" /> : null}
-        {platform === 'i' && idx === 2 ? <ShareSheet accent={accent} /> : null}
-        {platform === 'i' && idx === 3 ? <AddToHomeDialog ini={ini} name={centreName} url={url} accent={accent} /> : null}
-        {platform === 'i' && idx === 4 ? (
+        {platform === 'i' && idx === 0 ? <Pointer x="50%" y="88%" /> : null}
+        {platform === 'i' && idx === 1 ? <ShareSheet accent={accent} /> : null}
+        {platform === 'i' && idx === 2 ? <AddToHomeDialog ini={ini} name={centreName} url={url} accent={accent} /> : null}
+        {platform === 'i' && idx === 3 ? (
           <>
             <HomeGrid ini={ini} name={centreName} accent={accent} />
             <Splash ini={ini} name={centreName} accent={accent} />
@@ -257,18 +256,25 @@ export const InstallGuide: React.FC<InstallGuideProps> = ({ centreName, url, acc
   };
 
   const card = (
-    <div style={{ background: '#fff', color: INK, borderRadius: 24, maxWidth: 660, width: '100%', margin: '0 auto', padding: '22px 22px 26px', maxHeight: '94vh', overflowY: 'auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-        <h2 style={{ font: '800 19px "Plus Jakarta Sans", Inter, sans-serif', margin: 0 }}>Install the app on your phone</h2>
-        {variant === 'overlay' ? (
-          <button type="button" onClick={onClose} aria-label="Close the install guide" style={{ border: 'none', background: '#F1F5F9', color: MUT, width: 34, height: 34, borderRadius: '50%', fontSize: 16, cursor: 'pointer', flex: 'none' }}>✕</button>
-        ) : null}
-      </div>
-      <p style={{ font: '500 14px/1.6 Inter, sans-serif', color: MUT, margin: '8px 0 0' }}>
-        Tutorial OS works as an app on your phone: no browser bar, no typing a web address. Watch the guide, then install.
-      </p>
+    <div style={{ background: '#fff', color: INK, borderRadius: 24, maxWidth: 780, width: '100%', margin: '0 auto', padding: '22px 22px 26px', maxHeight: '94vh', overflowY: 'auto' }}>
+      {variant === 'overlay' ? (
+        <>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+            <h2 style={{ font: '800 19px "Plus Jakarta Sans", Inter, sans-serif', margin: 0 }}>Install the app on your phone</h2>
+            <button type="button" onClick={onClose} aria-label="Close the install guide" style={{ border: 'none', background: '#F1F5F9', color: MUT, width: 34, height: 34, borderRadius: '50%', fontSize: 16, cursor: 'pointer', flex: 'none' }}>✕</button>
+          </div>
+          <p style={{ font: '500 14px/1.6 Inter, sans-serif', color: MUT, margin: '8px 0 0' }}>
+            Tutorial OS works as an app on your phone: no browser bar, no typing a web address. Watch the guide, then install.
+          </p>
+        </>
+      ) : null}
 
-      <div style={{ display: 'flex', gap: 8, margin: '16px 0 0', background: '#F1F5F9', borderRadius: 12, padding: 4 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '24px', alignItems: 'flex-start', margin: '16px 0 0' }}>
+        <div style={{ flex: 'none', margin: '0 auto' }}>
+          {scene()}
+        </div>
+        <div style={{ flex: '1 1 300px', minWidth: 290 }}>
+      <div style={{ display: 'flex', gap: 8, margin: '0', background: '#F1F5F9', borderRadius: 12, padding: 4 }}>
         {([['a', 'Android'], ['i', 'iPhone']] as const).map(([id, label]) => (
           <button
             key={id}
@@ -282,10 +288,8 @@ export const InstallGuide: React.FC<InstallGuideProps> = ({ centreName, url, acc
         ))}
       </div>
 
-      <div style={{ margin: '18px 0 0' }}>{scene()}</div>
-
-      <div style={{ textAlign: 'center', margin: '16px 0 0' }}>
-        <span style={{ font: '700 11px Inter, sans-serif', letterSpacing: '0.06em', textTransform: 'uppercase', color: accent }}>Step {idx + 1} of 5</span>
+      <div style={{ textAlign: 'center', margin: '18px 0 0' }}>
+        <span style={{ font: '700 11px Inter, sans-serif', letterSpacing: '0.06em', textTransform: 'uppercase', color: accent }}>Step {idx + 1} of 4</span>
         <h3 style={{ font: '800 17px Inter, sans-serif', margin: '6px 0 4px' }}>{captions[idx][0]}</h3>
         <p style={{ font: '500 13.5px/1.6 Inter, sans-serif', color: MUT, margin: 0 }}>{captions[idx][1]}</p>
       </div>
@@ -313,6 +317,8 @@ export const InstallGuide: React.FC<InstallGuideProps> = ({ centreName, url, acc
         We detected: <b style={{ color: INK }}>{isIOSDevice() ? 'iPhone' : isAndroidDevice() ? 'Android phone' : 'a computer'}</b>
         {warning ? <><br />{warning}</> : null}
       </p>
+        </div>
+      </div>
     </div>
   );
 
@@ -320,7 +326,7 @@ export const InstallGuide: React.FC<InstallGuideProps> = ({ centreName, url, acc
 
   return (
     <div role="dialog" aria-modal="true" aria-label="How to install the app" onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 90, background: 'rgba(2,6,23,.58)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '24px 14px', overflowY: 'auto' }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 700 }}>{card}</div>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 800 }}>{card}</div>
     </div>
   );
 };

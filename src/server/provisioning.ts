@@ -47,6 +47,7 @@ export interface ProvisionLead {
   state: string;
   city: string;
   examTypes: string[];
+  accentColor?: string;
   skipTrial: boolean;
   /** Optional popup extras (2026-11-13 signup wizard): stored on the centre
    *  document so the whitelabel branding and reports can use them. */
@@ -169,6 +170,7 @@ export async function provisionCentre(
     contact: { state: (params.state || '').trim(), city: (params.city || '').trim() },
     address: (params.address || '').trim(),
     logoUrl: (params.logoUrl || '').trim(),
+    accentColor: (params.accentColor || '').trim(),
     teacherCount: (params.teacherCount || '').trim(),
     audienceTypes: (params.examTypes || []).filter(Boolean),
     expectedStudentCount: params.studentCount,

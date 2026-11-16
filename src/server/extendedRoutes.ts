@@ -117,6 +117,9 @@ function validateLeadBody(body: any): Record<string, any> | string {
     ? body.examTypes.map((t: any) => String(t).trim()).filter(Boolean).slice(0, 10)
     : [];
   const skipTrial = body.skipTrial === true;
+  // Optional accent colour the owner picked in the signup form (Nov 16).
+  const accentRaw = String(body.accentColor || '').trim();
+  const accentColor = /^#[0-9a-fA-F]{6}$/.test(accentRaw) ? accentRaw.toUpperCase() : '';
   const phoneDigits = phoneRaw.replace(/\D/g, '');
   if (fullName.length < 2 || fullName.length > 100) return 'Please give your full name.';
   if (businessName.length < 2 || businessName.length > 120) return 'Please give your facility name.';
@@ -126,7 +129,7 @@ function validateLeadBody(body: any): Record<string, any> | string {
   if (!state || state.length > 60) return 'Please choose a state.';
   if (city.length > 60) return 'Please tell us your city.';
   if (!examTypes.length) return 'Pick at least one exam type you teach.';
-  return { fullName, businessName, email, phone: phoneDigits, state, city, studentCount, examTypes, skipTrial };
+  return { fullName, businessName, email, phone: phoneDigits, state, city, studentCount, examTypes, skipTrial, accentColor };
 }
 
 async function verifyCaptcha(token: any): Promise<boolean> {
@@ -327,6 +330,7 @@ export function registerExtendedRoutes(app: express.Express): void {
         logoUrl: typeof req.body.logoUrl === 'string' && /^https:\/\//.test(String(req.body.logoUrl)) ? String(req.body.logoUrl).trim() : '',
         teacherCount: typeof req.body.teacherCount === 'string' ? String(req.body.teacherCount).trim().slice(0, 20) : '',
         examTypes: Array.isArray(checked.examTypes) ? checked.examTypes.filter(Boolean) : [],
+        accentColor: checked.accentColor,
         skipTrial: checked.skipTrial === true,
         source: 'lead',
         actorUid: 'public:trial-form',
