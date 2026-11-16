@@ -255,6 +255,7 @@ export function registerExtendedRoutes(app: express.Express): void {
         start_url: '/#access',
         scope: '/',
         icons: [icon(192, 'any'), icon(512, 'maskable')],
+        related_applications: [{ platform: 'webapp', url: `/api/public/pwa-manifest?centre=${slug}`, id: `/pwa/${slug}` }],
       });
     } catch (error: any) {
       console.error('[pwa-manifest] failed:', error?.message || error);

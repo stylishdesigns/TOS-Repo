@@ -1,4 +1,5 @@
 import {useEffect, useState} from 'react';
+import { getPendingInstallPrompt, waitForInstallPrompt, detectInstalledApp } from '../../hooks/usePWAInstall';
 
 // Dedicated install page served at /app. The welcome email's "Download the app"
 // button links here: one tap installs the PWA on Android/desktop Chrome, iOS
@@ -18,7 +19,7 @@ function mobileDevice(): boolean {
 }
 
 export function AppInstallPage() {
-  const [deferred, setDeferred] = useState<InstallPromptEvent | null>(null);
+  const [deferred, setDeferred] = useState<InstallPromptEvent | null>(() => getPendingInstallPrompt() as InstallPromptEvent | null);
   const [installed, setInstalled] = useState(
     () =>
       window.matchMedia('(display-mode: standalone)').matches ||
@@ -26,6 +27,7 @@ export function AppInstallPage() {
       (window.navigator as Navigator & {standalone?: boolean}).standalone === true,
   );
   const [justInstalled, setJustInstalled] = useState(false);
+  const [noPrompt, setNoPrompt] = useState(false);
   const [ios] = useState(iosDevice);
   const [mobile] = useState(mobileDevice);
 
@@ -38,6 +40,7 @@ export function AppInstallPage() {
     const media = window.matchMedia('(display-mode: standalone)');
     const onMode = () => setInstalled(media.matches);
     media.addEventListener?.('change', onMode);
+    detectInstalledApp().then((yes) => { if (yes) setInstalled(true); });
     return () => {
       window.removeEventListener('beforeinstallprompt', onPrompt);
       media.removeEventListener?.('change', onMode);
@@ -45,9 +48,10 @@ export function AppInstallPage() {
   }, []);
 
   const install = async () => {
-    if (!deferred) return;
-    await deferred.prompt();
-    const choice = await deferred.userChoice;
+    const evt = deferred || (await waitForInstallPrompt(2000) as InstallPromptEvent | null);
+    if (!evt) { setNoPrompt(true); return; }
+    await evt.prompt();
+    const choice = await evt.userChoice;
     if (choice.outcome === 'accepted') {
       setJustInstalled(true);
       setDeferred(null);
@@ -97,17 +101,16 @@ export function AppInstallPage() {
             </div>
           ) : (
             <div style={{display:'grid', gap:14, justifyItems:'center'}}>
-              {deferred ? (
-                <button type="button" className="btn pr" style={{minWidth:240, minHeight:56, fontSize:16}} onClick={install}>
-                  Install the app
-                </button>
-              ) : mobile ? (
-                <div className="cd" style={{padding:24, textAlign:'left', color:'#0F172A'}}>
-                  <h3 style={{fontSize:20, marginBottom:14}}>Add it to your Home Screen</h3>
-                  <ol style={{margin:0, paddingLeft:20, display:'grid', gap:12}}>
-                    <li style={{fontSize:15, lineHeight:1.5}}>Tap the <strong>menu</strong> button (three dots) at the top of your browser.</li>
-                    <li style={{fontSize:15, lineHeight:1.5}}>Choose <strong>Install app</strong> or <strong>Add to Home screen</strong>.</li>
-                  </ol>
+              {mobile ? (
+                <div style={{display:'grid', gap:10, justifyItems:'center'}}>
+                  <button type="button" className="btn pr" style={{minWidth:240, minHeight:56, fontSize:16}} onClick={install}>
+                    Install the app
+                  </button>
+                  {noPrompt && (
+                    <p style={{fontSize:14, color:'#475569', margin:0, textAlign:'center'}}>
+                      Your phone hasn't offered the install yet. Give it a few seconds, then tap Install again.
+                    </p>
+                  )}
                 </div>
               ) : (
                 <div className="cd" style={{padding:24, color:'#0F172A'}}>

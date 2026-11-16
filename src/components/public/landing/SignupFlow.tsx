@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { InstallGuide } from './InstallGuide';
+import { waitForInstallPrompt, detectInstalledApp } from '../../../hooks/usePWAInstall';
 import { FlowSelect } from './FlowSelect';
 
 /**
@@ -765,6 +766,7 @@ export const SignupAppPage: React.FC = () => {
     () => window.matchMedia('(display-mode: standalone)').matches || (window.navigator as Navigator & { standalone?: boolean }).standalone === true,
   );
   const [justInstalled, setJustInstalled] = useState(false);
+  const [noPrompt, setNoPrompt] = useState(false);
 
   useEffect(() => {
     if (!owner) window.location.replace('/start');
@@ -779,6 +781,9 @@ export const SignupAppPage: React.FC = () => {
     const media = window.matchMedia('(display-mode: standalone)');
     const onMode = () => setInstalled(media.matches);
     media.addEventListener?.('change', onMode);
+    if (!media.matches) {
+      detectInstalledApp().then((yes) => { if (yes) setInstalled(true); });
+    }
     return () => {
       window.removeEventListener('beforeinstallprompt', onPrompt);
       media.removeEventListener?.('change', onMode);
@@ -788,8 +793,8 @@ export const SignupAppPage: React.FC = () => {
   if (!owner) return null;
 
   const install = async () => {
-    const evt = deferred || pendingInstall;
-    if (!evt) return;
+    const evt = deferred || pendingInstall || (await waitForInstallPrompt(2000) as InstallPromptEvent | null);
+    if (!evt) { setNoPrompt(true); return; }
     await evt.prompt();
     const choice = await evt.userChoice;
     if (choice.outcome === 'accepted') {
@@ -827,14 +832,10 @@ export const SignupAppPage: React.FC = () => {
               <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style={{ flex: 'none', marginTop: '2px', color: '#15803D' }}><path d="M5 12l5 5 9-10" /></svg>
               {justInstalled ? 'The app is now on your home screen. Open it and sign in with the details from your email.' : 'You already have the app. Open it from your home screen and sign in with the details from your email.'}
             </div>
-          ) : deferred ? (
+          ) : (
             <button type="button" className="btn pr" onClick={install} style={{ width: '100%', minHeight: '52px', border: 'none', fontSize: '16px' }}>
               Install the app
             </button>
-          ) : (
-            <p style={{ font: '500 14px/1.6 Inter, sans-serif', color: '#475569', margin: '0' }}>
-              On your phone, open Tutorial OS in your browser and use your browser's menu to install it. The steps below work on any phone.
-            </p>
           )}
 
           <InstallGuide
@@ -844,6 +845,7 @@ export const SignupAppPage: React.FC = () => {
             accent={facility?.accent || '#EA580C'}
             onInstall={install}
             canPrompt={Boolean(deferred)}
+            noPrompt={noPrompt}
             onDone={() => setJustInstalled(true)}
           />
         </div>

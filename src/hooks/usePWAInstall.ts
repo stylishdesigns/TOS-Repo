@@ -5,8 +5,42 @@ export interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
 }
 
+// Chrome fires beforeinstallprompt once, and it can fire before React has
+// even mounted. The earliest possible capture lives at module scope so no
+// install button ever misses the browser's install offer.
+let pendingInstallPrompt: BeforeInstallPromptEvent | null = null;
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    pendingInstallPrompt = e as BeforeInstallPromptEvent;
+  });
+}
+
+export const getPendingInstallPrompt = (): BeforeInstallPromptEvent | null => pendingInstallPrompt;
+
+export async function waitForInstallPrompt(ms: number): Promise<BeforeInstallPromptEvent | null> {
+  const deadline = Date.now() + ms;
+  while (!pendingInstallPrompt && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+  return pendingInstallPrompt;
+}
+
+// True when this facility's app is already on the phone (Chrome then never
+// fires the install offer again).
+export async function detectInstalledApp(): Promise<boolean> {
+  const nav = window.navigator as Navigator & { getInstalledRelatedApps?: () => Promise<unknown[]> };
+  if (!nav.getInstalledRelatedApps) return false;
+  try {
+    const apps = await nav.getInstalledRelatedApps();
+    return Array.isArray(apps) && apps.length > 0;
+  } catch {
+    return false;
+  }
+}
+
 export function usePWAInstall() {
-  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(() => pendingInstallPrompt);
   const [isInstalled, setIsInstalled] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
 
@@ -30,10 +64,14 @@ export function usePWAInstall() {
     const handleAppInstalled = () => {
       setIsInstalled(true);
       setDeferredPrompt(null);
+      pendingInstallPrompt = null;
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     window.addEventListener('appinstalled', handleAppInstalled);
+    if (!isStandalone) {
+      detectInstalledApp().then((yes) => { if (yes) setIsInstalled(true); });
+    }
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
@@ -42,12 +80,14 @@ export function usePWAInstall() {
   }, []);
 
   const install = async () => {
-    if (!deferredPrompt) return false;
-    await deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
+    const evt = deferredPrompt || (await waitForInstallPrompt(2000));
+    if (!evt) return false;
+    await evt.prompt();
+    const { outcome } = await evt.userChoice;
     if (outcome === 'accepted') {
       setIsInstalled(true);
       setDeferredPrompt(null);
+      pendingInstallPrompt = null;
       return true;
     }
     return false;

@@ -52,6 +52,7 @@ export default defineConfig(({mode}) => {
               purpose: 'maskable',
             },
           ],
+          related_applications: [{ platform: 'webapp', url: '/manifest.webmanifest', id: '/' }],
         },
         workbox: {
           maximumFileSizeToCacheInBytes: 10 * 1024 * 1024, // 10 MiB
