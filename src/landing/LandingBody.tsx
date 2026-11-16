@@ -334,7 +334,7 @@ export const LandingBody: React.FC<{
       <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '18px 28px', borderBottom: isObsidian ? `1px solid color-mix(in srgb, ${accent} 30%, transparent)` : `1px solid color-mix(in srgb, ${ink} 12%, transparent)` }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
           <span style={{ flexShrink: 0, width: 38, height: 38, borderRadius: isObsidian ? 0 : smallRad, background: accent, color: on, display: 'grid', placeItems: 'center', fontWeight: 700, fontFamily: preset.headingFont }}>{initial}</span>
-          <span style={{ fontFamily: preset.headingFont, fontWeight: 700, fontSize: 18, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}</span>
+          <span className="lpb-brand" style={{ fontFamily: preset.headingFont, fontWeight: 700, fontSize: 18, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}</span>
         </div>
         <nav className="lpb-navl" style={{ display: 'flex', gap: 22, fontSize: 14, fontWeight: 600, color: mut }}>
           <a className="lpb-navlink" href="#programs" style={{ color: 'inherit', textDecoration: 'none' }}>Programs</a>

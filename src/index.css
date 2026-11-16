@@ -457,4 +457,6 @@ span.text-slate-600:not(.dark-bg-mode *) {
   .lpb-navl{display:none !important}
   .lpb-encard{padding:28px 20px !important;border-radius:min(28px,28px) !important}
   .lpb-encard .lpb-h2{font-size:26px !important}
+  .lpb-brand{font-size:15px !important}
+  .lpb-navcta{padding:7px 12px !important;font-size:12px !important;white-space:nowrap !important}
 }
