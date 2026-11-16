@@ -371,7 +371,7 @@ export interface Announcement {
   centreId?: string;
   title: string;
   content: string;
-  target: 'All' | 'Students' | 'App Public' | 'Parents';
+  target: 'All' | 'Students' | 'Website Public' | 'Parents';
   date: string;
   priority: 'Normal' | 'Urgent';
 }

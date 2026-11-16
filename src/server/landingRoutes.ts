@@ -119,7 +119,7 @@ export function registerLandingRoutes(app: express.Express): void {
       return res.json({ ok: true, published, centreName, content, whatsapp, appSlug, appIcon: appIcon || "/pwa-512x512.png" });
     } catch (err) {
       console.error("[landing] GET /api/public/landing failed:", err);
-      return res.status(500).json({ error: "Could not load this facility's app." });
+      return res.status(500).json({ error: "Could not load this facility's website." });
     }
   });
 

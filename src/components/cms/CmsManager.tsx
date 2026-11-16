@@ -104,7 +104,7 @@ export const CmsManager: React.FC = () => {
 
         <div className="flex items-center space-x-2 shrink-0">
           <button
-            onClick={() => setViewMode('app')}
+            onClick={() => setViewMode('website')}
             className="px-3.5 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg flex items-center space-x-1.5 shadow-2xs"
           >
             <Eye className="w-3.5 h-3.5 text-slate-500" />

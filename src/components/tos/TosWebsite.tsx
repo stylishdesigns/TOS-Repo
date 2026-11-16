@@ -4,7 +4,7 @@ import { api, inputCls } from './tosShared';
 import { LandingEditor } from '../landing/LandingEditor';
 
 /**
- * App tab (piece 2 of the landing-page feature): the TOS-side builder for
+ * Website tab (piece 2 of the landing-page feature): the TOS-side builder for
  * each centre's public landing page. The dropdown picks the facility; the
  * editor itself lives in landing/LandingEditor and writes only PUBLIC
  * marketing content (centreLandingPages/{centreId}).

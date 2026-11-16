@@ -83,7 +83,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
         { id: 'payments', label: 'Fees & Payments', icon: CreditCard },
         { id: 'announcements', label: 'Announcements', icon: Bell },
         { id: 'chat', label: 'Chat', icon: MessageSquare },
-        { id: 'app', label: 'App (Landing page)', icon: Globe },
+        { id: 'website', label: 'Website (Landing page)', icon: Globe },
       ],
     },
     {
@@ -132,7 +132,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
           </div>
 
           <button
-            onClick={() => setViewMode('app')}
+            onClick={() => setViewMode('website')}
             title="Open Public Website"
             className="p-1.5 rounded-md text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
           >

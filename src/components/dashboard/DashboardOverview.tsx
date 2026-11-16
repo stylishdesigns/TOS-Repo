@@ -188,7 +188,7 @@ export const DashboardOverview: React.FC = () => {
 
                     <button
                       onClick={() => {
-                        setViewMode('app');
+                        setViewMode('website');
                         setShowRoleDropdown(false);
                         addToast({
                           type: 'info',

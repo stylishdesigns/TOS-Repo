@@ -690,7 +690,7 @@ const MainLayout: React.FC = () => {
   // their OWN landing page, always live from the server, so every template
   // change is visible the moment it is saved. Platform (TOS) staff without a
   // facility selected keep the generic Tutorial OS site.
-  if (viewMode === 'app') {
+  if (viewMode === 'website') {
     if (activeCentreId) {
       return (
         <>
@@ -752,7 +752,7 @@ const MainLayout: React.FC = () => {
             {adminSection === 'results' && <PerformanceManager />}
             {adminSection === 'announcements' && <AnnouncementsManager />}
             {adminSection === 'chat' && <AdminChatEntry />}
-            {adminSection === 'app' && <WebsiteLanding />}
+            {adminSection === 'website' && <WebsiteLanding />}
             {adminSection === 'student-portal' && <StudentPortal />}
             {adminSection === 'tutor-portal' && <TutorPortal />}
             {(adminSection === 'finance' || adminSection === 'payments') && <FinanceManager />}

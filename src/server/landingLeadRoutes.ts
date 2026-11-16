@@ -53,7 +53,7 @@ export function registerLandingLeadRoutes(app: express.Express): void {
       if (!caller) return res.status(401).json({ error: "Unauthorized" });
       const centreId = await centreIdForCaller(caller);
       if (!centreId) {
-        return res.status(403).json({ error: "Only a facility admin can view app enquiries." });
+        return res.status(403).json({ error: "Only a facility admin can view website enquiries." });
       }
       const snap = await adminDb
         .collection("centreLandingLeads")
@@ -89,7 +89,7 @@ export function registerLandingLeadRoutes(app: express.Express): void {
       if (!caller) return res.status(401).json({ error: "Unauthorized" });
       const centreId = await centreIdForCaller(caller);
       if (!centreId) {
-        return res.status(403).json({ error: "Only a facility admin can manage app enquiries." });
+        return res.status(403).json({ error: "Only a facility admin can manage website enquiries." });
       }
       const id = String(req.params.id || "");
       if (!/^[a-zA-Z0-9_-]{1,64}$/.test(id)) {
