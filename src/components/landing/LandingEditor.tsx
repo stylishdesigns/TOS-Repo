@@ -169,7 +169,7 @@ export const LandingEditor: React.FC<{ apiPath: string; refreshKey?: number }> =
         <div className="grid lg:grid-cols-[1fr_340px] gap-5 items-start">
           <div className="space-y-5">
             <Card title="Template">
-              <p className="text-[12px] text-slate-500 mb-3">Pick a look for your website. Your text, photos and details stay exactly as they are; each look brings its own fonts, corners and colour mood. You can still fine-tune the accent colour under Top of page.</p>
+              <p className="text-[12px] text-slate-500 mb-3">Pick a look for your app. Your text, photos and details stay exactly as they are; each look brings its own fonts, corners and colour mood. You can still fine-tune the accent colour under Top of page.</p>
               <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
                 {TEMPLATE_PRESETS.map((p) => {
                   const on = content.templateId === p.id;

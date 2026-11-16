@@ -236,7 +236,7 @@ const LeadsTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
       {loading && shown.length === 0 ? (
         <div className="flex items-center gap-2 text-slate-400 text-sm py-10 justify-center"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</div>
       ) : shown.length === 0 ? (
-        <Card><p className="text-slate-400 text-sm">No leads here yet. Sign-ups from the public site land in this list.</p></Card>
+        <Card><p className="text-slate-400 text-sm">No leads here yet. Sign-ups from the public app land in this list.</p></Card>
       ) : (
         <div className="space-y-2">
           {shown.map((l) => (
@@ -791,7 +791,7 @@ const TABS = [
   { id: 'questions', label: 'Question Bank', mlabel: 'Bank', icon: BookOpen, group: 'Content' },
   { id: 'mocks', label: 'Mocks', mlabel: 'Mocks', icon: CalendarDays, group: 'Content' },
   { id: 'chat', label: 'Chat', mlabel: 'Chat', icon: MessageSquare, group: 'Content' },
-  { id: 'website', label: 'Website', mlabel: 'Website', icon: Globe, group: 'Content' },
+  { id: 'app', label: 'Website', mlabel: 'Website', icon: Globe, group: 'Content' },
   { id: 'audit', label: 'Audit log', mlabel: 'Audit', icon: ScrollText, group: 'System' },
   { id: 'team', label: 'Team', mlabel: 'Team', icon: Users, group: 'System' },
   { id: 'account', label: 'Account', mlabel: 'Account', icon: UserRound, group: 'System' },
@@ -1020,7 +1020,8 @@ export const TosPortal: React.FC = () => {
   const TOS_CENTRE_KEY = 'tos:openCentreId';
   const [tab, setTabState] = useState<string>(() => {
     try {
-      const saved = localStorage.getItem(TOS_TAB_KEY) || '';
+      const savedRaw = localStorage.getItem(TOS_TAB_KEY) || '';
+      const saved = savedRaw === 'website' ? 'app' : savedRaw;
       if (TABS.some((t) => t.id === saved)) return saved;
     } catch { /* storage unavailable */ }
     return 'overview';
@@ -1118,13 +1119,13 @@ export const TosPortal: React.FC = () => {
           <h1 className="text-2xl font-black text-white tracking-tight capitalize">{TABS.find((t) => t.id === tab)?.label}</h1>
           <p className="text-slate-400 text-xs mt-1">
             {tab === 'overview' && 'Everything happening across the platform right now.'}
-            {tab === 'leads' && 'Sign-ups from the public site. Verify, provision, or decline.'}
+            {tab === 'leads' && 'Sign-ups from the public app. Verify, provision, or decline.'}
             {tab === 'centres' && 'Every facility, its plan, seats, billing and access code.'}
             {tab === 'plans' && 'Pricing, caps and feature flags. All stored as data.'}
             {tab === 'questions' && 'Two separate banks: Practice and Mock. Pick one on the hub to work in.'}
             {tab === 'mocks' && "One mock a day for every facility's students. Create, freeze and manage them from here."}
             {tab === 'chat' && 'The platform channel, chat settings and escalated reports.'}
-            {tab === 'website' && 'Each facility\'s public landing page: template, content and publish.'}
+            {tab === 'app' && 'Each facility\'s public landing page: template, content and publish.'}
             {tab === 'audit' && 'Every privileged action, recorded.'}
             {tab === 'team' && 'The people who run the platform.'}
             {tab === 'account' && 'Your platform profile, password and sign-out.'}
@@ -1138,7 +1139,7 @@ export const TosPortal: React.FC = () => {
         {tab === 'library' && <QuestionLibraryTab refreshKey={refreshKey} />}
         {tab === 'mocks' && <MocksTab refreshKey={refreshKey} openCreateSignal={mocksCreateKey} />}
         {tab === 'chat' && <TosChat refreshKey={refreshKey} />}
-        {tab === 'website' && <WebsiteTab refreshKey={refreshKey} />}
+        {tab === 'app' && <WebsiteTab refreshKey={refreshKey} />}
         {tab === 'plans' && <PlansTab />}
         {tab === 'audit' && <AuditTab />}
         {tab === 'team' && <TeamTab />}

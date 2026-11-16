@@ -143,7 +143,7 @@ export type AdminSection =
   | 'payments'
   | 'announcements'
   | 'chat'
-  | 'website'
+  | 'app'
   | 'cms-editor'
   | 'branches'
   | 'settings'
@@ -153,10 +153,12 @@ export type AdminSection =
   | 'student-portal'
   | 'tutor-portal';
 
-/** The facility-admin website item was renamed to 'website' (Nov 16); saved
- * hash and localStorage values from before the rename map forward. */
+/** The facility-admin landing-page section is now called 'app' (Nov 16,
+ * second rename: it was 'website-enquiries', then 'website'); saved hash and
+ * localStorage values from before the renames map forward. */
 const SECTION_ALIASES: Record<string, AdminSection> = {
-  'website-enquiries': 'website',
+  'website-enquiries': 'app',
+  'website': 'app',
 };
 
 interface ToastMessage {
@@ -261,8 +263,8 @@ interface AppContextType {
   exams: CBTExam[];
 
   // Navigation & View mode
-  viewMode: 'portal' | 'website' | 'student' | 'tutor';
-  setViewMode: (mode: 'portal' | 'website' | 'student' | 'tutor') => void;
+  viewMode: 'portal' | 'app' | 'student' | 'tutor';
+  setViewMode: (mode: 'portal' | 'app' | 'student' | 'tutor') => void;
   adminSection: AdminSection;
   setAdminSection: (section: AdminSection) => void;
   globalSearch: string;
@@ -704,7 +706,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Persistent navigation parsing from URL hash and localStorage
   const parseInitialNavigation = (): {
-    viewMode: 'portal' | 'website' | 'student' | 'tutor';
+    viewMode: 'portal' | 'app' | 'student' | 'tutor';
     adminSection: AdminSection;
   } => {
     const validSections: AdminSection[] = [
@@ -739,8 +741,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (hash.startsWith('#tutor')) {
           return { viewMode: 'tutor', adminSection: 'dashboard' };
         }
-        if (hash.startsWith('#website')) {
-          return { viewMode: 'website', adminSection: 'dashboard' };
+        if (hash.startsWith('#app')) {
+          return { viewMode: 'app', adminSection: 'dashboard' };
         }
         if (hash.startsWith('#admin/')) {
           const rawSection = hash.replace('#admin/', '') as AdminSection;
@@ -756,7 +758,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // 2. Check localStorage if no explicit URL hash
       const savedViewMode = localStorage.getItem(`${STORAGE_KEY}_viewMode`) as
         | 'portal'
-        | 'website'
+        | 'app'
         | 'student'
         | 'tutor'
         | null;
@@ -769,7 +771,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       const viewMode =
         savedViewMode === 'portal' ||
-        savedViewMode === 'website' ||
+        savedViewMode === 'app' ||
         savedViewMode === 'student' ||
         savedViewMode === 'tutor'
           ? savedViewMode
@@ -787,10 +789,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const initialNav = parseInitialNavigation();
-  const [viewMode, setViewModeState] = useState<'portal' | 'website' | 'student' | 'tutor'>(initialNav.viewMode);
+  const [viewMode, setViewModeState] = useState<'portal' | 'app' | 'student' | 'tutor'>(initialNav.viewMode);
   const [adminSection, setAdminSectionState] = useState<AdminSection>(initialNav.adminSection);
 
-  const setViewMode = (mode: 'portal' | 'website' | 'student' | 'tutor') => {
+  const setViewMode = (mode: 'portal' | 'app' | 'student' | 'tutor') => {
     setViewModeState(mode);
     try {
       localStorage.setItem(`${STORAGE_KEY}_viewMode`, mode);
@@ -798,8 +800,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         window.location.hash = `student/home`;
       } else if (mode === 'tutor') {
         window.location.hash = 'tutor/home';
-      } else if (mode === 'website') {
-        window.location.hash = 'website';
+      } else if (mode === 'app') {
+        window.location.hash = 'app';
       } else {
         window.location.hash = `admin/${adminSection}`;
       }
@@ -859,8 +861,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         window.location.hash = `student/${savedTab}`;
       } else if (viewMode === 'tutor') {
         window.location.hash = 'tutor';
-      } else if (viewMode === 'website') {
-        window.location.hash = 'website';
+      } else if (viewMode === 'app') {
+        window.location.hash = 'app';
       } else {
         window.location.hash = `admin/${adminSection}`;
       }
@@ -879,10 +881,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         try {
           localStorage.setItem(`${STORAGE_KEY}_viewMode`, 'tutor');
         } catch {}
-      } else if (hash.startsWith('#website')) {
-        setViewModeState('website');
+      } else if (hash.startsWith('#app')) {
+        setViewModeState('app');
         try {
-          localStorage.setItem(`${STORAGE_KEY}_viewMode`, 'website');
+          localStorage.setItem(`${STORAGE_KEY}_viewMode`, 'app');
         } catch {}
       } else if (hash.startsWith('#admin/')) {
         const rawSection = hash.replace('#admin/', '') as AdminSection;
@@ -1014,7 +1016,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             const isStudentHash = hash.startsWith('#student');
             const isTutorHash = hash.startsWith('#tutor');
             const isAdminHash = hash.startsWith('#admin');
-            const isWebsiteHash = hash === '#website';
+            const isWebsiteHash = hash === '#app';
 
             // Respect existing hash if valid for the user's roles
             if (isTutorHash && foundTutor) {
@@ -1581,22 +1583,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateCMS = async (newCms: Partial<CMSContent>) => {
     try {
       const updated = { ...cms, ...newCms };
-      if (!activeCentreId) throw new Error('Select your facility before saving website content.');
+      if (!activeCentreId) throw new Error('Select your facility before saving app content.');
       await setDoc(doc(db, 'centreSettings', `${activeCentreId}__cms`), updated);
       setCmsState(updated);
       addToast({
         type: 'success',
-        title: 'Website CMS Saved',
-        description: 'Changes are now live on your public education facility website.',
+        title: 'App Content Saved',
+        description: 'Changes are now live on your public education facility app.',
       });
       logActivity({
-        title: 'Live Website Content Published',
+        title: 'Live App Content Published',
         subtitle: 'CMS sections synchronized',
         category: 'CMS',
         type: 'success',
       });
     } catch (e) {
-      handleFirestoreError(e, OperationType.UPDATE, 'your website content');
+      handleFirestoreError(e, OperationType.UPDATE, 'your app content');
     }
   };
 
@@ -1818,7 +1820,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         // A centre with no website content yet starts from neutral defaults.
         setCmsState(INITIAL_CMS);
       }
-    }, (error) => handleFirestoreError(error, OperationType.GET, 'facility website content')) : () => {};
+    }, (error) => handleFirestoreError(error, OperationType.GET, 'facility app content')) : () => {};
 
     // Attendance Logs listener
     let qAttendance = query(collection(db, 'attendance_logs'));
@@ -2338,7 +2340,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       addToast({
         type: 'success',
         title: 'Programme Created',
-        description: `${progData.name} is now available on the website and registration form.`,
+        description: `${progData.name} is now available on the app and registration form.`,
       });
     } catch (e) {
       handleFirestoreError(e, OperationType.CREATE, 'programmes');

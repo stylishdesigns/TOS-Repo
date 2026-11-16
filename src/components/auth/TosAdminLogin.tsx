@@ -205,7 +205,7 @@ export const TosAdminLogin: React.FC<TosAdminLoginProps> = ({ onBack }) => {
         {onBack && (
           <div className="text-center mt-8 animate-in fade-in duration-700">
             <button onClick={onBack} className="text-slate-500 hover:text-slate-300 text-xs font-medium transition-colors">
-              Back to the public site
+              Back to the public app
             </button>
           </div>
         )}

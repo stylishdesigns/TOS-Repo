@@ -132,7 +132,7 @@ export const TopNav: React.FC<TopNavProps> = ({ onToggleMobileMenu }) => {
         {/* Switcher Button: Public Website */}
         <button
           id="switch-to-website-btn"
-          onClick={() => setViewMode(viewMode === 'portal' ? 'website' : 'portal')}
+          onClick={() => setViewMode(viewMode === 'portal' ? 'app' : 'portal')}
           className="hidden sm:flex items-center space-x-2 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 shadow-2xs"
         >
           <Globe className="w-3.5 h-3.5 text-[#EA580C]" />
