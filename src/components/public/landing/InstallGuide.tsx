@@ -265,7 +265,7 @@ export const InstallGuide: React.FC<InstallGuideProps> = ({ centreName, url, acc
         ) : null}
       </div>
       <p style={{ font: '500 14px/1.6 Inter, sans-serif', color: MUT, margin: '8px 0 0' }}>
-        Your tutors and students use Tutorial OS as an app on their phones. Watch the guide, then install so you know exactly what they will see.
+        Tutorial OS works as an app on your phone: no browser bar, no typing a web address. Watch the guide, then install.
       </p>
 
       <div style={{ display: 'flex', gap: 8, margin: '16px 0 0', background: '#F1F5F9', borderRadius: 12, padding: 4 }}>
