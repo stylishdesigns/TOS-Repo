@@ -198,7 +198,7 @@ export const LandingBody: React.FC<{
           <a className="lpb-navlink" href="#enquiry" style={{ color: 'inherit', textDecoration: 'none' }}>Enquiries</a>
         </nav>
         {c.hero.buttons[0]?.label ? (
-          <a {...btnProps(c.hero.buttons[0], true)} className="lpb-navcta" />
+          <a className="lpb-navcta" {...btnProps(c.hero.buttons[0], true)}>{c.hero.buttons[0].label}</a>
         ) : null}
       </header>
 
