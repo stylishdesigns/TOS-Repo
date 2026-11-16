@@ -18,7 +18,6 @@ import {
   CheckCircle2,
   Sun,
   Moon,
-  Smartphone,
   GraduationCap,
   Shield,
 } from 'lucide-react';
@@ -129,26 +128,6 @@ export const TopNav: React.FC<TopNavProps> = ({ onToggleMobileMenu }) => {
       <div className="flex items-center space-x-3 md:space-x-4 shrink-0 ml-4">
         {/* PWA Install Button */}
         <PWAInstallButton variant="compact" className="hidden lg:flex" />
-
-        {/* Switcher Button: Student Mobile App */}
-        <button
-          id="switch-to-student-app-btn"
-          onClick={() => setViewMode(viewMode === 'student' ? 'portal' : 'student')}
-          className="hidden sm:flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all border border-orange-200 bg-orange-50/80 text-orange-900 hover:bg-orange-100 shadow-2xs"
-        >
-          <Smartphone className="w-3.5 h-3.5 text-[#EA580C]" />
-          <span>Student App</span>
-        </button>
-
-        {/* Switcher Button: Tutor Portal */}
-        <button
-          id="switch-to-tutor-portal-btn"
-          onClick={() => setViewMode(viewMode === 'tutor' ? 'portal' : 'tutor')}
-          className="hidden sm:flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all border border-purple-200 bg-purple-50/80 text-purple-900 hover:bg-purple-100 shadow-2xs"
-        >
-          <GraduationCap className="w-3.5 h-3.5 text-purple-600" />
-          <span>Tutor Portal</span>
-        </button>
 
         {/* Switcher Button: Public Website */}
         <button

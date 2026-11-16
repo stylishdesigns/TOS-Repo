@@ -1325,7 +1325,7 @@ const ThreadPanel: React.FC<{
   // Same shell as the student room: a fixed screen with the header and the
   // composer both pinned, and only the messages scroll between them.
   return (
-    <div className="fixed inset-0 z-40 flex flex-col bg-[#FFF3E7]" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+    <div className="fixed inset-y-0 right-0 left-0 lg:left-60 z-40 flex flex-col bg-[#FFF3E7]" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
       <div className="px-3 sm:px-5 py-2.5 flex items-center gap-2 bg-[#EA580C] shadow-sm shrink-0">
         <button onClick={onBack} className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center text-white active:scale-95 transition shrink-0" aria-label="Back to groups">
           <ChevronLeft className="w-4 h-4" />

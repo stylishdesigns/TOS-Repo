@@ -21,6 +21,8 @@ type ApiResult = {
   centreName: string;
   content: LandingContent;
   whatsapp?: string;
+  appSlug?: string;
+  appIcon?: string;
 };
 
 function hrefFor(href: string): string {
@@ -64,6 +66,33 @@ export const PublicLandingPage: React.FC<{ centreId: string }> = ({ centreId }) 
       alive = false;
     };
   }, [centreId]);
+
+  // Piece 5: the landing link is what centres send students, so a visitor
+  // here is installing THIS facility's app. Swap the page's manifest and
+  // home-screen icon to the facility's own as soon as its page loads.
+  React.useEffect(() => {
+    if (!data || !data.appSlug) return;
+    try {
+      let link = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
+      if (!link) {
+        link = document.createElement('link');
+        link.rel = 'manifest';
+        document.head.appendChild(link);
+      }
+      link.href = `/api/public/pwa-manifest?centre=${encodeURIComponent(data.appSlug)}`;
+      if (data.appIcon) {
+        let ati = document.querySelector<HTMLLinkElement>('link[rel="apple-touch-icon"]');
+        if (!ati) {
+          ati = document.createElement('link');
+          ati.rel = 'apple-touch-icon';
+          document.head.appendChild(ati);
+        }
+        ati.href = data.appIcon;
+      }
+    } catch {
+      // Manifest swap is progressive; the page still renders without it.
+    }
+  }, [data]);
 
   if (failed) {
     return (
@@ -133,7 +162,7 @@ export const PublicLandingPage: React.FC<{ centreId: string }> = ({ centreId }) 
   };
 
   return (
-    <LandingBody
+    <LandingBody installCentre={data.appSlug || centreId}
       content={c}
       centreName={data.centreName}
       waHrefFor={waHrefFor}

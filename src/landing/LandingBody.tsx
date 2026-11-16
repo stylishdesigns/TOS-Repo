@@ -29,6 +29,97 @@ import {
  * enquiry form always posts to the facility's Website Enquiries inbox.
  */
 
+// The facility landing page carries an Install app button (piece 5): students
+// open the centre's landing link and install that centre's branded PWA. The
+// browser hands us the install event once the per-facility manifest is live;
+// without it (iPhone Safari) the pill opens a short how-to sheet instead.
+let installPromptEvent: any = null;
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeinstallprompt', (e: any) => {
+    e.preventDefault();
+    installPromptEvent = e;
+  });
+}
+
+const LandingInstallPill: React.FC<{
+  centreName: string;
+  accent: string;
+  on: string;
+  radius: number;
+}> = ({ centreName, accent, on, radius }) => {
+  const [sheet, setSheet] = React.useState(false);
+  const [busy, setBusy] = React.useState(false);
+  const openInstall = () => {
+    if (installPromptEvent) {
+      try {
+        installPromptEvent.prompt();
+      } catch {
+        installPromptEvent = null;
+      }
+      installPromptEvent = null;
+      setBusy(true);
+      window.setTimeout(() => setBusy(false), 2000);
+    } else {
+      setSheet(true);
+    }
+  };
+  return (
+    <>
+      <button
+        type="button"
+        className="lpb-installbtn"
+        onClick={openInstall}
+        style={{
+          border: `1.5px solid ${accent}`,
+          color: accent,
+          background: 'transparent',
+          padding: '11px 16px',
+          borderRadius: radius,
+          fontSize: 14,
+          fontWeight: 700,
+          cursor: 'pointer',
+          whiteSpace: 'nowrap',
+          lineHeight: 1,
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 7,
+          fontFamily: 'inherit',
+        }}
+      >
+        <span aria-hidden={true} style={{ fontSize: 15 }}>{busy ? '\u23F3' : '\u2B07'}</span>
+        {busy ? 'Installing…' : 'Install app'}
+      </button>
+      {sheet ? (
+        <div
+          role="dialog"
+          aria-label="How to install the app"
+          onClick={() => setSheet(false)}
+          style={{ position: 'fixed', inset: 0, zIndex: 80, background: 'rgba(2,6,23,0.55)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: 16 }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ background: '#ffffff', color: '#0f172a', borderRadius: 16, maxWidth: 430, width: '100%', padding: '20px 22px 24px' }}
+          >
+            <p style={{ fontSize: 17, fontWeight: 800, margin: 0 }}>Install the {centreName} app</p>
+            <p style={{ fontSize: 14, lineHeight: 1.6, color: '#475569', marginTop: 8 }}>
+              On iPhone: tap the Share button in Safari, then choose Add to Home Screen.
+              <br />
+              On Android: tap the three-dot menu in Chrome, then choose Install app.
+            </p>
+            <button
+              type="button"
+              onClick={() => setSheet(false)}
+              style={{ marginTop: 14, width: '100%', padding: '13px 0', borderRadius: 10, border: 'none', background: accent, color: on, fontWeight: 700, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' }}
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </>
+  );
+};
+
 const ICONS: Record<string, string> = {
   pencil: '\u270E',
   list: '\u2261',
@@ -82,13 +173,14 @@ export const LandingBody: React.FC<{
   content: LandingContent;
   centreName: string;
   waHrefFor: (href: string) => string;
+  installCentre?: string;
   formApi: LandingFormApi;
   /** Shows the floating WhatsApp button when set; pass the wa.me link. */
   waFab?: string;
   /** 'fixed' floats over the whole page (public page); 'sticky' floats
    *  inside the scrolling preview frame. */
   fabMode?: 'fixed' | 'sticky';
-}> = ({ content: c, centreName, waHrefFor, formApi, waFab, fabMode = 'fixed' }) => {
+}> = ({ content: c, centreName, waHrefFor, formApi, waFab, fabMode = 'fixed', installCentre }) => {
   const tpl = normalizeTemplateId(c.templateId);
   const preset = templatePreset(tpl);
   const accent = /^#[0-9a-fA-F]{6}$/.test(c.accent) ? c.accent : preset.accent;
@@ -341,9 +433,14 @@ export const LandingBody: React.FC<{
           <a className="lpb-navlink" href="#why-us" style={{ color: 'inherit', textDecoration: 'none' }}>Why us</a>
           <a className="lpb-navlink" href="#enquiry" style={{ color: 'inherit', textDecoration: 'none' }}>Enquiries</a>
         </nav>
-        {c.hero.buttons[0]?.label ? (
-          <a className="lpb-navcta" {...btnProps(c.hero.buttons[0], true)}>{c.hero.buttons[0].label}</a>
-        ) : null}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+          {installCentre ? (
+            <LandingInstallPill centreName={name} accent={accent} on={on} radius={isObsidian ? 0 : smallRad} />
+          ) : null}
+          {c.hero.buttons[0]?.label ? (
+            <a className="lpb-navcta" {...btnProps(c.hero.buttons[0], true)}>{c.hero.buttons[0].label}</a>
+          ) : null}
+        </div>
       </header>
 
       {/* Hero */}

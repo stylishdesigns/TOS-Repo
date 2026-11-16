@@ -38,6 +38,7 @@ export function registerLandingRoutes(app: express.Express): void {
 
       let centreName = "Our education facility";
       let centrePhone = "";
+      let logoUrl = "";
       try {
         const centreSnap = await adminDb.collection("centres").doc(resolvedId).get();
         if (centreSnap.exists) {
@@ -46,9 +47,23 @@ export function registerLandingRoutes(app: express.Express): void {
             centreName = data.name.trim();
           }
           if (data && typeof data.phone === "string") centrePhone = data.phone;
+          if (data && typeof data.logoUrl === "string") logoUrl = data.logoUrl;
         }
       } catch {
         // Name lookup failure must not break the page; fall back to the default.
+      }
+
+      // The facility's app identity for the landing page's Install button: the
+      // same slug the PWA manifest route resolves, and the centre logo as a
+      // square 512px icon for iOS home screens.
+      let appSlug = "";
+      let appIcon = "";
+      try {
+        appSlug = centreName.toLowerCase().replace(/[^a-z0-9]+/g, "").slice(0, 63);
+        const m = logoUrl.match(/^(https:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/)(.+)$/);
+        if (m) appIcon = `${m[1]}w_512,h_512,c_pad,b_white,f_png/${m[2]}`;
+      } catch {
+        // Identity fields are additive; failure must not break the page.
       }
 
       // The centre's WhatsApp line, exactly what getCentreWhatsApp reads for
@@ -101,7 +116,7 @@ export function registerLandingRoutes(app: express.Express): void {
       }
 
       res.set("Cache-Control", "public, max-age=60");
-      return res.json({ ok: true, published, centreName, content, whatsapp });
+      return res.json({ ok: true, published, centreName, content, whatsapp, appSlug, appIcon: appIcon || "/pwa-512x512.png" });
     } catch (err) {
       console.error("[landing] GET /api/public/landing failed:", err);
       return res.status(500).json({ error: "Could not load this facility's website." });

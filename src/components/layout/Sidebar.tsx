@@ -57,7 +57,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
     {
       title: 'MENU',
       items: [
-        { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+        { id: 'dashboard', label: 'Overview', icon: LayoutDashboard },
         { id: 'students', label: 'Students', icon: Users, badge: students.length },
         {
           id: 'subjects',
