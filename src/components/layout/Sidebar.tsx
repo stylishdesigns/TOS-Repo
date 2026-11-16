@@ -22,7 +22,6 @@ import {
   Award,
   Sparkles,
   MessageSquare,
-  Inbox,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -84,7 +83,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
         { id: 'payments', label: 'Fees & Payments', icon: CreditCard },
         { id: 'announcements', label: 'Announcements', icon: Bell },
         { id: 'chat', label: 'Chat', icon: MessageSquare },
-        { id: 'website-enquiries', label: 'Website Enquiries', icon: Inbox },
+        { id: 'website', label: 'Website (Landing page)', icon: Globe },
       ],
     },
     {

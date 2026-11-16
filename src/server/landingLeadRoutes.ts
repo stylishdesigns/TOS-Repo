@@ -18,7 +18,7 @@ import { Caller } from "./tenantService";
 
 const LEAD_LIMIT = 200;
 
-async function centreIdForCaller(caller: Caller): Promise<string | null> {
+export async function centreIdForCaller(caller: Caller): Promise<string | null> {
   try {
     const snap = await adminDb.collection("admins").doc(caller.uid).get();
     if (snap.exists) {

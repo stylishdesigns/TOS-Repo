@@ -143,7 +143,7 @@ export type AdminSection =
   | 'payments'
   | 'announcements'
   | 'chat'
-  | 'website-enquiries'
+  | 'website'
   | 'cms-editor'
   | 'branches'
   | 'settings'
@@ -152,6 +152,12 @@ export type AdminSection =
   | 'parent-portal'
   | 'student-portal'
   | 'tutor-portal';
+
+/** The facility-admin website item was renamed to 'website' (Nov 16); saved
+ * hash and localStorage values from before the rename map forward. */
+const SECTION_ALIASES: Record<string, AdminSection> = {
+  'website-enquiries': 'website',
+};
 
 interface ToastMessage {
   id: string;
@@ -738,7 +744,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
         if (hash.startsWith('#admin/')) {
           const rawSection = hash.replace('#admin/', '') as AdminSection;
-          if (validSections.includes(rawSection)) {
+          if (validSections.includes((SECTION_ALIASES as Record<string, AdminSection>)[rawSection] || rawSection)) {
             return { viewMode: 'portal', adminSection: rawSection };
           }
         }
@@ -754,9 +760,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         | 'student'
         | 'tutor'
         | null;
-      const savedAdminSection = localStorage.getItem(
+      const savedAdminSectionRaw = localStorage.getItem(
         `${STORAGE_KEY}_adminSection`
       ) as AdminSection | null;
+      const savedAdminSection = savedAdminSectionRaw
+        ? (SECTION_ALIASES as Record<string, AdminSection>)[savedAdminSectionRaw] || savedAdminSectionRaw
+        : null;
 
       const viewMode =
         savedViewMode === 'portal' ||
@@ -877,7 +886,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         } catch {}
       } else if (hash.startsWith('#admin/')) {
         const rawSection = hash.replace('#admin/', '') as AdminSection;
-        if (validSections.includes(rawSection)) {
+        if (validSections.includes((SECTION_ALIASES as Record<string, AdminSection>)[rawSection] || rawSection)) {
           setViewModeState('portal');
           setAdminSectionState(rawSection);
           try {
