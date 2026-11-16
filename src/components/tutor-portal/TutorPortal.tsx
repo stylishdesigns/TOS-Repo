@@ -47,7 +47,12 @@ export const TutorPortal: React.FC = () => {
           return tab;
         }
       }
-    } catch {}
+    } catch { /* hash unavailable */ }
+    // Refresh persistence: no usable hash, so reopen the saved tab.
+    try {
+      const saved = localStorage.getItem('EXCELLENCE_TUTORIAL_DATA_V1_tutorTab');
+      if (['home', 'classes', 'assessment', 'more'].includes(saved || '')) return saved as TabType;
+    } catch { /* storage unavailable */ }
     return 'home';
   };
 

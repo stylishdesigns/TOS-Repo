@@ -196,7 +196,12 @@ export const StudentPortal: React.FC = () => {
         if (primary === 'home') return 'home';
         if (primary === 'more') return 'more';
       }
-    } catch {}
+    } catch { /* hash unavailable */ }
+    // Refresh persistence: no usable hash, so reopen the saved tab.
+    try {
+      const saved = localStorage.getItem('EXCELLENCE_TUTORIAL_DATA_V1_studentTab');
+      if (['home', 'classes', 'chat', 'cbt', 'more'].includes(saved || '')) return saved as TabType;
+    } catch { /* storage unavailable */ }
     return 'home';
   };
 

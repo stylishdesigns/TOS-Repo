@@ -1014,9 +1014,35 @@ const QuestionBankShell: React.FC<{ refreshKey: number; onNewMock?: () => void }
 };
 
 export const TosPortal: React.FC = () => {
-  const [tab, setTab] = useState<string>('overview');
+  // Refresh persistence: the dashboard reopens on the tab (and facility) the
+  // admin was on before the refresh, never back on Overview.
+  const TOS_TAB_KEY = 'tos:tab';
+  const TOS_CENTRE_KEY = 'tos:openCentreId';
+  const [tab, setTabState] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem(TOS_TAB_KEY) || '';
+      if (TABS.some((t) => t.id === saved)) return saved;
+    } catch { /* storage unavailable */ }
+    return 'overview';
+  });
+  const setTab = (t: string) => {
+    setTabState(t);
+    try {
+      localStorage.setItem(TOS_TAB_KEY, t);
+      if (t !== 'centres') localStorage.removeItem(TOS_CENTRE_KEY);
+    } catch { /* storage unavailable */ }
+  };
   const [refreshKey, setRefreshKey] = useState(0);
-  const [openCentreId, setOpenCentreId] = useState<string>('');
+  const [openCentreId, setOpenCentreIdState] = useState<string>(() => {
+    try {
+      if (localStorage.getItem(TOS_TAB_KEY) === 'centres') return localStorage.getItem(TOS_CENTRE_KEY) || '';
+    } catch { /* storage unavailable */ }
+    return '';
+  });
+  const setOpenCentreId = (id: string) => {
+    setOpenCentreIdState(id);
+    try { localStorage.setItem(TOS_CENTRE_KEY, id); } catch { /* storage unavailable */ }
+  };
   const [mocksCreateKey, setMocksCreateKey] = useState(0);
 
   useEffect(() => {
