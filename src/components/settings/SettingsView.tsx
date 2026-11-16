@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { AccessCodeSettings } from './AccessCodeSettings';
 import { ModernSelect } from '../ui/ModernSelect';
@@ -22,10 +22,14 @@ import {
   Plus,
   Calendar,
   X,
+  Camera,
+  ImagePlus,
+  Trash2,
+  RefreshCw,
 } from 'lucide-react';
 
 export const SettingsView: React.FC = () => {
-  const { settings, updateSettings, addToast, authMethod, activeUser, activeCentre } = useApp();
+  const { settings, updateSettings, addToast, authMethod, activeUser, activeCentre, updateAdmin, uploadCentreImage, getCentreSessions, revokeCentreSession } = useApp();
 
   const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'sessions' | 'centre'>('profile');
 
@@ -78,13 +82,152 @@ export const SettingsView: React.FC = () => {
   const [showAddSessionModal, setShowAddSessionModal] = useState(false);
   const [newSessionName, setNewSessionName] = useState('');
 
+  // ---- Profile photo: uploaded to Cloudinary through the server, saved on the admin record.
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const [photoUrl, setPhotoUrl] = useState(activeUser?.photoUrl || '');
+  const [photoBusy, setPhotoBusy] = useState(false);
+
+  const readFileAsDataUrl = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+
+  const handlePhotoPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!/^image\/(png|jpe?g|webp)$/i.test(file.type)) {
+      addToast({ type: 'error', title: 'Unsupported Image', description: 'Upload a PNG, JPG or WebP picture.' });
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      addToast({ type: 'error', title: 'Image Too Large', description: 'Your profile photo can be up to 2 MB.' });
+      return;
+    }
+    if (!activeUser) return;
+    setPhotoBusy(true);
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      const url = await uploadCentreImage(dataUrl, 'profile');
+      setPhotoUrl(url);
+      await updateAdmin(activeUser.id, { photoUrl: url });
+      addToast({ type: 'success', title: 'Profile Photo Updated', description: 'Your new photo shows on the avatar and dropdown.' });
+    } catch (err: any) {
+      addToast({ type: 'error', title: 'Upload Failed', description: err?.message || 'The photo could not be uploaded. Please try again.' });
+    } finally {
+      setPhotoBusy(false);
+    }
+  };
+
+  // ---- Session expiry: this account decides how long a login lasts.
+  const [expiryDays, setExpiryDays] = useState<number>(activeUser?.sessionExpiryDays ?? 0);
+  React.useEffect(() => {
+    setExpiryDays(activeUser?.sessionExpiryDays ?? 0);
+  }, [activeUser?.id, activeUser?.sessionExpiryDays]);
+  const handleExpiryChange = (days: number) => {
+    setExpiryDays(days);
+    if (activeUser) updateAdmin(activeUser.id, { sessionExpiryDays: days });
+  };
+
+  // ---- Real active sessions: every device signed into this account.
+  type SessionRow = { id: string; device: string; ip: string; loginAt: number; lastActiveAt: number; current: boolean; revoked: boolean };
+  const [sessions, setSessions] = useState<SessionRow[] | null>(null);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+  const timeAgo = (ts: number) => {
+    if (!ts) return 'unknown';
+    const mins = Math.max(0, Math.round((Date.now() - ts) / 60000));
+    if (mins < 2) return 'just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.round(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.round(hours / 24);
+    return `${days}d ago`;
+  };
+  const loadSessions = async () => {
+    setSessionsLoading(true);
+    try {
+      const rows = await getCentreSessions();
+      setSessions(rows);
+    } catch (err: any) {
+      addToast({ type: 'error', title: 'Could Not Load Sessions', description: err?.message || 'Please try again.' });
+      setSessions([]);
+    } finally {
+      setSessionsLoading(false);
+    }
+  };
+  React.useEffect(() => {
+    if (activeTab === 'sessions') loadSessions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+  const handleRevokeSession = async (id: string) => {
+    try {
+      await revokeCentreSession(id);
+      addToast({ type: 'info', title: 'Session Revoked', description: 'That device signs out the next time it checks in.' });
+      loadSessions();
+    } catch (err: any) {
+      addToast({ type: 'error', title: 'Revoke Failed', description: err?.message || 'Please try again.' });
+    }
+  };
+
+  // ---- Facility photos: up to 5 images of the facility, hosted on Cloudinary.
+  const facilityInputRef = useRef<HTMLInputElement>(null);
+  const [facilityPhotos, setFacilityPhotos] = useState<string[]>(settings.centrePhotos || []);
+  const [facilityBusy, setFacilityBusy] = useState(false);
+  const [lightbox, setLightbox] = useState<string>('');
+  React.useEffect(() => {
+    setFacilityPhotos(settings.centrePhotos || []);
+  }, [settings.centrePhotos]);
+  const saveFacilityPhotos = (next: string[]) => {
+    setFacilityPhotos(next);
+    updateSettings({ centrePhotos: next });
+  };
+  const handleFacilityPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files: File[] = Array.from(e.target.files || []);
+    e.target.value = '';
+    if (!files.length) return;
+    const room = 5 - facilityPhotos.length;
+    if (room <= 0) {
+      addToast({ type: 'error', title: 'Photo Limit Reached', description: 'A facility holds up to 5 photos. Remove one to add another.' });
+      return;
+    }
+    const picked = files.slice(0, room);
+    if (files.length > room) {
+      addToast({ type: 'info', title: 'Some Photos Skipped', description: `Only ${room} more photo${room === 1 ? '' : 's'} fit. Remove one to add more.` });
+    }
+    setFacilityBusy(true);
+    const added: string[] = [];
+    for (const file of picked) {
+      try {
+        if (!/^image\/(png|jpe?g|webp)$/i.test(file.type)) {
+          addToast({ type: 'error', title: 'Unsupported Image', description: `${file.name} is not a PNG, JPG or WebP picture.` });
+          continue;
+        }
+        if (file.size > 4 * 1024 * 1024) {
+          addToast({ type: 'error', title: 'Image Too Large', description: `${file.name} is over 4 MB. Choose a smaller picture.` });
+          continue;
+        }
+        const dataUrl = await readFileAsDataUrl(file);
+        added.push(await uploadCentreImage(dataUrl, 'facility'));
+      } catch (err: any) {
+        addToast({ type: 'error', title: 'Upload Failed', description: err?.message || 'One photo could not be uploaded. Please try again.' });
+      }
+    }
+    if (added.length) saveFacilityPhotos([...facilityPhotos, ...added]);
+    setFacilityBusy(false);
+  };
+
   const handleUpdateProfile = (e: React.FormEvent) => {
     e.preventDefault();
-    addToast({
-      type: 'success',
-      title: 'Admin Profile Updated',
-      description: `Saved details for ${firstName} ${lastName}.`,
-    });
+    if (!activeUser) return;
+    const fullName = `${firstName} ${lastName}`.trim();
+    if (!fullName) {
+      addToast({ type: 'error', title: 'Name Required', description: 'Enter your first and last name.' });
+      return;
+    }
+    updateAdmin(activeUser.id, { name: fullName, phone, jobTitle, department });
   };
 
   const handleUpdatePassword = (e: React.FormEvent) => {
@@ -163,10 +306,14 @@ export const SettingsView: React.FC = () => {
       {/* Top Banner Card */}
       <div className="bg-white p-5 sm:p-6 rounded-xl border border-slate-200/90 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center space-x-4">
-          <div className="w-13 h-13 rounded-xl bg-orange-100 text-[#EA580C] font-black text-xl flex items-center justify-center shrink-0 border border-orange-200">
-            {firstName[0]}
-            {lastName[0]}
-          </div>
+          {photoUrl ? (
+            <img src={photoUrl} alt={activeUser?.name || 'Administrator'} className="w-13 h-13 rounded-xl object-cover shrink-0 border border-orange-200" />
+          ) : (
+            <div className="w-13 h-13 rounded-xl bg-orange-100 text-[#EA580C] font-black text-xl flex items-center justify-center shrink-0 border border-orange-200">
+              {firstName[0]}
+              {lastName[0]}
+            </div>
+          )}
           <div>
             <div className="flex items-center space-x-2.5">
               <h2 className="text-xl font-bold text-slate-900">
@@ -261,6 +408,32 @@ export const SettingsView: React.FC = () => {
             </p>
           </div>
 
+          <div className="flex items-center space-x-4">
+            <div className="relative">
+              {photoUrl ? (
+                <img src={photoUrl} alt="Profile" className="w-16 h-16 rounded-xl object-cover border border-slate-200" />
+              ) : (
+                <div className="w-16 h-16 rounded-xl bg-orange-100 text-[#EA580C] font-black text-lg grid place-items-center border border-orange-200">
+                  {firstName[0]}{lastName[0]}
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => photoInputRef.current?.click()}
+                disabled={photoBusy}
+                aria-label="Upload profile photo"
+                className="absolute -bottom-1.5 -right-1.5 w-7 h-7 rounded-full bg-[#EA580C] text-white shadow flex items-center justify-center hover:bg-[#C2410C] disabled:opacity-60 transition-colors"
+              >
+                {photoBusy ? <div className="w-3.5 h-3.5 rounded-full border-2 border-white border-t-transparent animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
+              </button>
+            </div>
+            <div>
+              <p className="text-xs font-bold text-slate-800">Profile photo</p>
+              <p className="text-[11px] text-slate-500">PNG, JPG or WebP, up to 2 MB. Shows on your avatar and dropdown.</p>
+            </div>
+            <input ref={photoInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={handlePhotoPick} />
+          </div>
+
           <form onSubmit={handleUpdateProfile} className="space-y-4 text-xs">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
@@ -286,14 +459,14 @@ export const SettingsView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">Email Address *</label>
+                <label className="block font-semibold text-slate-700 mb-1">Email Address</label>
                 <input
                   type="email"
-                  required
+                  disabled
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-900 focus:bg-white focus:border-orange-500 outline-none"
+                  className="w-full bg-slate-100 border border-slate-200 rounded-lg px-3 py-2 text-slate-500 cursor-not-allowed"
                 />
+                <p className="text-[10px] text-slate-400 mt-1">Your email is your sign-in address, so it cannot be changed here.</p>
               </div>
 
               <div>
@@ -441,70 +614,151 @@ export const SettingsView: React.FC = () => {
 
       {/* Tab: Active Sessions */}
       {activeTab === 'sessions' && (
-        <div className="bg-white p-5 sm:p-6 rounded-xl border border-slate-200/90 shadow-xs space-y-4">
-          <div className="border-b border-slate-100 pb-3">
-            <h3 className="text-base font-bold text-slate-900">Active Login Sessions</h3>
-            <p className="text-xs text-slate-500">
-              Devices and browsers currently logged into this administrator account.
-            </p>
+        <div className="space-y-6">
+          <div className="bg-white p-5 sm:p-6 rounded-xl border border-slate-200/90 shadow-xs space-y-3">
+            <div className="border-b border-slate-100 pb-3">
+              <h3 className="text-base font-bold text-slate-900">Session Expiry</h3>
+              <p className="text-xs text-slate-500">
+                How long a login on any of your devices stays signed in. "None" keeps every device signed in until you sign out or revoke it.
+              </p>
+            </div>
+            <div className="max-w-xs">
+              <ModernSelect
+                value={String(expiryDays)}
+                onChange={(v: string) => handleExpiryChange(Number(v))}
+                options={[
+                  { value: '0', label: 'None (never expires)' },
+                  { value: '30', label: '1 month' },
+                  { value: '90', label: '3 months' },
+                  { value: '180', label: '6 months' },
+                ]}
+              />
+            </div>
           </div>
 
-          <div className="divide-y divide-slate-100">
-            <div className="py-3 flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center text-slate-600">
-                  <Laptop className="w-5 h-5" />
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-slate-900">
-                    Chrome 122 on macOS (Current Session)
-                  </p>
-                  <p className="text-[11px] text-slate-400 font-mono">
-                    Lagos, Nigeria • IP: 102.89.44.12 • Active Now
-                  </p>
-                </div>
-              </div>
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                This Device
-              </span>
-            </div>
-
-            <div className="py-3 flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center text-slate-600">
-                  <Laptop className="w-5 h-5" />
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-slate-900">
-                    Safari on iPhone 15 Pro
-                  </p>
-                  <p className="text-[11px] text-slate-400 font-mono">
-                    Ikeja, Lagos • IP: 102.89.44.58 • 2 hours ago
-                  </p>
-                </div>
+          <div className="bg-white p-5 sm:p-6 rounded-xl border border-slate-200/90 shadow-xs space-y-3">
+            <div className="border-b border-slate-100 pb-3 flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Active Login Sessions</h3>
+                <p className="text-xs text-slate-500">
+                  Every device signed into this account, tracked live. Revoke one to sign it out.
+                </p>
               </div>
               <button
-                onClick={() =>
-                  addToast({
-                    type: 'info',
-                    title: 'Session Revoked',
-                    description: 'Device logged out safely.',
-                  })
-                }
-                className="px-2.5 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-50 rounded border border-rose-200 transition-colors"
+                type="button"
+                onClick={loadSessions}
+                className="px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg border border-slate-200 flex items-center space-x-1.5 shrink-0"
               >
-                Revoke
+                <RefreshCw className={`w-3.5 h-3.5 ${sessionsLoading ? 'animate-spin' : ''}`} />
+                <span>Refresh</span>
               </button>
+            </div>
+
+            {sessionsLoading && !sessions && (
+              <div className="py-8 grid place-items-center">
+                <div className="w-7 h-7 rounded-full border-2 border-orange-300 border-t-transparent animate-spin" />
+              </div>
+            )}
+            {sessions && sessions.length === 0 && (
+              <p className="text-xs text-slate-400 py-3">No devices yet. A device appears here the first time it signs in.</p>
+            )}
+            <div className="divide-y divide-slate-100">
+              {(sessions || []).map((s) => (
+                <div key={s.id} className={`py-3 flex items-center justify-between gap-3 ${s.revoked ? 'opacity-50' : ''}`}>
+                  <div className="flex items-center space-x-3 min-w-0">
+                    <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center text-slate-600 shrink-0">
+                      <Laptop className="w-5 h-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-slate-900 truncate">{s.device}{s.current ? ' (This device)' : ''}</p>
+                      <p className="text-[11px] text-slate-400 font-mono truncate">
+                        IP: {s.ip || 'unknown'} • Signed in {timeAgo(s.loginAt)} • {s.revoked ? 'Revoked' : `Active ${timeAgo(s.lastActiveAt)}`}
+                      </p>
+                    </div>
+                  </div>
+                  {s.current ? (
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 shrink-0">This Device</span>
+                  ) : s.revoked ? (
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500 shrink-0">Revoked</span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleRevokeSession(s.id)}
+                      className="px-2.5 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-50 rounded border border-rose-200 transition-colors shrink-0"
+                    >
+                      Revoke
+                    </button>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
         </div>
       )}
 
-      {/* Tab: Centre & System Parameters */}
+            {/* Tab: Centre & System Parameters */}
       {activeTab === 'centre' && (
         <div className="space-y-6">
           {/* Access code (Prompt C Part C): owner-managed, server-verified. */}
           <AccessCodeSettings />
+
+          {/* Facility photos: up to 5 images of the facility, hosted on Cloudinary. */}
+          <div className="bg-white p-5 sm:p-6 rounded-xl border border-slate-200/90 shadow-xs space-y-4">
+            <div className="border-b border-slate-100 pb-3 flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Facility Photos</h3>
+                <p className="text-xs text-slate-500">
+                  Show families what your facility looks like. Add up to 5 photos, one at a time or several at once. Tap a photo to preview it large.
+                </p>
+              </div>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-50 text-orange-700 border border-orange-200 shrink-0">
+                {facilityPhotos.length}/5
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {facilityPhotos.map((url, i) => (
+                <div key={url} className="relative rounded-xl overflow-hidden border border-slate-200 bg-slate-100" style={{ aspectRatio: '4 / 3' }}>
+                  <img
+                    src={url}
+                    alt={`Facility photo ${i + 1}`}
+                    onClick={() => setLightbox(url)}
+                    className="w-full h-full object-cover cursor-zoom-in"
+                  />
+                  <button
+                    type="button"
+                    aria-label={`Remove photo ${i + 1}`}
+                    onClick={() => saveFacilityPhotos(facilityPhotos.filter((u) => u !== url))}
+                    className="absolute top-2 right-2 w-7 h-7 rounded-full bg-white/95 text-rose-600 shadow flex items-center justify-center hover:bg-rose-50 transition-colors"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+              {facilityBusy && (
+                <div className="rounded-xl border border-orange-200 bg-orange-50 grid place-items-center" style={{ aspectRatio: '4 / 3' }}>
+                  <div className="w-6 h-6 rounded-full border-2 border-orange-300 border-t-transparent animate-spin" />
+                </div>
+              )}
+              {!facilityBusy && facilityPhotos.length < 5 && (
+                <button
+                  type="button"
+                  onClick={() => facilityInputRef.current?.click()}
+                  className="rounded-xl border-2 border-dashed border-slate-300 hover:border-orange-400 hover:bg-orange-50/40 transition-colors grid place-items-center text-slate-400 hover:text-orange-500"
+                  style={{ aspectRatio: '4 / 3' }}
+                >
+                  <span className="flex flex-col items-center gap-1.5">
+                    <ImagePlus className="w-6 h-6" />
+                    <span className="text-[11px] font-semibold">Add photo{facilityPhotos.length === 4 ? '' : 's'}</span>
+                  </span>
+                </button>
+              )}
+            </div>
+            <input ref={facilityInputRef} type="file" accept="image/png,image/jpeg,image/webp" multiple className="hidden" onChange={handleFacilityPick} />
+            {facilityPhotos.length === 0 && !facilityBusy && (
+              <p className="text-[11px] text-slate-400">PNG, JPG or WebP, up to 4 MB each.</p>
+            )}
+          </div>
           <div className="bg-white p-5 sm:p-6 rounded-xl border border-slate-200/90 shadow-xs space-y-5">
           <div className="border-b border-slate-100 pb-3">
             <h3 className="text-base font-bold text-slate-900">Facility Identity & Academic Parameters</h3>
@@ -676,6 +930,26 @@ export const SettingsView: React.FC = () => {
               </div>
             </form>
           </div>
+        </div>
+      )}
+
+      {/* Facility photo lightbox */}
+      {lightbox && (
+        <div className="fixed inset-0 z-[100] bg-slate-950/90 flex items-center justify-center p-4" onClick={() => setLightbox('')}>
+          <img
+            src={lightbox}
+            alt="Facility photo preview"
+            onClick={(e) => e.stopPropagation()}
+            className="max-h-[88vh] max-w-full rounded-xl shadow-2xl"
+          />
+          <button
+            type="button"
+            aria-label="Close preview"
+            onClick={() => setLightbox('')}
+            className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 text-white grid place-items-center hover:bg-white/20"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
       )}
     </div>

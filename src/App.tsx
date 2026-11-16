@@ -1,6 +1,7 @@
 import React, { useRef,  useState, useEffect, Component, ErrorInfo, ReactNode, lazy, Suspense } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { Sidebar } from './components/layout/Sidebar';
+import { AppOnlyGate } from './components/portal/AppOnlyGate';
 import { TopNav } from './components/layout/TopNav';
 import { ToastContainer } from './components/layout/ToastContainer';
 import { PublicWebsite } from './components/public/PublicWebsite';
@@ -667,22 +668,22 @@ const MainLayout: React.FC = () => {
   // If user toggles to the Student Portal view
   if (viewMode === 'student') {
     return (
-      <>
+      <AppOnlyGate>
         <Suspense fallback={<PortalFallback />}><StudentPortal /></Suspense>
         <OfflineIndicator />
         <ToastContainer />
-      </>
+      </AppOnlyGate>
     );
   }
 
   // If user toggles to the Tutor Portal view
   if (viewMode === 'tutor') {
     return (
-      <>
+      <AppOnlyGate>
         <Suspense fallback={<PortalFallback />}><TutorPortal /></Suspense>
         <OfflineIndicator />
         <ToastContainer />
-      </>
+      </AppOnlyGate>
     );
   }
 
@@ -717,6 +718,7 @@ const MainLayout: React.FC = () => {
 
   // Admin Portal Dashboard matching video layout and Geometric Balance theme
   return (
+    <AppOnlyGate>
     <div
       id="app-root-layout"
       className={`flex h-screen w-full ${
@@ -769,6 +771,7 @@ const MainLayout: React.FC = () => {
       <OfflineIndicator />
       <ToastContainer />
     </div>
+    </AppOnlyGate>
   );
 };
 

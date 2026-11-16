@@ -697,6 +697,25 @@ const AccountTab: React.FC = () => {
     } finally { setPwdBusy(false); }
   };
 
+  const [appOnly, setAppOnly] = useState<boolean | null>(null);
+  const [appOnlyBusy, setAppOnlyBusy] = useState(false);
+  const [appOnlyDone, setAppOnlyDone] = useState('');
+  useEffect(() => {
+    fetch('/api/public/platform-settings')
+      .then((r) => r.json())
+      .then((d: { appOnlyPortals?: boolean }) => setAppOnly(!!d.appOnlyPortals))
+      .catch(() => setAppOnly(false));
+  }, []);
+  const saveAppOnly = async (next: boolean) => {
+    setAppOnlyBusy(true); setAppOnlyDone(''); setError('');
+    try {
+      await api('/api/tos/platform-settings', { method: 'POST', body: { appOnlyPortals: next } });
+      setAppOnly(next);
+      setAppOnlyDone(next ? 'App-only mode is on. The three portals now open only inside the app.' : 'App-only mode is off. Portals open in browsers as usual.');
+    } catch (e: any) { setError(e.message || 'Could not save the setting.'); }
+    finally { setAppOnlyBusy(false); }
+  };
+
   const signOutEverywhere = async () => {
     window.location.hash = '';
     try { await signOut(getAuth()); } catch (e) { console.error(e); }
@@ -755,6 +774,27 @@ const AccountTab: React.FC = () => {
             {pwdError && <p className="text-rose-300 text-xs">{pwdError}</p>}
           </div>
         )}
+      </Card>
+
+      <Card title="App-only portals">
+        <p className="text-slate-400 text-sm">
+          When on, the admin, tutor and student portals open only inside the installed app. Any browser, phone or desktop sees an "Open this portal in the app" screen with an install button instead. The TOS console and the landing pages are never affected.
+        </p>
+        <div className="flex items-center gap-3 mt-3">
+          <button
+            role="switch"
+            aria-checked={!!appOnly}
+            aria-label="Toggle app-only portals"
+            onClick={() => saveAppOnly(!appOnly)}
+            disabled={appOnly === null || appOnlyBusy}
+            className={`relative inline-flex h-7 w-12 shrink-0 rounded-full transition-colors disabled:opacity-50 ${appOnly ? 'bg-orange-600' : 'bg-slate-600'}`}
+          >
+            <span className={`pointer-events-none inline-flex h-6 w-6 transform items-center justify-center rounded-full bg-white shadow transition duration-200 ${appOnly ? 'translate-x-5' : 'translate-x-0.5'}`} />
+          </button>
+          <span className="text-sm font-bold text-white">{appOnly === null ? 'Loading' : appOnly ? 'On' : 'Off'}</span>
+          {appOnlyBusy && <Loader2 className="w-4 h-4 animate-spin text-orange-400" />}
+        </div>
+        {appOnlyDone && <p className="text-emerald-300 text-xs mt-2">{appOnlyDone}</p>}
       </Card>
 
       <Card title="Session">

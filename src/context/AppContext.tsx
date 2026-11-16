@@ -79,6 +79,7 @@ import {
 } from 'firebase/auth';
 import { db, auth as firebaseAuth, firebaseConfigValues } from '../firebase';
 import { setLastGoodOwner, clearAllLastGood } from '../lib/lastGood';
+import { deviceKey } from '../lib/sessions';
 
 // -------------------------------------------------------------------------
 // CONSTANTS
@@ -248,6 +249,9 @@ interface AppContextType {
   admins: AdminUser[];
   addAdmin: (admin: Omit<AdminUser, 'id'>) => void;
   updateAdmin: (id: string, admin: Partial<AdminUser>) => void;
+  uploadCentreImage: (data: string, kind: 'profile' | 'facility') => Promise<string>;
+  getCentreSessions: () => Promise<Array<{ id: string; device: string; ip: string; loginAt: number; lastActiveAt: number; current: boolean; revoked: boolean }>>;
+  revokeCentreSession: (id: string) => Promise<void>;
   deleteAdmin: (id: string) => void;
   toggleAdminSuspend: (id: string) => void;
 
@@ -1652,6 +1656,67 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  // Shared helper for authenticated platform API calls.
+  const authedFetch = async (path: string, init?: RequestInit) => {
+    const token = await firebaseAuth.currentUser?.getIdToken();
+    if (!token) throw new Error('You are signed out. Sign in again.');
+    const resp = await fetch(path, { ...init, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...(init?.headers || {}) } });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error((data as any)?.error || 'Request failed. Please try again.');
+    return data;
+  };
+
+  const uploadCentreImage = async (data: string, kind: 'profile' | 'facility'): Promise<string> => {
+    const out = (await authedFetch('/api/centre/profile-image', { method: 'POST', body: JSON.stringify({ data, kind }) })) as any;
+    return String(out?.url || '');
+  };
+
+  const getCentreSessions = async () => {
+    const out = (await authedFetch(`/api/centre/sessions?device=${encodeURIComponent(deviceKey())}`)) as any;
+    return Array.isArray(out?.sessions) ? out.sessions : [];
+  };
+
+  const revokeCentreSession = async (id: string) => {
+    await authedFetch('/api/centre/sessions/revoke', { method: 'POST', body: JSON.stringify({ id }) });
+  };
+
+  // Real device session tracking: every signed-in admin device pings home and
+  // the server decides expiry/revocation from this account's own setting.
+  const sessionEndedRef = { current: '' };
+  useEffect(() => {
+    if (!activeUser?.id) return;
+    let alive = true;
+    let timer: ReturnType<typeof setInterval> | null = null;
+    const freshKey = `tos:sess-fresh-${activeUser.id}`;
+    const ping = async () => {
+      try {
+        const token = await firebaseAuth.currentUser?.getIdToken();
+        if (!token) return;
+        const fresh = !sessionStorage.getItem(freshKey);
+        const resp = await fetch('/api/centre/session-ping', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ deviceKey: deviceKey(), fresh }),
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (resp.ok && fresh) { try { sessionStorage.setItem(freshKey, '1'); } catch { /* ignore */ } }
+        if (alive && ((data as any).expired || (data as any).revoked) && sessionEndedRef.current !== activeUser.id) {
+          sessionEndedRef.current = activeUser.id;
+          addToast({
+            type: 'error',
+            title: 'Session Ended',
+            description: (data as any).expired ? 'Your login session expired. Please sign in again.' : 'This device was signed out remotely.',
+          });
+          await logout();
+        }
+      } catch { /* offline: retry on the next tick */ }
+    };
+    ping();
+    timer = setInterval(ping, 10 * 60 * 1000);
+    return () => { alive = false; if (timer) clearInterval(timer); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeUser?.id]);
+
   // Firestore Real-time Sync (Gated and Scoped)
   // Centre change: while the next centre's records load, per-centre screens
   // never show another centre's settings, website content or attendance times.
@@ -2943,6 +3008,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         admins,
         addAdmin,
         updateAdmin,
+        uploadCentreImage,
+        getCentreSessions,
+        revokeCentreSession,
         deleteAdmin,
         toggleAdminSuspend,
         activities,

@@ -9,7 +9,6 @@ import {
   ExternalLink,
   ChevronDown,
   User,
-  Sliders,
   Globe,
   LogOut,
   ShieldCheck,
@@ -18,7 +17,6 @@ import {
   CheckCircle2,
   Sun,
   Moon,
-  GraduationCap,
   Shield,
 } from 'lucide-react';
 
@@ -358,33 +356,14 @@ export const TopNav: React.FC<TopNavProps> = ({ onToggleMobileMenu }) => {
               <div className="py-1">
                 <button
                   onClick={() => {
-                    setAdminSection('staff-roles');
-                    setShowUserMenu(false);
-                  }}
-                  className="w-full px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center space-x-2.5"
-                >
-                  <Shield className="w-4 h-4 text-slate-400" />
-                  <span>Staff & Roles</span>
-                </button>
-                <button
-                  onClick={() => {
                     setAdminSection('settings');
+                    window.dispatchEvent(new CustomEvent('tos:open-settings-tab', { detail: 'profile' }));
                     setShowUserMenu(false);
                   }}
-                  className="w-full px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center space-x-2.5"
+                  className="w-full px-4 py-2 text-xs font-semibold text-[#EA580C] hover:bg-orange-50 flex items-center space-x-2.5"
                 >
-                  <Sliders className="w-4 h-4 text-slate-400" />
-                  <span>System Settings</span>
-                </button>
-                <button
-                  onClick={() => {
-                    setViewMode('tutor');
-                    setShowUserMenu(false);
-                  }}
-                  className="w-full px-4 py-2 text-xs font-medium text-purple-700 hover:bg-purple-50 flex items-center space-x-2.5"
-                >
-                  <GraduationCap className="w-4 h-4 text-purple-600" />
-                  <span>Switch to Tutor Portal</span>
+                  <User className="w-4 h-4 text-[#EA580C]" />
+                  <span>Go to Profile</span>
                 </button>
                 <button
                   onClick={() => {

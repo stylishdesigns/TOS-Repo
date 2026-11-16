@@ -60,6 +60,27 @@ function requireTos(req: express.Request): Caller {
   return caller;
 }
 
+/** Human one-liner for a user-agent: "Chrome on Windows" style. */
+function describeDevice(ua: string): string {
+  const u = ua || '';
+  const browser = /Edg\//.test(u) ? 'Edge'
+    : /OPR\//.test(u) ? 'Opera'
+    : /SamsungBrowser/.test(u) ? 'Samsung Internet'
+    : /Firefox\//.test(u) ? 'Firefox'
+    : /CriOS\//.test(u) ? 'Chrome'
+    : /FxiOS/.test(u) ? 'Firefox'
+    : /Chrome\//.test(u) ? 'Chrome'
+    : /Safari\//.test(u) ? 'Safari'
+    : 'Browser';
+  const os = /Windows/.test(u) ? 'Windows'
+    : /Android/.test(u) ? 'Android'
+    : /iPhone|iPad|iPod/.test(u) ? 'iOS'
+    : /Mac OS X/.test(u) ? 'macOS'
+    : /Linux/.test(u) ? 'Linux'
+    : 'Unknown OS';
+  return `${browser} on ${os}`;
+}
+
 function baseUrl(req: express.Request): string {
   if (process.env.APP_URL) return process.env.APP_URL.replace(/\/+$/, '');
   const host = req.headers.host || 'localhost';
@@ -294,6 +315,168 @@ export function registerExtendedRoutes(app: express.Express): void {
     } catch (error: any) {
       console.error('[logo-upload] failed:', error?.message || error);
       res.status(500).json({ error: 'The logo could not be uploaded. Please try again.' });
+    }
+  });
+
+  // ==========================================================================
+  // AUTHENTICATED: image upload for profile photos and facility photos.
+  // A data URL in, a hosted Cloudinary URL out (tos/profiles or tos/facility).
+  // Profile photos up to 2 MB, facility photos up to 4 MB.
+  // ==========================================================================
+  app.post('/api/centre/profile-image', async (req, res) => {
+    try {
+      getCaller(req);
+      const kind = String(req.body?.kind || 'profile');
+      const maxBytes = kind === 'facility' ? 4 * 1024 * 1024 : 2 * 1024 * 1024;
+      const folder = kind === 'facility' ? 'tos/facility' : 'tos/profiles';
+      const ip = clientIp(req);
+      if (!(await countRateLimit(`img-${ip.replace(/\W/g, '')}`, 40, 60 * 60 * 1000))) {
+        return res.status(429).json({ error: 'Too many uploads. Please try again later.' });
+      }
+      const dataUrl = String(req.body?.data || '');
+      const m = /^data:(image\/(?:png|jpe?g|webp));base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl);
+      if (!m) return res.status(400).json({ error: 'Upload a PNG, JPG or WebP image.' });
+      const bytes = Math.floor((m[2].length * 3) / 4);
+      if (bytes > maxBytes) {
+        return res.status(413).json({ error: kind === 'facility' ? 'Each facility photo can be up to 4 MB.' : 'The photo can be up to 2 MB.' });
+      }
+      const cloud = String(process.env.CLOUDINARY_CLOUD_NAME || '');
+      const preset = String(process.env.CLOUDINARY_UPLOAD_PRESET || '');
+      if (!cloud || !preset) return res.status(500).json({ error: 'Image hosting is not configured on this deployment.' });
+      const form = new FormData();
+      form.append('upload_preset', preset);
+      form.append('folder', folder);
+      form.append('file', dataUrl);
+      const resp = await fetch(`https://api.cloudinary.com/v1_1/${cloud}/image/upload`, { method: 'POST', body: form });
+      const data: any = await resp.json().catch(() => null);
+      const url = data && typeof data.secure_url === 'string' ? data.secure_url : '';
+      if (!resp.ok || !url) return res.status(502).json({ error: 'The image could not be uploaded. Please try again.' });
+      res.json({ ok: true, url });
+    } catch (error: any) {
+      console.error('[profile-image] failed:', error?.message || error);
+      res.status(error?.status || 500).json({ error: error?.message || 'The image could not be uploaded.' });
+    }
+  });
+
+  // ==========================================================================
+  // AUTHENTICATED: real device session tracking. Every signed-in device
+  // registers itself (one doc per user + device), pings its last-active time,
+  // and honours the account's own expiry setting (0 = never expires).
+  // ==========================================================================
+  app.post('/api/centre/session-ping', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const key = String(req.body?.deviceKey || '').replace(/[^\w-]/g, '').slice(0, 64);
+      if (!key) return res.status(400).json({ error: 'Missing device key.' });
+      const ref = adminDb.collection('adminSessions').doc(`${caller.uid}__${key}`);
+      const adminSnap = await adminDb.collection('admins').doc(caller.uid).get();
+      const admin = (adminSnap.data() || {}) as any;
+      const now = Date.now();
+      const expiryDays = Number(admin.sessionExpiryDays || 0);
+      const snap = await ref.get();
+      const existing = (snap.data() || {}) as any;
+      if (existing.revoked) return res.json({ revoked: true });
+      const freshFlag = req.body?.fresh === true;
+      const loginAt = freshFlag ? now : (typeof existing.loginAt === 'number' && existing.loginAt > 0 ? existing.loginAt : now);
+      if (expiryDays > 0 && now - loginAt > expiryDays * DAY_MS) {
+        await ref.set({ ...existing, uid: caller.uid, loginAt, lastActiveAt: now, revoked: true, revokedAt: now, revokeReason: 'expired' }, { merge: true });
+        return res.json({ expired: true });
+      }
+      await ref.set({
+        uid: caller.uid,
+        email: caller.email || admin.email || '',
+        name: admin.name || '',
+        role: admin.role || '',
+        centreId: admin.centreId || '',
+        deviceKey: key,
+        ua: String(req.headers['user-agent'] || '').slice(0, 300),
+        ip: clientIp(req),
+        loginAt,
+        lastActiveAt: now,
+        revoked: false,
+      }, { merge: true });
+      res.json({ ok: true });
+    } catch (error: any) {
+      console.error('[session-ping] failed:', error?.message || error);
+      res.status(error?.status || 500).json({ error: error?.message || 'Session check failed.' });
+    }
+  });
+
+  app.get('/api/centre/sessions', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const current = String(req.query.device || '').replace(/[^\w-]/g, '').slice(0, 64);
+      const snap = await adminDb.collection('adminSessions').where('uid', '==', caller.uid).get();
+      const sessions = snap.docs
+        .map((d) => {
+          const v = d.data() as any;
+          return {
+            id: d.id,
+            device: describeDevice(String(v.ua || '')),
+            ip: String(v.ip || ''),
+            loginAt: Number(v.loginAt || 0),
+            lastActiveAt: Number(v.lastActiveAt || 0),
+            revoked: !!v.revoked,
+            current: current ? d.id.endsWith(`__${current}`) : false,
+          };
+        })
+        .sort((a, b) => (b.current ? 1 : 0) - (a.current ? 1 : 0) || b.lastActiveAt - a.lastActiveAt);
+      res.json({ ok: true, sessions });
+    } catch (error: any) {
+      res.status(error?.status || 500).json({ error: error?.message || 'Could not load sessions.' });
+    }
+  });
+
+  app.post('/api/centre/sessions/revoke', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const id = String(req.body?.id || '');
+      const ref = adminDb.collection('adminSessions').doc(id);
+      const snap = await ref.get();
+      if (!snap.exists) return res.status(404).json({ error: 'Session not found.' });
+      if (String((snap.data() as any).uid || '') !== caller.uid) return res.status(403).json({ error: 'That session belongs to another account.' });
+      await ref.set({ revoked: true, revokedAt: Date.now(), revokeReason: 'user' }, { merge: true });
+      res.json({ ok: true });
+    } catch (error: any) {
+      res.status(error?.status || 500).json({ error: error?.message || 'Could not revoke the session.' });
+    }
+  });
+
+  // ==========================================================================
+  // PLATFORM: the app-only-portals switch. Public read (portals need it
+  // before sign-in); writes go through TOS staff only.
+  // ==========================================================================
+  let platformSettingsCache: { at: number; value: { appOnlyPortals: boolean } } | null = null;
+  app.get('/api/public/platform-settings', async (req, res) => {
+    try {
+      if (platformSettingsCache && Date.now() - platformSettingsCache.at < 30 * 1000) {
+        return res.json(platformSettingsCache.value);
+      }
+      const snap = await adminDb.collection('platformSettings').doc('global').get();
+      const value = { appOnlyPortals: !!(snap.data() as any)?.appOnlyPortals };
+      platformSettingsCache = { at: Date.now(), value };
+      res.set('Cache-Control', 'public, max-age=30');
+      res.json(value);
+    } catch (error: any) {
+      console.error('[platform-settings] failed:', error?.message || error);
+      res.json({ appOnlyPortals: false });
+    }
+  });
+
+  app.post('/api/tos/platform-settings', async (req, res) => {
+    try {
+      const caller = requireTos(req);
+      const enabled = req.body?.appOnlyPortals === true;
+      await adminDb.collection('platformSettings').doc('global').set({
+        appOnlyPortals: enabled,
+        updatedAt: Date.now(),
+        updatedBy: caller.uid,
+      });
+      platformSettingsCache = { at: Date.now(), value: { appOnlyPortals: enabled } };
+      await audit({ actorUid: caller.uid, centreId: '', action: 'PLATFORM_SETTING_CHANGED', before: null, after: { appOnlyPortals: enabled } });
+      res.json({ ok: true, appOnlyPortals: enabled });
+    } catch (error: any) {
+      res.status(error?.status || 500).json({ error: error?.message || 'Could not save the setting.' });
     }
   });
 

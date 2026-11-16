@@ -16,7 +16,6 @@ import {
   Globe,
   Bell,
   Settings,
-  ChevronRight,
   ExternalLink,
   Shield,
   Award,
@@ -192,27 +191,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
           ))}
         </div>
 
-        {/* User Card at bottom */}
-        <div className="p-3 border-t border-[#15233C]">
-          <div
-            id="sidebar-user-card"
-            onClick={() => setAdminSection('account')}
-            className="flex items-center justify-between p-2 rounded-xl bg-[#0F1B2E]/60 hover:bg-[#0F1B2E] border border-transparent hover:border-slate-800 cursor-pointer transition-all group"
-          >
-            <div className="flex items-center space-x-2.5 overflow-hidden">
-              <div className="w-8 h-8 rounded-lg bg-[#EA580C] flex items-center justify-center text-white font-bold text-xs shrink-0 shadow-sm">
-                {(activeUser?.name || 'EX').slice(0, 2).toUpperCase()}
-              </div>
-              <div className="text-left overflow-hidden">
-                <p className="text-white font-bold text-xs truncate group-hover:text-[#EA580C] transition-colors">
-                  {activeUser?.name || 'Administrator'}
-                </p>
-                <p className="text-slate-400 text-[10px] truncate">{activeUser?.role || 'Staff Member'}</p>
-              </div>
-            </div>
-            <ChevronRight className="w-3.5 h-3.5 text-slate-500 group-hover:text-white transition-colors shrink-0" />
-          </div>
-        </div>
       </aside>
     </>
   );

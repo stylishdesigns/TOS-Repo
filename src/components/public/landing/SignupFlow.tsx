@@ -828,9 +828,14 @@ export const SignupAppPage: React.FC = () => {
 
         <div style={CARD}>
           {installed ? (
-            <div role="status" style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '14px', padding: '12px 14px', font: '500 14px/1.5 Inter, sans-serif', color: '#166534' }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style={{ flex: 'none', marginTop: '2px', color: '#15803D' }}><path d="M5 12l5 5 9-10" /></svg>
-              {justInstalled ? 'The app is now on your home screen. Open it and sign in with the details from your email.' : 'You already have the app. Open it from your home screen and sign in with the details from your email.'}
+            <div style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '14px', padding: '14px', font: '500 14px/1.5 Inter, sans-serif', color: '#166534' }}>
+              <div role="status" style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style={{ flex: 'none', marginTop: '2px', color: '#15803D' }}><path d="M5 12l5 5 9-10" /></svg>
+                {justInstalled ? 'The app is now on your home screen. Log in below.' : 'You already have the app on this device. Log in below.'}
+              </div>
+              <a href="/#access" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', minHeight: '50px', borderRadius: '12px', background: '#EA580C', color: '#fff', font: '700 15px Inter, sans-serif', textDecoration: 'none', marginTop: '12px' }}>
+                Log in to the app
+              </a>
             </div>
           ) : (
             <button type="button" className="btn pr" onClick={install} style={{ width: '100%', minHeight: '52px', border: 'none', fontSize: '16px' }}>
@@ -838,6 +843,7 @@ export const SignupAppPage: React.FC = () => {
             </button>
           )}
 
+          {!installed && (
           <InstallGuide
             variant="inline"
             centreName={facility?.name || 'Your facility'}
@@ -848,6 +854,7 @@ export const SignupAppPage: React.FC = () => {
             noPrompt={noPrompt}
             onDone={() => setJustInstalled(true)}
           />
+          )}
         </div>
 
         <div role="status" style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '14px', padding: '12px 14px', marginTop: '16px', font: '500 14px/1.5 Inter, sans-serif', color: '#166534' }}>

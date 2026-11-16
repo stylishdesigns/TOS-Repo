@@ -7,6 +7,7 @@ export interface TenantSettings {
   secondaryColor: string;
   address: string;
   state: string;
+  centrePhotos?: string[];
   phone: string;
   email: string;
   whatsapp: string;
@@ -151,6 +152,8 @@ export interface Tutor {
   programmeIds?: string[];
   temporaryPassword?: string;
   hasChangedPassword?: boolean;
+  photoUrl?: string;
+  sessionExpiryDays?: number;
 }
 
 export interface Classroom {

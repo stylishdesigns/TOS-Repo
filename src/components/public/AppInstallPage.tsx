@@ -83,12 +83,14 @@ export function AppInstallPage() {
           {installed ? (
             <div className="cd" style={{padding:24, color:'#0F172A'}}>
               <h3 style={{fontSize:20, marginBottom:6}}>You already have the app</h3>
-              <p style={{fontSize:15, color:'#475569'}}>Tutorial OS is installed. Open it from your home screen or app list and sign in with the details from your welcome email.</p>
+              <p style={{fontSize:15, color:'#475569', marginBottom:16}}>Tutorial OS is installed on this device. Log in below or open it from your home screen.</p>
+              <a className="btn pr" style={{minWidth:220, minHeight:52, fontSize:15}} href="/#access">Log in to the app</a>
             </div>
           ) : justInstalled ? (
             <div className="cd" style={{padding:24, color:'#0F172A'}}>
               <h3 style={{fontSize:20, marginBottom:6}}>All set</h3>
-              <p style={{fontSize:15, color:'#475569'}}>Tutorial OS is now on your home screen. Open it and sign in with the details from your welcome email.</p>
+              <p style={{fontSize:15, color:'#475569', marginBottom:16}}>Tutorial OS is now on your home screen. Open it and log in with the details from your welcome email.</p>
+              <a className="btn pr" style={{minWidth:220, minHeight:52, fontSize:15}} href="/#access">Log in to the app</a>
             </div>
           ) : ios ? (
             <div className="cd" style={{padding:24, textAlign:'left', color:'#0F172A'}}>
