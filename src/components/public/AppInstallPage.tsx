@@ -1,5 +1,5 @@
 import { useEffect, useState, type CSSProperties } from 'react';
-import { getPendingInstallPrompt, waitForInstallPrompt, detectInstalledApp } from '../../hooks/usePWAInstall';
+import { getPendingInstallPrompt, waitForInstallPrompt, detectInstalledApp, resetPendingInstallPrompt, consumeInstallRetryFlag, reloadForFreshInstallPrompt } from '../../hooks/usePWAInstall';
 
 // Dedicated install page served at /app (the app-only gate links here, and so
 // does anyone who types the address). The facility's access code comes FIRST:
@@ -59,6 +59,8 @@ export function AppInstallPage() {
   const [deferred, setDeferred] = useState<InstallPromptEvent | null>(() => getPendingInstallPrompt() as InstallPromptEvent | null);
   const [noPrompt, setNoPrompt] = useState(false);
   const [waiting, setWaiting] = useState(false);
+  const [cancelled, setCancelled] = useState(false);
+  const [retryHint] = useState(() => consumeInstallRetryFlag());
   const [ios] = useState(iosDevice);
   const [mobile] = useState(mobileDevice);
 
@@ -132,6 +134,9 @@ export function AppInstallPage() {
 
   const install = async () => {
     setNoPrompt(false);
+    // The pop-up is offered once per page: after a cancellation the next tap
+    // reloads into a clean page so the pop-up can come back.
+    if (cancelled) { reloadForFreshInstallPrompt(); return; }
     let evt = deferred;
     if (!evt) {
       setWaiting(true);
@@ -149,6 +154,10 @@ export function AppInstallPage() {
     if (choice.outcome === 'accepted') {
       setJustInstalled(true);
       setDeferred(null);
+    } else {
+      setDeferred(null);
+      resetPendingInstallPrompt();
+      setCancelled(true);
     }
   };
 
@@ -238,11 +247,19 @@ export function AppInstallPage() {
           <button type="button" onClick={install} disabled={waiting} style={{ ...primaryBtn, minWidth: 240, minHeight: 56, fontSize: 16, opacity: waiting ? 0.75 : 1 }}>
             {waiting ? 'Getting the install pop-up ready…' : 'Install the app'}
           </button>
-          {noPrompt && (
+          {noPrompt && !cancelled && (
             <p style={{ fontSize: 13.5, color: '#FDBA74', margin: 0, lineHeight: 1.6, maxWidth: 400 }}>
               Chrome didn&apos;t offer the install pop-up this time. Wait a few seconds and tap Install again. If the app is
               already on this phone, open it from your home screen.
             </p>
+          )}
+          {cancelled && (
+            <p style={{ fontSize: 13.5, color: '#FDBA74', margin: 0, lineHeight: 1.6, maxWidth: 400 }}>
+              You cancelled the install. Tap Install again whenever you&apos;re ready.
+            </p>
+          )}
+          {retryHint && !cancelled && !noPrompt && (
+            <p style={{ fontSize: 12.5, color: '#94A3B8', margin: 0 }}>Tap Install to bring the pop-up back.</p>
           )}
         </div>
       ) : (

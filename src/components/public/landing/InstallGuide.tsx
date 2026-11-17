@@ -16,6 +16,7 @@ export type InstallGuideProps = {
   variant?: 'overlay' | 'inline';
   canPrompt?: boolean;
   noPrompt?: boolean;
+  noPromptText?: string;
   onInstall?: () => void;
   onDone?: () => void;
   onClose?: () => void;
@@ -173,7 +174,7 @@ const SAFARI_TOOLBAR = (
   </div>
 );
 
-export const InstallGuide: React.FC<InstallGuideProps> = ({ centreName, url, accent = ACCENT, variant = 'overlay', canPrompt = false, noPrompt = false, onInstall, onDone, onClose }) => {
+export const InstallGuide: React.FC<InstallGuideProps> = ({ centreName, url, accent = ACCENT, variant = 'overlay', canPrompt = false, noPrompt = false, noPromptText, onInstall, onDone, onClose }) => {
   const detected = isIOSDevice() ? 'i' : 'a';
   const [platform, setPlatform] = React.useState<'a' | 'i'>(detected);
   const [idx, setIdx] = React.useState(0);
@@ -310,7 +311,7 @@ export const InstallGuide: React.FC<InstallGuideProps> = ({ centreName, url, acc
         <div style={{ marginTop: 16 }}>
           <button type="button" onClick={() => { if (onInstall) onInstall(); }} style={{ width: '100%', border: 'none', borderRadius: 12, padding: '15px 0', background: accent, color: '#fff', font: '800 16px Inter, sans-serif', cursor: 'pointer' }}>↓ Install app</button>
           {noPrompt && (
-            <p style={{ font: '500 12.5px/1.55 Inter, sans-serif', color: '#B91C1C', margin: '6px 0 0', textAlign: 'center' }}>Chrome didn't offer the install pop-up this time. Wait a few seconds and tap Install again. If the app is already on this phone, open it from your home screen.</p>
+            <p style={{ font: '500 12.5px/1.55 Inter, sans-serif', color: '#B91C1C', margin: '6px 0 0', textAlign: 'center' }}>{noPromptText || "Chrome didn't offer the install pop-up this time. Wait a few seconds and tap Install again. If the app is already on this phone, open it from your home screen."}</p>
           )}
           <p style={{ font: '500 12.5px/1.55 Inter, sans-serif', color: MUT, margin: '8px 0 0', textAlign: 'center' }}>Tap the button and your phone will ask you to confirm.</p>
         </div>

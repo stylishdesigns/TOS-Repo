@@ -1,5 +1,6 @@
 import React from 'react';
 import { InstallGuide } from '../components/public/landing/InstallGuide';
+import { reloadForFreshInstallPrompt } from '../hooks/usePWAInstall';
 import {
   LandingContent,
   LandingCard,
@@ -53,7 +54,12 @@ const LandingInstallPill: React.FC<{
   // guide's own Install app button fires the native install prompt.
   const [guide, setGuide] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
+  const [note, setNote] = React.useState<null | 'cancelled' | 'noprompt'>(null);
   const doInstall = async () => {
+    setNote(null);
+    // The pop-up is offered once per page: after a cancellation the next tap
+    // reloads into a clean page so the pop-up can come back.
+    if (note === 'cancelled') { reloadForFreshInstallPrompt(); return; }
     if (!installPromptEvent) {
       // The browser has not offered the pop-up yet: give it a moment rather
       // than sending anyone to the browser menu.
@@ -70,14 +76,23 @@ const LandingInstallPill: React.FC<{
       }) as any;
     }
     if (installPromptEvent) {
+      let dismissed = false;
       try {
         installPromptEvent.prompt();
+        const choice = await installPromptEvent.userChoice;
+        dismissed = choice.outcome !== 'accepted';
       } catch {
-        installPromptEvent = null;
+        dismissed = false;
       }
       installPromptEvent = null;
+      if (dismissed) {
+        setNote('cancelled');
+        return;
+      }
       setBusy(true);
       window.setTimeout(() => setBusy(false), 2000);
+    } else {
+      setNote('noprompt');
     }
   };
   const openInstall = () => setGuide(true);
@@ -113,6 +128,10 @@ const LandingInstallPill: React.FC<{
           url={installUrl || 'tutorialos.com'}
           accent={accent}
           canPrompt={Boolean(installPromptEvent)}
+          noPrompt={Boolean(note)}
+          noPromptText={note === 'cancelled'
+            ? "You cancelled the install. Tap Install again whenever you're ready."
+            : undefined}
           onInstall={doInstall}
           onClose={() => setGuide(false)}
         />

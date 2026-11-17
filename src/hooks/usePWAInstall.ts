@@ -18,6 +18,31 @@ if (typeof window !== 'undefined') {
 
 export const getPendingInstallPrompt = (): BeforeInstallPromptEvent | null => pendingInstallPrompt;
 
+// The browser offers the install pop-up once per page. After it is used or
+// cancelled, only a fresh page load brings it back, so install screens clear
+// the captured offer and, on the next tap, reload into a clean page instead of
+// going silent.
+export const resetPendingInstallPrompt = (): void => {
+  pendingInstallPrompt = null;
+};
+
+export const INSTALL_RETRY_KEY = 'tos:install-retry';
+
+export const consumeInstallRetryFlag = (): boolean => {
+  try {
+    if (sessionStorage.getItem(INSTALL_RETRY_KEY) === '1') {
+      sessionStorage.removeItem(INSTALL_RETRY_KEY);
+      return true;
+    }
+  } catch { /* storage unavailable */ }
+  return false;
+};
+
+export const reloadForFreshInstallPrompt = (): void => {
+  try { sessionStorage.setItem(INSTALL_RETRY_KEY, '1'); } catch { /* ignore */ }
+  window.location.reload();
+};
+
 export async function waitForInstallPrompt(ms: number): Promise<BeforeInstallPromptEvent | null> {
   const deadline = Date.now() + ms;
   while (!pendingInstallPrompt && Date.now() < deadline) {

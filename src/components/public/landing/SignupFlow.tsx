@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { InstallGuide } from './InstallGuide';
-import { waitForInstallPrompt, detectInstalledApp } from '../../../hooks/usePWAInstall';
+import { waitForInstallPrompt, detectInstalledApp, resetPendingInstallPrompt, reloadForFreshInstallPrompt } from '../../../hooks/usePWAInstall';
 import { FlowSelect } from './FlowSelect';
 
 /**
@@ -767,6 +767,7 @@ export const SignupAppPage: React.FC = () => {
   );
   const [justInstalled, setJustInstalled] = useState(false);
   const [noPrompt, setNoPrompt] = useState(false);
+  const [cancelled, setCancelled] = useState(false);
 
   useEffect(() => {
     if (!owner) window.location.replace('/start');
@@ -793,6 +794,9 @@ export const SignupAppPage: React.FC = () => {
   if (!owner) return null;
 
   const install = async () => {
+    // The pop-up is offered once per page: after a cancellation the next tap
+    // reloads into a clean page so the pop-up can come back.
+    if (cancelled) { reloadForFreshInstallPrompt(); return; }
     let evt = deferred || pendingInstall;
     if (!evt) {
       evt = await waitForInstallPrompt(5000) as InstallPromptEvent | null;
@@ -809,6 +813,12 @@ export const SignupAppPage: React.FC = () => {
       setJustInstalled(true);
       setDeferred(null);
       pendingInstall = null;
+    } else {
+      setDeferred(null);
+      pendingInstall = null;
+      resetPendingInstallPrompt();
+      setCancelled(true);
+      setNoPrompt(false);
     }
   };
 
@@ -852,7 +862,10 @@ export const SignupAppPage: React.FC = () => {
             accent={facility?.accent || '#EA580C'}
             onInstall={install}
             canPrompt={Boolean(deferred)}
-            noPrompt={noPrompt}
+            noPrompt={noPrompt || cancelled}
+            noPromptText={cancelled
+              ? 'You cancelled the install. Tap Install again whenever you\'re ready.'
+              : undefined}
             onDone={() => setJustInstalled(true)}
           />
           )}
