@@ -7,36 +7,42 @@ import React, { useEffect, useState } from 'react';
  * install call-to-action. The TOS console, the TOS landing and facility
  * landing pages are never gated.
  */
+// True when this page is running inside the installed app rather than a
+// browser tab: the installed app is the only place app-only portals open.
+export const isStandaloneDisplay = (): boolean =>
+  window.matchMedia('(display-mode: standalone)').matches ||
+  (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
+
+// Reads the app-only switch with the same 5-minute session cache the gate has
+// always used, so the access-code gate and the install page can check it too
+// without extra round trips.
+export async function isAppOnlyOn(): Promise<boolean> {
+  try {
+    const cached = JSON.parse(sessionStorage.getItem('tos:app-only-cache') || 'null') as { v: boolean; at: number } | null;
+    if (cached && Date.now() - cached.at < 5 * 60 * 1000) return cached.v;
+  } catch { /* ignore */ }
+  try {
+    const d = await fetch('/api/public/platform-settings').then((r) => r.json()) as { appOnlyPortals?: boolean };
+    const on = !!d.appOnlyPortals;
+    try {
+      sessionStorage.setItem('tos:app-only-cache', JSON.stringify({ v: on, at: Date.now() }));
+    } catch { /* ignore */ }
+    return on;
+  } catch {
+    return false;
+  }
+}
+
 export const AppOnlyGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [state, setState] = useState<'loading' | 'open' | 'blocked'>('loading');
 
   useEffect(() => {
     let alive = true;
-    const standalone =
-      window.matchMedia('(display-mode: standalone)').matches ||
-      (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
-    if (standalone) {
+    if (isStandaloneDisplay()) {
       setState('open');
       return;
     }
-    try {
-      const cached = JSON.parse(sessionStorage.getItem('tos:app-only-cache') || 'null') as { v: boolean; at: number } | null;
-      if (cached && Date.now() - cached.at < 5 * 60 * 1000) {
-        setState(cached.v ? 'blocked' : 'open');
-        return;
-      }
-    } catch { /* ignore */ }
-    fetch('/api/public/platform-settings')
-      .then((r) => r.json())
-      .then((d: { appOnlyPortals?: boolean }) => {
-        if (!alive) return;
-        const on = !!d.appOnlyPortals;
-        try {
-          sessionStorage.setItem('tos:app-only-cache', JSON.stringify({ v: on, at: Date.now() }));
-        } catch { /* ignore */ }
-        setState(on ? 'blocked' : 'open');
-      })
-      .catch(() => { if (alive) setState('open'); });
+    isAppOnlyOn().then((on) => { if (alive) setState(on ? 'blocked' : 'open'); });
     return () => { alive = false; };
   }, []);
 

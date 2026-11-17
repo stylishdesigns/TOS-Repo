@@ -1,5 +1,6 @@
 import { useEffect, useState, type CSSProperties } from 'react';
 import { getPendingInstallPrompt, waitForInstallPrompt, detectInstalledApp, resetPendingInstallPrompt, consumeInstallRetryFlag, reloadForFreshInstallPrompt } from '../../hooks/usePWAInstall';
+import { isAppOnlyOn } from '../portal/AppOnlyGate';
 
 // Dedicated install page served at /app (the app-only gate links here, and so
 // does anyone who types the address). The facility's access code comes FIRST:
@@ -61,6 +62,11 @@ export function AppInstallPage() {
   const [waiting, setWaiting] = useState(false);
   const [cancelled, setCancelled] = useState(false);
   const [retryHint] = useState(() => consumeInstallRetryFlag());
+  const [appOnly, setAppOnly] = useState(false);
+
+  useEffect(() => {
+    isAppOnlyOn().then(setAppOnly).catch(() => undefined);
+  }, []);
   const [ios] = useState(iosDevice);
   const [mobile] = useState(mobileDevice);
 
@@ -294,6 +300,25 @@ export function AppInstallPage() {
         </div>
       </main>
 
+      {appOnly && (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '0 24px 6px' }}>
+          <a
+            href="/"
+            style={{
+              color: '#CBD5E1',
+              textDecoration: 'none',
+              fontWeight: 700,
+              fontSize: 14,
+              padding: '12px 22px',
+              borderRadius: 12,
+              border: '1px solid rgba(255,255,255,0.16)',
+              background: 'rgba(255,255,255,0.04)',
+            }}
+          >
+            Go to the TOS landing page
+          </a>
+        </div>
+      )}
       <footer style={{ padding: '18px 24px', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', justifyContent: 'space-between', color: '#64748B', fontSize: 13 }}>
         <span style={{ fontWeight: 700, color: '#94A3B8' }}>Tutorial OS</span>
         <span>One system for educational facilities.</span>

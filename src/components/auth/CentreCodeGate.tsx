@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Building2, ArrowRight, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
+import { isAppOnlyOn, isStandaloneDisplay } from '../portal/AppOnlyGate';
 
 /**
  * Centre code gate: the FIRST screen before any sign-in. The access code is a
@@ -18,7 +19,26 @@ export const CentreCodeGate: React.FC<CentreCodeGateProps> = ({ onProceed, onBac
   const [error, setError] = useState<string | null>(null);
   const [centre, setCentre] = useState<{ centreId?: string; centreName: string; suspended?: boolean } | null>(null);
   const [pendingCode, setPendingCode] = useState('');
+  const [continuing, setContinuing] = useState(false);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  // The app-only check runs HERE, after the centre is confirmed and before the
+  // login page: in any browser it sends the user straight to the app install
+  // page instead. Inside the installed app the check passes and sign-in
+  // continues as usual.
+  const handleContinue = async () => {
+    if (!centre || centre.suspended || continuing) return;
+    setContinuing(true);
+    try {
+      const appOnly = await isAppOnlyOn();
+      if (appOnly && !isStandaloneDisplay()) {
+        window.location.href = '/app';
+        return;
+      }
+    } catch { /* check unavailable: sign in as usual */ }
+    setContinuing(false);
+    onProceed(pendingCode, centre.centreName, centre.centreId);
+  };
 
   useEffect(() => {
     inputRefs.current[0]?.focus();
@@ -184,8 +204,8 @@ export const CentreCodeGate: React.FC<CentreCodeGateProps> = ({ onProceed, onBac
 
             <button
               type="button"
-              disabled={!!centre.suspended}
-              onClick={() => onProceed(pendingCode, centre.centreName, centre.centreId)}
+              disabled={!!centre.suspended || continuing}
+              onClick={handleContinue}
               className={`w-full py-4 rounded-2xl font-bold text-sm tracking-wide transition-all duration-200 flex items-center justify-center gap-2 shadow-lg
                 ${
                   centre.suspended
@@ -193,8 +213,17 @@ export const CentreCodeGate: React.FC<CentreCodeGateProps> = ({ onProceed, onBac
                     : 'bg-orange-600 hover:bg-orange-500 text-white shadow-orange-600/30 cursor-pointer active:scale-[0.98]'
                 }`}
             >
-              <span>Continue to sign in</span>
-              <ArrowRight className="w-4 h-4" />
+              {continuing ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin text-white" />
+                  <span>Checking...</span>
+                </>
+              ) : (
+                <>
+                  <span>Continue to sign in</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
             </button>
 
             <button
