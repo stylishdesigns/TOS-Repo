@@ -460,7 +460,13 @@ const MainLayout: React.FC = () => {
   if (!currentUser && !tosLoginRequested && !pendingCentre && centreGateRequested) {
     return (
       <CentreCodeGate
-        onProceed={(code, centreName, centreId) => setPendingCentre({ code, centreName, centreId })}
+        onProceed={(code, centreName, centreId) => {
+          // A code picked from a door that skipped the landing (the installed
+          // app boots on #access) must still land on the login page, not the
+          // landing: clear the welcome flag the gate ran past.
+          setShowWelcome(false);
+          setPendingCentre({ code, centreName, centreId });
+        }}
         onBack={() => { setShowPortals(false); setShowWelcome(true); setCentreGateRequested(false); }}
       />
     );
@@ -541,7 +547,7 @@ const MainLayout: React.FC = () => {
       if (pendingCentre) {
         return (
           <AuthPortal
-            portalType={viewMode === 'student' ? 'student' : viewMode === 'tutor' ? 'tutor' : 'admin'}
+            portalType="student"
             title={pendingCentre.centreName}
             subtitle=""
             onSuccess={() => {}}
@@ -654,7 +660,7 @@ const MainLayout: React.FC = () => {
   if ((viewMode === 'portal' || viewMode === 'tutor') && !currentUser && !isAdmin) {
     return (
       <AuthPortal 
-        portalType={viewMode === 'tutor' ? 'tutor' : 'admin'}
+        portalType="student"
         title={pendingCentre?.centreName || centreName}
         subtitle=""
         onSuccess={() => {}}

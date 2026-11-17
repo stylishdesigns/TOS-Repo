@@ -266,12 +266,12 @@ export const InstallGuide: React.FC<InstallGuideProps> = ({ centreName, url, acc
             <button type="button" onClick={onClose} aria-label="Close the install guide" style={{ border: 'none', background: '#F1F5F9', color: MUT, width: 34, height: 34, borderRadius: '50%', fontSize: 16, cursor: 'pointer', flex: 'none' }}>✕</button>
           </div>
           <p style={{ font: '500 14px/1.6 Inter, sans-serif', color: MUT, margin: '8px 0 0' }}>
-            Tutorial OS works as an app on your phone: no browser bar, no typing a web address. Watch the guide, then install.
+            {centreName} works as an app on your phone: no browser bar, no typing a web address. Watch the guide, then install.
           </p>
         </>
       ) : null}
 
-      <style>{'.igRow{display:flex;gap:24px;align-items:flex-start;margin-top:16px}.igScreen{width:288px;height:541px;flex:none;margin:0 auto;position:relative}.igScreen>div{transform:scale(1.15);transform-origin:top left}.igSide{flex:1;min-width:220px}@media (max-width:660px){.igRow{gap:10px}.igScreen{width:186px;height:348px}.igScreen>div{transform:scale(.74)}.igSide{min-width:0}.igSide h3{font-size:14px !important}.igSide p{font-size:11.5px !important}.igCard{padding:16px 14px !important}}'}</style>
+      <style>{'.igRow{display:flex;gap:24px;align-items:flex-start;margin-top:16px}.igScreen{width:288px;height:541px;flex:none;margin:0 auto;position:relative}.igScreen>div{transform:scale(1.15);transform-origin:top left}.igSide{flex:1;min-width:220px}@media (max-width:660px){.igRow{gap:10px}.igScreen{width:186px;height:348px}.igScreen>div{transform:scale(.74)}.igSide{min-width:0}.igSide h3{font-size:14px !important}.igSide p{font-size:13px !important}.igCard{padding:16px 14px !important}}'}</style>
       <div style={{ display: 'flex', gap: 8, margin: '16px 0 0', background: '#F1F5F9', borderRadius: 12, padding: 4 }}>
         {([['a', 'Android'], ['i', 'iPhone']] as const).map(([id, label]) => (
           <button
@@ -294,7 +294,7 @@ export const InstallGuide: React.FC<InstallGuideProps> = ({ centreName, url, acc
         <div style={{ textAlign: 'center', margin: '8px 0 0' }}>
         <span style={{ font: '700 11px Inter, sans-serif', letterSpacing: '0.06em', textTransform: 'uppercase', color: accent }}>Step {idx + 1} of 4</span>
         <h3 style={{ font: '800 17px Inter, sans-serif', margin: '6px 0 4px' }}>{captions[idx][0]}</h3>
-        <p style={{ font: '500 13.5px/1.6 Inter, sans-serif', color: MUT, margin: 0 }}>{captions[idx][1]}</p>
+        <p style={{ font: '600 15.5px/1.65 Inter, sans-serif', color: '#334155', margin: 0 }}>{captions[idx][1]}</p>
       </div>
 
         </div>
