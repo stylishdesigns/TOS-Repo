@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { updatePassword } from 'firebase/auth';
 import { auth } from '../../firebase';
-import { KeyRound, Loader2, AlertCircle, CheckCircle2, Lock, ShieldCheck } from 'lucide-react';
+import { KeyRound, Loader2, AlertCircle, CheckCircle2, Lock, ShieldCheck, Eye, EyeOff } from 'lucide-react';
 
 /**
  * Forced first-password change for provisioned centre owners (Prompt C Part C).
@@ -16,6 +16,8 @@ export const FirstLoginPasswordChange: React.FC<{ onDone: () => void }> = ({ onD
   const [checking, setChecking] = useState(true);
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [done, setDone] = useState(false);
@@ -135,26 +137,42 @@ export const FirstLoginPasswordChange: React.FC<{ onDone: () => void }> = ({ onD
               <div className="relative">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                 <input
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="New password"
                   autoComplete="new-password"
-                  className="w-full bg-slate-950/60 border border-white/10 focus:border-orange-500/60 rounded-xl pl-11 pr-4 py-3.5 text-sm text-white placeholder:text-slate-600 outline-none transition-colors"
+                  className="w-full bg-slate-950/60 border border-white/10 focus:border-orange-500/60 rounded-xl pl-11 pr-11 py-3.5 text-sm text-white placeholder:text-slate-600 outline-none transition-colors"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-500 hover:text-slate-300 transition-colors"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
               <div className="relative">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                 <input
-                  type="password"
+                  type={showConfirmPassword ? 'text' : 'password'}
                   required
                   value={confirm}
                   onChange={(e) => setConfirm(e.target.value)}
                   placeholder="Confirm new password"
                   autoComplete="new-password"
-                  className="w-full bg-slate-950/60 border border-white/10 focus:border-orange-500/60 rounded-xl pl-11 pr-4 py-3.5 text-sm text-white placeholder:text-slate-600 outline-none transition-colors"
+                  className="w-full bg-slate-950/60 border border-white/10 focus:border-orange-500/60 rounded-xl pl-11 pr-11 py-3.5 text-sm text-white placeholder:text-slate-600 outline-none transition-colors"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-500 hover:text-slate-300 transition-colors"
+                  aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
 
               {error && (

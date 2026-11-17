@@ -218,26 +218,47 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
           return null;
         };
 
+        // A provisioned owner's account carries a mustChangePassword claim.
+        // The app-level first-login page enforces that claim, so the login
+        // form stays out of the way and the permanent-password page is the
+        // only password screen the user sees. Accounts without the claim fall
+        // back to the document check below, and go straight to the
+        // new-password fields: the temporary password was typed seconds ago,
+        // so a re-enter step would only be a second page before the real one.
+        let claimNeedsPassword = false;
+        try {
+          const tok = await userCredential?.user?.getIdTokenResult();
+          claimNeedsPassword = (tok?.claims as any)?.mustChangePassword === true;
+        } catch {
+          /* claim unreadable: fall back to the document check below */
+        }
+
         // Check Tutors
         const tutorInfo = await findUserDoc('tutors');
         if (tutorInfo) {
           if (!tutorInfo.data.hasChangedPassword) {
-            setUserDocInfo({ id: tutorInfo.id, collection: 'tutors' });
-            setCurrentPassword(''); // Clear to force user to re-enter
-            setNeedsPasswordChange(true);
-            setPasswordChangeStep('verify');
-            passwordChangeNeeded = true;
+            if (claimNeedsPassword) {
+              passwordChangeNeeded = true;
+            } else {
+              setUserDocInfo({ id: tutorInfo.id, collection: 'tutors' });
+              setNeedsPasswordChange(true);
+              setPasswordChangeStep('new');
+              passwordChangeNeeded = true;
+            }
           }
         } else {
           // Check Admins
           const adminInfo = await findUserDoc('admins');
           if (adminInfo) {
             if (!adminInfo.data.hasChangedPassword) {
-              setUserDocInfo({ id: adminInfo.id, collection: 'admins' });
-              setCurrentPassword(''); // Clear to force user to re-enter
-              setNeedsPasswordChange(true);
-              setPasswordChangeStep('verify');
-              passwordChangeNeeded = true;
+              if (claimNeedsPassword) {
+                passwordChangeNeeded = true;
+              } else {
+                setUserDocInfo({ id: adminInfo.id, collection: 'admins' });
+                setNeedsPasswordChange(true);
+                setPasswordChangeStep('new');
+                passwordChangeNeeded = true;
+              }
             }
           }
         }
