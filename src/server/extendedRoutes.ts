@@ -273,7 +273,11 @@ export function registerExtendedRoutes(app: express.Express): void {
         theme_color: '#EA580C',
         background_color: '#0F172A',
         display: 'standalone',
-        start_url: '/#access',
+        // Each facility's app starts at its own address: the access-code page
+        // carrying the facility, so Chrome's periodic app refresh re-reads
+        // THIS facility's manifest. With two branded apps on one phone, a
+        // shared start_url would let one app drift to the other's branding.
+        start_url: `/?centre=${encodeURIComponent(slug)}#access`,
         scope: '/',
         icons: [icon(192, 'any'), icon(512, 'maskable')],
         related_applications: [{ platform: 'webapp', url: `/api/public/pwa-manifest?centre=${slug}`, id: `/pwa/${slug}` }],
