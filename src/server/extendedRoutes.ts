@@ -484,7 +484,7 @@ export function registerExtendedRoutes(app: express.Express): void {
   let platformSettingsCache: { at: number; value: { appOnlyPortals: boolean } } | null = null;
   app.get('/api/public/platform-settings', async (req, res) => {
     try {
-      if (platformSettingsCache && Date.now() - platformSettingsCache.at < 30 * 1000) {
+      if (platformSettingsCache && Date.now() - platformSettingsCache.at < 15 * 1000) {
         return res.json(platformSettingsCache.value);
       }
       const snap = await adminDb.collection('platformSettings').doc('global').get();

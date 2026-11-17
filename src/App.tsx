@@ -51,6 +51,12 @@ const MainLayout: React.FC = () => {
   } = useApp();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [showWelcome, setShowWelcome] = useState(true);
+  // '#landing' forces the public Tutorial OS landing page for this visit,
+  // signed in or not: the app install page's "Back to landing page" uses it,
+  // so the button always reaches the landing instead of an open session
+  // pulling the visitor into the portals. It clears when the hash moves on.
+  const readLandingRequested = () => window.location.hash.toLowerCase() === '#landing';
+  const [forceLanding, setForceLanding] = useState(readLandingRequested);
   // Platform (TOS) staff sign-in lives on its own door: #tos-admin in the URL.
   // #centre is the matching door back into the tenant (centre) app.
   const [tosLoginRequested, setTosLoginRequested] = useState(() => /^#tos(-admin)?$/.test(window.location.hash.toLowerCase()));
@@ -60,6 +66,7 @@ const MainLayout: React.FC = () => {
       setTosLoginRequested(/^#tos(-admin)?$/.test(window.location.hash.toLowerCase()));
       setCentreAppRequested(/^#centre(-admin)?$/.test(window.location.hash.toLowerCase()));
       if (window.location.hash.toLowerCase() === '#access') setCentreGateRequested(true);
+      setForceLanding(readLandingRequested());
     };
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);
@@ -459,7 +466,7 @@ const MainLayout: React.FC = () => {
     );
   }
 
-  if (!currentUser && showWelcome) {
+  if (showWelcome && (forceLanding || !currentUser)) {
     if (!showPortals) {
       return (
         <TutorialOsLanding

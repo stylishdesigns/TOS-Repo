@@ -303,7 +303,7 @@ export function AppInstallPage() {
       {appOnly && (
         <div style={{ display: 'flex', justifyContent: 'center', padding: '0 24px 6px' }}>
           <a
-            href="/"
+            href="/#landing"
             style={{
               color: '#CBD5E1',
               textDecoration: 'none',
@@ -315,7 +315,7 @@ export function AppInstallPage() {
               background: 'rgba(255,255,255,0.04)',
             }}
           >
-            Go to the TOS landing page
+            Back to landing page
           </a>
         </div>
       )}

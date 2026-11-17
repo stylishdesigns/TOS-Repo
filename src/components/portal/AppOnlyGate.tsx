@@ -13,20 +13,18 @@ export const isStandaloneDisplay = (): boolean =>
   window.matchMedia('(display-mode: standalone)').matches ||
   (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
 
-// Reads the app-only switch with the same 5-minute session cache the gate has
-// always used, so the access-code gate and the install page can check it too
-// without extra round trips.
+// Reads the app-only switch fresh on every page load: no session storage, so
+// a refresh catches an on/off toggle right away. The tiny in-memory cache
+// only dedupes the checks one page load makes (the gate, the access-code
+// gate, the install page) so they share a single request.
+let appOnlyCache: { at: number; v: boolean } | null = null;
+const APP_ONLY_CACHE_MS = 10 * 1000;
 export async function isAppOnlyOn(): Promise<boolean> {
-  try {
-    const cached = JSON.parse(sessionStorage.getItem('tos:app-only-cache') || 'null') as { v: boolean; at: number } | null;
-    if (cached && Date.now() - cached.at < 5 * 60 * 1000) return cached.v;
-  } catch { /* ignore */ }
+  if (appOnlyCache && Date.now() - appOnlyCache.at < APP_ONLY_CACHE_MS) return appOnlyCache.v;
   try {
     const d = await fetch('/api/public/platform-settings').then((r) => r.json()) as { appOnlyPortals?: boolean };
     const on = !!d.appOnlyPortals;
-    try {
-      sessionStorage.setItem('tos:app-only-cache', JSON.stringify({ v: on, at: Date.now() }));
-    } catch { /* ignore */ }
+    appOnlyCache = { at: Date.now(), v: on };
     return on;
   } catch {
     return false;
