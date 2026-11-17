@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { AccessCodeSettings } from './AccessCodeSettings';
+import { WebsiteLanding } from '../dashboard/WebsiteLanding';
 import { ModernSelect } from '../ui/ModernSelect';
 import {
   User,
@@ -28,10 +29,10 @@ import {
   RefreshCw,
 } from 'lucide-react';
 
-export const SettingsView: React.FC = () => {
-  const { settings, updateSettings, addToast, authMethod, activeUser, activeCentre, updateAdmin, uploadCentreImage, getCentreSessions, revokeCentreSession } = useApp();
+export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode = 'profile' }) => {
+  const { settings, updateSettings, addToast, authMethod, activeUser, activeCentre, updateAdmin, uploadCentreImage, getCentreSessions, revokeCentreSession, getCentreLogo, saveCentreLogo, activeCentreId } = useApp();
 
-  const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'sessions' | 'centre'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'sessions'>('profile');
 
   // Sync active tab if security is forbidden
   React.useEffect(() => {
@@ -39,6 +40,54 @@ export const SettingsView: React.FC = () => {
       setActiveTab('profile');
     }
   }, [activeTab, authMethod]);
+
+  // ---- Facility logo: one image feeding the facility landing page and the
+  // app icon families see when they install. Upload, replace and remove live
+  // here alongside the facility photos.
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const [centreLogo, setCentreLogo] = useState('');
+  const [logoBusy, setLogoBusy] = useState(false);
+  React.useEffect(() => {
+    if (mode !== 'facility' || !activeCentreId) return;
+    getCentreLogo().then(setCentreLogo).catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, activeCentreId]);
+  const handleLogoPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file: File | undefined = (e.target.files || [])[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!/^image\/(png|jpe?g|webp)$/i.test(file.type)) {
+      addToast({ type: 'error', title: 'Unsupported Image', description: `${file.name} is not a PNG, JPG or WebP picture.` });
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      addToast({ type: 'error', title: 'Logo Too Large', description: 'The logo can be up to 2 MB. Choose a smaller picture.' });
+      return;
+    }
+    try {
+      setLogoBusy(true);
+      const dataUrl = await readFileAsDataUrl(file);
+      const url = await saveCentreLogo(dataUrl);
+      setCentreLogo(url);
+      addToast({ type: 'success', title: 'Logo Updated', description: 'Your facility logo is live on the landing page and the app install page.' });
+    } catch (err: any) {
+      addToast({ type: 'error', title: 'Upload Failed', description: err?.message || 'The logo could not be uploaded. Please try again.' });
+    } finally {
+      setLogoBusy(false);
+    }
+  };
+  const handleLogoRemove = async () => {
+    try {
+      setLogoBusy(true);
+      await saveCentreLogo('');
+      setCentreLogo('');
+      addToast({ type: 'success', title: 'Logo Removed', description: 'Your facility name will show in place of a logo.' });
+    } catch (err: any) {
+      addToast({ type: 'error', title: 'Remove Failed', description: err?.message || 'The logo could not be removed. Please try again.' });
+    } finally {
+      setLogoBusy(false);
+    }
+  };
 
   // Profile Form state
   const [firstName, setFirstName] = useState(activeUser?.name?.split(' ')[0] || '');
@@ -278,7 +327,7 @@ export const SettingsView: React.FC = () => {
 
     addToast({
       type: 'success',
-      title: 'System Settings Saved',
+      title: 'Facility Settings Saved',
       description: 'Global facility configuration and session parameters updated.',
     });
   };
@@ -303,7 +352,8 @@ export const SettingsView: React.FC = () => {
 
   return (
     <div id="system-settings-page" className="p-4 sm:p-6 md:p-8 space-y-6 max-w-7xl mx-auto animate-in fade-in duration-200">
-      {/* Top Banner Card */}
+      {/* Top Banner Card: only on the Profile page; the facility page shows facility things */}
+      {mode === 'profile' && (
       <div className="bg-white p-5 sm:p-6 rounded-xl border border-slate-200/90 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center space-x-4">
           {photoUrl ? (
@@ -344,8 +394,10 @@ export const SettingsView: React.FC = () => {
           <span className="text-sm font-bold text-slate-800">{settings.academicSession}</span>
         </div>
       </div>
+      )}
 
-      {/* Tabs */}
+      {/* Tabs: only on the Profile page */}
+      {mode === 'profile' && (
       <div className="flex items-center space-x-1.5 bg-slate-100/80 p-1.5 rounded-xl border border-slate-200/80 overflow-x-auto scrollbar-none">
         <button
           onClick={() => setActiveTab('profile')}
@@ -384,22 +436,11 @@ export const SettingsView: React.FC = () => {
           <Laptop className="w-3.5 h-3.5" />
           <span>Active Sessions</span>
         </button>
-
-        <button
-          onClick={() => setActiveTab('centre')}
-          className={`px-3.5 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap flex items-center space-x-2 ${
-            activeTab === 'centre'
-              ? 'bg-[#EA580C] text-white shadow-xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-white/70'
-          }`}
-        >
-          <Building className="w-3.5 h-3.5" />
-          <span>Facility & System Parameters</span>
-        </button>
       </div>
+      )}
 
       {/* Tab: Profile Details */}
-      {activeTab === 'profile' && (
+      {mode === 'profile' && activeTab === 'profile' && (
         <div className="bg-white p-5 sm:p-6 rounded-xl border border-slate-200/90 shadow-xs space-y-5">
           <div className="border-b border-slate-100 pb-3">
             <h3 className="text-base font-bold text-slate-900">Administrator Profile Details</h3>
@@ -514,7 +555,7 @@ export const SettingsView: React.FC = () => {
       )}
 
       {/* Tab: Security & Password */}
-      {activeTab === 'security' && (
+      {mode === 'profile' && activeTab === 'security' && (
         <div className="space-y-6">
           <div className="bg-white p-5 sm:p-6 rounded-xl border border-slate-200/90 shadow-xs space-y-4">
             <div className="border-b border-slate-100 pb-3">
@@ -613,7 +654,7 @@ export const SettingsView: React.FC = () => {
       )}
 
       {/* Tab: Active Sessions */}
-      {activeTab === 'sessions' && (
+      {mode === 'profile' && activeTab === 'sessions' && (
         <div className="space-y-6">
           <div className="bg-white p-5 sm:p-6 rounded-xl border border-slate-200/90 shadow-xs space-y-3">
             <div className="border-b border-slate-100 pb-3">
@@ -697,10 +738,57 @@ export const SettingsView: React.FC = () => {
       )}
 
             {/* Tab: Centre & System Parameters */}
-      {activeTab === 'centre' && (
+      {mode === 'facility' && (
+        <div>
+          <h2 className="text-xl font-bold text-slate-900">Facility Settings</h2>
+          <p className="text-xs text-slate-500 mt-0.5">Facility parameters, branding and your website landing page.</p>
+        </div>
+      )}
+
+      {mode === 'facility' && (
         <div className="space-y-6">
           {/* Access code (Prompt C Part C): owner-managed, server-verified. */}
           <AccessCodeSettings />
+
+          {/* Facility logo: upload, replace or remove; the landing page and app icon follow it. */}
+          <div className="bg-white p-5 sm:p-6 rounded-xl border border-slate-200/90 shadow-xs space-y-4">
+            <div className="border-b border-slate-100 pb-3">
+              <h3 className="text-base font-bold text-slate-900">Facility Logo</h3>
+              <p className="text-xs text-slate-500">
+                Your logo appears on your facility's landing page and becomes the app icon when families install your app. A square image works best.
+              </p>
+            </div>
+            <div className="flex items-center gap-4">
+              {centreLogo ? (
+                <img src={centreLogo} alt="Facility logo" className="w-20 h-20 rounded-xl object-contain border border-slate-200 bg-white p-1.5 shrink-0" />
+              ) : (
+                <div className="w-20 h-20 rounded-xl border-2 border-dashed border-slate-300 grid place-items-center text-slate-300 shrink-0">
+                  <ImagePlus className="w-6 h-6" />
+                </div>
+              )}
+              <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={() => logoInputRef.current?.click()}
+                  disabled={logoBusy}
+                  className="px-4 py-2 text-xs font-semibold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg shadow-sm disabled:opacity-60 w-fit"
+                >
+                  {logoBusy ? 'Uploading…' : centreLogo ? 'Replace logo' : 'Upload logo'}
+                </button>
+                {centreLogo && !logoBusy && (
+                  <button
+                    type="button"
+                    onClick={handleLogoRemove}
+                    className="px-4 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 rounded-lg border border-rose-200 w-fit"
+                  >
+                    Remove logo
+                  </button>
+                )}
+                <p className="text-[11px] text-slate-400">PNG, JPG or WebP, up to 2 MB.</p>
+              </div>
+            </div>
+            <input ref={logoInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={handleLogoPick} />
+          </div>
 
           {/* Facility photos: up to 5 images of the facility, hosted on Cloudinary. */}
           <div className="bg-white p-5 sm:p-6 rounded-xl border border-slate-200/90 shadow-xs space-y-4">
@@ -878,6 +966,17 @@ export const SettingsView: React.FC = () => {
             </div>
           </form>
           </div>
+        </div>
+      )}
+
+      {/* Facility mode, section two: the website landing page editor. */}
+      {mode === 'facility' && (
+        <div className="space-y-3">
+          <div>
+            <h3 className="text-base font-bold text-slate-900">Website Landing Page</h3>
+            <p className="text-xs text-slate-500">The public page families see at your facility's address. Edit what it says below.</p>
+          </div>
+          <WebsiteLanding />
         </div>
       )}
 

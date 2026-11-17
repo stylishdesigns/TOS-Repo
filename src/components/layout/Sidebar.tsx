@@ -13,7 +13,6 @@ import {
   Laptop,
   CreditCard,
   Layers,
-  Globe,
   Bell,
   Settings,
   ExternalLink,
@@ -82,14 +81,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
         { id: 'payments', label: 'Fees & Payments', icon: CreditCard },
         { id: 'announcements', label: 'Announcements', icon: Bell },
         { id: 'chat', label: 'Chat', icon: MessageSquare },
-        { id: 'website', label: 'Website (Landing page)', icon: Globe },
       ],
     },
     {
       title: 'SETTINGS',
       items: [
         { id: 'staff-roles', label: 'Staff & Roles', icon: Shield },
-        { id: 'settings', label: 'System Settings', icon: Settings },
+        { id: 'settings', label: 'Facility Settings', icon: Settings },
       ],
     },
   ];

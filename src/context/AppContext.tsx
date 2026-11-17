@@ -250,6 +250,8 @@ interface AppContextType {
   addAdmin: (admin: Omit<AdminUser, 'id'>) => void;
   updateAdmin: (id: string, admin: Partial<AdminUser>) => void;
   uploadCentreImage: (data: string, kind: 'profile' | 'facility') => Promise<string>;
+  getCentreLogo: () => Promise<string>;
+  saveCentreLogo: (data: string) => Promise<string>;
   getCentreSessions: () => Promise<Array<{ id: string; device: string; ip: string; loginAt: number; lastActiveAt: number; current: boolean; revoked: boolean }>>;
   revokeCentreSession: (id: string) => Promise<void>;
   deleteAdmin: (id: string) => void;
@@ -1671,6 +1673,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return String(out?.url || '');
   };
 
+  // Facility logo: one image on the centre document feeding the facility
+  // landing page, the app manifest and the app install page. An empty string
+  // removes the logo.
+  const getCentreLogo = async (): Promise<string> => {
+    const out = (await authedFetch(`/api/centre/branding-logo?centreId=${encodeURIComponent(activeCentreId || '')}`)) as any;
+    return String(out?.logoUrl || '');
+  };
+  const saveCentreLogo = async (data: string): Promise<string> => {
+    const out = (await authedFetch('/api/centre/profile-image', { method: 'POST', body: JSON.stringify({ data, kind: 'logo', centreId: activeCentreId, remove: !data }) })) as any;
+    return String(out?.url || '');
+  };
+
   const getCentreSessions = async () => {
     const out = (await authedFetch(`/api/centre/sessions?device=${encodeURIComponent(deviceKey())}`)) as any;
     return Array.isArray(out?.sessions) ? out.sessions : [];
@@ -3009,6 +3023,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addAdmin,
         updateAdmin,
         uploadCentreImage,
+        getCentreLogo,
+        saveCentreLogo,
         getCentreSessions,
         revokeCentreSession,
         deleteAdmin,

@@ -759,7 +759,8 @@ const MainLayout: React.FC = () => {
             {adminSection === 'tutor-portal' && <TutorPortal />}
             {(adminSection === 'finance' || adminSection === 'payments') && <FinanceManager />}
             {(adminSection === 'account' || adminSection === 'staff-roles') && <StaffRolesManager />}
-            {adminSection === 'settings' && <SettingsView />}
+            {adminSection === 'settings' && <SettingsView mode="facility" />}
+            {adminSection === 'profile' && <SettingsView mode="profile" />}
             {(adminSection === 'cms' || adminSection === 'cms-editor') && <CmsManager />}
             </Suspense>
           </div>

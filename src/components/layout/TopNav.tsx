@@ -356,8 +356,7 @@ export const TopNav: React.FC<TopNavProps> = ({ onToggleMobileMenu }) => {
               <div className="py-1">
                 <button
                   onClick={() => {
-                    setAdminSection('settings');
-                    window.dispatchEvent(new CustomEvent('tos:open-settings-tab', { detail: 'profile' }));
+                    setAdminSection('profile');
                     setShowUserMenu(false);
                   }}
                   className="w-full px-4 py-2 text-xs font-semibold text-[#EA580C] hover:bg-orange-50 flex items-center space-x-2.5"

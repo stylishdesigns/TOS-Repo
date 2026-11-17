@@ -43,7 +43,7 @@ const ROLE_PERMISSIONS: Record<
       'Manage Staff & User Permissions',
       'Finance & Fee Collection Audits',
       'All Programmes & Academic Tariffs',
-      'System Settings & Facility Profile',
+      'Facility Settings & Website Page',
       'Approve Tutor Topics & Timetables',
     ],
   },

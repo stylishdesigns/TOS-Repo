@@ -325,20 +325,35 @@ export function registerExtendedRoutes(app: express.Express): void {
   // ==========================================================================
   app.post('/api/centre/profile-image', async (req, res) => {
     try {
-      getCaller(req);
+      const caller = getCaller(req);
       const kind = String(req.body?.kind || 'profile');
+      // kind 'logo' is the facility's single logo image: besides uploading it
+      // to Cloudinary it stores the hosted URL on the centre document, the
+      // same place the signup puts it, so the facility landing page, the app
+      // manifest and the app install page all pick the new logo up.
+      const isLogo = kind === 'logo';
+      const centreId = String(req.body?.centreId || '');
+      if (isLogo) {
+        if (!/^[a-zA-Z0-9_-]{3,160}$/.test(centreId)) return res.status(400).json({ error: 'A valid facility id is required.' });
+        await requireMembership(caller, centreId, ['owner']);
+      }
       const maxBytes = kind === 'facility' ? 4 * 1024 * 1024 : 2 * 1024 * 1024;
-      const folder = kind === 'facility' ? 'tos/facility' : 'tos/profiles';
+      const folder = kind === 'facility' ? 'tos/facility' : isLogo ? 'tos/logos' : 'tos/profiles';
       const ip = clientIp(req);
       if (!(await countRateLimit(`img-${ip.replace(/\W/g, '')}`, 40, 60 * 60 * 1000))) {
         return res.status(429).json({ error: 'Too many uploads. Please try again later.' });
       }
       const dataUrl = String(req.body?.data || '');
+      if (isLogo && req.body?.remove === true) {
+        await adminDb.collection('centres').doc(centreId).set({ logoUrl: '' }, { merge: true });
+        await audit({ actorUid: caller.uid, centreId, action: 'FACILITY_LOGO_REMOVED', before: null, after: null });
+        return res.json({ ok: true, url: '' });
+      }
       const m = /^data:(image\/(?:png|jpe?g|webp));base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl);
       if (!m) return res.status(400).json({ error: 'Upload a PNG, JPG or WebP image.' });
       const bytes = Math.floor((m[2].length * 3) / 4);
       if (bytes > maxBytes) {
-        return res.status(413).json({ error: kind === 'facility' ? 'Each facility photo can be up to 4 MB.' : 'The photo can be up to 2 MB.' });
+        return res.status(413).json({ error: kind === 'facility' ? 'Each facility photo can be up to 4 MB.' : 'The image can be up to 2 MB.' });
       }
       const cloud = String(process.env.CLOUDINARY_CLOUD_NAME || '');
       const preset = String(process.env.CLOUDINARY_UPLOAD_PRESET || '');
@@ -351,10 +366,30 @@ export function registerExtendedRoutes(app: express.Express): void {
       const data: any = await resp.json().catch(() => null);
       const url = data && typeof data.secure_url === 'string' ? data.secure_url : '';
       if (!resp.ok || !url) return res.status(502).json({ error: 'The image could not be uploaded. Please try again.' });
+      if (isLogo) {
+        await adminDb.collection('centres').doc(centreId).set({ logoUrl: url }, { merge: true });
+        await audit({ actorUid: caller.uid, centreId, action: 'FACILITY_LOGO_UPDATED', before: null, after: { logoUrl: url } });
+      }
       res.json({ ok: true, url });
     } catch (error: any) {
       console.error('[profile-image] failed:', error?.message || error);
       res.status(error?.status || 500).json({ error: error?.message || 'The image could not be uploaded.' });
+    }
+  });
+
+  // ADMIN: the facility's current logo, so the settings page can show what is
+  // live before the admin uploads a replacement.
+  app.get('/api/centre/branding-logo', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const centreId = String(req.query.centreId || '');
+      if (!/^[a-zA-Z0-9_-]{3,160}$/.test(centreId)) return res.status(400).json({ error: 'A valid facility id is required.' });
+      await requireMembership(caller, centreId, ['owner']);
+      const snap = await adminDb.collection('centres').doc(centreId).get();
+      res.json({ ok: true, logoUrl: String((snap.data() as any)?.logoUrl || '') });
+    } catch (error: any) {
+      console.error('[branding-logo] failed:', error?.message || error);
+      res.status(error?.status || 500).json({ error: error?.message || 'Could not load the facility logo.' });
     }
   });
 

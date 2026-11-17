@@ -342,7 +342,7 @@ export const LandingEditor: React.FC<{ apiPath: string; refreshKey?: number; sho
                   <input className={inputCls} maxLength={200} value={content.socials?.instagram || ''} onChange={(e) => set({ socials: { ...(content.socials || { facebook: '', instagram: '', tiktok: '' }), instagram: e.target.value } })} placeholder="https://instagram.com/…" aria-label="Instagram page address" />
                   <input className={inputCls} maxLength={200} value={content.socials?.tiktok || ''} onChange={(e) => set({ socials: { ...(content.socials || { facebook: '', instagram: '', tiktok: '' }), tiktok: e.target.value } })} placeholder="https://tiktok.com/@…" aria-label="TikTok page address" />
                 </div>
-                <p className="text-[12px] text-slate-500">The floating WhatsApp button on the landing page uses the WhatsApp number set in facility admin settings (System Settings), so update it there, not here.</p>
+                <p className="text-[12px] text-slate-500">The floating WhatsApp button on the landing page uses the WhatsApp number set in facility admin settings (Facility Settings), so update it there, not here.</p>
               </div>
             </Card>
 

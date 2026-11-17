@@ -358,7 +358,7 @@ export const CentreSlideOver: React.FC<{ onClose: () => void; children: React.Re
   <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex justify-end" onClick={onClose}>
     <style>{'@keyframes tos-slide-in { from { transform: translateX(30px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }'}</style>
     <div
-      className="h-full w-full sm:max-w-md bg-[#020617] border-l border-white/10 shadow-2xl overflow-y-auto"
+      className="h-full w-full sm:max-w-2xl bg-[#020617] border-l border-white/10 shadow-2xl overflow-y-auto"
       onClick={(e) => e.stopPropagation()}
       style={{ animation: 'tos-slide-in .22s ease-out' }}
     >
