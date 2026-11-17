@@ -53,7 +53,22 @@ const LandingInstallPill: React.FC<{
   // guide's own Install app button fires the native install prompt.
   const [guide, setGuide] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
-  const doInstall = () => {
+  const doInstall = async () => {
+    if (!installPromptEvent) {
+      // The browser has not offered the pop-up yet: give it a moment rather
+      // than sending anyone to the browser menu.
+      installPromptEvent = await new Promise((resolve) => {
+        let done = false;
+        const timer = window.setTimeout(() => { if (!done) resolve(null); }, 4000);
+        window.addEventListener('beforeinstallprompt', (e: Event) => {
+          if (done) return;
+          done = true;
+          window.clearTimeout(timer);
+          e.preventDefault();
+          resolve(e);
+        }, { once: true });
+      }) as any;
+    }
     if (installPromptEvent) {
       try {
         installPromptEvent.prompt();

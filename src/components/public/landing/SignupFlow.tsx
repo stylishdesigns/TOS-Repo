@@ -793,7 +793,10 @@ export const SignupAppPage: React.FC = () => {
   if (!owner) return null;
 
   const install = async () => {
-    const evt = deferred || pendingInstall || (await waitForInstallPrompt(2000) as InstallPromptEvent | null);
+    let evt = deferred || pendingInstall;
+    if (!evt) {
+      evt = await waitForInstallPrompt(5000) as InstallPromptEvent | null;
+    }
     if (!evt) { setNoPrompt(true); return; }
     try {
       await evt.prompt();

@@ -310,7 +310,7 @@ export const InstallGuide: React.FC<InstallGuideProps> = ({ centreName, url, acc
         <div style={{ marginTop: 16 }}>
           <button type="button" onClick={() => { if (onInstall) onInstall(); }} style={{ width: '100%', border: 'none', borderRadius: 12, padding: '15px 0', background: accent, color: '#fff', font: '800 16px Inter, sans-serif', cursor: 'pointer' }}>↓ Install app</button>
           {noPrompt && (
-            <p style={{ font: '500 12.5px/1.55 Inter, sans-serif', color: '#B91C1C', margin: '6px 0 0', textAlign: 'center' }}>Your phone hasn't offered the install pop-up. Tap the three-dot menu at the top of your browser and choose Install app (or Add to Home screen). If the app is already on this phone, check your home screen.</p>
+            <p style={{ font: '500 12.5px/1.55 Inter, sans-serif', color: '#B91C1C', margin: '6px 0 0', textAlign: 'center' }}>Chrome didn't offer the install pop-up this time. Wait a few seconds and tap Install again. If the app is already on this phone, open it from your home screen.</p>
           )}
           <p style={{ font: '500 12.5px/1.55 Inter, sans-serif', color: MUT, margin: '8px 0 0', textAlign: 'center' }}>Tap the button and your phone will ask you to confirm.</p>
         </div>

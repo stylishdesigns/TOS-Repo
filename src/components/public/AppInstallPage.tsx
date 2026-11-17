@@ -58,8 +58,18 @@ export function AppInstallPage() {
   const [codeError, setCodeError] = useState('');
   const [deferred, setDeferred] = useState<InstallPromptEvent | null>(() => getPendingInstallPrompt() as InstallPromptEvent | null);
   const [noPrompt, setNoPrompt] = useState(false);
+  const [waiting, setWaiting] = useState(false);
   const [ios] = useState(iosDevice);
   const [mobile] = useState(mobileDevice);
+
+  // Warm up the browser's install pop-up as soon as the page loads, so by the
+  // time the user taps Install the pop-up fires straight away.
+  useEffect(() => {
+    if (installed) return;
+    let alive = true;
+    waitForInstallPrompt(6000).then((evt) => { if (alive && evt) setDeferred(evt as InstallPromptEvent); });
+    return () => { alive = false; };
+  }, [installed]);
 
   useEffect(() => {
     const prevBg = document.body.style.background;
@@ -118,7 +128,13 @@ export function AppInstallPage() {
   };
 
   const install = async () => {
-    const evt = deferred || ((await waitForInstallPrompt(2000)) as InstallPromptEvent | null);
+    setNoPrompt(false);
+    let evt = deferred;
+    if (!evt) {
+      setWaiting(true);
+      evt = (await waitForInstallPrompt(5000)) as InstallPromptEvent | null;
+      setWaiting(false);
+    }
     if (!evt) { setNoPrompt(true); return; }
     try {
       await evt.prompt();
@@ -219,13 +235,13 @@ export function AppInstallPage() {
         </div>
       ) : mobile ? (
         <div style={{ display: 'grid', gap: 12, justifyItems: 'center' }}>
-          <button type="button" onClick={install} style={{ ...primaryBtn, minWidth: 240, minHeight: 56, fontSize: 16 }}>
-            Install the app
+          <button type="button" onClick={install} disabled={waiting} style={{ ...primaryBtn, minWidth: 240, minHeight: 56, fontSize: 16, opacity: waiting ? 0.75 : 1 }}>
+            {waiting ? 'Getting the install pop-up ready…' : 'Install the app'}
           </button>
           {noPrompt && (
             <p style={{ fontSize: 13.5, color: '#FDBA74', margin: 0, lineHeight: 1.6, maxWidth: 400 }}>
-              Your phone hasn&apos;t offered the install pop-up. Tap the three-dot menu at the top of your browser and choose
-              Install app (on some phones: Add to Home screen). If the app is already on this phone, check your home screen.
+              Chrome didn&apos;t offer the install pop-up this time. Wait a few seconds and tap Install again. If the app is
+              already on this phone, open it from your home screen.
             </p>
           )}
         </div>
