@@ -638,6 +638,7 @@ export function registerExtendedRoutes(app: express.Express): void {
       res.json({
         centreId,
         centreName: c.name || 'Education facility',
+        logoUrl: typeof c.logoUrl === 'string' ? c.logoUrl : '',
         suspended: c.status === 'suspended' || c.status === 'closed',
       });
     } catch (error: any) {

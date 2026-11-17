@@ -795,7 +795,12 @@ export const SignupAppPage: React.FC = () => {
   const install = async () => {
     const evt = deferred || pendingInstall || (await waitForInstallPrompt(2000) as InstallPromptEvent | null);
     if (!evt) { setNoPrompt(true); return; }
-    await evt.prompt();
+    try {
+      await evt.prompt();
+    } catch {
+      setNoPrompt(true);
+      return;
+    }
     const choice = await evt.userChoice;
     if (choice.outcome === 'accepted') {
       setJustInstalled(true);
@@ -837,11 +842,7 @@ export const SignupAppPage: React.FC = () => {
                 Log in to the app
               </a>
             </div>
-          ) : (
-            <button type="button" className="btn pr" onClick={install} style={{ width: '100%', minHeight: '52px', border: 'none', fontSize: '16px' }}>
-              Install the app
-            </button>
-          )}
+          ) : null}
 
           {!installed && (
           <InstallGuide
