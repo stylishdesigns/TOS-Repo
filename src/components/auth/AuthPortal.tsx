@@ -147,8 +147,13 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
     setIsLoading(true);
     setError(null);
     const cleanEmail = email.trim().toLowerCase();
+    // Pasted passwords often carry a trailing space or line break from the
+    // email they were copied out of; Firebase then rejects them as wrong
+    // credentials even though the owner copied the exact password. Trim
+    // before sign-in and before the change-password verification.
+    const cleanPassword = password.trim();
     try {
-      const userCredential = await loginWithEmail(cleanEmail, password);
+      const userCredential = await loginWithEmail(cleanEmail, cleanPassword);
       const uid = (userCredential as any)?.user?.uid;
       const userEmail = (userCredential as any)?.user?.email;
       
@@ -342,7 +347,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
       // Logic to verify current password
       // Since we just logged in with 'password' (state variable from login form), 
       // we check against that.
-      if (currentPassword !== password) {
+      if (currentPassword.trim() !== password.trim()) {
         setError('The password entered does not match your current login password.');
         return;
       }
