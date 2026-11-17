@@ -56,6 +56,7 @@ export function AppInstallPage() {
   const [justInstalled, setJustInstalled] = useState(false);
   const [code, setCode] = useState('');
   const [looking, setLooking] = useState(false);
+  const [accent, setAccent] = useState<string>('');
   const [codeError, setCodeError] = useState('');
   const [deferred, setDeferred] = useState<InstallPromptEvent | null>(() => getPendingInstallPrompt() as InstallPromptEvent | null);
   const [noPrompt, setNoPrompt] = useState(false);
@@ -117,6 +118,8 @@ export function AppInstallPage() {
         return;
       }
       const name = String(d.centreName || 'Education facility');
+      const a = String(d.accentColor || '').trim();
+      setAccent(/^#[0-9a-fA-F]{6}$/.test(a) ? a : '');
       const slug = slugifyName(name);
       if (!slug) {
         setCodeError('Could not read that facility. Check the code and try again.');
@@ -168,7 +171,7 @@ export function AppInstallPage() {
   };
 
   const card: CSSProperties = { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 16, padding: 22, textAlign: 'center' };
-  const primaryBtn: CSSProperties = { width: '100%', minHeight: 52, borderRadius: 12, border: 'none', background: '#EA580C', color: '#fff', fontWeight: 800, fontSize: 16, cursor: 'pointer' };
+  const primaryBtn: CSSProperties = { width: '100%', minHeight: 52, borderRadius: 12, border: 'none', background: accent || '#EA580C', color: '#fff', fontWeight: 800, fontSize: 16, cursor: 'pointer' };
 
   const loginCard = (
     <div style={{ ...card, background: 'rgba(22,163,74,0.14)', borderColor: 'rgba(34,197,94,0.35)' }}>
@@ -227,7 +230,7 @@ export function AppInstallPage() {
       {centre.logo ? (
         <img src={centre.logo} alt={centre.name} style={{ width: 72, height: 72, borderRadius: 18, objectFit: 'cover', margin: '0 auto 16px', display: 'block', border: '1px solid rgba(255,255,255,0.15)' }} />
       ) : (
-        <span style={{ width: 72, height: 72, borderRadius: 18, background: '#EA580C', color: '#fff', fontWeight: 800, fontSize: 24, display: 'grid', placeItems: 'center', margin: '0 auto 16px' }}>{initialsOf(centre.name)}</span>
+        <span style={{ width: 72, height: 72, borderRadius: 18, background: accent || '#EA580C', color: '#fff', fontWeight: 800, fontSize: 24, display: 'grid', placeItems: 'center', margin: '0 auto 16px' }}>{initialsOf(centre.name)}</span>
       )}
       <h1 style={{ fontSize: 'clamp(24px,6vw,32px)', fontWeight: 800, margin: '0 0 10px', letterSpacing: '-0.02em' }}>
         Install {centre.name}&apos;s app
@@ -285,7 +288,7 @@ export function AppInstallPage() {
   return (
     <div style={{ minHeight: '100dvh', background: '#0F172A', color: '#F8FAFC', display: 'flex', flexDirection: 'column', fontFamily: 'Inter, sans-serif' }}>
       <header style={{ padding: '18px 24px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', gap: 10 }}>
-        <span style={{ width: 38, height: 38, borderRadius: 10, background: '#EA580C', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+        <span style={{ width: 38, height: 38, borderRadius: 10, background: accent || '#EA580C', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
           <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
             <path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z" fill="none" stroke="#fff" strokeWidth="2" strokeLinejoin="round" />
             <path d="M9 12l2 2 4-4" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />

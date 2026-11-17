@@ -1,3 +1,4 @@
+import { brandVars } from '../../lib/brand';
 import React, { useState } from 'react';
 import { useFirebase } from '../../context/FirebaseContext';
 import { useApp } from '../../context/AppContext';
@@ -55,6 +56,7 @@ interface AuthPortalProps {
   onEmailChange: (v: string) => void;
   password: string;
   onPasswordChange: (v: string) => void;
+  accent?: string;
 }
 
 export const AuthPortal: React.FC<AuthPortalProps> = ({ 
@@ -72,7 +74,8 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
   email,
   onEmailChange,
   password,
-  onPasswordChange
+  onPasswordChange,
+  accent
 }) => {
   const { loginWithEmail, loginWithGoogle, signUpWithEmail, resetPassword, updatePassword, logout } = useFirebase();
   const { addToast, activeCentreId, centreName } = useApp();
@@ -116,28 +119,28 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
       text: 'text-slate-900',
       bg: 'bg-slate-50',
       border: 'border-slate-100',
-      icon: <Lock className="w-6 h-6 text-white" />
+      icon: <Lock className="w-6 h-6 text-current" />
     },
     tutor: {
-      accent: 'bg-[#f97316] hover:bg-[#ea580c]',
-      text: 'text-[#f97316]',
+      accent: 'bg-orange-500 hover:bg-orange-600',
+      text: 'text-orange-500',
       bg: 'bg-orange-50',
       border: 'border-orange-100',
-      icon: <Lock className="w-6 h-6 text-white" />
+      icon: <Lock className="w-6 h-6 text-current" />
     },
     student: {
-      accent: 'bg-[#f97316] hover:bg-[#ea580c]',
-      text: 'text-[#f97316]',
+      accent: 'bg-orange-500 hover:bg-orange-600',
+      text: 'text-orange-500',
       bg: 'bg-orange-50',
       border: 'border-orange-100',
-      icon: <GraduationCap className="w-6 h-6 text-white" />,
-      pageBg: 'bg-[#f97316]'
+      icon: <GraduationCap className="w-6 h-6 text-current" />,
+      pageBg: 'bg-orange-500'
     }
   };
 
   const style = portalStyles[portalType];
   const isStudent = portalType === 'student';
-  const pageBackground = isStudent ? style.pageBg : 'bg-slate-900';
+  const pageBackground = isStudent ? style.pageBg : (accent ? 'bg-orange-950' : 'bg-slate-900');
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -489,15 +492,15 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
   };
 
   return (
-    <div className={`min-h-screen ${pageBackground} overflow-y-auto overflow-x-hidden selection:bg-orange-500 selection:text-white`}>
+    <div className={`min-h-screen ${pageBackground} overflow-y-auto overflow-x-hidden selection:bg-orange-500 selection:text-white`} style={brandVars(accent)}>
       <div className="min-h-screen w-full flex flex-col items-center justify-center py-8 md:py-12 px-4">
         <div className="w-full max-w-md bg-white rounded-[2.5rem] shadow-2xl shadow-black/50 border border-white/10 overflow-hidden animate-in fade-in zoom-in-95 duration-500 relative">
-          <div className={`p-8 ${style.bg} border-b ${style.border} text-center relative`}>
-          <div className={`w-12 h-12 rounded-xl ${style.accent} flex items-center justify-center mx-auto mb-4 shadow-lg shadow-black/5`}>
+          <div className={`p-8 ${accent ? '' : style.bg} border-b ${style.border} text-center relative`} style={accent ? { background: 'var(--brand)' } : undefined}>
+          <div className={`w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-black/5`} style={accent ? { background: 'color-mix(in oklab, var(--on-brand) 22%, transparent)', color: 'var(--on-brand)' } : undefined}>
             {style.icon}
           </div>
-          <h1 className="text-2xl font-bold text-slate-900">{title}</h1>
-          <p className="text-slate-500 text-sm mt-1">{subtitle}</p>
+          <h1 className="text-2xl font-bold text-slate-900" style={accent ? { color: 'var(--on-brand)' } : undefined}>{title}</h1>
+          <p className="text-slate-500 text-sm mt-1" style={accent ? { color: 'var(--on-brand)', opacity: 0.78 } : undefined}>{subtitle}</p>
         </div>
 
         <div className="p-8">
@@ -533,7 +536,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
               </p>
               <button
                 onClick={() => setResetSent(false)}
-                className="text-sm font-bold text-[#EA580C] hover:underline"
+                className="text-sm font-bold text-orange-600 hover:underline"
               >
                 Back to Login
               </button>
@@ -718,7 +721,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
                         <button
                           type="button"
                           onClick={() => setIsResetting(true)}
-                          className="text-[9px] font-black text-slate-400 hover:text-[#EA580C] uppercase tracking-widest transition-colors"
+                          className="text-[9px] font-black text-slate-400 hover:text-orange-600 uppercase tracking-widest transition-colors"
                         >
                           Forgot?
                         </button>

@@ -268,6 +268,7 @@ interface AppContextType {
 
   // Navigation & View mode
   viewMode: 'portal' | 'website' | 'student' | 'tutor';
+  brandAccent: string;
   setViewMode: (mode: 'portal' | 'website' | 'student' | 'tutor') => void;
   adminSection: AdminSection;
   setAdminSection: (section: AdminSection) => void;
@@ -794,6 +795,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const initialNav = parseInitialNavigation();
   const [viewMode, setViewModeState] = useState<'portal' | 'website' | 'student' | 'tutor'>(initialNav.viewMode);
+
+  // Facility brand accent: the colour the facility picked at signup, saved on
+  // the centre and mirrored into its landing content. Served through the
+  // public landing endpoint so every role (owner, tutor, student) gets the
+  // same brand colour. TOS surfaces (staff console, TOS landing) keep orange.
+  const [brandAccent, setBrandAccent] = useState<string>('');
+  useEffect(() => {
+    let dead = false;
+    setBrandAccent('');
+    if (!activeCentreId) return;
+    fetch(`/api/public/landing/${encodeURIComponent(activeCentreId)}`)
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => {
+        if (dead || !d || !d.content) return;
+        const a = String(d.content.accent || '').trim();
+        if (/^#[0-9a-fA-F]{6}$/.test(a)) setBrandAccent(a);
+      })
+      .catch(() => {});
+    return () => { dead = true; };
+  }, [activeCentreId]);
   const [adminSection, setAdminSectionState] = useState<AdminSection>(initialNav.adminSection);
 
   const setViewMode = (mode: 'portal' | 'website' | 'student' | 'tutor') => {
@@ -3060,6 +3081,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isAdmin,
         isAuthLoading,
         activeCentreId,
+        brandAccent,
         activeCentre,
         centreName,
         userCentres,

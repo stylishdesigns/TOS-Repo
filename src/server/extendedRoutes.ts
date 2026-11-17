@@ -258,6 +258,8 @@ export function registerExtendedRoutes(app: express.Express): void {
       if (!doc) return res.status(404).json({ error: 'Facility not found.' });
       const name = String((doc.data() as any)?.name || 'Tutorial OS').slice(0, 60);
       const logoUrl = String((doc.data() as any)?.logoUrl || '');
+      const rawAccent = String((doc.data() as any)?.accentColor || '').trim();
+      const accent = /^#[0-9a-fA-F]{6}$/.test(rawAccent) ? rawAccent : '';
       const icon = (size: number, purpose: string) => {
         const m = logoUrl.match(/^(https:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/)(.+)$/);
         if (m) return { src: `${m[1]}w_${size},h_${size},c_pad,b_white,f_png/${m[2]}`, sizes: `${size}x${size}`, type: 'image/png', purpose };
@@ -270,7 +272,7 @@ export function registerExtendedRoutes(app: express.Express): void {
         name,
         short_name: name.slice(0, 12),
         description: `${name} on Tutorial OS.`,
-        theme_color: '#EA580C',
+        theme_color: accent || '#EA580C',
         background_color: '#0F172A',
         display: 'standalone',
         // Each facility's app starts at its own address: the access-code page
@@ -390,7 +392,7 @@ export function registerExtendedRoutes(app: express.Express): void {
       if (!/^[a-zA-Z0-9_-]{3,160}$/.test(centreId)) return res.status(400).json({ error: 'A valid facility id is required.' });
       await requireMembership(caller, centreId, ['owner']);
       const snap = await adminDb.collection('centres').doc(centreId).get();
-      res.json({ ok: true, logoUrl: String((snap.data() as any)?.logoUrl || '') });
+      res.json({ ok: true, logoUrl: String((snap.data() as any)?.logoUrl || ''), accentColor: String((snap.data() as any)?.accentColor || '') });
     } catch (error: any) {
       console.error('[branding-logo] failed:', error?.message || error);
       res.status(error?.status || 500).json({ error: error?.message || 'Could not load the facility logo.' });
@@ -678,6 +680,7 @@ export function registerExtendedRoutes(app: express.Express): void {
         centreId,
         centreName: c.name || 'Education facility',
         logoUrl: typeof c.logoUrl === 'string' ? c.logoUrl : '',
+        accentColor: typeof c.accentColor === 'string' ? c.accentColor : '',
         suspended: c.status === 'suspended' || c.status === 'closed',
       });
     } catch (error: any) {

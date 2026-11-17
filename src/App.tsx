@@ -13,6 +13,7 @@ import { TosAdminLogin } from './components/auth/TosAdminLogin';
 import { FirstLoginPasswordChange } from './components/auth/FirstLoginPasswordChange';
 import { EnterAccessCodeScreen } from './components/auth/EnterAccessCodeScreen';
 import { CentreCodeGate } from './components/auth/CentreCodeGate';
+import { brandVars } from './lib/brand';
 import { JoinCentreScreen } from './components/auth/JoinCentreScreen';
 
 import { PasswordChangeOverlay } from './components/auth/PasswordChangeOverlay';
@@ -47,7 +48,8 @@ const MainLayout: React.FC = () => {
     fetchMyCentreIds,
     addToast,
     updateAdmin,
-    logout 
+    logout,
+    brandAccent
   } = useApp();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [showWelcome, setShowWelcome] = useState(true);
@@ -77,7 +79,7 @@ const MainLayout: React.FC = () => {
   // secret. The first screen asks for the code, shows the centre's name, and
   // the selected centre's login page follows; after sign-in the app enters
   // that centre automatically.
-  const [pendingCentre, setPendingCentre] = useState<{ code: string; centreName: string; centreId?: string } | null>(null);
+  const [pendingCentre, setPendingCentre] = useState<{ code: string; centreName: string; centreId?: string; accent?: string } | null>(null);
   const [loginCentreError, setLoginCentreError] = useState<string | null>(null);
   // Post-login centre resolution is silent: no code screen sits between the
   // login page and the dashboard. The centre chosen before login is entered
@@ -460,12 +462,12 @@ const MainLayout: React.FC = () => {
   if (!currentUser && !tosLoginRequested && !pendingCentre && centreGateRequested) {
     return (
       <CentreCodeGate
-        onProceed={(code, centreName, centreId) => {
+        onProceed={(code, centreName, centreId, accent) => {
           // A code picked from a door that skipped the landing (the installed
           // app boots on #access) must still land on the login page, not the
           // landing: clear the welcome flag the gate ran past.
           setShowWelcome(false);
-          setPendingCentre({ code, centreName, centreId });
+          setPendingCentre({ code, centreName, centreId, accent });
         }}
         onBack={() => { setShowPortals(false); setShowWelcome(true); setCentreGateRequested(false); }}
       />
@@ -549,6 +551,7 @@ const MainLayout: React.FC = () => {
           <AuthPortal
             portalType="student"
             title={pendingCentre.centreName}
+            accent={pendingCentre.accent}
             subtitle=""
             onSuccess={() => {}}
             verifying
@@ -641,6 +644,7 @@ const MainLayout: React.FC = () => {
       <AuthPortal 
         portalType="student"
         title={pendingCentre?.centreName || centreName}
+        accent={pendingCentre?.accent}
         subtitle=""
         onSuccess={() => {}}
         onBack={() => { setShowPortals(false); setShowWelcome(true); setCentreGateRequested(false); }}
@@ -662,6 +666,7 @@ const MainLayout: React.FC = () => {
       <AuthPortal 
         portalType="student"
         title={pendingCentre?.centreName || centreName}
+        accent={pendingCentre?.accent}
         subtitle=""
         onSuccess={() => {}}
         onBack={() => { setShowPortals(false); setShowWelcome(true); setCentreGateRequested(false); }}
@@ -682,7 +687,7 @@ const MainLayout: React.FC = () => {
   if (viewMode === 'student') {
     return (
       <AppOnlyGate>
-        <Suspense fallback={<PortalFallback />}><StudentPortal /></Suspense>
+        <div style={brandVars(brandAccent)}><Suspense fallback={<PortalFallback />}><StudentPortal /></Suspense></div>
         <OfflineIndicator />
         <ToastContainer />
       </AppOnlyGate>
@@ -693,7 +698,7 @@ const MainLayout: React.FC = () => {
   if (viewMode === 'tutor') {
     return (
       <AppOnlyGate>
-        <Suspense fallback={<PortalFallback />}><TutorPortal /></Suspense>
+        <div style={brandVars(brandAccent)}><Suspense fallback={<PortalFallback />}><TutorPortal /></Suspense></div>
         <OfflineIndicator />
         <ToastContainer />
       </AppOnlyGate>
@@ -732,6 +737,7 @@ const MainLayout: React.FC = () => {
   // Admin Portal Dashboard matching video layout and Geometric Balance theme
   return (
     <AppOnlyGate>
+    <div style={brandVars(brandAccent)}>
     <div
       id="app-root-layout"
       className={`flex h-screen w-full ${
@@ -784,6 +790,7 @@ const MainLayout: React.FC = () => {
       {selectedStudent && <Suspense fallback={null}><StudentDetailModal /></Suspense>}
       <OfflineIndicator />
       <ToastContainer />
+    </div>
     </div>
     </AppOnlyGate>
   );

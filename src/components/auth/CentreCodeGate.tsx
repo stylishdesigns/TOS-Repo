@@ -1,3 +1,4 @@
+import { brandVars } from '../../lib/brand';
 import React, { useState, useRef, useEffect } from 'react';
 import { Building2, ArrowRight, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { isAppOnlyOn, isStandaloneDisplay } from '../portal/AppOnlyGate';
@@ -9,7 +10,7 @@ import { isAppOnlyOn, isStandaloneDisplay } from '../portal/AppOnlyGate';
  * centre's login page follows. The code never reveals any centre data.
  */
 interface CentreCodeGateProps {
-  onProceed: (code: string, centreName: string, centreId?: string) => void;
+  onProceed: (code: string, centreName: string, centreId?: string, accent?: string) => void;
   onBack: () => void;
 }
 
@@ -17,7 +18,7 @@ export const CentreCodeGate: React.FC<CentreCodeGateProps> = ({ onProceed, onBac
   const [digits, setDigits] = useState<string[]>(['', '', '', '', '', '']);
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [centre, setCentre] = useState<{ centreId?: string; centreName: string; suspended?: boolean } | null>(null);
+  const [centre, setCentre] = useState<{ centreId?: string; centreName: string; suspended?: boolean; accentColor?: string } | null>(null);
   const [pendingCode, setPendingCode] = useState('');
   const [continuing, setContinuing] = useState(false);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -37,7 +38,7 @@ export const CentreCodeGate: React.FC<CentreCodeGateProps> = ({ onProceed, onBac
       }
     } catch { /* check unavailable: sign in as usual */ }
     setContinuing(false);
-    onProceed(pendingCode, centre.centreName, centre.centreId);
+    onProceed(pendingCode, centre.centreName, centre.centreId, centre.accentColor);
   };
 
   useEffect(() => {
@@ -116,7 +117,7 @@ export const CentreCodeGate: React.FC<CentreCodeGateProps> = ({ onProceed, onBac
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-slate-950 p-4 relative overflow-hidden select-none">
+    <div className="min-h-screen w-full flex items-center justify-center bg-slate-950 p-4 relative overflow-hidden select-none" style={brandVars(centre?.accentColor)}>
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[550px] h-[550px] bg-orange-600/10 rounded-full blur-[140px] pointer-events-none" />
       <div className="absolute bottom-10 right-10 w-80 h-80 bg-blue-600/10 rounded-full blur-[120px] pointer-events-none" />
 
