@@ -37,6 +37,16 @@ installServerApiFetch();
 try {
   let centre = new URLSearchParams(window.location.search).get('centre') || '';
   if (!centre) {
+    // The access code the user entered on the install page is the deliberate
+    // choice for this device and outranks any earlier signup left in this tab:
+    // without this priority, an owner who signed up facility A and then looked
+    // up facility B by code got A's branding on B's install popup.
+    const appRaw = sessionStorage.getItem('tos:app-centre');
+    if (appRaw) {
+      centre = String((JSON.parse(appRaw) as { slug?: string }).slug || '');
+    }
+  }
+  if (!centre) {
     const raw = sessionStorage.getItem('tos:signup-result');
     if (raw) {
       const domain = String((JSON.parse(raw) as { domain?: string }).domain || '');

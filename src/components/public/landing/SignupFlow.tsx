@@ -839,11 +839,8 @@ export const SignupAppPage: React.FC = () => {
             <div style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '14px', padding: '14px', font: '500 14px/1.5 Inter, sans-serif', color: '#166534' }}>
               <div role="status" style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style={{ flex: 'none', marginTop: '2px', color: '#15803D' }}><path d="M5 12l5 5 9-10" /></svg>
-                {justInstalled ? 'The app is now on your home screen. Log in below.' : 'You already have the app on this device. Log in below.'}
+                {justInstalled ? 'The app is now on your home screen. Open it from there and sign in with your details.' : 'You already have the app on this device. Open it from your home screen and sign in.'}
               </div>
-              <a href="/#access" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', minHeight: '50px', borderRadius: '12px', background: '#EA580C', color: '#fff', font: '700 15px Inter, sans-serif', textDecoration: 'none', marginTop: '12px' }}>
-                Log in to the app
-              </a>
             </div>
           ) : null}
 

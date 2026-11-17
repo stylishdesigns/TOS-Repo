@@ -116,6 +116,9 @@ export function AppInstallPage() {
       }
       try {
         sessionStorage.setItem(CENTRE_KEY, JSON.stringify({ slug, name, logo: String(d.logoUrl || '') }));
+        // This code is now the device's facility: drop any earlier signup's
+        // branding so it can never win over the code the user just entered.
+        sessionStorage.removeItem('tos:signup-result');
       } catch { /* ignore */ }
       // A fresh load with the branded manifest already in place, so the
       // browser's install pop-up offers the facility's own app.
@@ -157,14 +160,11 @@ export function AppInstallPage() {
       <h2 style={{ fontSize: 20, fontWeight: 800, margin: '0 0 6px', color: '#DCFCE7' }}>
         {justInstalled ? 'All set' : 'You already have the app'}
       </h2>
-      <p style={{ fontSize: 14.5, color: '#BBF7D0', margin: '0 0 16px', lineHeight: 1.55 }}>
+      <p style={{ fontSize: 14.5, color: '#BBF7D0', margin: 0, lineHeight: 1.55 }}>
         {justInstalled
-          ? `${centre ? centre.name : 'Tutorial OS'} is now on your home screen. Open it and sign in with the details from your welcome email.`
-          : `${centre ? centre.name : 'Tutorial OS'} is installed on this device. Sign in below or open it from your home screen.`}
+          ? `${centre ? centre.name : 'Tutorial OS'} is now on your home screen. Open it from there and sign in with the details from your welcome email.`
+          : `${centre ? centre.name : 'Tutorial OS'} is already on your home screen. Open it from there and sign in with your details.`}
       </p>
-      <a href="/#access" style={{ ...primaryBtn, display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none', minWidth: 220 }}>
-        Log in to the app
-      </a>
     </div>
   );
 
