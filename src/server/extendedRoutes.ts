@@ -795,6 +795,57 @@ export function registerExtendedRoutes(app: express.Express): void {
   // Public prefix: these run before any sign-in exists.
   // Codes live server-side only; clients never read the collection. Six
   // digits, ten minutes, five wrong attempts burn the code.
+  // The facility's registered programmes, for the student signup step pages:
+  // exam options come from what the facility actually offers, and so do the
+  // subject lists per exam. Only Active programmes are returned.
+  app.get('/api/public/programmes', async (req, res) => {
+    const centreId = String(req.query.centreId || '').trim();
+    if (!centreId) return res.status(400).json({ error: 'centreId is required.' });
+    try {
+      const snap = await adminDb.collection('programmes').where('centreId', '==', centreId).get();
+      const programmes = snap.docs
+        .map((d) => d.data() as any)
+        .filter((p) => p.status === 'Active')
+        .map((p) => ({
+          name: String(p.name || ''),
+          category: String(p.category || ''),
+          subjects: Array.isArray(p.subjects) ? p.subjects.map((s: any) => String(s)) : [],
+        }));
+      res.json({ programmes });
+    } catch {
+      res.status(500).json({ error: 'Could not load the facility programmes.' });
+    }
+  });
+
+  // Server-side username availability for the student signup form.
+  app.get('/api/public/username-check', async (req, res) => {
+    const u = String(req.query.u || '').trim().toLowerCase();
+    if (!/^[a-z][a-z0-9_]{2,19}$/.test(u)) return res.json({ available: false, invalid: true });
+    const snap = await adminDb.collection('usernames').doc(u).get().catch(() => null);
+    res.json({ available: !snap || !snap.exists });
+  });
+
+  // Reserve a username once the account exists: first writer wins.
+  app.post('/api/public/reserve-username', async (req, res) => {
+    const u = String(req.body?.username || '').trim().toLowerCase();
+    const uid = String(req.body?.uid || '').trim();
+    const centreId = String(req.body?.centreId || '').trim();
+    if (!/^[a-z][a-z0-9_]{2,19}$/.test(u) || !uid) {
+      return res.status(400).json({ error: 'A valid username and account are required.' });
+    }
+    const ref = adminDb.collection('usernames').doc(u);
+    try {
+      await adminDb.runTransaction(async (tx) => {
+        const snap = await tx.get(ref);
+        if (snap.exists) throw new Error('taken');
+        tx.set(ref, { username: u, uid, centreId, createdAt: new Date().toISOString() });
+      });
+      res.json({ success: true });
+    } catch {
+      res.status(409).json({ error: 'That username has just been taken. Choose another one.' });
+    }
+  });
+
   app.post('/api/public/send-otp', async (req, res) => {
     const email = String(req.body?.email || '').trim().toLowerCase();
     const centreName = String(req.body?.centreName || 'your centre').trim().slice(0, 80) || 'your centre';
