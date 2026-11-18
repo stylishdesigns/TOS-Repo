@@ -180,8 +180,8 @@ export function AppInstallPage() {
       </h2>
       <p style={{ fontSize: 14.5, color: '#BBF7D0', margin: 0, lineHeight: 1.55 }}>
         {justInstalled
-          ? `${centre ? centre.name : 'Tutorial OS'} is now on your home screen. Open it from there and sign in with the details from your welcome email.`
-          : `${centre ? centre.name : 'Tutorial OS'} is already on your home screen. Open it from there and sign in with your details.`}
+          ? `${centre ? centre.name : 'Tutorial OS'} is now on your home screen. Check your home screen for the app and open it from there to sign in with the details from your welcome email.`
+          : `${centre ? centre.name : 'Tutorial OS'} is already on your home screen. Check your home screen for the app and open it from there to sign in.`}
       </p>
     </div>
   );
@@ -233,14 +233,23 @@ export function AppInstallPage() {
         <span style={{ width: 72, height: 72, borderRadius: 18, background: accent || '#EA580C', color: '#fff', fontWeight: 800, fontSize: 24, display: 'grid', placeItems: 'center', margin: '0 auto 16px' }}>{initialsOf(centre.name)}</span>
       )}
       <h1 style={{ fontSize: 'clamp(24px,6vw,32px)', fontWeight: 800, margin: '0 0 10px', letterSpacing: '-0.02em' }}>
-        Install {centre.name}&apos;s app
+        {installed || justInstalled ? `${centre.name}'s app is on your home screen` : `Install ${centre.name}'s app`}
       </h1>
       <p style={{ color: '#94A3B8', fontSize: 15, lineHeight: 1.6, margin: '0 auto 26px', maxWidth: 420 }}>
         The app carries {centre.name}&apos;s name, logo and colours on every screen your students and tutors see.
       </p>
 
       {installed || justInstalled ? (
-        loginCard
+        <div style={{ display: 'grid', gap: 14, justifyItems: 'center' }}>
+          <button
+            type="button"
+            disabled
+            style={{ ...primaryBtn, minWidth: 240, minHeight: 56, fontSize: 16, background: '#16A34A', cursor: 'default', opacity: 1 }}
+          >
+            App installed
+          </button>
+          {loginCard}
+        </div>
       ) : ios ? (
         <div style={{ ...card, textAlign: 'left' }}>
           <h2 style={{ fontSize: 19, fontWeight: 800, margin: '0 0 14px' }}>Add it to your Home Screen</h2>
