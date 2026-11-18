@@ -137,12 +137,9 @@ export const CentreCodeGate: React.FC<CentreCodeGateProps> = ({ onProceed, onBac
           </div>
           {lockedCentre ? (
             <>
-              {lockedCentre.logoUrl ? (
-                <img src={lockedCentre.logoUrl} alt="Facility logo" className="w-14 h-14 mx-auto rounded-xl object-contain bg-white p-1.5 mb-3 shadow-lg" />
-              ) : null}
-              <h1 className="text-2xl font-black tracking-tight text-white mb-2">{lockedCentre.centreName}</h1>
+              <h1 className="text-2xl font-black tracking-tight text-white mb-2">Facility access code</h1>
               <p className="text-sm text-slate-400 font-medium max-w-xs">
-                Enter this facility's 6-digit access code to continue.
+                Enter the 6-digit access code provided by your education facility.
               </p>
             </>
           ) : (

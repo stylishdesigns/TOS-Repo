@@ -16,7 +16,7 @@ import { CentreCodeGate } from './components/auth/CentreCodeGate';
 import { AppWelcomePage } from './components/auth/AppWelcomePage';
 import { StudentSignupFlow } from './components/auth/StudentSignupFlow';
 import { EmailVerificationGate } from './components/auth/EmailVerificationGate';
-import { brandVars } from './lib/brand';
+import { brandVars, setThemeColor } from './lib/brand';
 import { JoinCentreScreen } from './components/auth/JoinCentreScreen';
 
 import { PasswordChangeOverlay } from './components/auth/PasswordChangeOverlay';
@@ -153,6 +153,9 @@ const MainLayout: React.FC = () => {
     setShowWelcome(false);
     setCentreGateRequested(true);
     setAppWelcomeCentre({ centreId: appFacility.centreId, centreName: appFacility.centreName, accent: appFacility.accent, logoUrl: appFacility.logoUrl, welcomeImageUrl: '' });
+    // The phone's top strip (browser chrome and the installed app's bar)
+    // follows the facility's colour, never platform orange.
+    setThemeColor(appFacility.accent);
   }, [appFacility]);
 
   // Email verification gate: a student account created with email + password
@@ -723,6 +726,7 @@ const MainLayout: React.FC = () => {
         uid={verifyPending.uid}
         email={verifyPending.email}
         centreName={pendingCentre?.centreName || centreName || undefined}
+        accent={appWelcomeCentre?.accent || pendingCentre?.accent || ''}
         onVerified={() => { setVerifyPending(null); setCentreEntryRetry((n) => n + 1); }}
         onSignOut={handleLogout}
       />

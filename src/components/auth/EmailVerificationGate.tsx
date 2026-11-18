@@ -11,9 +11,10 @@ export const EmailVerificationGate: React.FC<{
   uid: string;
   email: string;
   centreName?: string;
+  accent?: string;
   onVerified: () => void;
   onSignOut: () => void;
-}> = ({ uid, email, centreName, onVerified, onSignOut }) => {
+}> = ({ uid, email, centreName, accent, onVerified, onSignOut }) => {
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -25,7 +26,9 @@ export const EmailVerificationGate: React.FC<{
     const t = window.setInterval(() => setTick((n) => n + 1), 1000);
     return () => window.clearInterval(t);
   }, []);
-  const brand = '#EA580C';
+  // The facility's own brand colour carries this page; TOS orange is the
+  // fallback when no facility colour is known.
+  const brand = accent && /^#[0-9a-fA-F]{6}$/.test(accent) ? accent : '#EA580C';
   const resendWait = Math.max(0, Math.ceil((canResendAt - Date.now()) / 1000));
 
   const handleVerify = async () => {

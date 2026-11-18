@@ -78,6 +78,7 @@ import {
   createUserWithEmailAndPassword
 } from 'firebase/auth';
 import { db, auth as firebaseAuth, firebaseConfigValues } from '../firebase';
+import { setThemeColor } from '../lib/brand';
 import { setLastGoodOwner, clearAllLastGood } from '../lib/lastGood';
 import { deviceKey } from '../lib/sessions';
 
@@ -807,13 +808,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     let dead = false;
     setBrandAccent('');
+    setThemeColor('');
     if (!activeCentreId) return;
     fetch(`/api/public/landing/${encodeURIComponent(activeCentreId)}`)
       .then(r => (r.ok ? r.json() : null))
       .then(d => {
         if (dead || !d || !d.content) return;
         const a = String(d.content.accent || '').trim();
-        if (/^#[0-9a-fA-F]{6}$/.test(a)) setBrandAccent(a);
+        if (/^#[0-9a-fA-F]{6}$/.test(a)) { setBrandAccent(a); setThemeColor(a); }
       })
       .catch(() => {});
     return () => { dead = true; };

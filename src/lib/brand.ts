@@ -10,6 +10,17 @@ export function isBrandHex(v?: string | null): boolean {
   return !!v && /^#[0-9a-fA-F]{6}$/.test(String(v).trim());
 }
 
+// Phone-browser and installed-app top-bar colour. Chrome paints the strip
+// above the page (and the installed app's status bar) from this meta tag.
+// Facility surfaces take the facility's colour; TOS surfaces keep orange.
+export function setThemeColor(accent?: string | null): void {
+  try {
+    const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+    if (!meta) return;
+    meta.content = isBrandHex(accent) ? String(accent).trim() : '#EA580C';
+  } catch { /* progressive: the default stays */ }
+}
+
 export function brandVars(accent?: string | null): CSSProperties {
   if (!isBrandHex(accent)) return {};
   const a = String(accent).trim();

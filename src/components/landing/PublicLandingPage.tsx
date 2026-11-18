@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { LandingContent } from '../../landing/landingContent';
 import { LandingBody, LandingFormApi } from '../../landing/LandingBody';
+import { setThemeColor } from '../../lib/brand';
 
 /**
  * Public centre landing page (piece 5).
@@ -80,6 +81,9 @@ export const PublicLandingPage: React.FC<{ centreId: string }> = ({ centreId }) 
         document.head.appendChild(link);
       }
       link.href = `/api/public/pwa-manifest?centre=${encodeURIComponent(data.appSlug)}`;
+      // The phone's top strip follows the facility's colour on its own page.
+      const themeAccent = String((data as any)?.content?.accent || (data as any)?.accent || '').trim();
+      setThemeColor(themeAccent);
       if (data.appIcon) {
         let ati = document.querySelector<HTMLLinkElement>('link[rel="apple-touch-icon"]');
         if (!ati) {
