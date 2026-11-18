@@ -561,13 +561,12 @@ export const StudentPortal: React.FC = () => {
       {/* 1. Top Desktop Control Bar */}
       <header className="bg-slate-950 text-white px-4 py-3 z-40 sticky top-0 overflow-hidden shadow-md">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-3 relative">
-          {/* Facility name, dead centre of the header menu */}
-          <div className="flex items-center">
-            <span className="w-2.5 h-2.5 rounded-full bg-orange-500 animate-pulse shrink-0 shadow-sm shadow-orange-500" />
+          {/* Facility name, dead centre of the header menu, always shown in full */}
+          <div className="flex-1 min-w-0 text-center">
+            <span className="block w-full break-words leading-tight font-black text-sm uppercase tracking-[0.2em] pointer-events-none">
+              {centreName}
+            </span>
           </div>
-          <span className="absolute left-1/2 -translate-x-1/2 font-black text-sm uppercase tracking-[0.2em] max-w-[52%] truncate text-center pointer-events-none">
-            {centreName}
-          </span>
 
           {/* Late Notification Animation */}
           {isRunningLate && (

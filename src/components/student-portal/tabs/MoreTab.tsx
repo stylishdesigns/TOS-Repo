@@ -1424,7 +1424,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                               {logoInitials}
                             </div>
                             <div className="min-w-0">
-                              <p className="text-[15px] font-bold tracking-wide leading-tight truncate">{centreName}</p>
+                              <p className="text-[15px] font-bold tracking-wide leading-tight break-words">{centreName}</p>
                               <p className="text-[10px] text-slate-400 tracking-[0.2em]">STUDENT IDENTITY CARD</p>
                             </div>
                           </div>
