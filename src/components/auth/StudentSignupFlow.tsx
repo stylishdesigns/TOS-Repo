@@ -196,6 +196,12 @@ export const StudentSignupFlow: React.FC<StudentSignupFlowProps> = ({
 
   const goNext = () => {
     setError('');
+    // Preview link: click straight through without filling anything.
+    if (previewOnly) {
+      if (formStep === 1) setFormStep(2);
+      else if (formStep === 2) setFormStep(3);
+      return;
+    }
     if (formStep === 1) {
       if (!form.firstName.trim() || !form.lastName.trim()) { setError('Enter your first name and last name.'); return; }
       if (!usernameValue) { setError('Choose a username.'); return; }
@@ -271,6 +277,8 @@ export const StudentSignupFlow: React.FC<StudentSignupFlowProps> = ({
 
   const handleCreateAccount = async () => {
     setError(''); setNotice('');
+    // Preview link: jump straight to the congratulations page.
+    if (previewOnly) { setStep('done'); return; }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) { setError('Enter a valid email address.'); return; }
     if (!pwOk) { setError('Your password does not meet all the requirements yet.'); return; }
     if (form.password !== form.confirmPassword) { setError('The two passwords do not match.'); return; }
