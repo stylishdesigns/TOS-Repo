@@ -14,6 +14,7 @@ import {
   buildVerificationEmail,
   emailProviderConfigured,
   sendEmail,
+  sendOtpEmail,
 } from './email';
 import {
   completeFirstLogin,
@@ -790,6 +791,62 @@ export function registerExtendedRoutes(app: express.Express): void {
   // ==========================================================================
   // AUTH: first-login completion (Prompt C Part C)
   // ==========================================================================
+  // ---- Student email OTP (registration confirmation) ----
+  // Codes live server-side only; clients never read the collection. Six
+  // digits, ten minutes, five wrong attempts burn the code.
+  app.post('/api/auth/send-otp', async (req, res) => {
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    const centreName = String(req.body?.centreName || 'your centre').trim().slice(0, 80) || 'your centre';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ error: 'A valid email address is required.' });
+    }
+    const ref = adminDb.collection('otpCodes').doc(email);
+    const existing = await ref.get().catch(() => null);
+    const prev: any = existing && existing.exists ? existing.data() : null;
+    // A light resend brake: no more than one send every 45 seconds.
+    if (prev?.lastSentAt && Date.now() - new Date(prev.lastSentAt).getTime() < 45000) {
+      return res.status(429).json({ error: 'A code was just sent. Wait a moment and try again.' });
+    }
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    const now = new Date();
+    await ref.set({
+      email,
+      code,
+      expiresAt: Date.now() + 10 * 60 * 1000,
+      attempts: 0,
+      createdAt: prev?.createdAt || now.toISOString(),
+      lastSentAt: now.toISOString(),
+    });
+    const mail = await sendOtpEmail({ to: email, code, centreName, expiryMinutes: 10 });
+    res.json({ success: true, delivered: mail.delivered });
+  });
+
+  app.post('/api/auth/verify-otp', async (req, res) => {
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    const code = String(req.body?.code || '').trim();
+    if (!email || !code) return res.status(400).json({ error: 'Email and code are required.' });
+    const ref = adminDb.collection('otpCodes').doc(email);
+    const snap = await ref.get().catch(() => null);
+    if (!snap || !snap.exists) {
+      return res.status(400).json({ error: 'No code was sent to this email. Request a new one.' });
+    }
+    const data: any = snap.data();
+    if ((data.expiresAt || 0) < Date.now()) {
+      await ref.delete().catch(() => {});
+      return res.status(400).json({ error: 'That code has expired. Request a new one.' });
+    }
+    if ((data.attempts || 0) >= 5) {
+      await ref.delete().catch(() => {});
+      return res.status(429).json({ error: 'Too many wrong attempts. Request a new code.' });
+    }
+    if (String(data.code) !== code) {
+      await ref.set({ attempts: (data.attempts || 0) + 1 }, { merge: true });
+      return res.status(400).json({ error: 'That code is not correct. Check the email and try again.' });
+    }
+    await ref.delete().catch(() => {});
+    res.json({ success: true });
+  });
+
   app.post('/api/auth/complete-first-login', async (req, res) => {
     try {
       const caller = getCaller(req);

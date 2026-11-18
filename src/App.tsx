@@ -14,6 +14,7 @@ import { FirstLoginPasswordChange } from './components/auth/FirstLoginPasswordCh
 import { EnterAccessCodeScreen } from './components/auth/EnterAccessCodeScreen';
 import { CentreCodeGate } from './components/auth/CentreCodeGate';
 import { AppWelcomePage } from './components/auth/AppWelcomePage';
+import { StudentSignupFlow } from './components/auth/StudentSignupFlow';
 import { brandVars } from './lib/brand';
 import { JoinCentreScreen } from './components/auth/JoinCentreScreen';
 
@@ -578,6 +579,24 @@ const MainLayout: React.FC = () => {
   // the login page: the login page stays up (inputs kept, the button shows a
   // verifying state) until the account is confirmed to belong; only then does
   // the centre's own loading screen play.
+  // The student registration flow owns the whole app screen once Get Started
+  // is picked: it continues through the email-code and congratulations steps
+  // even after the account exists (the student is signed in from then on), so
+  // it sits above every signed-in screen.
+  if (appWelcomeCentre && appWelcomeMode === 'signup') {
+    return (
+      <StudentSignupFlow
+        centreName={appWelcomeCentre.centreName}
+        centreId={appWelcomeCentre.centreId}
+        accent={appWelcomeCentre.accent}
+        logoUrl={appWelcomeCentre.logoUrl}
+        onGoToDashboard={() => setAppWelcomeMode(null)}
+        onBack={() => setAppWelcomeMode('welcome')}
+        onSwitchToLogin={() => setAppWelcomeMode('login')}
+      />
+    );
+  }
+
   if (currentUser && !activeCentreId && !isTosAdmin) {
     if (centreEntryBusy || !centreEntryFailed) {
       if (pendingCentre) {
@@ -674,7 +693,7 @@ const MainLayout: React.FC = () => {
 
   // The facility app's login and student sign-up, reached from the app's own
   // welcome screen. Back returns to the welcome screen, never the TOS landing.
-  if (!currentUser && appWelcomeCentre && (appWelcomeMode === 'login' || appWelcomeMode === 'signup')) {
+  if (!currentUser && appWelcomeCentre && appWelcomeMode === 'login') {
     return (
       <AuthPortal
         portalType="student"

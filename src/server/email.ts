@@ -20,6 +20,8 @@ export interface OutgoingEmail {
    *  and ZEPTOMAIL_TEMPLATE_KEY is configured, the mail goes out through the
    *  registered ZeptoMail template instead of the raw-message endpoint. */
   mergeFields?: Record<string, string>;
+  /** Overrides ZEPTOMAIL_TEMPLATE_KEY for this one send (the OTP template). */
+  templateKey?: string;
 }
 
 export interface SendEmailResult {
@@ -67,7 +69,7 @@ async function sendViaZepto(email: OutgoingEmail): Promise<SendEmailResult> {
   const bounce =
     (process.env.ZEPTOMAIL_BOUNCE || '').trim() ||
     (host.includes('@') ? host : '');
-  const templateKey = (process.env.ZEPTOMAIL_TEMPLATE_KEY || '').trim();
+  const templateKey = email.templateKey || (process.env.ZEPTOMAIL_TEMPLATE_KEY || '').trim();
   // A registered ZeptoMail template (the welcome template) carries its own
   // subject and layout; Zoho fills the placeholders from merge_info. The
   // template key is an identifier, never logged.
@@ -273,4 +275,48 @@ function escapeHtml(value: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+export interface OtpEmailRequest {
+  to: string;
+  code: string;
+  centreName: string;
+  expiryMinutes: number;
+}
+
+/**
+ * The student registration OTP. When ZEPTOMAIL_OTP_TEMPLATE_KEY is configured
+ * (the OTP template registered in ZeptoMail), the mail goes out through that
+ * template; otherwise a plain inline card carries the code, so registration
+ * never blocks on template registration.
+ */
+export async function sendOtpEmail(req: OtpEmailRequest): Promise<SendEmailResult> {
+  const otpKey = (process.env.ZEPTOMAIL_OTP_TEMPLATE_KEY || '').trim();
+  if (otpKey) {
+    return sendEmail({
+      to: req.to,
+      subject: 'Your Tutorial OS verification code',
+      html: '',
+      text: '',
+      mergeFields: {
+        otp_code: req.code,
+        centre_name: req.centreName,
+        expiry_minutes: String(req.expiryMinutes),
+      },
+      templateKey: otpKey,
+    });
+  }
+  const html = `<!doctype html><html><body style="margin:0;padding:24px;background:#f1f5f9;font-family:Arial,Helvetica,sans-serif;">
+<div style="max-width:480px;margin:0 auto;background:#ffffff;border-radius:16px;padding:32px;text-align:center;">
+<h1 style="font-size:20px;color:#0f172a;margin:0 0 8px;">Your verification code</h1>
+<p style="font-size:14px;color:#475569;margin:0 0 24px;">Use this code to finish registering with ${req.centreName} on Tutorial OS.</p>
+<div style="font-size:36px;letter-spacing:10px;font-weight:bold;color:#0f172a;padding:16px;background:#f8fafc;border-radius:12px;">${req.code}</div>
+<p style="font-size:12px;color:#94a3b8;margin:24px 0 0;">This code expires in ${req.expiryMinutes} minutes. If you did not request it, you can ignore this email.</p>
+</div></body></html>`;
+  return sendEmail({
+    to: req.to,
+    subject: 'Your Tutorial OS verification code',
+    html,
+    text: `Your Tutorial OS verification code is ${req.code}. It expires in ${req.expiryMinutes} minutes. If you did not request it, ignore this email.`,
+  });
 }

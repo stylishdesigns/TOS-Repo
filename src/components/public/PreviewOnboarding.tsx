@@ -3,6 +3,7 @@ import { FirebaseProvider } from '../../context/FirebaseContext';
 import { AppProvider } from '../../context/AppContext';
 import { AppWelcomePage } from '../auth/AppWelcomePage';
 import { AuthPortal } from '../auth/AuthPortal';
+import { StudentSignupFlow } from '../auth/StudentSignupFlow';
 
 // Throwaway design preview of the student onboarding flow: the app welcome
 // screen, then the student sign-up and login pages, with dummy branding.
@@ -31,6 +32,20 @@ const PreviewInner: React.FC = () => {
       />
     );
   }
+  if (step === 'signup') {
+    return (
+      <StudentSignupFlow
+        centreName={DEMO.centreName}
+        centreId={DEMO.centreId}
+        accent={DEMO.accent}
+        logoUrl={DEMO.logoUrl}
+        previewOnly
+        onGoToDashboard={() => setStep('welcome')}
+        onBack={() => setStep('welcome')}
+        onSwitchToLogin={() => setStep('login')}
+      />
+    );
+  }
   return (
     <AuthPortal
       portalType="student"
@@ -38,7 +53,7 @@ const PreviewInner: React.FC = () => {
       subtitle=""
       accent={DEMO.accent}
       logoUrl={DEMO.logoUrl}
-      entryMode={step === 'signup' ? 'signup' : 'login'}
+      entryMode="login"
       onSuccess={() => {}}
       onBack={() => setStep('welcome')}
       centreId={DEMO.centreId}
