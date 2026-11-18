@@ -4,6 +4,7 @@ import App from './App.tsx';
 import { PublicLandingPage } from './components/landing/PublicLandingPage';
 import { AppInstallPage } from './components/public/AppInstallPage';
 import { SignupStartPage, SignupConfirmPage, SignupAppPage } from './components/public/landing/SignupFlow';
+import { PreviewOnboarding } from './components/public/PreviewOnboarding';
 import './index.css';
 import {registerSW} from 'virtual:pwa-register';
 import { installServerApiFetch } from './utils/serverApi';
@@ -91,6 +92,7 @@ const appInstallMatch = window.location.pathname.match(/^\/app\/?$/);
 const startMatch = window.location.pathname.match(/^\/start\/?$/);
 const confirmMatch = window.location.pathname.match(/^\/start\/confirm\/?$/);
 const appFlowMatch = window.location.pathname.match(/^\/start\/app\/?$/);
+const previewOnboardingMatch = /^\/preview\/?$/.test(window.location.pathname);
 
 // A facility's plain address: tutorialos.com/<facility-name>, the whole name
 // with every space and symbol removed and never shortened. Reserved
@@ -115,6 +117,8 @@ createRoot(document.getElementById('root')!).render(
     <SignupConfirmPage />
   ) : appFlowMatch ? (
     <SignupAppPage />
+  ) : previewOnboardingMatch ? (
+    <PreviewOnboarding />
   ) : rootLandingMatch ? (
     <PublicLandingPage centreId={rootLandingMatch[1]} />
   ) : (
