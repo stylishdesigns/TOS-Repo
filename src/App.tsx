@@ -102,6 +102,8 @@ const MainLayout: React.FC = () => {
   // centre loading screen). They clear once the account is inside a centre.
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  const [appWelcomeCentre, setAppWelcomeCentre] = useState<{ centreId: string; centreName: string; accent: string; logoUrl: string; welcomeImageUrl: string } | null>(null);
+  const [appWelcomeMode, setAppWelcomeMode] = useState<'welcome' | 'login' | 'signup' | null>(null);
   useEffect(() => {
     if (activeCentreId) {
       setLoginEmail('');
@@ -118,6 +120,12 @@ const MainLayout: React.FC = () => {
   const [centreEntryWhatsapp, setCentreEntryWhatsapp] = useState<string | null>(null);
   useEffect(() => {
     if (!currentUser || !hasCheckedActiveCentre) return;
+    // During the student sign-up flow the account is signed in mid-flow while
+    // the flow still owns the screen: automatic centre entry must wait, or it
+    // would confirm belonging and play the loading splash, which unmounts the
+    // flow and wipes everything the student typed. Entry runs the moment the
+    // flow hands the screen back.
+    if (appWelcomeCentre && appWelcomeMode === 'signup') return;
     if (activeCentreId) {
       setCentreEntryBusy(false);
       setCentreEntryFailed(false);
@@ -186,7 +194,7 @@ const MainLayout: React.FC = () => {
         });
       })
       .finally(() => setCentreEntryBusy(false));
-  }, [currentUser, hasCheckedActiveCentre, activeCentreId, pendingCentre, centreEntryRetry, enterCentreByCode, enterSoleCentre]);
+  }, [currentUser, hasCheckedActiveCentre, activeCentreId, pendingCentre, centreEntryRetry, appWelcomeCentre, appWelcomeMode, enterCentreByCode, enterSoleCentre]);
 
   // The centre code gate appears only after a login button on the landing
   // page is clicked; the platform-staff door (#tos-admin) never shows it.
@@ -196,8 +204,6 @@ const MainLayout: React.FC = () => {
   // carries ?centre=), a signed-out user goes through the access-code gate
   // first; Continue then shows the welcome screen. A signed-in user skips the
   // gate and lands straight in their portal.
-  const [appWelcomeCentre, setAppWelcomeCentre] = useState<{ centreId: string; centreName: string; accent: string; logoUrl: string; welcomeImageUrl: string } | null>(null);
-  const [appWelcomeMode, setAppWelcomeMode] = useState<'welcome' | 'login' | 'signup' | null>(null);
   const [isAppContext] = useState(() => {
     try { return !!new URLSearchParams(window.location.search).get('centre'); } catch { return false; }
   });
@@ -568,7 +574,7 @@ const MainLayout: React.FC = () => {
 
   // Whitelabel splash: belonging was confirmed, the centre's own loading
   // screen plays before the dashboard opens.
-  if (currentUser && activeCentreId && centreSplash && !isTosAdmin) {
+  if (currentUser && activeCentreId && centreSplash && !isTosAdmin && appWelcomeMode !== 'signup') {
     return centreSpinnerScreen;
   }
 
