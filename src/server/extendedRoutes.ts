@@ -250,6 +250,33 @@ export function registerExtendedRoutes(app: express.Express): void {
   // logo, and the installed app opens on the access-code page, never the
   // platform landing page.
   // ==========================================================================
+  // PUBLIC: resolve a facility by its name slug, the value each installed
+  // app's manifest start_url carries (?centre=<slug>). The app binds itself
+  // to THIS facility at boot, so on a phone where every facility app shares
+  // one address (and therefore one login session), each app only ever shows
+  // its own facility: a signed-in account that does not belong to the bound
+  // facility is signed out, and the app opens on its own welcome screen.
+  app.get('/api/public/centre-by-slug', async (req, res) => {
+    try {
+      const slug = slugifyName(String(req.query.centre || '').trim());
+      if (!slug) return res.status(400).json({ error: 'Missing facility.' });
+      const snap = await adminDb.collection('centres').limit(200).get();
+      const doc = snap.docs.find((d) => slugifyName(String((d.data() as any)?.name || '')) === slug);
+      if (!doc) return res.status(404).json({ error: 'Facility not found.' });
+      const data = doc.data() as any;
+      const rawAccent = String(data.accentColor || '').trim();
+      res.json({
+        centreId: doc.id,
+        centreName: String(data.name || '').slice(0, 60),
+        accent: /^#[0-9a-fA-F]{6}$/.test(rawAccent) ? rawAccent : '',
+        logoUrl: String(data.logoUrl || ''),
+      });
+    } catch (error: any) {
+      console.error('[centre-by-slug] failed:', error?.message || error);
+      res.status(500).json({ error: 'Could not look up that facility. Please try again.' });
+    }
+  });
+
   app.get('/api/public/pwa-manifest', async (req, res) => {
     try {
       const slug = slugifyName(String(req.query.centre || '').trim());
@@ -896,6 +923,21 @@ export function registerExtendedRoutes(app: express.Express): void {
       return res.status(400).json({ error: 'That code is not correct. Check the email and try again.' });
     }
     await ref.delete().catch(() => {});
+    // The code was correct: record it on the student record, so the app can
+    // refuse any portal session for an account that never confirmed its
+    // email. The uid must name a student whose email is the verified one, so
+    // a guessed uid cannot mark someone else's account.
+    const verifiedUid = String(req.body?.uid || '').trim();
+    if (verifiedUid && /^[A-Za-z0-9_-]{20,}$/.test(verifiedUid)) {
+      try {
+        const sdoc = await adminDb.collection('students').doc(verifiedUid).get();
+        if (sdoc.exists && String(sdoc.data()?.email || '').trim().toLowerCase() === email) {
+          await adminDb.collection('students').doc(verifiedUid).set({ emailVerified: true }, { merge: true });
+        }
+      } catch (stampError: any) {
+        console.error('[verify-otp] stamp failed:', stampError?.message || stampError);
+      }
+    }
     res.json({ success: true });
   });
 

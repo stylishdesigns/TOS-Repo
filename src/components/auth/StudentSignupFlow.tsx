@@ -4,7 +4,7 @@ import {
   Eye, EyeOff, Check, X,
 } from 'lucide-react';
 import { auth, db } from '../../firebase';
-import { createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
+import { createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signOut, signInWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { COURSES, UNIVERSITIES, SUBJECTS } from '../../data/academicLists';
 import { ModernSelect } from '../ui/ModernSelect';
@@ -95,6 +95,7 @@ export const StudentSignupFlow: React.FC<StudentSignupFlowProps> = ({
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [otpEmail, setOtpEmail] = useState('');
+  const [createdUid, setCreatedUid] = useState<string | null>(null);
   const [otp, setOtp] = useState('');
   const [otpError, setOtpError] = useState('');
   const [resending, setResending] = useState(false);
@@ -240,7 +241,7 @@ export const StudentSignupFlow: React.FC<StudentSignupFlowProps> = ({
     }
   };
 
-  const saveRecord = async (uid: string, email: string) => {
+  const saveRecord = async (uid: string, email: string, verified = true) => {
     const ref = doc(db, 'students', uid);
     const existing = await getDoc(ref);
     const base: any = {
@@ -260,6 +261,9 @@ export const StudentSignupFlow: React.FC<StudentSignupFlowProps> = ({
       parentWhatsApp: form.parentWhatsApp,
       parentEmail: email,
       status: 'Active',
+      // An email-registered account is not confirmed until the emailed code
+      // verifies; a Google account is verified by Google itself.
+      emailVerified: verified,
       registrationDate: new Date().toISOString(),
       programmeName: form.examToRegister || 'General Programme',
       subjects: form.selectedSubjects,
@@ -303,17 +307,29 @@ export const StudentSignupFlow: React.FC<StudentSignupFlowProps> = ({
     setBusy(true);
     try {
       const cred: any = await createUserWithEmailAndPassword(auth, form.email.trim(), form.password);
-      await saveRecord(cred.user.uid, form.email.trim());
+      setCreatedUid(cred.user.uid as string);
+      await saveRecord(cred.user.uid, form.email.trim(), false);
       reserveUsername(cred.user.uid);
-      const res = await fetch('/api/public/send-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: form.email.trim(), centreName }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Could not send the verification code.');
-      setOtpEmail(form.email.trim());
-      setCanResendAt(Date.now() + 45000);
+      let sendError: string | null = null;
+      try {
+        const res = await fetch('/api/public/send-otp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: form.email.trim(), centreName }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'Could not send the verification code.');
+        setOtpEmail(form.email.trim());
+        setCanResendAt(Date.now() + 45000);
+      } catch (sendErr: any) {
+        sendError = sendErr?.message || 'Could not send the verification code.';
+      }
+      // The account must not hold a live session until the emailed code is
+      // confirmed: sign it back out here. The flow keeps the password in
+      // memory and signs back in only after the code verifies, so a student
+      // who never confirms the code is never logged in.
+      try { await signOut(auth); } catch { /* already signed out */ }
+      if (sendError) throw new Error(sendError);
       setStep('otp');
     } catch (err: any) {
       if (err?.code === 'auth/email-already-in-use') {
@@ -344,7 +360,7 @@ export const StudentSignupFlow: React.FC<StudentSignupFlowProps> = ({
         onGoToDashboard();
         return;
       }
-      await saveRecord(uid, email);
+      await saveRecord(uid, email, true);
       reserveUsername(uid);
       setStep('done');
     } catch (err: any) {
@@ -362,10 +378,15 @@ export const StudentSignupFlow: React.FC<StudentSignupFlowProps> = ({
       const res = await fetch('/api/public/verify-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: otpEmail, code: otp.trim() }),
+        body: JSON.stringify({ email: otpEmail, code: otp.trim(), ...(createdUid ? { uid: createdUid } : {}) }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'That code is not correct.');
+      // The account was signed back out after creation; now that the code is
+      // confirmed, sign it in again so the dashboard opens as a verified
+      // session. If the sign-in cannot complete, the congratulations screen
+      // still stands and the standard login page takes over from there.
+      try { await signInWithEmailAndPassword(auth, form.email.trim(), form.password); } catch { /* fall through */ }
       setStep('done');
     } catch (err: any) {
       setOtpError(err?.message || 'That code is not correct.');

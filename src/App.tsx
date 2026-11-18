@@ -15,11 +15,14 @@ import { EnterAccessCodeScreen } from './components/auth/EnterAccessCodeScreen';
 import { CentreCodeGate } from './components/auth/CentreCodeGate';
 import { AppWelcomePage } from './components/auth/AppWelcomePage';
 import { StudentSignupFlow } from './components/auth/StudentSignupFlow';
+import { EmailVerificationGate } from './components/auth/EmailVerificationGate';
 import { brandVars } from './lib/brand';
 import { JoinCentreScreen } from './components/auth/JoinCentreScreen';
 
 import { PasswordChangeOverlay } from './components/auth/PasswordChangeOverlay';
 import { getAuth } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from './firebase';
 import { AlertCircle, MessageCircle, ShieldCheck } from 'lucide-react';
 
 // The #tos door shows nothing to anyone who is not platform staff.
@@ -104,12 +107,81 @@ const MainLayout: React.FC = () => {
   const [loginPassword, setLoginPassword] = useState('');
   const [appWelcomeCentre, setAppWelcomeCentre] = useState<{ centreId: string; centreName: string; accent: string; logoUrl: string; welcomeImageUrl: string } | null>(null);
   const [appWelcomeMode, setAppWelcomeMode] = useState<'welcome' | 'login' | 'signup' | null>(null);
+
+  // The facility app's own home screen. In the installed app (its own address
+  // carries ?centre=), a signed-out user goes through the access-code gate
+  // first; Continue then shows the welcome screen. A signed-in user skips the
+  // gate and lands straight in their portal.
+  const [isAppContext] = useState(() => {
+    try { return !!new URLSearchParams(window.location.search).get('centre'); } catch { return false; }
+  });
+
+  // The installed app is bound to ONE facility. Its manifest start_url opens
+  // with ?centre=<facility>, and on a phone every facility app shares the
+  // same address, so the browser keeps ONE login session for all of them.
+  // Without this binding, a student logged in through one facility's app was
+  // signed in inside every other facility's app too. The binding resolves
+  // the facility from that address and: opens the app straight on its own
+  // welcome screen (no access-code gate), makes automatic centre entry
+  // always enter THIS facility, and signs out an account that does not
+  // belong to it. undefined while the lookup runs, null when the visit
+  // carries no ?centre= (a plain browser visit keeps today's behaviour).
+  const [appFacility, setAppFacility] = useState<{ centreId: string; centreName: string; accent: string; logoUrl: string } | null | undefined>(undefined);
+  useEffect(() => {
+    if (!isAppContext) { setAppFacility(null); return; }
+    let alive = true;
+    let slug = '';
+    try { slug = new URLSearchParams(window.location.search).get('centre') || ''; } catch { slug = ''; }
+    fetch(`/api/public/centre-by-slug?centre=${encodeURIComponent(slug)}`)
+      .then((r) => r.json())
+      .then((d: any) => {
+        if (!alive) return;
+        setAppFacility(d && d.centreId
+          ? { centreId: String(d.centreId), centreName: String(d.centreName || ''), accent: String(d.accent || ''), logoUrl: String(d.logoUrl || '') }
+          : null);
+      })
+      .catch(() => { if (alive) setAppFacility(null); });
+    return () => { alive = false; };
+  }, [isAppContext]);
+  // A bound app skips the access-code gate and opens on its own facility's
+  // welcome screen, so the app's screen always belongs to its own facility.
+  useEffect(() => {
+    if (!appFacility) return;
+    setShowWelcome(false);
+    setCentreGateRequested(true);
+    setAppWelcomeCentre({ centreId: appFacility.centreId, centreName: appFacility.centreName, accent: appFacility.accent, logoUrl: appFacility.logoUrl, welcomeImageUrl: '' });
+    setAppWelcomeMode((m) => m ?? 'welcome');
+  }, [appFacility]);
+
+  // Email verification gate: a student account created with email + password
+  // holds emailVerified=false until the emailed code is confirmed. The
+  // account is signed back out at creation, and even when a session exists
+  // (an old device, a login on another one before confirming), this gate
+  // blocks every portal until the code verifies. Tutors, admins and owners
+  // have no student record, so the gate never applies to them.
+  const [verifyPending, setVerifyPending] = useState<{ uid: string; email: string } | null>(null);
+  const verifyCheckedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!currentUser) { verifyCheckedRef.current = null; return; }
+    if (verifyCheckedRef.current === currentUser.uid) return;
+    verifyCheckedRef.current = currentUser.uid;
+    let alive = true;
+    getDoc(doc(db, 'students', currentUser.uid))
+      .then((snap) => {
+        if (alive && snap.exists() && (snap.data() as any)?.emailVerified === false) {
+          setVerifyPending({ uid: currentUser.uid, email: currentUser.email || '' });
+        }
+      })
+      .catch(() => { /* The check could not run: never lock a portal on a failed read. */ });
+    return () => { alive = false; };
+  }, [currentUser]);
   useEffect(() => {
     if (activeCentreId) {
       setLoginEmail('');
       setLoginPassword('');
     }
   }, [activeCentreId]);
+
   const centreEntryKeyRef = useRef<string | null>(null);
   // What the last failed centre entry said, so the user sees the real reason
   // (a lockout, an inactive membership, a server hiccup) instead of being
@@ -126,24 +198,41 @@ const MainLayout: React.FC = () => {
     // flow and wipes everything the student typed. Entry runs the moment the
     // flow hands the screen back.
     if (appWelcomeCentre && appWelcomeMode === 'signup') return;
+    // In the installed facility app, entry waits until the app's own facility
+    // is resolved from its start address (?centre=): the binding decides
+    // which centre this app belongs to, so nothing may enter before it lands.
+    if (isAppContext && appFacility === undefined) return;
+    // While the email-verification gate is up it owns the screen.
+    if (verifyPending) return;
     if (activeCentreId) {
-      setCentreEntryBusy(false);
-      setCentreEntryFailed(false);
-      return;
+      if (appFacility && activeCentreId !== appFacility.centreId) {
+        // A restored session points at a DIFFERENT facility than the one this
+        // installed app belongs to: fall through and re-enter the app's own
+        // facility below, so two facility apps on one phone can never show
+        // each other's data.
+      } else {
+        setCentreEntryBusy(false);
+        setCentreEntryFailed(false);
+        return;
+      }
     }
-    const key = `${pendingCentre ? `code:${pendingCentre.code}|${pendingCentre.centreId || ''}` : 'auto'}#${centreEntryRetry}`;
+    const key = `${appFacility ? `app:${appFacility.centreId}` : pendingCentre ? `code:${pendingCentre.code}|${pendingCentre.centreId || ''}` : 'auto'}#${centreEntryRetry}`;
     if (centreEntryKeyRef.current === key) return;
     centreEntryKeyRef.current = key;
     setCentreEntryFailed(false);
     setCentreEntryError(null);
     setCentreEntryWhatsapp(null);
     setCentreEntryBusy(true);
-    const work = pendingCentre ? enterCentreByCode(pendingCentre.code, pendingCentre.centreId) : enterSoleCentre();
+    const work = appFacility
+      ? enterCentreByCode('', appFacility.centreId)
+      : pendingCentre
+        ? enterCentreByCode(pendingCentre.code, pendingCentre.centreId)
+        : enterSoleCentre();
     work
       .then((r: any) => {
-        const ok = pendingCentre ? !!(r && r.success) : !!(r && r.entered);
+        const ok = !!(r && (r.success || r.entered));
         if (!ok) {
-          setCentreEntryCount(pendingCentre ? null : (r && typeof r.count === 'number' ? r.count : null));
+          setCentreEntryCount(pendingCentre || appFacility ? null : (r && typeof r.count === 'number' ? r.count : null));
           setCentreEntryWhatsapp(r?.whatsapp || null);
           setCentreEntryFailed(true);
           return;
@@ -158,25 +247,27 @@ const MainLayout: React.FC = () => {
         // temporary lockout, a membership mismatch) shows as a message, so the
         // join screen never appears without an explanation.
         //
-        // Strict centre login: when the signed-in account does not belong to
-        // the centre chosen before login, sign the user back out and say so on
-        // the login page, with the student sign-up route. Only students
+        // Strict facility login: when the signed-in account does not belong
+        // to the centre chosen before login, or to the facility this
+        // installed app is bound to, sign the user back out and say so on the
+        // login page, with the student sign-up route. Only students
         // self-register; centre staff are provisioned by each centre's super
         // admin, so there is no staff sign-up.
         // The "no account" message shows only when the server itself confirms
-        // the signed-in account holds no active membership in the chosen
-        // centre. Other failures (too many attempts, centre suspended or the
+        // the signed-in account holds no active membership in that facility.
+        // Other failures (too many attempts, centre suspended or the
         // membership not active yet, a server error) keep the session and show
         // the server's own reason in the toast below, never "no account".
-        if (pendingCentre?.centreId && err?.status === 400) {
+        const boundId = pendingCentre?.centreId || appFacility?.centreId || null;
+        if (boundId && err?.status === 400) {
           try {
             const myIds = await fetchMyCentreIds();
-            if (!myIds.includes(pendingCentre.centreId)) {
+            if (!myIds.includes(boundId)) {
               centreEntryKeyRef.current = null;
               await logout();
               setShowWelcome(false);
               setLoginCentreError(
-                `No account can be found with these login details for ${pendingCentre.centreName}. If you are a student, sign up below.`
+                `No account can be found with these login details for ${pendingCentre?.centreName || appFacility?.centreName}. If you are a student, sign up below.`
               );
               return;
             }
@@ -194,19 +285,13 @@ const MainLayout: React.FC = () => {
         });
       })
       .finally(() => setCentreEntryBusy(false));
-  }, [currentUser, hasCheckedActiveCentre, activeCentreId, pendingCentre, centreEntryRetry, appWelcomeCentre, appWelcomeMode, enterCentreByCode, enterSoleCentre]);
+  }, [currentUser, hasCheckedActiveCentre, activeCentreId, pendingCentre, centreEntryRetry, appWelcomeCentre, appWelcomeMode, appFacility, verifyPending, enterCentreByCode, enterSoleCentre]);
 
   // The centre code gate appears only after a login button on the landing
   // page is clicked; the platform-staff door (#tos-admin) never shows it.
   const [centreGateRequested, setCentreGateRequested] = useState(() => window.location.hash.toLowerCase() === '#access');
 
-  // The facility app's own home screen. In the installed app (its own address
-  // carries ?centre=), a signed-out user goes through the access-code gate
-  // first; Continue then shows the welcome screen. A signed-in user skips the
-  // gate and lands straight in their portal.
-  const [isAppContext] = useState(() => {
-    try { return !!new URLSearchParams(window.location.search).get('centre'); } catch { return false; }
-  });
+
 
   // Platform (TOS) admins are exempt from the centre access-code gate below.
   // TOS access is the server-stamped `tos` custom claim, verified in a fresh
@@ -491,10 +576,25 @@ const MainLayout: React.FC = () => {
     );
   }
 
+  // While the installed app resolves its own facility from its start
+  // address, show a plain loading screen: never the landing page or an
+  // access-code prompt for the wrong facility.
+  if (isAppContext && appFacility === undefined) {
+    return (
+      <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-900 text-white">
+        <div className="relative w-20 h-20 mb-6">
+          <div className="absolute inset-0 border-4 border-orange-500/20 rounded-full" />
+          <div className="absolute inset-0 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+        <p className="text-xs text-slate-400 font-medium animate-pulse">Loading...</p>
+      </div>
+    );
+  }
+
   // The centre code gate shows after a login button on the landing page is
   // clicked (the platform-staff door above is exempt). It only selects and
   // names the centre; the centre's login page follows it.
-  if (!currentUser && !tosLoginRequested && !pendingCentre && centreGateRequested) {
+  if (!currentUser && !tosLoginRequested && !pendingCentre && centreGateRequested && appFacility === null) {
     return (
       <CentreCodeGate
         onProceed={(code, centreName, centreId, accent, logoUrl) => {
@@ -568,6 +668,20 @@ const MainLayout: React.FC = () => {
         userId={activeUser.id}
         onSuccess={handleAdminPasswordSuccess}
         onLogout={handleLogout}
+      />
+    );
+  }
+
+  // Email verification gate: no portal screen for an unconfirmed student
+  // account, on a fresh login or a restored session alike.
+  if (currentUser && verifyPending) {
+    return (
+      <EmailVerificationGate
+        uid={verifyPending.uid}
+        email={verifyPending.email}
+        centreName={pendingCentre?.centreName || centreName || undefined}
+        onVerified={() => { setVerifyPending(null); setCentreEntryRetry((n) => n + 1); }}
+        onSignOut={handleLogout}
       />
     );
   }
