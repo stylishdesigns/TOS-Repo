@@ -328,7 +328,6 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
   } | null>(null);
   const [usernameDraft, setUsernameDraft] = useState('');
   const [usernameCheck, setUsernameCheck] = useState<Json | null>(null);
-  const [usernameBusy, setUsernameBusy] = useState(false);
   const [usernameError, setUsernameError] = useState('');
 
   useEffect(() => {
@@ -368,22 +367,6 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
     }, 400);
     return () => clearTimeout(t);
   }, [usernameDraft, usernameInfo?.mine, usernameInfo?.username]);
-
-  const saveUsername = async () => {
-    if (!usernameInfo?.mine) return;
-    setUsernameBusy(true);
-    setUsernameError('');
-    try {
-      const r = await api('/api/student/profile/username', { method: 'POST', body: { name: usernameDraft.trim() } });
-      setUsernameInfo({ username: String(r?.username || ''), lastChangedAt: new Date().toISOString(), canChangeAt: null, canChange: true, mine: true });
-      setUsernameCheck(null);
-      addToast({ type: 'success', title: 'Username Saved', description: `${String(r?.username || '')} now shows on chat and the mock leaderboard.` });
-    } catch (e: any) {
-      setUsernameError(e.message || 'Could not save that username.');
-    } finally {
-      setUsernameBusy(false);
-    }
-  };
 
   // Biometric toggle state
   const [biometricEnabled, setBiometricEnabled] = useState(true);
@@ -530,8 +513,20 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
     }
   };
 
-  const handleSavePersonalDetails = (e: React.FormEvent) => {
+  const handleSavePersonalDetails = async (e: React.FormEvent) => {
     e.preventDefault();
+    const newUsername = usernameDraft.trim();
+    if (usernameInfo?.mine && newUsername && newUsername !== usernameInfo.username) {
+      try {
+        const r = await api('/api/student/profile/username', { method: 'POST', body: { name: newUsername } });
+        setUsernameInfo({ username: String(r?.username || ''), lastChangedAt: new Date().toISOString(), canChangeAt: null, canChange: true, mine: true });
+        setUsernameCheck(null);
+      } catch (err: any) {
+        setUsernameError(err.message || 'Could not save that username.');
+        addToast({ type: 'error', title: 'Username Not Saved', description: err.message || 'Fix the username, then save again.' });
+        return;
+      }
+    }
     const updatedFullName = `${firstName} ${lastName}`.trim();
     updateStudent(student.id, {
       name: updatedFullName,
@@ -1107,14 +1102,6 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                           <p className="text-xs text-slate-400 font-medium">At least 4 characters: letters, numbers, underscores or dashes.</p>
                         )}
                         {usernameError && <p className="text-xs font-bold text-rose-600">{usernameError}</p>}
-                        <button
-                          type="button"
-                          disabled={usernameBusy || usernameDraft.trim() === usernameInfo?.username || !(usernameCheck?.valid && usernameCheck?.available)}
-                          onClick={saveUsername}
-                          className="px-4 min-h-[40px] rounded-xl bg-[#EA580C] text-white text-xs font-black tracking-wide disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-                        >
-                          {usernameBusy ? 'Saving…' : usernameInfo?.username ? 'Save new username' : 'Set username'}
-                        </button>
                       </>
                     )}
                   </div>
@@ -2289,56 +2276,17 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                         <span className="text-[10px] text-slate-400 font-semibold block uppercase">
                           Support Email
                         </span>
-                        <span className="text-xs font-bold text-slate-800 truncate block">
-                          {settings.email || 'support@excellencetutorials.ng'}
+                        <span className={`text-xs font-bold truncate block ${settings.email ? 'text-slate-800' : 'text-slate-400'}`}>
+                          {settings.email || 'Not provided yet'}
                         </span>
                       </div>
                     </div>
                     <button
-                      onClick={() =>
-                        handleCopy(
-                          settings.email || 'support@excellencetutorials.ng',
-                          'email'
-                        )
-                      }
-                      className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-50 flex items-center space-x-1 shrink-0 ml-2"
+                      onClick={() => settings.email && handleCopy(settings.email, 'email')}
+                      disabled={!settings.email}
+                      className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-50 flex items-center space-x-1 shrink-0 ml-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white"
                     >
                       {copiedKey === 'email' ? (
-                        <>
-                          <Check className="w-3.5 h-3.5 text-emerald-600" />
-                          <span className="text-emerald-700">Copied</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-3.5 h-3.5" />
-                          <span>Copy</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-
-                  {/* Channel 2: Academic Advisory */}
-                  <div className="p-3.5 rounded-2xl border border-slate-200 flex items-center justify-between bg-slate-50/50">
-                    <div className="flex items-center space-x-3 min-w-0">
-                      <div className="w-9 h-9 rounded-full bg-orange-50 text-orange-600 flex items-center justify-center shrink-0">
-                        <GraduationCap className="w-4.5 h-4.5" />
-                      </div>
-                      <div className="min-w-0">
-                        <span className="text-[10px] text-slate-400 font-semibold block uppercase">
-                          Academic Advisory
-                        </span>
-                        <span className="text-xs font-bold text-slate-800 truncate block">
-                          academics@excellencetutorials.ng
-                        </span>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() =>
-                        handleCopy('academics@excellencetutorials.ng', 'academics')
-                      }
-                      className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-50 flex items-center space-x-1 shrink-0 ml-2"
-                    >
-                      {copiedKey === 'academics' ? (
                         <>
                           <Check className="w-3.5 h-3.5 text-emerald-600" />
                           <span className="text-emerald-700">Copied</span>
@@ -2362,16 +2310,15 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                         <span className="text-[10px] text-slate-400 font-semibold block uppercase">
                           Phone Helpline
                         </span>
-                        <span className="text-xs font-bold text-slate-800 truncate block">
-                          {settings.phone || '+234 805 676 5455'}
+                        <span className={`text-xs font-bold truncate block ${settings.phone ? 'text-slate-800' : 'text-slate-400'}`}>
+                          {settings.phone || 'Not provided yet'}
                         </span>
                       </div>
                     </div>
                     <button
-                      onClick={() =>
-                        handleCopy(settings.phone || '+234 805 676 5455', 'phone')
-                      }
-                      className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-50 flex items-center space-x-1 shrink-0 ml-2"
+                      onClick={() => settings.phone && handleCopy(settings.phone, 'phone')}
+                      disabled={!settings.phone}
+                      className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-50 flex items-center space-x-1 shrink-0 ml-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white"
                     >
                       {copiedKey === 'phone' ? (
                         <>
@@ -2397,19 +2344,27 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                         <span className="text-[10px] text-slate-400 font-semibold block uppercase">
                           WhatsApp Support
                         </span>
-                        <span className="text-xs font-bold text-slate-800 truncate block">
-                          {settings.whatsappNumber || settings.whatsapp || settings.phone}
+                        <span className={`text-xs font-bold truncate block ${(settings.whatsappNumber || settings.whatsapp) ? 'text-slate-800' : 'text-slate-400'}`}>
+                          {settings.whatsappNumber || settings.whatsapp || 'Not provided yet'}
                         </span>
                       </div>
                     </div>
-                    <a
-                      href={`https://wa.me/${(settings.whatsappNumber || settings.whatsapp || settings.phone).replace(/\D/g, '')}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 flex items-center space-x-1 shrink-0 ml-2 shadow-2xs"
-                    >
-                      <span>Chat</span>
-                    </a>
+                    {settings.whatsappNumber || settings.whatsapp ? (
+                      <a
+                        href={`https://wa.me/${(settings.whatsappNumber || settings.whatsapp).replace(/\D/g, '')}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 flex items-center space-x-1 shrink-0 ml-2 shadow-2xs"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5" />
+                        <span>Chat</span>
+                      </a>
+                    ) : (
+                      <span className="px-2.5 py-1.5 rounded-lg bg-slate-100 text-slate-400 text-xs font-bold flex items-center space-x-1 shrink-0 ml-2">
+                        <MessageSquare className="w-3.5 h-3.5" />
+                        <span>Chat</span>
+                      </span>
+                    )}
                   </div>
 
                   {/* Channel 5: Campus Address */}
@@ -2422,19 +2377,15 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                         <span className="text-[10px] text-slate-400 font-semibold block uppercase">
                           Main Campus Facility
                         </span>
-                        <span className="text-xs font-bold text-slate-800 line-clamp-1 block">
-                          {settings.address || '14 Allen Avenue, Ikeja, Lagos State, Nigeria'}
+                        <span className={`text-xs font-bold line-clamp-1 block ${settings.address ? 'text-slate-800' : 'text-slate-400'}`}>
+                          {settings.address || 'Not provided yet'}
                         </span>
                       </div>
                     </div>
                     <button
-                      onClick={() =>
-                        handleCopy(
-                          settings.address || '14 Allen Avenue, Ikeja, Lagos State, Nigeria',
-                          'address'
-                        )
-                      }
-                      className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-50 flex items-center space-x-1 shrink-0 ml-2"
+                      onClick={() => settings.address && handleCopy(settings.address, 'address')}
+                      disabled={!settings.address}
+                      className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-50 flex items-center space-x-1 shrink-0 ml-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white"
                     >
                       {copiedKey === 'address' ? (
                         <>

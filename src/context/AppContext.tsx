@@ -1604,9 +1604,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const addToast = (toast: Omit<ToastMessage, 'id'>) => {
     const id = `toast-${Date.now()}-${Math.random()}`;
     setToasts((prev) => [...prev, { ...toast, id }]);
+    const dwell = toast.type === 'error' ? 6000 : 4200;
     setTimeout(() => {
       removeToast(id);
-    }, 1200);
+    }, dwell);
   };
 
   const removeToast = (id: string) => {

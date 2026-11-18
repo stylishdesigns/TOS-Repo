@@ -78,10 +78,6 @@ export const PerformanceTab: React.FC<PerformanceTabProps> = ({
     return timeUsage(studentResults, examsMap);
   }, [studentResults, examsMap]);
 
-  const handleGoToCbt = () => {
-    onNavigateTab?.('cbt');
-  };
-
   const handlePractiseSubject = (subject: string) => {
     onNavigateTab?.('cbt', subject);
   };
@@ -108,7 +104,7 @@ export const PerformanceTab: React.FC<PerformanceTabProps> = ({
     <div className="space-y-4 px-4 py-3 max-w-lg mx-auto">
       {studentResults.length === 0 ? (
         /* Empty State */
-        <EmptyState onGoToCbt={handleGoToCbt} />
+        <EmptyState />
       ) : (
         <>
           {/* Period Control (segmented control: Last 8 | This Term | All Time) */}
