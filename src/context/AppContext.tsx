@@ -947,15 +947,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isAdmin, setIsAdmin] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
 
-  // Safety timeout for auth loading to prevent stuck loading screen in case of connectivity issues
+  // Safety timeout for auth loading to prevent stuck loading screen in case of connectivity issues.
+  // A saved facility session on this device means an account is signed in here:
+  // its restore is local and normally instant, so a slow start must wait for it
+  // instead of treating the account as signed out and showing the access-code
+  // gate and login again. Without a saved session the 6-second guard still applies.
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (isAuthLoading) {
-        console.warn("Auth initialization timed out, proceeding with default state.");
-        setIsAuthLoading(false);
+    if (!isAuthLoading) return;
+    const deviceHasSavedSession = () => {
+      try { return Object.keys(localStorage).some((k) => k.startsWith('tos_tenant:')); } catch { return false; }
+    };
+    const proceedAsSignedOut = () => {
+      console.warn("Auth initialization timed out, proceeding with default state.");
+      setIsAuthLoading(false);
+    };
+    let lateTimer: ReturnType<typeof setTimeout> | undefined;
+    const earlyTimer = setTimeout(() => {
+      if (deviceHasSavedSession()) {
+        lateTimer = setTimeout(proceedAsSignedOut, 30000);
+      } else {
+        proceedAsSignedOut();
       }
-    }, 6000); // 6 seconds safety window
-    return () => clearTimeout(timer);
+    }, 6000);
+    return () => { clearTimeout(earlyTimer); if (lateTimer) clearTimeout(lateTimer); };
   }, [isAuthLoading]);
 
   // Auth State Listener & Admin Verification
@@ -2889,6 +2903,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Prompt PF2: wipe every saved last-good copy before the session ends,
     // so nothing is left on the device after sign-out.
     clearAllLastGood();
+    // The active facility's remembered session goes with it too, so a signed-out
+    // account is signed out for good until the account holder signs in again.
+    // Other facility apps on this device keep their own remembered sessions.
+    if (activeCentreId) {
+      try { localStorage.removeItem(`tos_tenant:${activeCentreId}`); } catch { /* ignore */ }
+    }
+    try { sessionStorage.removeItem('tos_activeCentreId'); } catch { /* ignore */ }
     await signOut(firebaseAuth);
   };
 
