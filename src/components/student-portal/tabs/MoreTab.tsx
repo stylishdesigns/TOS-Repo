@@ -9,9 +9,7 @@ import {
   GraduationCap,
   CreditCard,
   Receipt,
-  Lock,
   KeyRound,
-  Fingerprint,
   Palette,
   Camera,
   HelpCircle,
@@ -223,7 +221,6 @@ type ModalType =
   | 'academic_details'
   | 'id_card'
   | 'tuition_statement'
-  | 'change_pin'
   | 'change_password'
   | 'theme_settings'
   | 'help_support'
@@ -368,8 +365,6 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
     return () => clearTimeout(t);
   }, [usernameDraft, usernameInfo?.mine, usernameInfo?.username]);
 
-  // Biometric toggle state
-  const [biometricEnabled, setBiometricEnabled] = useState(true);
 
   // Theme selection state ('system' | 'light' | 'dark')
   const [selectedTheme, setSelectedTheme] = useState<'system' | 'light' | 'dark'>(() => (bgTheme === 'dark' ? 'dark' : 'light'));
@@ -386,8 +381,6 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
   const [dob, setDob] = useState(student.dob || '2008-04-12');
   const [address, setAddress] = useState(student.address || '12 Admiralty Way, Lekki Phase 1, Lagos');
 
-  // Change PIN keypad state
-  const [pin, setPin] = useState<string>('');
 
   // Password fields state
   const [currentPassword, setCurrentPassword] = useState('');
@@ -399,7 +392,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
   const [payAmount, setPayAmount] = useState<number>(
     student.outstandingBalance > 0 ? student.outstandingBalance : 15000
   );
-  const [paymentMode, setPaymentMode] = useState<'Bank Transfer' | 'Card' | 'Cash'>('Bank Transfer');
+  const [paymentMode, setPaymentMode] = useState<'Bank Transfer' | 'Cash'>('Bank Transfer');
   const [paymentNote, setPaymentNote] = useState('');
   const [evidenceDataUrl, setEvidenceDataUrl] = useState<string | null>(null);
   const [evidenceFileName, setEvidenceFileName] = useState<string>('');
@@ -548,35 +541,6 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
       title: 'Profile Updated',
       description: 'Candidate personal details have been updated successfully.',
     });
-    setActiveModal(null);
-  };
-
-  // Handle PIN Keypad press
-  const handlePinKey = (digit: string) => {
-    if (pin.length < 4) {
-      setPin((prev) => prev + digit);
-    }
-  };
-
-  const handlePinBackspace = () => {
-    setPin((prev) => prev.slice(0, -1));
-  };
-
-  const handleConfirmPin = () => {
-    if (pin.length !== 4) {
-      addToast({
-        type: 'error',
-        title: 'Incomplete PIN',
-        description: 'Please enter all 4 digits of your security PIN.',
-      });
-      return;
-    }
-    addToast({
-      type: 'success',
-      title: 'PIN Updated',
-      description: 'Your 4-digit student portal PIN has been securely updated.',
-    });
-    setPin('');
     setActiveModal(null);
   };
 
@@ -816,21 +780,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
         </div>
 
         <div className="bg-white rounded-2xl border border-slate-200/90 divide-y divide-slate-100 shadow-2xs overflow-hidden">
-          {/* Item 1: Change Account PIN */}
-          <button
-            onClick={() => setActiveModal('change_pin')}
-            className="w-full flex items-center justify-between p-3.5 hover:bg-slate-50/80 active:bg-slate-100/80 transition-colors text-left group"
-          >
-            <div className="flex items-center space-x-3">
-              <div className="w-9 h-9 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-                <Lock className="w-4.5 h-4.5" />
-              </div>
-              <span className="text-sm font-semibold text-slate-800">Change Account PIN</span>
-            </div>
-            <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-slate-600 transition-colors" />
-          </button>
-
-          {/* Item 2: Change Password */}
+          {/* Item 1: Change Password */}
           <button
             onClick={() => setActiveModal('change_password')}
             className="w-full flex items-center justify-between p-3.5 hover:bg-slate-50/80 active:bg-slate-100/80 transition-colors text-left group"
@@ -843,40 +793,6 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
             </div>
             <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-slate-600 transition-colors" />
           </button>
-
-          {/* Item 3: Enable Biometric (Interactive toggle matching video 00:02) */}
-          <div className="w-full flex items-center justify-between p-3.5">
-            <div className="flex items-center space-x-3">
-              <div className="w-9 h-9 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-                <Fingerprint className="w-4.5 h-4.5" />
-              </div>
-              <span className="text-sm font-semibold text-slate-800">Enable Biometric</span>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => {
-                const nextState = !biometricEnabled;
-                setBiometricEnabled(nextState);
-                addToast({
-                  type: 'success',
-                  title: nextState ? 'Biometrics Enabled' : 'Biometrics Disabled',
-                  description: nextState
-                    ? 'Fingerprint & FaceID active for quick portal authentication.'
-                    : 'Biometric sign-in turned off.',
-                });
-              }}
-              className={`w-11 h-6 rounded-full transition-colors relative focus:outline-none ${
-                biometricEnabled ? 'bg-slate-900' : 'bg-slate-300'
-              }`}
-            >
-              <span
-                className={`w-5 h-5 rounded-full bg-white shadow-md block transform transition-transform ${
-                  biometricEnabled ? 'translate-x-5' : 'translate-x-0.5'
-                }`}
-              />
-            </button>
-          </div>
 
           {/* Item 4: Appearance */}
           <button
@@ -1615,7 +1531,6 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                       <div className="grid grid-cols-3 gap-2">
                         {[
                           { mode: 'Bank Transfer' as const, label: 'Bank Transfer', icon: Building2 },
-                          { mode: 'Card' as const, label: 'Card / POS', icon: CreditCard },
                           { mode: 'Cash' as const, label: 'Cash Payment', icon: Banknote },
                         ].map(({ mode, label, icon: ModeIcon }) => (
                           <button
@@ -1635,8 +1550,8 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                       </div>
                     </div>
 
-                    {/* Conditional Box: Bank Transfer / Card */}
-                    {(paymentMode === 'Bank Transfer' || paymentMode === 'Card') && (
+                    {/* Conditional Box: Bank Transfer */}
+                    {paymentMode === 'Bank Transfer' && (
                       <div className="space-y-3">
                         {/* Center Account Details */}
                         <div className="p-3.5 bg-blue-50/80 border border-blue-200 rounded-xl space-y-2">
@@ -1651,18 +1566,19 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                           <div className="bg-white/90 p-2.5 rounded-lg border border-blue-100 space-y-1">
                             <div className="flex justify-between items-center text-xs">
                               <span className="text-slate-500 font-medium">Bank Name:</span>
-                              <span className="font-bold text-slate-900">{settings.bankName || 'Access Bank Plc'}</span>
+                              <span className="font-bold text-slate-900">{settings.bankName || 'Not provided yet'}</span>
                             </div>
                             <div className="flex justify-between items-center text-xs">
                               <span className="text-slate-500 font-medium">Account Number:</span>
                               <div className="flex items-center gap-1.5">
                                 <span className="font-mono font-black text-slate-900 tracking-wider">
-                                  {settings.bankAccountNumber || '0123456789'}
+                                  {settings.bankAccountNumber || 'Not provided yet'}
                                 </span>
                                 <button
                                   type="button"
-                                  onClick={() => handleCopy(settings.bankAccountNumber || '0123456789', 'acc_num')}
-                                  className="p-1 rounded bg-blue-50 hover:bg-blue-100 text-blue-700 cursor-pointer"
+                                  onClick={() => handleCopy(settings.bankAccountNumber || '', 'acc_num')}
+                                  disabled={!settings.bankAccountNumber}
+                                  className={`p-1 rounded text-blue-700 ${settings.bankAccountNumber ? 'bg-blue-50 hover:bg-blue-100 cursor-pointer' : 'bg-slate-100 text-slate-300 cursor-not-allowed'}`}
                                   title="Copy Account Number"
                                 >
                                   {copiedKey === 'acc_num' ? (
@@ -1676,7 +1592,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                             <div className="flex justify-between items-center text-xs">
                               <span className="text-slate-500 font-medium">Account Name:</span>
                               <span className="font-bold text-slate-900 truncate max-w-[180px]">
-                                {settings.bankAccountName || centreName}
+                                {settings.bankAccountName || 'Not provided yet'}
                               </span>
                             </div>
                           </div>
@@ -1977,92 +1893,6 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
             )}
 
             {/* MODAL 5: Change Account PIN (Exact Match to video 00:05!) */}
-            {activeModal === 'change_pin' && (
-              <div className="p-6 overflow-y-auto space-y-4">
-                <div className="flex items-start justify-between">
-                  <div className="w-full text-center">
-                    {/* Pink/Rose icon circle */}
-                    <div className="w-14 h-14 rounded-full bg-rose-50 text-rose-500 flex items-center justify-center mx-auto mb-2">
-                      <Lock className="w-7 h-7" />
-                    </div>
-                    <h3 className="text-lg font-black text-slate-900">Current PIN</h3>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Enter your current 4-digit security PIN
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => {
-                      setPin('');
-                      setActiveModal(null);
-                    }}
-                    className="absolute right-5 top-5 p-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-
-                {/* 4 PIN Dots */}
-                <div className="flex justify-center items-center space-x-4 my-6">
-                  {[0, 1, 2, 3].map((index) => (
-                    <div
-                      key={index}
-                      className={`w-4 h-4 rounded-full border-2 transition-all ${
-                        pin.length > index
-                          ? 'bg-slate-900 border-slate-900 scale-110'
-                          : 'border-slate-300 bg-transparent'
-                      }`}
-                    />
-                  ))}
-                </div>
-
-                {/* Number Keypad (1-9, 0, backspace) */}
-                <div className="grid grid-cols-3 gap-2.5 max-w-xs mx-auto">
-                  {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((digit) => (
-                    <button
-                      key={digit}
-                      type="button"
-                      onClick={() => handlePinKey(digit)}
-                      className="py-3.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-900 font-bold text-lg active:scale-95 transition-all shadow-2xs"
-                    >
-                      {digit}
-                    </button>
-                  ))}
-                  <div />
-                  <button
-                    type="button"
-                    onClick={() => handlePinKey('0')}
-                    className="py-3.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-900 font-bold text-lg active:scale-95 transition-all shadow-2xs"
-                  >
-                    0
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handlePinBackspace}
-                    className="py-3.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm active:scale-95 transition-all flex items-center justify-center shadow-2xs"
-                    title="Backspace"
-                  >
-                    <Delete className="w-5 h-5" />
-                  </button>
-                </div>
-
-                <div className="pt-3 max-w-xs mx-auto">
-                  <button
-                    type="button"
-                    onClick={handleConfirmPin}
-                    disabled={pin.length < 4}
-                    className={`w-full py-3.5 rounded-xl font-bold text-sm transition-all shadow-md ${
-                      pin.length === 4
-                        ? 'bg-slate-900 text-white hover:bg-black active:scale-98'
-                        : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                    }`}
-                  >
-                    Next
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* MODAL 6: Change Password */}
             {activeModal === 'change_password' && (
               <div className="p-6 overflow-y-auto space-y-4">
                 <div className="flex items-start justify-between">

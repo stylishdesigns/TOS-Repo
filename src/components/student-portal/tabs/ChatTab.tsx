@@ -195,7 +195,6 @@ const RULES_SEEN_KEY = 'tos-chat-rules-seen-v1';
 
 interface ChatTabProps {
   student: Student;
-  onGoToProfile?: () => void;
   onGoToPractice?: () => void;
   onHideBottomNav?: (hide: boolean) => void;
   // Phase 1 A: the orb badge in the shell reads this instead of polling.
@@ -207,7 +206,7 @@ interface ChatTabProps {
 // The chat list's last good copy, scoped to this student and kept across
 // full reloads, so the list renders straight away while the refresh runs
 // behind it.
-export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoToPractice, onHideBottomNav, onUnreadTotal, view = 'chats' }) => {
+export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToPractice, onHideBottomNav, onUnreadTotal, view = 'chats' }) => {
   const [listImage, setListImage] = useState('');
   const [listImageName, setListImageName] = useState('');
   const cachedOverview = loadLastGood<ChatOverview>(`chat:overview:${student.id}`);
@@ -456,24 +455,6 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
         </div>
       )}
 
-      {!error && overview && !overview.username && (
-        <div className="bg-orange-50 rounded-3xl p-4 border border-orange-100 flex items-center gap-3">
-          <Info className="w-5 h-5 text-orange-600 shrink-0" />
-          <div className="flex-1">
-            <p className="text-xs font-bold text-slate-800">Set your username first</p>
-            <p className="text-[11px] text-slate-500 font-medium">Your chat name is the one you set for mocks.</p>
-          </div>
-          {onGoToProfile && (
-            <button
-              onClick={onGoToProfile}
-              className="px-3 py-2 rounded-xl bg-orange-600 text-white text-[11px] font-black shrink-0 active:scale-95 transition"
-            >
-              Go to Profile
-            </button>
-          )}
-        </div>
-      )}
-
       {!error && overview?.paused && (
         <div className="bg-amber-50 rounded-3xl p-4 border border-amber-100 flex items-center gap-3">
           <ShieldAlert className="w-5 h-5 text-amber-600 shrink-0" />
@@ -497,7 +478,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
         <button
           onClick={() => setPickerOpen(true)}
           className="fixed bottom-24 right-4 z-40 w-14 h-14 rounded-full text-white flex items-center justify-center shadow-xl active:scale-95 transition"
-          style={{ background: 'linear-gradient(145deg, #EA580C, #9A3412)' }}
+          style={{ background: 'linear-gradient(145deg, var(--brand, #EA580C), color-mix(in oklab, var(--brand, #EA580C) 60%, black))' }}
           aria-label="Start a new chat"
         >
           <UserPlus className="w-6 h-6" />

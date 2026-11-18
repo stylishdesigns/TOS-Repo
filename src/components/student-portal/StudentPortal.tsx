@@ -56,7 +56,15 @@ const ChatOrbIcon: React.FC<{ className?: string }> = ({ className }) => (
 export type TabType = 'home' | 'classes' | 'chat' | 'cbt' | 'results' | 'more';
 
 export const StudentPortal: React.FC = () => {
-  const { students, settings, isAdmin, attendanceSettings, attendanceLogs, entitlements, centreName, bgTheme } = useApp();
+  const { students, settings, isAdmin, attendanceSettings, attendanceLogs, entitlements, centreName, bgTheme, activeCentre } = useApp();
+
+  // The facility's own accent drives the orb and fan menu; orange only where
+  // the facility has saved no brand color of its own.
+  const brandAccent = /^#[0-9a-fA-F]{6}$/.test(String(activeCentre?.accentColor || ''))
+    ? String(activeCentre?.accentColor)
+    : '#EA580C';
+  const orbGradient = `linear-gradient(145deg, ${brandAccent}, color-mix(in oklab, ${brandAccent} 60%, black))`;
+  const orbShadowClosed = `0 0 0 5px color-mix(in srgb, ${brandAccent} 22%, transparent), 0 10px 24px color-mix(in srgb, ${brandAccent} 50%, transparent), inset 0 2px 0 rgba(255,255,255,.35)`;
 
   const { user, loading: authLoading } = useFirebase();
   const [profileLoading, setProfileLoading] = useState(true);
@@ -691,7 +699,6 @@ export const StudentPortal: React.FC = () => {
             {activeTab === 'chat' && (
               <ChatTab
                 student={activeStudent}
-                onGoToProfile={() => setActiveTab('more')}
                 onGoToPractice={() => setActiveTab('cbt')}
                 onHideBottomNav={setHideBottomNav}
                 onUnreadTotal={setOrbUnread}
@@ -906,14 +913,14 @@ export const StudentPortal: React.FC = () => {
                           height: 62,
                           background: '#FFFFFF',
                           border: '4px solid #020617',
-                          boxShadow: '0 0 0 5px rgba(234,88,12,.18), 0 10px 24px rgba(15,23,42,.35)',
+                          boxShadow: `0 0 0 5px color-mix(in srgb, ${brandAccent} 18%, transparent), 0 10px 24px rgba(15,23,42,.35)`,
                         }
                       : {
                           width: 62,
                           height: 62,
-                          background: 'linear-gradient(145deg, #EA580C, #9A3412)',
+                          background: orbGradient,
                           border: '4px solid #020617',
-                          boxShadow: '0 0 0 5px rgba(234,88,12,.22), 0 10px 24px rgba(234,88,12,.5), inset 0 2px 0 rgba(255,255,255,.35)',
+                          boxShadow: orbShadowClosed,
                         }
                   }
                 >
@@ -960,7 +967,7 @@ export const StudentPortal: React.FC = () => {
                     onClick={fanWing(() => openChatSection('chats'))}
                     aria-label="Chats"
                     className={`absolute w-14 h-14 rounded-full text-white flex items-center justify-center shadow-xl cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-200 ${prefersReducedMotion ? '' : 'animate-in fade-in zoom-in-95 duration-200'}`}
-                    style={{ left: 0, top: -84, transform: 'translate(-50%, -50%)', background: 'linear-gradient(145deg, #EA580C, #9A3412)' }}
+                    style={{ left: 0, top: -84, transform: 'translate(-50%, -50%)', background: orbGradient }}
                   >
                     <MessageCircle className="w-7 h-7" />
                     <span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 whitespace-nowrap text-[11px] font-bold text-white pointer-events-none">

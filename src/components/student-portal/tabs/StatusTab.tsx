@@ -1614,7 +1614,7 @@ export const StatusScreenCore: React.FC<{ call: (path: string, opts?: any) => Pr
             aria-expanded={fanOpen}
             onClick={() => setFanOpen((o) => !o)}
             className={`absolute bottom-24 right-4 w-14 h-14 rounded-full text-white flex items-center justify-center shadow-xl cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-200 pointer-events-auto active:scale-95 transition ${prefersReducedMotion ? '' : 'animate-in fade-in zoom-in-95 duration-200'}`}
-            style={{ background: 'linear-gradient(145deg, #EA580C, #9A3412)' }}
+            style={{ background: 'linear-gradient(145deg, var(--brand, #EA580C), color-mix(in oklab, var(--brand, #EA580C) 60%, black))' }}
           >
             {fanOpen ? <X className="w-7 h-7" /> : <Plus className="w-7 h-7" />}
           </button>
