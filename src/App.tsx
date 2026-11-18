@@ -13,6 +13,7 @@ import { TosAdminLogin } from './components/auth/TosAdminLogin';
 import { FirstLoginPasswordChange } from './components/auth/FirstLoginPasswordChange';
 import { EnterAccessCodeScreen } from './components/auth/EnterAccessCodeScreen';
 import { CentreCodeGate } from './components/auth/CentreCodeGate';
+import { AppWelcomePage } from './components/auth/AppWelcomePage';
 import { brandVars } from './lib/brand';
 import { JoinCentreScreen } from './components/auth/JoinCentreScreen';
 
@@ -121,14 +122,14 @@ const MainLayout: React.FC = () => {
       setCentreEntryFailed(false);
       return;
     }
-    const key = `${pendingCentre ? `code:${pendingCentre.code}` : 'auto'}#${centreEntryRetry}`;
+    const key = `${pendingCentre ? `code:${pendingCentre.code}|${pendingCentre.centreId || ''}` : 'auto'}#${centreEntryRetry}`;
     if (centreEntryKeyRef.current === key) return;
     centreEntryKeyRef.current = key;
     setCentreEntryFailed(false);
     setCentreEntryError(null);
     setCentreEntryWhatsapp(null);
     setCentreEntryBusy(true);
-    const work = pendingCentre ? enterCentreByCode(pendingCentre.code) : enterSoleCentre();
+    const work = pendingCentre ? enterCentreByCode(pendingCentre.code, pendingCentre.centreId) : enterSoleCentre();
     work
       .then((r: any) => {
         const ok = pendingCentre ? !!(r && r.success) : !!(r && r.entered);
@@ -189,6 +190,55 @@ const MainLayout: React.FC = () => {
   // The centre code gate appears only after a login button on the landing
   // page is clicked; the platform-staff door (#tos-admin) never shows it.
   const [centreGateRequested, setCentreGateRequested] = useState(() => window.location.hash.toLowerCase() === '#access');
+
+  // The facility app's own home screen. When the installed app (or its address)
+  // opens with a facility context, a welcome screen with the facility's photo,
+  // Get Started and Log In replaces the access-code gate, and the TOS landing
+  // page is never seen from the app.
+  const [appWelcomeCentre, setAppWelcomeCentre] = useState<{ centreId: string; centreName: string; accent: string; logoUrl: string; welcomeImageUrl: string } | null>(null);
+  const [appWelcomeMode, setAppWelcomeMode] = useState<'welcome' | 'login' | 'signup' | null>(null);
+  const appWelcomeTriedRef = useRef(false);
+  useEffect(() => {
+    if (appWelcomeTriedRef.current) return;
+    if (!centreGateRequested || currentUser || tosLoginRequested) return;
+    appWelcomeTriedRef.current = true;
+    let ref = '';
+    try {
+      const p = new URLSearchParams(window.location.search);
+      const c = p.get('centre');
+      if (c && /^[A-Za-z0-9][A-Za-z0-9_-]{2,159}$/.test(c)) ref = c;
+      if (!ref) {
+        const m = window.location.pathname.match(/^\/([A-Za-z0-9][A-Za-z0-9_-]{2,159})\/?$/);
+        if (m && !['app', 'start', 'preview', 'tos-admin', 'c'].includes(m[1].toLowerCase())) ref = m[1];
+      }
+      if (!ref) {
+        const saved = localStorage.getItem('tos:signup-result');
+        if (saved) {
+          try {
+            const s = JSON.parse(saved);
+            const slug = typeof s === 'string' ? s : String(s?.facilitySlug || s?.slug || '');
+            if (slug && /^[A-Za-z0-9][A-Za-z0-9_-]{2,159}$/.test(slug)) ref = slug;
+          } catch { /* not a facility ref */ }
+        }
+      }
+    } catch { /* facility context stays unknown; the gate still works */ }
+    if (!ref) return;
+    fetch(`/api/public/landing/${encodeURIComponent(ref)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d && d.ok && d.centreName) {
+          setAppWelcomeCentre({
+            centreId: String(d.centreId || ref),
+            centreName: String(d.centreName),
+            accent: String(d.content?.accent || ''),
+            logoUrl: String(d.logoUrl || ''),
+            welcomeImageUrl: String(d.welcomeImageUrl || ''),
+          });
+          setAppWelcomeMode('welcome');
+        }
+      })
+      .catch(() => { /* no facility context: the gate shows as usual */ });
+  }, [centreGateRequested, currentUser, tosLoginRequested]);
 
   // Platform (TOS) admins are exempt from the centre access-code gate below.
   // TOS access is the server-stamped `tos` custom claim, verified in a fresh
@@ -456,6 +506,24 @@ const MainLayout: React.FC = () => {
     setCentreGateRequested(true);
   };
 
+  // The facility app's home screen: welcome first, then login or sign-up.
+  if (!currentUser && !tosLoginRequested && centreGateRequested && appWelcomeCentre && appWelcomeMode === 'welcome') {
+    const enterFromWelcome = (mode: 'login' | 'signup') => {
+      setPendingCentre({ code: '', centreName: appWelcomeCentre.centreName, centreId: appWelcomeCentre.centreId, accent: appWelcomeCentre.accent });
+      setAppWelcomeMode(mode);
+    };
+    return (
+      <AppWelcomePage
+        centreName={appWelcomeCentre.centreName}
+        accent={appWelcomeCentre.accent}
+        logoUrl={appWelcomeCentre.logoUrl}
+        welcomeImageUrl={appWelcomeCentre.welcomeImageUrl}
+        onGetStarted={() => enterFromWelcome('signup')}
+        onLogin={() => enterFromWelcome('login')}
+      />
+    );
+  }
+
   // The centre code gate shows after a login button on the landing page is
   // clicked (the platform-staff door above is exempt). It only selects and
   // names the centre; the centre's login page follows it.
@@ -638,6 +706,28 @@ const MainLayout: React.FC = () => {
   }
 
 
+  // The facility app's login and student sign-up, reached from the app's own
+  // welcome screen. Back returns to the welcome screen, never the TOS landing.
+  if (!currentUser && appWelcomeCentre && (appWelcomeMode === 'login' || appWelcomeMode === 'signup')) {
+    return (
+      <AuthPortal
+        portalType="student"
+        title={appWelcomeCentre.centreName}
+        accent={appWelcomeCentre.accent}
+        logoUrl={appWelcomeCentre.logoUrl}
+        entryMode={appWelcomeMode}
+        subtitle=""
+        onSuccess={() => {}}
+        onBack={() => setAppWelcomeMode('welcome')}
+        centreId={appWelcomeCentre.centreId}
+        email={loginEmail}
+        onEmailChange={setLoginEmail}
+        password={loginPassword}
+        onPasswordChange={setLoginPassword}
+      />
+    );
+  }
+
   // Auth Guards for different portals
   if (viewMode === 'student' && !currentUser && !isAdmin) {
     return (
@@ -647,7 +737,7 @@ const MainLayout: React.FC = () => {
         accent={pendingCentre?.accent}
         subtitle=""
         onSuccess={() => {}}
-        onBack={() => { setShowPortals(false); setShowWelcome(true); setCentreGateRequested(false); }}
+        onBack={() => { if (appWelcomeCentre) { setAppWelcomeMode('welcome'); } else { setShowPortals(false); setShowWelcome(true); setCentreGateRequested(false); } }}
         notice={loginCentreError || undefined}
         onNoticeSignUp={() => { setLoginCentreError(null); setViewMode('student'); }}
         onNoticeCancel={() => setLoginCentreError(null)}
@@ -669,7 +759,7 @@ const MainLayout: React.FC = () => {
         accent={pendingCentre?.accent}
         subtitle=""
         onSuccess={() => {}}
-        onBack={() => { setShowPortals(false); setShowWelcome(true); setCentreGateRequested(false); }}
+        onBack={() => { if (appWelcomeCentre) { setAppWelcomeMode('welcome'); } else { setShowPortals(false); setShowWelcome(true); setCentreGateRequested(false); } }}
         notice={loginCentreError || undefined}
         onNoticeSignUp={() => { setLoginCentreError(null); setViewMode('student'); }}
         onNoticeCancel={() => setLoginCentreError(null)}

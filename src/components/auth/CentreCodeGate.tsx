@@ -191,9 +191,13 @@ export const CentreCodeGate: React.FC<CentreCodeGateProps> = ({ onProceed, onBac
         ) : (
           <div className="space-y-6">
             <div className="p-5 rounded-2xl bg-slate-800/60 border border-slate-700/60 text-center">
-              <div className="w-12 h-12 mx-auto rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-400 mb-3">
-                <Building2 className="w-6 h-6" />
-              </div>
+              {centre.logoUrl ? (
+                <img src={centre.logoUrl} alt="Facility logo" className="w-12 h-12 mx-auto rounded-xl object-contain bg-white p-1.5 mb-3 shadow-lg" />
+              ) : (
+                <div className="w-12 h-12 mx-auto rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-400 mb-3">
+                  <Building2 className="w-6 h-6" />
+                </div>
+              )}
               <p className="text-[11px] uppercase tracking-widest text-slate-500 font-bold mb-1">You are entering</p>
               <p className="text-xl font-black text-white">{centre.centreName}</p>
               {centre.suspended && (

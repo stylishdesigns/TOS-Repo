@@ -252,6 +252,8 @@ interface AppContextType {
   uploadCentreImage: (data: string, kind: 'profile' | 'facility') => Promise<string>;
   getCentreLogo: () => Promise<string>;
   saveCentreLogo: (data: string) => Promise<string>;
+  getCentreWelcomeImage: () => Promise<string>;
+  saveCentreWelcomeImage: (data: string) => Promise<string>;
   getCentreSessions: () => Promise<Array<{ id: string; device: string; ip: string; loginAt: number; lastActiveAt: number; current: boolean; revoked: boolean }>>;
   revokeCentreSession: (id: string) => Promise<void>;
   deleteAdmin: (id: string) => void;
@@ -313,7 +315,7 @@ interface AppContextType {
   entitlements: CentreEntitlements;
   seatsSummary: CentreSeatsSummary | null;
   hasCheckedActiveCentre: boolean;
-  enterCentreByCode: (code: string) => Promise<{ success: boolean; centreId?: string; error?: string }>;
+  enterCentreByCode: (code: string, centreId?: string) => Promise<{ success: boolean; centreId?: string; error?: string }>;
   enterSoleCentre: () => Promise<{ entered: boolean; count: number; error?: string; whatsapp?: string }>;
   fetchMyCentreIds: () => Promise<string[]>;
   joinCentreByCode: (code: string) => Promise<{ status: 'active' | 'pending'; centreName: string; centreId: string }>;
@@ -1192,7 +1194,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     initTenantSession();
   }, [user]);
 
-  const enterCentreByCode = async (code: string) => {
+  const enterCentreByCode = async (code: string, centreId?: string) => {
     if (!user) throw new Error('You must be signed in.');
     const token = await user.getIdToken();
     const res = await fetch('/api/auth/enter-centre', {
@@ -1201,7 +1203,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ code }),
+      body: JSON.stringify(centreId && !code.trim() ? { centreId } : { code }),
     });
 
     const data = await res.json();
@@ -1703,6 +1705,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
   const saveCentreLogo = async (data: string): Promise<string> => {
     const out = (await authedFetch('/api/centre/profile-image', { method: 'POST', body: JSON.stringify({ data, kind: 'logo', centreId: activeCentreId, remove: !data }) })) as any;
+    return String(out?.url || '');
+  };
+  const getCentreWelcomeImage = async (): Promise<string> => {
+    const out = (await authedFetch(`/api/centre/branding-logo?centreId=${encodeURIComponent(activeCentreId || '')}`)) as any;
+    return String(out?.welcomeImageUrl || '');
+  };
+  const saveCentreWelcomeImage = async (data: string): Promise<string> => {
+    const out = (await authedFetch('/api/centre/profile-image', { method: 'POST', body: JSON.stringify({ data, kind: 'welcome-image', centreId: activeCentreId, remove: !data }) })) as any;
     return String(out?.url || '');
   };
 
@@ -3046,6 +3056,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         uploadCentreImage,
         getCentreLogo,
         saveCentreLogo,
+        getCentreWelcomeImage,
+        saveCentreWelcomeImage,
         getCentreSessions,
         revokeCentreSession,
         deleteAdmin,

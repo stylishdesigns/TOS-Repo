@@ -484,6 +484,7 @@ export async function enterCentreService(params: {
   code: string;
   ip: string;
   tos?: boolean;
+  centreId?: string;
 }): Promise<{
   centreId: string;
   centre: Centre;
@@ -492,6 +493,8 @@ export async function enterCentreService(params: {
 }> {
   const { uid, userEmail, code } = params;
   const caller: Caller = { uid, email: userEmail, tos: Boolean(params.tos), claims: {} };
+  // The facility app flow enters by centre id with no code.
+  const forcedCentreId = params.centreId && /^[a-zA-Z0-9_-]{3,160}$/.test(params.centreId) ? params.centreId : null;
   const cleanCode = code.trim();
   const rateLimitKey = `${uid || userEmail || 'anon'}:${params.ip}`;
 
@@ -503,8 +506,9 @@ export async function enterCentreService(params: {
     );
   }
 
-  // 1. Look the code up in Firestore only.
-  let centreId: string | null = null;
+  // 1. Resolve the facility: by id for the app flow, else by access code.
+  let centreId: string | null = forcedCentreId;
+  if (!centreId) {
   try {
     const codeDoc = await adminDb.collection('accessCodes').doc(cleanCode).get();
     if (codeDoc.exists) centreId = codeDoc.data()?.centreId || null;
@@ -540,6 +544,7 @@ export async function enterCentreService(params: {
       dbFailure('enterCentreService(facility-doc fallback)', err);
     }
   }
+  }
 
   const failWith = async (reason: string) => {
     try {
@@ -570,7 +575,22 @@ export async function enterCentreService(params: {
   // that centre's own accounts, never by entering its access code.
   // One shared membership lookup (Login hotfix): the same legacy shapes
   // enter-centre always accepted are now exactly what my-centres reports.
-  const membership: CentreMembership | null = await findCentreMembership(uid, centreId, userEmail);
+  let membership: CentreMembership | null = await findCentreMembership(uid, centreId, userEmail);
+  if (!membership && forcedCentreId) {
+    // The facility's own app enrolls by itself: a student who signed up
+    // inside the app is bound to this facility on their student record,
+    // so the record itself creates the student membership here.
+    try {
+      const stu = await adminDb.collection('students').doc(uid).get();
+      if (stu.exists && String((stu.data() as any)?.centreId || '') === forcedCentreId) {
+        const row: CentreMembership = { uid, centreId: forcedCentreId, role: 'student', status: 'active', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+        await adminDb.collection('memberships').doc(`${uid}__${forcedCentreId}`).set(row, { merge: true });
+        membership = row;
+      }
+    } catch (err) {
+      dbFailure('enterCentreService(app enrolment)', err);
+    }
+  }
   if (!membership) {
     await failWith('membership-missing');
   }

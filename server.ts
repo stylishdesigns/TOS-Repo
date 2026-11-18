@@ -505,8 +505,16 @@ async function startServer() {
   app.post("/api/auth/enter-centre", async (req, res) => {
     try {
       const caller = await getCaller(req);
-      const { code } = req.body;
+      const { code, centreId } = req.body;
       const ip = (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || "127.0.0.1";
+
+      // The facility's own app boots on its own address, so the app flow
+      // enters by centre id with no code: the facility context rode in
+      // with the app itself.
+      if (centreId && typeof centreId === "string" && /^[a-zA-Z0-9_-]{3,160}$/.test(centreId)) {
+        const result = await enterCentreService({ uid: caller.uid, userEmail: caller.email, code: "", ip, tos: caller.tos, centreId });
+        return res.json({ success: true, ...result });
+      }
 
       if (!code || typeof code !== "string" || code.trim().length !== 6) {
         return res.status(400).json({ error: "That code did not match. Check it and try again." });

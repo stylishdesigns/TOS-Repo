@@ -52,6 +52,10 @@ interface AuthPortalProps {
   noticeModal?: boolean;
   onChangeAccessCode?: () => void;
   verifying?: boolean;
+  logoUrl?: string;
+  entryMode?: 'login' | 'signup';
+  centreId?: string;
+  previewOnly?: boolean;
   email: string;
   onEmailChange: (v: string) => void;
   password: string;
@@ -71,6 +75,10 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
   noticeModal,
   onChangeAccessCode,
   verifying,
+  logoUrl,
+  entryMode,
+  centreId,
+  previewOnly,
   email,
   onEmailChange,
   password,
@@ -86,7 +94,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
   const [showPassword, setShowPassword] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [resetSent, setResetSent] = useState(false);
-  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
+  const [authMode, setAuthMode] = useState<'login' | 'signup'>(entryMode === 'signup' ? 'signup' : 'login');
 
   // New Password Flow
   const [needsPasswordChange, setNeedsPasswordChange] = useState(false);
@@ -144,6 +152,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (previewOnly) { setError('Preview only. Nothing is signed in or created on this link.'); return; }
     setIsLoading(true);
     setError(null);
     const cleanEmail = email.trim().toLowerCase();
@@ -315,6 +324,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
 
   const handleStudentSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (previewOnly) { setError('Preview only. Nothing is signed in or created on this link.'); return; }
     setIsLoading(true);
     setError(null);
 
@@ -345,7 +355,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
           programmeName: 'General Student',
           courses: []
         };
-        await setDoc(doc(db, 'students', uid), { ...newStudent, ...(activeCentreId ? { centreId: activeCentreId } : {}) });
+        await setDoc(doc(db, 'students', uid), { ...newStudent, ...((centreId || activeCentreId) ? { centreId: centreId || activeCentreId } : {}) });
       }
 
       addToast({
@@ -522,9 +532,13 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
       <div className="min-h-screen w-full flex flex-col items-center justify-center py-8 md:py-12 px-4">
         <div className="w-full max-w-md bg-white rounded-[2.5rem] shadow-2xl shadow-black/50 border border-white/10 overflow-hidden animate-in fade-in zoom-in-95 duration-500 relative">
           <div className={`p-8 ${accent ? '' : style.bg} border-b ${style.border} text-center relative`} style={accent ? { background: 'var(--brand)' } : undefined}>
-          <div className={`w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-black/5`} style={accent ? { background: 'color-mix(in oklab, var(--on-brand) 22%, transparent)', color: 'var(--on-brand)' } : undefined}>
-            {style.icon}
-          </div>
+          {logoUrl ? (
+            <img src={logoUrl} alt="Facility logo" className="w-14 h-14 rounded-xl object-contain bg-white p-1.5 mx-auto mb-4 shadow-lg" />
+          ) : (
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-black/5`} style={accent ? { background: 'color-mix(in oklab, var(--on-brand) 22%, transparent)', color: 'var(--on-brand)' } : undefined}>
+              {style.icon}
+            </div>
+          )}
           <h1 className="text-2xl font-bold text-slate-900" style={accent ? { color: 'var(--on-brand)' } : undefined}>{title}</h1>
           <p className="text-slate-500 text-sm mt-1" style={accent ? { color: 'var(--on-brand)', opacity: 0.78 } : undefined}>{subtitle}</p>
         </div>
@@ -700,25 +714,6 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
             </form>
           ) : (
             <div className="space-y-6">
-              {portalType === 'student' && !isResetting && (
-                <div className="flex p-1 bg-slate-100 rounded-2xl mb-2">
-                  <button
-                    type="button"
-                    onClick={() => setAuthMode('login')}
-                    className={`flex-1 py-2.5 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${authMode === 'login' ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-                  >
-                    Sign In
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setAuthMode('signup')}
-                    className={`flex-1 py-2.5 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${authMode === 'signup' ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-                  >
-                    Sign Up
-                  </button>
-                </div>
-              )}
-
               <form onSubmit={authMode === 'login' ? handleEmailLogin : handleStudentSignup} className="space-y-4">
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black text-slate-700 uppercase tracking-[0.2em] px-1">
@@ -833,7 +828,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
                     className="w-full mt-2 flex items-center justify-center space-x-2 py-3 border border-dashed border-slate-200 rounded-xl text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-all text-[10px] font-black uppercase tracking-widest disabled:opacity-50"
                   >
                     <ArrowRight className="w-4 h-4 rotate-180 opacity-50" />
-                    <span>Back to landing page</span>
+                    <span>Back to home</span>
                   </button>
                 )}
 

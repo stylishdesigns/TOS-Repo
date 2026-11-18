@@ -39,6 +39,7 @@ export function registerLandingRoutes(app: express.Express): void {
       let centreName = "Our education facility";
       let centrePhone = "";
       let logoUrl = "";
+      let welcomeImageUrl = "";
       try {
         const centreSnap = await adminDb.collection("centres").doc(resolvedId).get();
         if (centreSnap.exists) {
@@ -48,6 +49,7 @@ export function registerLandingRoutes(app: express.Express): void {
           }
           if (data && typeof data.phone === "string") centrePhone = data.phone;
           if (data && typeof data.logoUrl === "string") logoUrl = data.logoUrl;
+          if (data && typeof data.welcomeImageUrl === "string") welcomeImageUrl = data.welcomeImageUrl;
         }
       } catch {
         // Name lookup failure must not break the page; fall back to the default.
@@ -116,7 +118,7 @@ export function registerLandingRoutes(app: express.Express): void {
       }
 
       res.set("Cache-Control", "public, max-age=60");
-      return res.json({ ok: true, published, centreName, content, whatsapp, appSlug, appIcon: appIcon || "/pwa-512x512.png" });
+      return res.json({ ok: true, published, centreName, centreId: resolvedId, logoUrl, welcomeImageUrl, content, whatsapp, appSlug, appIcon: appIcon || "/pwa-512x512.png" });
     } catch (err) {
       console.error("[landing] GET /api/public/landing failed:", err);
       return res.status(500).json({ error: "Could not load this facility's website." });

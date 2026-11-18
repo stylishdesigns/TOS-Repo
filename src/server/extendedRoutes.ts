@@ -338,21 +338,22 @@ export function registerExtendedRoutes(app: express.Express): void {
       // same place the signup puts it, so the facility landing page, the app
       // manifest and the app install page all pick the new logo up.
       const isLogo = kind === 'logo';
+      const isWelcome = kind === 'welcome-image';
       const centreId = String(req.body?.centreId || '');
-      if (isLogo) {
+      if (isLogo || isWelcome) {
         if (!/^[a-zA-Z0-9_-]{3,160}$/.test(centreId)) return res.status(400).json({ error: 'A valid facility id is required.' });
         await requireMembership(caller, centreId, ['owner']);
       }
-      const maxBytes = kind === 'facility' ? 4 * 1024 * 1024 : 2 * 1024 * 1024;
-      const folder = kind === 'facility' ? 'tos/facility' : isLogo ? 'tos/logos' : 'tos/profiles';
+      const maxBytes = kind === 'facility' || isWelcome ? 4 * 1024 * 1024 : 2 * 1024 * 1024;
+      const folder = kind === 'facility' ? 'tos/facility' : isLogo ? 'tos/logos' : isWelcome ? 'tos/welcome' : 'tos/profiles';
       const ip = clientIp(req);
       if (!(await countRateLimit(`img-${ip.replace(/\W/g, '')}`, 40, 60 * 60 * 1000))) {
         return res.status(429).json({ error: 'Too many uploads. Please try again later.' });
       }
       const dataUrl = String(req.body?.data || '');
-      if (isLogo && req.body?.remove === true) {
-        await adminDb.collection('centres').doc(centreId).set({ logoUrl: '' }, { merge: true });
-        await audit({ actorUid: caller.uid, centreId, action: 'FACILITY_LOGO_REMOVED', before: null, after: null });
+      if ((isLogo || isWelcome) && req.body?.remove === true) {
+        await adminDb.collection('centres').doc(centreId).set(isWelcome ? { welcomeImageUrl: '' } : { logoUrl: '' }, { merge: true });
+        await audit({ actorUid: caller.uid, centreId, action: isWelcome ? 'FACILITY_WELCOME_IMAGE_REMOVED' : 'FACILITY_LOGO_REMOVED', before: null, after: null });
         return res.json({ ok: true, url: '' });
       }
       const m = /^data:(image\/(?:png|jpe?g|webp));base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl);
@@ -372,9 +373,9 @@ export function registerExtendedRoutes(app: express.Express): void {
       const data: any = await resp.json().catch(() => null);
       const url = data && typeof data.secure_url === 'string' ? data.secure_url : '';
       if (!resp.ok || !url) return res.status(502).json({ error: 'The image could not be uploaded. Please try again.' });
-      if (isLogo) {
-        await adminDb.collection('centres').doc(centreId).set({ logoUrl: url }, { merge: true });
-        await audit({ actorUid: caller.uid, centreId, action: 'FACILITY_LOGO_UPDATED', before: null, after: { logoUrl: url } });
+      if (isLogo || isWelcome) {
+        await adminDb.collection('centres').doc(centreId).set(isWelcome ? { welcomeImageUrl: url } : { logoUrl: url }, { merge: true });
+        await audit({ actorUid: caller.uid, centreId, action: isWelcome ? 'FACILITY_WELCOME_IMAGE_UPDATED' : 'FACILITY_LOGO_UPDATED', before: null, after: isWelcome ? { welcomeImageUrl: url } : { logoUrl: url } });
       }
       res.json({ ok: true, url });
     } catch (error: any) {
@@ -392,7 +393,7 @@ export function registerExtendedRoutes(app: express.Express): void {
       if (!/^[a-zA-Z0-9_-]{3,160}$/.test(centreId)) return res.status(400).json({ error: 'A valid facility id is required.' });
       await requireMembership(caller, centreId, ['owner']);
       const snap = await adminDb.collection('centres').doc(centreId).get();
-      res.json({ ok: true, logoUrl: String((snap.data() as any)?.logoUrl || ''), accentColor: String((snap.data() as any)?.accentColor || '') });
+      res.json({ ok: true, logoUrl: String((snap.data() as any)?.logoUrl || ''), welcomeImageUrl: String((snap.data() as any)?.welcomeImageUrl || ''), accentColor: String((snap.data() as any)?.accentColor || '') });
     } catch (error: any) {
       console.error('[branding-logo] failed:', error?.message || error);
       res.status(error?.status || 500).json({ error: error?.message || 'Could not load the facility logo.' });
@@ -682,6 +683,7 @@ export function registerExtendedRoutes(app: express.Express): void {
         logoUrl: typeof c.logoUrl === 'string' ? c.logoUrl : '',
         accentColor: typeof c.accentColor === 'string' ? c.accentColor : '',
         suspended: c.status === 'suspended' || c.status === 'closed',
+        welcomeImageUrl: typeof c.welcomeImageUrl === 'string' ? c.welcomeImageUrl : '',
       });
     } catch (error: any) {
       console.error('[facility-by-code] lookup failed:', error?.message || error);

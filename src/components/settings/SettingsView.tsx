@@ -30,7 +30,7 @@ import {
 } from 'lucide-react';
 
 export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode = 'profile' }) => {
-  const { settings, updateSettings, addToast, authMethod, activeUser, activeCentre, updateAdmin, uploadCentreImage, getCentreSessions, revokeCentreSession, getCentreLogo, saveCentreLogo, activeCentreId } = useApp();
+  const { settings, updateSettings, addToast, authMethod, activeUser, activeCentre, updateAdmin, uploadCentreImage, getCentreSessions, revokeCentreSession, getCentreLogo, saveCentreLogo, getCentreWelcomeImage, saveCentreWelcomeImage, activeCentreId } = useApp();
 
   const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'sessions'>('profile');
 
@@ -86,6 +86,54 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
       addToast({ type: 'error', title: 'Remove Failed', description: err?.message || 'The logo could not be removed. Please try again.' });
     } finally {
       setLogoBusy(false);
+    }
+  };
+
+  // ---- Welcome image: the picture families see when the installed app opens
+  // before they sign in. Upload, replace and remove, like the logo above; up
+  // to 4 MB so phone photos work.
+  const welcomeInputRef = useRef<HTMLInputElement>(null);
+  const [centreWelcome, setCentreWelcome] = useState('');
+  const [welcomeBusy, setWelcomeBusy] = useState(false);
+  React.useEffect(() => {
+    if (mode !== 'facility' || !activeCentreId) return;
+    getCentreWelcomeImage().then(setCentreWelcome).catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, activeCentreId]);
+  const handleWelcomePick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file: File | undefined = (e.target.files || [])[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!/^image\/(png|jpe?g|webp)$/i.test(file.type)) {
+      addToast({ type: 'error', title: 'Unsupported Image', description: `${file.name} is not a PNG, JPG or WebP picture.` });
+      return;
+    }
+    if (file.size > 4 * 1024 * 1024) {
+      addToast({ type: 'error', title: 'Image Too Large', description: 'The welcome image can be up to 4 MB. Choose a smaller picture.' });
+      return;
+    }
+    try {
+      setWelcomeBusy(true);
+      const dataUrl = await readFileAsDataUrl(file);
+      const url = await saveCentreWelcomeImage(dataUrl);
+      setCentreWelcome(url);
+      addToast({ type: 'success', title: 'Welcome Image Updated', description: 'The new image shows when the app opens before sign-in.' });
+    } catch (err: any) {
+      addToast({ type: 'error', title: 'Upload Failed', description: err?.message || 'The welcome image could not be uploaded. Please try again.' });
+    } finally {
+      setWelcomeBusy(false);
+    }
+  };
+  const handleWelcomeRemove = async () => {
+    try {
+      setWelcomeBusy(true);
+      await saveCentreWelcomeImage('');
+      setCentreWelcome('');
+      addToast({ type: 'success', title: 'Welcome Image Removed', description: 'The default students image shows again.' });
+    } catch (err: any) {
+      addToast({ type: 'error', title: 'Remove Failed', description: err?.message || 'The welcome image could not be removed. Please try again.' });
+    } finally {
+      setWelcomeBusy(false);
     }
   };
 
@@ -788,6 +836,45 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
               </div>
             </div>
             <input ref={logoInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={handleLogoPick} />
+          </div>
+
+          {/* Welcome image: the picture on the app's welcome screen. Every
+              facility starts on a default students image and can replace it. */}
+          <div className="bg-white p-5 sm:p-6 rounded-xl border border-slate-200/90 shadow-xs space-y-4">
+            <div className="border-b border-slate-100 pb-3">
+              <h3 className="text-base font-bold text-slate-900">Welcome Image</h3>
+              <p className="text-xs text-slate-500">
+                The picture families see when your app opens, above Get Started and Log In. A photo of your centre or a graphic both work. A tall portrait image (three by four) fills the card best; every facility starts with a default students image until you change it.
+              </p>
+            </div>
+            <div className="flex items-center gap-4">
+              {centreWelcome ? (
+                <img src={centreWelcome} alt="Welcome image" className="w-20 h-28 rounded-xl object-cover border border-slate-200 shrink-0" />
+              ) : (
+                <img src="/welcome-default.jpg" alt="Default welcome image" className="w-20 h-28 rounded-xl object-cover border border-slate-200 shrink-0" />
+              )}
+              <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={() => welcomeInputRef.current?.click()}
+                  disabled={welcomeBusy}
+                  className="px-4 py-2 text-xs font-semibold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg shadow-sm disabled:opacity-60 w-fit"
+                >
+                  {welcomeBusy ? 'Uploading…' : centreWelcome ? 'Replace image' : 'Upload your own image'}
+                </button>
+                {centreWelcome && !welcomeBusy && (
+                  <button
+                    type="button"
+                    onClick={handleWelcomeRemove}
+                    className="px-4 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 rounded-lg border border-rose-200 w-fit"
+                  >
+                    Remove image
+                  </button>
+                )}
+                <p className="text-[11px] text-slate-400">PNG, JPG or WebP, up to 4 MB.</p>
+              </div>
+            </div>
+            <input ref={welcomeInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={handleWelcomePick} />
           </div>
 
           {/* Facility photos: up to 5 images of the facility, hosted on Cloudinary. */}
