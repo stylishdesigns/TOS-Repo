@@ -1,7 +1,6 @@
 import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
-import { PreviewOnboarding } from './components/public/PreviewOnboarding';
 import { PublicLandingPage } from './components/landing/PublicLandingPage';
 import { AppInstallPage } from './components/public/AppInstallPage';
 import { SignupStartPage, SignupConfirmPage, SignupAppPage } from './components/public/landing/SignupFlow';
@@ -97,7 +96,6 @@ const appFlowMatch = window.location.pathname.match(/^\/start\/app\/?$/);
 // with every space and symbol removed and never shortened. Reserved
 // single-segment paths (the app install page, the signup flow) never match.
 const RESERVED_ROOT = ['app', 'start', 'api', 'tos', 'login', 'admin', 'support', 'preview'];
-const previewOnboardingMatch = /^\/preview\/?$/.test(window.location.pathname);
 
 const rootLandingMatch = (() => {
   const m = window.location.pathname.match(/^\/([A-Za-z0-9][A-Za-z0-9_-]{2,159})\/?$/);
@@ -119,8 +117,6 @@ createRoot(document.getElementById('root')!).render(
     <SignupAppPage />
   ) : rootLandingMatch ? (
     <PublicLandingPage centreId={rootLandingMatch[1]} />
-  ) : previewOnboardingMatch ? (
-    <PreviewOnboarding />
   ) : (
     <App />
   )}
