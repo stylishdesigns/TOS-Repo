@@ -27,7 +27,27 @@
     <meta name="twitter:card" content="summary_large_image" />
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div id="boot-splash" style="position:fixed;inset:0;background:#0f172a;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:2147483647;">
+        <style>
+          @keyframes boot-spin { to { transform: rotate(360deg); } }
+          #boot-splash .ring {
+            width: 96px; height: 96px; border-radius: 50%;
+            border: 4px solid rgba(234,88,12,0.2);
+            border-top-color: #EA580C;
+            animation: boot-spin 0.9s linear infinite;
+            display: flex; align-items: center; justify-content: center;
+            margin-bottom: 32px;
+          }
+          #boot-splash .dot { width: 8px; height: 8px; border-radius: 50%; background: #EA580C; }
+          #boot-splash .name { color: #EA580C; font-weight: 900; letter-spacing: 0.1em; text-transform: uppercase; font-size: 20px; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; }
+          #boot-splash .note { color: #94a3b8; font-size: 12px; margin-top: 8px; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; }
+        </style>
+        <div class="ring"><div class="dot"></div></div>
+        <div class="name">Tutorial OS</div>
+        <div class="note">Loading your facility app...</div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

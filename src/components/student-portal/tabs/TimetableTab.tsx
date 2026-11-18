@@ -267,7 +267,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({ student }) => {
                   }}
                   className={`py-2 px-1 rounded-[20px] text-center transition-all border cursor-pointer flex flex-col items-center justify-between min-h-[64px] active:scale-95 ${
                     isSelected
-                      ? 'bg-[#C2410C] text-white border-[#C2410C] shadow-sm'
+                      ? 'bg-orange-700 text-white border-orange-700 shadow-sm'
                       : 'bg-white text-slate-800 border-[#E2E8F0] hover:bg-slate-50'
                   }`}
                 >
@@ -306,7 +306,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({ student }) => {
                     <span>Live now</span>
                   </span>
                 ) : (
-                  <span className="px-3 py-1 rounded-full text-xs font-extrabold font-mono bg-[#3E2319] border border-[#8C3A16] text-[#FB923C] tabular-nums">
+                  <span className="px-3 py-1 rounded-full text-xs font-extrabold font-mono bg-[#3E2319] border border-[#8C3A16] text-orange-400 tabular-nums">
                     Starts in {nextClassToday.minutesUntilStart} min
                   </span>
                 )}
@@ -353,7 +353,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({ student }) => {
             <h3 className="text-xs font-black uppercase tracking-[0.12em] text-[#0F172A]">
               {selectedDay === todayName ? 'TODAY' : selectedDay.toUpperCase()}
             </h3>
-            <span className="text-[11px] font-extrabold text-[#C2410C] bg-orange-50 px-2.5 py-0.5 rounded-full border border-orange-200">
+            <span className="text-[11px] font-extrabold text-orange-700 bg-orange-50 px-2.5 py-0.5 rounded-full border border-orange-200">
               {filteredSlots.length} {filteredSlots.length === 1 ? 'Period' : 'Periods'}
             </span>
           </div>
@@ -379,7 +379,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({ student }) => {
                   onClick={() => setSubjectFilter(sub)}
                   className={`px-3 py-1 rounded-full text-xs font-bold transition-all shrink-0 cursor-pointer ${
                     subjectFilter === sub
-                      ? 'bg-[#EA580C] text-white shadow-2xs'
+                      ? 'bg-orange-600 text-white shadow-2xs'
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                   }`}
                 >
@@ -414,7 +414,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({ student }) => {
                     onClick={() => setViewingSession(slot)}
                     className={`bg-white rounded-[22px] p-4.5 sm:p-5 min-h-[82px] transition-all relative overflow-hidden cursor-pointer active:scale-[0.99] flex items-center justify-between gap-4 ${
                       nextUp
-                        ? 'border-2 border-[#C2410C] shadow-md shadow-orange-500/5'
+                        ? 'border-2 border-orange-700 shadow-md shadow-orange-500/5'
                         : 'border border-[#E2E8F0] shadow-2xs hover:border-slate-300 hover:shadow-xs'
                     }`}
                   >
@@ -422,7 +422,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({ student }) => {
                     <div className="w-16 shrink-0 flex flex-col justify-center">
                       <span
                         className={`text-base font-black font-mono tabular-nums leading-none ${
-                          nextUp ? 'text-[#C2410C]' : 'text-slate-900'
+                          nextUp ? 'text-orange-700' : 'text-slate-900'
                         }`}
                       >
                         {startTimeOnly}
@@ -472,14 +472,14 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({ student }) => {
                               e.stopPropagation();
                               setRatingSlot(slot);
                             }}
-                            className="px-3.5 py-2 rounded-xl bg-[#FFF7ED] border border-[#FFEDD5] text-[#C2410C] font-extrabold text-xs flex items-center gap-1.5 hover:bg-orange-100 transition-colors shadow-2xs cursor-pointer active:scale-95"
+                            className="px-3.5 py-2 rounded-xl bg-orange-50 border border-orange-100 text-orange-700 font-extrabold text-xs flex items-center gap-1.5 hover:bg-orange-100 transition-colors shadow-2xs cursor-pointer active:scale-95"
                           >
-                            <Star className="w-4 h-4 fill-[#C2410C] text-[#C2410C]" />
+                            <Star className="w-4 h-4 fill-orange-700 text-orange-700" />
                             <span>Rate class</span>
                           </button>
                         )
                       ) : nextUp ? (
-                        <span className="px-3 py-1.5 rounded-xl text-xs font-black font-mono bg-orange-50 text-[#C2410C] border border-orange-200 shadow-2xs">
+                        <span className="px-3 py-1.5 rounded-xl text-xs font-black font-mono bg-orange-50 text-orange-700 border border-orange-200 shadow-2xs">
                           Next
                         </span>
                       ) : (
@@ -499,20 +499,20 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({ student }) => {
             onClick={() => {
               setActiveSection('materials');
             }}
-            className="bg-[#FFF7ED] border border-[#FED7AA] rounded-[20px] p-3.5 flex items-center justify-between gap-3 cursor-pointer hover:bg-orange-100/70 transition-all shadow-2xs group mt-2"
+            className="bg-orange-50 border border-orange-200 rounded-[20px] p-3.5 flex items-center justify-between gap-3 cursor-pointer hover:bg-orange-100/70 transition-all shadow-2xs group mt-2"
           >
-            <div className="w-10 h-10 rounded-2xl bg-[#FFEDD5] flex items-center justify-center text-[#C2410C] shrink-0">
-              <BookOpen className="w-5 h-5 text-[#C2410C]" />
+            <div className="w-10 h-10 rounded-2xl bg-orange-100 flex items-center justify-center text-orange-700 shrink-0">
+              <BookOpen className="w-5 h-5 text-orange-700" />
             </div>
             <div className="flex-1 min-w-0">
               <h4 className="text-xs font-extrabold text-[#0F172A] truncate">
                 Prepare for {nextClassToday?.slot.subject || 'your upcoming classes'}
               </h4>
-              <p className="text-[11px] font-semibold text-[#C2410C] truncate mt-0.5">
+              <p className="text-[11px] font-semibold text-orange-700 truncate mt-0.5">
                 Review lecture notes & handouts uploaded by your tutors
               </p>
             </div>
-            <ChevronRight className="w-4 h-4 text-[#C2410C] shrink-0 group-hover:translate-x-0.5 transition-transform" />
+            <ChevronRight className="w-4 h-4 text-orange-700 shrink-0 group-hover:translate-x-0.5 transition-transform" />
           </div>
         </>
       )}

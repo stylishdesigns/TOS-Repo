@@ -29,7 +29,7 @@ const SUBJECT_COLORS: Record<string, { bg: string; text: string; border: string 
   Chemistry: { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200' },
   Biology: { bg: 'bg-teal-50', text: 'text-teal-700', border: 'border-teal-200' },
   'Further Mathematics': { bg: 'bg-indigo-50', text: 'text-indigo-700', border: 'border-indigo-200' },
-  General: { bg: 'bg-orange-50', text: 'text-[#C2410C]', border: 'border-orange-200' },
+  General: { bg: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-200' },
 };
 
 export const StudyMaterialsSection: React.FC<StudyMaterialsSectionProps> = ({
@@ -93,7 +93,7 @@ export const StudyMaterialsSection: React.FC<StudyMaterialsSectionProps> = ({
     <div className="space-y-4 animate-in fade-in duration-200">
       {/* Header Banner */}
       <div className="pt-1">
-        <span className="text-[10px] font-extrabold uppercase text-[#C2410C] tracking-wider block">
+        <span className="text-[10px] font-extrabold uppercase text-orange-700 tracking-wider block">
           {student.name} · Learning Resources
         </span>
         <h2 className="text-xl font-black text-[#0F172A] tracking-tight">
@@ -148,7 +148,7 @@ export const StudyMaterialsSection: React.FC<StudyMaterialsSectionProps> = ({
               onClick={() => setSelectedSubject(sub)}
               className={`px-3 py-1.5 rounded-full text-xs font-extrabold transition-all shrink-0 cursor-pointer ${
                 isSelected
-                  ? 'bg-[#EA580C] text-white shadow-xs'
+                  ? 'bg-orange-600 text-white shadow-xs'
                   : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
               }`}
             >
@@ -162,7 +162,7 @@ export const StudyMaterialsSection: React.FC<StudyMaterialsSectionProps> = ({
       <div className="space-y-3">
         {filteredMaterials.length === 0 ? (
           <div className="text-center py-12 bg-white rounded-2xl border border-slate-200/90 p-6 space-y-3">
-            <div className="w-12 h-12 rounded-2xl bg-orange-50 border border-orange-100 text-[#EA580C] flex items-center justify-center mx-auto">
+            <div className="w-12 h-12 rounded-2xl bg-orange-50 border border-orange-100 text-orange-600 flex items-center justify-center mx-auto">
               <BookOpen className="w-6 h-6" />
             </div>
             <h4 className="text-sm font-black text-slate-900">No Study Materials Found</h4>
@@ -212,11 +212,11 @@ export const StudyMaterialsSection: React.FC<StudyMaterialsSectionProps> = ({
 
                 {/* Title & Topic */}
                 <div className="space-y-1">
-                  <h3 className="text-[15px] font-black text-[#0F172A] tracking-tight group-hover:text-[#C2410C] transition-colors leading-snug">
+                  <h3 className="text-[15px] font-black text-[#0F172A] tracking-tight group-hover:text-orange-700 transition-colors leading-snug">
                     {material.title}
                   </h3>
                   {material.topic && (
-                    <p className="text-xs text-[#EA580C] font-extrabold">
+                    <p className="text-xs text-orange-600 font-extrabold">
                       Topic: {material.topic}
                     </p>
                   )}
@@ -252,7 +252,7 @@ export const StudyMaterialsSection: React.FC<StudyMaterialsSectionProps> = ({
                     <button
                       type="button"
                       onClick={() => setReadingMaterial(material)}
-                      className="px-3 py-1.5 rounded-lg bg-[#C2410C] hover:bg-[#EA580C] text-white font-extrabold text-[11px] flex items-center space-x-1 shadow-2xs cursor-pointer transition-all active:scale-95"
+                      className="px-3 py-1.5 rounded-lg bg-orange-700 hover:bg-orange-600 text-white font-extrabold text-[11px] flex items-center space-x-1 shadow-2xs cursor-pointer transition-all active:scale-95"
                     >
                       <span>Read</span>
                     </button>
@@ -280,7 +280,7 @@ export const StudyMaterialsSection: React.FC<StudyMaterialsSectionProps> = ({
             {/* Modal Header */}
             <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-100">
               <div className="min-w-0 flex-1">
-                <span className="text-[10px] font-black uppercase text-[#C2410C] tracking-wider block">
+                <span className="text-[10px] font-black uppercase text-orange-700 tracking-wider block">
                   {readingMaterial.subject} · {readingMaterial.topic || 'Lecture Note'}
                 </span>
                 <h3 className="text-base font-black text-slate-900 tracking-tight leading-snug mt-0.5">
@@ -304,7 +304,7 @@ export const StudyMaterialsSection: React.FC<StudyMaterialsSectionProps> = ({
             {/* Modal Content Scroll */}
             <div className="flex-1 overflow-y-auto py-4 space-y-4 text-xs text-slate-700 leading-relaxed font-medium">
               <div className="p-3.5 bg-orange-50/60 rounded-2xl border border-orange-100 space-y-1">
-                <h4 className="text-xs font-black text-[#C2410C] uppercase tracking-wider flex items-center gap-1.5">
+                <h4 className="text-xs font-black text-orange-700 uppercase tracking-wider flex items-center gap-1.5">
                   <Sparkles className="w-3.5 h-3.5" />
                   <span>Overview & Objectives</span>
                 </h4>
@@ -347,7 +347,7 @@ export const StudyMaterialsSection: React.FC<StudyMaterialsSectionProps> = ({
               <button
                 type="button"
                 onClick={() => handleDownload(readingMaterial)}
-                className="h-11 px-5 rounded-xl bg-[#C2410C] hover:bg-[#EA580C] text-white font-extrabold text-xs flex items-center space-x-2 shadow-sm transition-all cursor-pointer active:scale-95"
+                className="h-11 px-5 rounded-xl bg-orange-700 hover:bg-orange-600 text-white font-extrabold text-xs flex items-center space-x-2 shadow-sm transition-all cursor-pointer active:scale-95"
               >
                 <Download className="w-4 h-4" />
                 <span>Download Full Handout ({readingMaterial.fileSize || '2.4 MB'})</span>

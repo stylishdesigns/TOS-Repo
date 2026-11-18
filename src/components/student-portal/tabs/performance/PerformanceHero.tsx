@@ -86,7 +86,7 @@ export const PerformanceHero: React.FC<PerformanceHeroProps> = ({ stats }) => {
           <span className="text-[56px] leading-none font-extrabold tabular-nums text-white">
             {meanPercent}
           </span>
-          <span className="text-[24px] leading-none font-extrabold text-[#FDBA74] ml-0.5">
+          <span className="text-[24px] leading-none font-extrabold text-orange-300 ml-0.5">
             %
           </span>
         </div>
@@ -132,7 +132,7 @@ export const PerformanceHero: React.FC<PerformanceHeroProps> = ({ stats }) => {
       <div className="mt-4">
         {isThinData ? (
           <div className="rounded-[14px] p-4 border border-dashed border-white/20 bg-white/[0.06] flex items-center justify-center space-x-2.5">
-            <span className="w-2 h-2 rounded-full bg-[#FB923C] shrink-0" />
+            <span className="w-2 h-2 rounded-full bg-orange-400 shrink-0" />
             <span className="text-xs font-medium text-slate-300">
               Take one more assessment and your trend line will appear here.
             </span>

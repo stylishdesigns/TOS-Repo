@@ -134,7 +134,7 @@ export const TutorHistoryView: React.FC<TutorHistoryViewProps> = ({ tutor, onBac
       </div>
 
       <div>
-        <div className="text-[10px] font-extrabold uppercase tracking-wider text-[#C2410C]">
+        <div className="text-[10px] font-extrabold uppercase tracking-wider text-orange-700">
           {tutor.name} · {primarySubject}
         </div>
         <h1 className="text-2xl font-black text-[#0F172A] tracking-tight mt-0.5">

@@ -17,6 +17,7 @@ import { MoreTab } from './tabs/MoreTab';
 import { ActionSheetModal, ActionSheetItem } from './tabs/ActionSheetModal';
 import { StudentResult } from '../../types';
 import { PWAInstallButton } from '../pwa/PWAInstallButton';
+import { NotificationsBell } from './NotificationsBell';
 import {
   Bell,
   Home,
@@ -401,7 +402,7 @@ export const StudentPortal: React.FC = () => {
       title: 'Timetable',
       subtitle: 'Your classes for the week',
       badge: 'Schedule',
-      icon: <Calendar className="w-5 h-5 text-[#C2410C]" />,
+      icon: <Calendar className="w-5 h-5 text-orange-700" />,
       iconBg: 'bg-orange-50 border border-orange-100',
       onClick: () => {
         setClassesSubPage('timetable');
@@ -416,7 +417,7 @@ export const StudentPortal: React.FC = () => {
       title: 'Assessment',
       subtitle: 'Tests set by your tutors & performance',
       badge: 'Tests & Scores',
-      icon: <FileText className="w-5 h-5 text-[#C2410C]" />,
+      icon: <FileText className="w-5 h-5 text-orange-700" />,
       iconBg: 'bg-orange-50 border border-orange-100',
       onClick: () => {
         setClassesSubPage('assessment');
@@ -436,7 +437,7 @@ export const StudentPortal: React.FC = () => {
       title: 'CBT Practice',
       subtitle: 'Untimed practice, no pressure',
       badge: 'Self-Paced',
-      icon: <Sparkles className="w-5 h-5 text-[#C2410C]" />,
+      icon: <Sparkles className="w-5 h-5 text-orange-700" />,
       iconBg: 'bg-orange-50 border border-orange-100',
       onClick: () => {
         setCbtSubPage('practice');
@@ -451,7 +452,7 @@ export const StudentPortal: React.FC = () => {
       title: 'CBT Mock',
       subtitle: 'Timed mock exams under real conditions',
       badge: 'Timed Exam',
-      icon: <Laptop className="w-5 h-5 text-[#C2410C]" />,
+      icon: <Laptop className="w-5 h-5 text-orange-700" />,
       iconBg: 'bg-orange-50 border border-orange-100',
       onClick: () => {
         setCbtSubPage('mock');
@@ -583,12 +584,7 @@ export const StudentPortal: React.FC = () => {
 
           {/* Right side: notifications (work continues) + install */}
           <div className="flex items-center gap-2">
-            <button
-              className="w-9 h-9 rounded-xl bg-white/10 border border-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors relative"
-              aria-label="Notifications"
-            >
-              <Bell className="w-4 h-4" />
-            </button>
+            <NotificationsBell />
             <PWAInstallButton
               variant="icon"
               className="!bg-white/10 !border-white/10 hover:!bg-white/20"
@@ -927,7 +923,7 @@ export const StudentPortal: React.FC = () => {
                     <ChatOrbIcon className="w-8 h-8 text-white" />
                   )}
                   {orbBadgeText && !chatFanOpen && (
-                    <span className="absolute -top-0.5 -right-0.5 min-w-[22px] h-[22px] px-1 rounded-full bg-white text-[#EA580C] text-[11px] font-black flex items-center justify-center border border-orange-200 shadow-sm">
+                    <span className="absolute -top-0.5 -right-0.5 min-w-[22px] h-[22px] px-1 rounded-full bg-white text-orange-600 text-[11px] font-black flex items-center justify-center border border-orange-200 shadow-sm">
                       {orbBadgeText}
                     </span>
                   )}
@@ -945,7 +941,7 @@ export const StudentPortal: React.FC = () => {
                     role="menuitem"
                     onClick={fanWing(openStatusScreen)}
                     aria-label="Status"
-                    className={`absolute w-12 h-12 rounded-full bg-white text-[#EA580C] flex items-center justify-center shadow-lg cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 ${prefersReducedMotion ? '' : 'animate-in fade-in zoom-in-95 duration-200'}`}
+                    className={`absolute w-12 h-12 rounded-full bg-white text-orange-600 flex items-center justify-center shadow-lg cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 ${prefersReducedMotion ? '' : 'animate-in fade-in zoom-in-95 duration-200'}`}
                     style={{ left: -72, top: -42, transform: 'translate(-50%, -50%)' }}
                   >
                     <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden="true">
@@ -977,7 +973,7 @@ export const StudentPortal: React.FC = () => {
                     role="menuitem"
                     onClick={fanWing(openTito)}
                     aria-label="Tutor AI"
-                    className={`absolute w-12 h-12 rounded-full bg-white text-[#EA580C] flex items-center justify-center shadow-lg cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 ${prefersReducedMotion ? '' : 'animate-in fade-in zoom-in-95 duration-200'}`}
+                    className={`absolute w-12 h-12 rounded-full bg-white text-orange-600 flex items-center justify-center shadow-lg cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 ${prefersReducedMotion ? '' : 'animate-in fade-in zoom-in-95 duration-200'}`}
                     style={{ left: 72, top: -42, transform: 'translate(-50%, -50%)' }}
                   >
                     <Sparkles className="w-6 h-6" />

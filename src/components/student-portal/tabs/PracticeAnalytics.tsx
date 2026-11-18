@@ -249,7 +249,7 @@ export const PracticeAnalytics: React.FC<PracticeAnalyticsProps> = ({ onStartPra
   if (status === 'error' && !summary) {
     return (
       <div className="bg-white rounded-3xl p-8 border border-slate-200/90 shadow-sm text-center space-y-4" data-testid="practice-analytics-error">
-        <div className="w-16 h-16 rounded-2xl bg-orange-50 border border-orange-100 text-[#EA580C] flex items-center justify-center mx-auto shadow-sm">
+        <div className="w-16 h-16 rounded-2xl bg-orange-50 border border-orange-100 text-orange-600 flex items-center justify-center mx-auto shadow-sm">
           <TrendingUp className="w-8 h-8" />
         </div>
         <h3 className="text-lg font-black text-slate-900 tracking-tight">Practice Analytics</h3>
@@ -270,11 +270,11 @@ export const PracticeAnalytics: React.FC<PracticeAnalyticsProps> = ({ onStartPra
   if (!view || !view.hasData) {
     return (
       <div className="bg-white rounded-3xl p-8 border border-slate-200/90 shadow-sm text-center space-y-4" data-testid="practice-analytics-empty">
-        <div className="w-16 h-16 rounded-2xl bg-orange-50 border border-orange-100 text-[#EA580C] flex items-center justify-center mx-auto shadow-sm">
+        <div className="w-16 h-16 rounded-2xl bg-orange-50 border border-orange-100 text-orange-600 flex items-center justify-center mx-auto shadow-sm">
           <TrendingUp className="w-8 h-8" />
         </div>
         <div className="space-y-1.5 max-w-xs mx-auto">
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-orange-100/60 text-[#C2410C] text-[10px] font-extrabold uppercase tracking-wider mb-1">
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-orange-100/60 text-orange-700 text-[10px] font-extrabold uppercase tracking-wider mb-1">
             <Sparkles className="w-3 h-3" />
             <span>Progress Insights</span>
           </div>
@@ -286,7 +286,7 @@ export const PracticeAnalytics: React.FC<PracticeAnalyticsProps> = ({ onStartPra
         <button
           type="button"
           onClick={onStartPractice}
-          className="h-11 px-6 rounded-full bg-[#EA580C] text-white text-sm font-extrabold shadow-sm active:scale-[0.98] transition-transform cursor-pointer"
+          className="h-11 px-6 rounded-full bg-orange-600 text-white text-sm font-extrabold shadow-sm active:scale-[0.98] transition-transform cursor-pointer"
         >
           Start practising
         </button>
@@ -312,7 +312,7 @@ export const PracticeAnalytics: React.FC<PracticeAnalyticsProps> = ({ onStartPra
         {status === 'error' && (
           <p className="text-xs text-slate-400 font-medium">
             Showing your last saved progress.{' '}
-            <button type="button" onClick={retry} className="font-bold text-[#C2410C] cursor-pointer">
+            <button type="button" onClick={retry} className="font-bold text-orange-700 cursor-pointer">
               Try again
             </button>
           </p>
@@ -335,7 +335,7 @@ export const PracticeAnalytics: React.FC<PracticeAnalyticsProps> = ({ onStartPra
                 <button
                   type="button"
                   onClick={() => startTopic(r.subject, r.topic)}
-                  className="shrink-0 h-11 px-3.5 rounded-full bg-[#EA580C] text-white text-xs font-extrabold shadow-sm active:scale-[0.98] transition-transform cursor-pointer"
+                  className="shrink-0 h-11 px-3.5 rounded-full bg-orange-600 text-white text-xs font-extrabold shadow-sm active:scale-[0.98] transition-transform cursor-pointer"
                 >
                   Practise this
                 </button>
@@ -352,12 +352,12 @@ export const PracticeAnalytics: React.FC<PracticeAnalyticsProps> = ({ onStartPra
           <div className="space-y-2">
             {view.doingWell.map((r) => (
               <div key={`${r.subject}__${r.topic}`} className="flex items-center gap-3 bg-orange-50/60 rounded-2xl px-3 py-2.5">
-                <CheckCircle className="w-4 h-4 shrink-0 text-[#C2410C]" />
+                <CheckCircle className="w-4 h-4 shrink-0 text-orange-700" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-bold text-slate-900 truncate">{r.topic}</p>
                   <p className="text-xs text-slate-500 font-medium truncate">{r.subject}</p>
                 </div>
-                <p className="shrink-0 text-xs font-extrabold text-[#C2410C]">{r.accuracy}%</p>
+                <p className="shrink-0 text-xs font-extrabold text-orange-700">{r.accuracy}%</p>
               </div>
             ))}
           </div>
@@ -412,12 +412,12 @@ export const PracticeAnalytics: React.FC<PracticeAnalyticsProps> = ({ onStartPra
             <div
               key={d.day}
               className={`flex-1 flex flex-col items-center gap-1 rounded-xl py-2 ${
-                d.practised ? 'bg-[#EA580C]/10 text-[#C2410C]' : 'bg-slate-50 text-slate-300'
+                d.practised ? 'bg-orange-600/10 text-orange-700' : 'bg-slate-50 text-slate-300'
               }`}
               title={d.day}
             >
               <span className="text-[10px] font-extrabold">{d.letter}</span>
-              <span className={`w-2 h-2 rounded-full ${d.practised ? 'bg-[#EA580C]' : 'bg-slate-200'}`} />
+              <span className={`w-2 h-2 rounded-full ${d.practised ? 'bg-orange-600' : 'bg-slate-200'}`} />
             </div>
           ))}
         </div>

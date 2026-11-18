@@ -510,7 +510,7 @@ export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => 
   if (screen === 'loading') {
     return (
       <div className="bg-white rounded-3xl p-8 border border-slate-200/90 shadow-sm text-center space-y-4">
-        <div className="w-16 h-16 rounded-2xl bg-orange-50 border border-orange-100 text-[#EA580C] flex items-center justify-center mx-auto shadow-sm">
+        <div className="w-16 h-16 rounded-2xl bg-orange-50 border border-orange-100 text-orange-600 flex items-center justify-center mx-auto shadow-sm">
           <RefreshCw className="w-8 h-8 animate-spin" />
         </div>
         <p className="text-xs text-slate-500 font-medium">Loading your practice bank...</p>
@@ -546,7 +546,7 @@ export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => 
   if (screen === 'noBank') {
     return (
       <div className="bg-white rounded-3xl p-8 border border-slate-200/90 shadow-sm text-center space-y-4">
-        <div className="w-16 h-16 rounded-2xl bg-orange-50 border border-orange-100 text-[#EA580C] flex items-center justify-center mx-auto shadow-sm">
+        <div className="w-16 h-16 rounded-2xl bg-orange-50 border border-orange-100 text-orange-600 flex items-center justify-center mx-auto shadow-sm">
           <BookOpen className="w-8 h-8" />
         </div>
         <div className="space-y-1.5 max-w-xs mx-auto">
@@ -563,7 +563,7 @@ export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => 
   if (screen === 'home' && subjectsBlocked) {
     return (
       <div className="bg-white rounded-3xl p-8 border border-slate-200/90 shadow-sm text-center space-y-4">
-        <div className="w-16 h-16 rounded-2xl bg-orange-50 border border-orange-100 text-[#EA580C] flex items-center justify-center mx-auto shadow-sm">
+        <div className="w-16 h-16 rounded-2xl bg-orange-50 border border-orange-100 text-orange-600 flex items-center justify-center mx-auto shadow-sm">
           <BookOpen className="w-8 h-8" />
         </div>
         <div className="space-y-1.5 max-w-xs mx-auto">
@@ -581,7 +581,7 @@ export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => 
         <button
           type="button"
           onClick={openProfileSubjects}
-          className="w-full max-w-xs mx-auto h-11 rounded-2xl bg-[#EA580C] text-white text-xs font-extrabold hover:bg-[#C2410C] transition-colors cursor-pointer"
+          className="w-full max-w-xs mx-auto h-11 rounded-2xl bg-orange-600 text-white text-xs font-extrabold hover:bg-orange-700 transition-colors cursor-pointer"
         >
           Update your subjects in Profile
         </button>
@@ -618,7 +618,7 @@ export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => 
           </div>
           <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
             <div
-              className="h-full rounded-full bg-[#EA580C] transition-all duration-300"
+              className="h-full rounded-full bg-orange-600 transition-all duration-300"
               style={{ width: `${((qIndex + (selected ? 1 : 0)) / session.length) * 100}%` }}
             />
           </div>
@@ -638,7 +638,7 @@ export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => 
                     onClick={() => { setPicked(null); setQIndex(i); }}
                     className={`w-9 h-9 rounded-xl text-xs font-extrabold flex items-center justify-center transition-all cursor-pointer ${
                       current
-                        ? 'bg-[#EA580C] text-white'
+                        ? 'bg-orange-600 text-white'
                         : answered
                           ? 'bg-slate-900 text-white'
                           : 'bg-slate-100 text-slate-500'
@@ -673,7 +673,7 @@ export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => 
             const isAnswer = key === q.correct;
             let cls = 'bg-white border-[#E2E8F0] text-[#0F172A]';
             if (endMode) {
-              if (chosen) cls = 'bg-orange-50/70 border-[#EA580C] text-[#0F172A]';
+              if (chosen) cls = 'bg-orange-50/70 border-orange-600 text-[#0F172A]';
             } else {
               const showState = picked !== null;
               if (showState && isAnswer) cls = 'bg-emerald-50 border-emerald-300 text-emerald-900';
@@ -681,7 +681,7 @@ export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => 
               else if (showState) cls = 'bg-white border-[#E2E8F0] text-slate-400';
             }
             const keyCls = endMode
-              ? (chosen ? 'bg-[#EA580C] text-white' : 'bg-slate-100 text-slate-600')
+              ? (chosen ? 'bg-orange-600 text-white' : 'bg-slate-100 text-slate-600')
               : ((picked !== null && isAnswer) ? 'bg-emerald-500 text-white' : (picked !== null && chosen) ? 'bg-red-500 text-white' : 'bg-slate-100 text-slate-600');
             return (
               <button
@@ -697,7 +697,7 @@ export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => 
                 <span className="text-[15px] font-semibold leading-snug pt-0.5">{q.options[key]}</span>
                 {!endMode && picked !== null && isAnswer ? <CheckCircle2 className="w-5 h-5 ml-auto shrink-0 text-emerald-500" /> : null}
                 {!endMode && picked !== null && chosen && !isAnswer ? <XCircle className="w-5 h-5 ml-auto shrink-0 text-red-500" /> : null}
-                {endMode && chosen ? <CheckCircle2 className="w-5 h-5 ml-auto shrink-0 text-[#EA580C]" /> : null}
+                {endMode && chosen ? <CheckCircle2 className="w-5 h-5 ml-auto shrink-0 text-orange-600" /> : null}
               </button>
             );
           })}
@@ -737,7 +737,7 @@ export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => 
             className={`flex-1 h-12 rounded-2xl flex items-center justify-center gap-2 text-sm font-extrabold transition-all ${
               (endMode ? selected === null : picked === null)
                 ? 'bg-slate-100 text-slate-300 cursor-not-allowed'
-                : 'bg-[#EA580C] text-white shadow-sm hover:bg-[#C2410C] cursor-pointer'
+                : 'bg-orange-600 text-white shadow-sm hover:bg-orange-700 cursor-pointer'
             }`}
           >
             {isLast ? 'Finish' : 'Next question'}
@@ -754,7 +754,7 @@ export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => 
                 <button
                   type="button"
                   onClick={() => { setConfirmLeave(false); setScreen('home'); }}
-                  className="flex-1 h-12 rounded-2xl bg-[#EA580C] text-white text-sm font-extrabold hover:bg-[#C2410C] cursor-pointer"
+                  className="flex-1 h-12 rounded-2xl bg-orange-600 text-white text-sm font-extrabold hover:bg-orange-700 cursor-pointer"
                 >
                   Leave
                 </button>
@@ -789,7 +789,7 @@ export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => 
       <div className="space-y-4">
         <div className="bg-white rounded-3xl p-8 border border-slate-200/90 shadow-sm text-center space-y-2">
           <p className={`text-5xl font-black tracking-tight ${
-            pct >= 70 ? 'text-emerald-600' : pct >= 50 ? 'text-[#EA580C]' : 'text-red-600'
+            pct >= 70 ? 'text-emerald-600' : pct >= 50 ? 'text-orange-600' : 'text-red-600'
           }`}>{score.correct}</p>
           <p className="text-sm font-bold text-slate-500">{score.correct} of {score.total} correct</p>
         </div>
@@ -803,7 +803,7 @@ export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => 
               const el = document.getElementById('practice-review');
               if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }}
-            className="w-full h-14 rounded-2xl bg-[#EA580C] text-white text-base font-extrabold shadow-sm hover:bg-[#C2410C] cursor-pointer"
+            className="w-full h-14 rounded-2xl bg-orange-600 text-white text-base font-extrabold shadow-sm hover:bg-orange-700 cursor-pointer"
           >
             Review wrong answers
           </button>
@@ -872,7 +872,7 @@ export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => 
           <button
             type="button"
             onClick={startSession}
-            className="w-full h-14 rounded-2xl bg-[#EA580C] text-white text-base font-extrabold shadow-sm hover:bg-[#C2410C] cursor-pointer"
+            className="w-full h-14 rounded-2xl bg-orange-600 text-white text-base font-extrabold shadow-sm hover:bg-orange-700 cursor-pointer"
           >
             Practise again
           </button>
@@ -966,7 +966,7 @@ export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => 
 
   const progressBar = (
     <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
-      <div className="h-full rounded-full bg-[#EA580C] transition-all duration-300" style={{ width: `${progressPct}%` }} />
+      <div className="h-full rounded-full bg-orange-600 transition-all duration-300" style={{ width: `${progressPct}%` }} />
     </div>
   );
 
@@ -974,7 +974,7 @@ export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => 
   if (questions.length === 0) {
     return (
       <div className="bg-white rounded-3xl p-8 border border-slate-200/90 shadow-sm text-center space-y-4">
-        <div className="w-16 h-16 rounded-2xl bg-orange-50 border border-orange-100 text-[#EA580C] flex items-center justify-center mx-auto shadow-sm">
+        <div className="w-16 h-16 rounded-2xl bg-orange-50 border border-orange-100 text-orange-600 flex items-center justify-center mx-auto shadow-sm">
           <BookOpen className="w-8 h-8" />
         </div>
         <h3 className="text-lg font-black text-slate-900 tracking-tight">CBT Practice</h3>
@@ -1011,13 +1011,13 @@ export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => 
             <button
               type="button"
               onClick={quickStart}
-              className="w-full min-h-[56px] rounded-2xl border-2 border-[#EA580C]/40 bg-orange-50/60 px-4 py-3.5 flex items-center justify-between gap-3 text-left hover:border-[#EA580C] transition-all cursor-pointer"
+              className="w-full min-h-[56px] rounded-2xl border-2 border-orange-600/40 bg-orange-50/60 px-4 py-3.5 flex items-center justify-between gap-3 text-left hover:border-orange-600 transition-all cursor-pointer"
             >
               <span className="min-w-0">
                 <span className="block text-base font-extrabold text-[#0F172A]">Practise again</span>
                 <span className="block text-xs text-slate-500 font-semibold mt-0.5 truncate">{quickCard.subject} · {quickCard.topic}</span>
               </span>
-              <ChevronRight className="w-5 h-5 text-[#EA580C] shrink-0" />
+              <ChevronRight className="w-5 h-5 text-orange-600 shrink-0" />
             </button>
           ) : null}
           <div className="space-y-2.5">
@@ -1026,7 +1026,7 @@ export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => 
                 key={et}
                 type="button"
                 onClick={() => { setPipeline(et); setTopic('all'); setStep(2); }}
-                className="w-full min-h-[60px] rounded-2xl border-2 border-[#E2E8F0] bg-white px-4 py-4 flex items-center justify-between text-left hover:border-[#EA580C] transition-all cursor-pointer"
+                className="w-full min-h-[60px] rounded-2xl border-2 border-[#E2E8F0] bg-white px-4 py-4 flex items-center justify-between text-left hover:border-orange-600 transition-all cursor-pointer"
               >
                 <span className="text-base font-extrabold text-[#0F172A]">{pipelineLabel(et)}</span>
                 <ChevronRight className="w-5 h-5 text-slate-400 shrink-0" />
@@ -1053,7 +1053,7 @@ export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => 
                 key={sub}
                 type="button"
                 onClick={() => { setSubject(sub); setTopic('all'); setStep(3); }}
-                className="w-full min-h-[60px] rounded-2xl border-2 border-[#E2E8F0] bg-white px-4 py-4 flex items-center justify-between text-left hover:border-[#EA580C] transition-all cursor-pointer"
+                className="w-full min-h-[60px] rounded-2xl border-2 border-[#E2E8F0] bg-white px-4 py-4 flex items-center justify-between text-left hover:border-orange-600 transition-all cursor-pointer"
               >
                 <span className="text-base font-extrabold text-[#0F172A]">{sub}</span>
                 <ChevronRight className="w-5 h-5 text-slate-400 shrink-0" />
@@ -1072,7 +1072,7 @@ export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => 
           <button
             type="button"
             onClick={openProfileSubjects}
-            className="w-full text-left px-1 h-11 flex items-center text-sm font-bold text-[#C2410C] underline underline-offset-2 cursor-pointer"
+            className="w-full text-left px-1 h-11 flex items-center text-sm font-bold text-orange-700 underline underline-offset-2 cursor-pointer"
           >
             Missing a subject? Update it in Profile
           </button>
@@ -1091,17 +1091,17 @@ export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => 
               value={topicSearch}
               onChange={(e) => setTopicSearch(e.target.value)}
               placeholder="Search topics"
-              className="w-full h-12 rounded-2xl border border-[#E2E8F0] bg-white pl-10 pr-3 text-[15px] font-semibold text-[#0F172A] placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#EA580C]/30 focus:border-[#EA580C]"
+              className="w-full h-12 rounded-2xl border border-[#E2E8F0] bg-white pl-10 pr-3 text-[15px] font-semibold text-[#0F172A] placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-600/30 focus:border-orange-600"
             />
           </div>
           <div className="space-y-2.5">
             <button
               type="button"
               onClick={() => { setTopic('all'); setStep(4); }}
-              className="w-full min-h-[56px] rounded-2xl border-2 border-[#EA580C] bg-orange-50/60 px-4 py-4 flex items-center justify-between text-left cursor-pointer"
+              className="w-full min-h-[56px] rounded-2xl border-2 border-orange-600 bg-orange-50/60 px-4 py-4 flex items-center justify-between text-left cursor-pointer"
             >
               <span className="text-base font-extrabold text-[#0F172A]">All topics (mixed)</span>
-              <ChevronRight className="w-5 h-5 text-[#EA580C] shrink-0" />
+              <ChevronRight className="w-5 h-5 text-orange-600 shrink-0" />
             </button>
             {topicChoices
               .filter((t) => t.toLowerCase().includes(topicSearch.trim().toLowerCase()))
@@ -1110,7 +1110,7 @@ export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => 
                   key={t}
                   type="button"
                   onClick={() => { setTopic(t); setStep(4); }}
-                  className="w-full min-h-[56px] rounded-2xl border-2 border-[#E2E8F0] bg-white px-4 py-4 flex items-center justify-between text-left hover:border-[#EA580C] transition-all cursor-pointer"
+                  className="w-full min-h-[56px] rounded-2xl border-2 border-[#E2E8F0] bg-white px-4 py-4 flex items-center justify-between text-left hover:border-orange-600 transition-all cursor-pointer"
                 >
                   <span className="text-base font-extrabold text-[#0F172A]">{t}</span>
                   <ChevronRight className="w-5 h-5 text-slate-400 shrink-0" />
@@ -1166,7 +1166,7 @@ export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => 
                   type="button"
                   onClick={() => setFeedbackMode('instant')}
                   className={`w-full min-h-[64px] rounded-2xl border-2 p-3.5 text-left transition-all cursor-pointer ${
-                    feedbackMode === 'instant' ? 'bg-orange-50/60 border-[#EA580C]' : 'bg-white border-[#E2E8F0] hover:border-[#CBD5E1]'
+                    feedbackMode === 'instant' ? 'bg-orange-50/60 border-orange-600' : 'bg-white border-[#E2E8F0] hover:border-[#CBD5E1]'
                   }`}
                 >
                   <span className="block text-base font-extrabold text-[#0F172A]">Learn</span>
@@ -1176,7 +1176,7 @@ export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => 
                   type="button"
                   onClick={() => setFeedbackMode('end')}
                   className={`w-full min-h-[64px] rounded-2xl border-2 p-3.5 text-left transition-all cursor-pointer ${
-                    feedbackMode === 'end' ? 'bg-orange-50/60 border-[#EA580C]' : 'bg-white border-[#E2E8F0] hover:border-[#CBD5E1]'
+                    feedbackMode === 'end' ? 'bg-orange-50/60 border-orange-600' : 'bg-white border-[#E2E8F0] hover:border-[#CBD5E1]'
                   }`}
                 >
                   <span className="block text-base font-extrabold text-[#0F172A]">Test</span>
@@ -1189,7 +1189,7 @@ export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => 
               <button
                 type="button"
                 onClick={() => setShowMore((v) => !v)}
-                className="text-sm font-bold text-[#C2410C] underline underline-offset-2 cursor-pointer"
+                className="text-sm font-bold text-orange-700 underline underline-offset-2 cursor-pointer"
               >
                 {showMore ? 'Hide more options' : 'More options'}
               </button>
@@ -1200,7 +1200,7 @@ export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => 
                     <select
                       value={year}
                       onChange={(e) => setYear(e.target.value)}
-                      className="w-full h-11 rounded-xl border border-[#E2E8F0] bg-white px-3 text-sm font-bold text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#EA580C]/30 focus:border-[#EA580C]"
+                      className="w-full h-11 rounded-xl border border-[#E2E8F0] bg-white px-3 text-sm font-bold text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-orange-600/30 focus:border-orange-600"
                     >
                       {yearOptions.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
                     </select>
@@ -1210,7 +1210,7 @@ export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => 
                     <select
                       value={difficulty}
                       onChange={(e) => setDifficulty(e.target.value)}
-                      className="w-full h-11 rounded-xl border border-[#E2E8F0] bg-white px-3 text-sm font-bold text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#EA580C]/30 focus:border-[#EA580C]"
+                      className="w-full h-11 rounded-xl border border-[#E2E8F0] bg-white px-3 text-sm font-bold text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-orange-600/30 focus:border-orange-600"
                     >
                       {difficultyOptions.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
                     </select>
@@ -1246,7 +1246,7 @@ export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => 
                 <button
                   type="button"
                   onClick={startSession}
-                  className="w-full h-14 rounded-2xl bg-[#EA580C] text-white text-base font-extrabold shadow-sm hover:bg-[#C2410C] cursor-pointer"
+                  className="w-full h-14 rounded-2xl bg-orange-600 text-white text-base font-extrabold shadow-sm hover:bg-orange-700 cursor-pointer"
                 >
                   Start practice
                 </button>

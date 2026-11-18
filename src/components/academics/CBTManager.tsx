@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { api } from '../tos/tosShared';
 import { ModernSelect } from '../ui/ModernSelect';
 import { useApp } from '../../context/AppContext';
 import {
@@ -724,6 +725,16 @@ export const CBTManager: React.FC = () => {
       const examPayload = JSON.parse(JSON.stringify(examData)) as Record<string, any>;
       if (activeCentreId) examPayload.centreId = activeCentreId;
       await setDoc(doc(db, 'cbt_exams', examId), examPayload);
+      if (!editingExamId) {
+        // Students taking this exam's subjects get a notification.
+        void api('/api/notifications/push', { method: 'POST', body: {
+          centreId: activeCentreId,
+          type: 'mock',
+          title: 'New CBT exam',
+          body: `${examData.title} - ${examData.questionCount} questions, ${examData.durationMinutes} minutes`,
+          subjects: examData.subjects || [],
+        } }).catch(() => {});
+      }
       addToast({ 
         type: 'success', 
         title: editingExamId ? 'Assessment Updated' : 'Assessment Published', 

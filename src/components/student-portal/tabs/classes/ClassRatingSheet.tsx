@@ -113,7 +113,7 @@ export const ClassRatingSheet: React.FC<ClassRatingSheetProps> = ({
         {/* Header */}
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <span className="text-[10px] font-extrabold uppercase text-[#C2410C] tracking-[0.1em] block">
+            <span className="text-[10px] font-extrabold uppercase text-orange-700 tracking-[0.1em] block">
               Class finished
             </span>
             <h2 className="text-xl font-extrabold text-[#0F172A] tracking-tight leading-snug mt-0.5 truncate">
@@ -198,7 +198,7 @@ export const ClassRatingSheet: React.FC<ClassRatingSheetProps> = ({
             type="button"
             disabled={submitting || isPast24Hours || selectedStars === null}
             onClick={handleSubmit}
-            className="w-full h-[52px] bg-[#C2410C] hover:bg-[#EA580C] text-white font-extrabold text-sm rounded-[14px] shadow-sm active:scale-98 transition-all flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full h-[52px] bg-orange-700 hover:bg-orange-600 text-white font-extrabold text-sm rounded-[14px] shadow-sm active:scale-98 transition-all flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <span>{submitting ? 'Submitting...' : selectedStars === null ? 'Select a rating to submit' : 'Submit rating'}</span>
           </button>

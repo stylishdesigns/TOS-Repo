@@ -62,7 +62,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({ tutor, onNavigateTab }) => {
       </div>
 
       {/* 1. Tutor Profile Greeting Card (Redesigned) */}
-      <div className="relative overflow-hidden rounded-3xl bg-[#EA580C] text-white p-6 shadow-xl shadow-orange-200">
+      <div className="relative overflow-hidden rounded-3xl bg-orange-600 text-white p-6 shadow-xl shadow-orange-200">
         <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl" />
         <div className="absolute bottom-0 left-0 w-24 h-24 bg-black/10 rounded-full translate-y-1/2 -translate-x-1/2 blur-xl" />
 

@@ -155,7 +155,7 @@ export const AssessmentSheet: React.FC<AssessmentSheetProps> = ({
             {/* Chips: Rank & Got/Total Marks */}
             <div className="text-right space-y-1.5">
               {rankInfo.displayString && (
-                <span className="inline-block px-2.5 py-1 rounded-xl bg-orange-100/70 text-[#EA580C] font-extrabold text-[11px] font-mono border border-orange-200/80">
+                <span className="inline-block px-2.5 py-1 rounded-xl bg-orange-100/70 text-orange-600 font-extrabold text-[11px] font-mono border border-orange-200/80">
                   {rankInfo.displayString}
                 </span>
               )}
@@ -202,7 +202,7 @@ export const AssessmentSheet: React.FC<AssessmentSheetProps> = ({
                 </div>
                 <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-[#EA580C] rounded-full"
+                    className="h-full bg-orange-600 rounded-full"
                     style={{ width: `${Math.min(100, Math.round((essayScore.score / essayScore.maxScore) * 100))}%` }}
                   />
                 </div>

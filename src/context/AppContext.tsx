@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { initialsAvatar } from '../lib/avatar';
+import { api } from '../components/tos/tosShared';
 import {
   TenantSettings,
   Branch,
@@ -591,6 +592,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       try {
         await setDoc(doc(db, 'studyMaterials', newId), tenantWrite(newMaterial));
+        // Students taking this subject get a notification about the upload.
+        void api('/api/notifications/push', { method: 'POST', body: {
+          centreId: (newMaterial as any).centreId || activeCentreId,
+          type: 'material',
+          title: 'New study material',
+          body: `${newMaterial.title} (${newMaterial.subject}, ${newMaterial.fileType})`,
+          subjects: [newMaterial.subject],
+        } }).catch(() => {});
       } catch (err) {
         console.warn('Firestore studyMaterial save (using local):', err);
       }
@@ -2542,6 +2551,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       Object.keys(newSlot).forEach(key => newSlot[key] === undefined && delete newSlot[key]);
 
       await setDoc(doc(db, 'timetable', id), tenantWrite(newSlot));
+      // Students taking this subject get a notification about the new class.
+      void api('/api/notifications/push', { method: 'POST', body: {
+        centreId: newSlot.centreId || activeCentreId,
+        type: 'class',
+        title: 'New class scheduled',
+        body: `${newSlot.subject}${newSlot.topic ? ': ' + newSlot.topic : ''} - ${newSlot.day} ${newSlot.time}`,
+        subjects: [newSlot.subject],
+      } }).catch(() => {});
       addToast({
         type: 'success',
         title: 'Timetable Slot Added',
@@ -2565,6 +2582,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         Object.keys(newSlot).forEach(key => newSlot[key] === undefined && delete newSlot[key]);
 
         await setDoc(doc(db, 'timetable', id), tenantWrite(newSlot));
+      // Students taking this subject get a notification about the new class.
+      void api('/api/notifications/push', { method: 'POST', body: {
+        centreId: newSlot.centreId || activeCentreId,
+        type: 'class',
+        title: 'New class scheduled',
+        body: `${newSlot.subject}${newSlot.topic ? ': ' + newSlot.topic : ''} - ${newSlot.day} ${newSlot.time}`,
+        subjects: [newSlot.subject],
+      } }).catch(() => {});
       }
       addToast({
         type: 'success',

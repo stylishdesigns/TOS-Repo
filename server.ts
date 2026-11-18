@@ -33,6 +33,7 @@ import { registerMockRoutes } from "./src/server/mockRoutes";
 import { PaymentError, parseAmount, parseConfirmAction } from "./src/server/paymentLogic";
 import { loadPaymentActor, submitPayment, decidePayment } from "./src/server/paymentService";
 import { registerStudentMockRoutes } from "./src/server/studentMockRoutes";
+import { registerNotificationRoutes } from "./src/server/notificationRoutes";
 import { registerTutorAiRoutes } from "./src/server/tutorAiRoutes";
 
 
@@ -1235,6 +1236,7 @@ RULES:
   registerLandingLeadRoutes(app);
   registerLandingAdminRoutes(app);
   registerMockRoutes(app);
+  registerNotificationRoutes(app);
   registerStudentMockRoutes(app);
 
   // Tutor AI (T1): general study-assistant chat for centre members. Separate

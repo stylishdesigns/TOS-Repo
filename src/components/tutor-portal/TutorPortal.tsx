@@ -150,7 +150,7 @@ export const TutorPortal: React.FC = () => {
       <header className="bg-slate-950/80 backdrop-blur-md border-b border-slate-800 text-white px-4 py-2.5 z-40 sticky top-0">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
           <div className="flex items-center space-x-2.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#EA580C] animate-pulse shrink-0" />
+            <span className="w-2.5 h-2.5 rounded-full bg-orange-600 animate-pulse shrink-0" />
             <span className="hidden sm:inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-500/20 text-orange-400 border border-orange-500/30">
               Tutor Portal
             </span>
@@ -164,7 +164,7 @@ export const TutorPortal: React.FC = () => {
                aria-label="Notifications"
             >
                <Bell className="w-4 h-4" />
-               <span className="absolute top-2 right-2 w-2 h-2 bg-[#EA580C] rounded-full ring-2 ring-slate-900 animate-pulse" />
+               <span className="absolute top-2 right-2 w-2 h-2 bg-orange-600 rounded-full ring-2 ring-slate-900 animate-pulse" />
             </button>
 
             <button
@@ -259,7 +259,7 @@ export const TutorPortal: React.FC = () => {
           )}
 
           {/* 3. Bottom Navigation (Mobile App Style) */}
-          <nav className={`${chatThreadOpen || chatMode === 'tito' ? 'hidden' : ''} fixed bottom-0 left-0 right-0 sm:absolute z-40 bg-[#EA580C] border-t border-orange-600/30 py-2 px-3 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] rounded-t-[24px]`}>
+          <nav className={`${chatThreadOpen || chatMode === 'tito' ? 'hidden' : ''} fixed bottom-0 left-0 right-0 sm:absolute z-40 bg-orange-600 border-t border-orange-600/30 py-2 px-3 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] rounded-t-[24px]`}>
             <div className="max-w-md mx-auto grid grid-cols-5 gap-1 items-center">
               {/* Home */}
               <button

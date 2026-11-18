@@ -114,7 +114,7 @@ export const ActionSheetModal: React.FC<ActionSheetModalProps> = ({
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-[#EA580C] animate-pulse" />
+              <span className="w-2 h-2 rounded-full bg-orange-600 animate-pulse" />
               <h3 className="text-base font-black text-[#0F172A] tracking-tight">
                 {title}
               </h3>
@@ -157,11 +157,11 @@ export const ActionSheetModal: React.FC<ActionSheetModalProps> = ({
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <h4 className="text-sm font-black text-[#0F172A] tracking-tight group-hover:text-[#C2410C] transition-colors truncate">
+                    <h4 className="text-sm font-black text-[#0F172A] tracking-tight group-hover:text-orange-700 transition-colors truncate">
                       {item.title}
                     </h4>
                     {item.badge && (
-                      <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-orange-100 text-[#C2410C] border border-orange-200/60 shrink-0">
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-orange-100 text-orange-700 border border-orange-200/60 shrink-0">
                         {item.badge}
                       </span>
                     )}
@@ -171,7 +171,7 @@ export const ActionSheetModal: React.FC<ActionSheetModalProps> = ({
                   </p>
                 </div>
               </div>
-              <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-[#C2410C] group-hover:translate-x-1 transition-all shrink-0" />
+              <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-orange-700 group-hover:translate-x-1 transition-all shrink-0" />
             </button>
           ))}
         </div>

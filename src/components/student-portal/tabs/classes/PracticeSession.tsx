@@ -79,7 +79,7 @@ export const PracticeSession: React.FC<PracticeSessionProps> = ({
           </button>
           <div>
             <div className="flex items-center space-x-1.5">
-              <span className="text-[10px] font-extrabold uppercase text-[#EA580C] tracking-wider">
+              <span className="text-[10px] font-extrabold uppercase text-orange-600 tracking-wider">
                 Practice
               </span>
               <span className="text-slate-300 text-xs">•</span>
@@ -204,7 +204,7 @@ export const PracticeSession: React.FC<PracticeSessionProps> = ({
         {/* Explanation Card (shows after answered) */}
         {hasAnsweredCurrent && currentQ.explanation && (
           <div className="mt-4 p-4 rounded-2xl bg-[#F8FAFC] border border-[#E2E8F0] space-y-1.5 animate-in fade-in duration-300">
-            <div className="flex items-center space-x-1.5 text-[#EA580C]">
+            <div className="flex items-center space-x-1.5 text-orange-600">
               <HelpCircle className="w-3.5 h-3.5" />
               <span className="text-[10px] font-extrabold uppercase tracking-wider">
                 Why
@@ -224,7 +224,7 @@ export const PracticeSession: React.FC<PracticeSessionProps> = ({
           <button
             type="button"
             onClick={handleNext}
-            className="w-full h-[52px] bg-[#EA580C] hover:bg-[#C2410C] text-white font-extrabold text-xs uppercase tracking-wider rounded-2xl shadow-xl shadow-orange-950/20 active:scale-98 transition-all flex items-center justify-center space-x-2 cursor-pointer"
+            className="w-full h-[52px] bg-orange-600 hover:bg-orange-700 text-white font-extrabold text-xs uppercase tracking-wider rounded-2xl shadow-xl shadow-orange-950/20 active:scale-98 transition-all flex items-center justify-center space-x-2 cursor-pointer"
           >
             <span>{isLast ? 'Finish Practice' : 'Next Question'}</span>
             <ArrowRight className="w-4 h-4" />
@@ -236,7 +236,7 @@ export const PracticeSession: React.FC<PracticeSessionProps> = ({
       {showExitConfirm && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs animate-in fade-in duration-150">
           <div className="bg-white rounded-3xl max-w-xs w-full p-6 shadow-2xl border border-slate-100 text-center space-y-4">
-            <div className="w-12 h-12 rounded-2xl bg-orange-100 text-[#EA580C] mx-auto flex items-center justify-center">
+            <div className="w-12 h-12 rounded-2xl bg-orange-100 text-orange-600 mx-auto flex items-center justify-center">
               <AlertCircle className="w-6 h-6" />
             </div>
 
@@ -256,7 +256,7 @@ export const PracticeSession: React.FC<PracticeSessionProps> = ({
                   setShowExitConfirm(false);
                   onExit(userAnswers);
                 }}
-                className="w-full py-3 bg-[#EA580C] text-white rounded-xl font-bold text-xs uppercase tracking-wider hover:bg-[#C2410C] transition-all cursor-pointer"
+                className="w-full py-3 bg-orange-600 text-white rounded-xl font-bold text-xs uppercase tracking-wider hover:bg-orange-700 transition-all cursor-pointer"
               >
                 End Practice
               </button>

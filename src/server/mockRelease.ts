@@ -23,6 +23,7 @@ import { httpError } from './tenantService';
 import { MOCKS, MOCK_ATTEMPTS, MOCK_TALLY, MOCK_LEADERBOARDS, MOCK_KEYS, KeyItem, audit, lagosToday, bumpMockTally } from './mockRoutes';
 import { markWithKey } from './studentMockRoutes';
 import { postAutoTos } from './chatAutoPosts';
+import { pushNotification } from './notificationRoutes';
 
 const TOP_ENTRIES = 100;
 const OPEN_ATTEMPT_CAP = 25;
@@ -139,6 +140,23 @@ async function releaseOne(mockId: string, mock: any, source: string, by?: string
     releasedEntries: entries.length,
   });
   await batch.commit();
+
+  // Students get a notification that the daily board is out.
+  try {
+    const boardCentreId = String(mock.centreId || '').trim();
+    if (boardCentreId) {
+      await pushNotification({
+        centreId: boardCentreId,
+        type: 'leaderboard',
+        title: 'Daily leaderboard released',
+        body: totalAttempts > 0
+          ? `Today's leaderboard is out with ${totalAttempts} attempt${totalAttempts === 1 ? '' : 's'}. See where you rank.`
+          : "Today's leaderboard is out. See where you rank.",
+      });
+    }
+  } catch (e: any) {
+    console.error(`[mockRelease] notification failed for ${mockId}:`, e?.message || e);
+  }
 
   // 5. Rank every submitted attempt once, while the histogram is fresh, so
   //    the student's Past list never has to read boards at view time. Ties

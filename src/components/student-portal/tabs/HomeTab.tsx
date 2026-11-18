@@ -252,7 +252,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
             {/* Progress Connecting Line (Improved Visuals) */}
             <div className="absolute top-[33px] left-[45px] right-[45px] h-[6px] bg-slate-200 rounded-full z-0 overflow-hidden shadow-inner">
               <div 
-                className="h-full bg-gradient-to-r from-orange-500 to-[#EA580C] rounded-full transition-all duration-1000 shadow-[0_0_10px_rgba(234,88,12,0.5)]" 
+                className="h-full bg-gradient-to-r from-orange-500 to-orange-600 rounded-full transition-all duration-1000 shadow-[0_0_10px_rgba(234,88,12,0.5)]" 
                 style={{ width: `${getProgress()}%` }}
               />
             </div>
@@ -417,13 +417,13 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
         {/* Card 4: Calendar Planner Scheduling */}
         <button
           onClick={() => setShowCalendar(true)}
-          className="text-left bg-white p-4 sm:p-4.5 rounded-2xl border border-slate-200/90 shadow-sm hover:border-[#EA580C] hover:shadow-md transition-all active:scale-98 flex flex-col justify-between min-h-[112px] group cursor-pointer"
+          className="text-left bg-white p-4 sm:p-4.5 rounded-2xl border border-slate-200/90 shadow-sm hover:border-orange-600 hover:shadow-md transition-all active:scale-98 flex flex-col justify-between min-h-[112px] group cursor-pointer"
         >
           <div className="flex items-center justify-between text-slate-400 mb-2">
-            <div className="w-8 h-8 rounded-xl bg-orange-50 flex items-center justify-center text-[#EA580C] group-hover:scale-105 transition-transform">
+            <div className="w-8 h-8 rounded-xl bg-orange-50 flex items-center justify-center text-orange-600 group-hover:scale-105 transition-transform">
               <Calendar className="w-4.5 h-4.5" />
             </div>
-            <span className="text-[10px] font-black px-2 py-0.5 bg-orange-100 text-[#C2410C] rounded-lg">
+            <span className="text-[10px] font-black px-2 py-0.5 bg-orange-100 text-orange-700 rounded-lg">
               Planner
             </span>
           </div>
@@ -444,12 +444,12 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
         >
           <div className="space-y-1">
             <div className="flex items-center space-x-2 text-sm font-black text-orange-950">
-              <Laptop className="w-5 h-5 text-[#EA580C]" />
+              <Laptop className="w-5 h-5 text-orange-600" />
               <span>Launch CBT</span>
             </div>
             <p className="text-xs text-orange-800/80 font-medium">Timed exam simulations</p>
           </div>
-          <ArrowRight className="w-4 h-4 text-[#EA580C] group-hover:translate-x-1 transition-transform shrink-0 ml-1" />
+          <ArrowRight className="w-4 h-4 text-orange-600 group-hover:translate-x-1 transition-transform shrink-0 ml-1" />
         </button>
 
         <button
@@ -471,14 +471,14 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
       <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
-            <Clock className="w-4 h-4 text-[#EA580C]" />
+            <Clock className="w-4 h-4 text-orange-600" />
             <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
               Today's Lectures ({todayClasses.length})
             </h4>
           </div>
           <button
             onClick={() => onNavigateTab('classes')}
-            className="text-[11px] font-bold text-[#EA580C] hover:underline"
+            className="text-[11px] font-bold text-orange-600 hover:underline"
           >
             Full Week →
           </button>

@@ -207,7 +207,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({ tutor }) => {
           className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs rounded-xl flex items-center space-x-1.5 shadow-sm active:scale-95 transition-all cursor-pointer shrink-0"
           title="View Past Classes and Ratings History"
         >
-          <History className="w-4 h-4 text-[#F97316]" />
+          <History className="w-4 h-4 text-orange-500" />
           <span>Past Classes</span>
         </button>
 
@@ -516,7 +516,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({ tutor }) => {
                            )}
                            
                            {hasConsented && viewingSession.status === 'pending_tutor_consent' ? (
-                              <button disabled={isProcessing || (!viewingSession.topic && !tutorTopic.trim())} onClick={handleConsent} className="w-full py-4 bg-[#EA580C] text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-lg shadow-orange-200 disabled:opacity-50">
+                              <button disabled={isProcessing || (!viewingSession.topic && !tutorTopic.trim())} onClick={handleConsent} className="w-full py-4 bg-orange-600 text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-lg shadow-orange-200 disabled:opacity-50">
                                 {isProcessing ? 'Processing...' : 'Approve Class'}
                               </button>
                            ) : (

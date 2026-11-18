@@ -577,7 +577,7 @@ export const CbtTab: React.FC<CbtTabProps> = ({
             <div className="p-6 space-y-6 bg-white text-slate-900">
               {/* Slip Header */}
               <div className="text-center pb-5 border-b-2 border-slate-900 space-y-1.5">
-                <div className="w-12 h-12 rounded-2xl bg-[#EA580C] text-white flex items-center justify-center font-black text-xl mx-auto mb-2 shadow-lg shadow-orange-100">
+                <div className="w-12 h-12 rounded-2xl bg-orange-600 text-white flex items-center justify-center font-black text-xl mx-auto mb-2 shadow-lg shadow-orange-100">
                   EX
                 </div>
                 <h2 className="text-lg font-black tracking-tight uppercase text-slate-900">
@@ -636,7 +636,7 @@ export const CbtTab: React.FC<CbtTabProps> = ({
                               <span className="font-black text-slate-800">{displaySubject}</span>
                             </td>
                             <td className="p-3 text-center font-mono text-slate-500">{s.maxScore}</td>
-                            <td className="p-3 text-center font-mono font-black text-[#EA580C]">
+                            <td className="p-3 text-center font-mono font-black text-orange-600">
                               {s.score}
                             </td>
                             <td className="p-3 text-right font-black text-emerald-700">
@@ -731,11 +731,11 @@ export const CbtTab: React.FC<CbtTabProps> = ({
       );
     }
     return (
-      <div className={`space-y-4 transition-all duration-500 min-h-screen relative ${showArchive ? 'bg-slate-50' : (activeFrequency === 'Mock' ? 'bg-[#EA580C]' : 'bg-slate-50')} p-4`}>
+      <div className={`space-y-4 transition-all duration-500 min-h-screen relative ${showArchive ? 'bg-slate-50' : (activeFrequency === 'Mock' ? 'bg-orange-600' : 'bg-slate-50')} p-4`}>
         {renderModals()}
         {/* Overscroll Background Extender */}
         {(isMock || showArchive) && (
-          <div className={`absolute top-[-1000px] left-0 right-0 h-[1000px] ${showArchive ? 'bg-slate-50' : 'bg-[#EA580C]'} -z-10`} />
+          <div className={`absolute top-[-1000px] left-0 right-0 h-[1000px] ${showArchive ? 'bg-slate-50' : 'bg-orange-600'} -z-10`} />
         )}
         <div className="flex items-center justify-between">
           {!showArchive ? (
@@ -796,7 +796,7 @@ export const CbtTab: React.FC<CbtTabProps> = ({
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Archive</p>
                 <p className="text-xl font-black text-slate-900 mt-0.5">{allArchiveExams.length}</p>
               </div>
-              <div className="w-9 h-9 rounded-xl bg-orange-50 border border-orange-100 flex items-center justify-center text-[#EA580C]">
+              <div className="w-9 h-9 rounded-xl bg-orange-50 border border-orange-100 flex items-center justify-center text-orange-600">
                 <Archive className="w-4 h-4" />
               </div>
             </div>
@@ -827,7 +827,7 @@ export const CbtTab: React.FC<CbtTabProps> = ({
                  setShowArchive(false);
               }}
               className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${
-                activeFrequency === 'General' ? 'bg-white text-[#EA580C] shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                activeFrequency === 'General' ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
               }`}
             >
               Assessments
@@ -839,7 +839,7 @@ export const CbtTab: React.FC<CbtTabProps> = ({
                  setShowArchive(false);
               }}
               className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${
-                activeFrequency === 'Mock' ? 'bg-white text-[#EA580C] shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                activeFrequency === 'Mock' ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
               }`}
             >
               Mock Exams
@@ -907,7 +907,7 @@ export const CbtTab: React.FC<CbtTabProps> = ({
                             )}
                             
                             {showArchive && (
-                              <span className="px-2 py-0.5 rounded-md bg-orange-50 text-[#EA580C] text-[8px] font-black uppercase border border-orange-100">
+                              <span className="px-2 py-0.5 rounded-md bg-orange-50 text-orange-600 text-[8px] font-black uppercase border border-orange-100">
                                  {examStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                               </span>
                             )}
@@ -982,7 +982,7 @@ export const CbtTab: React.FC<CbtTabProps> = ({
                           onClick={() => handleStartExam(exam)}
                           className={`px-6 py-2 rounded-xl text-white text-[10px] font-black uppercase tracking-widest transition-all ${
                             isTimeStarted
-                              ? 'bg-[#EA580C] shadow-lg shadow-orange-100 active:scale-95' 
+                              ? 'bg-orange-600 shadow-lg shadow-orange-100 active:scale-95' 
                               : 'bg-slate-300 cursor-not-allowed'
                           }`}
                         >
@@ -1074,7 +1074,7 @@ export const CbtTab: React.FC<CbtTabProps> = ({
                   onHideBottomNav?.(false);
                   onExitReview?.();
                 }}
-                className="w-full py-4 bg-[#EA580C] text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-2xl shadow-orange-950/40 hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2 border border-orange-400/20"
+                className="w-full py-4 bg-orange-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-2xl shadow-orange-950/40 hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2 border border-orange-400/20"
               >
                 <RotateCcw className="w-4 h-4" />
                 <span>Back to CBT</span>
@@ -1084,7 +1084,7 @@ export const CbtTab: React.FC<CbtTabProps> = ({
 
           <div className="space-y-4">
             <h3 className="text-xs font-black uppercase tracking-widest text-white px-1 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-[#EA580C]" />
+              <span className="w-2 h-2 rounded-full bg-orange-600" />
               Explanations & Corrections
             </h3>
             {selectedExam.questions.map((q, idx) => (
@@ -1093,7 +1093,7 @@ export const CbtTab: React.FC<CbtTabProps> = ({
                   <div className="bg-slate-900/60 rounded-3xl p-6 border border-white/10 shadow-sm space-y-4">
                     <div className="flex items-center justify-between border-b border-white/5 pb-3">
                       <span className="text-xs font-black uppercase text-white tracking-wider flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full bg-[#EA580C]" />
+                        <span className="w-2.5 h-2.5 rounded-full bg-orange-600" />
                         Question {idx + 1}
                       </span>
                       {userAnswers[idx] === q.correctAnswer ? (
@@ -1195,7 +1195,7 @@ export const CbtTab: React.FC<CbtTabProps> = ({
       <div className="fixed inset-0 z-50 bg-slate-950 flex flex-col">
         <div className="bg-slate-900/50 backdrop-blur-xl text-white p-4 flex items-center justify-between border-b border-white/5 shrink-0">
           <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 rounded-lg bg-[#EA580C] flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-orange-600 flex items-center justify-center">
               <BookOpen className="w-5 h-5 text-white" />
             </div>
             <div>
@@ -1217,7 +1217,7 @@ export const CbtTab: React.FC<CbtTabProps> = ({
               <div key={idx} className="space-y-2">
                 <div className="flex items-center justify-between px-4 pb-1">
                    <span className="text-sm sm:text-base font-black uppercase text-white tracking-wider flex items-center gap-2">
-                     <span className="w-2.5 h-2.5 rounded-full bg-[#EA580C]" />
+                     <span className="w-2.5 h-2.5 rounded-full bg-orange-600" />
                      Question {idx + 1}
                    </span>
                 </div>
@@ -1311,7 +1311,7 @@ export const CbtTab: React.FC<CbtTabProps> = ({
               onHideBottomNav?.(false);
               onExitReview?.();
             }}
-            className="w-full py-4 bg-[#EA580C] text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-2xl shadow-orange-950/40 hover:scale-105 active:scale-95 transition-all flex items-center justify-center space-x-2 border border-orange-400/20"
+            className="w-full py-4 bg-orange-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-2xl shadow-orange-950/40 hover:scale-105 active:scale-95 transition-all flex items-center justify-center space-x-2 border border-orange-400/20"
           >
             <ChevronLeft className="w-3.5 h-3.5" />
             <span>Back to CBT</span>
@@ -1370,7 +1370,7 @@ export const CbtTab: React.FC<CbtTabProps> = ({
             <div className="bg-slate-900/40 rounded-[32px] p-6 sm:p-10 border border-white/5 shadow-2xl space-y-8 backdrop-blur-sm">
               <div className="flex items-center justify-between pb-6 border-b border-white/5">
                 <span className="text-sm sm:text-base font-black uppercase text-white tracking-wider flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-[#EA580C]" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-orange-600" />
                   Question {currentIndex + 1} <span className="mx-1 text-slate-500 font-bold">/</span> <span className="text-slate-300 font-bold">{selectedExam.questionCount}</span>
                 </span>
               </div>

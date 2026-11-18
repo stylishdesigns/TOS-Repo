@@ -133,7 +133,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ tutor, onExit }) => {
               <Loader2 className="w-6 h-6 animate-spin text-white" />
             </div>
           ) : (
-            <div className="absolute bottom-0 right-0 w-7 h-7 bg-[#EA580C] border-2 border-white rounded-full shadow-sm flex items-center justify-center">
+            <div className="absolute bottom-0 right-0 w-7 h-7 bg-orange-600 border-2 border-white rounded-full shadow-sm flex items-center justify-center">
               <Camera className="w-3.5 h-3.5 text-white" />
             </div>
           )}
@@ -311,7 +311,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ tutor, onExit }) => {
               <button
                 onClick={saveProfile}
                 disabled={saving}
-                className="w-full py-3.5 rounded-2xl bg-[#EA580C] text-white text-sm font-black active:scale-[0.99] transition disabled:opacity-60 flex items-center justify-center gap-2"
+                className="w-full py-3.5 rounded-2xl bg-orange-600 text-white text-sm font-black active:scale-[0.99] transition disabled:opacity-60 flex items-center justify-center gap-2"
               >
                 {saving && <Loader2 className="w-4 h-4 animate-spin" />} Save changes
               </button>
