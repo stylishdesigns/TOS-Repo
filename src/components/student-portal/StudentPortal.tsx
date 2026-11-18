@@ -56,15 +56,15 @@ const ChatOrbIcon: React.FC<{ className?: string }> = ({ className }) => (
 export type TabType = 'home' | 'classes' | 'chat' | 'cbt' | 'results' | 'more';
 
 export const StudentPortal: React.FC = () => {
-  const { students, settings, isAdmin, attendanceSettings, attendanceLogs, entitlements, centreName, bgTheme, activeCentre } = useApp();
+  const { students, settings, isAdmin, attendanceSettings, attendanceLogs, entitlements, centreName, bgTheme, activeCentre, brandAccent } = useApp();
 
   // The facility's own accent drives the orb and fan menu; orange only where
   // the facility has saved no brand color of its own.
-  const brandAccent = /^#[0-9a-fA-F]{6}$/.test(String(activeCentre?.accentColor || ''))
-    ? String(activeCentre?.accentColor)
+  const orbAccent = /^#[0-9a-fA-F]{6}$/.test(String(brandAccent || ''))
+    ? String(brandAccent)
     : '#EA580C';
-  const orbGradient = `linear-gradient(145deg, ${brandAccent}, color-mix(in oklab, ${brandAccent} 60%, black))`;
-  const orbShadowClosed = `0 0 0 5px color-mix(in srgb, ${brandAccent} 22%, transparent), 0 10px 24px color-mix(in srgb, ${brandAccent} 50%, transparent), inset 0 2px 0 rgba(255,255,255,.35)`;
+  const orbGradient = `linear-gradient(145deg, ${orbAccent}, color-mix(in oklab, ${orbAccent} 60%, black))`;
+  const orbShadowClosed = `0 0 0 5px color-mix(in srgb, ${orbAccent} 22%, transparent), 0 10px 24px color-mix(in srgb, ${orbAccent} 50%, transparent), inset 0 2px 0 rgba(255,255,255,.35)`;
 
   const { user, loading: authLoading } = useFirebase();
   const [profileLoading, setProfileLoading] = useState(true);
@@ -913,7 +913,7 @@ export const StudentPortal: React.FC = () => {
                           height: 62,
                           background: '#FFFFFF',
                           border: '4px solid #020617',
-                          boxShadow: `0 0 0 5px color-mix(in srgb, ${brandAccent} 18%, transparent), 0 10px 24px rgba(15,23,42,.35)`,
+                          boxShadow: `0 0 0 5px color-mix(in srgb, ${orbAccent} 18%, transparent), 0 10px 24px rgba(15,23,42,.35)`,
                         }
                       : {
                           width: 62,
