@@ -89,8 +89,9 @@ export const StudentPortal: React.FC = () => {
         unsubscribe = onSnapshot(
           docRef,
           (docSnap) => {
-            saveLastGoodFlag(`hasProfile:${user.uid}`, docSnap.exists());
-            setHasProfile(docSnap.exists());
+            const profiled = docSnap.exists() && (docSnap.data() as any)?.skeleton !== true;
+            saveLastGoodFlag(`hasProfile:${user.uid}`, profiled);
+            setHasProfile(profiled);
             setProfileLoading(false);
           },
           (error) => {

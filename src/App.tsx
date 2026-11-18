@@ -191,54 +191,15 @@ const MainLayout: React.FC = () => {
   // page is clicked; the platform-staff door (#tos-admin) never shows it.
   const [centreGateRequested, setCentreGateRequested] = useState(() => window.location.hash.toLowerCase() === '#access');
 
-  // The facility app's own home screen. When the installed app (or its address)
-  // opens with a facility context, a welcome screen with the facility's photo,
-  // Get Started and Log In replaces the access-code gate, and the TOS landing
-  // page is never seen from the app.
+  // The facility app's own home screen. In the installed app (its own address
+  // carries ?centre=), a signed-out user goes through the access-code gate
+  // first; Continue then shows the welcome screen. A signed-in user skips the
+  // gate and lands straight in their portal.
   const [appWelcomeCentre, setAppWelcomeCentre] = useState<{ centreId: string; centreName: string; accent: string; logoUrl: string; welcomeImageUrl: string } | null>(null);
   const [appWelcomeMode, setAppWelcomeMode] = useState<'welcome' | 'login' | 'signup' | null>(null);
-  const appWelcomeTriedRef = useRef(false);
-  useEffect(() => {
-    if (appWelcomeTriedRef.current) return;
-    if (!centreGateRequested || currentUser || tosLoginRequested) return;
-    appWelcomeTriedRef.current = true;
-    let ref = '';
-    try {
-      const p = new URLSearchParams(window.location.search);
-      const c = p.get('centre');
-      if (c && /^[A-Za-z0-9][A-Za-z0-9_-]{2,159}$/.test(c)) ref = c;
-      if (!ref) {
-        const m = window.location.pathname.match(/^\/([A-Za-z0-9][A-Za-z0-9_-]{2,159})\/?$/);
-        if (m && !['app', 'start', 'preview', 'tos-admin', 'c'].includes(m[1].toLowerCase())) ref = m[1];
-      }
-      if (!ref) {
-        const saved = localStorage.getItem('tos:signup-result');
-        if (saved) {
-          try {
-            const s = JSON.parse(saved);
-            const slug = typeof s === 'string' ? s : String(s?.facilitySlug || s?.slug || '');
-            if (slug && /^[A-Za-z0-9][A-Za-z0-9_-]{2,159}$/.test(slug)) ref = slug;
-          } catch { /* not a facility ref */ }
-        }
-      }
-    } catch { /* facility context stays unknown; the gate still works */ }
-    if (!ref) return;
-    fetch(`/api/public/landing/${encodeURIComponent(ref)}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (d && d.ok && d.centreName) {
-          setAppWelcomeCentre({
-            centreId: String(d.centreId || ref),
-            centreName: String(d.centreName),
-            accent: String(d.content?.accent || ''),
-            logoUrl: String(d.logoUrl || ''),
-            welcomeImageUrl: String(d.welcomeImageUrl || ''),
-          });
-          setAppWelcomeMode('welcome');
-        }
-      })
-      .catch(() => { /* no facility context: the gate shows as usual */ });
-  }, [centreGateRequested, currentUser, tosLoginRequested]);
+  const [isAppContext] = useState(() => {
+    try { return !!new URLSearchParams(window.location.search).get('centre'); } catch { return false; }
+  });
 
   // Platform (TOS) admins are exempt from the centre access-code gate below.
   // TOS access is the server-stamped `tos` custom claim, verified in a fresh
@@ -516,7 +477,6 @@ const MainLayout: React.FC = () => {
       <AppWelcomePage
         centreName={appWelcomeCentre.centreName}
         accent={appWelcomeCentre.accent}
-        logoUrl={appWelcomeCentre.logoUrl}
         welcomeImageUrl={appWelcomeCentre.welcomeImageUrl}
         onGetStarted={() => enterFromWelcome('signup')}
         onLogin={() => enterFromWelcome('login')}
@@ -530,12 +490,18 @@ const MainLayout: React.FC = () => {
   if (!currentUser && !tosLoginRequested && !pendingCentre && centreGateRequested) {
     return (
       <CentreCodeGate
-        onProceed={(code, centreName, centreId, accent) => {
+        onProceed={(code, centreName, centreId, accent, logoUrl) => {
           // A code picked from a door that skipped the landing (the installed
           // app boots on #access) must still land on the login page, not the
           // landing: clear the welcome flag the gate ran past.
           setShowWelcome(false);
           setPendingCentre({ code, centreName, centreId, accent });
+          // In the facility app the gate's Continue opens the app's own
+          // welcome screen; login happens from there, never straight away.
+          if (isAppContext) {
+            setAppWelcomeCentre({ centreId: centreId || '', centreName, accent: accent || '', logoUrl: logoUrl || '', welcomeImageUrl: '' });
+            setAppWelcomeMode('welcome');
+          }
         }}
         onBack={() => { setShowPortals(false); setShowWelcome(true); setCentreGateRequested(false); }}
       />

@@ -16,6 +16,7 @@ export const StudentOnboarding: React.FC<StudentOnboardingProps> = ({ onComplete
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
+    dob: '',
     courseOfStudy: '',
     universityChoice: '',
     examToRegister: '',
@@ -36,6 +37,7 @@ export const StudentOnboarding: React.FC<StudentOnboardingProps> = ({ onComplete
         uid: user.uid,
         name: `${formData.firstName} ${formData.lastName}`,
         email: user.email || '',
+        dob: formData.dob,
         courseOfStudy: formData.courseOfStudy,
         universityChoice: formData.universityChoice,
         examToRegister: formData.examToRegister,
@@ -48,7 +50,6 @@ export const StudentOnboarding: React.FC<StudentOnboardingProps> = ({ onComplete
         avatar: user.photoURL || '',
         // Missing fields to satisfy Student interface
         gender: 'Male',
-        dob: '',
         address: '',
         programmeId: '',
         programmeName: formData.examToRegister || 'General Programme',
@@ -61,7 +62,7 @@ export const StudentOnboarding: React.FC<StudentOnboardingProps> = ({ onComplete
         outstandingBalance: 0,
       };
 
-      await setDoc(doc(db, 'students', user.uid), { ...studentData, ...(activeCentreId ? { centreId: activeCentreId } : {}) });
+      await setDoc(doc(db, 'students', user.uid), { ...studentData, ...(activeCentreId ? { centreId: activeCentreId } : {}) }, { merge: true });
       addToast({
         type: 'success',
         title: 'Profile Created!',
@@ -112,6 +113,16 @@ export const StudentOnboarding: React.FC<StudentOnboardingProps> = ({ onComplete
                   onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all text-sm"
                   placeholder="Doe"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1.5 ml-1">Date of Birth</label>
+                <input
+                  required
+                  type="date"
+                  value={formData.dob}
+                  onChange={(e) => setFormData({ ...formData, dob: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all text-sm"
                 />
               </div>
             </div>

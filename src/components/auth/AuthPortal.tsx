@@ -343,6 +343,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
       if (uid) {
         const newStudent: any = {
           id: uid,
+          skeleton: true,
           name: email.split('@')[0],
           email: email,
           studentId: `STU-${Math.floor(1000 + Math.random() * 9000)}`,

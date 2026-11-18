@@ -10,7 +10,7 @@ import { isAppOnlyOn, isStandaloneDisplay } from '../portal/AppOnlyGate';
  * centre's login page follows. The code never reveals any centre data.
  */
 interface CentreCodeGateProps {
-  onProceed: (code: string, centreName: string, centreId?: string, accent?: string) => void;
+  onProceed: (code: string, centreName: string, centreId?: string, accent?: string, logoUrl?: string) => void;
   onBack: () => void;
 }
 
@@ -38,7 +38,7 @@ export const CentreCodeGate: React.FC<CentreCodeGateProps> = ({ onProceed, onBac
       }
     } catch { /* check unavailable: sign in as usual */ }
     setContinuing(false);
-    onProceed(pendingCode, centre.centreName, centre.centreId, centre.accentColor);
+    onProceed(pendingCode, centre.centreName, centre.centreId, centre.accentColor, centre.logoUrl);
   };
 
   useEffect(() => {
@@ -225,7 +225,7 @@ export const CentreCodeGate: React.FC<CentreCodeGateProps> = ({ onProceed, onBac
                 </>
               ) : (
                 <>
-                  <span>Continue to sign in</span>
+                  <span>Continue</span>
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}
