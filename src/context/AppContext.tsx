@@ -316,6 +316,7 @@ interface AppContextType {
   seatsSummary: CentreSeatsSummary | null;
   hasCheckedActiveCentre: boolean;
   enterCentreByCode: (code: string, centreId?: string) => Promise<{ success: boolean; centreId?: string; error?: string }>;
+  resumeCentreSession: (centreId: string) => Promise<void>;
   enterSoleCentre: () => Promise<{ entered: boolean; count: number; error?: string; whatsapp?: string }>;
   fetchMyCentreIds: () => Promise<string[]>;
   joinCentreByCode: (code: string) => Promise<{ status: 'active' | 'pending'; centreName: string; centreId: string }>;
@@ -1168,6 +1169,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             setActiveCentreId(savedCentreId);
             setActiveCentre(valData.centre);
             if (valData.entitlements) setEntitlements(valData.entitlements);
+            try { localStorage.setItem(`tos_tenant:${savedCentreId}`, savedCentreId); } catch { /* storage unavailable */ }
 
             // Fetch seats summary
             fetch(`/api/centre/seats-summary?centreId=${savedCentreId}`, {
@@ -1193,6 +1195,46 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     initTenantSession();
   }, [user]);
+
+  // Restore a facility app's remembered tenant from this device: the same
+  // server validation a page reload runs, so the dashboard comes back without
+  // re-entry. A centre the account no longer belongs to is dropped from the
+  // device (the mirror is cleared) and normal entry takes over.
+  const resumeCentreSession = async (centreId: string) => {
+    const u = firebaseAuth.currentUser;
+    if (!u) throw new Error('You must be signed in.');
+    const token = await u.getIdToken();
+    const res = await fetch('/api/auth/validate-active-centre', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ centreId }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data?.success) {
+      try { localStorage.removeItem(`tos_tenant:${centreId}`); } catch { /* ignore */ }
+      throw new Error(data?.error || 'This facility session could not be restored.');
+    }
+    setActiveCentreId(centreId);
+    setActiveCentre(data.centre);
+    if (data.entitlements) setEntitlements(data.entitlements);
+    sessionStorage.setItem('tos_activeCentreId', centreId);
+    try { localStorage.setItem(`tos_tenant:${centreId}`, centreId); } catch { /* storage unavailable */ }
+    fetch(`/api/centre/seats-summary?centreId=${centreId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => r.json())
+      .then((sData) => {
+        if (sData.success && sData.summary) setSeatsSummary(sData.summary);
+      })
+      .catch((e) => console.warn('seats summary error:', e));
+    fetch('/api/session/sync', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    }).catch(() => {});
+  };
 
   const enterCentreByCode = async (code: string, centreId?: string) => {
     if (!user) throw new Error('You must be signed in.');
@@ -1220,6 +1262,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setActiveCentre(data.centre);
     if (data.entitlements) setEntitlements(data.entitlements);
     sessionStorage.setItem('tos_activeCentreId', data.centreId);
+    // Keep the tenant on this device per facility, so a facility app (and a
+    // page refresh or relaunch) restores its own dashboard without asking for
+    // anything. The value is always re-validated with the server before use.
+    try { localStorage.setItem(`tos_tenant:${data.centreId}`, data.centreId); } catch { /* storage unavailable */ }
 
     // Refresh seats summary
     refreshSeatsSummary(data.centreId);
@@ -3102,6 +3148,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         hasCheckedActiveCentre,
         enterCentreByCode,
         enterSoleCentre,
+        resumeCentreSession,
         fetchMyCentreIds,
         joinCentreByCode,
         switchCentre,

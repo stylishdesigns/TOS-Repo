@@ -12,9 +12,14 @@ import { isAppOnlyOn, isStandaloneDisplay } from '../portal/AppOnlyGate';
 interface CentreCodeGateProps {
   onProceed: (code: string, centreName: string, centreId?: string, accent?: string, logoUrl?: string) => void;
   onBack: () => void;
+  // Bound mode: the installed facility app belongs to ONE facility, so its
+  // gate is locked to that facility. The facility's name and logo show up
+  // front (the centre is confirmed before the code is even asked for), and a
+  // code that belongs to a different facility is refused.
+  lockedCentre?: { centreId?: string; centreName: string; accent?: string; logoUrl?: string };
 }
 
-export const CentreCodeGate: React.FC<CentreCodeGateProps> = ({ onProceed, onBack }) => {
+export const CentreCodeGate: React.FC<CentreCodeGateProps> = ({ onProceed, onBack, lockedCentre }) => {
   const [digits, setDigits] = useState<string[]>(['', '', '', '', '', '']);
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -99,6 +104,10 @@ export const CentreCodeGate: React.FC<CentreCodeGateProps> = ({ onProceed, onBac
         setError(data.error || 'That code did not match any facility. Check it and try again.');
         return;
       }
+      if (lockedCentre && data.centreId && lockedCentre.centreId && String(data.centreId) !== String(lockedCentre.centreId)) {
+        setError(`That access code is not for ${lockedCentre.centreName}. Check it and try again.`);
+        return;
+      }
       setCentre(data);
       setPendingCode(code);
     } catch {
@@ -126,10 +135,24 @@ export const CentreCodeGate: React.FC<CentreCodeGateProps> = ({ onProceed, onBac
           <div className="w-16 h-16 rounded-2xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-500 shadow-inner shadow-orange-500/20 mb-4">
             <Building2 className="w-8 h-8" />
           </div>
-          <h1 className="text-2xl font-black tracking-tight text-white mb-2">Which facility?</h1>
-          <p className="text-sm text-slate-400 font-medium max-w-xs">
-            Enter the 6-digit access code provided by your education facility.
-          </p>
+          {lockedCentre ? (
+            <>
+              {lockedCentre.logoUrl ? (
+                <img src={lockedCentre.logoUrl} alt="Facility logo" className="w-14 h-14 mx-auto rounded-xl object-contain bg-white p-1.5 mb-3 shadow-lg" />
+              ) : null}
+              <h1 className="text-2xl font-black tracking-tight text-white mb-2">{lockedCentre.centreName}</h1>
+              <p className="text-sm text-slate-400 font-medium max-w-xs">
+                Enter this facility's 6-digit access code to continue.
+              </p>
+            </>
+          ) : (
+            <>
+              <h1 className="text-2xl font-black tracking-tight text-white mb-2">Which facility?</h1>
+              <p className="text-sm text-slate-400 font-medium max-w-xs">
+                Enter the 6-digit access code provided by your education facility.
+              </p>
+            </>
+          )}
         </div>
 
         {error && (

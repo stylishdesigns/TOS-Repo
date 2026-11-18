@@ -50,6 +50,7 @@ const MainLayout: React.FC = () => {
     hasCheckedActiveCentre,
     enterCentreByCode,
     enterSoleCentre,
+    resumeCentreSession,
     fetchMyCentreIds,
     addToast,
     updateAdmin,
@@ -143,14 +144,15 @@ const MainLayout: React.FC = () => {
       .catch(() => { if (alive) setAppFacility(null); });
     return () => { alive = false; };
   }, [isAppContext]);
-  // A bound app skips the access-code gate and opens on its own facility's
-  // welcome screen, so the app's screen always belongs to its own facility.
+  // A bound app keeps the access-code gate as the first screen for a
+  // signed-out visitor: the gate is locked to the app's own facility, the
+  // code confirms the centre, and the welcome screen follows. A signed-in
+  // account never sees the gate: automatic entry opens the dashboard.
   useEffect(() => {
     if (!appFacility) return;
     setShowWelcome(false);
     setCentreGateRequested(true);
     setAppWelcomeCentre({ centreId: appFacility.centreId, centreName: appFacility.centreName, accent: appFacility.accent, logoUrl: appFacility.logoUrl, welcomeImageUrl: '' });
-    setAppWelcomeMode((m) => m ?? 'welcome');
   }, [appFacility]);
 
   // Email verification gate: a student account created with email + password
@@ -183,6 +185,9 @@ const MainLayout: React.FC = () => {
   }, [activeCentreId]);
 
   const centreEntryKeyRef = useRef<string | null>(null);
+  // The facility whose saved tenant this load already tried to restore, so a
+  // failed restore falls through to normal entry instead of looping.
+  const centreResumeTriedRef = useRef<string | null>(null);
   // What the last failed centre entry said, so the user sees the real reason
   // (a lockout, an inactive membership, a server hiccup) instead of being
   // dropped on an access-code screen that asks for the centre all over again.
@@ -213,6 +218,22 @@ const MainLayout: React.FC = () => {
       } else {
         setCentreEntryBusy(false);
         setCentreEntryFailed(false);
+        return;
+      }
+    }
+    // A permanent session: the facility app keeps the tenant it last entered
+    // on this device (per facility), so reopening or refreshing the app
+    // restores the dashboard without asking for anything again. The restored
+    // tenant is always re-validated with the server before it is trusted; a
+    // failed restore falls through to normal automatic entry.
+    if (appFacility && !activeCentreId && centreResumeTriedRef.current !== appFacility.centreId) {
+      centreResumeTriedRef.current = appFacility.centreId;
+      let savedTenant = '';
+      try { savedTenant = localStorage.getItem(`tos_tenant:${appFacility.centreId}`) || ''; } catch { savedTenant = ''; }
+      if (savedTenant === appFacility.centreId) {
+        resumeCentreSession(appFacility.centreId)
+          .catch(() => { /* the saved tenant is stale: normal entry takes over below */ })
+          .finally(() => setCentreEntryRetry((n) => n + 1));
         return;
       }
     }
@@ -285,7 +306,7 @@ const MainLayout: React.FC = () => {
         });
       })
       .finally(() => setCentreEntryBusy(false));
-  }, [currentUser, hasCheckedActiveCentre, activeCentreId, pendingCentre, centreEntryRetry, appWelcomeCentre, appWelcomeMode, appFacility, verifyPending, enterCentreByCode, enterSoleCentre]);
+  }, [currentUser, hasCheckedActiveCentre, activeCentreId, pendingCentre, centreEntryRetry, appWelcomeCentre, appWelcomeMode, appFacility, verifyPending, enterCentreByCode, enterSoleCentre, resumeCentreSession]);
 
   // The centre code gate appears only after a login button on the landing
   // page is clicked; the platform-staff door (#tos-admin) never shows it.
@@ -396,6 +417,9 @@ const MainLayout: React.FC = () => {
     setLoginCentreError(null);
     setShowWelcome(true);
     setShowPortals(false);
+    // Inside the installed app a signed-out account meets the facility's
+    // access-code gate again, never the login page or the landing.
+    if (isAppContext) setAppWelcomeMode(null);
     try {
       await logout();
     } catch (e) {
@@ -558,6 +582,25 @@ const MainLayout: React.FC = () => {
     setShowWelcome(false);
     setCentreGateRequested(true);
   };
+
+  // The installed app's access-code gate, bound to the app's own facility.
+  // A signed-out visitor enters this facility's access code first; the code
+  // confirms the centre, then the facility's welcome screen opens, and
+  // sign-in follows from there. A signed-in account skips the gate entirely.
+  if (!currentUser && !tosLoginRequested && !pendingCentre && isAppContext && appFacility && appWelcomeCentre && appWelcomeMode === null) {
+    return (
+      <CentreCodeGate
+        lockedCentre={{ centreId: appFacility.centreId, centreName: appFacility.centreName, accent: appFacility.accent, logoUrl: appFacility.logoUrl }}
+        onProceed={(code, centreName, centreId, accent, logoUrl) => {
+          setShowWelcome(false);
+          setPendingCentre({ code, centreName, centreId, accent });
+          setAppWelcomeCentre({ centreId: centreId || appFacility.centreId, centreName, accent: accent || '', logoUrl: logoUrl || appFacility.logoUrl, welcomeImageUrl: '' });
+          setAppWelcomeMode('welcome');
+        }}
+        onBack={() => { setShowPortals(false); setShowWelcome(true); setCentreGateRequested(false); }}
+      />
+    );
+  }
 
   // The facility app's home screen: welcome first, then login or sign-up.
   if (!currentUser && !tosLoginRequested && centreGateRequested && appWelcomeCentre && appWelcomeMode === 'welcome') {
