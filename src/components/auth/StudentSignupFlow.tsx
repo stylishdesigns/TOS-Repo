@@ -8,6 +8,7 @@ import { createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } f
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { COURSES, UNIVERSITIES, SUBJECTS } from '../../data/academicLists';
 import { ModernSelect } from '../ui/ModernSelect';
+import { BrandDatePicker } from '../ui/BrandDatePicker';
 
 interface StudentSignupFlowProps {
   centreName: string;
@@ -53,6 +54,20 @@ const EXAM_LABELS: Record<string, string> = {
 const FALLBACK_EXAMS = ['JAMB', 'WAEC', 'NECO', 'POST-UTME', 'A-LEVELS'];
 
 const USERNAME_RE = /^[a-z][a-z0-9_]{2,19}$/;
+
+/**
+ * What is wrong with a username, spelled out plainly. When a character is not
+ * accepted, the message names that exact character.
+ */
+const usernameProblem = (v: string): string => {
+  if (!v) return '';
+  const bad = v.split('').find((c) => !/[a-z0-9_]/.test(c));
+  if (bad) return `The character "${bad}" is not accepted. Usernames use only letters, numbers and underscores.`;
+  if (!/^[a-z]/.test(v)) return 'Usernames must start with a letter.';
+  if (v.length < 3) return 'Usernames are too short: at least 3 characters.';
+  if (v.length > 20) return 'Usernames are too long: at most 20 characters.';
+  return '';
+};
 
 /**
  * The student registration flow for the facility app: THREE STEP PAGES with a
@@ -205,9 +220,9 @@ export const StudentSignupFlow: React.FC<StudentSignupFlowProps> = ({
     if (formStep === 1) {
       if (!form.firstName.trim() || !form.lastName.trim()) { setError('Enter your first name and last name.'); return; }
       if (!usernameValue) { setError('Choose a username.'); return; }
-      if (usernameStatus === 'invalid') { setError('Usernames are 3 to 20 characters: letters, numbers and underscores, starting with a letter.'); return; }
+      if (usernameStatus === 'invalid') { setError(usernameProblem(usernameValue) || 'That username is not valid.'); return; }
       if (usernameStatus === 'checking') { setError('Still checking that username. Try again in a second.'); return; }
-      if (usernameStatus === 'taken') { setError('That username is already taken. Choose another one.'); return; }
+      if (usernameStatus === 'taken') { setError('That username is not available. Choose another one.'); return; }
       if (usernameStatus === 'idle') { setError('Still checking that username. Try again in a second.'); return; }
       if (!form.dob) { setError('Enter your date of birth.'); return; }
       if (!ageAtLeast14) { setError('You must be at least 14 years old to register.'); return; }
@@ -283,7 +298,7 @@ export const StudentSignupFlow: React.FC<StudentSignupFlowProps> = ({
     if (!pwOk) { setError('Your password does not meet all the requirements yet.'); return; }
     if (form.password !== form.confirmPassword) { setError('The two passwords do not match.'); return; }
     if (previewOnly) { setNotice('Preview only. Nothing is signed in or created on this link.'); return; }
-    if (usernameStatus === 'taken') { setError('That username is already taken. Go back and choose another one.'); setFormStep(1); return; }
+    if (usernameStatus === 'taken') { setError('That username is not available. Go back and choose another one.'); setFormStep(1); return; }
     if (usernameStatus !== 'available') { setError('Still checking that username. Try again in a second.'); return; }
     setBusy(true);
     try {
@@ -316,7 +331,7 @@ export const StudentSignupFlow: React.FC<StudentSignupFlowProps> = ({
   const handleGoogle = async () => {
     setError(''); setNotice('');
     if (previewOnly) { setNotice('Preview only. Nothing is signed in or created on this link.'); return; }
-    if (usernameStatus === 'taken') { setError('That username is already taken. Go back and choose another one.'); setFormStep(1); return; }
+    if (usernameStatus === 'taken') { setError('That username is not available. Go back and choose another one.'); setFormStep(1); return; }
     if (usernameStatus !== 'available') { setError('Still checking that username. Try again in a second.'); return; }
     setBusy(true);
     try {
@@ -533,17 +548,24 @@ export const StudentSignupFlow: React.FC<StudentSignupFlowProps> = ({
                   <span className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center text-[10px] font-bold text-emerald-600"><Check className="w-3 h-3 mr-0.5" />Available</span>
                 )}
                 {usernameStatus === 'taken' && (
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center text-[10px] font-bold text-rose-600"><X className="w-3 h-3 mr-0.5" />Taken</span>
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center text-[10px] font-bold text-rose-600"><X className="w-3 h-3 mr-0.5" />Not available</span>
                 )}
               </div>
-              {usernameStatus === 'taken' && <p className="text-[11px] font-semibold text-rose-600 mt-1 ml-1">That username is taken. Choose another one.</p>}
-              {usernameStatus === 'available' && <p className="text-[11px] font-semibold text-emerald-600 mt-1 ml-1">Great, that username is free.</p>}
-              {usernameStatus === 'invalid' && usernameValue && <p className="text-[11px] font-semibold text-amber-600 mt-1 ml-1">3 to 20 characters: letters, numbers and underscores, starting with a letter.</p>}
+              {usernameStatus === 'taken' && <p className="text-[11px] font-semibold text-rose-600 mt-1 ml-1">That username is not available. Choose another one.</p>}
+              {usernameStatus === 'available' && <p className="text-[11px] font-semibold text-emerald-600 mt-1 ml-1">Great, that username is available.</p>}
+              {usernameStatus === 'invalid' && usernameValue && <p className="text-[11px] font-semibold text-amber-600 mt-1 ml-1">{usernameProblem(usernameValue)}</p>}
             </div>
             <div className="grid grid-cols-2 gap-3 mb-3">
               <div>
                 <label className={labelCls}>Date of birth</label>
-                <input required type="date" max={dobMax} value={form.dob} onChange={set('dob')} className={inputCls} />
+                <BrandDatePicker
+                  value={form.dob}
+                  onChange={(v: string) => setForm((f) => ({ ...f, dob: v }))}
+                  accent={brand}
+                  maxDate={dobMax}
+                  placeholder="Pick your date of birth"
+                  ariaLabel="Date of birth"
+                />
                 {form.dob && !ageAtLeast14 && <p className="text-[11px] font-semibold text-rose-600 mt-1 ml-1">You must be at least 14 to register.</p>}
               </div>
               <div>
