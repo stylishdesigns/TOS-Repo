@@ -116,7 +116,7 @@ export const StudentSignupFlow: React.FC<StudentSignupFlowProps> = ({
     try {
       const cred: any = await createUserWithEmailAndPassword(auth, form.email.trim(), form.password);
       await saveRecord(cred.user.uid, form.email.trim());
-      const res = await fetch('/api/auth/send-otp', {
+      const res = await fetch('/api/public/send-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: form.email.trim(), centreName }),
@@ -171,7 +171,7 @@ export const StudentSignupFlow: React.FC<StudentSignupFlowProps> = ({
     if (otp.trim().length !== 6) { setOtpError('Enter the 6-digit code from your email.'); return; }
     setBusy(true);
     try {
-      const res = await fetch('/api/auth/verify-otp', {
+      const res = await fetch('/api/public/verify-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: otpEmail, code: otp.trim() }),
@@ -190,7 +190,7 @@ export const StudentSignupFlow: React.FC<StudentSignupFlowProps> = ({
     if (resending || Date.now() < canResendAt) return;
     setResending(true); setOtpError('');
     try {
-      const res = await fetch('/api/auth/send-otp', {
+      const res = await fetch('/api/public/send-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: otpEmail, centreName }),

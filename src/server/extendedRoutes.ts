@@ -792,9 +792,10 @@ export function registerExtendedRoutes(app: express.Express): void {
   // AUTH: first-login completion (Prompt C Part C)
   // ==========================================================================
   // ---- Student email OTP (registration confirmation) ----
+  // Public prefix: these run before any sign-in exists.
   // Codes live server-side only; clients never read the collection. Six
   // digits, ten minutes, five wrong attempts burn the code.
-  app.post('/api/auth/send-otp', async (req, res) => {
+  app.post('/api/public/send-otp', async (req, res) => {
     const email = String(req.body?.email || '').trim().toLowerCase();
     const centreName = String(req.body?.centreName || 'your centre').trim().slice(0, 80) || 'your centre';
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -821,7 +822,7 @@ export function registerExtendedRoutes(app: express.Express): void {
     res.json({ success: true, delivered: mail.delivered });
   });
 
-  app.post('/api/auth/verify-otp', async (req, res) => {
+  app.post('/api/public/verify-otp', async (req, res) => {
     const email = String(req.body?.email || '').trim().toLowerCase();
     const code = String(req.body?.code || '').trim();
     if (!email || !code) return res.status(400).json({ error: 'Email and code are required.' });
