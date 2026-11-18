@@ -136,9 +136,18 @@ const MainLayout: React.FC = () => {
       .then((r) => r.json())
       .then((d: any) => {
         if (!alive) return;
-        setAppFacility(d && d.centreId
-          ? { centreId: String(d.centreId), centreName: String(d.centreName || ''), accent: String(d.accent || ''), logoUrl: String(d.logoUrl || '') }
-          : null);
+        if (d && d.centreId) {
+          const facility = { centreId: String(d.centreId), centreName: String(d.centreName || ''), accent: String(d.accent || ''), logoUrl: String(d.logoUrl || '') };
+          // The gate state is prepared in the same update as the facility
+          // itself, so the access-code gate is the very first screen that
+          // paints: the TOS landing never flashes through the gap in between.
+          setShowWelcome(false);
+          setCentreGateRequested(true);
+          setAppWelcomeCentre({ centreId: facility.centreId, centreName: facility.centreName, accent: facility.accent, logoUrl: facility.logoUrl, welcomeImageUrl: '' });
+          setAppFacility(facility);
+        } else {
+          setAppFacility(null);
+        }
       })
       .catch(() => { if (alive) setAppFacility(null); });
     return () => { alive = false; };
@@ -656,6 +665,21 @@ const MainLayout: React.FC = () => {
         }}
         onBack={() => { setShowPortals(false); setShowWelcome(true); setCentreGateRequested(false); }}
       />
+    );
+  }
+
+  // Belt over braces: a bound facility app never paints the public TOS
+  // landing, not for a single frame. If the gate state is somehow not ready
+  // yet, hold on the plain loading screen instead.
+  if (isAppContext && appFacility && !currentUser && !appWelcomeCentre) {
+    return (
+      <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-900 text-white">
+        <div className="relative w-20 h-20 mb-6">
+          <div className="absolute inset-0 border-4 border-orange-500/20 rounded-full" />
+          <div className="absolute inset-0 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+        <p className="text-xs text-slate-400 font-medium animate-pulse">Loading...</p>
+      </div>
     );
   }
 
