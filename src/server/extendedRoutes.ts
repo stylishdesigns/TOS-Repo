@@ -873,40 +873,6 @@ export function registerExtendedRoutes(app: express.Express): void {
     }
   });
 
-  // TEMP one-time data fix (added and removed in adjacent commits): stamp a
-  // student record with emailVerified=false so the new verification gate
-  // applies to an account created before the flag existed.
-  app.post('/api/public/tmp-verify-flag', async (req, res) => {
-    if (String(req.headers['x-tmp-token'] || '') !== '53d55c626d4141f26604962ef8140a29d2bccdf8af5eec0b') {
-      return res.status(403).json({ error: 'Forbidden.' });
-    }
-    try {
-      if (req.body?.list) {
-        const centreId = String(req.body.centreId || '');
-        const snap = await adminDb.collection('students').where('centreId', '==', centreId).limit(50).get();
-        return res.json({ students: snap.docs.map((d) => ({
-          id: d.id,
-          name: String((d.data() as any)?.name || ''),
-          email: String((d.data() as any)?.email || ''),
-          username: String((d.data() as any)?.username || ''),
-          emailVerified: (d.data() as any)?.emailVerified ?? null,
-        })) });
-      }
-      const studentId = String(req.body?.studentId || '');
-      const centreId = String(req.body?.centreId || '');
-      if (!studentId || !centreId) return res.status(400).json({ error: 'studentId and centreId are required.' });
-      const ref = adminDb.collection('students').doc(studentId);
-      const snap = await ref.get();
-      if (!snap.exists) return res.status(404).json({ error: 'Student not found.' });
-      if (String(snap.data()?.centreId || '') !== centreId) return res.status(400).json({ error: 'Student does not belong to that facility.' });
-      await ref.set({ emailVerified: false }, { merge: true });
-      return res.json({ success: true, email: String(snap.data()?.email || '') });
-    } catch (error: any) {
-      console.error('[tmp-verify-flag] failed:', error?.message || error);
-      return res.status(500).json({ error: 'The fix could not run. Please try again.' });
-    }
-  });
-
   app.post('/api/public/send-otp', async (req, res) => {
     const email = String(req.body?.email || '').trim().toLowerCase();
     const centreName = String(req.body?.centreName || 'your centre').trim().slice(0, 80) || 'your centre';
