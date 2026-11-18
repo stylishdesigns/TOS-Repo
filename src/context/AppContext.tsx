@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { initialsAvatar } from '../lib/avatar';
 import {
   TenantSettings,
   Branch,
@@ -386,14 +387,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const saved = localStorage.getItem(scopedKey('students'));
       if (saved) {
         const parsed: Student[] = JSON.parse(saved);
-        // Ensure student avatars use authentic Nigerian student pictures
-        const MALE_NIGERIAN =
-          'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=500&q=80';
-        const FEMALE_NIGERIAN =
-          'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?auto=format&fit=crop&w=500&q=80';
+        // No profile picture uploaded: the student's own initials, never a
+        // stock-photo placeholder.
         return parsed.map((s) => {
           if (!s.avatar || s.avatar.includes('photo-1534528741775') || s.avatar.includes('photo-1517841905240')) {
-            return { ...s, avatar: s.gender === 'Female' ? FEMALE_NIGERIAN : MALE_NIGERIAN };
+            return { ...s, avatar: initialsAvatar(s.name) };
           }
           return s;
         });
@@ -1524,9 +1522,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [bgTheme, setBgThemeState] = useState<'light' | 'dark'>(() => {
     try {
       const saved = localStorage.getItem(`${STORAGE_KEY}_bgTheme`);
-      return saved === 'light' ? 'light' : 'dark';
+      return saved === 'dark' ? 'dark' : 'light';
     } catch {
-      return 'dark';
+      return 'light';
     }
   });
 
@@ -2248,7 +2246,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const newStudent: Student = {
         id: studentId,
         name: app.applicantName,
-        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+        avatar: initialsAvatar(app.applicantName),
         phone: app.phone,
         email: app.email,
         gender: app.gender,

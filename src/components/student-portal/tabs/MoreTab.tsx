@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { initialsAvatar } from '../../../lib/avatar';
 import { useApp } from '../../../context/AppContext';
 import { api, Json } from '../../tos/tosShared';
 import { Student } from '../../../types';
-import regeneratedStudentAvatar from '../../../assets/images/regenerated_image_1789369642757.jpg';
 import { ModernSelect } from '../../ui/ModernSelect';
 import {
   User,
@@ -230,9 +230,6 @@ type ModalType =
   | 'exam_policy'
   | 'logout'
   | null;
-
-const MALE_NIGERIAN_STUDENT_AVATAR =
-  'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=500&q=80';
 
 export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
   const {
@@ -703,16 +700,9 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
     }, 2000);
   };
 
-  // Resolved avatar ensuring an authentic Nigerian student portrait
-  const MALE_NIGERIAN_STUDENT_AVATAR =
-    regeneratedStudentAvatar ||
-    'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=500&q=80';
-  const FEMALE_NIGERIAN_STUDENT_AVATAR =
-    'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?auto=format&fit=crop&w=500&q=80';
-
+  // No uploaded photo: the student's initials, never a placeholder portrait
   const studentAvatar =
-    realAvatar(student.avatar) ||
-    (student.gender === 'Female' ? FEMALE_NIGERIAN_STUDENT_AVATAR : MALE_NIGERIAN_STUDENT_AVATAR);
+    realAvatar(student.avatar) || initialsAvatar(student.name);
 
   return (
     <div className="min-h-full bg-slate-50/70 pb-16 px-4 pt-6 max-w-lg mx-auto">

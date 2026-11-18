@@ -100,7 +100,6 @@ const MainLayout: React.FC = () => {
   // Whitelabel splash: after the account is confirmed to belong to the chosen
   // centre, the centre's own loading screen plays briefly before the
   // dashboard opens.
-  const [centreSplash, setCentreSplash] = useState(false);
   // The login page's email/password live here so they survive every screen
   // swap on the way to a verdict (verification, the no-account popup, the
   // centre loading screen). They clear once the account is inside a centre.
@@ -261,10 +260,9 @@ const MainLayout: React.FC = () => {
           setCentreEntryFailed(true);
           return;
         }
-        // Belonging is confirmed: play the centre's own loading screen
-        // briefly before the dashboard opens.
-        setCentreSplash(true);
-        window.setTimeout(() => setCentreSplash(false), 1200);
+        // Belonging is confirmed: the dashboard opens straight away. No
+        // decorative loading screen after entry; spinners belong only to the
+        // login itself and to real background work.
       })
       .catch(async (err: any) => {
         // A failed automatic entry is never silent: the server's reason (a
@@ -731,12 +729,6 @@ const MainLayout: React.FC = () => {
         onSignOut={handleLogout}
       />
     );
-  }
-
-  // Whitelabel splash: belonging was confirmed, the centre's own loading
-  // screen plays before the dashboard opens.
-  if (currentUser && activeCentreId && centreSplash && !isTosAdmin && appWelcomeMode !== 'signup') {
-    return centreSpinnerScreen;
   }
 
   // Multi-Tenant Access Code Screen Guard (Part A, point 2 & Part B). With

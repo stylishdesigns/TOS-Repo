@@ -1,3 +1,4 @@
+import { initialsAvatar } from '../../lib/avatar';
 import { loadLastGood, loadLastGoodFlag, saveLastGoodFlag } from '../../lib/lastGood';
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
@@ -16,8 +17,8 @@ import { MoreTab } from './tabs/MoreTab';
 import { ActionSheetModal, ActionSheetItem } from './tabs/ActionSheetModal';
 import { StudentResult } from '../../types';
 import { PWAInstallButton } from '../pwa/PWAInstallButton';
-import regeneratedStudentAvatar from '../../assets/images/regenerated_image_1789369642757.jpg';
 import {
+  Bell,
   Home,
   Calendar,
   Laptop,
@@ -462,12 +463,6 @@ export const StudentPortal: React.FC = () => {
     },
   ];
 
-  const MALE_NIGERIAN_AVATAR =
-    regeneratedStudentAvatar ||
-    'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=500&q=80';
-  const FEMALE_NIGERIAN_AVATAR =
-    'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?auto=format&fit=crop&w=500&q=80';
-
   const rawStudent = user
     ? students.find((s) => s.uid === user.uid || s.email === user.email) || students[0]
     : students[0];
@@ -479,15 +474,13 @@ export const StudentPortal: React.FC = () => {
           !rawStudent.avatar.includes('photo-1534528741775') &&
           !rawStudent.avatar.includes('photo-1517841905240')
             ? rawStudent.avatar
-            : rawStudent.gender === 'Female'
-            ? FEMALE_NIGERIAN_AVATAR
-            : MALE_NIGERIAN_AVATAR,
+            : initialsAvatar(rawStudent.name),
       }
     : {
         id: 'stu-1',
         regNumber: 'EXC-2026-00421',
         name: 'John Ade',
-        avatar: MALE_NIGERIAN_AVATAR,
+        avatar: initialsAvatar('John Ade'),
         programmeName: 'JAMB / UTME 2027 Intensive',
         attendancePercent: 92,
         totalFee: 50000,
@@ -568,13 +561,13 @@ export const StudentPortal: React.FC = () => {
       {/* 1. Top Desktop Control Bar */}
       <header className="bg-slate-950 text-white px-4 py-3 z-40 sticky top-0 overflow-hidden shadow-md">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-3 relative">
-          {/* Brand / Tutorial App Name */}
-          <div className="flex items-center space-x-2.5">
+          {/* Facility name, dead centre of the header menu */}
+          <div className="flex items-center">
             <span className="w-2.5 h-2.5 rounded-full bg-orange-500 animate-pulse shrink-0 shadow-sm shadow-orange-500" />
-            <span className="font-black text-sm uppercase tracking-[0.2em]">
-              {centreName}
-            </span>
           </div>
+          <span className="absolute left-1/2 -translate-x-1/2 font-black text-sm uppercase tracking-[0.2em] max-w-[52%] truncate text-center pointer-events-none">
+            {centreName}
+          </span>
 
           {/* Late Notification Animation */}
           {isRunningLate && (
@@ -589,8 +582,14 @@ export const StudentPortal: React.FC = () => {
             </div>
           )}
 
-          {/* PWA Icon Button beside banner */}
-          <div className="flex items-center">
+          {/* Right side: notifications (work continues) + install */}
+          <div className="flex items-center gap-2">
+            <button
+              className="w-9 h-9 rounded-xl bg-white/10 border border-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors relative"
+              aria-label="Notifications"
+            >
+              <Bell className="w-4 h-4" />
+            </button>
             <PWAInstallButton
               variant="icon"
               className="!bg-white/10 !border-white/10 hover:!bg-white/20"

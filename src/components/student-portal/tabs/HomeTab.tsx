@@ -1,4 +1,5 @@
 import React from 'react';
+import { initialsAvatar } from '../../../lib/avatar';
 import { useApp } from '../../../context/AppContext';
 import { Student } from '../../../types';
 import { PWAInstallButton } from '../../pwa/PWAInstallButton';
@@ -112,19 +113,12 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
   // Urgent announcements
   const urgentAnnouncements = announcements.filter((a) => a.priority === 'Urgent' || a.target !== 'Parents');
 
-  const MALE_NIGERIAN_AVATAR =
-    'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=500&q=80';
-  const FEMALE_NIGERIAN_AVATAR =
-    'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?auto=format&fit=crop&w=500&q=80';
-
   const studentAvatar =
     (student.avatar &&
     !student.avatar.includes('photo-1534528741775') &&
     !student.avatar.includes('photo-1517841905240')
       ? student.avatar
-      : student.gender === 'Female'
-      ? FEMALE_NIGERIAN_AVATAR
-      : MALE_NIGERIAN_AVATAR);
+      : initialsAvatar(student.name));
 
   const todayLog = attendanceLogs.find(l => l.studentId === student.id && l.date === todayStr);
 
