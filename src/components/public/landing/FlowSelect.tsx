@@ -108,7 +108,7 @@ export const FlowSelect: React.FC<{
             position: 'absolute',
             left: 0,
             right: 0,
-            top: 'calc(100% + 6px)',
+            bottom: 'calc(100% + 6px)',
             background: '#fff',
             border: '1px solid #E2E8F0',
             borderRadius: '14px',

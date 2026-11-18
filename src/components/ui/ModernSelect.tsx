@@ -90,7 +90,7 @@ export const ModernSelect: React.FC<ModernSelectProps> = ({
       </button>
 
       {isOpen && (
-        <div className="absolute z-[100] mt-2 w-full bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 max-h-60 overflow-y-auto">
+        <div className="absolute z-[100] bottom-full mb-2 w-full bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200 max-h-60 overflow-y-auto">
           <div className="p-1.5">
             {options.map((option) => (
               <button
