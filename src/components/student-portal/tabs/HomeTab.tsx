@@ -11,18 +11,14 @@ import {
   CheckCircle2,
   AlertCircle,
   CreditCard,
-  MessageSquare,
   ArrowRight,
   TrendingUp,
   MapPin,
-  Flame,
   Award,
   BookOpen,
   GraduationCap,
   Bell,
   ShieldCheck,
-  ChevronUp,
-  ChevronDown,
 } from 'lucide-react';
 
 import { CalendarView } from '../../common/CalendarView';
@@ -31,6 +27,8 @@ interface HomeTabProps {
   student: Student;
   onNavigateTab: (tab: 'home' | 'timetable' | 'cbt' | 'results' | 'more' | 'profile') => void;
 }
+
+const RING_CIRCUMFERENCE = 2 * Math.PI * 74;
 
 export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
   // Attendance & Clock logic
@@ -53,9 +51,6 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
   // Days left to national exams (JAMB UTME 2026 approx April 19)
   const now = new Date();
   const dateStr = now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-  const targetExamDate = new Date('2026-04-19T08:00:00');
-  const diffTime = targetExamDate.getTime() - now.getTime();
-  const daysLeft = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
 
   // Latest mock results for this student
   const currentUid = student.uid || student.id;
@@ -149,14 +144,29 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
   const lateMinutesThreshold = parseTimeToMinutes(attendanceSettings.lateArrivalTime || '08:30 AM');
   const currentMinutes = currentTime.getHours() * 60 + currentTime.getMinutes();
 
-  // Progress percentage (from resumption to closing)
-  const getProgress = () => {
-    const totalMinutes = closingMinutes - resumptionMinutes;
-    if (totalMinutes <= 0) return 0;
-    
-    const elapsed = Math.max(0, currentMinutes - resumptionMinutes);
-    return Math.min(100, (elapsed / totalMinutes) * 100);
+  // Closing time as today's date, for the sign-in ring
+  const closingToday = (() => {
+    const d = new Date(currentTime);
+    d.setHours(Math.floor(closingMinutes / 60), closingMinutes % 60, 0, 0);
+    return d;
+  })();
+
+  const elapsedMillis = clockedInAt ? Math.max(0, currentTime.getTime() - clockedInAt.getTime()) : 0;
+  const ringProgress = clockedInAt
+    ? Math.min(1, Math.max(0, (currentTime.getTime() - clockedInAt.getTime()) / Math.max(60000, closingToday.getTime() - clockedInAt.getTime())))
+    : 0;
+  const totalMillis = clockedInAt && clockedOutAt ? Math.max(0, clockedOutAt.getTime() - clockedInAt.getTime()) : 0;
+
+  const formatDuration = (ms: number) => {
+    const total = Math.floor(ms / 1000);
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    const sec = total % 60;
+    return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}` : `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
   };
+  const fmtClock = (d: Date) => d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const clockInLabel = clockedInAt ? fmtClock(clockedInAt) : '';
+  const clockOutLabel = clockedOutAt ? fmtClock(clockedOutAt) : '';
 
   const isClosingTime = currentMinutes >= closingMinutes;
   const isLate = clockedInAt && (clockedInAt.getHours() * 60 + clockedInAt.getMinutes()) > lateMinutesThreshold;
@@ -220,8 +230,8 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
         </div>
       </div>
 
-      {/* Attendance Clock In/Out Card */}
-      <div className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-sm relative overflow-hidden">
+      {/* Attendance Check Card */}
+      <div className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-sm">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center space-x-2">
             <div className={`p-2 rounded-xl transition-colors ${student.attendancePercent > 90 ? 'bg-emerald-50 text-emerald-600' : 'bg-orange-50 text-orange-600'}`}>
@@ -229,110 +239,103 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
             </div>
             <h4 className="text-[10px] font-black text-slate-900 uppercase tracking-wider">Attendance Check</h4>
           </div>
-          <button 
+          <button
             onClick={() => setShowAttendanceInfo(!showAttendanceInfo)}
-            className="p-1.5 rounded-lg bg-slate-50 text-slate-400 hover:text-orange-500 transition-colors relative"
+            className="p-1.5 rounded-lg bg-slate-50 text-slate-400 hover:text-orange-500 transition-colors"
           >
             <Clock className="w-4 h-4" />
-            {showAttendanceInfo && (
-              <div className="absolute top-full right-0 mt-2 w-48 bg-slate-900 text-white p-3 rounded-xl shadow-xl z-50 text-[10px] text-left animate-in fade-in zoom-in-95">
-                <p className="font-black uppercase tracking-widest text-orange-400 mb-1.5">Facility Hours</p>
-                <ul className="space-y-1.5 opacity-90 font-medium">
-                  <li>• Resumption: {attendanceSettings.resumptionTime}</li>
-                  <li>• Late Gate: {attendanceSettings.lateArrivalTime}</li>
-                  <li>• Closing: {attendanceSettings.closingTime}</li>
-                </ul>
-              </div>
-            )}
           </button>
         </div>
 
-        {/* Compact Controls */}
-        <div className="relative flex items-center justify-between px-2 py-2">
-            {/* Progress Connecting Line (Improved Visuals) */}
-            <div className="absolute top-[33px] left-[45px] right-[45px] h-[6px] bg-slate-200 rounded-full z-0 overflow-hidden shadow-inner">
-              <div 
-                className="h-full bg-gradient-to-r from-orange-500 to-orange-600 rounded-full transition-all duration-1000 shadow-[0_0_10px_rgba(234,88,12,0.5)]" 
-                style={{ width: `${getProgress()}%` }}
-              />
-            </div>
+        {showAttendanceInfo && (
+          <div className="mb-4 p-3 rounded-xl bg-slate-900 text-white text-left">
+            <p className="font-black uppercase tracking-widest text-orange-400 mb-1.5 text-[10px]">Facility Hours</p>
+            <ul className="space-y-1.5 opacity-90 font-medium text-[10px]">
+              <li>• Resumption: {attendanceSettings.resumptionTime}</li>
+              <li>• Late Gate: {attendanceSettings.lateArrivalTime}</li>
+              <li>• Closing: {attendanceSettings.closingTime}</li>
+            </ul>
+          </div>
+        )}
 
-            {/* Clock In Button */}
-            <div className="flex flex-col items-center z-10">
-              <button 
-                onClick={handleClockInAction}
-                disabled={!!clockedInAt}
-                className={`w-14 h-14 rounded-full flex flex-col items-center justify-center shadow-md active:scale-95 transition-all border-4 border-white ${
-                  clockedInAt 
-                    ? 'bg-slate-700 text-white' 
-                    : 'bg-[#475569] text-white'
-                } disabled:cursor-not-allowed`}
-              >
-                <ChevronUp className="w-4 h-4" />
-                <span className="text-[10px] font-black">IN</span>
-                <span className="text-[7px] font-bold opacity-80 uppercase tracking-tighter">{attendanceSettings.resumptionTime || '8:00 AM'}</span>
-              </button>
-              <div className="mt-1 h-3 flex items-center justify-center">
-                {isLate && clockedInAt && (
-                  <span className="text-[7px] font-black uppercase text-amber-600">Late Arrival</span>
+        {!clockedInAt ? (
+          /* Before sign-in: one full-width sign-in button with the arrow icon inside the text */
+          <div>
+            <button
+              onClick={handleClockInAction}
+              className="w-full min-h-[48px] px-5 rounded-2xl bg-gradient-to-r from-orange-500 to-orange-600 text-white text-sm font-black flex items-center justify-center gap-2.5 shadow-md active:scale-[0.98] transition-all"
+            >
+              <span>Sign In</span>
+              <ArrowRight className="w-4.5 h-4.5" />
+            </button>
+            <p className="text-center text-[10px] font-semibold text-slate-400 mt-2">
+              Resumption {attendanceSettings.resumptionTime || '8:00 AM'} • Late after {attendanceSettings.lateArrivalTime || '8:30 AM'}
+            </p>
+          </div>
+        ) : (
+          /* Signed in: a circular ring fills from the sign-in moment toward closing
+             time. Everything sits in normal flow, so nothing overlays a button. */
+          <div className="flex flex-col items-center">
+            {isLate && !clockedOutAt && (
+              <span className="mb-2 px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 text-[9px] font-black uppercase tracking-wider">Late Arrival</span>
+            )}
+            <div className="relative">
+              <svg width="168" height="168" viewBox="0 0 168 168" className="block">
+                <circle cx="84" cy="84" r="74" fill="none" stroke="#E2E8F0" strokeWidth="10" />
+                <circle
+                  cx="84"
+                  cy="84"
+                  r="74"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="10"
+                  strokeLinecap="round"
+                  className={clockedOutAt ? 'text-emerald-500' : 'text-orange-500'}
+                  strokeDasharray={RING_CIRCUMFERENCE}
+                  strokeDashoffset={RING_CIRCUMFERENCE * (1 - ringProgress)}
+                  transform="rotate(-90 84 84)"
+                  style={{ transition: 'stroke-dashoffset 1s linear' }}
+                />
+              </svg>
+              {/* Side markers are state badges only: sign-in and sign-out happen on
+                  the buttons, never by tapping these */}
+              <div className="absolute top-1/2 -translate-y-1/2 -left-3 w-9 h-9 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[9px] font-black border-4 border-white shadow-md">IN</div>
+              <div className={`absolute top-1/2 -translate-y-1/2 -right-3 w-9 h-9 rounded-full flex items-center justify-center text-[9px] font-black border-4 border-white shadow-md ${clockedOutAt ? 'bg-emerald-600 text-white' : isClosingTime ? 'bg-[#E11D48] text-white' : 'bg-slate-200 text-slate-400'}`}>OUT</div>
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                {clockedOutAt ? (
+                  <>
+                    <CheckCircle2 className="w-6 h-6 text-emerald-600" />
+                    <span className="text-lg font-black text-slate-900 leading-none mt-1 tabular-nums">{formatDuration(totalMillis)}</span>
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-1">In facility</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-xl font-black text-slate-900 leading-none tabular-nums">{formatDuration(elapsedMillis)}</span>
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-1.5">Since {clockInLabel}</span>
+                  </>
                 )}
               </div>
             </div>
-
-            {/* Current Time Indicator (Compact) */}
-            <div className="flex flex-col items-center justify-center z-10">
-              <div className="w-12 h-12 rounded-full border-4 border-white bg-slate-50 flex flex-col items-center justify-center shadow-md ring-1 ring-slate-100">
-                <span className="text-slate-900 text-[9px] font-black">
-                  {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
-                </span>
-                <div className="w-6 h-0.5 bg-orange-500 rounded-full mt-0.5" />
+            {clockedOutAt ? (
+              <p className="text-center text-[10px] font-semibold text-slate-400 mt-3">
+                Signed in {clockInLabel} • Signed out {clockOutLabel}
+              </p>
+            ) : (
+              <div className="w-full mt-3">
+                <button
+                  onClick={handleClockOutAction}
+                  disabled={!isClosingTime}
+                  className={`w-full min-h-[44px] px-5 rounded-2xl text-sm font-black flex items-center justify-center transition-all active:scale-[0.98] ${isClosingTime ? 'bg-[#E11D48] text-white shadow-md' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}
+                >
+                  <span>Sign Out</span>
+                </button>
+                <p className="text-center text-[10px] font-semibold text-slate-400 mt-2">
+                  {isClosingTime ? 'Closing time reached — you can sign out now' : `On-going • Sign out opens at ${attendanceSettings.closingTime || '3:30 PM'}`}
+                </p>
               </div>
-            </div>
-
-            {/* Clock Out Button */}
-            <div className="flex flex-col items-center z-10">
-              <button 
-                onClick={handleClockOutAction}
-                disabled={!clockedInAt || clockedOutAt || !isClosingTime}
-                className={`w-14 h-14 rounded-full flex flex-col items-center justify-center shadow-md active:scale-95 transition-all border-4 border-white ${
-                  clockedOutAt
-                    ? 'bg-emerald-600 text-white'
-                    : clockedInAt && isClosingTime
-                    ? 'bg-[#E11D48] text-white' 
-                    : 'bg-[#E11D48]/30 text-white/50'
-                }`}
-              >
-                <ChevronDown className="w-4 h-4" />
-                <span className="text-[10px] font-black">OUT</span>
-                <span className="text-[7px] font-bold opacity-80 uppercase tracking-tighter">{attendanceSettings.closingTime || '03:30 PM'}</span>
-              </button>
-              <div className="mt-1 h-3 flex items-center justify-center">
-                {clockedInAt && !isClosingTime && !clockedOutAt && (
-                  <span className="text-[7px] font-bold text-slate-400 uppercase italic">On-going</span>
-                )}
-              </div>
-            </div>
-        </div>
-      </div>
-
-      {/* 2. Target Exam Countdown Banner */}
-      <div className="bg-gradient-to-r from-orange-500 to-amber-600 rounded-2xl p-4 text-white shadow-md relative overflow-hidden">
-        <div className="absolute -right-4 -bottom-4 opacity-15">
-          <Flame className="w-28 h-28" />
-        </div>
-        <div className="relative z-10 flex items-center justify-between">
-          <div className="space-y-0.5">
-            <span className="text-[10px] font-bold tracking-wider uppercase opacity-90">
-              Target Examination Milestone
-            </span>
-            <h3 className="text-base font-black">JAMB UTME 2026</h3>
-            <p className="text-xs text-orange-100">Intensive cohort syllabus is 74% complete</p>
+            )}
           </div>
-          <div className="text-center bg-black/20 backdrop-blur-xs px-3.5 py-2 rounded-xl border border-white/20">
-            <span className="text-2xl font-black block leading-none">{daysLeft}</span>
-            <span className="text-[9px] uppercase tracking-wider font-bold text-orange-100">Days Left</span>
-          </div>
-        </div>
+        )}
       </div>
 
       {/* 3. Candidate Vitals Row (Enhanced, comfortable button cards) */}
@@ -373,9 +376,6 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
             <div className="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 group-hover:scale-105 transition-transform">
               <CheckCircle2 className="w-4.5 h-4.5" />
             </div>
-            <span className="text-[10px] font-black px-2 py-0.5 bg-emerald-100/80 text-emerald-800 rounded-lg">
-              34/37
-            </span>
           </div>
           <div>
             <div className="text-lg font-black text-slate-900 leading-snug">
@@ -555,25 +555,6 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
           </div>
         </div>
       )}
-
-      {/* 7. WhatsApp Campus Coordinator */}
-      <a
-        href={`https://wa.me/${(settings.whatsappNumber || settings.whatsapp || settings.phone).replace(/\D/g, '')}`}
-        target="_blank"
-        rel="noreferrer"
-        className="flex items-center justify-between p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-emerald-900 hover:bg-emerald-100/80 transition-all shadow-2xs"
-      >
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0">
-            <MessageSquare className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-xs font-bold">Have a Question for Tutor / Coordinator?</div>
-            <div className="text-[10px] text-emerald-700">Chat with Academic Support Desk on WhatsApp</div>
-          </div>
-        </div>
-        <ArrowRight className="w-4 h-4 text-emerald-700" />
-      </a>
 
       {/* Academic Calendar Planner Modal */}
       <CalendarView
