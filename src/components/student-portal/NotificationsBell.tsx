@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Bell, CalendarDays, BookOpen, ClipboardList, Trophy, Sparkles, Clock, X } from 'lucide-react';
+import { Bell, CalendarDays, BookOpen, ClipboardList, Trophy, Sparkles, Clock, X, ArrowLeft } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { api } from '../tos/tosShared';
 import { pushStatus } from './push';
@@ -100,8 +100,9 @@ function timeAgo(at: number): string {
   return new Date(at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
-export function NotificationsBell() {
+export function NotificationsBell({ onOpenChange }: { onOpenChange?: (open: boolean) => void }) {
   const [open, setOpen] = useState(false);
+  const [view, setView] = useState<'splash' | 'history'>('splash');
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [seenTick, setSeenTick] = useState(0);
@@ -216,8 +217,15 @@ export function NotificationsBell() {
     [items, readTick],
   );
 
+  const closeSplash = () => {
+    setOpen(false);
+    setView('splash');
+    onOpenChange?.(false);
+  };
+
   const openPanel = async () => {
     setOpen(true);
+    onOpenChange?.(true);
     setLoading(true);
     setPush(pushStatus());
     await refresh();
@@ -235,6 +243,14 @@ export function NotificationsBell() {
     if (filter === 'all' || filter === 'reminder') return rows;
     return [];
   }, [dueReminders, upcomingReminders, filter]);
+
+  // The splash shows only the first entry of the feed: a due reminder when
+  // one exists, otherwise the newest notification.
+  const latestEntry = React.useMemo(() => {
+    if (dueReminders.length > 0) return { kind: 'reminder' as const, r: dueReminders[0] as any };
+    if (items.length > 0) return { kind: 'item' as const, n: items[0] };
+    return null;
+  }, [dueReminders, items]);
 
   const visibleItems = React.useMemo(() => {
     if (filter === 'all') return items;
@@ -258,44 +274,38 @@ export function NotificationsBell() {
       </button>
 
       {open && (
+        <style>{`@keyframes tosSplashUp{from{transform:translateY(100%)}to{transform:translateY(0)}}@keyframes tosHistoryIn{from{transform:translateX(28px);opacity:0}to{transform:translateX(0);opacity:1}}.tos-splash-up{animation:tosSplashUp .28s cubic-bezier(.22,1,.36,1)}.tos-history-in{animation:tosHistoryIn .22s ease-out}`}</style>
+      )}
+
+      {open && view === 'splash' && (
         <div className="fixed inset-0 z-[70]" role="dialog" aria-label="Notifications">
-          <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" onClick={() => setOpen(false)} />
-          <div className="absolute top-0 inset-x-0 sm:inset-x-auto sm:right-4 sm:top-16 sm:w-[400px] max-h-[80vh] bg-white rounded-b-3xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col">
+          <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" onClick={closeSplash} />
+          <div className="tos-splash-up absolute bottom-0 inset-x-0 bg-white rounded-t-3xl shadow-2xl overflow-hidden flex flex-col max-h-[70vh]">
             <div className="bg-slate-950 text-white px-4 py-3.5 flex items-center justify-between shrink-0">
               <div>
                 <p className="text-sm font-black">Notifications</p>
-                <p className="text-[10px] text-white/60 font-semibold uppercase tracking-wider">Classes, materials, exams & reminders</p>
+                <p className="text-[10px] text-white/60 font-semibold uppercase tracking-wider">Classes, materials, exams &amp; reminders</p>
               </div>
-              <button onClick={() => setOpen(false)} className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors" aria-label="Close notifications">
+              <button onClick={closeSplash} className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors" aria-label="Close notifications">
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="shrink-0 border-b border-slate-100 px-3 py-2 flex items-center gap-1.5 overflow-x-auto">
-              {FILTERS.map((f) => (
-                <button
-                  key={f.key}
-                  onClick={() => setFilter(f.key)}
-                  className={`px-3 py-1.5 rounded-full text-[11px] font-black whitespace-nowrap transition-colors ${filter === f.key ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </div>
-            <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
-              {loading && items.length === 0 && visibleReminders.length === 0 && (
+            <div className="overflow-y-auto divide-y divide-slate-100">
+              {loading && !latestEntry && (
                 <div className="px-4 py-10 text-center text-sm text-slate-400 font-semibold">Loading notifications...</div>
               )}
-              {!loading && items.length === 0 && visibleReminders.length === 0 && (
+              {!loading && !latestEntry && (
                 <div className="px-4 py-10 text-center">
                   <Bell className="w-8 h-8 text-slate-200 mx-auto mb-2" />
                   <p className="text-sm font-black text-slate-900">You're all caught up</p>
                   <p className="text-xs text-slate-500 font-medium mt-0.5">New classes, materials, exams, reminders and leaderboard news will show up here.</p>
                 </div>
               )}
-              {visibleReminders.map((r: any) => {
+              {latestEntry?.kind === 'reminder' && (() => {
+                const r = latestEntry.r;
                 const today = String(r.date) === localToday();
                 return (
-                  <div key={r.id} className={`px-4 py-3 flex items-start gap-3 ${r.isDue ? 'bg-amber-50/60' : ''}`}>
+                  <div className={`px-4 py-3 flex items-start gap-3 ${r.isDue ? 'bg-amber-50/60' : ''}`}>
                     <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${r.isDue ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>
                       <Clock className="w-4 h-4" />
                     </div>
@@ -314,12 +324,13 @@ export function NotificationsBell() {
                     </div>
                   </div>
                 );
-              })}
-              {visibleItems.map((n) => {
+              })()}
+              {latestEntry?.kind === 'item' && (() => {
+                const n = latestEntry.n;
                 const style = TYPE_STYLES[n.type] || TYPE_STYLES.mock;
                 const isUnread = !readRef.current.has(String(n.id));
                 return (
-                  <div key={n.id} className={`px-4 py-3 flex items-start gap-3 ${isUnread ? 'bg-orange-50/40' : ''}`}>
+                  <div className={`px-4 py-3 flex items-start gap-3 ${isUnread ? 'bg-orange-50/40' : ''}`}>
                     <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${style.chip}`}>
                       {style.icon}
                     </div>
@@ -336,14 +347,104 @@ export function NotificationsBell() {
                     </div>
                   </div>
                 );
-              })}
+              })()}
             </div>
-            <div className="shrink-0 border-t border-slate-100 px-4 py-2.5 flex items-start gap-2.5 bg-white">
-              <div className={`w-2 h-2 rounded-full mt-1 shrink-0 ${push.on ? 'bg-emerald-500' : 'bg-slate-300'}`} />
-              <div className="min-w-0">
-                <p className="text-[11px] font-black text-slate-700 leading-tight">{push.label}</p>
-                <p className="text-[10px] text-slate-500 font-medium leading-snug">{push.detail}</p>
+            <div className="shrink-0 border-t border-slate-100 p-3 bg-white">
+              <button
+                onClick={() => setView('history')}
+                className="w-full py-3 rounded-2xl bg-slate-900 text-white text-[13px] font-black flex items-center justify-center gap-2 hover:bg-slate-800 active:scale-[0.98] transition-all"
+              >
+                View more
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {open && view === 'history' && (
+        <div className="tos-history-in fixed inset-0 z-[70] bg-white flex flex-col" role="dialog" aria-label="All notifications">
+          <div className="bg-slate-950 text-white px-4 py-3.5 flex items-center gap-3 shrink-0">
+            <button onClick={() => setView('splash')} className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors" aria-label="Back to notifications">
+              <ArrowLeft className="w-4 h-4" />
+            </button>
+            <div>
+              <p className="text-sm font-black">All notifications</p>
+              <p className="text-[10px] text-white/60 font-semibold uppercase tracking-wider">Full history</p>
+            </div>
+          </div>
+          <div className="shrink-0 border-b border-slate-100 px-3 py-2 flex items-center gap-1.5 overflow-x-auto">
+            {FILTERS.map((f) => (
+              <button
+                key={f.key}
+                onClick={() => setFilter(f.key)}
+                className={`px-3 py-1.5 rounded-full text-[11px] font-black whitespace-nowrap transition-colors ${filter === f.key ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
+            {loading && items.length === 0 && visibleReminders.length === 0 && (
+              <div className="px-4 py-10 text-center text-sm text-slate-400 font-semibold">Loading notifications...</div>
+            )}
+            {!loading && items.length === 0 && visibleReminders.length === 0 && (
+              <div className="px-4 py-10 text-center">
+                <Bell className="w-8 h-8 text-slate-200 mx-auto mb-2" />
+                <p className="text-sm font-black text-slate-900">You're all caught up</p>
+                <p className="text-xs text-slate-500 font-medium mt-0.5">New classes, materials, exams, reminders and leaderboard news will show up here.</p>
               </div>
+            )}
+            {visibleReminders.map((r: any) => {
+              const today = String(r.date) === localToday();
+              return (
+                <div key={r.id} className={`px-4 py-3 flex items-start gap-3 ${r.isDue ? 'bg-amber-50/60' : ''}`}>
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${r.isDue ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>
+                    <Clock className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-[13px] font-black text-slate-900 leading-tight">{String(r.title)}</p>
+                      <span className={`text-[10px] font-bold shrink-0 ${r.isDue ? 'text-amber-600' : 'text-slate-400'}`}>{r.isDue ? 'Reminder' : 'Upcoming'}</span>
+                    </div>
+                    <p className="text-xs text-slate-600 font-medium mt-0.5 leading-relaxed break-words">
+                      {r.isDue
+                        ? (today
+                          ? `Your planner reminder for today${r.time ? ` at ${r.time}` : ''}.`
+                          : `Your planner reminder was set for ${dayLabel(String(r.date))}${r.time ? ` at ${r.time}` : ''}.`)
+                        : `Scheduled for ${dayLabel(String(r.date))}${r.time ? ` at ${r.time}` : ''}.`}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+            {visibleItems.map((n) => {
+              const style = TYPE_STYLES[n.type] || TYPE_STYLES.mock;
+              const isUnread = !readRef.current.has(String(n.id));
+              return (
+                <div key={n.id} className={`px-4 py-3 flex items-start gap-3 ${isUnread ? 'bg-orange-50/40' : ''}`}>
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${style.chip}`}>
+                    {style.icon}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        {isUnread && <span className="w-1.5 h-1.5 rounded-full bg-orange-600 shrink-0" aria-label="Unread" />}
+                        <p className="text-[13px] font-black text-slate-900 leading-tight">{n.title}</p>
+                      </div>
+                      <span className="text-[10px] text-slate-400 font-bold shrink-0">{timeAgo(Number(n.at) || 0)}</span>
+                    </div>
+                    <p className="text-xs text-slate-600 font-medium mt-0.5 leading-relaxed break-words">{n.body}</p>
+                    <span className={`inline-block mt-1.5 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${style.chip}`}>{style.label}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="shrink-0 border-t border-slate-100 px-4 py-2.5 flex items-start gap-2.5 bg-white">
+            <div className={`w-2 h-2 rounded-full mt-1 shrink-0 ${push.on ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+            <div className="min-w-0">
+              <p className="text-[11px] font-black text-slate-700 leading-tight">{push.label}</p>
+              <p className="text-[10px] text-slate-500 font-medium leading-snug">{push.detail}</p>
             </div>
           </div>
         </div>

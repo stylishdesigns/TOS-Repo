@@ -74,6 +74,7 @@ export const StudentPortal: React.FC = () => {
   const [portalMode, setPortalMode] = useState<'student' | 'parent'>('student');
   const [desktopViewMode] = useState<'mobile_frame' | 'expanded'>('mobile_frame');
   const [hideBottomNav, setHideBottomNav] = useState(false);
+  const [bellOpen, setBellOpen] = useState(false);
   // Orb badge: seeded from the chat overview's last good copy (no new reads);
   // ChatTab reports each fresh total through onUnreadTotal after its loads.
   const [orbUnread, setOrbUnread] = useState(0);
@@ -593,7 +594,7 @@ export const StudentPortal: React.FC = () => {
 
           {/* Right side: notifications (work continues) + install */}
           <div className="flex items-center gap-2">
-            <NotificationsBell />
+            <NotificationsBell onOpenChange={setBellOpen} />
             <PWAInstallButton
               variant="icon"
               className="!bg-white/10 !border-white/10 hover:!bg-white/20"
@@ -808,7 +809,7 @@ export const StudentPortal: React.FC = () => {
 
           {/* 3. Persistent Mobile Bottom Navigation Bar (5 Items: Home · Classes · Chat · CBT · More).
               Hidden while the Tutor AI thread is open, like a chat room. */}
-          {!hideBottomNav && (!titoOpen || chatFanOpen) && (
+          {!hideBottomNav && !bellOpen && (!titoOpen || chatFanOpen) && (
             <nav
               aria-label="Student Mobile Navigation"
               className="relative z-40 shrink-0 bg-slate-950/95 backdrop-blur-md border-t border-slate-800 py-1.5 px-2 shadow-2xl"
