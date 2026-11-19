@@ -39,7 +39,7 @@ export function brandVars(accent?: string | null): CSSProperties {
     '--color-orange-300': mix(48, 'white'),
     '--color-orange-400': mix(74, 'white'),
     '--color-orange-500': a,
-    '--color-orange-600': mix(88, 'black'),
+    '--color-orange-600': a,
     '--color-orange-700': mix(74, 'black'),
     '--color-orange-800': mix(60, 'black'),
     '--color-orange-900': mix(46, 'black'),

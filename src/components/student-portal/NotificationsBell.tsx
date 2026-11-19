@@ -120,8 +120,9 @@ export function NotificationsBell({ onOpenChange }: { onOpenChange?: (open: bool
       .filter((r: any) => {
         const date = String(r?.date || '');
         if (!date || !r?.title) return false;
-        if (date < today) return true;
-        if (date > today) return false;
+        // Only today's arrived reminders count as due; older ones are history
+        // and leave the bell instead of lingering with a stale label.
+        if (date !== today) return false;
         const t = parseTimeToMinutes(String(r?.time || ''));
         return t === null ? true : t <= nowMin;
       })
@@ -298,6 +299,8 @@ export function NotificationsBell({ onOpenChange }: { onOpenChange?: (open: bool
               {latestEntry?.kind === 'reminder' && (() => {
                 const r = latestEntry.r;
                 const today = String(r.date) === localToday();
+                const remKey = `rem-${r.id}`;
+                const isUnread = !readRef.current.has(remKey);
                 return (
                   <div className={`px-4 py-3 flex items-start gap-3 ${r.isDue ? 'bg-amber-50/60' : ''}`}>
                     <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${r.isDue ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>
@@ -305,7 +308,10 @@ export function NotificationsBell({ onOpenChange }: { onOpenChange?: (open: bool
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
-                        <p className="text-[13px] font-black text-slate-900 leading-tight">{String(r.title)}</p>
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          {isUnread && <span className="w-1.5 h-1.5 rounded-full bg-orange-600 shrink-0" aria-label="Unread" />}
+                          <p className="text-[13px] font-black text-slate-900 leading-tight">{String(r.title)}</p>
+                        </div>
                         <span className={`text-[10px] font-bold shrink-0 ${r.isDue ? 'text-amber-600' : 'text-slate-400'}`}>{r.isDue ? 'Reminder' : 'Upcoming'}</span>
                       </div>
                       <p className="text-xs text-slate-600 font-medium mt-0.5 leading-relaxed break-words">
@@ -316,6 +322,14 @@ export function NotificationsBell({ onOpenChange }: { onOpenChange?: (open: bool
                           : `Scheduled for ${dayLabel(String(r.date))}${r.time ? ` at ${r.time}` : ''}.`}
                       </p>
                     </div>
+                    <button
+                      onClick={() => toggleRead(remKey)}
+                      className={`mt-0.5 w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-colors ${isUnread ? 'text-orange-600 hover:bg-orange-50' : 'text-slate-300 hover:text-slate-500 hover:bg-slate-100'}`}
+                      aria-label={isUnread ? 'Mark as read' : 'Mark as unread'}
+                      title={isUnread ? 'Mark as read' : 'Mark as unread'}
+                    >
+                      {isUnread ? <MailCheck className="w-4 h-4" /> : <Mail className="w-4 h-4" />}
+                    </button>
                   </div>
                 );
               })()}
@@ -395,6 +409,8 @@ export function NotificationsBell({ onOpenChange }: { onOpenChange?: (open: bool
             )}
             {visibleReminders.map((r: any) => {
               const today = String(r.date) === localToday();
+              const remKey = `rem-${r.id}`;
+              const isUnread = !readRef.current.has(remKey);
               return (
                 <div key={r.id} className={`px-4 py-3 flex items-start gap-3 ${r.isDue ? 'bg-amber-50/60' : ''}`}>
                   <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${r.isDue ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>
@@ -402,7 +418,10 @@ export function NotificationsBell({ onOpenChange }: { onOpenChange?: (open: bool
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
-                      <p className="text-[13px] font-black text-slate-900 leading-tight">{String(r.title)}</p>
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        {isUnread && <span className="w-1.5 h-1.5 rounded-full bg-orange-600 shrink-0" aria-label="Unread" />}
+                        <p className="text-[13px] font-black text-slate-900 leading-tight">{String(r.title)}</p>
+                      </div>
                       <span className={`text-[10px] font-bold shrink-0 ${r.isDue ? 'text-amber-600' : 'text-slate-400'}`}>{r.isDue ? 'Reminder' : 'Upcoming'}</span>
                     </div>
                     <p className="text-xs text-slate-600 font-medium mt-0.5 leading-relaxed break-words">
