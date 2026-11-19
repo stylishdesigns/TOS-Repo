@@ -1,10 +1,11 @@
-// Web push for planner reminders (Nov 19). The public key below is the Web
-// Push certificate's public key: it ships to every browser that allows
-// notifications and is safe to embed. The matching private key lives only in
-// the server environment.
+// Web push for planner reminders (Nov 19). The public key below is our own
+// VAPID public key: it ships to every browser that allows notifications and is
+// safe to embed. The matching private key lives only in the Netlify server
+// environment (WEB_PUSH_PRIVATE_KEY), never in this bundle.
 import { api } from '../tos/tosShared';
 
-const VAPID_PUBLIC_KEY = 'BFMo8SSNA0RgwpNF0zVU_cVP5wVKRCjQrOBwh2ODha7Ml1iKBiXRsuuA3ySI77Zp5owrp3oC7kOHTv8H6Agtn6o';
+const VAPID_PUBLIC_KEY = 'BFXOh72Rhv-vH1AhTTn375mvNJCweGgoGGjwATkQVuplkyGx3KqMWlZS4cEPWJr0WJk8nTHwMAN47-W9nAhifgs';
+const KEY_STORE = 'tos:push-vapid-key';
 
 export type PushState = 'unsupported' | 'denied' | 'default' | 'granted' | 'error';
 
@@ -48,11 +49,19 @@ export async function enablePush(): Promise<PushState> {
     }
     const reg = await navigator.serviceWorker.ready;
     let sub = await reg.pushManager.getSubscription();
+    const lastKey = typeof localStorage !== 'undefined' ? localStorage.getItem(KEY_STORE) : null;
+    if (sub && lastKey && lastKey !== VAPID_PUBLIC_KEY) {
+      // The app's VAPID key changed: the old subscription can never receive a
+      // push we can sign, so drop it and subscribe again with the new key.
+      await sub.unsubscribe().catch(() => {});
+      sub = null;
+    }
     if (!sub) {
       sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlB64ToUint8Array(VAPID_PUBLIC_KEY) as BufferSource,
       });
+      try { localStorage.setItem(KEY_STORE, VAPID_PUBLIC_KEY); } catch { /* private mode */ }
     }
     await api('/api/push/subscribe', { method: 'POST', body: { subscription: sub.toJSON() } });
     return 'granted';

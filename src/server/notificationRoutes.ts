@@ -3,7 +3,7 @@ import { createHash } from 'crypto';
 import { FieldValue } from 'firebase-admin/firestore';
 import { adminDb } from './firebaseAdmin';
 import { Caller, httpError, requireMembership } from './tenantService';
-import { sendAtMs } from './pushSender';
+import { sendAtMs, runPushSweep } from './pushSender';
 
 // ============================================================================
 // In-app notifications for the student portal.
@@ -232,6 +232,23 @@ export function registerNotificationRoutes(app: express.Express): void {
       return res.json({ ok: true });
     } catch (e) {
       return res.status(errStatus(e)).json({ error: (e as Error).message || 'Could not mark notifications read.' });
+    }
+  });
+
+  // Manual trigger for the scheduled push sweep (staff only). The Netlify
+  // scheduler only fires scheduled functions from production deploys, so on a
+  // preview this route lets staff run the same sweep to test reminders.
+  app.post('/api/push/send-due', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const resolved = await resolveMemberCentre(caller.uid);
+      if (!STAFF_ROLES.includes(resolved.role)) {
+        return res.status(403).json({ error: 'Only facility staff can run the push sweep.' });
+      }
+      const result = await runPushSweep({ limit: 20 });
+      return res.json(result);
+    } catch (e) {
+      return res.status(errStatus(e)).json({ error: (e as Error).message || 'Could not run the push sweep.' });
     }
   });
 

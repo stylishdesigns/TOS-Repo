@@ -20,9 +20,11 @@ import webpush from 'web-push';
 import { adminDb } from './firebaseAdmin';
 import { FieldValue } from 'firebase-admin/firestore';
 
-// Same VAPID public key the browser uses to subscribe (public by design).
+// Our own VAPID key pair (generated Nov 19 for this sender; the key pair
+// Firebase's console mints cannot be used for self-sending because its private
+// half stays inside Firebase). The public half ships in the browser app.
 export const WEB_PUSH_PUBLIC_KEY =
-  'BFMo8SSNA0RgwpNF0zVU_cVP5wVKRCjQrOBwh2ODha7Ml1iKBiXRsuuA3ySI77Zp5owrp3oC7kOHTv8H6Agtn6o';
+  'BFXOh72Rhv-vH1AhTTn375mvNJCweGgoGGjwATkQVuplkyGx3KqMWlZS4cEPWJr0WJk8nTHwMAN47-W9nAhifgs';
 
 /** Planner reminder "HH:MM AM/PM" -> minutes past midnight, 0 when absent. */
 export function parseReminderMinutes(time: string): number {
@@ -103,6 +105,7 @@ export async function runPushSweep(opts: { limit?: number } = {}): Promise<PushS
 
     let ok = 0;
     let hardFail = false;
+    let cleanedJob = 0;
     for (const dev of endpoints) {
       const endpoint = String(dev?.endpoint || '');
       if (!endpoint.startsWith('https://')) continue;
@@ -121,6 +124,7 @@ export async function runPushSweep(opts: { limit?: number } = {}): Promise<PushS
           await adminDb.collection('pushTokens').doc(uid)
             .set({ [`devices.${hash}`]: FieldValue.delete(), updatedAt: now }, { merge: true });
           out.cleaned += 1;
+          cleanedJob += 1;
         } else {
           hardFail = true;
           out.failed += 1;
@@ -142,7 +146,7 @@ export async function runPushSweep(opts: { limit?: number } = {}): Promise<PushS
     }
     // When every device was cleaned but none delivered (all 404/410), the
     // member has no working device left, so mark the job done to stop retries.
-    if (ok === 0 && !hardFail && endpoints.length > 0 && out.cleaned > 0) {
+    if (ok === 0 && !hardFail && endpoints.length > 0 && cleanedJob === endpoints.length) {
       await job.ref.set({ sent: true, sentAt: now, delivered: 0, note: 'no working device left' }, { merge: true });
     }
   }
