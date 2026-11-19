@@ -19,6 +19,8 @@ import {
   GraduationCap,
   Bell,
   ShieldCheck,
+  LogIn,
+  LogOut,
 } from 'lucide-react';
 
 import { CalendarView } from '../../common/CalendarView';
@@ -29,7 +31,6 @@ interface HomeTabProps {
   onNavigateTab: (tab: 'home' | 'timetable' | 'cbt' | 'results' | 'more' | 'profile') => void;
 }
 
-const RING_CIRCUMFERENCE = 2 * Math.PI * 74;
 
 export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
   // Attendance & Clock logic
@@ -178,6 +179,9 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
   const clockOutLabel = clockedOutAt ? fmtClock(clockedOutAt) : '';
 
   const isClosingTime = currentMinutes >= closingMinutes;
+  const daySeconds = currentTime.getHours() * 3600 + currentTime.getMinutes() * 60 + currentTime.getSeconds();
+  const handAngle = (daySeconds / 86400) * 360;
+  const digitalTime = currentTime.toLocaleTimeString('en-GB', { hour12: false });
   const isLate = clockedInAt && (clockedInAt.getHours() * 60 + clockedInAt.getMinutes()) > lateMinutesThreshold;
 
   const handleClockInAction = () => {
@@ -267,84 +271,112 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
           </div>
         )}
 
-        {!clockedInAt ? (
-          /* Before check-in: one full-width check-in button with the arrow icon inside the text */
-          <div>
+        {/* The 24-hour session clock. The hand and the digital readout tick
+            live; the session timer starts the moment the student checks in. */}
+        <div className="flex flex-col items-center">
+          {isLate && !clockedOutAt && (
+            <span className="mb-1 px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 text-[9px] font-black uppercase tracking-wider">Late Arrival</span>
+          )}
+          <div className="relative">
+            <svg width="150" height="150" viewBox="0 0 150 150" className="block text-slate-300">
+              <circle cx="75" cy="75" r="64" fill="none" stroke="currentColor" strokeWidth="2" />
+              {Array.from({ length: 24 }, (_, i) => {
+                const a = (i / 24) * Math.PI * 2 - Math.PI / 2;
+                const major = i % 6 === 0;
+                const r1 = major ? 52 : 57;
+                return (
+                  <line
+                    key={i}
+                    x1={75 + r1 * Math.cos(a)}
+                    y1={75 + r1 * Math.sin(a)}
+                    x2={75 + 62 * Math.cos(a)}
+                    y2={75 + 62 * Math.sin(a)}
+                    stroke="currentColor"
+                    strokeWidth={major ? 2.5 : 1}
+                    strokeLinecap="round"
+                  />
+                );
+              })}
+              <line
+                x1="75"
+                y1="75"
+                x2="75"
+                y2="27"
+                transform={`rotate(${handAngle} 75 75)`}
+                style={{ stroke: 'var(--brand, #EA580C)' }}
+                strokeWidth="3.5"
+                strokeLinecap="round"
+              />
+              <circle cx="75" cy="75" r="5" style={{ fill: 'var(--brand, #EA580C)' }} />
+            </svg>
+            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+              <span className="text-lg font-black text-slate-900 leading-none tabular-nums">{digitalTime}</span>
+              <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-1">24-hour time</span>
+            </div>
+          </div>
+          {clockedInAt && !clockedOutAt && (
+            <p className="text-[10px] font-bold text-slate-400 mt-1 tabular-nums">
+              In facility {formatDuration(elapsedMillis)} • since {clockInLabel}
+            </p>
+          )}
+          {clockedOutAt && (
+            <p className="text-[10px] font-bold text-slate-400 mt-1 tabular-nums">
+              Total {formatDuration(totalMillis)} in the facility
+            </p>
+          )}
+        </div>
+
+        {/* Check In on the student's left, Check Out on the right, and the
+            facility-coloured line the timer travels from check-in until the
+            facility's closing time, arriving at the check-out button. */}
+        <div className="flex items-center gap-2 mt-3">
+          <div className="flex flex-col items-center gap-1 shrink-0 w-[64px]">
             <button
               onClick={handleClockInAction}
-              className="w-full min-h-[48px] px-5 rounded-2xl bg-gradient-to-r from-orange-500 to-orange-600 text-white text-sm font-black flex items-center justify-center gap-2.5 shadow-md active:scale-[0.98] transition-all"
+              disabled={!!clockedInAt}
+              aria-label="Check In"
+              className={`w-14 h-14 rounded-full flex items-center justify-center text-white shadow-md transition-all ${clockedInAt ? 'bg-emerald-600 opacity-60 cursor-not-allowed' : 'bg-emerald-600 hover:brightness-110 active:scale-95'}`}
             >
-              <span>Check In</span>
-              <ArrowRight className="w-4.5 h-4.5" />
+              <LogIn className="w-6 h-6" />
             </button>
-            <p className="text-center text-[10px] font-semibold text-slate-400 mt-2">
-              Resumption {attendanceSettings.resumptionTime} • Late after {attendanceSettings.lateArrivalTime}
-            </p>
+            <span className="text-[9px] font-black uppercase tracking-wider text-emerald-600">Check In</span>
           </div>
-        ) : (
-          /* Checked in: a circular ring fills from the check-in moment toward closing
-             time. Everything sits in normal flow, so nothing overlays a button. */
-          <div className="flex flex-col items-center">
-            {isLate && !clockedOutAt && (
-              <span className="mb-2 px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 text-[9px] font-black uppercase tracking-wider">Late Arrival</span>
+          <div className="flex-1 relative h-9 flex items-center min-w-[40px]">
+            <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-1.5 rounded-full bg-slate-200" />
+            {clockedInAt && (
+              <div
+                className="absolute left-0 top-1/2 -translate-y-1/2 h-1.5 rounded-full transition-[width] duration-1000 ease-linear"
+                style={{ width: `${Math.round(ringProgress * 100)}%`, background: 'var(--brand, #EA580C)' }}
+              />
             )}
-            <div className="relative">
-              <svg width="168" height="168" viewBox="0 0 168 168" className="block">
-                <circle cx="84" cy="84" r="74" fill="none" stroke="#E2E8F0" strokeWidth="10" />
-                <circle
-                  cx="84"
-                  cy="84"
-                  r="74"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="10"
-                  strokeLinecap="round"
-                  className={clockedOutAt ? 'text-emerald-500' : 'text-orange-500'}
-                  strokeDasharray={RING_CIRCUMFERENCE}
-                  strokeDashoffset={RING_CIRCUMFERENCE * (1 - ringProgress)}
-                  transform="rotate(-90 84 84)"
-                  style={{ transition: 'stroke-dashoffset 1s linear' }}
-                />
-              </svg>
-              {/* Side markers are state badges only: check-in and check-out happen on
-                  the buttons, never by tapping these */}
-              <div className="absolute top-1/2 -translate-y-1/2 -left-3 w-9 h-9 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[9px] font-black border-4 border-white shadow-md">IN</div>
-              <div className={`absolute top-1/2 -translate-y-1/2 -right-3 w-9 h-9 rounded-full flex items-center justify-center text-[9px] font-black border-4 border-white shadow-md ${clockedOutAt ? 'bg-emerald-600 text-white' : isClosingTime ? 'bg-[#E11D48] text-white' : 'bg-slate-200 text-slate-400'}`}>OUT</div>
-              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                {clockedOutAt ? (
-                  <>
-                    <CheckCircle2 className="w-6 h-6 text-emerald-600" />
-                    <span className="text-lg font-black text-slate-900 leading-none mt-1 tabular-nums">{formatDuration(totalMillis)}</span>
-                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-1">In facility</span>
-                  </>
-                ) : (
-                  <>
-                    <span className="text-xl font-black text-slate-900 leading-none tabular-nums">{formatDuration(elapsedMillis)}</span>
-                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-1.5">Since {clockInLabel}</span>
-                  </>
-                )}
-              </div>
-            </div>
-            {clockedOutAt ? (
-              <p className="text-center text-[10px] font-semibold text-slate-400 mt-3">
-                Checked in {clockInLabel} • Checked out {clockOutLabel}
-              </p>
-            ) : (
-              <div className="w-full mt-3">
-                <button
-                  onClick={handleClockOutAction}
-                  disabled={!isClosingTime}
-                  className={`w-full min-h-[44px] px-5 rounded-2xl text-sm font-black flex items-center justify-center transition-all active:scale-[0.98] ${isClosingTime ? 'bg-[#E11D48] text-white shadow-md' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}
-                >
-                  <span>Check Out</span>
-                </button>
-                <p className="text-center text-[10px] font-semibold text-slate-400 mt-2">
-                  {isClosingTime ? 'Closing time reached — you can check out now' : `On-going • Check out opens at ${attendanceSettings.closingTime}`}
-                </p>
-              </div>
+            {clockedInAt && !clockedOutAt && (
+              <div
+                className="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full transition-[left] duration-1000 ease-linear"
+                style={{ left: `calc(${Math.round(ringProgress * 100)}% - 6px)`, background: 'var(--brand, #EA580C)', boxShadow: '0 0 0 4px color-mix(in oklab, var(--brand, #EA580C) 25%, transparent)' }}
+              />
             )}
           </div>
-        )}
+          <div className="flex flex-col items-center gap-1 shrink-0 w-[64px]">
+            <button
+              onClick={handleClockOutAction}
+              disabled={!clockedInAt || !!clockedOutAt || !isClosingTime}
+              aria-label="Check Out"
+              className={`w-14 h-14 rounded-full flex items-center justify-center text-white shadow-md transition-all ${!clockedInAt || !!clockedOutAt || !isClosingTime ? 'bg-rose-600 opacity-40 cursor-not-allowed' : `bg-rose-600 hover:brightness-110 active:scale-95 ${isClosingTime ? 'animate-pulse' : ''}`}`}
+            >
+              <LogOut className="w-6 h-6" />
+            </button>
+            <span className="text-[9px] font-black uppercase tracking-wider text-rose-600">Check Out</span>
+          </div>
+        </div>
+        <p className="text-center text-[10px] font-semibold text-slate-400 mt-2">
+          {!clockedInAt
+            ? `Tap Check In when you arrive • Resumption ${attendanceSettings.resumptionTime} • Late after ${attendanceSettings.lateArrivalTime}`
+            : clockedOutAt
+            ? `Checked in ${clockInLabel} • Checked out ${clockOutLabel}`
+            : isClosingTime
+            ? 'Time complete — you can check out now'
+            : `On-going • Check out opens at ${attendanceSettings.closingTime}`}
+        </p>
       </div>
 
       {/* 3. Candidate Vitals Row (Enhanced, comfortable button cards) */}

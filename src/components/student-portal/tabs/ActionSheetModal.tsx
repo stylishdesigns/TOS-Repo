@@ -147,7 +147,7 @@ export const ActionSheetModal: React.FC<ActionSheetModalProps> = ({
                 onClose();
                 item.onClick();
               }}
-              className="w-full min-h-[72px] p-3.5 sm:p-4 rounded-[20px] border border-slate-200/90 hover:border-orange-500/70 bg-gradient-to-r from-slate-50/70 via-white to-white hover:from-orange-50/30 hover:to-white transition-all flex items-center justify-between gap-3.5 text-left cursor-pointer active:scale-[0.98] group shadow-2xs"
+              className="w-full min-h-[72px] p-3.5 sm:p-4 rounded-[20px] border border-slate-200/90 hover:border-orange-500/70 bg-slate-50/70 hover:bg-slate-100 transition-all flex items-center justify-between gap-3.5 text-left cursor-pointer active:scale-[0.98] group shadow-2xs"
             >
               <div className="flex items-center gap-3.5 min-w-0 flex-1">
                 <div

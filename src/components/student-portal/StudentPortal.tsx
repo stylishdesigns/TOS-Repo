@@ -30,6 +30,7 @@ import {
   MessageSquare,
   FileText,
   Sparkles,
+  Monitor,
   ChevronLeft,
   MessageCircle,
   X,
@@ -448,7 +449,7 @@ export const StudentPortal: React.FC = () => {
       title: 'CBT Practice',
       subtitle: 'Untimed practice, no pressure',
       badge: 'Self-Paced',
-      icon: <Sparkles className="w-5 h-5 text-orange-700" />,
+      icon: <Monitor className="w-5 h-5 text-orange-700" />,
       iconBg: 'bg-orange-50 border border-orange-100',
       onClick: () => {
         setCbtSubPage('practice');
