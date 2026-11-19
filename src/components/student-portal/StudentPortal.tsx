@@ -537,7 +537,9 @@ export const StudentPortal: React.FC = () => {
 
   // Appearance: the student's Light / Dark pick in More. The screens stay as
   // written; a scoped stylesheet flips their light surfaces while the body
-  // carries the marker class. Chat and status portals attach to the body
+  let splashShownThisLoad = false;
+
+// carries the marker class. Chat and status portals attach to the body
   // too, so they follow along.
   React.useEffect(() => {
     if (bgTheme === 'dark') document.body.classList.add('tos-student-dark');
@@ -545,7 +547,15 @@ export const StudentPortal: React.FC = () => {
     return () => document.body.classList.remove('tos-student-dark');
   }, [bgTheme]);
 
-  if (!isAdmin && (authLoading || profileLoading)) {
+  const [splashHold, setSplashHold] = useState(!splashShownThisLoad);
+  useEffect(() => {
+    if (!splashHold) return;
+    splashShownThisLoad = true;
+    const t = setTimeout(() => setSplashHold(false), 1500);
+    return () => clearTimeout(t);
+  }, []);
+
+  if (!isAdmin && (authLoading || profileLoading || splashHold)) {
     return <LaunchSplash />;
   }
 
