@@ -444,19 +444,7 @@ const MainLayout: React.FC = () => {
   const claimsPending = !!currentUser && !tosClaimsSettled;
   if (isAuthLoading || claimsPending) {
     return (
-      <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-900 text-white">
-        <div className="relative w-24 h-24 mb-8">
-          <div className="absolute inset-0 border-4 border-orange-500/20 rounded-full" />
-          <div className="absolute inset-0 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
-          <div className="absolute inset-4 bg-orange-500/10 rounded-full flex items-center justify-center">
-             <span className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" />
-          </div>
-        </div>
-        <div className="space-y-2 text-center">
-          <h2 className="text-xl font-black tracking-widest uppercase text-orange-500">{activeCentre?.name || ''}</h2>
-          <p className="text-xs text-slate-400 font-medium animate-pulse">Synchronizing academic records...</p>
-        </div>
-      </div>
+      <LaunchSplash />
     );
   }
 
@@ -635,13 +623,7 @@ const MainLayout: React.FC = () => {
   // access-code prompt for the wrong facility.
   if (isAppContext && appFacility === undefined) {
     return (
-      <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-900 text-white">
-        <div className="relative w-20 h-20 mb-6">
-          <div className="absolute inset-0 border-4 border-orange-500/20 rounded-full" />
-          <div className="absolute inset-0 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
-        </div>
-        <p className="text-xs text-slate-400 font-medium animate-pulse">Loading...</p>
-      </div>
+      <LaunchSplash />
     );
   }
 
@@ -674,13 +656,7 @@ const MainLayout: React.FC = () => {
   // yet, hold on the plain loading screen instead.
   if (isAppContext && appFacility && !currentUser && !appWelcomeCentre) {
     return (
-      <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-900 text-white">
-        <div className="relative w-20 h-20 mb-6">
-          <div className="absolute inset-0 border-4 border-orange-500/20 rounded-full" />
-          <div className="absolute inset-0 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
-        </div>
-        <p className="text-xs text-slate-400 font-medium animate-pulse">Loading...</p>
-      </div>
+      <LaunchSplash />
     );
   }
 
@@ -713,19 +689,7 @@ const MainLayout: React.FC = () => {
   // Shown after belonging is confirmed (centreSplash) and while an automatic
   // centre entry runs for a restored session.
   const centreSpinnerScreen = (
-    <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-900 text-white">
-      <div className="relative w-24 h-24 mb-8">
-        <div className="absolute inset-0 border-4 border-orange-500/20 rounded-full" />
-        <div className="absolute inset-0 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
-        <div className="absolute inset-4 bg-orange-500/10 rounded-full flex items-center justify-center">
-           <span className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" />
-        </div>
-      </div>
-      <div className="space-y-2 text-center">
-        <h2 className="text-xl font-black tracking-widest uppercase text-orange-500">{pendingCentre?.centreName || centreName}</h2>
-        <p className="text-xs text-slate-400 font-medium animate-pulse">Taking you to your dashboard...</p>
-      </div>
-    </div>
+    <LaunchSplash />
   );
 
   // Admin Password Change Guard
