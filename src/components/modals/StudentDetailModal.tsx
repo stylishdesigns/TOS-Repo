@@ -22,12 +22,16 @@ export const StudentDetailModal: React.FC = () => {
     setSelectedStudent,
     settings,
     updateStudent,
+    setStudentTotalFee,
     recordPayment,
     payments,
   } = useApp();
 
   const [isEditing, setIsEditing] = useState(false);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [showFeeForm, setShowFeeForm] = useState(false);
+  const [feeAmount, setFeeAmount] = useState('');
+  const [feeSaving, setFeeSaving] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'Bank Transfer' | 'Card' | 'Cash'>('Bank Transfer');
 
@@ -53,6 +57,29 @@ export const StudentDetailModal: React.FC = () => {
 
     setShowPaymentForm(false);
     setPaymentAmount('');
+  };
+
+  // The admin decides what the student owes. The server recomputes the
+  // balance and status from the fee; the client only reads back the numbers
+  // it wrote and mirrors them into the open modal.
+  const handleSetFee = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const fee = Number(feeAmount);
+    if (!Number.isFinite(fee) || fee < 0) return;
+    setFeeSaving(true);
+    const result = await setStudentTotalFee({ studentId: selectedStudent.id, totalFee: fee });
+    setFeeSaving(false);
+    if (result) {
+      const patch = {
+        totalFee: result.totalFee,
+        outstandingBalance: result.outstandingBalance,
+        paymentStatus: result.paymentStatus,
+      } as any;
+      updateStudent(selectedStudent.id, patch);
+      setSelectedStudent({ ...selectedStudent, ...patch } as any);
+      setShowFeeForm(false);
+      setFeeAmount('');
+    }
   };
 
   return (
@@ -113,6 +140,15 @@ export const StudentDetailModal: React.FC = () => {
               <span className="text-[10px] text-slate-500 font-medium">
                 Paid: {settings.currencySymbol}{(selectedStudent.paidAmount || 0).toLocaleString()}
               </span>
+              <button
+                onClick={() => {
+                  setShowFeeForm(true);
+                  setFeeAmount(selectedStudent.totalFee ? String(selectedStudent.totalFee) : '');
+                }}
+                className="text-[10px] text-slate-600 font-bold underline hover:text-slate-800"
+              >
+                Set total fee
+              </button>
             </div>
 
             <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200/80">
@@ -192,6 +228,50 @@ export const StudentDetailModal: React.FC = () => {
                     Generate Receipt
                   </button>
                 </div>
+              </form>
+            </div>
+          )}
+
+          {/* Total Fee Form (if triggered) */}
+          {showFeeForm && (
+            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold text-slate-800">
+                  Set Total Fee for {selectedStudent.name}
+                </h4>
+                <button
+                  onClick={() => setShowFeeForm(false)}
+                  className="text-xs text-slate-500 hover:text-slate-700"
+                >
+                  Cancel
+                </button>
+              </div>
+              <p className="text-[11px] text-slate-500">
+                The total this student owes. The outstanding balance and payment status update from it automatically.
+              </p>
+              <form onSubmit={handleSetFee} className="flex items-end space-x-3">
+                <div className="flex-1">
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    Total fee ({settings.currencySymbol})
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    required
+                    placeholder="e.g. 50000"
+                    value={feeAmount}
+                    onChange={(e) => setFeeAmount(e.target.value)}
+                    className="w-full px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={feeSaving}
+                  className="px-4 py-2 text-xs font-bold text-[var(--on-brand,#fff)] bg-[var(--brand,#0f172a)] hover:brightness-110 rounded-lg shadow-sm disabled:opacity-60"
+                >
+                  {feeSaving ? 'Saving...' : 'Save Fee'}
+                </button>
               </form>
             </div>
           )}

@@ -250,6 +250,7 @@ interface AppContextType {
 
   payments: PaymentRecord[];
   recordPayment: (payment: { studentId: string; amountPaid: number; method?: 'Card' | 'Bank Transfer' | 'Cash'; note?: string; evidenceUrl?: string; evidenceName?: string }) => Promise<RecordPaymentResult | void>;
+  setStudentTotalFee: (input: { studentId: string; totalFee: number }) => Promise<{ totalFee: number; outstandingBalance: number; paymentStatus: string } | void>;
   confirmPayment: (paymentId: string, action: 'confirm' | 'reject', reason?: string) => Promise<boolean>;
 
   announcements: Announcement[];
@@ -2921,6 +2922,43 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  // Admin-only: set the student's total fee. The server recomputes the
+  // outstanding balance and payment status, so no device ever sends balance
+  // numbers; the client only reads back what the server wrote.
+  const setStudentTotalFee = async (input: { studentId: string; totalFee: number }): Promise<{ totalFee: number; outstandingBalance: number; paymentStatus: string } | void> => {
+    try {
+      const token = await firebaseAuth.currentUser?.getIdToken();
+      if (!token) throw new Error('You are signed out, so the fee cannot be set. Sign in and try again.');
+      const res = await fetch('/api/centre/students/set-fee', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(input),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || 'The fee could not be set. Please try again.');
+      }
+      const s = data.student || {};
+      addToast({
+        type: 'success',
+        title: 'Fee Updated',
+        description: `Total fee set to ${settings.currencySymbol}${Number(input.totalFee).toLocaleString()}. The balance now reflects it.`,
+      });
+      return {
+        totalFee: typeof s.totalFee === 'number' ? s.totalFee : input.totalFee,
+        outstandingBalance: typeof s.outstandingBalance === 'number' ? s.outstandingBalance : 0,
+        paymentStatus: typeof s.paymentStatus === 'string' ? s.paymentStatus : 'Pending',
+      };
+    } catch (e) {
+      console.error(e);
+      addToast({ type: 'error', title: 'Fee Not Updated', description: (e as Error)?.message || 'Could not set the fee.' });
+      return;
+    }
+  };
+
   const login = async () => {
     const provider = new GoogleAuthProvider();
     await signInWithPopup(firebaseAuth, provider);
@@ -3230,6 +3268,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addCBTQuestion,
         payments,
         recordPayment,
+        setStudentTotalFee,
         confirmPayment,
         announcements,
         addAnnouncement,

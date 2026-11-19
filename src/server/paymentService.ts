@@ -14,6 +14,7 @@ import {
   assertCentreAccess,
   assertOwnStudentRecord,
   applyPayment,
+  feeState,
   assertPending,
   assertPendingCapacity,
   type ConfirmAction,
@@ -187,6 +188,64 @@ export async function submitPayment(
         paymentStatus: fees.paymentStatus,
       },
     };
+  });
+}
+
+export interface SetFeeInput {
+  studentId: string;
+  totalFee: number;
+}
+
+/**
+ * Admin: set the total fee a student owes. This is the only way a fee moves
+ * (the admin decides what each student pays), and the server recomputes the
+ * balance and status from it, so no device ever sends balance numbers.
+ */
+export async function setStudentFee(
+  db: Firestore,
+  caller: PaymentCaller,
+  actor: PaymentActor,
+  input: SetFeeInput
+) {
+  if (!actor.isAdminCaller) {
+    throw new PaymentError(403, 'Only a facility admin can set the total fee');
+  }
+  const { studentId, totalFee } = input;
+
+  return db.runTransaction(async (tx) => {
+    const studentRef = db.collection('students').doc(studentId);
+    const studentSnap = await tx.get(studentRef);
+    if (!studentSnap.exists) {
+      throw new PaymentError(404, 'Student record not found');
+    }
+    const s = studentSnap.data() as Record<string, any>;
+    const studentCentreId = typeof s.centreId === 'string' ? s.centreId : '';
+    assertCentreAccess({
+      tos: tosOverride(caller, actor),
+      callerCentreId: actor.callerCentreId,
+      recordCentreId: studentCentreId,
+    });
+
+    const fees = feeState(s, totalFee);
+    tx.update(studentRef, {
+      totalFee: fees.totalFee,
+      outstandingBalance: fees.outstandingBalance,
+      paymentStatus: fees.paymentStatus,
+      feeSetBy: caller.uid,
+      feeSetAt: Date.now(),
+    });
+    tx.set(db.collection('auditLogs').doc(), {
+      action: 'fee.set',
+      actorUid: caller.uid,
+      actorEmail: caller.email,
+      centreId: studentCentreId,
+      studentId,
+      totalFee: fees.totalFee,
+      previousFee: typeof s.totalFee === 'number' ? s.totalFee : 0,
+      paidAmount: fees.paidAmount,
+      at: new Date().toISOString(),
+    });
+    return { student: fees };
   });
 }
 

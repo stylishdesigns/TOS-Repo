@@ -30,8 +30,8 @@ import { registerLandingRoutes } from "./src/server/landingRoutes";
 import { registerLandingAdminRoutes } from "./src/server/landingAdminRoutes";
 import { registerLandingLeadRoutes } from "./src/server/landingLeadRoutes";
 import { registerMockRoutes } from "./src/server/mockRoutes";
-import { PaymentError, parseAmount, parseConfirmAction } from "./src/server/paymentLogic";
-import { loadPaymentActor, submitPayment, decidePayment } from "./src/server/paymentService";
+import { PaymentError, parseAmount, parseConfirmAction, parseFee } from "./src/server/paymentLogic";
+import { loadPaymentActor, submitPayment, decidePayment, setStudentFee } from "./src/server/paymentService";
 import { registerStudentMockRoutes } from "./src/server/studentMockRoutes";
 import { registerNotificationRoutes } from "./src/server/notificationRoutes";
 import { registerTutorAiRoutes } from "./src/server/tutorAiRoutes";
@@ -669,6 +669,10 @@ async function startServer() {
   //       the desk, confirmed transfer) and applies it in one transaction.
   //   POST /api/centre/payments/confirm
   //     - admin only: confirms or rejects a pending claim, once.
+  //   POST /api/centre/students/set-fee
+  //     - admin only: sets the student's total fee. The server recomputes
+  //       outstandingBalance / paymentStatus from it, so no client ever sends
+  //       balance numbers.
   //
   // Both refuse overpayment and enforce centre isolation (fail closed when a
   // record has no centre). Every action leaves an audit record.
@@ -725,6 +729,22 @@ async function startServer() {
       res.json({ success: true, ...result });
     } catch (error: any) {
       sendPaymentError(res, error, "confirm-payment");
+    }
+  });
+
+  app.post("/api/centre/students/set-fee", async (req, res) => {
+    try {
+      const caller = await getCaller(req);
+      const { studentId, totalFee } = req.body || {};
+      if (typeof studentId !== "string" || !/^[a-zA-Z0-9_\-]{1,128}$/.test(studentId)) {
+        return res.status(400).json({ error: "Invalid studentId" });
+      }
+      const fee = parseFee(totalFee);
+      const actor = await loadPaymentActor(adminDb, caller);
+      const result = await setStudentFee(adminDb, caller, actor, { studentId, totalFee: fee });
+      res.json({ success: true, ...result });
+    } catch (error: any) {
+      sendPaymentError(res, error, "set-fee");
     }
   });
 

@@ -129,6 +129,49 @@ export function assertPendingCapacity(existingPending: number): void {
 
 export type ConfirmAction = 'confirm' | 'reject';
 
+export interface FeeState {
+  totalFee: number;
+  paidAmount: number;
+  outstandingBalance: number;
+  paymentStatus: 'Paid' | 'Partial' | 'Pending';
+}
+
+/**
+ * A fee an admin sets. 0 is allowed and clears the fee (the student then shows
+ * as 'no fee set'); anything above runs to the same ceiling as a payment.
+ */
+export function parseFee(raw: unknown): number {
+  const n = typeof raw === 'number' ? raw : typeof raw === 'string' && raw.trim() !== '' ? Number(raw) : NaN;
+  if (!Number.isFinite(n) || n < 0 || n > MAX_PAYMENT_AMOUNT) {
+    throw new PaymentError(400, 'Invalid fee amount');
+  }
+  return round2(n);
+}
+
+/**
+ * Recompute a student's fee fields after an admin sets the total fee.
+ * 'Pending' stays the nothing-paid status, so the rest of the app keeps its
+ * existing vocabulary; 'Partial' means something is paid and a balance is
+ * left, 'Paid' means the fee is fully covered.
+ */
+export function feeState(student: StudentFees, totalFee: number): FeeState {
+  const paidAmount = round2(num(student.paidAmount));
+  const outstandingBalance = round2(Math.max(totalFee - paidAmount, 0));
+  return {
+    totalFee,
+    paidAmount,
+    outstandingBalance,
+    paymentStatus:
+      totalFee <= 0
+        ? 'Pending'
+        : outstandingBalance <= 0
+          ? 'Paid'
+          : paidAmount > 0
+            ? 'Partial'
+            : 'Pending',
+  };
+}
+
 export function parseConfirmAction(raw: unknown): ConfirmAction {
   if (raw === 'confirm' || raw === 'reject') return raw;
   throw new PaymentError(400, 'Invalid action');
