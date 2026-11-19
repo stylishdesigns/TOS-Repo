@@ -46,7 +46,7 @@ export function LaunchSplash() {
     const base: LaunchBranding = readPersisted() || { logo: '', name: '', accent: '' };
     const next: LaunchBranding = {
       centreId: String(activeCentre?.id || '') || base.centreId,
-      logo: String(activeCentre?.branding?.logo || activeCentre?.branding?.logoUrl || '') || base.logo,
+      logo: String(activeCentre?.logoUrl || activeCentre?.branding?.logo || activeCentre?.branding?.logoUrl || '') || base.logo,
       name: String(centreName || activeCentre?.name || '') || base.name,
       accent: /^#[0-9a-fA-F]{6}$/.test(String(brandAccent || '')) ? String(brandAccent) : base.accent,
     };
