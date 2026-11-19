@@ -1096,10 +1096,10 @@ const PageFallback = () => (
   </div>
 );
 const ScreenFallback = () => (
-  <div className="h-screen w-full bg-slate-900" aria-busy="true" />
+  <div className="h-screen w-full bg-white" aria-busy="true" />
 );
 const PortalFallback = () => (
-  <div className="h-screen w-full bg-[#FFF3E7]" aria-busy="true" />
+  <div className="h-screen w-full" style={{ backgroundColor: 'var(--brand, #FFF3E7)' }} aria-busy="true" />
 );
 
 interface ErrorBoundaryProps {

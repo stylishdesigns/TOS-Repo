@@ -150,7 +150,8 @@ async function readLanding(centreId: string) {
   const centreAccent = String((centreSnap.data() as any)?.accentColor || '');
   if (!centreSnap.exists) return null;
   const stored = pageSnap.data() as any;
-  const content = isLandingContent(stored?.content) ? stored.content : defaultLandingContent(centreName, centreAccent);
+  let content = isLandingContent(stored?.content) ? stored.content : defaultLandingContent(centreName, centreAccent);
+  if (HEX_RE.test(centreAccent)) content = { ...content, accent: centreAccent.toUpperCase() };
   return {
     centreId,
     centreName,

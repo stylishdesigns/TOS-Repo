@@ -301,7 +301,7 @@ export function registerExtendedRoutes(app: express.Express): void {
         short_name: name.slice(0, 12),
         description: `${name} on Tutorial OS.`,
         theme_color: accent || '#EA580C',
-        background_color: '#0F172A',
+        background_color: accent || '#EA580C',
         display: 'standalone',
         // Each facility's app starts at its own address: the access-code page
         // carrying the facility, so Chrome's periodic app refresh re-reads
