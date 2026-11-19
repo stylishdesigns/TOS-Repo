@@ -6,8 +6,7 @@ import { pushStatus } from './push';
 
 // The student portal's notification bell (rebuilt Nov 19): unread badge in
 // the header, and a tap-open panel listing everything the facility has sent
-// them, each item tagged by type, with real per-item read state and filter
-// chips. Subject-based notifications (classes, materials, mocks) are filtered
+// them, each item tagged by type, with real per-item read state. Subject-based notifications (classes, materials, mocks) are filtered
 // server-side to the subjects the student actually takes.
 
 // Planner reminders: a reminder a member set on their academic schedule
@@ -70,22 +69,15 @@ function saveRead(ids: string[]) {
   try { localStorage.setItem(READ_KEY, JSON.stringify(ids.slice(-500))); } catch { /* private mode */ }
 }
 
-const TYPE_STYLES: Record<string, { icon: React.ReactNode; chip: string; label: string }> = {
-  class: { icon: <CalendarDays className="w-4 h-4" />, chip: 'bg-orange-100 text-orange-700', label: 'Class' },
-  material: { icon: <BookOpen className="w-4 h-4" />, chip: 'bg-orange-100 text-orange-700', label: 'Material' },
-  mock: { icon: <ClipboardList className="w-4 h-4" />, chip: 'bg-orange-100 text-orange-700', label: 'Mock' },
-  leaderboard: { icon: <Trophy className="w-4 h-4" />, chip: 'bg-amber-100 text-amber-700', label: 'Leaderboard' },
-  welcome: { icon: <Star className="w-4 h-4" />, chip: 'bg-emerald-100 text-emerald-700', label: 'Welcome' },
-  reminder: { icon: <Clock className="w-4 h-4" />, chip: 'bg-amber-100 text-amber-700', label: 'Reminder' },
+const TYPE_STYLES: Record<string, { icon: React.ReactNode; chip: string }> = {
+  class: { icon: <CalendarDays className="w-4 h-4" />, chip: 'bg-orange-100 text-orange-700', },
+  material: { icon: <BookOpen className="w-4 h-4" />, chip: 'bg-orange-100 text-orange-700', },
+  mock: { icon: <ClipboardList className="w-4 h-4" />, chip: 'bg-orange-100 text-orange-700', },
+  leaderboard: { icon: <Trophy className="w-4 h-4" />, chip: 'bg-amber-100 text-amber-700', },
+  welcome: { icon: <Star className="w-4 h-4" />, chip: 'bg-emerald-100 text-emerald-700', },
+  reminder: { icon: <Clock className="w-4 h-4" />, chip: 'bg-amber-100 text-amber-700', },
 };
 
-const FILTERS: { key: string; label: string }[] = [
-  { key: 'all', label: 'All' },
-  { key: 'reminder', label: 'Reminders' },
-  { key: 'class', label: 'Classes' },
-  { key: 'material', label: 'Materials' },
-  { key: 'mock', label: 'Mocks' },
-];
 
 function timeAgo(at: number): string {
   const diff = Date.now() - at;
@@ -107,7 +99,6 @@ export function NotificationsBell({ onOpenChange }: { onOpenChange?: (open: bool
   const [loading, setLoading] = useState(false);
   const [seenTick, setSeenTick] = useState(0);
   const [readTick, setReadTick] = useState(0);
-  const [filter, setFilter] = useState('all');
   const [push, setPush] = useState(() => pushStatus());
   const { plannerReminders, addToast } = useApp() as any;
 
@@ -239,10 +230,8 @@ export function NotificationsBell({ onOpenChange }: { onOpenChange?: (open: bool
   };
 
   const visibleReminders = React.useMemo(() => {
-    const rows = [...dueReminders.map((r: any) => ({ ...r, isDue: true })), ...upcomingReminders.map((r: any) => ({ ...r, isDue: false }))];
-    if (filter === 'all' || filter === 'reminder') return rows;
-    return [];
-  }, [dueReminders, upcomingReminders, filter]);
+    return [...dueReminders.map((r: any) => ({ ...r, isDue: true })), ...upcomingReminders.map((r: any) => ({ ...r, isDue: false }))];
+  }, [dueReminders, upcomingReminders]);
 
   // The splash shows only the first entry of the feed: a due reminder when
   // one exists, otherwise the newest notification.
@@ -252,11 +241,7 @@ export function NotificationsBell({ onOpenChange }: { onOpenChange?: (open: bool
     return null;
   }, [dueReminders, items]);
 
-  const visibleItems = React.useMemo(() => {
-    if (filter === 'all') return items;
-    if (filter === 'reminder') return [];
-    return items.filter((n) => String(n.type) === filter);
-  }, [items, filter]);
+  const visibleItems = items;
 
   return (
     <>
@@ -342,7 +327,6 @@ export function NotificationsBell({ onOpenChange }: { onOpenChange?: (open: bool
                         <span className="text-[10px] text-slate-400 font-bold shrink-0">{timeAgo(Number(n.at) || 0)}</span>
                       </div>
                       <p className="text-xs text-slate-600 font-medium mt-0.5 leading-relaxed break-words">{n.body}</p>
-                      <span className={`inline-block mt-1.5 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${style.chip}`}>{style.label}</span>
                     </div>
                   </div>
                 );
@@ -369,17 +353,6 @@ export function NotificationsBell({ onOpenChange }: { onOpenChange?: (open: bool
             <div>
               <p className="text-base font-black text-white">All notifications</p>
             </div>
-          </div>
-          <div className="shrink-0 border-b border-slate-100 px-3 py-2 flex items-center gap-1.5 overflow-x-auto">
-            {FILTERS.map((f) => (
-              <button
-                key={f.key}
-                onClick={() => setFilter(f.key)}
-                className={`px-3 py-1.5 rounded-full text-[11px] font-black whitespace-nowrap transition-colors ${filter === f.key ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
-              >
-                {f.label}
-              </button>
-            ))}
           </div>
           <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
             {loading && items.length === 0 && visibleReminders.length === 0 && (
@@ -432,7 +405,6 @@ export function NotificationsBell({ onOpenChange }: { onOpenChange?: (open: bool
                       <span className="text-[10px] text-slate-400 font-bold shrink-0">{timeAgo(Number(n.at) || 0)}</span>
                     </div>
                     <p className="text-xs text-slate-600 font-medium mt-0.5 leading-relaxed break-words">{n.body}</p>
-                    <span className={`inline-block mt-1.5 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${style.chip}`}>{style.label}</span>
                   </div>
                 </div>
               );
