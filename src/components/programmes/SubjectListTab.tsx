@@ -256,7 +256,7 @@ export const SubjectListTab: React.FC = () => {
 
           <button
             onClick={() => setShowAddModal(true)}
-            className="px-3 py-1.5 text-xs font-semibold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg shadow-sm transition-all flex items-center space-x-1.5 shrink-0"
+            className="px-3 py-1.5 text-xs font-semibold text-white bg-[orange-600] hover:bg-[orange-700] rounded-lg shadow-sm transition-all flex items-center space-x-1.5 shrink-0"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Add Subject</span>
@@ -394,7 +394,7 @@ export const SubjectListTab: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 font-semibold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg shadow-sm"
+                  className="px-4 py-2 font-semibold text-white bg-[orange-600] hover:bg-[orange-700] rounded-lg shadow-sm"
                 >
                   Add Subject
                 </button>

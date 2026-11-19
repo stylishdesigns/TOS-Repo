@@ -373,7 +373,7 @@ export const TimetableManager: React.FC = () => {
 
         <div className="flex items-center space-x-3">
           <div className="text-right hidden md:block">
-            <span className="px-3 py-1.5 rounded-lg bg-orange-50 text-[11px] font-black text-[#EA580C] uppercase tracking-wider">{settings.academicSession}</span>
+            <span className="px-3 py-1.5 rounded-lg bg-orange-50 text-[11px] font-black text-[orange-600] uppercase tracking-wider">{settings.academicSession}</span>
           </div>
         </div>
       </div>
@@ -435,7 +435,7 @@ export const TimetableManager: React.FC = () => {
 
       <button
         onClick={handleOpenAdd}
-        className="w-full py-2.5 text-sm font-black text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-2xl shadow-lg shadow-orange-200/50 transition-all flex items-center justify-center space-x-2"
+        className="w-full py-2.5 text-sm font-black text-white bg-[orange-600] hover:bg-[orange-700] rounded-2xl shadow-lg shadow-orange-200/50 transition-all flex items-center justify-center space-x-2"
       >
         <Plus className="w-5 h-5" />
         <span>SCHEDULE CLASS</span>
@@ -545,7 +545,7 @@ export const TimetableManager: React.FC = () => {
 
                           <div className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
                             <div className="flex items-start space-x-4">
-                              <div className={`w-14 h-14 rounded-2xl border flex flex-col items-center justify-center shrink-0 ${finished ? 'bg-slate-50 border-slate-100 text-slate-400' : 'bg-orange-50 border-orange-100 text-[#EA580C]'}`}>
+                              <div className={`w-14 h-14 rounded-2xl border flex flex-col items-center justify-center shrink-0 ${finished ? 'bg-slate-50 border-slate-100 text-slate-400' : 'bg-orange-50 border-orange-100 text-[orange-600]'}`}>
                                  <Clock className="w-4 h-4 mb-1" />
                                  <span className="text-[9px] font-black">
                                    {new Date(sess.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}

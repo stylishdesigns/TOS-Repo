@@ -191,9 +191,9 @@ export const ProgrammesManager: React.FC = () => {
       case 'JAMB':
         return {
           bg: 'bg-orange-50 text-orange-700 border-orange-200',
-          badge: 'bg-[#EA580C] text-white',
+          badge: 'bg-[orange-600] text-white',
           border: 'border-orange-500/40',
-          accent: 'text-[#EA580C]',
+          accent: 'text-[orange-600]',
         };
       case 'WAEC':
         return {
@@ -244,7 +244,7 @@ export const ProgrammesManager: React.FC = () => {
         <div className="flex items-center space-x-4">
           <button
             onClick={handleOpenAdd}
-            className="px-4 py-2 text-xs font-semibold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg shadow-sm transition-all flex items-center space-x-1.5 shadow-xs"
+            className="px-4 py-2 text-xs font-semibold text-white bg-[orange-600] hover:bg-[orange-700] rounded-lg shadow-sm transition-all flex items-center space-x-1.5 shadow-xs"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Add Exam Programs</span>
@@ -268,7 +268,7 @@ export const ProgrammesManager: React.FC = () => {
               onClick={() => setActiveSubsection(sub.id)}
               className={`px-3.5 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap flex items-center space-x-2 ${
                 isActive
-                  ? 'bg-[#EA580C] text-white shadow-xs'
+                  ? 'bg-[orange-600] text-white shadow-xs'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-white/70'
               }`}
             >
@@ -290,7 +290,7 @@ export const ProgrammesManager: React.FC = () => {
       <div className="grid grid-cols-2 gap-3 md:gap-4">
         <div className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200/90 shadow-xs">
           <div className="flex items-center space-x-2 text-slate-600">
-            <BookOpen className="w-4 h-4 text-[#EA580C]" />
+            <BookOpen className="w-4 h-4 text-[orange-600]" />
             <span className="text-xs font-semibold text-slate-600 truncate">Exam Tracks</span>
           </div>
           <p className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight mt-2">
@@ -323,7 +323,7 @@ export const ProgrammesManager: React.FC = () => {
             onClick={() => setSelectedCategory('All')}
             className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap ${
               selectedCategory === 'All'
-                ? 'bg-[#EA580C] text-white shadow-2xs'
+                ? 'bg-[orange-600] text-white shadow-2xs'
                 : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
             }`}
           >
@@ -337,7 +337,7 @@ export const ProgrammesManager: React.FC = () => {
                 onClick={() => setSelectedCategory(cat)}
                 className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap ${
                   selectedCategory === cat
-                    ? 'bg-[#EA580C] text-white shadow-2xs'
+                    ? 'bg-[orange-600] text-white shadow-2xs'
                     : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
                 }`}
               >
@@ -377,7 +377,7 @@ export const ProgrammesManager: React.FC = () => {
       {/* Programme Cards Grid */}
       {filteredProgrammes.length === 0 ? (
         <div className="bg-white p-12 rounded-xl border border-slate-200/90 text-center space-y-3">
-          <div className="w-12 h-12 bg-orange-50 text-[#EA580C] rounded-full flex items-center justify-center mx-auto">
+          <div className="w-12 h-12 bg-orange-50 text-[orange-600] rounded-full flex items-center justify-center mx-auto">
             <BookOpen className="w-6 h-6" />
           </div>
           <h3 className="font-bold text-slate-800 text-base">No Academic Programmes Found</h3>
@@ -386,7 +386,7 @@ export const ProgrammesManager: React.FC = () => {
           </p>
           <button
             onClick={handleOpenAdd}
-            className="px-4 py-2 text-xs font-semibold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg shadow-sm"
+            className="px-4 py-2 text-xs font-semibold text-white bg-[orange-600] hover:bg-[orange-700] rounded-lg shadow-sm"
           >
             Create Programme
           </button>
@@ -427,7 +427,7 @@ export const ProgrammesManager: React.FC = () => {
                   </div>
 
                   <div>
-                    <h3 className="font-bold text-slate-900 text-base group-hover:text-[#EA580C] transition-colors leading-snug">
+                    <h3 className="font-bold text-slate-900 text-base group-hover:text-[orange-600] transition-colors leading-snug">
                       {prog.name}
                     </h3>
                     <p className="text-[11px] font-mono font-semibold text-slate-400 mt-0.5">
@@ -454,7 +454,7 @@ export const ProgrammesManager: React.FC = () => {
                           fillRate >= 90
                             ? 'bg-rose-500'
                             : fillRate >= 70
-                            ? 'bg-[#EA580C]'
+                            ? 'bg-[orange-600]'
                             : 'bg-emerald-500'
                         }`}
                         style={{ width: `${fillRate}%` }}
@@ -504,7 +504,7 @@ export const ProgrammesManager: React.FC = () => {
                     </button>
                     <button
                       onClick={() => setInspectingProg(prog)}
-                      className="px-3 py-1.5 text-xs font-semibold text-[#EA580C] bg-orange-50 hover:bg-orange-100 rounded-lg border border-orange-200 shadow-2xs transition-colors flex items-center space-x-1"
+                      className="px-3 py-1.5 text-xs font-semibold text-[orange-600] bg-orange-50 hover:bg-orange-100 rounded-lg border border-orange-200 shadow-2xs transition-colors flex items-center space-x-1"
                     >
                       <span>Syllabus & Info</span>
                       <ChevronRight className="w-3 h-3" />
@@ -562,7 +562,7 @@ export const ProgrammesManager: React.FC = () => {
               </div>
               <div>
                 <span className="text-[10px] text-slate-400 block font-medium">TUITION FEE</span>
-                <p className="font-bold text-[#EA580C]">₦{(inspectingProg.fee || 0).toLocaleString()}</p>
+                <p className="font-bold text-[orange-600]">₦{(inspectingProg.fee || 0).toLocaleString()}</p>
               </div>
               <div>
                 <span className="text-[10px] text-slate-400 block font-medium">ENROLLMENT</span>
@@ -575,7 +575,7 @@ export const ProgrammesManager: React.FC = () => {
             {/* Subjects & Syllabus Structure */}
             <div className="space-y-3">
               <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center space-x-1.5">
-                <BookMarked className="w-4 h-4 text-[#EA580C]" />
+                <BookMarked className="w-4 h-4 text-[orange-600]" />
                 <span>Curriculum Modules & Tested Subjects</span>
               </h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
@@ -721,7 +721,7 @@ export const ProgrammesManager: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 font-semibold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg shadow-sm"
+                  className="px-4 py-2 font-semibold text-white bg-[orange-600] hover:bg-[orange-700] rounded-lg shadow-sm"
                 >
                   {editingProg ? 'Save Changes' : 'Create Exam Program'}
                 </button>

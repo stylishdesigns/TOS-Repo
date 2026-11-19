@@ -162,7 +162,7 @@ export const PerformanceManager: React.FC = () => {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center space-x-3">
              <div className="w-8 h-8 rounded-xl bg-orange-50 flex items-center justify-center">
-                <Filter className="w-4 h-4 text-[#EA580C]" />
+                <Filter className="w-4 h-4 text-[orange-600]" />
              </div>
              <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest leading-none">Performance Filters</h3>
           </div>
@@ -243,7 +243,7 @@ export const PerformanceManager: React.FC = () => {
             onClick={() => setActiveToggle(mode)}
             className={`px-8 py-2.5 text-xs font-black rounded-lg transition-all ${
               activeToggle === mode
-                ? 'bg-white text-[#EA580C] shadow-md scale-105'
+                ? 'bg-white text-[orange-600] shadow-md scale-105'
                 : 'text-slate-500 hover:text-slate-700'
             }`}
           >
@@ -370,7 +370,7 @@ export const PerformanceManager: React.FC = () => {
                                        </td>
                                        <td className="px-4 py-4 text-right">
                                           <div className="flex flex-col items-end">
-                                             <span className="text-sm font-black text-[#EA580C]">{result.totalScore}</span>
+                                             <span className="text-sm font-black text-[orange-600]">{result.totalScore}</span>
                                              <span className="text-[9px] font-bold text-slate-400 uppercase">{result.averagePercent}% Acc.</span>
                                           </div>
                                        </td>

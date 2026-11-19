@@ -159,7 +159,7 @@ export const TutorTopicsApprovalSection: React.FC = () => {
                 onClick={() => setFilterStatus(st)}
                 className={`px-2.5 py-1 rounded font-semibold text-[11px] transition-colors ${
                   filterStatus === st
-                    ? 'bg-[#EA580C] text-white shadow-2xs'
+                    ? 'bg-[orange-600] text-white shadow-2xs'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >

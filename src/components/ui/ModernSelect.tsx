@@ -111,7 +111,7 @@ export const ModernSelect: React.FC<ModernSelectProps> = ({
                 onClick={() => handleSelect(option.value)}
                 className={`w-full flex items-center justify-between px-3.5 py-2.5 text-sm rounded-xl transition-all ${
                   isSelected(option.value)
-                    ? 'bg-orange-50 text-[#EA580C] font-black'
+                    ? 'bg-orange-50 text-[orange-600] font-black'
                     : 'text-slate-700 hover:bg-slate-50 font-bold'
                 }`}
               >

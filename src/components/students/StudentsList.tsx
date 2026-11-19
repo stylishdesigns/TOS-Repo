@@ -141,7 +141,7 @@ export const StudentsList: React.FC = () => {
         <div className="flex items-center space-x-4">
           <button
             onClick={() => setShowAddModal(true)}
-            className="px-4 py-2 text-xs font-semibold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg shadow-sm transition-all flex items-center space-x-1.5 self-start sm:self-auto"
+            className="px-4 py-2 text-xs font-semibold text-white bg-[orange-600] hover:bg-[orange-700] rounded-lg shadow-sm transition-all flex items-center space-x-1.5 self-start sm:self-auto"
           >
             <Plus className="w-4 h-4" />
             <span>Enroll New Student</span>
@@ -322,7 +322,7 @@ export const StudentsList: React.FC = () => {
                     {/* Student Info */}
                     <td className="py-3.5 px-5">
                       <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 rounded-lg bg-orange-50 text-[#EA580C] font-bold text-xs flex items-center justify-center shrink-0 border border-orange-200/60">
+                        <div className="w-8 h-8 rounded-lg bg-orange-50 text-[orange-600] font-bold text-xs flex items-center justify-center shrink-0 border border-orange-200/60">
                           {initials}
                         </div>
                         <div>
@@ -445,7 +445,7 @@ export const StudentsList: React.FC = () => {
                 onClick={() => setCurrentPage(page)}
                 className={`w-7 h-7 rounded-md text-xs font-bold transition-colors ${
                   currentPage === page
-                    ? 'bg-[#EA580C] text-white shadow-xs'
+                    ? 'bg-[orange-600] text-white shadow-xs'
                     : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
                 }`}
               >
@@ -618,7 +618,7 @@ export const StudentsList: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 font-semibold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg shadow-sm"
+                  className="px-4 py-2 font-semibold text-white bg-[orange-600] hover:bg-[orange-700] rounded-lg shadow-sm"
                 >
                   Enroll Student
                 </button>

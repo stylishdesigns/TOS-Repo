@@ -30,7 +30,7 @@ export const DebateManager: React.FC = () => {
 
         <button
           onClick={() => setAdminSection('tutors')}
-          className="px-4 py-2 text-xs font-semibold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg shadow-sm transition-all flex items-center space-x-1.5 self-start sm:self-auto"
+          className="px-4 py-2 text-xs font-semibold text-white bg-[orange-600] hover:bg-[orange-700] rounded-lg shadow-sm transition-all flex items-center space-x-1.5 self-start sm:self-auto"
         >
           <Users className="w-4 h-4" />
           <span>Manage Jury</span>
@@ -68,7 +68,7 @@ export const DebateManager: React.FC = () => {
             onClick={() => setActiveTab('All')}
             className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
               activeTab === 'All'
-                ? 'bg-[#EA580C] text-white shadow-sm'
+                ? 'bg-[orange-600] text-white shadow-sm'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
@@ -78,7 +78,7 @@ export const DebateManager: React.FC = () => {
             onClick={() => setActiveTab('Scored')}
             className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
               activeTab === 'Scored'
-                ? 'bg-[#EA580C] text-white shadow-sm'
+                ? 'bg-[orange-600] text-white shadow-sm'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
@@ -88,7 +88,7 @@ export const DebateManager: React.FC = () => {
             onClick={() => setActiveTab('Awaiting')}
             className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
               activeTab === 'Awaiting'
-                ? 'bg-[#EA580C] text-white shadow-sm'
+                ? 'bg-[orange-600] text-white shadow-sm'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
