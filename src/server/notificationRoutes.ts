@@ -118,7 +118,12 @@ export function registerNotificationRoutes(app: express.Express): void {
       for (const d of snap.docs) {
         const v = d.data() as any;
         if (v.audienceUid && v.audienceUid !== caller.uid) continue;
-        if (!subjectsInclude(student.subjects, Array.isArray(v.subjects) ? v.subjects : [])) continue;
+        // The subject filter only bites when the student actually has
+        // subjects saved: a student with none saved sees everything, never
+        // just the welcome note (the Nov 19 bug where every class, material
+        // and mock was hidden from them).
+        const stuSubjects = Array.isArray(student.subjects) ? student.subjects : [];
+        if (stuSubjects.length > 0 && !subjectsInclude(stuSubjects, Array.isArray(v.subjects) ? v.subjects : [])) continue;
         const at = Number(v.createdAt) || 0;
         if (at > lastReadAt) unread += 1;
         items.push({
@@ -288,8 +293,9 @@ export function registerNotificationRoutes(app: express.Express): void {
       if (!id || !title) return res.status(400).json({ error: 'A reminder id and title are required.' });
       const sendAt = sendAtMs(date, time);
       if (!sendAt) return res.status(400).json({ error: 'A valid reminder date is required.' });
+      const resolved = await resolveMemberCentre(caller.uid);
       await adminDb.collection('pushQueue').doc(`prq_${id}`).set(
-        { id: `prq_${id}`, uid: caller.uid, date, time, title, kind, sendAt, sent: false, attempts: 0, createdAt: Date.now() },
+        { id: `prq_${id}`, uid: caller.uid, date, time, title, kind, centreId: resolved.centreId, sendAt, sent: false, attempts: 0, createdAt: Date.now() },
         { merge: true }
       );
       return res.json({ ok: true });

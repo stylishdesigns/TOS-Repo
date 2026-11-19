@@ -150,6 +150,35 @@ export async function runPushSweep(opts: { limit?: number } = {}): Promise<PushS
     if (ok > 0) {
       await job.ref.set({ sent: true, sentAt: now, delivered: ok }, { merge: true });
       out.delivered += 1;
+      // Bell-history copy (Nov 19): a push the member swipes away must not be
+      // lost, so every delivered reminder is also filed as a notification
+      // with a deterministic id (rem-<reminderId>) the bell de-dupes against
+      // its upcoming row. One write per delivered job, no reads.
+      const reminderId = String(v.id || job.id.replace(/^prq_/, ''));
+      let centreId = String(v.centreId || '');
+      if (!centreId) {
+        // Jobs queued before centreId was stored: resolve it once here.
+        const [stu, tut, adm] = await Promise.all([
+          adminDb.collection('students').where('uid', '==', uid).limit(1).get(),
+          adminDb.collection('tutors').where('uid', '==', uid).limit(1).get(),
+          adminDb.collection('admins').doc(uid).get(),
+        ]);
+        centreId = String(
+          (!stu.empty ? stu.docs[0].data()?.centreId : undefined) ||
+          (!tut.empty ? tut.docs[0].data()?.centreId : undefined) ||
+          (adm.exists ? adm.data()?.centreId : undefined) || ''
+        );
+      }
+      await adminDb.collection('notifications').doc(`rem-${reminderId}`).set({
+        centreId,
+        type: 'reminder',
+        title: String(v.title || 'Planner reminder').slice(0, 120),
+        body: `Planner reminder for ${String(v.date || '')}${v.time ? ` at ${String(v.time)}` : ''}.`.slice(0, 400),
+        subjects: [],
+        audienceUid: uid,
+        reminderId,
+        createdAt: now,
+      }, { merge: true });
     } else if (hardFail) {
       const attempts = Number(v.attempts) + 1;
       if (attempts >= 3) {
