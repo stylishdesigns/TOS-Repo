@@ -3,9 +3,30 @@ import { BookOpen } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
 // Launch splash (Nov 19): every facility app opens on its own brand color with
-// the facility logo and name, then hands straight to the dashboard. It also
-// replaces the old blank loading screen, so there is no empty gap before the
-// home page.
+// the facility logo and name together, loading dots under the name, then hands
+// straight to the dashboard. The resolved branding is remembered on the device,
+// so the first paint already shows logo + name together instead of a logo-only
+// screen that later changes into a second one.
+
+interface LaunchBranding { centreId?: string; logo: string; name: string; accent: string; }
+
+let memBranding: LaunchBranding | null = null;
+
+function readPersisted(): LaunchBranding | null {
+  if (memBranding) return memBranding;
+  try {
+    const raw = localStorage.getItem('tos:launch-brand');
+    if (!raw) return null;
+    const r = JSON.parse(raw);
+    if (r && r.accent && (r.name || r.logo)) return r as LaunchBranding;
+  } catch { /* private mode */ }
+  return null;
+}
+
+function persist(b: LaunchBranding) {
+  memBranding = b;
+  try { localStorage.setItem('tos:launch-brand', JSON.stringify(b)); } catch { /* private mode */ }
+}
 
 function readableOn(hex: string): boolean {
   // true when dark text reads better on this background (light accent).
@@ -19,23 +40,36 @@ function readableOn(hex: string): boolean {
 export function LaunchSplash() {
   const { centreName, activeCentre, brandAccent } = useApp() as any;
 
-  const branding = React.useMemo(() => {
-    let logo = String(activeCentre?.branding?.logo || activeCentre?.branding?.logoUrl || '');
-    let name = String(centreName || activeCentre?.name || '');
-    let accent = /^#[0-9a-fA-F]{6}$/.test(String(brandAccent || '')) ? String(brandAccent) : '';
-    // Device fallback so the splash paints with the right facility even before
-    // Firestore answers (the install flow stores it at signup).
-    try {
-      const raw = sessionStorage.getItem('tos:signup-result');
-      if (raw) {
-        const r = JSON.parse(raw);
-        logo = logo || String(r.logoUrl || r.logo || '');
-        name = name || String(r.name || r.centreName || '');
-        accent = accent || (/^#[0-9a-fA-F]{6}$/.test(String(r.accent || '')) ? String(r.accent) : '');
-      }
-    } catch { /* private mode */ }
-    return { logo, name, accent: accent || '#EA580C' };
+  const branding = React.useMemo<LaunchBranding>(() => {
+    // Start from what the device already knows (survives app cold starts), so
+    // the splash is one steady screen from the first paint.
+    const base: LaunchBranding = readPersisted() || { logo: '', name: '', accent: '' };
+    const next: LaunchBranding = {
+      centreId: String(activeCentre?.id || '') || base.centreId,
+      logo: String(activeCentre?.branding?.logo || activeCentre?.branding?.logoUrl || '') || base.logo,
+      name: String(centreName || activeCentre?.name || '') || base.name,
+      accent: /^#[0-9a-fA-F]{6}$/.test(String(brandAccent || '')) ? String(brandAccent) : base.accent,
+    };
+    // Device fallback from the install flow, for a facility seen for the first
+    // time on this device.
+    if (!next.name && !next.logo) {
+      try {
+        const raw = sessionStorage.getItem('tos:signup-result');
+        if (raw) {
+          const r = JSON.parse(raw);
+          next.logo = next.logo || String(r.logoUrl || r.logo || '');
+          next.name = next.name || String(r.name || r.centreName || '');
+          next.accent = next.accent || (/^#[0-9a-fA-F]{6}$/.test(String(r.accent || '')) ? String(r.accent) : '');
+        }
+      } catch { /* private mode */ }
+    }
+    if (!next.accent) next.accent = '#EA580C';
+    return next;
   }, [centreName, activeCentre, brandAccent]);
+
+  React.useEffect(() => {
+    if (branding.name || branding.logo) persist(branding);
+  }, [branding]);
 
   const dark = readableOn(branding.accent);
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Bell, CalendarDays, BookOpen, ClipboardList, Trophy, Star, Clock, X, ArrowLeft } from 'lucide-react';
+import { Bell, CalendarDays, BookOpen, ClipboardList, Trophy, Star, Clock, X, ArrowLeft, Mail, MailCheck } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { api } from '../tos/tosShared';
 import { pushStatus } from './push';
@@ -180,6 +180,16 @@ export function NotificationsBell({ onOpenChange }: { onOpenChange?: (open: bool
     } catch { /* the bell stays quiet when the feed can't load */ }
   }, []);
 
+  // Per-item read/unread (Nov 19): one tap marks a notification read, and the
+  // same control flips a read one back to unread on this device.
+  const toggleRead = useCallback((id: string) => {
+    const next = new Set(readRef.current);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    readRef.current = next;
+    saveRead([...next]);
+    setReadTick((t) => t + 1);
+  }, []);
+
   const markAllRead = useCallback(() => {
     const next = new Set(readRef.current);
     let added = false;
@@ -325,6 +335,14 @@ export function NotificationsBell({ onOpenChange }: { onOpenChange?: (open: bool
                       </div>
                       <p className="text-xs text-slate-600 font-medium mt-0.5 leading-relaxed break-words">{n.body}</p>
                     </div>
+                    <button
+                      onClick={() => toggleRead(String(n.id))}
+                      className={`mt-0.5 w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-colors ${isUnread ? 'text-orange-600 hover:bg-orange-50' : 'text-slate-300 hover:text-slate-500 hover:bg-slate-100'}`}
+                      aria-label={isUnread ? 'Mark as read' : 'Mark as unread'}
+                      title={isUnread ? 'Mark as read' : 'Mark as unread'}
+                    >
+                      {isUnread ? <MailCheck className="w-4 h-4" /> : <Mail className="w-4 h-4" />}
+                    </button>
                   </div>
                 );
               })()}
@@ -414,6 +432,14 @@ export function NotificationsBell({ onOpenChange }: { onOpenChange?: (open: bool
                     </div>
                     <p className="text-xs text-slate-600 font-medium mt-0.5 leading-relaxed break-words">{n.body}</p>
                   </div>
+                  <button
+                    onClick={() => toggleRead(String(n.id))}
+                    className={`mt-0.5 w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-colors ${isUnread ? 'text-orange-600 hover:bg-orange-50' : 'text-slate-300 hover:text-slate-500 hover:bg-slate-100'}`}
+                    aria-label={isUnread ? 'Mark as read' : 'Mark as unread'}
+                    title={isUnread ? 'Mark as read' : 'Mark as unread'}
+                  >
+                    {isUnread ? <MailCheck className="w-4 h-4" /> : <Mail className="w-4 h-4" />}
+                  </button>
                 </div>
               );
             })}

@@ -1317,12 +1317,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setViewMode('portal');
     }
 
-    addToast({
-      type: 'success',
-      title: 'Welcome to ' + data.centre.name,
-      description: `Access code verified successfully. Role: ${data.role}`,
-    });
-
     return { success: true, centreId: data.centreId };
   };
 
