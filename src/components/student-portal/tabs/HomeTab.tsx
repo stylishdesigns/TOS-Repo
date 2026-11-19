@@ -179,9 +179,9 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
   const clockOutLabel = clockedOutAt ? fmtClock(clockedOutAt) : '';
 
   const isClosingTime = currentMinutes >= closingMinutes;
-  const daySeconds = currentTime.getHours() * 3600 + currentTime.getMinutes() * 60 + currentTime.getSeconds();
-  const handAngle = (daySeconds / 86400) * 360;
-  const digitalTime = currentTime.toLocaleTimeString('en-GB', { hour12: false });
+  // The chip on the line shows hour and minutes only; once the student has
+  // checked out it freezes at that moment instead of ticking on.
+  const chipTime = (clockedOutAt || currentTime).toLocaleTimeString('en-GB', { hour12: false, hour: '2-digit', minute: '2-digit' });
   const isLate = clockedInAt && (clockedInAt.getHours() * 60 + clockedInAt.getMinutes()) > lateMinutesThreshold;
 
   const handleClockInAction = () => {
@@ -271,65 +271,16 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
           </div>
         )}
 
-        {/* The 24-hour session clock. The hand and the digital readout tick
-            live; the session timer starts the moment the student checks in. */}
-        <div className="flex flex-col items-center">
-          {isLate && !clockedOutAt && (
-            <span className="mb-1 px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 text-[9px] font-black uppercase tracking-wider">Late Arrival</span>
-          )}
-          <div className="relative">
-            <svg width="150" height="150" viewBox="0 0 150 150" className="block text-slate-300">
-              <circle cx="75" cy="75" r="64" fill="none" stroke="currentColor" strokeWidth="2" />
-              {Array.from({ length: 24 }, (_, i) => {
-                const a = (i / 24) * Math.PI * 2 - Math.PI / 2;
-                const major = i % 6 === 0;
-                const r1 = major ? 52 : 57;
-                return (
-                  <line
-                    key={i}
-                    x1={75 + r1 * Math.cos(a)}
-                    y1={75 + r1 * Math.sin(a)}
-                    x2={75 + 62 * Math.cos(a)}
-                    y2={75 + 62 * Math.sin(a)}
-                    stroke="currentColor"
-                    strokeWidth={major ? 2.5 : 1}
-                    strokeLinecap="round"
-                  />
-                );
-              })}
-              <line
-                x1="75"
-                y1="75"
-                x2="75"
-                y2="27"
-                transform={`rotate(${handAngle} 75 75)`}
-                style={{ stroke: 'var(--brand, #EA580C)' }}
-                strokeWidth="3.5"
-                strokeLinecap="round"
-              />
-              <circle cx="75" cy="75" r="5" style={{ fill: 'var(--brand, #EA580C)' }} />
-            </svg>
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-              <span className="text-lg font-black text-slate-900 leading-none tabular-nums">{digitalTime}</span>
-              <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-1">24-hour time</span>
-            </div>
-          </div>
-          {clockedInAt && !clockedOutAt && (
-            <p className="text-[10px] font-bold text-slate-400 mt-1 tabular-nums">
-              In facility {formatDuration(elapsedMillis)} • since {clockInLabel}
-            </p>
-          )}
-          {clockedOutAt && (
-            <p className="text-[10px] font-bold text-slate-400 mt-1 tabular-nums">
-              Total {formatDuration(totalMillis)} in the facility
-            </p>
-          )}
-        </div>
+        {isLate && !clockedOutAt && (
+          <span className="self-center mb-1 px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 text-[9px] font-black uppercase tracking-wider">Late Arrival</span>
+        )}
 
-        {/* Check In on the student's left, Check Out on the right, and the
-            facility-coloured line the timer travels from check-in until the
-            facility's closing time, arriving at the check-out button. */}
-        <div className="flex items-center gap-2 mt-3">
+        {/* Check In on the student's left, Check Out on the right, and a small
+            circular time chip sitting centred on the line between them. It
+            starts moving the moment the student checks in, rides the
+            facility-coloured fill toward closing time, and stops at the end
+            of the line when the student checks out. */}
+        <div className="flex items-center gap-2 mt-2">
           <div className="flex flex-col items-center gap-1 shrink-0 w-[64px]">
             <button
               onClick={handleClockInAction}
@@ -341,7 +292,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
             </button>
             <span className="text-[9px] font-black uppercase tracking-wider text-emerald-600">Check In</span>
           </div>
-          <div className="flex-1 relative h-9 flex items-center min-w-[40px]">
+          <div className="flex-1 relative h-10 flex items-center min-w-[40px]">
             <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-1.5 rounded-full bg-slate-200" />
             {clockedInAt && (
               <div
@@ -349,11 +300,22 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
                 style={{ width: `${Math.round(ringProgress * 100)}%`, background: 'var(--brand, #EA580C)' }}
               />
             )}
-            {clockedInAt && !clockedOutAt && (
+            {clockedInAt && (
               <div
-                className="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full transition-[left] duration-1000 ease-linear"
-                style={{ left: `calc(${Math.round(ringProgress * 100)}% - 6px)`, background: 'var(--brand, #EA580C)', boxShadow: '0 0 0 4px color-mix(in oklab, var(--brand, #EA580C) 25%, transparent)' }}
-              />
+                className="absolute top-1/2 -translate-y-1/2 transition-[left] duration-1000 ease-linear"
+                style={{ left: `min(max(calc(${Math.round(ringProgress * 100)}% - 18px), 0px), calc(100% - 36px))` }}
+              >
+                <div
+                  className="w-9 h-9 rounded-full flex items-center justify-center text-[10px] font-black tabular-nums select-none"
+                  style={{
+                    background: 'var(--brand, #EA580C)',
+                    color: 'var(--on-brand, #fff)',
+                    boxShadow: '0 2px 8px rgba(15,23,42,0.28), 0 0 0 4px color-mix(in oklab, var(--brand, #EA580C) 20%, transparent)',
+                  }}
+                >
+                  {chipTime}
+                </div>
+              </div>
             )}
           </div>
           <div className="flex flex-col items-center gap-1 shrink-0 w-[64px]">
@@ -368,6 +330,16 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
             <span className="text-[9px] font-black uppercase tracking-wider text-rose-600">Check Out</span>
           </div>
         </div>
+        {clockedInAt && !clockedOutAt && (
+          <p className="text-center text-[10px] font-bold text-slate-400 mt-2 tabular-nums">
+            In facility {formatDuration(elapsedMillis)} • since {clockInLabel}
+          </p>
+        )}
+        {clockedOutAt && (
+          <p className="text-center text-[10px] font-bold text-slate-400 mt-2 tabular-nums">
+            Total {formatDuration(totalMillis)} in the facility
+          </p>
+        )}
         <p className="text-center text-[10px] font-semibold text-slate-400 mt-2">
           {!clockedInAt
             ? `Tap Check In when you arrive • Resumption ${attendanceSettings.resumptionTime} • Late after ${attendanceSettings.lateArrivalTime}`
