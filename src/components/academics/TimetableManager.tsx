@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { ClassroomSettingsModal } from './ClassroomSettingsModal';
 import { CalendarView } from '../common/CalendarView';
+import { slotsToActivities } from '../../lib/planner';
 import { ConfirmationModal } from '../common/ConfirmationModal';
 import { ModernSelect } from '../ui/ModernSelect';
 import { TimetableSlot } from '../../types';
@@ -37,7 +38,10 @@ export const TimetableManager: React.FC = () => {
     addMultipleTimetableSlots,
     updateTimetableSlot,
     deleteTimetableSlot,
-    addToast 
+    addToast,
+    plannerReminders,
+    addPlannerReminder,
+    removePlannerReminder,
   } = useApp();
 
   const [selectedProgramme, setSelectedProgramme] = useState<string>('All');
@@ -802,8 +806,10 @@ export const TimetableManager: React.FC = () => {
       <CalendarView
         isOpen={showCalendar}
         onClose={() => setShowCalendar(false)}
-        slots={timetable}
+        activities={[...slotsToActivities(timetable), ...plannerReminders]}
         title="Facility Master Timetable"
+        onAddActivity={addPlannerReminder}
+        onRemoveActivity={removePlannerReminder}
       />
 
       {/* View Session Modal */}

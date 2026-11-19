@@ -30,6 +30,7 @@ import {
   CentreEntitlements,
   CentreSeatsSummary,
   CentreUserRole,
+  PlannerActivity,
 } from '../types';
 
 export const SWITCH_REQUIRES_CODE = false;
@@ -67,7 +68,9 @@ import {
   query,
   where,
   addDoc,
-  getDocFromServer
+  getDocFromServer,
+  arrayUnion,
+  arrayRemove
 } from 'firebase/firestore';
 import { initializeApp, deleteApp } from 'firebase/app';
 import { 
@@ -233,6 +236,9 @@ interface AppContextType {
 
   attendanceLogs: AttendanceLog[];
   clockIn: (studentId: string) => Promise<void>;
+  plannerReminders: PlannerActivity[];
+  addPlannerReminder: (input: { date: string; time: string; title: string; kind: 'practice' | 'mock' | 'custom' }) => Promise<boolean>;
+  removePlannerReminder: (id: string) => Promise<boolean>;
   clockOut: (studentId: string) => Promise<void>;
 
   results: StudentResult[];
@@ -3048,6 +3054,61 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  // ---- Academic planner reminders (Nov 19) -------------------------------
+  // Each member's own planner reminders live on their own portal record
+  // (students/tutors/admins document) under plannerReminders, so no new
+  // collection and no extra database reads: the records are already live
+  // here. The shared calendar carries timetable classes plus these.
+  const plannerUid = user?.uid || '';
+  const ownAdminRecord = admins.find((a: any) => a.id === plannerUid);
+  const ownTutorRecord = tutors.find((t: any) => t.uid === plannerUid || t.id === plannerUid);
+  const ownStudentRecord = students.find((st: any) => st.uid === plannerUid || st.id === plannerUid);
+  const plannerReminders = ((ownAdminRecord?.plannerReminders)
+    ?? (ownTutorRecord?.plannerReminders)
+    ?? (ownStudentRecord?.plannerReminders)
+    ?? []) as PlannerActivity[];
+
+  const plannerWriteTarget = (): { col: string; id: string } | null => {
+    if (ownAdminRecord) return { col: 'admins', id: ownAdminRecord.id };
+    // Tutors may only self-update the tutors document whose id is their uid.
+    if (ownTutorRecord && ownTutorRecord.id === plannerUid) return { col: 'tutors', id: plannerUid };
+    if (ownStudentRecord) return { col: 'students', id: ownStudentRecord.id };
+    return null;
+  };
+
+  const addPlannerReminder = async (input: { date: string; time: string; title: string; kind: 'practice' | 'mock' | 'custom' }): Promise<boolean> => {
+    const target = plannerWriteTarget();
+    if (!target || !input.date || !input.title.trim()) return false;
+    const item: PlannerActivity = {
+      id: `pr_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
+      date: input.date,
+      time: (input.time || '').trim(),
+      title: input.title.trim().slice(0, 80),
+      kind: input.kind,
+      createdAt: Date.now(),
+    };
+    try {
+      await updateDoc(doc(db, target.col, target.id), { plannerReminders: arrayUnion(item) });
+      return true;
+    } catch (e) {
+      console.error('planner reminder save failed', e);
+      return false;
+    }
+  };
+
+  const removePlannerReminder = async (id: string): Promise<boolean> => {
+    const target = plannerWriteTarget();
+    const item = plannerReminders.find((r) => r.id === id);
+    if (!target || !item) return false;
+    try {
+      await updateDoc(doc(db, target.col, target.id), { plannerReminders: arrayRemove(item) });
+      return true;
+    } catch (e) {
+      console.error('planner reminder removal failed', e);
+      return false;
+    }
+  };
+
   const toggleAdminSuspend = async (id: string) => {
     try {
       const admin = admins.find((a) => a.id === id);
@@ -3132,6 +3193,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateAttendanceSettings,
         attendanceLogs,
         clockIn,
+        plannerReminders,
+        addPlannerReminder,
+        removePlannerReminder,
         clockOut,
         results,
         addResult,

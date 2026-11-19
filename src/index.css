@@ -474,3 +474,8 @@ span.text-slate-600:not(.dark-bg-mode *) {
 @keyframes igPoint{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-7px,-7px) scale(1.12)}}
 @keyframes igSplash{0%{opacity:0}12%{opacity:1}72%{opacity:1}100%{opacity:0}}
 @keyframes igBar{0%,100%{opacity:.35}50%{opacity:.85}}
+
+/* Academic schedule planner (Nov 19): the home planner card blinks when
+   today carries any activity; the ring follows the facility brand colour. */
+@keyframes plannerBlink{0%,100%{box-shadow:0 0 0 0 color-mix(in oklab,var(--brand,#EA580C) 0%,transparent)}50%{box-shadow:0 0 0 3px color-mix(in oklab,var(--brand,#EA580C) 45%,transparent)}}
+.planner-blink{animation:plannerBlink 1.6s ease-in-out infinite}

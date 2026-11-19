@@ -83,6 +83,18 @@ export interface CMSContent {
   gallery: { id: string; title: string; category: string; imageUrl: string }[];
 }
 
+// One item on the academic schedule planner: a timetable class, or a
+// reminder a member added to a day (practice, mock or custom). CalendarView
+// renders every kind uniformly on the shared month grid.
+export interface PlannerActivity {
+  id: string;
+  date: string; // YYYY-MM-DD
+  time?: string; // display time, e.g. "09:00"
+  title: string;
+  kind: 'class' | 'mock' | 'practice' | 'custom';
+  createdAt?: number;
+}
+
 export interface Student {
   id: string;
   centreId?: string;
@@ -133,6 +145,7 @@ export interface AdmissionApplication {
 }
 
 export interface Tutor {
+  plannerReminders?: PlannerActivity[];
   id: string;
   centreId?: string;
   name: string;
@@ -380,6 +393,7 @@ export interface Announcement {
 }
 
 export interface AdminUser {
+  plannerReminders?: PlannerActivity[];
   id: string;
   centreId?: string;
   name: string;

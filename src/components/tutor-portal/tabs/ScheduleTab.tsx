@@ -17,6 +17,7 @@ import {
   History
 } from 'lucide-react';
 import { CalendarView } from '../../common/CalendarView';
+import { slotsToActivities } from '../../../lib/planner';
 import { ModernSelect } from '../../ui/ModernSelect';
 import { TimetableSlot, Tutor, Student } from '../../../types';
 import { useScrollLock } from '../../../hooks/useScrollLock';
@@ -27,7 +28,7 @@ interface ScheduleTabProps {
 }
 
 export const ScheduleTab: React.FC<ScheduleTabProps> = ({ tutor }) => {
-  const { timetable, programmes, settings, consentToTimetableSlot, updateTimetableSlot, students } = useApp();
+  const { timetable, programmes, settings, consentToTimetableSlot, updateTimetableSlot, students, plannerReminders, addPlannerReminder, removePlannerReminder } = useApp();
   const [showCalendar, setShowCalendar] = useState(false);
   const [showPastClasses, setShowPastClasses] = useState(false);
   const [selectedDay, setSelectedDay] = useState<'All' | string>('All');
@@ -285,7 +286,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({ tutor }) => {
         </div>
       </div>
 
-      <CalendarView isOpen={showCalendar} onClose={() => setShowCalendar(false)} slots={myClasses} title="My Teaching Schedule" />
+      <CalendarView isOpen={showCalendar} onClose={() => setShowCalendar(false)} activities={[...slotsToActivities(myClasses), ...plannerReminders]} title="My Teaching Schedule" onAddActivity={addPlannerReminder} onRemoveActivity={removePlannerReminder} />
 
       {pendingClasses.length > 0 && (
         <div className="space-y-3">

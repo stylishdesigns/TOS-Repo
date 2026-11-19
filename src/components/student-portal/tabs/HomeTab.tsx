@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 
 import { CalendarView } from '../../common/CalendarView';
+import { slotsToActivities } from '../../../lib/planner';
 
 interface HomeTabProps {
   student: Student;
@@ -32,7 +33,7 @@ const RING_CIRCUMFERENCE = 2 * Math.PI * 74;
 
 export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
   // Attendance & Clock logic
-  const { settings, timetable, announcements, results, attendanceSettings, attendanceLogs, clockIn, clockOut } = useApp();
+  const { settings, timetable, announcements, results, attendanceSettings, attendanceLogs, clockIn, clockOut, plannerReminders, addPlannerReminder, removePlannerReminder } = useApp();
   const [showAttendanceInfo, setShowAttendanceInfo] = React.useState(false);
   const [showCalendar, setShowCalendar] = React.useState(false);
 
@@ -65,6 +66,14 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
   const todayStr = new Date().toISOString().split('T')[0];
   
   const activeTimetable = timetable.filter(s => s.status === 'active' || !s.status);
+
+  // Academic planner: timetable classes plus this member's own reminders.
+  const plannerActivities = React.useMemo(
+    () => [...slotsToActivities(activeTimetable), ...plannerReminders],
+    [activeTimetable, plannerReminders]
+  );
+  const todayKey = new Date().toLocaleDateString('en-CA');
+  const todayHasActivities = plannerActivities.some((a) => a.date === todayKey);
   const todayClasses = activeTimetable.filter(
     (slot) => slot.day === todayName && slot.date === todayStr
   ).sort((a, b) => a.time.localeCompare(b.time));
@@ -417,7 +426,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
         {/* Card 4: Calendar Planner Scheduling */}
         <button
           onClick={() => setShowCalendar(true)}
-          className="text-left bg-white p-4 sm:p-4.5 rounded-2xl border border-slate-200/90 shadow-sm hover:border-orange-600 hover:shadow-md transition-all active:scale-98 flex flex-col justify-between min-h-[112px] group cursor-pointer"
+          className={`text-left bg-white p-4 sm:p-4.5 rounded-2xl border border-slate-200/90 shadow-sm hover:border-orange-600 hover:shadow-md transition-all active:scale-98 flex flex-col justify-between min-h-[112px] group cursor-pointer ${todayHasActivities ? 'planner-blink' : ''}`}
         >
           <div className="flex items-center justify-between text-slate-400 mb-2">
             <div className="w-8 h-8 rounded-xl bg-orange-50 flex items-center justify-center text-orange-600 group-hover:scale-105 transition-transform">
@@ -560,8 +569,10 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
       <CalendarView
         isOpen={showCalendar}
         onClose={() => setShowCalendar(false)}
-        slots={activeTimetable}
+        activities={plannerActivities}
         title="Academic Schedule Planner"
+        onAddActivity={addPlannerReminder}
+        onRemoveActivity={removePlannerReminder}
       />
     </div>
   );
