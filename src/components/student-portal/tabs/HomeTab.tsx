@@ -144,7 +144,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
   const lateMinutesThreshold = parseTimeToMinutes(attendanceSettings.lateArrivalTime || '08:30 AM');
   const currentMinutes = currentTime.getHours() * 60 + currentTime.getMinutes();
 
-  // Closing time as today's date, for the sign-in ring
+  // Closing time as today's date, for the check-in ring
   const closingToday = (() => {
     const d = new Date(currentTime);
     d.setHours(Math.floor(closingMinutes / 60), closingMinutes % 60, 0, 0);
@@ -259,21 +259,21 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
         )}
 
         {!clockedInAt ? (
-          /* Before sign-in: one full-width sign-in button with the arrow icon inside the text */
+          /* Before check-in: one full-width check-in button with the arrow icon inside the text */
           <div>
             <button
               onClick={handleClockInAction}
               className="w-full min-h-[48px] px-5 rounded-2xl bg-gradient-to-r from-orange-500 to-orange-600 text-white text-sm font-black flex items-center justify-center gap-2.5 shadow-md active:scale-[0.98] transition-all"
             >
-              <span>Sign In</span>
+              <span>Check In</span>
               <ArrowRight className="w-4.5 h-4.5" />
             </button>
             <p className="text-center text-[10px] font-semibold text-slate-400 mt-2">
-              Resumption {attendanceSettings.resumptionTime || '8:00 AM'} • Late after {attendanceSettings.lateArrivalTime || '8:30 AM'}
+              Resumption {attendanceSettings.resumptionTime} • Late after {attendanceSettings.lateArrivalTime}
             </p>
           </div>
         ) : (
-          /* Signed in: a circular ring fills from the sign-in moment toward closing
+          /* Checked in: a circular ring fills from the check-in moment toward closing
              time. Everything sits in normal flow, so nothing overlays a button. */
           <div className="flex flex-col items-center">
             {isLate && !clockedOutAt && (
@@ -297,7 +297,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
                   style={{ transition: 'stroke-dashoffset 1s linear' }}
                 />
               </svg>
-              {/* Side markers are state badges only: sign-in and sign-out happen on
+              {/* Side markers are state badges only: check-in and check-out happen on
                   the buttons, never by tapping these */}
               <div className="absolute top-1/2 -translate-y-1/2 -left-3 w-9 h-9 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[9px] font-black border-4 border-white shadow-md">IN</div>
               <div className={`absolute top-1/2 -translate-y-1/2 -right-3 w-9 h-9 rounded-full flex items-center justify-center text-[9px] font-black border-4 border-white shadow-md ${clockedOutAt ? 'bg-emerald-600 text-white' : isClosingTime ? 'bg-[#E11D48] text-white' : 'bg-slate-200 text-slate-400'}`}>OUT</div>
@@ -318,7 +318,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
             </div>
             {clockedOutAt ? (
               <p className="text-center text-[10px] font-semibold text-slate-400 mt-3">
-                Signed in {clockInLabel} • Signed out {clockOutLabel}
+                Checked in {clockInLabel} • Checked out {clockOutLabel}
               </p>
             ) : (
               <div className="w-full mt-3">
@@ -327,10 +327,10 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
                   disabled={!isClosingTime}
                   className={`w-full min-h-[44px] px-5 rounded-2xl text-sm font-black flex items-center justify-center transition-all active:scale-[0.98] ${isClosingTime ? 'bg-[#E11D48] text-white shadow-md' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}
                 >
-                  <span>Sign Out</span>
+                  <span>Check Out</span>
                 </button>
                 <p className="text-center text-[10px] font-semibold text-slate-400 mt-2">
-                  {isClosingTime ? 'Closing time reached — you can sign out now' : `On-going • Sign out opens at ${attendanceSettings.closingTime || '3:30 PM'}`}
+                  {isClosingTime ? 'Closing time reached — you can check out now' : `On-going • Check out opens at ${attendanceSettings.closingTime}`}
                 </p>
               </div>
             )}

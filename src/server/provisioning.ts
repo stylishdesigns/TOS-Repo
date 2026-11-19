@@ -179,6 +179,15 @@ export async function provisionCentre(
     credentialsNotDelivered: false,
   });
 
+  // Every facility starts on the same default daily hours, stored in the
+  // database so each facility can change them in settings and the change
+  // takes effect everywhere at once (mirrors INITIAL_ATTENDANCE_SETTINGS).
+  await adminDb.collection('centreSettings').doc(`${centreId}__attendance`).set({
+    resumptionTime: '08:00 AM',
+    closingTime: '03:30 PM',
+    lateArrivalTime: '08:30 AM',
+  });
+
   await adminDb.collection('centreBilling').doc(centreId).set({
     centreId,
     planId,
