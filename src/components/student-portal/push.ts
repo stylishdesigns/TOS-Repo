@@ -77,3 +77,35 @@ export async function enablePush(): Promise<PushState> {
     return 'error';
   }
 }
+
+const LAST_REG_KEY = 'tos:push-last-reg';
+
+// Self-healing registration (Nov 19): a device whose permission is granted
+// but whose sender record was lost (a failed save, a key mismatch, a cleared
+// database) repairs itself quietly here. It never asks: it only runs when
+// permission is already granted, so a dismissed banner can never strand a
+// device off the sender's list again.
+export async function ensurePushRegistered(): Promise<PushState> {
+  if (!pushSupported()) return 'unsupported';
+  if (Notification.permission !== 'granted') return pushPermission();
+  const state = await enablePush();
+  if (state === 'granted') {
+    try { localStorage.setItem(LAST_REG_KEY, new Date().toISOString()); } catch { /* private mode */ }
+  }
+  return state;
+}
+
+// Status read for the notifications screen: is this device receiving
+// reminders, and when did it last confirm itself with the sender?
+export function pushStatus(): { on: boolean; label: string; detail: string } {
+  const perm = pushPermission();
+  if (perm === 'unsupported') return { on: false, label: 'Reminders unavailable', detail: 'This browser cannot receive push notifications.' };
+  if (perm === 'denied') return { on: false, label: 'Reminders blocked', detail: 'Allow notifications for this app in your browser settings.' };
+  if (perm !== 'granted') return { on: false, label: 'Reminders off', detail: 'Turn them on to get planner reminders.' };
+  let when = '';
+  try {
+    const raw = localStorage.getItem(LAST_REG_KEY);
+    if (raw) when = new Date(raw).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  } catch { /* private mode */ }
+  return { on: true, label: 'Reminders on', detail: when ? `This device last synced ${when}.` : 'This device syncs on next open.' };
+}

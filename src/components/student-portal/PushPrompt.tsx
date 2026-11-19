@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { BellRing, X } from 'lucide-react';
-import { enablePush, pushPermission, pushSupported } from './push';
+import { ensurePushRegistered, pushPermission, pushSupported } from './push';
 import { useApp } from '../../context/AppContext';
 
 // One quiet banner (Nov 19): when the browser can receive push notifications
@@ -17,15 +17,18 @@ export function PushPrompt() {
 
   useEffect(() => {
     if (!pushSupported()) return;
-    if (localStorage.getItem(DISMISS_KEY) === '1') return;
-    const perm = pushPermission();
-    if (perm === 'default') {
-      setShow(true);
-    } else if (perm === 'granted') {
-      // Already allowed in browser settings: subscribe quietly so this device
-      // is on file, without asking anything.
-      void enablePush();
+    // Self-heal first, banner rules second: even a dismissed banner must not
+    // leave a granted device off the sender's list. The heal runs on every
+    // return to the app, never asks, and just re-confirms this device.
+    const heal = () => { if (pushPermission() === 'granted') void ensurePushRegistered(); };
+    heal();
+    const onVis = () => { if (document.visibilityState === 'visible') heal(); };
+    document.addEventListener('visibilitychange', onVis);
+    if (localStorage.getItem(DISMISS_KEY) === '1') {
+      return () => document.removeEventListener('visibilitychange', onVis);
     }
+    if (pushPermission() === 'default') setShow(true);
+    return () => document.removeEventListener('visibilitychange', onVis);
   }, []);
 
   if (!show) return null;

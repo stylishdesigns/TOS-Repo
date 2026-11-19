@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Bell, CalendarDays, BookOpen, ClipboardList, Trophy, Sparkles, Clock, X } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { api } from '../tos/tosShared';
+import { pushStatus } from './push';
 
 // The student portal's notification bell: unread badge in the header, and a
 // tap-open panel listing everything the facility has sent them. Subject-based
@@ -83,6 +84,7 @@ export function NotificationsBell() {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [seenTick, setSeenTick] = useState(0);
+  const [push, setPush] = useState(() => pushStatus());
   const { plannerReminders, addToast } = useApp() as any;
 
   const dueReminders = React.useMemo(() => {
@@ -165,6 +167,7 @@ export function NotificationsBell() {
   const openPanel = async () => {
     setOpen(true);
     setLoading(true);
+    setPush(pushStatus());
     await refresh();
     setLoading(false);
     if (dueReminders.length > 0) {
@@ -257,6 +260,13 @@ export function NotificationsBell() {
                   </div>
                 );
               })}
+            </div>
+            <div className="shrink-0 border-t border-slate-100 px-4 py-2.5 flex items-start gap-2.5 bg-white">
+              <div className={`w-2 h-2 rounded-full mt-1 shrink-0 ${push.on ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+              <div className="min-w-0">
+                <p className="text-[11px] font-black text-slate-700 leading-tight">{push.label}</p>
+                <p className="text-[10px] text-slate-500 font-medium leading-snug">{push.detail}</p>
+              </div>
             </div>
           </div>
         </div>
