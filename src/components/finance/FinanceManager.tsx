@@ -224,7 +224,7 @@ export const FinanceManager: React.FC = () => {
           <div className="mt-3">
             <button
               onClick={() => setShowRecordModal(true)}
-              className="px-4 py-2.5 text-xs font-semibold text-white bg-[orange-600] hover:bg-[orange-700] rounded-lg shadow-sm transition-all inline-flex items-center justify-center space-x-2 shrink-0 cursor-pointer"
+              className="px-4 py-2.5 text-xs font-semibold text-white bg-orange-600 hover:bg-orange-700 rounded-lg shadow-sm transition-all inline-flex items-center justify-center space-x-2 shrink-0 cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               <span>Record Payment</span>
@@ -240,10 +240,10 @@ export const FinanceManager: React.FC = () => {
               setShowTariffModal(true);
               setEditingProgrammeId(null);
             }}
-            className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-slate-700 bg-white hover:bg-orange-50 hover:text-[orange-600] hover:border-orange-300 border border-slate-200 rounded-xl shadow-xs transition-all group cursor-pointer"
+            className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-slate-700 bg-white hover:bg-orange-50 hover:text-orange-600 hover:border-orange-300 border border-slate-200 rounded-xl shadow-xs transition-all group cursor-pointer"
             title="Configure Exam Program Fees, Bank Details & Cash Guide"
           >
-            <Settings className="w-4 h-4 text-slate-400 group-hover:text-[orange-600] group-hover:rotate-90 transition-transform duration-500" />
+            <Settings className="w-4 h-4 text-slate-400 group-hover:text-orange-600 group-hover:rotate-90 transition-transform duration-500" />
             <span>Exam program fee</span>
           </button>
         </div>
@@ -522,7 +522,7 @@ export const FinanceManager: React.FC = () => {
                           onClick={() => setSelectedReceipt(pay)}
                           className="px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 rounded-md border border-slate-200 flex items-center space-x-1 ml-auto cursor-pointer"
                         >
-                          <Receipt className="w-3 h-3 text-[orange-600]" />
+                          <Receipt className="w-3 h-3 text-orange-600" />
                           <span>View Detail</span>
                         </button>
                       )}
@@ -609,7 +609,7 @@ export const FinanceManager: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-lg shadow-sm"
+                  className="px-4 py-2 text-xs font-bold text-[var(--on-brand,#fff)] bg-[var(--brand,#0f172a)] hover:brightness-110 rounded-lg shadow-sm"
                 >
                   Post Payment & Issue Receipt
                 </button>
@@ -704,7 +704,7 @@ export const FinanceManager: React.FC = () => {
                             title: `${selectedReceipt.studentName} - Payment Evidence`,
                           })
                         }
-                        className="text-[10px] font-bold text-[orange-600] hover:underline flex items-center gap-1 cursor-pointer"
+                        className="text-[10px] font-bold text-orange-600 hover:underline flex items-center gap-1 cursor-pointer"
                       >
                         <Eye className="w-3 h-3" />
                         <span>Enlarge</span>
@@ -773,7 +773,7 @@ export const FinanceManager: React.FC = () => {
             <div className="flex justify-end space-x-2 pt-4 border-t border-slate-100">
               <button
                 onClick={() => setSelectedReceipt(null)}
-                className="px-6 py-2 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+                className="px-6 py-2 text-xs font-bold text-[var(--on-brand,#fff)] bg-[var(--brand,#0f172a)] hover:brightness-110 rounded-lg transition-colors cursor-pointer"
               >
                 Close
               </button>
@@ -789,13 +789,13 @@ export const FinanceManager: React.FC = () => {
             {/* Modal Header */}
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 shrink-0">
               <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-xl bg-orange-50 border border-orange-100 flex items-center justify-center text-[orange-600]">
+                <div className="w-10 h-10 rounded-xl bg-orange-50 border border-orange-100 flex items-center justify-center text-orange-600">
                   <Settings className="w-5 h-5" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className="font-bold text-base text-slate-900">Exam Program Fee & Payment Settings</h3>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-100 text-[orange-600]">
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-600">
                       {settings.academicSession}
                     </span>
                   </div>
@@ -823,7 +823,7 @@ export const FinanceManager: React.FC = () => {
                 onClick={() => setTariffModalTab('fees')}
                 className={`pb-2.5 text-xs font-bold transition-all border-b-2 cursor-pointer ${
                   tariffModalTab === 'fees'
-                    ? 'border-[orange-600] text-[orange-600]'
+                    ? 'border-orange-600 text-orange-600'
                     : 'border-transparent text-slate-500 hover:text-slate-800'
                 }`}
               >
@@ -834,7 +834,7 @@ export const FinanceManager: React.FC = () => {
                 onClick={() => setTariffModalTab('channels')}
                 className={`pb-2.5 text-xs font-bold transition-all border-b-2 cursor-pointer ${
                   tariffModalTab === 'channels'
-                    ? 'border-[orange-600] text-[orange-600]'
+                    ? 'border-orange-600 text-orange-600'
                     : 'border-transparent text-slate-500 hover:text-slate-800'
                 }`}
               >
@@ -885,7 +885,7 @@ export const FinanceManager: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => handleSaveProgrammeFee(p.id)}
-                              className="px-3 py-1.5 text-xs font-semibold text-white bg-[orange-600] hover:bg-[orange-700] rounded-lg shadow-xs transition-colors flex items-center gap-1 cursor-pointer"
+                              className="px-3 py-1.5 text-xs font-semibold text-white bg-orange-600 hover:bg-orange-700 rounded-lg shadow-xs transition-colors flex items-center gap-1 cursor-pointer"
                             >
                               <Check className="w-3.5 h-3.5" />
                               <span>Save</span>
@@ -994,7 +994,7 @@ export const FinanceManager: React.FC = () => {
                 <div className="flex justify-end pt-2">
                   <button
                     type="submit"
-                    className="px-4 py-2 text-xs font-bold text-white bg-[orange-600] hover:bg-[orange-700] rounded-lg shadow-sm transition-all cursor-pointer flex items-center gap-1.5"
+                    className="px-4 py-2 text-xs font-bold text-white bg-orange-600 hover:bg-orange-700 rounded-lg shadow-sm transition-all cursor-pointer flex items-center gap-1.5"
                   >
                     <Check className="w-4 h-4" />
                     <span>Save Channel Details & Cash Guide</span>

@@ -558,7 +558,7 @@ export const CbtTab: React.FC<CbtTabProps> = ({
         <div className="fixed inset-0 z-[150] flex items-center justify-center p-3 bg-black/80 backdrop-blur-sm overflow-y-auto font-sans">
           <div className="bg-white rounded-[32px] max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden my-6 animate-in fade-in zoom-in-95 duration-300">
             {/* Modal Header */}
-            <div className="bg-slate-900 text-white p-3.5 flex items-center justify-between print:hidden">
+            <div className="bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] p-3.5 flex items-center justify-between print:hidden">
               <div className="flex items-center space-x-2">
                 <BarChart2 className="w-4 h-4 text-orange-400" />
                 <span className="text-[10px] font-black uppercase tracking-widest text-slate-300">
@@ -607,7 +607,7 @@ export const CbtTab: React.FC<CbtTabProps> = ({
               {/* Score Breakdown */}
               <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
                 <table className="w-full text-[11px] text-left">
-                  <thead className="bg-slate-900 text-white font-black uppercase tracking-widest">
+                  <thead className="bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] font-black uppercase tracking-widest">
                     <tr>
                       <th className="p-3">Subject</th>
                       <th className="p-3 text-center">Max</th>
@@ -671,7 +671,7 @@ export const CbtTab: React.FC<CbtTabProps> = ({
 
               <button
                 onClick={() => setShowResultMetrics(null)}
-                className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-xl hover:bg-slate-800 transition-all active:scale-95 mt-4"
+                className="w-full py-4 bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-xl hover:brightness-110 transition-all active:scale-95 mt-4"
               >
                 Close Report
               </button>
@@ -698,7 +698,7 @@ export const CbtTab: React.FC<CbtTabProps> = ({
               <div className="flex flex-col gap-3 pt-2">
                 <button
                   onClick={handleSubmitExam}
-                  className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-xl shadow-black/10 hover:bg-black transition-all active:scale-95"
+                  className="w-full py-4 bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-xl shadow-black/10 hover:bg-black transition-all active:scale-95"
                 >
                   YES, SUBMIT NOW
                 </button>
@@ -958,7 +958,7 @@ export const CbtTab: React.FC<CbtTabProps> = ({
                           </button>
                           <button
                             onClick={() => handleStartExam(exam, true)}
-                            className="px-4 py-2 rounded-xl bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest active:scale-95 shadow-lg"
+                            className="px-4 py-2 rounded-xl bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] text-[10px] font-black uppercase tracking-widest active:scale-95 shadow-lg"
                           >
                             Review
                           </button>
@@ -969,7 +969,7 @@ export const CbtTab: React.FC<CbtTabProps> = ({
                       {!hasAttempted && (isPast || isPastDay || showArchive) && (
                         <button
                           onClick={() => handleStartExam(exam, true)}
-                          className="px-5 py-2 rounded-xl bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest active:scale-95 shadow-md hover:bg-slate-800 transition-all"
+                          className="px-5 py-2 rounded-xl bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] text-[10px] font-black uppercase tracking-widest active:scale-95 shadow-md hover:brightness-110 transition-all"
                         >
                           Review
                         </button>
@@ -1031,7 +1031,7 @@ export const CbtTab: React.FC<CbtTabProps> = ({
     const pct = total > 0 ? Math.round((score / total) * 100) : 0;
 
     return (
-      <div className="fixed inset-0 z-50 bg-slate-950 text-white flex flex-col overflow-y-auto pb-32 animate-in fade-in duration-300">
+      <div className="fixed inset-0 z-50 bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] flex flex-col overflow-y-auto pb-32 animate-in fade-in duration-300">
         {renderModals()}
         <div className="max-w-3xl mx-auto w-full p-4 space-y-6">
           <div className="bg-slate-900/80 rounded-3xl p-6 text-white text-center shadow-2xl border border-slate-800 space-y-4">

@@ -816,7 +816,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
               <button 
                 onClick={handleSaveOverride}
                 disabled={isSaving}
-                className="flex-[2] py-4 rounded-2xl bg-slate-900 text-white font-black text-[10px] uppercase tracking-[0.2em] shadow-xl hover:bg-black transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+                className="flex-[2] py-4 rounded-2xl bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] font-black text-[10px] uppercase tracking-[0.2em] shadow-xl hover:bg-black transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
                 <span>Save Manual Grades</span>
@@ -972,7 +972,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
                   return (
                     <div key={exam.id} className="bg-white border border-slate-200 rounded-2xl overflow-hidden transition-all shadow-lg hover:border-orange-200 relative">
                        {/* Top Right Corner - Created Date */}
-                       <div className="absolute top-0 right-0 px-3 py-1 bg-slate-700 text-white text-[8px] font-black uppercase tracking-widest flex items-center gap-1 border-b border-l border-slate-600 rounded-bl-lg z-10">
+                       <div className="absolute top-0 right-0 px-3 py-1 bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] text-[8px] font-black uppercase tracking-widest flex items-center gap-1 border-b border-l border-slate-600 rounded-bl-lg z-10">
                           <Clock className="w-2.5 h-2.5 text-orange-400" />
                           <span>Created: <span className="text-orange-300">{exam.createdAt ? new Date(exam.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : (exam.startTime ? new Date(exam.startTime).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A')}</span></span>
                        </div>
@@ -1005,7 +1005,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
                          </div>
                          <button
                             onClick={() => setExpandedExamId(expandedExamId === exam.id ? null : exam.id)}
-                            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${expandedExamId === exam.id ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
+                            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${expandedExamId === exam.id ? 'bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)]' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
                          >
                             <ChevronDown className={`w-5 h-5 transition-transform duration-300 ${expandedExamId === exam.id ? 'rotate-180' : 'rotate-0'}`} />
                          </button>
@@ -1120,7 +1120,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
                       </div>
 
                       {/* Top Right Tip - Start Time or Created Date (Deep Grey Color) */}
-                      <div className="absolute top-0 right-0 px-3 py-1 bg-slate-700 text-white text-[8px] font-black uppercase tracking-widest flex items-center gap-1 border-b border-l border-slate-600">
+                      <div className="absolute top-0 right-0 px-3 py-1 bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] text-[8px] font-black uppercase tracking-widest flex items-center gap-1 border-b border-l border-slate-600">
                         <Clock className="w-2.5 h-2.5 text-orange-500" />
                         {isActuallyPast 
                           ? <span>Created: <span className="text-orange-300">{exam.createdAt ? new Date(exam.createdAt).toLocaleDateString() : 'N/A'}</span></span>
@@ -1225,7 +1225,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
                         
                         <button
                           onClick={() => handleStartExam(exam)}
-                          className="px-5 py-2.5 text-xs font-black text-white rounded-xl shadow-lg transition-all flex items-center space-x-2 bg-slate-900 hover:bg-slate-800"
+                          className="px-5 py-2.5 text-xs font-black text-white rounded-xl shadow-lg transition-all flex items-center space-x-2 bg-slate-900 hover:brightness-110"
                         >
                           <span className="leading-none">
                             Review
@@ -1262,7 +1262,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
                     <div className="bg-slate-50 rounded-2xl overflow-hidden border border-slate-200">
                       <div className="overflow-x-auto">
                         <table className="w-full text-left text-[11px]">
-                          <thead className="bg-slate-900 text-white font-black uppercase tracking-widest">
+                          <thead className="bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] font-black uppercase tracking-widest">
                             <tr>
                               <th className="px-4 py-3 w-16">Rank</th>
                               <th className="px-4 py-3">Student</th>
@@ -1648,7 +1648,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
                              disabled={generatingAI}
                              onClick={handleGenerateAIQuestions}
                              className={`w-full py-3 text-white font-black uppercase tracking-widest rounded-xl flex items-center justify-center gap-2 shadow-md transition-all disabled:opacity-50 ${
-                               hasGeneratedBefore ? 'bg-slate-900 hover:bg-slate-800' : 'bg-orange-600 hover:bg-orange-600'
+                               hasGeneratedBefore ? 'bg-slate-900 hover:brightness-110' : 'bg-orange-600 hover:bg-orange-600'
                              }`}
                            >
                              {generatingAI ? (
@@ -1815,7 +1815,7 @@ Number of Questions: ${setupData.questionCount}`;
                         <button 
                           type="button"
                           onClick={() => parsePastedQuestions(pastedText)}
-                          className="w-full py-4 bg-slate-900 text-white font-black uppercase tracking-widest rounded-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-2 shadow-lg"
+                          className="w-full py-4 bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] font-black uppercase tracking-widest rounded-xl hover:brightness-110 transition-all flex items-center justify-center gap-2 shadow-lg"
                         >
                           <Plus className="w-4 h-4" />
                           Process & Parse Questions
@@ -1940,7 +1940,7 @@ Number of Questions: ${setupData.questionCount}`;
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-2">
-                             <span className="px-2 py-0.5 bg-slate-900 text-white text-[10px] font-black rounded-md">Q{idx + 1}</span>
+                             <span className="px-2 py-0.5 bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] text-[10px] font-black rounded-md">Q{idx + 1}</span>
                              <span className={`px-2 py-0.5 text-[10px] font-black rounded-md uppercase tracking-widest ${(q as any).type === 'Essay' ? 'bg-blue-50 text-blue-600 border border-blue-100' : 'bg-orange-50 text-orange-600 border border-orange-100'}`}>
                                 {(q as any).type || (activeQuizModal.mode === 'Essay' ? 'Essay' : 'MCQ')}
                              </span>
@@ -2013,7 +2013,7 @@ Number of Questions: ${setupData.questionCount}`;
                    setActiveQuizModal(null);
                    setShowDeleteConfirm(false);
                  }}
-                 className="px-6 py-2 bg-slate-900 text-white text-xs font-black uppercase tracking-widest rounded-xl shadow-md hover:bg-slate-800 transition-all"
+                 className="px-6 py-2 bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] text-xs font-black uppercase tracking-widest rounded-xl shadow-md hover:brightness-110 transition-all"
                >
                  Close Review
                </button>
@@ -2107,7 +2107,7 @@ Number of Questions: ${setupData.questionCount}`;
               <div className="pt-4 border-t border-slate-100">
                  <button
                    onClick={() => setShowAnalyticsModal(null)}
-                   className="w-full py-3 bg-slate-900 text-white font-black uppercase tracking-widest rounded-xl hover:bg-slate-800 transition-all shadow-lg"
+                   className="w-full py-3 bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] font-black uppercase tracking-widest rounded-xl hover:brightness-110 transition-all shadow-lg"
                  >
                    Close Insights
                  </button>
@@ -2122,7 +2122,7 @@ Number of Questions: ${setupData.questionCount}`;
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-3 bg-black/90 backdrop-blur-md overflow-y-auto">
           <div className="bg-white rounded-[32px] max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden my-6 animate-in fade-in zoom-in-95 duration-300">
             {/* Modal Header */}
-            <div className="bg-slate-950 text-white p-4 flex items-center justify-between">
+            <div className="bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] p-4 flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <BarChart2 className="w-4 h-4 text-orange-400" />
                 <span className="text-[10px] font-black uppercase tracking-widest text-slate-300">
@@ -2171,7 +2171,7 @@ Number of Questions: ${setupData.questionCount}`;
               {/* Score Breakdown */}
               <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
                 <table className="w-full text-[11px] text-left">
-                  <thead className="bg-slate-900 text-white font-black uppercase tracking-widest">
+                  <thead className="bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] font-black uppercase tracking-widest">
                     <tr>
                       <th className="p-3">Subject</th>
                       <th className="p-3 text-center">Max</th>
@@ -2216,7 +2216,7 @@ Number of Questions: ${setupData.questionCount}`;
 
               <button
                 onClick={() => setSelectedStudentResult(null)}
-                className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-xl hover:bg-slate-800 transition-all active:scale-95 mt-4"
+                className="w-full py-4 bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-xl hover:brightness-110 transition-all active:scale-95 mt-4"
               >
                 Back to Analytics
               </button>

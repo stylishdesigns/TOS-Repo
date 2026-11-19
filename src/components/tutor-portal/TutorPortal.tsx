@@ -160,7 +160,7 @@ export const TutorPortal: React.FC = () => {
             <PWAInstallButton variant="pill" />
             
             <button
-               className="w-9 h-9 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 flex items-center justify-center border border-slate-700 transition-all relative"
+               className="w-9 h-9 rounded-xl bg-slate-800/80 hover:brightness-110 text-slate-300 flex items-center justify-center border border-slate-700 transition-all relative"
                aria-label="Notifications"
             >
                <Bell className="w-4 h-4" />
@@ -171,7 +171,7 @@ export const TutorPortal: React.FC = () => {
               onClick={() =>
                 setDesktopViewMode(desktopViewMode === 'mobile_frame' ? 'expanded' : 'mobile_frame')
               }
-              className="hidden lg:flex items-center space-x-1 px-2.5 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 text-xs font-semibold border border-slate-700 transition-all"
+              className="hidden lg:flex items-center space-x-1 px-2.5 py-1.5 rounded-xl bg-slate-800/80 hover:brightness-110 text-slate-300 text-xs font-semibold border border-slate-700 transition-all"
             >
               {desktopViewMode === 'mobile_frame' ? (
                 <>
@@ -345,7 +345,7 @@ export const TutorPortal: React.FC = () => {
                 </button>
                 <button
                   onClick={handleLogout}
-                  className="py-4 rounded-2xl bg-slate-900 text-white font-black text-[10px] uppercase tracking-widest hover:bg-black shadow-lg shadow-black/10 transition-all active:scale-95"
+                  className="py-4 rounded-2xl bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] font-black text-[10px] uppercase tracking-widest hover:bg-black shadow-lg shadow-black/10 transition-all active:scale-95"
                 >
                   Sign Out
                 </button>

@@ -150,7 +150,7 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
 
           <button
             onClick={() => refreshSeatsSummary()}
-            className="p-2 text-slate-400 hover:text-orange-500 rounded-xl hover:bg-white dark:hover:bg-slate-700 transition-colors"
+            className="p-2 text-slate-400 hover:text-orange-500 rounded-xl hover:bg-white dark:hover:brightness-110 transition-colors"
             title="Refresh seats"
           >
             <RefreshCw className="w-4 h-4" />
@@ -261,7 +261,7 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
                 return (
                   <tr
                     key={student.id}
-                    className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors"
+                    className="hover:bg-slate-50/50 dark:hover:brightness-110/30 transition-colors"
                   >
                     {/* Student Info */}
                     <td className="py-3.5 px-4">

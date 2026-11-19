@@ -1467,6 +1467,17 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                     </span>
                   </div>
                 </div>
+                <p className="text-center text-[11px] font-bold mt-2">
+                  {(student.totalFee || 0) <= 0 ? (
+                    <span className="text-slate-500">Fee not set yet — your facility will confirm what you owe</span>
+                  ) : (student.outstandingBalance || 0) <= 0 ? (
+                    <span className="text-emerald-700">Fully paid</span>
+                  ) : (
+                    <span className="text-amber-700">
+                      Balance {settings.currencySymbol}{(student.outstandingBalance || 0).toLocaleString()} of {settings.currencySymbol}{(student.totalFee || 0).toLocaleString()} remaining
+                    </span>
+                  )}
+                </p>
 
                 {/* Navigation sub-tabs */}
                 <div className="flex rounded-xl bg-slate-100 p-1 text-xs font-bold">

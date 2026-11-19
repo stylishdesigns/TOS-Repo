@@ -187,7 +187,7 @@ export const StudentDetailModal: React.FC = () => {
                 <div className="flex items-end">
                   <button
                     type="submit"
-                    className="w-full px-4 py-2 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-lg shadow-sm"
+                    className="w-full px-4 py-2 text-xs font-bold text-[var(--on-brand,#fff)] bg-[var(--brand,#0f172a)] hover:brightness-110 rounded-lg shadow-sm"
                   >
                     Generate Receipt
                   </button>
@@ -244,7 +244,7 @@ export const StudentDetailModal: React.FC = () => {
         <div className="pt-4 border-t border-slate-100 flex items-center justify-end">
           <button
             onClick={() => setSelectedStudent(null)}
-            className="px-4 py-2 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-lg"
+            className="px-4 py-2 text-xs font-semibold text-[var(--on-brand,#fff)] bg-[var(--brand,#0f172a)] hover:brightness-110 rounded-lg"
           >
             Done
           </button>

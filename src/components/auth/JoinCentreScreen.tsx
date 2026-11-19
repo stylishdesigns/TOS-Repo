@@ -141,7 +141,7 @@ export const JoinCentreScreen: React.FC<JoinCentreScreenProps> = ({
                 setCentreFullInfo(null);
                 setDigits(['', '', '', '', '', '']);
               }}
-              className="w-full py-3.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl font-bold text-xs transition-colors cursor-pointer"
+              className="w-full py-3.5 bg-slate-800 hover:brightness-110 text-slate-200 rounded-xl font-bold text-xs transition-colors cursor-pointer"
             >
               Try another access code
             </button>

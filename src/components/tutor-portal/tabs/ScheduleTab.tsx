@@ -205,7 +205,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({ tutor }) => {
         <button
           type="button"
           onClick={() => setShowPastClasses(true)}
-          className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs rounded-xl flex items-center space-x-1.5 shadow-sm active:scale-95 transition-all cursor-pointer shrink-0"
+          className="px-3.5 py-2 bg-slate-900 hover:bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] font-extrabold text-xs rounded-xl flex items-center space-x-1.5 shadow-sm active:scale-95 transition-all cursor-pointer shrink-0"
           title="View Past Classes and Ratings History"
         >
           <History className="w-4 h-4 text-orange-500" />
@@ -416,7 +416,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({ tutor }) => {
                             </div>
                           </div>
                           <div className="pt-4 border-t border-slate-100 flex items-center justify-end">
-                            <button className="px-6 py-2 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-orange-600 transition-colors">View Details</button>
+                            <button className="px-6 py-2 bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-orange-600 transition-colors">View Details</button>
                           </div>
                         </div>
                       </div>

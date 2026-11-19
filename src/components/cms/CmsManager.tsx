@@ -113,7 +113,7 @@ export const CmsManager: React.FC = () => {
 
           <button
             onClick={handleSaveSettings}
-            className="px-4 py-2 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-lg shadow-sm flex items-center space-x-1.5"
+            className="px-4 py-2 text-xs font-bold text-[var(--on-brand,#fff)] bg-[var(--brand,#0f172a)] hover:brightness-110 rounded-lg shadow-sm flex items-center space-x-1.5"
           >
             <Save className="w-3.5 h-3.5 text-amber-400" />
             <span>Publish Changes</span>
@@ -555,7 +555,7 @@ export const CmsManager: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 text-white bg-slate-900 hover:bg-slate-800 rounded-lg font-bold"
+                  className="px-4 py-2 text-[var(--on-brand,#fff)] bg-[var(--brand,#0f172a)] hover:brightness-110 rounded-lg font-bold"
                 >
                   Add Story
                 </button>

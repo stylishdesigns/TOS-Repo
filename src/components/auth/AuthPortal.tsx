@@ -123,7 +123,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
 
   const portalStyles = {
     admin: {
-      accent: 'bg-slate-900 hover:bg-slate-800',
+      accent: 'bg-slate-900 hover:brightness-110',
       text: 'text-slate-900',
       bg: 'bg-slate-50',
       border: 'border-slate-100',

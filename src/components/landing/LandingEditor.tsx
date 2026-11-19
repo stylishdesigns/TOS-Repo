@@ -214,7 +214,7 @@ export const LandingEditor: React.FC<{ apiPath: string; refreshKey?: number; sho
                     ) : (
                       <div className="h-16 w-24 rounded-lg bg-slate-800 border border-white/10 flex items-center justify-center text-slate-500"><ImageIcon className="w-5 h-5" /></div>
                     )}
-                    <label className="inline-flex items-center gap-2 text-xs font-bold px-3 py-2.5 rounded-lg bg-slate-800 border border-white/10 text-white hover:bg-slate-700 cursor-pointer min-h-[44px]">
+                    <label className="inline-flex items-center gap-2 text-xs font-bold px-3 py-2.5 rounded-lg bg-slate-800 border border-white/10 text-white hover:brightness-110 cursor-pointer min-h-[44px]">
                       {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImageIcon className="w-4 h-4" />}
                       {content.hero.photoUrl ? 'Replace photo' : 'Upload photo'}
                       <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadHero(f); e.currentTarget.value = ''; }} />

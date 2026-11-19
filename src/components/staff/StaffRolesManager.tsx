@@ -225,7 +225,7 @@ export const StaffRolesManager: React.FC = () => {
           </button>
           <button
             onClick={() => setShowAddModal(true)}
-            className="px-4 py-2.5 text-xs font-semibold text-white bg-[orange-600] hover:bg-[orange-700] rounded-lg shadow-sm transition-all flex items-center justify-center space-x-2 shrink-0"
+            className="px-4 py-2.5 text-xs font-semibold text-white bg-orange-600 hover:bg-orange-700 rounded-lg shadow-sm transition-all flex items-center justify-center space-x-2 shrink-0"
           >
             <Plus className="w-4 h-4" />
             <span>Add Staff Member</span>
@@ -242,7 +242,7 @@ export const StaffRolesManager: React.FC = () => {
               onClick={() => setSelectedRoleFilter('All')}
               className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap ${
                 selectedRoleFilter === 'All'
-                  ? 'bg-[orange-600] text-white shadow-2xs'
+                  ? 'bg-orange-600 text-white shadow-2xs'
                   : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
               }`}
             >
@@ -254,7 +254,7 @@ export const StaffRolesManager: React.FC = () => {
                 onClick={() => setSelectedRoleFilter(r)}
                 className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap ${
                   selectedRoleFilter === r
-                    ? 'bg-[orange-600] text-white shadow-2xs'
+                    ? 'bg-orange-600 text-white shadow-2xs'
                     : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
                 }`}
               >
@@ -357,7 +357,7 @@ export const StaffRolesManager: React.FC = () => {
           <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center space-x-2">
-                <Briefcase className="w-5 h-5 text-[orange-600]" />
+                <Briefcase className="w-5 h-5 text-orange-600" />
                 <h3 className="font-bold text-base text-slate-900">Add Staff Member</h3>
               </div>
               <button
@@ -445,7 +445,7 @@ export const StaffRolesManager: React.FC = () => {
                   <button
                     type="button"
                     onClick={generatePassword}
-                    className="px-3 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors flex items-center space-x-1"
+                    className="px-3 py-2 bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] rounded-lg hover:brightness-110 transition-colors flex items-center space-x-1"
                   >
                     <KeyRound className="w-3.5 h-3.5" />
                     <span>Generate</span>
@@ -455,7 +455,7 @@ export const StaffRolesManager: React.FC = () => {
 
               {/* Explicit Mandatory Message Required by User */}
               <div className="p-3 bg-orange-50 rounded-xl border border-orange-200 text-[11px] text-orange-900 space-y-1">
-                <p className="font-bold flex items-center space-x-1 text-[orange-600]">
+                <p className="font-bold flex items-center space-x-1 text-orange-600">
                   <KeyRound className="w-3.5 h-3.5 shrink-0" />
                   <span>Onboarding & Password Provisioning:</span>
                 </p>
@@ -475,7 +475,7 @@ export const StaffRolesManager: React.FC = () => {
                 <button
                   type="submit"
                   disabled={isInviting}
-                  className="px-4 py-2 font-semibold text-white bg-[orange-600] hover:bg-[orange-700] rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                  className="px-4 py-2 font-semibold text-white bg-orange-600 hover:bg-orange-700 rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
                 >
                   {isInviting ? (
                     <>
@@ -508,7 +508,7 @@ export const StaffRolesManager: React.FC = () => {
 
             <div className="mt-4 space-y-3.5 text-xs">
               <div className="flex items-center space-x-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
-                <div className="w-12 h-12 rounded-full bg-orange-100 text-[orange-600] font-black text-base flex items-center justify-center">
+                <div className="w-12 h-12 rounded-full bg-orange-100 text-orange-600 font-black text-base flex items-center justify-center">
                   {viewingStaff.name.slice(0, 2).toUpperCase()}
                 </div>
                 <div>
@@ -608,7 +608,7 @@ export const StaffRolesManager: React.FC = () => {
           <div className="bg-white rounded-2xl max-w-4xl w-full p-6 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <div className="flex items-center space-x-3">
-                <div className="p-2.5 bg-orange-50 text-[orange-600] rounded-xl">
+                <div className="p-2.5 bg-orange-50 text-orange-600 rounded-xl">
                   <Shield className="w-6 h-6" />
                 </div>
                 <div>
@@ -656,7 +656,7 @@ export const StaffRolesManager: React.FC = () => {
             <div className="flex justify-end pt-6 mt-6 border-t border-slate-100">
               <button
                 onClick={() => setShowRolesModal(false)}
-                className="px-6 py-2.5 font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-xl shadow-sm transition-all"
+                className="px-6 py-2.5 font-bold text-[var(--on-brand,#fff)] bg-[var(--brand,#0f172a)] hover:brightness-110 rounded-xl shadow-sm transition-all"
               >
                 Understood
               </button>

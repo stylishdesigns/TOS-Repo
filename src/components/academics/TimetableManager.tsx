@@ -373,7 +373,7 @@ export const TimetableManager: React.FC = () => {
 
         <div className="flex items-center space-x-3">
           <div className="text-right hidden md:block">
-            <span className="px-3 py-1.5 rounded-lg bg-orange-50 text-[11px] font-black text-[orange-600] uppercase tracking-wider">{settings.academicSession}</span>
+            <span className="px-3 py-1.5 rounded-lg bg-orange-50 text-[11px] font-black text-orange-600 uppercase tracking-wider">{settings.academicSession}</span>
           </div>
         </div>
       </div>
@@ -388,7 +388,7 @@ export const TimetableManager: React.FC = () => {
 
         <button
           onClick={() => setShowCalendar(true)}
-          className="px-3 sm:px-5 py-3 text-[9px] sm:text-[10px] font-black text-white bg-slate-900 hover:bg-black rounded-xl shadow-lg shadow-slate-200 transition-all uppercase tracking-widest flex items-center justify-center space-x-2"
+          className="px-3 sm:px-5 py-3 text-[9px] sm:text-[10px] font-black text-[var(--on-brand,#fff)] bg-[var(--brand,#0f172a)] hover:bg-black rounded-xl shadow-lg shadow-slate-200 transition-all uppercase tracking-widest flex items-center justify-center space-x-2"
         >
           <LayoutGrid className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-orange-500" />
           <span>Calendar</span>
@@ -435,7 +435,7 @@ export const TimetableManager: React.FC = () => {
 
       <button
         onClick={handleOpenAdd}
-        className="w-full py-2.5 text-sm font-black text-white bg-[orange-600] hover:bg-[orange-700] rounded-2xl shadow-lg shadow-orange-200/50 transition-all flex items-center justify-center space-x-2"
+        className="w-full py-2.5 text-sm font-black text-white bg-orange-600 hover:bg-orange-700 rounded-2xl shadow-lg shadow-orange-200/50 transition-all flex items-center justify-center space-x-2"
       >
         <Plus className="w-5 h-5" />
         <span>SCHEDULE CLASS</span>
@@ -545,7 +545,7 @@ export const TimetableManager: React.FC = () => {
 
                           <div className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
                             <div className="flex items-start space-x-4">
-                              <div className={`w-14 h-14 rounded-2xl border flex flex-col items-center justify-center shrink-0 ${finished ? 'bg-slate-50 border-slate-100 text-slate-400' : 'bg-orange-50 border-orange-100 text-[orange-600]'}`}>
+                              <div className={`w-14 h-14 rounded-2xl border flex flex-col items-center justify-center shrink-0 ${finished ? 'bg-slate-50 border-slate-100 text-slate-400' : 'bg-orange-50 border-orange-100 text-orange-600'}`}>
                                  <Clock className="w-4 h-4 mb-1" />
                                  <span className="text-[9px] font-black">
                                    {new Date(sess.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
@@ -596,7 +596,7 @@ export const TimetableManager: React.FC = () => {
                                     e.stopPropagation();
                                     handleOpenEdit(sess);
                                   }}
-                                  className="flex-1 md:flex-none px-4 py-2 text-[10px] font-black text-slate-600 bg-white hover:bg-slate-900 hover:text-white border border-slate-200 hover:border-slate-900 rounded-xl transition-all uppercase tracking-widest"
+                                  className="flex-1 md:flex-none px-4 py-2 text-[10px] font-black text-slate-600 bg-white hover:brightness-110 hover:text-white border border-slate-200 hover:border-slate-900 rounded-xl transition-all uppercase tracking-widest"
                                 >
                                   Modify
                                 </button>
@@ -741,7 +741,7 @@ export const TimetableManager: React.FC = () => {
                     <button
                       type="submit"
                       disabled={isSaving}
-                      className="w-full py-3 bg-slate-900 text-white font-black uppercase tracking-widest rounded-xl shadow-xl hover:bg-slate-800 transition-all disabled:opacity-50 flex items-center justify-center space-x-2"
+                      className="w-full py-3 bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] font-black uppercase tracking-widest rounded-xl shadow-xl hover:brightness-110 transition-all disabled:opacity-50 flex items-center justify-center space-x-2"
                     >
                       {isSaving ? (
                         <>

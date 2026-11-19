@@ -70,7 +70,7 @@ export const MyAccountView: React.FC = () => {
       {/* Top Header Card (video 01:06 - 01:08) */}
       <div className="bg-white p-6 rounded-xl border border-slate-200/90 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-5">
         <div className="flex items-center space-x-4">
-          <div className="w-14 h-14 rounded-xl bg-[orange-200] text-[orange-700] font-extrabold text-xl flex items-center justify-center shrink-0">
+          <div className="w-14 h-14 rounded-xl bg-orange-200 text-orange-700 font-extrabold text-xl flex items-center justify-center shrink-0">
             PA
           </div>
           <div>
@@ -121,7 +121,7 @@ export const MyAccountView: React.FC = () => {
             onClick={() => setActiveTab(tab)}
             className={`px-4 py-1.5 text-xs font-semibold rounded-lg transition-all ${
               activeTab === tab
-                ? 'bg-[orange-600] text-white shadow-sm'
+                ? 'bg-orange-600 text-white shadow-sm'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
@@ -317,7 +317,7 @@ export const MyAccountView: React.FC = () => {
 
             <button
               type="submit"
-              className="px-4 py-2 text-xs font-semibold text-white bg-[orange-600] hover:bg-[orange-700] rounded-lg shadow-sm transition-all"
+              className="px-4 py-2 text-xs font-semibold text-white bg-orange-600 hover:bg-orange-700 rounded-lg shadow-sm transition-all"
             >
               Update Password
             </button>
@@ -346,7 +346,7 @@ export const MyAccountView: React.FC = () => {
                 });
               }}
               className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors ${
-                twoFactorEnabled ? 'bg-[orange-600]' : 'bg-slate-200'
+                twoFactorEnabled ? 'bg-orange-600' : 'bg-slate-200'
               }`}
             >
               <div

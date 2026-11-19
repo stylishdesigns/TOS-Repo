@@ -196,7 +196,7 @@ export const TutorsManager: React.FC = () => {
         <div className="flex items-center space-x-4">
           <button
             onClick={() => setShowAddModal(true)}
-            className="px-4 py-2 text-xs font-semibold text-white bg-[orange-600] hover:bg-[orange-700] rounded-lg shadow-sm transition-all flex items-center space-x-1.5 self-start sm:self-auto"
+            className="px-4 py-2 text-xs font-semibold text-white bg-orange-600 hover:bg-orange-700 rounded-lg shadow-sm transition-all flex items-center space-x-1.5 self-start sm:self-auto"
           >
             <Plus className="w-4 h-4" />
             <span>Add Tutor</span>
@@ -208,7 +208,7 @@ export const TutorsManager: React.FC = () => {
       <div className="grid grid-cols-2 gap-3 md:gap-4">
         <div className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200/90 shadow-xs">
           <div className="flex items-center space-x-2 text-slate-600">
-            <GraduationCap className="w-4 h-4 text-[orange-600]" />
+            <GraduationCap className="w-4 h-4 text-orange-600" />
             <span className="text-xs font-semibold text-slate-600">Total Tutors</span>
           </div>
           <p className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight mt-2">
@@ -296,7 +296,7 @@ export const TutorsManager: React.FC = () => {
                   >
                     <td className="py-3.5 px-5">
                       <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 rounded-lg bg-orange-100 text-[orange-600] font-bold text-xs flex items-center justify-center shrink-0">
+                        <div className="w-8 h-8 rounded-lg bg-orange-100 text-orange-600 font-bold text-xs flex items-center justify-center shrink-0">
                           {initials}
                         </div>
                         <div>
@@ -526,7 +526,7 @@ export const TutorsManager: React.FC = () => {
                   <button
                     type="button"
                     onClick={generatePassword}
-                    className="px-3 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors flex items-center space-x-1"
+                    className="px-3 py-2 bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] rounded-lg hover:brightness-110 transition-colors flex items-center space-x-1"
                   >
                     <Key className="w-3.5 h-3.5" />
                     <span>Generate</span>
@@ -552,7 +552,7 @@ export const TutorsManager: React.FC = () => {
                 <button
                   type="submit"
                   disabled={isInviting}
-                  className="px-4 py-2 font-semibold text-white bg-[orange-600] hover:bg-[orange-700] rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                  className="px-4 py-2 font-semibold text-white bg-orange-600 hover:bg-orange-700 rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
                 >
                   {isInviting ? (
                     <>
@@ -583,7 +583,7 @@ export const TutorsManager: React.FC = () => {
             <div className="py-4 space-y-4 text-xs">
               <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                 <div className="flex items-center space-x-3.5">
-                  <div className="w-12 h-12 rounded-xl bg-orange-100 text-[orange-600] font-extrabold text-base flex items-center justify-center overflow-hidden">
+                  <div className="w-12 h-12 rounded-xl bg-orange-100 text-orange-600 font-extrabold text-base flex items-center justify-center overflow-hidden">
                     {selectedTutor.avatar ? (
                       <img src={selectedTutor.avatar} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                     ) : (
@@ -642,7 +642,7 @@ export const TutorsManager: React.FC = () => {
                   {(selectedTutor.subjects || []).map((sub, idx) => (
                     <span
                       key={idx}
-                      className="px-2.5 py-1 bg-orange-50 text-[orange-600] font-semibold rounded-md border border-orange-200"
+                      className="px-2.5 py-1 bg-orange-50 text-orange-600 font-semibold rounded-md border border-orange-200"
                     >
                       {sub}
                     </span>
@@ -696,7 +696,7 @@ export const TutorsManager: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setSelectedTutor(null)}
-                className="px-4 py-1.5 text-xs font-semibold text-white bg-[orange-600] hover:bg-[orange-700] rounded-lg shadow-sm"
+                className="px-4 py-1.5 text-xs font-semibold text-white bg-orange-600 hover:bg-orange-700 rounded-lg shadow-sm"
               >
                 Close
               </button>

@@ -27,7 +27,7 @@ export const ChatModeToggle: React.FC<{
     >
       <div
         aria-hidden="true"
-        className="absolute top-1 bottom-1 left-1 rounded-xl bg-[orange-600] shadow-sm transition-transform duration-300 ease-out"
+        className="absolute top-1 bottom-1 left-1 rounded-xl bg-orange-600 shadow-sm transition-transform duration-300 ease-out"
         style={{ width: 'calc((100% - 0.5rem) / 3)', transform: `translateX(${idx * 100}%)` }}
       />
       {items.map((it) => {

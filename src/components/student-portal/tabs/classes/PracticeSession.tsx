@@ -33,7 +33,7 @@ export const PracticeSession: React.FC<PracticeSessionProps> = ({
         <button
           type="button"
           onClick={() => onExit({})}
-          className="px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold"
+          className="px-4 py-2 bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] rounded-xl text-xs font-bold"
         >
           Back
         </button>

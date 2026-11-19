@@ -152,7 +152,7 @@ export const AttendanceTracker: React.FC = () => {
       {/* Timing Schedule Pill Banner */}
       <div className="bg-orange-50/70 border border-orange-200/80 rounded-xl p-3 flex flex-wrap items-center justify-between gap-2 text-xs">
         <div className="flex items-center space-x-2 text-slate-700 font-medium flex-wrap gap-y-1">
-          <span className="font-bold text-[orange-600] flex items-center space-x-1">
+          <span className="font-bold text-orange-600 flex items-center space-x-1">
             <Clock className="w-3.5 h-3.5" />
             <span>Active Attendance Timings:</span>
           </span>
@@ -168,7 +168,7 @@ export const AttendanceTracker: React.FC = () => {
         </div>
         <button
           onClick={() => setShowSettingsModal(true)}
-          className="text-[11px] text-[orange-600] hover:underline font-bold"
+          className="text-[11px] text-orange-600 hover:underline font-bold"
         >
           Modify Timings →
         </button>
@@ -178,7 +178,7 @@ export const AttendanceTracker: React.FC = () => {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <div className="bg-white p-3.5 sm:p-5 rounded-xl border border-slate-200/90 shadow-xs">
           <div className="flex items-center space-x-2 text-slate-600">
-            <Users className="w-4 h-4 text-[orange-600] shrink-0" />
+            <Users className="w-4 h-4 text-orange-600 shrink-0" />
             <span className="text-[11px] sm:text-xs font-semibold text-slate-600">Attendance Rate</span>
           </div>
           <p className="text-xl sm:text-3xl font-extrabold text-slate-900 tracking-tight mt-1.5 sm:mt-2">
@@ -390,7 +390,7 @@ export const AttendanceTracker: React.FC = () => {
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center space-x-2">
-                <Clock className="w-5 h-5 text-[orange-600]" />
+                <Clock className="w-5 h-5 text-orange-600" />
                 <h3 className="font-bold text-base text-slate-900">Attendance Timing Settings</h3>
               </div>
               <button
@@ -468,7 +468,7 @@ export const AttendanceTracker: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 font-semibold text-white bg-[orange-600] hover:bg-[orange-700] rounded-lg shadow-sm"
+                  className="px-4 py-2 font-semibold text-white bg-orange-600 hover:bg-orange-700 rounded-lg shadow-sm"
                 >
                   Save Timing Settings
                 </button>

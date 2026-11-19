@@ -207,7 +207,7 @@ export const ExamProgrammesFeesTab: React.FC = () => {
               <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-slate-600">
                 <div className="flex justify-between font-bold text-slate-900 text-xs pb-1 border-b border-slate-200">
                   <span>Total Programme Package</span>
-                  <span className="text-[orange-600]">₦{(Number(tuitionFee || 0) + (regFee || 0) + (mockFee || 0)).toLocaleString()}</span>
+                  <span className="text-orange-600">₦{(Number(tuitionFee || 0) + (regFee || 0) + (mockFee || 0)).toLocaleString()}</span>
                 </div>
                 <p className="text-[10px] text-slate-500 mt-1.5">
                   Standard policy: 60% minimum deposit upon registration. Balance due 2 weeks before first mock exam.
@@ -224,7 +224,7 @@ export const ExamProgrammesFeesTab: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 font-semibold text-white bg-[orange-600] hover:bg-[orange-700] rounded-lg shadow-sm"
+                  className="px-4 py-2 font-semibold text-white bg-orange-600 hover:bg-orange-700 rounded-lg shadow-sm"
                 >
                   Save Fee Structure
                 </button>

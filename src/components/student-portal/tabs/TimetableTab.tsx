@@ -645,7 +645,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({ student }) => {
               <button
                 type="button"
                 onClick={() => setViewingSession(null)}
-                className="w-full py-4 bg-slate-900 text-white font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-slate-800 transition-all shadow-lg shadow-slate-100 mt-4 cursor-pointer"
+                className="w-full py-4 bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] font-black text-xs uppercase tracking-widest rounded-2xl hover:brightness-110 transition-all shadow-lg shadow-slate-100 mt-4 cursor-pointer"
               >
                 Close
               </button>

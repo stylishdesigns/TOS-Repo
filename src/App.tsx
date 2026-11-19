@@ -777,7 +777,7 @@ const MainLayout: React.FC = () => {
         ? `https://wa.me/${waDigits}?text=${encodeURIComponent(`Hello, I am a student of ${pendingCentre?.centreName || centreName}. I cannot access the portal at the moment. Please help me regain access. Thank you.`)}`
         : '';
       return (
-        <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-900 text-white px-6 text-center">
+        <div className="h-screen w-full flex flex-col items-center justify-center bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] px-6 text-center">
           <div className={accessBlocked
             ? "w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 mb-5"
             : "w-14 h-14 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 mb-5"}>
@@ -808,7 +808,7 @@ const MainLayout: React.FC = () => {
               Try again
             </button>
             {!accessBlocked && (
-              <button onClick={handleLogout} className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-semibold transition-colors">
+              <button onClick={handleLogout} className="px-5 py-2.5 rounded-xl bg-slate-800 hover:brightness-110 text-slate-200 text-sm font-semibold transition-colors">
                 Sign out
               </button>
             )}
@@ -964,7 +964,7 @@ const MainLayout: React.FC = () => {
     <div
       id="app-root-layout"
       className={`flex h-screen w-full ${
-        bgTheme === 'dark' ? 'bg-[#0B1120]' : 'bg-[#F8FAFC]'
+        'bg-[#F8FAFC]'
       } text-slate-900 font-sans overflow-hidden transition-colors duration-300`}
     >
       {/* Left Navigation Sidebar (#070F1E) */}
@@ -979,7 +979,7 @@ const MainLayout: React.FC = () => {
         <main
           id="app-main-content"
           className={`flex-1 overflow-y-auto ${
-            bgTheme === 'dark' ? 'bg-[#0B1120] dark-bg-mode' : 'bg-[#F8FAFC]'
+            'bg-[#F8FAFC]'
           } transition-colors duration-300`}
         >
           <div className="pb-12">
@@ -1130,7 +1130,7 @@ class ErrorBoundary extends Component<any, any> {
           <div className="flex flex-wrap items-center justify-center gap-3">
             <button
               onClick={() => window.location.reload()}
-              className="px-6 py-2 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-slate-800 transition-all"
+              className="px-6 py-2 bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] rounded-xl font-bold text-sm hover:brightness-110 transition-all"
             >
               Reload Application
             </button>

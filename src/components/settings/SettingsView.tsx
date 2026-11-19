@@ -446,7 +446,7 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
           {photoUrl ? (
             <img src={photoUrl} alt={activeUser?.name || 'Administrator'} className="w-13 h-13 rounded-xl object-cover shrink-0 border border-orange-200" />
           ) : (
-            <div className="w-13 h-13 rounded-xl bg-orange-100 text-[orange-600] font-black text-xl flex items-center justify-center shrink-0 border border-orange-200">
+            <div className="w-13 h-13 rounded-xl bg-orange-100 text-orange-600 font-black text-xl flex items-center justify-center shrink-0 border border-orange-200">
               {firstName[0]}
               {lastName[0]}
             </div>
@@ -490,7 +490,7 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
           onClick={() => setActiveTab('profile')}
           className={`px-3.5 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap flex items-center space-x-2 ${
             activeTab === 'profile'
-              ? 'bg-[orange-600] text-white shadow-xs'
+              ? 'bg-orange-600 text-white shadow-xs'
               : 'text-slate-600 hover:text-slate-900 hover:bg-white/70'
           }`}
         >
@@ -503,7 +503,7 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
             onClick={() => setActiveTab('security')}
             className={`px-3.5 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap flex items-center space-x-2 ${
               activeTab === 'security'
-                ? 'bg-[orange-600] text-white shadow-xs'
+                ? 'bg-orange-600 text-white shadow-xs'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-white/70'
             }`}
           >
@@ -516,7 +516,7 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
           onClick={() => setActiveTab('sessions')}
           className={`px-3.5 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap flex items-center space-x-2 ${
             activeTab === 'sessions'
-              ? 'bg-[orange-600] text-white shadow-xs'
+              ? 'bg-orange-600 text-white shadow-xs'
               : 'text-slate-600 hover:text-slate-900 hover:bg-white/70'
           }`}
         >
@@ -541,7 +541,7 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
               {photoUrl ? (
                 <img src={photoUrl} alt="Profile" className="w-16 h-16 rounded-xl object-cover border border-slate-200" />
               ) : (
-                <div className="w-16 h-16 rounded-xl bg-orange-100 text-[orange-600] font-black text-lg grid place-items-center border border-orange-200">
+                <div className="w-16 h-16 rounded-xl bg-orange-100 text-orange-600 font-black text-lg grid place-items-center border border-orange-200">
                   {firstName[0]}{lastName[0]}
                 </div>
               )}
@@ -550,7 +550,7 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
                 onClick={() => photoInputRef.current?.click()}
                 disabled={photoBusy}
                 aria-label="Upload profile photo"
-                className="absolute -bottom-1.5 -right-1.5 w-7 h-7 rounded-full bg-[orange-600] text-white shadow flex items-center justify-center hover:bg-[orange-700] disabled:opacity-60 transition-colors"
+                className="absolute -bottom-1.5 -right-1.5 w-7 h-7 rounded-full bg-orange-600 text-white shadow flex items-center justify-center hover:bg-orange-700 disabled:opacity-60 transition-colors"
               >
                 {photoBusy ? <div className="w-3.5 h-3.5 rounded-full border-2 border-white border-t-transparent animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
               </button>
@@ -631,7 +631,7 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
             <div className="flex justify-end pt-3 border-t border-slate-100">
               <button
                 type="submit"
-                className="px-4 py-2 text-xs font-semibold text-white bg-[orange-600] hover:bg-[orange-700] rounded-lg shadow-sm flex items-center space-x-1.5"
+                className="px-4 py-2 text-xs font-semibold text-white bg-orange-600 hover:bg-orange-700 rounded-lg shadow-sm flex items-center space-x-1.5"
               >
                 <Save className="w-3.5 h-3.5" />
                 <span>Save Profile Changes</span>
@@ -703,7 +703,7 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
               <div className="pt-2">
                 <button
                   type="submit"
-                  className="px-4 py-2 text-xs font-semibold text-white bg-[orange-600] hover:bg-[orange-700] rounded-lg shadow-sm"
+                  className="px-4 py-2 text-xs font-semibold text-white bg-orange-600 hover:bg-orange-700 rounded-lg shadow-sm"
                 >
                   Update Password
                 </button>
@@ -857,7 +857,7 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
               />
               <span className="text-xs text-slate-400">{accentDraft || 'Pick a colour'}</span>
               <div className="flex-1" />
-              <button type="button" onClick={handleAccentSave} disabled={accentBusy || accentDraft === accent} className="px-4 py-2 rounded-lg text-sm font-semibold bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-50 transition-colors">
+              <button type="button" onClick={handleAccentSave} disabled={accentBusy || accentDraft === accent} className="px-4 py-2 rounded-lg text-sm font-semibold bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] hover:brightness-110 disabled:opacity-50 transition-colors">
                 {accentBusy ? 'Saving…' : 'Save colour'}
               </button>
             </div>
@@ -887,7 +887,7 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
                   type="button"
                   onClick={() => logoInputRef.current?.click()}
                   disabled={logoBusy}
-                  className="px-4 py-2 text-xs font-semibold text-white bg-[orange-600] hover:bg-[orange-700] rounded-lg shadow-sm disabled:opacity-60 w-fit"
+                  className="px-4 py-2 text-xs font-semibold text-white bg-orange-600 hover:bg-orange-700 rounded-lg shadow-sm disabled:opacity-60 w-fit"
                 >
                   {logoBusy ? 'Uploading…' : centreLogo ? 'Replace logo' : 'Upload logo'}
                 </button>
@@ -926,7 +926,7 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
                   type="button"
                   onClick={() => welcomeInputRef.current?.click()}
                   disabled={welcomeBusy}
-                  className="px-4 py-2 text-xs font-semibold text-white bg-[orange-600] hover:bg-[orange-700] rounded-lg shadow-sm disabled:opacity-60 w-fit"
+                  className="px-4 py-2 text-xs font-semibold text-white bg-orange-600 hover:bg-orange-700 rounded-lg shadow-sm disabled:opacity-60 w-fit"
                 >
                   {welcomeBusy ? 'Uploading…' : centreWelcome ? 'Replace image' : 'Upload your own image'}
                 </button>
@@ -1113,7 +1113,7 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
             <div className="flex justify-end pt-3 border-t border-slate-100">
               <button
                 type="submit"
-                className="px-4 py-2 text-xs font-semibold text-white bg-[orange-600] hover:bg-[orange-700] rounded-lg shadow-sm flex items-center space-x-1.5"
+                className="px-4 py-2 text-xs font-semibold text-white bg-orange-600 hover:bg-orange-700 rounded-lg shadow-sm flex items-center space-x-1.5"
               >
                 <Save className="w-3.5 h-3.5" />
                 <span>Save Facility Parameters</span>
@@ -1141,7 +1141,7 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
           <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center space-x-2">
-                <Calendar className="w-5 h-5 text-[orange-600]" />
+                <Calendar className="w-5 h-5 text-orange-600" />
                 <h3 className="font-bold text-base text-slate-900">Add Academic Session</h3>
               </div>
               <button
@@ -1177,7 +1177,7 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 font-semibold text-white bg-[orange-600] hover:bg-[orange-700] rounded-lg shadow-sm"
+                  className="px-4 py-2 font-semibold text-white bg-orange-600 hover:bg-orange-700 rounded-lg shadow-sm"
                 >
                   Add Session
                 </button>

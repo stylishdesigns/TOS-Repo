@@ -141,7 +141,7 @@ export const StudentsList: React.FC = () => {
         <div className="flex items-center space-x-4">
           <button
             onClick={() => setShowAddModal(true)}
-            className="px-4 py-2 text-xs font-semibold text-white bg-[orange-600] hover:bg-[orange-700] rounded-lg shadow-sm transition-all flex items-center space-x-1.5 self-start sm:self-auto"
+            className="px-4 py-2 text-xs font-semibold text-white bg-orange-600 hover:bg-orange-700 rounded-lg shadow-sm transition-all flex items-center space-x-1.5 self-start sm:self-auto"
           >
             <Plus className="w-4 h-4" />
             <span>Enroll New Student</span>
@@ -322,7 +322,7 @@ export const StudentsList: React.FC = () => {
                     {/* Student Info */}
                     <td className="py-3.5 px-5">
                       <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 rounded-lg bg-orange-50 text-[orange-600] font-bold text-xs flex items-center justify-center shrink-0 border border-orange-200/60">
+                        <div className="w-8 h-8 rounded-lg bg-orange-50 text-orange-600 font-bold text-xs flex items-center justify-center shrink-0 border border-orange-200/60">
                           {initials}
                         </div>
                         <div>
@@ -353,20 +353,37 @@ export const StudentsList: React.FC = () => {
 
                     {/* Fee Status */}
                     <td className="py-3.5 px-5">
-                      {(st.outstandingBalance || 0) === 0 ? (
-                        <span className="inline-flex items-center space-x-1 text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded-full text-[11px]">
-                          <span>Paid Full</span>
-                        </span>
-                      ) : (
-                        <div>
-                          <span className="text-amber-700 font-bold">
-                            ₦{(st.outstandingBalance || 0).toLocaleString()}
-                          </span>
-                          <span className="text-slate-400 text-[10px] block">
-                            of ₦{(st.totalFee || 0).toLocaleString()}
-                          </span>
-                        </div>
-                      )}
+                      {(() => {
+                        const fee = st.totalFee || 0;
+                        const paid = st.paidAmount || 0;
+                        const bal = st.outstandingBalance || 0;
+                        if (fee <= 0) {
+                          return (
+                            <span className="inline-flex items-center space-x-1 text-slate-600 font-semibold bg-slate-100 px-2 py-0.5 rounded-full text-[11px]">
+                              <span>No fee set</span>
+                            </span>
+                          );
+                        }
+                        if (bal === 0) {
+                          return (
+                            <span className="inline-flex items-center space-x-1 text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded-full text-[11px]">
+                              <span>Paid Full</span>
+                            </span>
+                          );
+                        }
+                        return (
+                          <div>
+                            <span className="text-amber-700 font-bold">
+                              ₦{bal.toLocaleString()}
+                            </span>
+                            <span className="text-slate-400 text-[10px] block">
+                              {paid > 0
+                                ? `paid ₦${paid.toLocaleString()} of ₦${fee.toLocaleString()}`
+                                : `unpaid of ₦${fee.toLocaleString()}`}
+                            </span>
+                          </div>
+                        );
+                      })()}
                     </td>
 
                     {/* Status */}
@@ -445,7 +462,7 @@ export const StudentsList: React.FC = () => {
                 onClick={() => setCurrentPage(page)}
                 className={`w-7 h-7 rounded-md text-xs font-bold transition-colors ${
                   currentPage === page
-                    ? 'bg-[orange-600] text-white shadow-xs'
+                    ? 'bg-orange-600 text-white shadow-xs'
                     : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
                 }`}
               >
@@ -618,7 +635,7 @@ export const StudentsList: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 font-semibold text-white bg-[orange-600] hover:bg-[orange-700] rounded-lg shadow-sm"
+                  className="px-4 py-2 font-semibold text-white bg-orange-600 hover:bg-orange-700 rounded-lg shadow-sm"
                 >
                   Enroll Student
                 </button>

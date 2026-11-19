@@ -640,7 +640,7 @@ export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => 
                       current
                         ? 'bg-orange-600 text-white'
                         : answered
-                          ? 'bg-slate-900 text-white'
+                          ? 'bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)]'
                           : 'bg-slate-100 text-slate-500'
                     }`}
                   >

@@ -261,7 +261,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
         </div>
 
         {showAttendanceInfo && (
-          <div className="mb-4 p-3 rounded-xl bg-slate-900 text-white text-left">
+          <div className="mb-4 p-3 rounded-xl bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] text-left">
             <p className="font-black uppercase tracking-widest text-orange-400 mb-1.5 text-[10px]">Facility Hours</p>
             <ul className="space-y-1.5 opacity-90 font-medium text-[10px]">
               <li>• Resumption: {attendanceSettings.resumptionTime}</li>

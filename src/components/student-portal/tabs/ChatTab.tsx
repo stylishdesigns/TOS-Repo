@@ -1726,7 +1726,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
 
       {toast && (
         <div className="fixed bottom-28 left-0 right-0 flex justify-center z-50 pointer-events-none">
-          <div className="bg-slate-900 text-white text-xs font-bold px-4 py-2.5 rounded-full shadow-lg max-w-[85%] text-center">{toast}</div>
+          <div className="bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] text-xs font-bold px-4 py-2.5 rounded-full shadow-lg max-w-[85%] text-center">{toast}</div>
         </div>
       )}
 

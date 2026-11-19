@@ -57,7 +57,7 @@ export const WebsiteLanding: React.FC = () => {
               onClick={() => setTab(id)}
               className={`flex items-center gap-2 px-4 h-11 rounded-xl text-sm font-bold border transition-colors ${
                 tab === id
-                  ? 'bg-[orange-600] text-white border-[orange-600]'
+                  ? 'bg-orange-600 text-white border-orange-600'
                   : 'bg-[#0F1B2E] text-slate-300 border-slate-800 hover:bg-[#15233C]'
               }`}
             >
@@ -70,7 +70,7 @@ export const WebsiteLanding: React.FC = () => {
               href={publicUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1.5 px-3 h-11 rounded-xl text-xs font-bold border border-[orange-600] text-[orange-600] bg-transparent hover:bg-[orange-50] transition-colors"
+              className="flex items-center gap-1.5 px-3 h-11 rounded-xl text-xs font-bold border border-orange-600 text-orange-600 bg-transparent hover:bg-orange-50 transition-colors"
               title="Open this facility's public landing page in a new tab"
             >
               <ExternalLink className="w-3.5 h-3.5" />

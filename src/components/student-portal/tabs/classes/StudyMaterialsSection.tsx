@@ -175,7 +175,7 @@ export const StudyMaterialsSection: React.FC<StudyMaterialsSectionProps> = ({
               <button
                 type="button"
                 onClick={onSwitchToTimetable}
-                className="inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-slate-900 text-white font-extrabold text-xs shadow-sm hover:bg-slate-800 transition-all cursor-pointer"
+                className="inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] font-extrabold text-xs shadow-sm hover:brightness-110 transition-all cursor-pointer"
               >
                 <span>View Timetable</span>
               </button>

@@ -277,7 +277,7 @@ export function NotificationsBell({ onOpenChange }: { onOpenChange?: (open: bool
         <div className="fixed inset-0 z-[70]" role="dialog" aria-label="Notifications">
           <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" onClick={closeSplash} />
           <div className="tos-splash-up absolute bottom-0 inset-x-0 bg-white rounded-t-3xl shadow-2xl overflow-hidden flex flex-col max-h-[70vh]">
-            <div className="bg-slate-950 text-white px-4 py-3.5 flex items-center justify-between shrink-0">
+            <div className="bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] px-4 py-3.5 flex items-center justify-between shrink-0">
               <div>
                 <p className="text-base font-black text-white">Notifications</p>
               </div>
@@ -366,7 +366,7 @@ export function NotificationsBell({ onOpenChange }: { onOpenChange?: (open: bool
             <div className="shrink-0 border-t border-slate-100 p-3 bg-white">
               <button
                 onClick={() => setView('history')}
-                className="w-full py-3 rounded-2xl bg-slate-900 text-white text-[13px] font-black flex items-center justify-center gap-2 hover:bg-slate-800 active:scale-[0.98] transition-all"
+                className="w-full py-3 rounded-2xl bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] text-[13px] font-black flex items-center justify-center gap-2 hover:brightness-110 active:scale-[0.98] transition-all"
               >
                 View more
               </button>
@@ -377,7 +377,7 @@ export function NotificationsBell({ onOpenChange }: { onOpenChange?: (open: bool
 
       {open && view === 'history' && (
         <div className="tos-history-in fixed inset-0 z-[70] bg-white flex flex-col" role="dialog" aria-label="All notifications">
-          <div className="bg-slate-950 text-white px-4 py-3.5 flex items-center gap-3 shrink-0">
+          <div className="bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] px-4 py-3.5 flex items-center gap-3 shrink-0">
             <button onClick={() => setView('splash')} className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors" aria-label="Back to notifications">
               <ArrowLeft className="w-4 h-4" />
             </button>
@@ -390,7 +390,7 @@ export function NotificationsBell({ onOpenChange }: { onOpenChange?: (open: bool
               <button
                 key={f.key}
                 onClick={() => setFilter(f.key)}
-                className={`px-3 py-1.5 rounded-full text-[11px] font-black whitespace-nowrap transition-colors ${filter === f.key ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                className={`px-3 py-1.5 rounded-full text-[11px] font-black whitespace-nowrap transition-colors ${filter === f.key ? 'bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)]' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
               >
                 {f.label}
               </button>

@@ -55,14 +55,14 @@ export const AppOnlyGate: React.FC<{ children: React.ReactNode }> = ({ children 
   return (
     <div className="min-h-screen bg-[#0F172A] grid place-items-center px-6 text-center">
       <div className="max-w-md">
-        <div className="w-16 h-16 rounded-2xl bg-[orange-600] text-white font-black text-2xl grid place-items-center mx-auto shadow-lg">TO</div>
+        <div className="w-16 h-16 rounded-2xl bg-orange-600 text-white font-black text-2xl grid place-items-center mx-auto shadow-lg">TO</div>
         <h1 className="mt-6 text-white text-2xl font-bold tracking-tight">Open this portal in the app</h1>
         <p className="mt-3 text-slate-300 text-sm leading-relaxed">
           For safety, the admin, tutor and student portals open only inside the Tutorial OS app. Install it below, then sign in there.
         </p>
         <a
           href="/app"
-          className="mt-7 inline-flex items-center justify-center px-6 min-h-[52px] rounded-xl bg-[orange-600] hover:bg-[orange-700] text-white font-bold text-sm transition-colors"
+          className="mt-7 inline-flex items-center justify-center px-6 min-h-[52px] rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-sm transition-colors"
         >
           Get the app
         </a>
