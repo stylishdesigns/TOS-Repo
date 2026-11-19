@@ -1,5 +1,6 @@
 import { initialsAvatar } from '../../lib/avatar';
 import { loadLastGood, loadLastGoodFlag, saveLastGoodFlag } from '../../lib/lastGood';
+import { LaunchSplash } from './LaunchSplash';
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useFirebase } from '../../context/FirebaseContext';
