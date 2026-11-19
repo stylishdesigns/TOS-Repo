@@ -1,7 +1,8 @@
 /* Web push handlers for Tutorial OS (Nov 19).
  * Loaded into the app's service worker via workbox importScripts, so pushes
  * that arrive while the app is closed still surface as notifications.
- * The payload is JSON: { title, body, url?, tag? }. */
+ * The payload is JSON: { title, body, url?, tag?, icon?, badge? }; icon is
+ * the facility's own logo so every push wears the right mark. */
 self.addEventListener('push', (event) => {
   let data = {};
   try {
@@ -13,7 +14,7 @@ self.addEventListener('push', (event) => {
   const options = {
     body: String(data.body || '').slice(0, 300),
     icon: data.icon || '/pwa-192x192.png',
-    badge: '/pwa-192x192.png',
+    badge: data.badge || data.icon || '/pwa-192x192.png',
     tag: data.tag || 'tos-push',
     renotify: Boolean(data.renotify),
     data: { url: data.url || '/' },

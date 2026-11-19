@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Bell, CalendarDays, BookOpen, ClipboardList, Trophy, Sparkles, Clock, X, ArrowLeft } from 'lucide-react';
+import { Bell, CalendarDays, BookOpen, ClipboardList, Trophy, Star, Clock, X, ArrowLeft } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { api } from '../tos/tosShared';
 import { pushStatus } from './push';
@@ -75,7 +75,7 @@ const TYPE_STYLES: Record<string, { icon: React.ReactNode; chip: string; label: 
   material: { icon: <BookOpen className="w-4 h-4" />, chip: 'bg-orange-100 text-orange-700', label: 'Material' },
   mock: { icon: <ClipboardList className="w-4 h-4" />, chip: 'bg-orange-100 text-orange-700', label: 'Mock' },
   leaderboard: { icon: <Trophy className="w-4 h-4" />, chip: 'bg-amber-100 text-amber-700', label: 'Leaderboard' },
-  welcome: { icon: <Sparkles className="w-4 h-4" />, chip: 'bg-emerald-100 text-emerald-700', label: 'Welcome' },
+  welcome: { icon: <Star className="w-4 h-4" />, chip: 'bg-emerald-100 text-emerald-700', label: 'Welcome' },
   reminder: { icon: <Clock className="w-4 h-4" />, chip: 'bg-amber-100 text-amber-700', label: 'Reminder' },
 };
 
@@ -283,8 +283,7 @@ export function NotificationsBell({ onOpenChange }: { onOpenChange?: (open: bool
           <div className="tos-splash-up absolute bottom-0 inset-x-0 bg-white rounded-t-3xl shadow-2xl overflow-hidden flex flex-col max-h-[70vh]">
             <div className="bg-slate-950 text-white px-4 py-3.5 flex items-center justify-between shrink-0">
               <div>
-                <p className="text-sm font-black">Notifications</p>
-                <p className="text-[10px] text-white/60 font-semibold uppercase tracking-wider">Classes, materials, exams &amp; reminders</p>
+                <p className="text-base font-black text-white">Notifications</p>
               </div>
               <button onClick={closeSplash} className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors" aria-label="Close notifications">
                 <X className="w-4 h-4" />
@@ -368,8 +367,7 @@ export function NotificationsBell({ onOpenChange }: { onOpenChange?: (open: bool
               <ArrowLeft className="w-4 h-4" />
             </button>
             <div>
-              <p className="text-sm font-black">All notifications</p>
-              <p className="text-[10px] text-white/60 font-semibold uppercase tracking-wider">Full history</p>
+              <p className="text-base font-black text-white">All notifications</p>
             </div>
           </div>
           <div className="shrink-0 border-b border-slate-100 px-3 py-2 flex items-center gap-1.5 overflow-x-auto">

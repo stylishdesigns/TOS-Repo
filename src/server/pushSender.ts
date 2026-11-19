@@ -71,6 +71,21 @@ export async function runPushSweep(opts: { limit?: number } = {}): Promise<PushS
   );
 
   const now = Date.now();
+  // Per-sweep cache: one read per facility per sweep, not per device.
+  const logoCache = new Map<string, string>();
+  const facilityIcon = async (centreId: string): Promise<string> => {
+    if (!centreId) return '/pwa-192x192.png';
+    if (logoCache.has(centreId)) return logoCache.get(centreId) as string;
+    let icon = '/pwa-192x192.png';
+    try {
+      const cs = await adminDb.collection('centres').doc(centreId).get();
+      const logoUrl = String((cs.data() as any)?.logoUrl || '');
+      const m = logoUrl.match(/^(https:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/)(.+)$/);
+      if (m) icon = `${m[1]}w_192,h_192,c_pad,b_white,f_png/${m[2]}`;
+    } catch { /* fall back to the default icon */ }
+    logoCache.set(centreId, icon);
+    return icon;
+  };
   const snap = await adminDb
     .collection('pushQueue')
     .where('sent', '==', false)
@@ -88,11 +103,16 @@ export async function runPushSweep(opts: { limit?: number } = {}): Promise<PushS
       out.gaveUp += 1;
       continue;
     }
+    // The notification carries the facility's own logo, so a Godzilla push
+    // shows Godzilla's mark, never a default graduation cap.
+    const icon = await facilityIcon(String(v.centreId || ''));
     const payload = JSON.stringify({
       title: 'Planner reminder',
       body: v.time ? `${v.title} (${v.time})` : String(v.title || ''),
       tag: `planner-${String(v.id || job.id)}`,
       url: '/',
+      icon,
+      badge: icon,
     });
 
     const tokenSnap = await adminDb.collection('pushTokens').doc(uid).get();
