@@ -534,7 +534,7 @@ export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => 
         <button
           type="button"
           onClick={load}
-          className="inline-flex items-center gap-2 h-11 px-5 rounded-full bg-[#0F172A] text-white text-xs font-extrabold cursor-pointer"
+          className="inline-flex items-center gap-2 h-11 px-5 rounded-full bg-[var(--brand,#0F172A)] text-[var(--on-brand,#fff)] text-xs font-extrabold cursor-pointer"
         >
           <RefreshCw className="w-4 h-4" /> Try again
         </button>
@@ -1149,7 +1149,7 @@ export const StudentPractice: React.FC<StudentPracticeProps> = ({ student }) => 
                       disabled={disabled}
                       onClick={() => setLength(v)}
                       className={`h-11 px-4 rounded-full text-sm font-extrabold border transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
-                        length === v ? 'bg-[#0F172A] text-white border-[#0F172A]' : 'bg-white text-[#475569] border-[#E2E8F0] hover:border-[#CBD5E1]'
+                        length === v ? 'bg-[var(--brand,#0F172A)] text-[var(--on-brand,#fff)] border-[#0F172A]' : 'bg-white text-[#475569] border-[#E2E8F0] hover:border-[#CBD5E1]'
                       }`}
                     >
                       {v === 'all' ? 'All questions' : v}

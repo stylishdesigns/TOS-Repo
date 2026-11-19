@@ -224,7 +224,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({ student }) => {
           onClick={() => setActiveSection('timetable')}
           className={`h-10 rounded-[10px] text-xs font-extrabold transition-all flex items-center justify-center cursor-pointer ${
             activeSection === 'timetable'
-              ? 'bg-[#0F172A] text-white shadow-xs'
+              ? 'bg-[var(--brand,#0F172A)] text-[var(--on-brand,#fff)] shadow-xs'
               : 'text-[#64748B] hover:text-[#0F172A]'
           }`}
         >
@@ -236,7 +236,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({ student }) => {
           onClick={() => setActiveSection('materials')}
           className={`h-10 rounded-[10px] text-xs font-extrabold transition-all flex items-center justify-center cursor-pointer ${
             activeSection === 'materials'
-              ? 'bg-[#0F172A] text-white shadow-xs'
+              ? 'bg-[var(--brand,#0F172A)] text-[var(--on-brand,#fff)] shadow-xs'
               : 'text-[#64748B] hover:text-[#0F172A]'
           }`}
         >
@@ -366,7 +366,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({ student }) => {
                 onClick={() => setSubjectFilter('All')}
                 className={`px-3 py-1 rounded-full text-xs font-bold transition-all shrink-0 cursor-pointer ${
                   subjectFilter === 'All'
-                    ? 'bg-[#0F172A] text-white shadow-2xs'
+                    ? 'bg-[var(--brand,#0F172A)] text-[var(--on-brand,#fff)] shadow-2xs'
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
               >

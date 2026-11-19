@@ -259,7 +259,7 @@ export const PracticeAnalytics: React.FC<PracticeAnalyticsProps> = ({ onStartPra
         <button
           type="button"
           onClick={retry}
-          className="h-11 px-5 rounded-full bg-[#0F172A] text-white text-sm font-extrabold shadow-sm active:scale-[0.98] transition-transform cursor-pointer"
+          className="h-11 px-5 rounded-full bg-[var(--brand,#0F172A)] text-[var(--on-brand,#fff)] text-sm font-extrabold shadow-sm active:scale-[0.98] transition-transform cursor-pointer"
         >
           Retry
         </button>

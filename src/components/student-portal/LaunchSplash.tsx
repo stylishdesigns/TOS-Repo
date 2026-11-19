@@ -89,7 +89,7 @@ export function LaunchSplash() {
       </div>
       {branding.name && (
         <p
-          className={`mt-6 text-xl font-black tracking-tight px-6 text-center leading-tight ${dark ? 'text-slate-900' : 'text-white'}`}
+          className={`mt-6 text-3xl font-black tracking-tight px-6 text-center leading-tight ${dark ? 'text-slate-900' : 'text-white'}`}
           style={dark ? undefined : { textShadow: '0 1px 12px rgba(0,0,0,0.18)' }}
         >
           {branding.name}

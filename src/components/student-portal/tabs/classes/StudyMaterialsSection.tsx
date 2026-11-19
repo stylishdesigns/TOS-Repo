@@ -132,7 +132,7 @@ export const StudyMaterialsSection: React.FC<StudyMaterialsSectionProps> = ({
           onClick={() => setSelectedSubject('All')}
           className={`px-3 py-1.5 rounded-full text-xs font-extrabold transition-all shrink-0 cursor-pointer ${
             selectedSubject === 'All'
-              ? 'bg-[#0F172A] text-white shadow-xs'
+              ? 'bg-[var(--brand,#0F172A)] text-[var(--on-brand,#fff)] shadow-xs'
               : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
           }`}
         >

@@ -30,7 +30,7 @@ export const PeriodControl: React.FC<PeriodControlProps> = ({ value, onChange })
             onClick={() => onChange(opt.id)}
             className={`h-10 rounded-[10px] text-xs transition-all flex items-center justify-center cursor-pointer min-h-[40px] ${
               isActive
-                ? 'bg-[#0F172A] text-white font-extrabold shadow-xs'
+                ? 'bg-[var(--brand,#0F172A)] text-[var(--on-brand,#fff)] font-extrabold shadow-xs'
                 : 'bg-transparent text-[#475569] font-bold hover:text-[#0F172A]'
             }`}
           >

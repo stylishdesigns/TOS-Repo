@@ -113,6 +113,15 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     else setAddError("Couldn't save the reminder. Try again.");
   };
 
+  // A reminder whose day and time already passed is history: editing is
+  // disabled for it, only upcoming ones can move.
+  const isReminderPast = (a: PlannerActivity) => {
+    if (!a.date) return false;
+    const d = new Date(`${a.date}T${a.time || '23:59'}`);
+    if (Number.isNaN(d.getTime())) return false;
+    return d.getTime() < Date.now();
+  };
+
   // Edit an existing reminder: the same form, pre-filled with its values.
   const startEdit = (a: PlannerActivity) => {
     setEditing(a);
@@ -178,9 +187,10 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                 </div>
                 {a.kind !== 'class' && onEditActivity && (
                   <button
-                    onClick={() => startEdit(a)}
-                    className="p-2 rounded-full text-slate-300 hover:text-orange-500 hover:bg-orange-50 transition-colors"
-                    title="Edit reminder"
+                    onClick={() => { if (!isReminderPast(a)) startEdit(a); }}
+                    disabled={isReminderPast(a)}
+                    className={`p-2 rounded-full text-slate-300 transition-colors ${isReminderPast(a) ? 'opacity-40 cursor-not-allowed' : 'hover:text-orange-500 hover:bg-orange-50'}`}
+                    title={isReminderPast(a) ? 'Past reminders can no longer be edited' : 'Edit reminder'}
                   >
                     <Pencil className="w-4 h-4" />
                   </button>
