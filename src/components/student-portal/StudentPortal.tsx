@@ -476,8 +476,10 @@ export const StudentPortal: React.FC = () => {
     },
   ];
 
+  // Only the signed-in student's own record; never another student's row, and
+  // no sample record. Payment figures come from the server-written fields only.
   const rawStudent = user
-    ? students.find((s) => s.uid === user.uid || s.email === user.email) || students[0]
+    ? students.find((s) => s.uid === user.uid || s.email === user.email)
     : students[0];
   const activeStudent = rawStudent
     ? {
@@ -490,14 +492,14 @@ export const StudentPortal: React.FC = () => {
             : initialsAvatar(rawStudent.name),
       }
     : {
-        id: 'stu-1',
-        regNumber: 'EXC-2026-00421',
-        name: 'John Ade',
-        avatar: initialsAvatar('John Ade'),
-        programmeName: 'JAMB / UTME 2027 Intensive',
-        attendancePercent: 92,
-        totalFee: 50000,
-        paidAmount: 50000,
+        id: 'self',
+        regNumber: '',
+        name: (user && (user.displayName || user.email?.split('@')[0])) || 'Student',
+        avatar: initialsAvatar(user && (user.displayName || user.email?.split('@')[0]) || 'Student'),
+        programmeName: '',
+        attendancePercent: 0,
+        totalFee: 0,
+        paidAmount: 0,
         outstandingBalance: 0,
       };
 
