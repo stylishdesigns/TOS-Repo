@@ -33,7 +33,7 @@ const RING_CIRCUMFERENCE = 2 * Math.PI * 74;
 
 export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
   // Attendance & Clock logic
-  const { settings, timetable, announcements, results, attendanceSettings, attendanceLogs, clockIn, clockOut, plannerReminders, addPlannerReminder, removePlannerReminder } = useApp();
+  const { settings, timetable, announcements, results, attendanceSettings, attendanceLogs, clockIn, clockOut, plannerReminders, addPlannerReminder, removePlannerReminder, updatePlannerReminder } = useApp();
   const [showAttendanceInfo, setShowAttendanceInfo] = React.useState(false);
   const [showCalendar, setShowCalendar] = React.useState(false);
 
@@ -573,6 +573,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
         title="Academic Schedule Planner"
         onAddActivity={addPlannerReminder}
         onRemoveActivity={removePlannerReminder}
+        onEditActivity={updatePlannerReminder}
       />
     </div>
   );

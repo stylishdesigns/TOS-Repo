@@ -28,7 +28,7 @@ interface ScheduleTabProps {
 }
 
 export const ScheduleTab: React.FC<ScheduleTabProps> = ({ tutor }) => {
-  const { timetable, programmes, settings, consentToTimetableSlot, updateTimetableSlot, students, plannerReminders, addPlannerReminder, removePlannerReminder } = useApp();
+  const { timetable, programmes, settings, consentToTimetableSlot, updateTimetableSlot, students, plannerReminders, addPlannerReminder, removePlannerReminder, updatePlannerReminder } = useApp();
   const [showCalendar, setShowCalendar] = useState(false);
   const [showPastClasses, setShowPastClasses] = useState(false);
   const [selectedDay, setSelectedDay] = useState<'All' | string>('All');
@@ -286,7 +286,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({ tutor }) => {
         </div>
       </div>
 
-      <CalendarView isOpen={showCalendar} onClose={() => setShowCalendar(false)} activities={[...slotsToActivities(myClasses), ...plannerReminders]} title="My Teaching Schedule" onAddActivity={addPlannerReminder} onRemoveActivity={removePlannerReminder} />
+      <CalendarView isOpen={showCalendar} onClose={() => setShowCalendar(false)} activities={[...slotsToActivities(myClasses), ...plannerReminders]} title="My Teaching Schedule" onAddActivity={addPlannerReminder} onRemoveActivity={removePlannerReminder} onEditActivity={updatePlannerReminder} />
 
       {pendingClasses.length > 0 && (
         <div className="space-y-3">

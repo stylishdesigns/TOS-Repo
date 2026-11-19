@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, X, Plus, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, X, Plus, Trash2, Pencil } from 'lucide-react';
 import { PlannerActivity } from '../../types';
 import { useScrollLock } from '../../hooks/useScrollLock';
 
@@ -10,6 +10,7 @@ interface CalendarViewProps {
   title?: string;
   onAddActivity?: (input: { date: string; time: string; title: string; kind: 'practice' | 'mock' | 'custom' }) => Promise<boolean>;
   onRemoveActivity?: (id: string) => Promise<boolean>;
+  onEditActivity?: (id: string, input: { date: string; time: string; title: string; kind: 'practice' | 'mock' | 'custom' }) => Promise<boolean>;
 }
 
 const KIND_DOT: Record<string, string> = {
@@ -32,10 +33,12 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   title = 'Schedule Planner',
   onAddActivity,
   onRemoveActivity,
+  onEditActivity,
 }) => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState<PlannerActivity | null>(null);
   const [formTitle, setFormTitle] = useState('');
   const [formTime, setFormTime] = useState('09:00');
   const [formKind, setFormKind] = useState<'practice' | 'mock' | 'custom'>('custom');
@@ -70,6 +73,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
   const resetForm = () => {
     setAdding(false);
+    setEditing(null);
     setFormTitle('');
     setFormTime('09:00');
     setFormKind('custom');
@@ -95,16 +99,28 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   };
 
   const handleSave = async () => {
-    if (!onAddActivity || !selectedDate) return;
+    if ((!onAddActivity && !onEditActivity) || !selectedDate) return;
     if (!formTitle.trim()) {
       setAddError('Give the reminder a name first.');
       return;
     }
     setSaving(true);
-    const ok = await onAddActivity({ date: selectedDate, time: formTime, title: formTitle, kind: formKind });
+    let ok = false;
+    if (editing && onEditActivity) ok = await onEditActivity(editing.id, { date: selectedDate, time: formTime, title: formTitle, kind: formKind });
+    else if (onAddActivity) ok = await onAddActivity({ date: selectedDate, time: formTime, title: formTitle, kind: formKind });
     setSaving(false);
     if (ok) resetForm();
     else setAddError("Couldn't save the reminder. Try again.");
+  };
+
+  // Edit an existing reminder: the same form, pre-filled with its values.
+  const startEdit = (a: PlannerActivity) => {
+    setEditing(a);
+    setAdding(true);
+    setFormTitle(a.title);
+    setFormTime(a.time || '09:00');
+    setFormKind((['practice', 'mock', 'custom'] as string[]).includes(a.kind) ? a.kind as 'practice' | 'mock' | 'custom' : 'custom');
+    setAddError('');
   };
 
   const dayTitle = (dateStr: string) => {
@@ -160,6 +176,15 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                   <div className="text-sm font-black text-slate-900 truncate">{a.title}</div>
                   {a.time && <div className="text-[11px] font-bold text-slate-400 mt-0.5">{a.time}</div>}
                 </div>
+                {a.kind !== 'class' && onEditActivity && (
+                  <button
+                    onClick={() => startEdit(a)}
+                    className="p-2 rounded-full text-slate-300 hover:text-orange-500 hover:bg-orange-50 transition-colors"
+                    title="Edit reminder"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                )}
                 {a.kind !== 'class' && onRemoveActivity && (
                   <button
                     onClick={() => setConfirmDelete(a)}
@@ -222,7 +247,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                     onClick={handleSave}
                     className="flex-1 py-3 rounded-xl bg-orange-600 text-white text-xs font-black uppercase disabled:opacity-60"
                   >
-                    {saving ? 'Saving…' : 'Save reminder'}
+                    {saving ? 'Saving…' : editing ? 'Save changes' : 'Save reminder'}
                   </button>
                 </div>
               </div>

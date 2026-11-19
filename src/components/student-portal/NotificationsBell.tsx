@@ -244,6 +244,9 @@ export function NotificationsBell({ onOpenChange }: { onOpenChange?: (open: bool
     return null;
   }, [dueReminders, items]);
 
+  // The popup always carries the last 10 notifications, newest first.
+  const latestItems = React.useMemo(() => items.slice(0, 10), [items]);
+
   const visibleItems = React.useMemo(() => {
     if (filter === 'all') return items;
     if (filter === 'reminder') return [];
@@ -316,12 +319,11 @@ export function NotificationsBell({ onOpenChange }: { onOpenChange?: (open: bool
                   </div>
                 );
               })()}
-              {latestEntry?.kind === 'item' && (() => {
-                const n = latestEntry.n;
+              {latestItems.map((n: any) => {
                 const style = TYPE_STYLES[n.type] || TYPE_STYLES.mock;
                 const isUnread = !readRef.current.has(String(n.id));
                 return (
-                  <div className={`px-4 py-3 flex items-start gap-3 ${isUnread ? 'bg-orange-50/40' : ''}`}>
+                  <div key={String(n.id)} className={`px-4 py-3 flex items-start gap-3 ${isUnread ? 'bg-orange-50/40' : ''}`}>
                     <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${style.chip}`}>
                       {style.icon}
                     </div>
@@ -345,7 +347,7 @@ export function NotificationsBell({ onOpenChange }: { onOpenChange?: (open: bool
                     </button>
                   </div>
                 );
-              })()}
+              })}
             </div>
             <div className="shrink-0 border-t border-slate-100 p-3 bg-white">
               <button

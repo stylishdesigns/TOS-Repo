@@ -95,11 +95,16 @@ export function LaunchSplash() {
           {branding.name}
         </p>
       )}
-      <div
-        className={`mt-6 w-9 h-9 rounded-full border-[3px] ${dark ? 'border-slate-900/20 border-t-slate-900' : 'border-white/30 border-t-white'}`}
-        style={{ animation: 'tosLaunchSpin 0.9s linear infinite' }}
-      />
-      <style>{`@keyframes tosLaunchSpin{to{transform:rotate(360deg)}}`}</style>
+      <div className="mt-6 flex items-center gap-2">
+        {[0, 1, 2].map((i) => (
+          <span
+            key={i}
+            className={`w-2.5 h-2.5 rounded-full ${dark ? 'bg-slate-900' : 'bg-white'}`}
+            style={{ animation: `tosLaunchDot 1.05s cubic-bezier(.45,0,.55,1) ${i * 0.16}s infinite` }}
+          />
+        ))}
+      </div>
+      <style>{`@keyframes tosLaunchDot{0%,100%{transform:translateY(0) scale(.85);opacity:.35}40%{transform:translateY(-7px) scale(1.15);opacity:1}}`}</style>
     </div>
   );
 }

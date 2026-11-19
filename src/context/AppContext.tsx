@@ -239,6 +239,7 @@ interface AppContextType {
   plannerReminders: PlannerActivity[];
   addPlannerReminder: (input: { date: string; time: string; title: string; kind: 'practice' | 'mock' | 'custom' }) => Promise<boolean>;
   removePlannerReminder: (id: string) => Promise<boolean>;
+  updatePlannerReminder: (id: string, input: { date: string; time: string; title: string; kind: 'practice' | 'mock' | 'custom' }) => Promise<boolean>;
   clockOut: (studentId: string) => Promise<void>;
 
   results: StudentResult[];
@@ -3108,6 +3109,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  // Editing a reminder keeps its id (and the queued push job id) and rewrites
+  // the fields, so the planner and push sender see one reminder that moved.
+  const updatePlannerReminder = async (id: string, input: { date: string; time: string; title: string; kind: 'practice' | 'mock' | 'custom' }): Promise<boolean> => {
+    const target = plannerWriteTarget();
+    const item = plannerReminders.find((r) => r.id === id);
+    if (!target || !item || !input.date || !input.title.trim()) return false;
+    const next: PlannerActivity = {
+      ...item,
+      date: input.date,
+      time: (input.time || '').trim(),
+      title: input.title.trim().slice(0, 80),
+      kind: input.kind,
+    };
+    try {
+      await updateDoc(doc(db, target.col, target.id), { plannerReminders: arrayRemove(item) });
+      await updateDoc(doc(db, target.col, target.id), { plannerReminders: arrayUnion(next) });
+      // Re-queue the push for the new time and drop the job for the old one.
+      void api('/api/push/unqueue', { method: 'POST', body: { id } }).catch(() => {});
+      void api('/api/push/queue', { method: 'POST', body: { reminder: next } }).catch(() => {});
+      return true;
+    } catch (e) {
+      console.error('planner reminder update failed', e);
+      return false;
+    }
+  };
+
   const toggleAdminSuspend = async (id: string) => {
     try {
       const admin = admins.find((a) => a.id === id);
@@ -3195,6 +3222,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         plannerReminders,
         addPlannerReminder,
         removePlannerReminder,
+        updatePlannerReminder,
         clockOut,
         results,
         addResult,
