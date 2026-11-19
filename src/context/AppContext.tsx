@@ -3089,6 +3089,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
     try {
       await updateDoc(doc(db, target.col, target.id), { plannerReminders: arrayUnion(item) });
+      // Queue the web-push job for this reminder (server-side; fire and forget,
+      // the reminder itself already saved so a queue miss is not fatal).
+      void api('/api/push/queue', { method: 'POST', body: { reminder: item } }).catch(() => {});
       return true;
     } catch (e) {
       console.error('planner reminder save failed', e);
@@ -3102,6 +3105,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!target || !item) return false;
     try {
       await updateDoc(doc(db, target.col, target.id), { plannerReminders: arrayRemove(item) });
+      // Drop the queued push job for this reminder, if one exists.
+      void api('/api/push/unqueue', { method: 'POST', body: { id } }).catch(() => {});
       return true;
     } catch (e) {
       console.error('planner reminder removal failed', e);

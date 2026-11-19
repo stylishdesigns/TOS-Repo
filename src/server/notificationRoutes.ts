@@ -3,6 +3,7 @@ import { createHash } from 'crypto';
 import { FieldValue } from 'firebase-admin/firestore';
 import { adminDb } from './firebaseAdmin';
 import { Caller, httpError, requireMembership } from './tenantService';
+import { sendAtMs } from './pushSender';
 
 // ============================================================================
 // In-app notifications for the student portal.
@@ -231,6 +232,51 @@ export function registerNotificationRoutes(app: express.Express): void {
       return res.json({ ok: true });
     } catch (e) {
       return res.status(errStatus(e)).json({ error: (e as Error).message || 'Could not mark notifications read.' });
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // Planner-reminder push queue (Nov 19): when a member saves a reminder, the
+  // client posts it here and the server stores one `pushQueue` document whose
+  // sendAt is the reminder's Lagos wall-clock moment. The scheduled sender
+  // (netlify/functions/push-sender.mts, every 10 minutes) turns due jobs into
+  // real device notifications. Server-only collection: no rules change needed.
+  // ---------------------------------------------------------------------------
+  app.post('/api/push/queue', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const r = (req.body?.reminder || {}) as Record<string, any>;
+      const id = cleanStr(r.id, 60);
+      const date = cleanStr(r.date, 10);
+      const time = cleanStr(r.time, 20);
+      const title = cleanStr(r.title, 120);
+      const kind = cleanStr(r.kind, 12);
+      if (!id || !title) return res.status(400).json({ error: 'A reminder id and title are required.' });
+      const sendAt = sendAtMs(date, time);
+      if (!sendAt) return res.status(400).json({ error: 'A valid reminder date is required.' });
+      await adminDb.collection('pushQueue').doc(`prq_${id}`).set(
+        { id: `prq_${id}`, uid: caller.uid, date, time, title, kind, sendAt, sent: false, attempts: 0, createdAt: Date.now() },
+        { merge: true }
+      );
+      return res.json({ ok: true });
+    } catch (e) {
+      return res.status(errStatus(e)).json({ error: (e as Error).message || 'Could not queue this reminder.' });
+    }
+  });
+
+  app.post('/api/push/unqueue', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const id = cleanStr(req.body?.id, 60);
+      if (!id) return res.status(400).json({ error: 'A reminder id is required.' });
+      const ref = adminDb.collection('pushQueue').doc(`prq_${id}`);
+      const snap = await ref.get();
+      if (snap.exists && String((snap.data() as any).uid) === caller.uid) {
+        await ref.delete().catch(() => {});
+      }
+      return res.json({ ok: true });
+    } catch (e) {
+      return res.status(errStatus(e)).json({ error: (e as Error).message || 'Could not remove this reminder from the queue.' });
     }
   });
 
