@@ -79,6 +79,14 @@ const TYPE_STYLES: Record<string, { icon: React.ReactNode; chip: string }> = {
 };
 
 
+const FILTERS: { key: string; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'reminder', label: 'Reminders' },
+  { key: 'class', label: 'Classes' },
+  { key: 'material', label: 'Materials' },
+  { key: 'mock', label: 'Mocks' },
+];
+
 function timeAgo(at: number): string {
   const diff = Date.now() - at;
   if (diff < 60_000) return 'Just now';
@@ -99,6 +107,7 @@ export function NotificationsBell({ onOpenChange }: { onOpenChange?: (open: bool
   const [loading, setLoading] = useState(false);
   const [seenTick, setSeenTick] = useState(0);
   const [readTick, setReadTick] = useState(0);
+  const [filter, setFilter] = useState('all');
   const [push, setPush] = useState(() => pushStatus());
   const { plannerReminders, addToast } = useApp() as any;
 
@@ -230,8 +239,10 @@ export function NotificationsBell({ onOpenChange }: { onOpenChange?: (open: bool
   };
 
   const visibleReminders = React.useMemo(() => {
-    return [...dueReminders.map((r: any) => ({ ...r, isDue: true })), ...upcomingReminders.map((r: any) => ({ ...r, isDue: false }))];
-  }, [dueReminders, upcomingReminders]);
+    const rows = [...dueReminders.map((r: any) => ({ ...r, isDue: true })), ...upcomingReminders.map((r: any) => ({ ...r, isDue: false }))];
+    if (filter === 'all' || filter === 'reminder') return rows;
+    return [];
+  }, [dueReminders, upcomingReminders, filter]);
 
   // The splash shows only the first entry of the feed: a due reminder when
   // one exists, otherwise the newest notification.
@@ -241,7 +252,11 @@ export function NotificationsBell({ onOpenChange }: { onOpenChange?: (open: bool
     return null;
   }, [dueReminders, items]);
 
-  const visibleItems = items;
+  const visibleItems = React.useMemo(() => {
+    if (filter === 'all') return items;
+    if (filter === 'reminder') return [];
+    return items.filter((n) => String(n.type) === filter);
+  }, [items, filter]);
 
   return (
     <>
@@ -353,6 +368,17 @@ export function NotificationsBell({ onOpenChange }: { onOpenChange?: (open: bool
             <div>
               <p className="text-base font-black text-white">All notifications</p>
             </div>
+          </div>
+          <div className="shrink-0 border-b border-slate-100 px-3 py-2 flex items-center gap-1.5 overflow-x-auto">
+            {FILTERS.map((f) => (
+              <button
+                key={f.key}
+                onClick={() => setFilter(f.key)}
+                className={`px-3 py-1.5 rounded-full text-[11px] font-black whitespace-nowrap transition-colors ${filter === f.key ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+              >
+                {f.label}
+              </button>
+            ))}
           </div>
           <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
             {loading && items.length === 0 && visibleReminders.length === 0 && (
