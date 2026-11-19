@@ -18,6 +18,7 @@ import { ActionSheetModal, ActionSheetItem } from './tabs/ActionSheetModal';
 import { StudentResult } from '../../types';
 import { PWAInstallButton } from '../pwa/PWAInstallButton';
 import { NotificationsBell } from './NotificationsBell';
+import { PushPrompt } from './PushPrompt';
 import {
   Bell,
   Home,
@@ -600,6 +601,8 @@ export const StudentPortal: React.FC = () => {
           </div>
         </div>
       </header>
+
+      <PushPrompt />
 
       {/* 2. Main Body: Phone Shell Container */}
       <main className="flex-1 min-h-0 flex items-center justify-center p-0 sm:py-6 sm:px-4">

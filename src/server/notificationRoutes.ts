@@ -1,4 +1,6 @@
 import express from 'express';
+import { createHash } from 'crypto';
+import { FieldValue } from 'firebase-admin/firestore';
 import { adminDb } from './firebaseAdmin';
 import { Caller, httpError, requireMembership } from './tenantService';
 
@@ -130,6 +132,88 @@ export function registerNotificationRoutes(app: express.Express): void {
       return res.json({ items, unread });
     } catch (e) {
       return res.status(errStatus(e)).json({ error: (e as Error).message || 'Could not load notifications.' });
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // Web push (Nov 19): each signed-in member can allow notifications on a
+  // device. The subscription is stored server-side in the `pushTokens`
+  // collection, one document per member with one entry per device endpoint.
+  // Only the server touches this collection (Admin SDK), so the Firestore
+  // rules need no change for it.
+  // ---------------------------------------------------------------------------
+  const endpointHash = (endpoint: string): string =>
+    createHash('sha256').update(endpoint).digest('hex').slice(0, 32);
+
+  async function resolveMemberCentre(uid: string): Promise<{ centreId: string; role: string }> {
+    const [stu, tut, adm] = await Promise.all([
+      adminDb.collection('students').where('uid', '==', uid).limit(1).get(),
+      adminDb.collection('tutors').where('uid', '==', uid).limit(1).get(),
+      adminDb.collection('admins').doc(uid).get(),
+    ]);
+    if (!stu.empty) {
+      const v = stu.docs[0].data() as any;
+      return { centreId: cleanStr(v.centreId, 120), role: 'student' };
+    }
+    if (!tut.empty) {
+      const v = tut.docs[0].data() as any;
+      return { centreId: cleanStr(v.centreId, 120), role: 'tutor' };
+    }
+    if (adm.exists) {
+      const v = adm.data() as any;
+      return { centreId: cleanStr(v.centreId, 120), role: cleanStr(v.role, 20) || 'admin' };
+    }
+    return { centreId: '', role: '' };
+  }
+
+  app.post('/api/push/subscribe', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const sub = (req.body?.subscription || {}) as Record<string, any>;
+      const endpoint = cleanStr(sub.endpoint, 500);
+      const p256dh = cleanStr(sub.keys?.p256dh, 200);
+      const auth = cleanStr(sub.keys?.auth, 200);
+      if (!endpoint.startsWith('https://') || !p256dh || !auth) {
+        return res.status(400).json({ error: 'A valid push subscription is required.' });
+      }
+      const resolved = await resolveMemberCentre(caller.uid);
+      const centreId = cleanStr(req.body?.centreId, 120) || resolved.centreId;
+      if (centreId) await requireMembership(caller, centreId);
+      const now = Date.now();
+      const ref = adminDb.collection('pushTokens').doc(caller.uid);
+      await ref.set(
+        {
+          uid: caller.uid,
+          email: caller.email,
+          ...(centreId ? { centreId } : {}),
+          ...(resolved.role ? { role: resolved.role } : {}),
+          [`devices.${endpointHash(endpoint)}`]: { endpoint, keys: { p256dh, auth }, updatedAt: now },
+          updatedAt: now,
+        },
+        { merge: true }
+      );
+      return res.json({ ok: true });
+    } catch (e) {
+      return res.status(errStatus(e)).json({ error: (e as Error).message || 'Could not save this device for notifications.' });
+    }
+  });
+
+  app.post('/api/push/unsubscribe', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const endpoint = cleanStr(req.body?.endpoint, 500);
+      const ref = adminDb.collection('pushTokens').doc(caller.uid);
+      if (!endpoint) {
+        await ref.delete().catch(() => {});
+        return res.json({ ok: true });
+      }
+      await ref.set(
+        { [`devices.${endpointHash(endpoint)}`]: FieldValue.delete(), updatedAt: Date.now() },
+        { merge: true }
+      );
+      return res.json({ ok: true });
+    } catch (e) {
+      return res.status(errStatus(e)).json({ error: (e as Error).message || 'Could not remove this device.' });
     }
   });
 
