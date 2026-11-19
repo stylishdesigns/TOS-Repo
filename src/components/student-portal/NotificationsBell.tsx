@@ -44,19 +44,7 @@ function dayLabel(dateStr: string): string {
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
-const SEEN_KEY = 'tos:planner-seen-reminders';
 const READ_KEY = 'tos:notification-read';
-
-function loadSeen(): string[] {
-  try {
-    const raw = JSON.parse(localStorage.getItem(SEEN_KEY) || '[]');
-    return Array.isArray(raw) ? raw.filter((v) => typeof v === 'string') : [];
-  } catch { return []; }
-}
-
-function saveSeen(ids: string[]) {
-  try { localStorage.setItem(SEEN_KEY, JSON.stringify(ids.slice(-300))); } catch { /* private mode */ }
-}
 
 function loadRead(): string[] {
   try {
@@ -105,7 +93,6 @@ export function NotificationsBell({ onOpenChange }: { onOpenChange?: (open: bool
   const [view, setView] = useState<'splash' | 'history'>('splash');
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [seenTick, setSeenTick] = useState(0);
   const [readTick, setReadTick] = useState(0);
   const [filter, setFilter] = useState('all');
   const [push, setPush] = useState(() => pushStatus());
@@ -129,7 +116,6 @@ export function NotificationsBell({ onOpenChange }: { onOpenChange?: (open: bool
   const dueReminders = React.useMemo(() => {
     const today = localToday();
     const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
-    const seen = new Set(loadSeen());
     return (Array.isArray(plannerReminders) ? plannerReminders : [])
       .filter((r: any) => {
         const date = String(r?.date || '');
@@ -139,8 +125,8 @@ export function NotificationsBell({ onOpenChange }: { onOpenChange?: (open: bool
         const t = parseTimeToMinutes(String(r?.time || ''));
         return t === null ? true : t <= nowMin;
       })
-      .filter((r: any) => !seen.has(String(r.id)) && !deliveredIds.has(String(r.id)));
-  }, [plannerReminders, seenTick, deliveredIds]);
+      .filter((r: any) => !deliveredIds.has(String(r.id)));
+  }, [plannerReminders, deliveredIds]);
 
   // Upcoming reminders stay visible in the bell until they come due, so a
   // reminder the student just set is never a silent surprise.
@@ -230,10 +216,6 @@ export function NotificationsBell({ onOpenChange }: { onOpenChange?: (open: bool
     setPush(pushStatus());
     await refresh();
     setLoading(false);
-    if (dueReminders.length > 0) {
-      saveSeen([...loadSeen(), ...dueReminders.map((r: any) => String(r.id))]);
-      setSeenTick((t) => t + 1);
-    }
     markAllRead();
     void api('/api/student/notifications/read', { method: 'POST' }).catch(() => {});
   };

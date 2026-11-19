@@ -2,6 +2,7 @@ import React, { useRef,  useState, useEffect, Component, ErrorInfo, ReactNode, l
 import { AppProvider, useApp } from './context/AppContext';
 import { Sidebar } from './components/layout/Sidebar';
 import { AppOnlyGate } from './components/portal/AppOnlyGate';
+import { LaunchSplash } from './components/student-portal/LaunchSplash';
 import { TopNav } from './components/layout/TopNav';
 import { ToastContainer } from './components/layout/ToastContainer';
 import { PublicWebsite } from './components/public/PublicWebsite';
@@ -945,7 +946,7 @@ const MainLayout: React.FC = () => {
   if (viewMode === 'student') {
     return (
       <AppOnlyGate>
-        <div style={brandVars(brandAccent)}><Suspense fallback={<PortalFallback />}><StudentPortal /></Suspense></div>
+        <div style={brandVars(brandAccent)}><Suspense fallback={<LaunchSplash />}><StudentPortal /></Suspense></div>
         <OfflineIndicator />
         <ToastContainer />
       </AppOnlyGate>
