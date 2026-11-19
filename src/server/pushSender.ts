@@ -96,8 +96,16 @@ export async function runPushSweep(opts: { limit?: number } = {}): Promise<PushS
     });
 
     const tokenSnap = await adminDb.collection('pushTokens').doc(uid).get();
-    const devices = (tokenSnap.data()?.devices || {}) as Record<string, any>;
-    const endpoints = Object.values(devices);
+    // Self-healing read: subscriptions saved by the earlier dotted-key write
+    // sit in literal "devices.<hash>" fields; fold them into the real map.
+    const raw = (tokenSnap.data() || {}) as Record<string, any>;
+    const deviceMap: Record<string, any> =
+      raw.devices && typeof raw.devices === 'object' ? { ...raw.devices } : {};
+    for (const [k, val] of Object.entries(raw)) {
+      if (k.startsWith('devices.') && val && typeof val === 'object') deviceMap[k.slice(8)] = val;
+    }
+    const endpoints = Object.values(deviceMap);
+    console.log(`[push-sender] job ${job.id} uid=${uid} devices=${endpoints.length}`);
     if (!endpoints.length) {
       await job.ref.set({ sent: true, sentAt: now, delivered: 0, note: 'no device subscribed' }, { merge: true });
       continue;
@@ -121,8 +129,15 @@ export async function runPushSweep(opts: { limit?: number } = {}): Promise<PushS
         if (status === 404 || status === 410) {
           // Subscription is gone (app uninstalled, browser dropped it): clean up.
           const hash = require('crypto').createHash('sha256').update(endpoint).digest('hex').slice(0, 32);
-          await adminDb.collection('pushTokens').doc(uid)
-            .set({ [`devices.${hash}`]: FieldValue.delete(), updatedAt: now }, { merge: true });
+          const tokenRef = adminDb.collection('pushTokens').doc(uid);
+          const freshRaw = ((await tokenRef.get()).data() || {}) as Record<string, any>;
+          const freshMap: Record<string, any> =
+            freshRaw.devices && typeof freshRaw.devices === 'object' ? { ...freshRaw.devices } : {};
+          for (const [k, val] of Object.entries(freshRaw)) {
+            if (k.startsWith('devices.') && val && typeof val === 'object') freshMap[k.slice(8)] = val;
+          }
+          delete freshMap[hash];
+          await tokenRef.set({ devices: freshMap, updatedAt: now }, { merge: true });
           out.cleaned += 1;
           cleanedJob += 1;
         } else {

@@ -101,6 +101,25 @@ export function NotificationsBell() {
       .filter((r: any) => !seen.has(String(r.id)));
   }, [plannerReminders, seenTick]);
 
+  // Upcoming reminders stay visible in the bell until they come due, so a
+  // reminder the student just set is never a silent surprise.
+  const upcomingReminders = React.useMemo(() => {
+    const today = localToday();
+    const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+    return (Array.isArray(plannerReminders) ? plannerReminders : [])
+      .filter((r: any) => {
+        const date = String(r?.date || '');
+        if (!date || !r?.title) return false;
+        if (date < today) return false;
+        if (date > today) return true;
+        const t = parseTimeToMinutes(String(r?.time || ''));
+        return t !== null && t > nowMin;
+      })
+      .sort((a: any, b: any) =>
+        String(a.date).localeCompare(String(b.date)) ||
+        String(a.time || '').localeCompare(String(b.time || '')));
+  }, [plannerReminders]);
+
   const toastRef = React.useRef<Set<string>>(new Set());
 
   // While the app is open, a reminder that comes due gets a toast so it does
@@ -197,22 +216,25 @@ export function NotificationsBell() {
                   <p className="text-xs text-slate-500 font-medium mt-0.5">New classes, materials, exams, reminders and leaderboard news will show up here.</p>
                 </div>
               )}
-              {dueReminders.map((r: any) => {
+              {[...dueReminders, ...upcomingReminders].map((r: any) => {
                 const today = String(r.date) === localToday();
+                const isDue = dueReminders.some((d: any) => String(d.id) === String(r.id));
                 return (
-                  <div key={r.id} className="px-4 py-3 flex items-start gap-3 bg-amber-50/60">
-                    <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-amber-100 text-amber-700">
+                  <div key={r.id} className={`px-4 py-3 flex items-start gap-3 ${isDue ? 'bg-amber-50/60' : ''}`}>
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${isDue ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>
                       <Clock className="w-4 h-4" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
                         <p className="text-[13px] font-black text-slate-900 leading-tight">{String(r.title)}</p>
-                        <span className="text-[10px] text-amber-600 font-bold shrink-0">Reminder</span>
+                        <span className={`text-[10px] font-bold shrink-0 ${isDue ? 'text-amber-600' : 'text-slate-400'}`}>{isDue ? 'Reminder' : 'Upcoming'}</span>
                       </div>
                       <p className="text-xs text-slate-600 font-medium mt-0.5 leading-relaxed break-words">
-                        {today
-                          ? `Your planner reminder for today${r.time ? ` at ${r.time}` : ''}.`
-                          : `Your planner reminder was set for ${dayLabel(String(r.date))}${r.time ? ` at ${r.time}` : ''}.`}
+                        {isDue
+                          ? (today
+                            ? `Your planner reminder for today${r.time ? ` at ${r.time}` : ''}.`
+                            : `Your planner reminder was set for ${dayLabel(String(r.date))}${r.time ? ` at ${r.time}` : ''}.`)
+                          : `Scheduled for ${dayLabel(String(r.date))}${r.time ? ` at ${r.time}` : ''}.`}
                       </p>
                     </div>
                   </div>

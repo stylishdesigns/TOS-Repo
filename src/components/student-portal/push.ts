@@ -56,6 +56,13 @@ export async function enablePush(): Promise<PushState> {
       await sub.unsubscribe().catch(() => {});
       sub = null;
     }
+    if (sub && !lastKey) {
+      // A subscription saved before the app started tracking its VAPID key
+      // cannot be trusted to match the sender's key: replace it with a fresh
+      // one so this device always ends up on the key we can sign with.
+      await sub.unsubscribe().catch(() => {});
+      sub = null;
+    }
     if (!sub) {
       sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,

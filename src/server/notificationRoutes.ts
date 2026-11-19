@@ -182,13 +182,25 @@ export function registerNotificationRoutes(app: express.Express): void {
       if (centreId) await requireMembership(caller, centreId);
       const now = Date.now();
       const ref = adminDb.collection('pushTokens').doc(caller.uid);
+      // Firestore stores dotted keys in set() as literal field names, not
+      // nested paths, so the device must live inside a real `devices` map.
+      // Legacy literal "devices.<hash>" fields left by the earlier write are
+      // folded in here, which repairs subscriptions saved before this fix.
+      const prevSnap = await ref.get();
+      const prev = (prevSnap.data() || {}) as Record<string, any>;
+      const devices: Record<string, any> =
+        prev.devices && typeof prev.devices === 'object' ? { ...prev.devices } : {};
+      for (const [k, v] of Object.entries(prev)) {
+        if (k.startsWith('devices.') && v && typeof v === 'object') devices[k.slice(8)] = v;
+      }
+      devices[endpointHash(endpoint)] = { endpoint, keys: { p256dh, auth }, updatedAt: now };
       await ref.set(
         {
           uid: caller.uid,
           email: caller.email,
           ...(centreId ? { centreId } : {}),
           ...(resolved.role ? { role: resolved.role } : {}),
-          [`devices.${endpointHash(endpoint)}`]: { endpoint, keys: { p256dh, auth }, updatedAt: now },
+          devices,
           updatedAt: now,
         },
         { merge: true }
@@ -208,10 +220,15 @@ export function registerNotificationRoutes(app: express.Express): void {
         await ref.delete().catch(() => {});
         return res.json({ ok: true });
       }
-      await ref.set(
-        { [`devices.${endpointHash(endpoint)}`]: FieldValue.delete(), updatedAt: Date.now() },
-        { merge: true }
-      );
+      const snap = await ref.get();
+      const raw = (snap.data() || {}) as Record<string, any>;
+      const devices: Record<string, any> =
+        raw.devices && typeof raw.devices === 'object' ? { ...raw.devices } : {};
+      for (const [k, v] of Object.entries(raw)) {
+        if (k.startsWith('devices.') && v && typeof v === 'object') devices[k.slice(8)] = v;
+      }
+      delete devices[endpointHash(endpoint)];
+      await ref.set({ devices, updatedAt: Date.now() }, { merge: true });
       return res.json({ ok: true });
     } catch (e) {
       return res.status(errStatus(e)).json({ error: (e as Error).message || 'Could not remove this device.' });
