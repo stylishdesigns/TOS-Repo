@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { AccessCodeSettings } from './AccessCodeSettings';
 import { WebsiteLanding } from '../dashboard/WebsiteLanding';
+import { ACCENTS } from '../../landing/landingContent';
 import { ModernSelect } from '../ui/ModernSelect';
 import {
   User,
@@ -86,6 +87,44 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
       addToast({ type: 'error', title: 'Remove Failed', description: err?.message || 'The logo could not be removed. Please try again.' });
     } finally {
       setLogoBusy(false);
+    }
+  };
+
+  // ---- Accent colour: one colour for the whole facility. Saving here moves
+  // the account accent AND the website landing page accent together, so the
+  // landing page, portals, login page, install page and app theme all agree.
+  const [accent, setAccent] = useState('');
+  const [accentDraft, setAccentDraft] = useState('');
+  const [accentBusy, setAccentBusy] = useState(false);
+  React.useEffect(() => {
+    if (mode !== 'facility' || !activeCentreId) return;
+    fetch('/api/centre/landing').then((r) => (r.ok ? r.json() : null)).then((d) => {
+      const a = String(d?.content?.accent || '');
+      if (/^#[0-9a-fA-F]{6}$/i.test(a)) {
+        setAccent(a.toUpperCase());
+        setAccentDraft(a.toUpperCase());
+      }
+    }).catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, activeCentreId]);
+  const handleAccentSave = async () => {
+    if (!/^#[0-9a-fA-F]{6}$/i.test(accentDraft)) {
+      addToast({ type: 'error', title: 'Pick a Colour', description: 'Choose a preset or a custom colour before saving.' });
+      return;
+    }
+    try {
+      setAccentBusy(true);
+      const r = await fetch('/api/centre/branding-accent', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ accent: accentDraft }) });
+      const d = await r.json().catch(() => null);
+      if (!r.ok || d?.error) throw new Error(d?.error || 'The colour could not be saved. Please try again.');
+      const saved = String(d.accent || accentDraft).toUpperCase();
+      setAccent(saved);
+      setAccentDraft(saved);
+      addToast({ type: 'success', title: 'Colour Is Live', description: 'The landing page, portals, login page and install pages now use this colour.' });
+    } catch (err: any) {
+      addToast({ type: 'error', title: 'Save Failed', description: err?.message || 'The colour could not be saved. Please try again.' });
+    } finally {
+      setAccentBusy(false);
     }
   };
 
@@ -795,6 +834,35 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
 
       {mode === 'facility' && (
         <div className="space-y-6">
+          {/* Accent colour: one colour for the whole facility, saved to the
+              account and the website landing page together. */}
+          <div className="bg-white p-5 sm:p-6 rounded-xl border border-slate-200/90 shadow-xs space-y-4">
+            <div className="border-b border-slate-100 pb-3">
+              <h3 className="text-base font-bold text-slate-900">Accent colour</h3>
+              <p className="text-xs text-slate-500">
+                One colour for your facility: the website landing page, portals, login page and the app families install. Saving here updates them all together, no deploy needed.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {ACCENTS.map((a) => (
+                <button key={a} type="button" onClick={() => setAccentDraft(a)} aria-label={`Accent ${a}`} className={`w-9 h-9 rounded-full border-2 transition-transform ${accentDraft === a ? 'border-slate-900 scale-110' : 'border-transparent'}`} style={{ background: a }} />
+              ))}
+              <input
+                type="color"
+                value={/^#[0-9a-fA-F]{6}$/i.test(accentDraft) ? accentDraft : '#F2A93B'}
+                onChange={(e) => setAccentDraft(e.target.value.toUpperCase())}
+                aria-label="Custom colour"
+                title="Pick any colour"
+                className="w-9 h-9 rounded-full border-2 border-dashed border-slate-300 bg-transparent p-0 cursor-pointer"
+              />
+              <span className="text-xs text-slate-400">{accentDraft || 'Pick a colour'}</span>
+              <div className="flex-1" />
+              <button type="button" onClick={handleAccentSave} disabled={accentBusy || accentDraft === accent} className="px-4 py-2 rounded-lg text-sm font-semibold bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-50 transition-colors">
+                {accentBusy ? 'Saving…' : 'Save colour'}
+              </button>
+            </div>
+          </div>
+
           {/* Access code (Prompt C Part C): owner-managed, server-verified. */}
           <AccessCodeSettings />
 

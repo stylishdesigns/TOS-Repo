@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { BellRing, X } from 'lucide-react';
-import { ensurePushRegistered, pushPermission, pushSupported } from './push';
+import { enablePush, ensurePushRegistered, pushPermission, pushSupported } from './push';
 import { useApp } from '../../context/AppContext';
 
 // One quiet banner (Nov 19): when the browser can receive push notifications

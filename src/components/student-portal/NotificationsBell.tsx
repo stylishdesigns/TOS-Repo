@@ -183,7 +183,7 @@ export function NotificationsBell({ onOpenChange }: { onOpenChange?: (open: bool
   // Per-item read/unread (Nov 19): one tap marks a notification read, and the
   // same control flips a read one back to unread on this device.
   const toggleRead = useCallback((id: string) => {
-    const next = new Set(readRef.current);
+    const next = new Set<string>(readRef.current);
     if (next.has(id)) next.delete(id); else next.add(id);
     readRef.current = next;
     saveRead([...next]);
@@ -191,7 +191,7 @@ export function NotificationsBell({ onOpenChange }: { onOpenChange?: (open: bool
   }, []);
 
   const markAllRead = useCallback(() => {
-    const next = new Set(readRef.current);
+    const next = new Set<string>(readRef.current);
     let added = false;
     for (const n of items) {
       if (!next.has(String(n.id))) { next.add(String(n.id)); added = true; }
