@@ -15,7 +15,7 @@ interface AppWelcomePageProps {
 export const AppWelcomePage: React.FC<AppWelcomePageProps> = ({ centreName, accent, welcomeImageUrl, onGetStarted, onLogin }) => {
   const img = welcomeImageUrl || '/welcome-default.jpg';
   return (
-    <div className="min-h-screen w-full bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] flex flex-col" style={brandVars(accent)}>
+    <div className="min-h-screen w-full bg-slate-950 text-white flex flex-col" style={brandVars(accent)}>
       <div className="flex-1 flex flex-col items-center justify-center px-5 py-10">
         <div className="w-full max-w-sm">
           <div className="rounded-3xl overflow-hidden shadow-2xl ring-1 ring-white/10 bg-slate-900">

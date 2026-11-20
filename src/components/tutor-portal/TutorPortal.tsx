@@ -11,6 +11,7 @@ import { StaffStatusScreen } from '../student-portal/tabs/StatusTab';
 import { ChatModeToggle, ChatMode } from '../communications/ChatSplash';
 import TutorAiChat from '../tutor-ai/TutorAiChat';
 import { PWAInstallButton } from '../pwa/PWAInstallButton';
+import { NotificationsBell } from '../student-portal/NotificationsBell';
 import {
   Home,
   Calendar,
@@ -19,7 +20,6 @@ import {
   Menu,
   Smartphone,
   Maximize2,
-  Bell,
   LogOut,
   GraduationCap,
   Shield,
@@ -35,7 +35,9 @@ import { useScrollLock } from '../../hooks/useScrollLock';
 type TabType = 'home' | 'classes' | 'assessment' | 'chat' | 'more';
 
 export const TutorPortal: React.FC = () => {
-  const { tutors, settings, setViewMode, isAdmin, activeTutor: contextTutor, updateTutor, logout } = useApp();
+  const { tutors, settings, setViewMode, isAdmin, activeTutor: contextTutor, updateTutor, logout, bgTheme, activeCentre } = useApp();
+  const centreName = activeCentre?.name || (settings as any)?.centreName || 'Tutor Portal';
+  const centreLogo = activeCentre?.logoUrl || (settings as any)?.logoUrl || '';
   const { updatePassword } = useFirebase();
 
   const parseInitialTutorTab = (): TabType => {
@@ -134,7 +136,7 @@ export const TutorPortal: React.FC = () => {
   }, [activeTab]);
 
   return (
-    <div className="min-h-screen bg-slate-900/95 flex flex-col justify-between selection:bg-orange-500 selection:text-white">
+    <div className={`min-h-screen bg-slate-900/95 flex flex-col justify-between selection:bg-orange-500 selection:text-white ${bgTheme === 'dark' ? 'tos-student-dark' : ''}`}>
       {/* Password Change Overlay for Invited Tutors */}
       {activeTutor.status === 'Invited' && !activeTutor.hasChangedPassword && !isAdmin && (
         <PasswordChangeOverlay
@@ -147,11 +149,16 @@ export const TutorPortal: React.FC = () => {
       )}
 
       {/* 1. Top Desktop Control Bar */}
-      <header className="bg-slate-950/80 backdrop-blur-md border-b border-slate-800 text-white px-4 py-2.5 z-40 sticky top-0">
+      <header className="bg-slate-950 border-b border-slate-800 text-white px-4 py-2.5 z-40 sticky top-0">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
-          <div className="flex items-center space-x-2.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-orange-600 animate-pulse shrink-0" />
-            <span className="hidden sm:inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-500/20 text-orange-400 border border-orange-500/30">
+          <div className="flex items-center space-x-2.5 min-w-0">
+            {centreLogo ? (
+              <img src={centreLogo} alt="" className="w-7 h-7 rounded-lg object-cover border border-slate-700 shrink-0" />
+            ) : null}
+            <span className="font-black text-sm text-white truncate">
+              {centreName}
+            </span>
+            <span className="hidden sm:inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-500/20 text-orange-400 border border-orange-500/30 shrink-0">
               Tutor Portal
             </span>
           </div>
@@ -159,13 +166,7 @@ export const TutorPortal: React.FC = () => {
           <div className="flex items-center space-x-2">
             <PWAInstallButton variant="pill" />
             
-            <button
-               className="w-9 h-9 rounded-xl bg-slate-800/80 hover:brightness-110 text-slate-300 flex items-center justify-center border border-slate-700 transition-all relative"
-               aria-label="Notifications"
-            >
-               <Bell className="w-4 h-4" />
-               <span className="absolute top-2 right-2 w-2 h-2 bg-orange-600 rounded-full ring-2 ring-slate-900 animate-pulse" />
-            </button>
+            <NotificationsBell feed="tutor" />
 
             <button
               onClick={() =>
@@ -186,26 +187,6 @@ export const TutorPortal: React.FC = () => {
               )}
             </button>
 
-            <button 
-              onClick={async () => {
-                if (isAdmin) {
-                  setViewMode('portal');
-                } else {
-                  setShowLogoutConfirm(true);
-                }
-              }}
-              className="px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-rose-500/20 hover:text-rose-400 text-slate-400 border border-slate-700 transition-all flex items-center space-x-2"
-              title={isAdmin ? "Switch to Admin" : "Logout"}
-            >
-              {isAdmin ? (
-                <>
-                  <Shield className="w-4 h-4" />
-                  <span className="text-[10px] font-bold uppercase tracking-widest hidden sm:inline">Switch to Admin</span>
-                </>
-              ) : (
-                <LogOut className="w-4 h-4" />
-              )}
-            </button>
           </div>
         </div>
       </header>
@@ -259,66 +240,66 @@ export const TutorPortal: React.FC = () => {
           )}
 
           {/* 3. Bottom Navigation (Mobile App Style) */}
-          <nav className={`${chatThreadOpen || chatMode === 'tito' ? 'hidden' : ''} fixed bottom-0 left-0 right-0 sm:absolute z-40 bg-orange-600 border-t border-orange-600/30 py-2 px-3 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] rounded-t-[24px]`}>
+          <nav className={`${chatThreadOpen || chatMode === 'tito' ? 'hidden' : ''} fixed bottom-0 left-0 right-0 sm:absolute z-40 bg-slate-950 border-t border-slate-800 py-2 px-3 shadow-[0_-4px_20px_rgba(0,0,0,0.25)] rounded-t-[24px]`}>
             <div className="max-w-md mx-auto grid grid-cols-5 gap-1 items-center">
               {/* Home */}
               <button
                 onClick={() => setActiveTab('home')}
                 className={`flex flex-col items-center justify-center py-1 transition-all ${
-                  activeTab === 'home' ? 'text-white scale-110' : 'text-orange-100/70'
+                  activeTab === 'home' ? 'text-[var(--brand,#EA580C)] scale-110' : 'text-slate-500'
                 }`}
               >
                 <Home className={`w-5 h-5 ${activeTab === 'home' ? 'fill-white/10' : ''}`} />
                 <span className="text-[10px] mt-1 font-bold">Home</span>
-                {activeTab === 'home' && <div className="w-1 h-1 bg-white rounded-full mt-0.5" />}
+                {activeTab === 'home' && <div className="w-1 h-1 bg-[var(--brand,#EA580C)] rounded-full mt-0.5" />}
               </button>
 
               {/* Classes */}
               <button
                 onClick={() => setActiveTab('classes')}
                 className={`flex flex-col items-center justify-center py-1 transition-all ${
-                  activeTab === 'classes' ? 'text-white scale-110' : 'text-orange-100/70'
+                  activeTab === 'classes' ? 'text-[var(--brand,#EA580C)] scale-110' : 'text-slate-500'
                 }`}
               >
                 <Calendar className={`w-5 h-5 ${activeTab === 'classes' ? 'fill-white/10' : ''}`} />
                 <span className="text-[10px] mt-1 font-bold">Classes</span>
-                {activeTab === 'classes' && <div className="w-1 h-1 bg-white rounded-full mt-0.5" />}
+                {activeTab === 'classes' && <div className="w-1 h-1 bg-[var(--brand,#EA580C)] rounded-full mt-0.5" />}
               </button>
 
               {/* Chat */}
               <button
                 onClick={() => setActiveTab('chat')}
                 className={`flex flex-col items-center justify-center py-1 transition-all ${
-                  activeTab === 'chat' ? 'text-white scale-110' : 'text-orange-100/70'
+                  activeTab === 'chat' ? 'text-[var(--brand,#EA580C)] scale-110' : 'text-slate-500'
                 }`}
               >
                 <MessageSquare className={`w-5 h-5 ${activeTab === 'chat' ? 'fill-white/10' : ''}`} />
                 <span className="text-[10px] mt-1 font-bold">Chat</span>
-                {activeTab === 'chat' && <div className="w-1 h-1 bg-white rounded-full mt-0.5" />}
+                {activeTab === 'chat' && <div className="w-1 h-1 bg-[var(--brand,#EA580C)] rounded-full mt-0.5" />}
               </button>
 
               {/* Assessment */}
               <button
                 onClick={() => setActiveTab('assessment')}
                 className={`flex flex-col items-center justify-center py-1 transition-all ${
-                  activeTab === 'assessment' ? 'text-white scale-110' : 'text-orange-100/70'
+                  activeTab === 'assessment' ? 'text-[var(--brand,#EA580C)] scale-110' : 'text-slate-500'
                 }`}
               >
                 <Laptop className={`w-5 h-5 ${activeTab === 'assessment' ? 'fill-white/10' : ''}`} />
                 <span className="text-[10px] mt-1 font-bold">Assessment</span>
-                {activeTab === 'assessment' && <div className="w-1 h-1 bg-white rounded-full mt-0.5" />}
+                {activeTab === 'assessment' && <div className="w-1 h-1 bg-[var(--brand,#EA580C)] rounded-full mt-0.5" />}
               </button>
 
               {/* More */}
               <button
                 onClick={() => setActiveTab('more')}
                 className={`flex flex-col items-center justify-center py-1 transition-all ${
-                  activeTab === 'more' ? 'text-white scale-110' : 'text-orange-100/70'
+                  activeTab === 'more' ? 'text-[var(--brand,#EA580C)] scale-110' : 'text-slate-500'
                 }`}
               >
                 <Menu className={`w-5 h-5 ${activeTab === 'more' ? 'fill-white/10' : ''}`} />
                 <span className="text-[10px] mt-1 font-bold">More</span>
-                {activeTab === 'more' && <div className="w-1 h-1 bg-white rounded-full mt-0.5" />}
+                {activeTab === 'more' && <div className="w-1 h-1 bg-[var(--brand,#EA580C)] rounded-full mt-0.5" />}
               </button>
             </div>
           </nav>

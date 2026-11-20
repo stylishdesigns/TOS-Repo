@@ -193,7 +193,9 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
 
   const style = portalStyles[portalType];
   const isStudent = portalType === 'student';
-  const pageBackground = isStudent ? style.pageBg : (accent ? 'bg-orange-950' : 'bg-slate-900');
+  // Facility logins are dark with the facility colour kept for the buttons and
+  // accents (Nov 20); the plain console login keeps its own dark slate.
+  const pageBackground = isStudent || accent ? 'bg-slate-950' : 'bg-slate-900';
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -575,7 +577,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
   };
 
   return (
-    <div className={`min-h-screen ${pageBackground} overflow-y-auto overflow-x-hidden selection:bg-orange-500 selection:text-white`} style={brandVars(accent)}>
+    <div className={`min-h-screen ${pageBackground} overflow-y-auto overflow-x-hidden selection:bg-orange-500 selection:text-white ${(isStudent || accent) ? 'tos-student-dark' : ''}`} style={brandVars(accent)}>
       <div className="min-h-screen w-full flex flex-col items-center justify-center py-8 md:py-12 px-4">
         <div className="w-full max-w-md bg-white rounded-[2.5rem] shadow-2xl shadow-black/50 border border-white/10 overflow-hidden animate-in fade-in zoom-in-95 duration-500 relative">
           <div className={`p-8 ${accent ? '' : style.bg} border-b ${style.border} text-center relative`} style={accent ? { background: 'var(--brand)' } : undefined}>

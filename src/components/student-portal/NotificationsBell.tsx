@@ -89,7 +89,9 @@ function timeAgo(at: number): string {
   return new Date(at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
-export function NotificationsBell({ onOpenChange }: { onOpenChange?: (open: boolean) => void }) {
+// feed: 'student' (default) reads the student record's feed; 'tutor' reads the
+// same facility history from the caller's membership, for the tutor portal bell.
+export function NotificationsBell({ onOpenChange, feed = 'student' }: { onOpenChange?: (open: boolean) => void; feed?: 'student' | 'tutor' }) {
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<'splash' | 'history'>('splash');
   const [items, setItems] = useState<any[]>([]);
@@ -187,7 +189,7 @@ export function NotificationsBell({ onOpenChange }: { onOpenChange?: (open: bool
 
   const refresh = useCallback(async () => {
     try {
-      const out = await api('/api/student/notifications') as any;
+      const out = await api(feed === 'tutor' ? '/api/tutor/notifications' : '/api/student/notifications') as any;
       if (Array.isArray(out?.items)) setItems(out.items);
     } catch { /* the bell stays quiet when the feed can't load */ }
   }, []);
@@ -216,7 +218,7 @@ export function NotificationsBell({ onOpenChange }: { onOpenChange?: (open: bool
     void refresh();
     if (!sessionStorage.getItem('tos:welcome-asked')) {
       sessionStorage.setItem('tos:welcome-asked', '1');
-      void api('/api/student/notifications/welcome', { method: 'POST' }).catch(() => {});
+      if (feed === 'student') void api('/api/student/notifications/welcome', { method: 'POST' }).catch(() => {});
     }
   }, [refresh]);
 
@@ -239,7 +241,7 @@ export function NotificationsBell({ onOpenChange }: { onOpenChange?: (open: bool
     await refresh();
     setLoading(false);
     markAllRead();
-    void api('/api/student/notifications/read', { method: 'POST' }).catch(() => {});
+    void api(feed === 'tutor' ? '/api/tutor/notifications/read' : '/api/student/notifications/read', { method: 'POST' }).catch(() => {});
   };
 
   const visibleReminders = React.useMemo(() => {

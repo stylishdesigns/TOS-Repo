@@ -269,6 +269,62 @@ export function registerNotificationRoutes(app: express.Express): void {
   // Manual trigger for the scheduled push sweep (staff only). The Netlify
   // scheduler only fires scheduled functions from production deploys, so on a
   // preview this route lets staff run the same sweep to test reminders.
+  // ---------------------------------------------------------------------------
+  // Tutor/staff notification feed (Nov 20): the same facility notification
+  // history the student bell shows, resolved from the caller's facility
+  // membership instead of a student record. Staff see everything
+  // facility-wide; the audienceUid filter keeps individually-addressed items
+  // private. Per-item read state stays in localStorage on the device, and
+  // marking the feed read bumps the same notificationReads document.
+  // ---------------------------------------------------------------------------
+  app.get('/api/tutor/notifications', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const resolved = await resolveMemberCentre(caller.uid);
+      if (!resolved?.centreId) return res.status(403).json({ error: 'No facility is linked to this account.' });
+      await requireMembership(caller, resolved.centreId);
+      const [snap, readSnap] = await Promise.all([
+        adminDb.collection('notifications').where('centreId', '==', resolved.centreId).orderBy('createdAt', 'desc').limit(60).get(),
+        adminDb.collection('notificationReads').doc(`${resolved.centreId}__${caller.uid}`).get(),
+      ]);
+      const lastReadAt = Number(readSnap.data()?.lastReadAt) || 0;
+      const items: Record<string, unknown>[] = [];
+      let unread = 0;
+      for (const d of snap.docs) {
+        const v = d.data() as any;
+        if (v.audienceUid && v.audienceUid !== caller.uid) continue;
+        const at = Number(v.createdAt) || 0;
+        if (at > lastReadAt) unread += 1;
+        items.push({
+          id: d.id,
+          type: cleanStr(v.type, 20),
+          title: cleanStr(v.title, 120),
+          body: cleanStr(v.body, 400),
+          subjects: Array.isArray(v.subjects) ? v.subjects : [],
+          programmes: Array.isArray(v.programmes) ? v.programmes : [],
+          at,
+        });
+      }
+      return res.json({ items, unread });
+    } catch (e) {
+      return res.status(errStatus(e)).json({ error: (e as Error).message || 'Could not load notifications.' });
+    }
+  });
+
+  app.post('/api/tutor/notifications/read', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const resolved = await resolveMemberCentre(caller.uid);
+      if (!resolved?.centreId) return res.status(403).json({ error: 'No facility is linked to this account.' });
+      await requireMembership(caller, resolved.centreId);
+      await adminDb.collection('notificationReads').doc(`${resolved.centreId}__${caller.uid}`)
+        .set({ lastReadAt: Date.now(), uid: caller.uid }, { merge: true });
+      return res.json({ ok: true });
+    } catch (e) {
+      return res.status(errStatus(e)).json({ error: (e as Error).message || 'Could not mark notifications read.' });
+    }
+  });
+
   app.post('/api/push/send-due', async (req, res) => {
     try {
       const caller = getCaller(req);
