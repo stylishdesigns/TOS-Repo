@@ -550,7 +550,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [studyMaterials, setStudyMaterials] = useState<StudyMaterial[]>(() => {
     try {
       const saved = localStorage.getItem(scopedKey('studyMaterials'));
-      return saved ? JSON.parse(saved) : [];
+      if (!saved) return [];
+      const parsed: StudyMaterial[] = JSON.parse(saved);
+      // Drop the old demo placeholder materials (mat-1..mat-6) cached from earlier builds.
+      return parsed.filter((m) => !/^mat-\d{1,6}$/.test(m.id));
     } catch {
       return [];
     }
