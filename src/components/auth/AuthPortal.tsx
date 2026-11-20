@@ -1,8 +1,8 @@
 import { brandVars } from '../../lib/brand';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useFirebase } from '../../context/FirebaseContext';
 import { useApp } from '../../context/AppContext';
-import { db } from '../../firebase';
+import { db, auth as firebaseAuth } from '../../firebase';
 import { doc, getDoc, updateDoc, query, collection, where, getDocs, setDoc, deleteDoc } from 'firebase/firestore';
 import { 
   GraduationCap, 
@@ -52,6 +52,7 @@ interface AuthPortalProps {
   noticeModal?: boolean;
   onChangeAccessCode?: () => void;
   verifying?: boolean;
+  forcePasswordChange?: boolean;
   logoUrl?: string;
   entryMode?: 'login' | 'signup';
   centreId?: string;
@@ -75,6 +76,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
   noticeModal,
   onChangeAccessCode,
   verifying,
+  forcePasswordChange,
   logoUrl,
   entryMode,
   centreId,
@@ -86,7 +88,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
   accent
 }) => {
   const { loginWithEmail, loginWithGoogle, signUpWithEmail, resetPassword, updatePassword, logout } = useFirebase();
-  const { addToast, activeCentreId, centreName } = useApp();
+  const { addToast, activeCentreId, centreName, setPasswordChangePending } = useApp();
   
   const [currentPassword, setCurrentPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -97,7 +99,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
   const [authMode, setAuthMode] = useState<'login' | 'signup'>(entryMode === 'signup' ? 'signup' : 'login');
 
   // New Password Flow
-  const [needsPasswordChange, setNeedsPasswordChange] = useState(false);
+  const [needsPasswordChange, setNeedsPasswordChange] = useState(forcePasswordChange === true);
   const [passwordChangeStep, setPasswordChangeStep] = useState<'verify' | 'new'>('verify');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -105,6 +107,49 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [userDocInfo, setUserDocInfo] = useState<{ id: string, collection: string } | null>(null);
+
+  // The app holds the whole page while this screen is up: a first-login
+  // password change outranks the splash, the facility entry and the portals.
+  // It clears only when the change completes or the account signs out, never
+  // on an unmount, so a splash or branch switch mid-flow cannot drop it.
+  useEffect(() => {
+    setPasswordChangePending(!!needsPasswordChange);
+  }, [needsPasswordChange, setPasswordChangePending]);
+
+  // Standalone first-login password screen: re-detect the account's own
+  // staff or tutor record on mount, so a remount mid-flow never loses the
+  // change. The first sign-in already ran any legacy migration, so the
+  // record is read by its uid key directly.
+  useEffect(() => {
+    if (!forcePasswordChange) return;
+    const u = firebaseAuth.currentUser;
+    if (!u?.uid || !u.email) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const tutor = await getDoc(doc(db, 'tutors', u.uid));
+        const adminSnap = tutor.exists() ? null : await getDoc(doc(db, 'admins', u.uid));
+        const hit = tutor.exists()
+          ? { id: u.uid, collection: 'tutors' as string, data: tutor.data() }
+          : adminSnap && adminSnap.exists()
+            ? { id: u.uid, collection: 'admins' as string, data: adminSnap.data() }
+            : null;
+        if (cancelled) return;
+        if (hit && !(hit.data as any).hasChangedPassword) {
+          setUserDocInfo({ id: hit.id, collection: hit.collection });
+          setNeedsPasswordChange(true);
+          setPasswordChangeStep('new');
+        } else {
+          // Nothing pending: the flag was stale, hand the app back.
+          setNeedsPasswordChange(false);
+          setPasswordChangePending(false);
+        }
+      } catch (e) {
+        console.error('Password-change re-detection failed:', e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [forcePasswordChange]);
 
   const validatePassword = (pass: string) => {
     const hasUpper = /[A-Z]/.test(pass);
@@ -423,6 +468,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
         title: 'Account Activated',
         description: 'Your permanent password has been set. Welcome!'
       });
+      setPasswordChangePending(false);
       onSuccess();
     } catch (err: any) {
       setError(err.message || 'Failed to update password.');

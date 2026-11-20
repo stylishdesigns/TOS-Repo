@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { initialsAvatar } from '../lib/avatar';
 import { api } from '../components/tos/tosShared';
 import {
@@ -328,6 +328,8 @@ interface AppContextType {
   entitlements: CentreEntitlements;
   seatsSummary: CentreSeatsSummary | null;
   hasCheckedActiveCentre: boolean;
+  passwordChangePending: boolean;
+  setPasswordChangePending: (v: boolean) => void;
   enterCentreByCode: (code: string, centreId?: string) => Promise<{ success: boolean; centreId?: string; error?: string }>;
   resumeCentreSession: (centreId: string) => Promise<void>;
   enterSoleCentre: () => Promise<{ entered: boolean; count: number; error?: string; whatsapp?: string }>;
@@ -588,6 +590,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
   const [seatsSummary, setSeatsSummary] = useState<CentreSeatsSummary | null>(null);
   const [hasCheckedActiveCentre, setHasCheckedActiveCentre] = useState(false);
+  // True while a staff or tutor account is mid-way through its first-login
+  // password change: the whole app holds on that one screen until it is done.
+  const [passwordChangePending, setPasswordChangePending] = useState(false);
 
 
   const addStudyMaterial = async (materialData: Omit<StudyMaterial, 'id' | 'uploadedAt'>) => {
@@ -1152,6 +1157,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => unsub();
   }, []);
 
+  // The uid the facility session state belongs to: a different account
+  // signing in never inherits the previous account's facility.
+  const lastAuthUidRef = useRef<string | null>(null);
+
   // -------------------------------------------------------------------------
   // MULTI-TENANT INITIALIZATION & REFRESH (Prompt 3)
   // -------------------------------------------------------------------------
@@ -1160,6 +1169,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setHasCheckedActiveCentre(true);
       return;
     }
+
+    // A different account signing in must never inherit the previous
+    // account's facility session, not even for the moment before its own
+    // validation comes back: clear the previous facility first.
+    if (lastAuthUidRef.current && lastAuthUidRef.current !== user.uid) {
+      setActiveCentreId(null);
+      setActiveCentre(null);
+      setUserCentres([]);
+      setSeatsSummary(null);
+      try {
+        sessionStorage.removeItem('tos_activeCentreId');
+        sessionStorage.removeItem('tos_activeCentreOwner');
+      } catch { /* storage unavailable */ }
+    }
+    lastAuthUidRef.current = user.uid;
 
     const initTenantSession = async () => {
       try {
@@ -1188,7 +1212,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         // 3. Check & Validate activeCentreId from sessionStorage (Part A, point 4)
         const savedCentreId = sessionStorage.getItem('tos_activeCentreId');
-        if (savedCentreId) {
+        const savedCentreOwner = sessionStorage.getItem('tos_activeCentreOwner');
+        if (savedCentreId && savedCentreOwner && savedCentreOwner !== user.uid) {
+          // The saved facility session belongs to a different account: drop
+          // it before anything else, so no other user's facility can leak
+          // into this one.
+          sessionStorage.removeItem('tos_activeCentreId');
+          sessionStorage.removeItem('tos_activeCentreOwner');
+        } else if (savedCentreId) {
           const valRes = await fetch('/api/auth/validate-active-centre', {
             method: 'POST',
             headers: {
@@ -1254,6 +1285,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setActiveCentre(data.centre);
     if (data.entitlements) setEntitlements(data.entitlements);
     sessionStorage.setItem('tos_activeCentreId', centreId);
+    try { sessionStorage.setItem('tos_activeCentreOwner', firebaseAuth.currentUser?.uid || ''); } catch { /* storage unavailable */ }
     try { localStorage.setItem(`tos_tenant:${centreId}`, centreId); } catch { /* storage unavailable */ }
     fetch(`/api/centre/seats-summary?centreId=${centreId}`, {
       headers: { Authorization: `Bearer ${token}` },
@@ -1295,6 +1327,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setActiveCentre(data.centre);
     if (data.entitlements) setEntitlements(data.entitlements);
     sessionStorage.setItem('tos_activeCentreId', data.centreId);
+    try { sessionStorage.setItem('tos_activeCentreOwner', firebaseAuth.currentUser?.uid || ''); } catch { /* storage unavailable */ }
     // Keep the tenant on this device per facility, so a facility app (and a
     // page refresh or relaunch) restores its own dashboard without asking for
     // anything. The value is always re-validated with the server before use.
@@ -1347,6 +1380,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (data.status === 'active') {
       setActiveCentreId(data.centreId);
       sessionStorage.setItem('tos_activeCentreId', data.centreId);
+      try { sessionStorage.setItem('tos_activeCentreOwner', firebaseAuth.currentUser?.uid || ''); } catch { /* storage unavailable */ }
       setViewMode('student');
       addToast({
         type: 'success',
@@ -1390,6 +1424,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setActiveCentre(data.centre);
       if (data.entitlements) setEntitlements(data.entitlements);
       sessionStorage.setItem('tos_activeCentreId', targetCentreId);
+      try { sessionStorage.setItem('tos_activeCentreOwner', firebaseAuth.currentUser?.uid || ''); } catch { /* storage unavailable */ }
       addToast({
         type: 'success',
         title: 'Switched Facility',
@@ -1463,6 +1498,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setActiveCentre(valData.centre);
       if (valData.entitlements) setEntitlements(valData.entitlements);
       sessionStorage.setItem('tos_activeCentreId', target.centreId);
+      try { sessionStorage.setItem('tos_activeCentreOwner', firebaseAuth.currentUser?.uid || ''); } catch { /* storage unavailable */ }
       refreshSeatsSummary(target.centreId);
       if (valData.role === 'student') setViewMode('student');
       else if (valData.role === 'tutor') setViewMode('tutor');
@@ -3014,6 +3050,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       try { localStorage.removeItem(`tos_tenant:${activeCentreId}`); } catch { /* ignore */ }
     }
     try { sessionStorage.removeItem('tos_activeCentreId'); } catch { /* ignore */ }
+    try { sessionStorage.removeItem('tos_activeCentreOwner'); } catch { /* ignore */ }
+    setPasswordChangePending(false);
     await signOut(firebaseAuth);
   };
 
@@ -3363,6 +3401,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         entitlements,
         seatsSummary,
         hasCheckedActiveCentre,
+        passwordChangePending,
+        setPasswordChangePending,
         enterCentreByCode,
         enterSoleCentre,
         resumeCentreSession,

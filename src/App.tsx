@@ -56,7 +56,8 @@ const MainLayout: React.FC = () => {
     addToast,
     updateAdmin,
     logout,
-    brandAccent
+    brandAccent,
+    passwordChangePending
   } = useApp();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [showWelcome, setShowWelcome] = useState(true);
@@ -237,6 +238,13 @@ const MainLayout: React.FC = () => {
     // on this device (per facility), so reopening or refreshing the app
     // restores the dashboard without asking for anything again. The restored
     // tenant is always re-validated with the server before it is trusted; a
+    // A first-login password change holds the app: facility entry waits
+    // until the permanent password is set, then runs from the same state.
+    if (passwordChangePending) {
+      centreEntryKeyRef.current = null;
+      return;
+    }
+
     // failed restore falls through to normal automatic entry.
     if (appFacility && !activeCentreId && centreResumeTriedRef.current !== appFacility.centreId) {
       centreResumeTriedRef.current = appFacility.centreId;
@@ -317,7 +325,7 @@ const MainLayout: React.FC = () => {
         });
       })
       .finally(() => setCentreEntryBusy(false));
-  }, [currentUser, hasCheckedActiveCentre, activeCentreId, pendingCentre, centreEntryRetry, appWelcomeCentre, appWelcomeMode, appFacility, verifyPending, enterCentreByCode, enterSoleCentre, resumeCentreSession]);
+  }, [currentUser, hasCheckedActiveCentre, activeCentreId, pendingCentre, centreEntryRetry, appWelcomeCentre, appWelcomeMode, appFacility, verifyPending, passwordChangePending, enterCentreByCode, enterSoleCentre, resumeCentreSession]);
 
   // The centre code gate appears only after a login button on the landing
   // page is clicked; the platform-staff door (#tos-admin) never shows it.
@@ -437,6 +445,43 @@ const MainLayout: React.FC = () => {
       console.error(e);
     }
   };
+
+  // The facility the auth surface belongs to, resolved from the access code,
+  // the facility app's own binding, or its welcome screen. The sign-in and
+  // password screens render ONLY this facility: a stale device-level centre
+  // (the last one used on this device) can never repaint them as another
+  // facility's page.
+  const authCentre: { centreName: string; accent?: string; logoUrl?: string } | null = pendingCentre
+    ? { centreName: pendingCentre.centreName, accent: pendingCentre.accent }
+    : appFacility
+      ? { centreName: appFacility.centreName, accent: appFacility.accent, logoUrl: appFacility.logoUrl }
+      : appWelcomeCentre
+        ? { centreName: appWelcomeCentre.centreName, accent: appWelcomeCentre.accent, logoUrl: appWelcomeCentre.logoUrl }
+        : null;
+
+  // FIRST-LOGIN PASSWORD HOLD: while a staff or tutor account is setting its
+  // permanent password, the whole app stays on that one screen. No splash,
+  // no automatic facility entry and no other screen can take the page over,
+  // and the screen keeps the facility's own branding. A remount re-detects
+  // the account's record, so even a reload mid-flow lands back here.
+  if (passwordChangePending) {
+    return (
+      <AuthPortal
+        portalType="student"
+        forcePasswordChange
+        title={authCentre?.centreName || ''}
+        accent={authCentre?.accent}
+        logoUrl={authCentre?.logoUrl}
+        subtitle=""
+        onSuccess={() => {}}
+        onBack={handleLogout}
+        email={loginEmail}
+        onEmailChange={setLoginEmail}
+        password={loginPassword}
+        onPasswordChange={setLoginPassword}
+      />
+    );
+  }
 
   // Global loading state to prevent auth "flashes". Signed-in users also hold
   // one beat while token claims are read, so a `tos`-claim staff account never
@@ -712,8 +757,8 @@ const MainLayout: React.FC = () => {
       <EmailVerificationGate
         uid={verifyPending.uid}
         email={verifyPending.email}
-        centreName={pendingCentre?.centreName || centreName || undefined}
-        accent={appWelcomeCentre?.accent || pendingCentre?.accent || ''}
+        centreName={authCentre?.centreName || undefined}
+        accent={authCentre?.accent || ''}
         onVerified={() => { setVerifyPending(null); setCentreEntryRetry((n) => n + 1); }}
         onSignOut={handleLogout}
       />
@@ -747,12 +792,12 @@ const MainLayout: React.FC = () => {
 
   if (currentUser && !activeCentreId && !isTosAdmin) {
     if (centreEntryBusy || !centreEntryFailed) {
-      if (pendingCentre) {
+      if (authCentre) {
         return (
           <AuthPortal
             portalType="student"
-            title={pendingCentre.centreName}
-            accent={pendingCentre.accent}
+            title={authCentre.centreName}
+            accent={authCentre.accent}
             subtitle=""
             onSuccess={() => {}}
             verifying
@@ -774,7 +819,7 @@ const MainLayout: React.FC = () => {
       const accessBlocked = !!centreEntryError && /cannot access/i.test(centreEntryError);
       const waDigits = accessBlocked && centreEntryWhatsapp ? centreEntryWhatsapp.replace(/\D/g, '') : '';
       const waHref = waDigits
-        ? `https://wa.me/${waDigits}?text=${encodeURIComponent(`Hello, I am a student of ${pendingCentre?.centreName || centreName}. I cannot access the portal at the moment. Please help me regain access. Thank you.`)}`
+        ? `https://wa.me/${waDigits}?text=${encodeURIComponent(`Hello, I am a student of ${authCentre?.centreName || 'your facility'}. I cannot access the portal at the moment. Please help me regain access. Thank you.`)}`
         : '';
       return (
         <div className="h-screen w-full flex flex-col items-center justify-center bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] px-6 text-center">
@@ -783,7 +828,7 @@ const MainLayout: React.FC = () => {
             : "w-14 h-14 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 mb-5"}>
             <AlertCircle className="w-7 h-7" />
           </div>
-          <h2 className="text-xl font-black tracking-widest uppercase text-orange-500 mb-3">{pendingCentre?.centreName || centreName}</h2>
+          <h2 className="text-xl font-black tracking-widest uppercase text-orange-500 mb-3">{authCentre?.centreName || 'your facility'}</h2>
           <p className="text-sm text-slate-300 font-medium max-w-sm mb-2">
             {accessBlocked
               ? 'Your access to this facility has been switched off. Please contact your facility admin to have it switched back on.'
@@ -866,8 +911,8 @@ const MainLayout: React.FC = () => {
     return (
       <AuthPortal 
         portalType="student"
-        title={pendingCentre?.centreName || centreName}
-        accent={pendingCentre?.accent}
+        title={authCentre?.centreName || ''}
+        accent={authCentre?.accent}
         subtitle=""
         onSuccess={() => {}}
         onBack={() => { if (appWelcomeCentre) { setAppWelcomeMode('welcome'); } else { setShowPortals(false); setShowWelcome(true); setCentreGateRequested(false); } }}
@@ -888,8 +933,8 @@ const MainLayout: React.FC = () => {
     return (
       <AuthPortal 
         portalType="student"
-        title={pendingCentre?.centreName || centreName}
-        accent={pendingCentre?.accent}
+        title={authCentre?.centreName || ''}
+        accent={authCentre?.accent}
         subtitle=""
         onSuccess={() => {}}
         onBack={() => { if (appWelcomeCentre) { setAppWelcomeMode('welcome'); } else { setShowPortals(false); setShowWelcome(true); setCentreGateRequested(false); } }}
