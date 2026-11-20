@@ -40,6 +40,8 @@ export async function pushNotification(input: {
   title: string;
   body: string;
   subjects?: string[];
+  /** Programme-scoped delivery (broadcasts): students of other programmes never see it. */
+  programmes?: string[];
   audienceUid?: string;
 }): Promise<void> {
   const doc: Record<string, unknown> = {
@@ -51,6 +53,8 @@ export async function pushNotification(input: {
   };
   const subjects = (input.subjects || []).map((s) => cleanStr(s, 60)).filter(Boolean);
   if (subjects.length) doc.subjects = subjects;
+  const programmes = (input.programmes || []).map((x) => cleanStr(x, 120)).filter(Boolean);
+  if (programmes.length) doc.programmes = programmes;
   if (input.audienceUid) doc.audienceUid = cleanStr(input.audienceUid, 128);
   await adminDb.collection('notifications').add(doc);
 }
@@ -124,6 +128,10 @@ export function registerNotificationRoutes(app: express.Express): void {
         // and mock was hidden from them).
         const stuSubjects = Array.isArray(student.subjects) ? student.subjects : [];
         if (stuSubjects.length > 0 && !subjectsInclude(stuSubjects, Array.isArray(v.subjects) ? v.subjects : [])) continue;
+        // Programme-scoped items (a broadcast sent to one programme) stay
+        // hidden from students of other programmes; unscoped items show to all.
+        if (Array.isArray(v.programmes) && v.programmes.length > 0
+          && !v.programmes.map((x: unknown) => String(x)).includes(String(student.programmeName || ''))) continue;
         const at = Number(v.createdAt) || 0;
         if (at > lastReadAt) unread += 1;
         items.push({
@@ -132,6 +140,7 @@ export function registerNotificationRoutes(app: express.Express): void {
           title: cleanStr(v.title, 120),
           body: cleanStr(v.body, 400),
           subjects: Array.isArray(v.subjects) ? v.subjects : [],
+          programmes: Array.isArray(v.programmes) ? v.programmes : [],
           at,
         });
       }

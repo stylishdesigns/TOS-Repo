@@ -42,6 +42,7 @@ export const AnnouncementsManager: React.FC = () => {
   const [busy, setBusy] = useState(false);
 
   const [announcements, setAnnouncements] = useState<AnnouncementItem[]>([]);
+  const [historyTick, setHistoryTick] = useState(0);
 
   // The centre's own chat groups, pulled live so the Student Group channel
   // can target any group the centre has created.
@@ -62,6 +63,35 @@ export const AnnouncementsManager: React.FC = () => {
     })();
     return () => { dead = true; };
   }, [activeCentreId]);
+
+  // Broadcast history comes from the server (the `announcements` collection):
+  // every saved broadcast, delivered or scheduled, across reloads.
+  useEffect(() => {
+    if (!activeCentreId || activeCentreId === 'none') return;
+    let dead = false;
+    (async () => {
+      try {
+        const res: any = await api(`/api/centre/announcements?centreId=${encodeURIComponent(activeCentreId)}`);
+        if (dead) return;
+        const items: AnnouncementItem[] = (res?.items || []).map((v: any) => ({
+          id: String(v.id),
+          title: String(v.title || ''),
+          body: String(v.body || ''),
+          audience: String(v.audience || 'All Programs'),
+          channels: Array.isArray(v.channels) ? v.channels : [],
+          dateSent: v.status === 'Scheduled' && v.scheduledAt
+            ? new Date(Number(v.scheduledAt)).toLocaleString()
+            : new Date(Number(v.deliveredAt || v.createdAt || Date.now())).toLocaleString(),
+          status: v.status === 'Scheduled' ? 'Scheduled' : 'Delivered',
+          imageUrl: String(v.imageUrl || ''),
+          targetGroups: Array.isArray(v.targetGroups) && v.targetGroups.length ? v.targetGroups : ['Student'],
+          groupName: v.groupName || undefined,
+        }));
+        setAnnouncements(items);
+      } catch { /* the page stays usable when history cannot load */ }
+    })();
+    return () => { dead = true; };
+  }, [activeCentreId, historyTick]);
 
   const [showComposeModal, setShowComposeModal] = useState(false);
   const [formData, setFormData] = useState({
@@ -129,36 +159,84 @@ export const AnnouncementsManager: React.FC = () => {
       setBusy(false);
     }
 
-    const newAnn: AnnouncementItem = {
-      id: `ann-${Date.now()}`,
-      title: formData.title,
-      body: formData.body,
-      audience: formData.audience,
-      channels: formData.channels,
-      dateSent: formData.sendMode === 'now' ? 'Just now' : new Date(formData.scheduleTime).toLocaleString(),
-      status: formData.sendMode === 'now' ? 'Delivered' : 'Scheduled',
-      imageUrl: formData.imageUrl,
-      targetGroups: [target],
-      groupName: groupName || undefined,
-    };
-
-    setAnnouncements([newAnn, ...announcements]);
-    setShowComposeModal(false);
-    setFormData({
-      title: '',
-      body: '',
-      audience: 'All Programs',
-      channels: ['In-App', 'Student Group'],
-      sendMode: 'now',
-      scheduleTime: '',
-      imageUrl: '',
-    });
-
-    addToast({
-      type: 'success',
-      title: 'Broadcast Dispatched!',
-      description: `Announcement pushed to ${target}s for ${formData.audience} via ${formData.channels.join(', ')}.`,
-    });
+    const wantsInApp = formData.channels.includes('In-App');
+    const wantsEmail = formData.channels.includes('Email');
+    if (busy) return;
+    setBusy(true);
+    try {
+      const res: any = await api(`/api/centre/announcements/broadcast?centreId=${encodeURIComponent(activeCentreId || '')}`, {
+        method: 'POST',
+        body: {
+          centreId: activeCentreId,
+          title: formData.title.trim(),
+          body: formData.body.trim(),
+          audience: formData.audience,
+          channels: formData.channels,
+          target,
+          imageUrl: formData.imageUrl,
+          groupId: wantsGroup ? selectedGroupId : '',
+          groupName: groupName || '',
+          sendMode: formData.sendMode,
+          scheduleTime: formData.scheduleTime,
+        },
+      });
+      if (res?.status === 'Scheduled') {
+        setShowComposeModal(false);
+        setFormData({
+          title: '',
+          body: '',
+          audience: 'All Programs',
+          channels: ['In-App', 'Student Group'],
+          sendMode: 'now',
+          scheduleTime: '',
+          imageUrl: '',
+        });
+        setHistoryTick((n) => n + 1);
+        setBusy(false);
+        addToast({
+          type: 'success',
+          title: 'Broadcast Scheduled',
+          description: `It goes out automatically at the time you picked.`,
+        });
+        return;
+      }
+      const r = res?.results || {};
+      const parts: string[] = [];
+      if (wantsInApp) {
+        const pushed = r.push?.queued ? `${r.inApp?.delivered || 0} in the bell, ${r.push.queued} phone notifications` : `${r.inApp?.delivered || 0} in the bell`;
+        parts.push(`In-app: ${pushed}`);
+      }
+      if (wantsEmail) {
+        const note = r.email?.skipped ? ` (${r.email.skipped})` : r.email?.noAddress ? `, ${r.email.noAddress} without an email address` : '';
+        parts.push(`Email: ${r.email?.sent || 0} sent${note}`);
+      }
+      if (wantsGroup) parts.push(`Group: ${groupName || 'sent'}`);
+      setShowComposeModal(false);
+      setFormData({
+        title: '',
+        body: '',
+        audience: 'All Programs',
+        channels: ['In-App', 'Student Group'],
+        sendMode: 'now',
+        scheduleTime: '',
+        imageUrl: '',
+      });
+      setHistoryTick((n) => n + 1);
+      addToast({
+        type: 'success',
+        title: 'Broadcast Dispatched!',
+        description: parts.join(' · ') || `Announcement sent to ${target}s for ${formData.audience}.`,
+      });
+    } catch (e: any) {
+      setBusy(false);
+      addToast({
+        type: 'error',
+        title: 'Not Delivered',
+        description: String(e?.message || 'The broadcast could not be sent. Check the attached channels and try again.'),
+      });
+      return;
+    }
+    setBusy(false);
   };
 
   return (
@@ -170,7 +248,7 @@ export const AnnouncementsManager: React.FC = () => {
             Announcements
           </h2>
           <p className="text-[11px] text-slate-500 mt-1 uppercase font-black tracking-widest">
-            Broadcast announcements to your facility's student groups, in-app, WhatsApp and email.
+            Broadcast announcements to your facility's student groups, in-app and email.
           </p>
         </div>
 
@@ -424,7 +502,7 @@ export const AnnouncementsManager: React.FC = () => {
                   Delivery Channels
                 </label>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                  {(['In-App', 'Student Group', 'WhatsApp', 'Email'] as const).map((ch) => {
+                  {(['In-App', 'Student Group', 'Email'] as const).map((ch) => {
                     const active = formData.channels.includes(ch);
                     return (
                       <button

@@ -37,6 +37,7 @@ import { runPushSweep } from "./src/server/pushSender";
 import { registerStudentMockRoutes } from "./src/server/studentMockRoutes";
 import { registerNotificationRoutes } from "./src/server/notificationRoutes";
 import { registerTutorAiRoutes } from "./src/server/tutorAiRoutes";
+import { registerAnnouncementRoutes } from "./src/server/announcementRoutes";
 
 
 // Source file is ESM, but compiled to CJS for production.
@@ -1407,6 +1408,7 @@ RULES:
   registerLandingAdminRoutes(app);
   registerMockRoutes(app);
   registerNotificationRoutes(app);
+  registerAnnouncementRoutes(app);
   registerStudentMockRoutes(app);
 
   // Tutor AI (T1): general study-assistant chat for centre members. Separate

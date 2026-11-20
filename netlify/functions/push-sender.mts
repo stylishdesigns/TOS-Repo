@@ -16,10 +16,14 @@
  * Netlify's environment variables.
  */
 import { runPushSweep } from '../../src/server/pushSender';
+import { runAnnouncementSweep } from '../../src/server/announcementRoutes';
 
 export default async () => {
   const result = await runPushSweep({ limit: 20 });
-  console.log('[push-sender]', JSON.stringify(result));
+  // Scheduled broadcasts (compose page, "Schedule" mode) ride the same
+  // 10-minute cadence: due ones deliver here, minutes after their moment.
+  const announcements = await runAnnouncementSweep({ limit: 10 });
+  console.log('[push-sender]', JSON.stringify(result), '[announcements]', JSON.stringify(announcements));
   return new Response(JSON.stringify(result), {
     status: 200,
     headers: { 'content-type': 'application/json' },

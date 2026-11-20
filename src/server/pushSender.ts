@@ -103,7 +103,7 @@ export async function runPushSweep(opts: { limit?: number } = {}): Promise<PushS
     // closed instead of sent. The 15-minute grace just covers the sweep's own
     // 10-minute cadence. Fee-reminder jobs are exempt; the fee sweep controls
     // their timing with its own due-date windows.
-    const isPlannerJob = v.kind !== 'fee_reminder';
+    const isPlannerJob = v.kind !== 'fee_reminder' && v.kind !== 'announcement';
     if (isPlannerJob && Number(v.sendAt || 0) < now - 15 * 60 * 1000) {
       await job.ref.set(
         { sent: true, sentAt: now, delivered: 0, note: 'reminder time already passed; not sent late' },
@@ -124,14 +124,15 @@ export async function runPushSweep(opts: { limit?: number } = {}): Promise<PushS
     // Fee-reminder jobs carry their own facility-voiced title and body;
     // planner jobs keep the platform's wording.
     const isFee = v.kind === 'fee_reminder';
-    const pushTitle = isFee ? String(v.pushTitle || 'Payment reminder') : 'Planner reminder';
-    const pushBody = isFee
+    const isAnn = v.kind === 'announcement';
+    const pushTitle = isFee || isAnn ? String(v.pushTitle || 'Announcement') : 'Planner reminder';
+    const pushBody = isFee || isAnn
       ? String(v.pushBody || v.pushTitle || '')
       : v.time ? `${v.title} (${v.time})` : String(v.title || '');
     const payload = JSON.stringify({
       title: pushTitle,
       body: pushBody,
-      tag: isFee ? `fee-${String(job.id)}` : `planner-${String(v.id || job.id)}`,
+      tag: isFee ? `fee-${String(job.id)}` : isAnn ? `ann-${String(job.id)}` : `planner-${String(v.id || job.id)}`,
       url: '/',
       icon,
       badge: icon,

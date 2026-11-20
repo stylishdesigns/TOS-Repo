@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Bell, CalendarDays, BookOpen, ClipboardList, Trophy, Star, Clock, X, ArrowLeft, Mail, MailCheck } from 'lucide-react';
+import { Bell, CalendarDays, BookOpen, ClipboardList, Trophy, Star, Clock, X, ArrowLeft, Mail, MailCheck, Megaphone } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { api } from '../tos/tosShared';
 import { pushStatus } from './push';
@@ -62,6 +62,7 @@ const TYPE_STYLES: Record<string, { icon: React.ReactNode; chip: string }> = {
   material: { icon: <BookOpen className="w-4 h-4" />, chip: 'bg-orange-100 text-orange-700', },
   mock: { icon: <ClipboardList className="w-4 h-4" />, chip: 'bg-orange-100 text-orange-700', },
   leaderboard: { icon: <Trophy className="w-4 h-4" />, chip: 'bg-amber-100 text-amber-700', },
+  announcement: { icon: <Megaphone className="w-4 h-4" />, chip: 'bg-sky-100 text-sky-700', },
   welcome: { icon: <Star className="w-4 h-4" />, chip: 'bg-emerald-100 text-emerald-700', },
   reminder: { icon: <Clock className="w-4 h-4" />, chip: 'bg-amber-100 text-amber-700', },
 };
