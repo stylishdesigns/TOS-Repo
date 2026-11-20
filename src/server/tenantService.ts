@@ -302,6 +302,67 @@ export async function getMembership(
 }
 
 /**
+ * Staff access materialised from the staff record (invite login fix). Staff
+ * and tutor accounts are created by the invite forms, which write only the
+ * admins/tutors document; the facility entry path reads memberships, so a
+ * newly invited staff member could sign in but never enter the facility.
+ * When the caller's staff record belongs to this centre, create the
+ * memberships row it implies and return it. Suspended staff stay out.
+ */
+async function ensureStaffMembershipFromRecord(
+  uid: string,
+  centreId: string,
+  userEmail?: string
+): Promise<CentreMembership | null> {
+  if (!centreId) return null;
+  try {
+    let staffDoc: Record<string, any> | null = null;
+    let staffRole = '';
+    const adm = await adminDb.collection('admins').doc(uid).get();
+    if (adm.exists) {
+      staffDoc = adm.data() as Record<string, any>;
+      staffRole = String((staffDoc as any).role || '');
+    }
+    if (!staffDoc) {
+      const tut = await adminDb.collection('tutors').doc(uid).get();
+      if (tut.exists) {
+        staffDoc = tut.data() as Record<string, any>;
+        staffRole = 'tutor';
+      }
+    }
+    if (!staffDoc && userEmail) {
+      // Legacy staff records keyed by email under a different document id.
+      const legacy = await adminDb.collection('tutors')
+        .where('email', '==', userEmail.toLowerCase())
+        .limit(5)
+        .get();
+      const match = legacy.docs.find((d) => String((d.data() as any).centreId || '') === centreId);
+      if (match) {
+        staffDoc = match.data() as Record<string, any>;
+        staffRole = 'tutor';
+      }
+    }
+    if (!staffDoc) return null;
+    if (String((staffDoc as any).centreId || '') !== centreId) return null;
+    if (String((staffDoc as any).status || '') === 'Suspended') return null;
+    const role: MembershipRole = /^tutor/i.test(staffRole)
+      ? 'tutor'
+      : /secretary/i.test(staffRole)
+        ? 'secretary'
+        : /finance/i.test(staffRole)
+          ? 'finance'
+          : 'admin';
+    const now = new Date().toISOString();
+    const row: CentreMembership = { uid, centreId, role, status: 'active', createdAt: now, updatedAt: now };
+    await adminDb.collection('memberships').doc(`${uid}__${centreId}`).set(row, { merge: true });
+    return row;
+  } catch (err) {
+    dbFailure('ensureStaffMembershipFromRecord', err);
+    return null;
+  }
+}
+
+/**
  * One shared membership lookup for the login path (Login hotfix). Resolves a
  * caller's membership in one centre across every documented shape:
  *  - doc id `${uid}__${centreId}` (canonical, set by provisioning and import)
@@ -335,6 +396,9 @@ export async function findCentreMembership(
       dbFailure('findCentreMembership', err);
     }
   }
+  // Last resort: the caller's own staff record for this centre.
+  const staffMembership = await ensureStaffMembershipFromRecord(uid, centreId, userEmail);
+  if (staffMembership) return staffMembership;
   return null;
 }
 
@@ -736,6 +800,49 @@ export async function listUserCentresService(params: {
         centreName: centre?.name || 'Facility',
         logo: centre?.branding?.logo || '',
       });
+    }
+    if (results.length === 0) {
+      // Staff fallback: the staff/tutor record itself names the facility it
+      // belongs to. New invites carry no memberships row until first entry,
+      // so without this the account would sign in but never see its facility.
+      const staffCentreIds: string[] = [];
+      try {
+        const adm = await adminDb.collection('admins').doc(uid).get();
+        const c = adm.exists ? String((adm.data() as any).centreId || '') : '';
+        if (c) staffCentreIds.push(c);
+      } catch (err) {
+        dbFailure('listUserCentresService(admins)', err);
+      }
+      try {
+        const tut = await adminDb.collection('tutors').doc(uid).get();
+        const c = tut.exists ? String((tut.data() as any).centreId || '') : '';
+        if (c && !staffCentreIds.includes(c)) staffCentreIds.push(c);
+      } catch (err) {
+        dbFailure('listUserCentresService(tutors)', err);
+      }
+      if (userEmail) {
+        try {
+          const legacy = await adminDb.collection('tutors').where('email', '==', userEmail.toLowerCase()).limit(5).get();
+          legacy.forEach((d) => {
+            const c = String((d.data() as any).centreId || '');
+            if (c && !staffCentreIds.includes(c)) staffCentreIds.push(c);
+          });
+        } catch (err) {
+          dbFailure('listUserCentresService(legacy tutors)', err);
+        }
+      }
+      for (const centreId of staffCentreIds) {
+        const m = await ensureStaffMembershipFromRecord(uid, centreId, userEmail);
+        if (!m) continue;
+        const centre = await getCentreDoc(m.centreId);
+        if (!centre) continue;
+        results.push({
+          centreId: m.centreId,
+          role: m.role,
+          centreName: centre?.name || 'Facility',
+          logo: centre?.branding?.logo || '',
+        });
+      }
     }
   } catch (err) {
     dbFailure('listUserCentresService', err);

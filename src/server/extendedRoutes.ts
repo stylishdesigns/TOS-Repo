@@ -1113,6 +1113,26 @@ export function registerExtendedRoutes(app: express.Express): void {
         return res.status(502).json({ error: 'The welcome email could not be sent, so nobody was invited. Please try again.' });
       }
       await adminDb.collection(isTutor ? 'tutors' : 'admins').doc(authUser.uid).set(doc);
+
+      // The facility entry path reads memberships, so a new staff account
+      // gets its row here and can enter the facility on first sign-in.
+      const membershipRole = role === 'Tutor'
+        ? 'tutor'
+        : role === 'Admin Secretary'
+          ? 'secretary'
+          : role === 'Finance Admin'
+            ? 'finance'
+            : 'admin';
+      const nowIso = new Date().toISOString();
+      await adminDb.collection('memberships').doc(`${authUser.uid}__${centreId}`).set({
+        uid: authUser.uid,
+        centreId,
+        role: membershipRole,
+        status: 'active',
+        createdAt: nowIso,
+        updatedAt: nowIso,
+      }, { merge: true });
+
       await audit({ actorUid: caller.uid, centreId, action: 'STAFF_INVITED', after: { email, role, collection: isTutor ? 'tutors' : 'admins' } });
       res.json({ success: true, emailDelivered: true });
     } catch (error: any) {
