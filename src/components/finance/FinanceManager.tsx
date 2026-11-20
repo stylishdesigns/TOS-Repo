@@ -148,7 +148,7 @@ export const FinanceManager: React.FC = () => {
       bankAccountNumber,
       bankAccountName,
       cashPaymentGuide,
-    });
+    }, { silent: true });
     addToast({
       type: 'success',
       title: 'Payment Settings Saved',
@@ -278,7 +278,7 @@ export const FinanceManager: React.FC = () => {
           channels: { email: remEmail, push: remPush, chat: remChat },
           chatTemplate: remTemplate,
         },
-      });
+      }, { silent: true });
       addToast({ type: 'success', title: 'Reminders Saved', description: 'Automatic payment reminders will follow these settings.' });
     } finally {
       setRemSaving(false);

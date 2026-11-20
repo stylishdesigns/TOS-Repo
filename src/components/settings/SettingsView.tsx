@@ -410,7 +410,7 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
       whatsappNumber: centreForm.whatsapp,
       smsNotifications: centreForm.smsNotifications,
       emailNotifications: centreForm.emailNotifications,
-    });
+    }, { silent: true });
 
     addToast({
       type: 'success',
@@ -425,7 +425,7 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
     const currentSessions = settings.academicSessions || [];
     if (!currentSessions.includes(newSessionName.trim())) {
       const updated = [newSessionName.trim(), ...currentSessions];
-      updateSettings({ academicSessions: updated, academicSession: newSessionName.trim() });
+      updateSettings({ academicSessions: updated, academicSession: newSessionName.trim() }, { silent: true });
       setCentreForm(prev => ({ ...prev, academicSession: newSessionName.trim() }));
       addToast({
         type: 'success',

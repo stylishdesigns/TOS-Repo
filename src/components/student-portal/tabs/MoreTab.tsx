@@ -297,20 +297,6 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
     (sub) => sub.name.toLowerCase().includes(subjectSearch.trim().toLowerCase())
   );
 
-  const [savingDepartment, setSavingDepartment] = useState(false);
-  const handleDepartmentChange = async (val: string) => {
-    if (!val || val === student.department) return;
-    setSavingDepartment(true);
-    try {
-      await updateStudent(student.id, { department: val as any }, { silent: true });
-      student.department = val as any;
-      addToast({ type: 'success', title: 'Department Updated', description: `${val} department saved.` });
-    } catch {
-      addToast({ type: 'error', title: 'Not Saved', description: 'Could not save your department. Try again.' });
-    } finally {
-      setSavingDepartment(false);
-    }
-  };
   const openSubjectsEditor = () => {
     // The draft starts from this facility's own subject list: names that are
     // not registered facility subjects (old demo data such as Economics) are
@@ -483,6 +469,53 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
     if (!wanted) return '';
     return centreProgrammeNames.find((n) => n.trim().toLowerCase() === wanted) || student.programmeName || '';
   }, [student.programmeName, centreProgrammeNames]);
+  // Academic details holds a draft of the department and the programme track
+  // until the student saves. Saving both together is what switches the fee:
+  // when the track is one of the facility's programmes, that programme's
+  // approved fee becomes the student's fee, applied by the server so the
+  // balance and status stay consistent.
+  const [acadDeptDraft, setAcadDeptDraft] = useState<string>(student.department || '');
+  const [acadTrackDraft, setAcadTrackDraft] = useState<string>(programmeTrackLabel || '');
+  const [savingAcad, setSavingAcad] = useState(false);
+  useEffect(() => {
+    setAcadDeptDraft(student.department || '');
+    setAcadTrackDraft(programmeTrackLabel || '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [student.id, student.department, student.programmeName, centreProgrammeNames]);
+  const academicDirty =
+    (acadDeptDraft || '') !== (student.department || '') ||
+    (acadTrackDraft || '') !== (programmeTrackLabel || '');
+  const handleSaveAcademic = async () => {
+    if (savingAcad || !academicDirty) return;
+    setSavingAcad(true);
+    try {
+      const d: any = await api('/api/student/programme-fee', {
+        method: 'POST',
+        body: { department: acadDeptDraft, programmeName: acadTrackDraft },
+      });
+      const patch: any = {
+        department: (d.department || acadDeptDraft) as any,
+        programmeName: d.programmeName || acadTrackDraft,
+      };
+      if (d.feeApplied) {
+        patch.totalFee = d.totalFee;
+        patch.outstandingBalance = d.outstandingBalance;
+        patch.paymentStatus = d.paymentStatus;
+      }
+      await updateStudent(student.id, patch, { silent: true });
+      addToast({
+        type: 'success',
+        title: 'Academic Details Saved',
+        description: d.feeApplied
+          ? `Programme track set. Your fee is now ${settings.currencySymbol}${Number(d.totalFee || 0).toLocaleString()} for this track.`
+          : 'Your department and programme track are saved.',
+      });
+    } catch (err: any) {
+      addToast({ type: 'error', title: 'Not Saved', description: err?.message || 'Could not save your academic details.' });
+    } finally {
+      setSavingAcad(false);
+    }
+  };
 
   // CH1 Step 1: username lives in Profile. One claim per student, set here,
   // shown on chat and the mock leaderboard, changeable once every 30 days.
@@ -1334,10 +1367,25 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 pt-2 text-xs">
-                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-0.5">
-                    <span className="text-[10px] text-slate-400 font-semibold block uppercase">Programme Track</span>
-                    <span className="font-bold text-slate-900 block leading-tight">{programmeTrackLabel || '—'}</span>
-                  </div>
+                  {centreProgrammeNames.length > 0 ? (
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                      <span className="text-[10px] text-slate-400 font-semibold block uppercase mb-1">Programme Track</span>
+                      <ModernSelect
+                        value={acadTrackDraft}
+                        onChange={(val: string) => setAcadTrackDraft(val)}
+                        options={[
+                          { value: '', label: 'Not set yet' },
+                          ...centreProgrammeNames.map((n) => ({ value: n, label: n })),
+                        ]}
+                        placeholder="Select programme track"
+                      />
+                    </div>
+                  ) : (
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-0.5">
+                      <span className="text-[10px] text-slate-400 font-semibold block uppercase">Programme Track</span>
+                      <span className="font-bold text-slate-900 block leading-tight">{programmeTrackLabel || '—'}</span>
+                    </div>
+                  )}
                   {settings.academicSession ? (
                     <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-0.5">
                       <span className="text-[10px] text-slate-400 font-semibold block uppercase">Academic Session</span>
@@ -1353,10 +1401,10 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                   <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-1 col-span-2">
                     <span className="text-[10px] text-slate-400 font-semibold block uppercase">Department</span>
                     <ModernSelect
-                      value={student.department || ''}
-                      onChange={(val: string) => handleDepartmentChange(val)}
+                      value={acadDeptDraft}
+                      onChange={(val: string) => setAcadDeptDraft(val)}
                       options={[
-                        { value: '', label: student.department ? 'Change department' : 'Not set yet' },
+                        { value: '', label: 'Not set yet' },
                         { value: 'Science', label: 'Science' },
                         { value: 'Commercial', label: 'Commercial' },
                         { value: 'Arts', label: 'Arts' },
@@ -1376,6 +1424,22 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                     </div>
                   ) : null}
                 </div>
+
+                {centreProgrammeNames.length > 0 && (
+                  <div className="pt-1">
+                    <button
+                      type="button"
+                      disabled={savingAcad || !academicDirty}
+                      onClick={handleSaveAcademic}
+                      className="w-full py-3 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-sm shadow-md disabled:opacity-50 transition-colors cursor-pointer"
+                    >
+                      {savingAcad ? 'Saving…' : 'Save Changes'}
+                    </button>
+                    <p className="text-[10px] text-slate-400 font-medium mt-1.5 text-center">
+                      Saves your department and programme track. Picking a facility programme applies its approved fee.
+                    </p>
+                  </div>
+                )}
 
                 {/* Registered subjects, moved here from its own section. The
                     student adds or removes subjects right in this popup, and

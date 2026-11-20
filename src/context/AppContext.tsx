@@ -175,7 +175,7 @@ interface ToastMessage {
 
 interface AppContextType {
   settings: TenantSettings;
-  updateSettings: (newSettings: Partial<TenantSettings>) => void;
+  updateSettings: (newSettings: Partial<TenantSettings>, opts?: { silent?: boolean }) => void;
   resetToDefaults: () => void;
 
   branches: Branch[];
@@ -1627,7 +1627,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
-  const updateSettings = async (newSettings: Partial<TenantSettings>) => {
+  const updateSettings = async (newSettings: Partial<TenantSettings>, opts?: { silent?: boolean }) => {
     try {
       const updated = { ...settings, ...newSettings };
       if (newSettings.whatsappNumber && !newSettings.whatsapp) {
@@ -1639,11 +1639,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (!activeCentreId) throw new Error('Select your facility before saving settings.');
       await setDoc(doc(db, 'centreSettings', `${activeCentreId}__global`), updated);
       setSettingsState(updated);
-      addToast({
-        type: 'success',
-        title: 'Settings Updated',
-        description: 'Education facility configuration updated successfully.',
-      });
+      // Screens with their own tailored message pass { silent: true } so the
+      // action still shows exactly one toast.
+      if (!opts?.silent) {
+        addToast({
+          type: 'success',
+          title: 'Settings Updated',
+          description: 'Education facility configuration updated successfully.',
+        });
+      }
       logActivity({
         title: 'Facility Configuration Modified',
         subtitle: `Updated by ${activeUser?.name || 'Admin'}`,

@@ -30,7 +30,7 @@ import { registerLandingRoutes } from "./src/server/landingRoutes";
 import { registerLandingAdminRoutes } from "./src/server/landingAdminRoutes";
 import { registerLandingLeadRoutes } from "./src/server/landingLeadRoutes";
 import { registerMockRoutes } from "./src/server/mockRoutes";
-import { PaymentError, parseAmount, parseConfirmAction, parseFee } from "./src/server/paymentLogic";
+import { PaymentError, feeState, parseAmount, parseConfirmAction, parseFee } from "./src/server/paymentLogic";
 import { loadPaymentActor, submitPayment, decidePayment, setStudentFee } from "./src/server/paymentService";
 import { runFeeReminderSweep } from "./src/server/feeReminders";
 import { runPushSweep } from "./src/server/pushSender";
@@ -771,6 +771,101 @@ async function startServer() {
       res.json({ success: true, ...result });
     } catch (error: any) {
       sendPaymentError(res, error, "set-fee");
+    }
+  });
+
+  //   POST /api/student/programme-fee
+  //     - student only: saves the department and programme track the student
+  //       picked in their own Academic details, and when the track is one of
+  //       the facility's programmes, that programme's approved fee becomes
+  //       the student's fee. Only the server writes totalFee /
+  //       outstandingBalance / paymentStatus, the same rule as set-fee: the
+  //       paid amount is preserved, balance and status are recomputed from
+  //       the new fee, and every fee switch lands in the audit log.
+  app.post("/api/student/programme-fee", async (req, res) => {
+    try {
+      const caller = await getCaller(req);
+      const department = String(req.body?.department || "").trim();
+      const programmeName = String(req.body?.programmeName || "").trim();
+      if (department && !["Science", "Commercial", "Arts"].includes(department)) {
+        throw new PaymentError(400, "Pick Science, Commercial or Arts as the department");
+      }
+      if (programmeName.length > 120) {
+        throw new PaymentError(400, "That programme name is too long");
+      }
+      const stuSnap = await adminDb.collection("students").where("uid", "==", caller.uid).limit(1).get();
+      if (stuSnap.empty) {
+        throw new PaymentError(403, "Only a student can change their academic details");
+      }
+      const stuDoc = stuSnap.docs[0];
+      const s = stuDoc.data() as Record<string, any>;
+      const centreId = typeof s.centreId === "string" ? s.centreId : "";
+      if (!centreId) {
+        throw new PaymentError(400, "Your facility could not be resolved");
+      }
+
+      let programme: Record<string, any> | null = null;
+      if (programmeName) {
+        const progSnap = await adminDb.collection("programmes").where("centreId", "==", centreId).get();
+        programme =
+          progSnap.docs
+            .map((d) => d.data() as Record<string, any>)
+            .find((p) => String(p.name || "").trim().toLowerCase() === programmeName.toLowerCase()) || null;
+        if (!programme) {
+          throw new PaymentError(400, "That programme is not one of your facility's programmes");
+        }
+      }
+
+      const updates: Record<string, any> = {};
+      if (department && department !== String(s.department || "")) {
+        updates.department = department;
+      }
+      const canonicalName = programme ? String(programme.name || "").trim() : programmeName;
+      if (canonicalName !== String(s.programmeName || "")) {
+        updates.programmeName = canonicalName;
+      }
+
+      const rawFee = programme ? Number(programme.fee) : 0;
+      const fee = Number.isFinite(rawFee) && rawFee > 0 ? Math.round(rawFee) : 0;
+      let fees: ReturnType<typeof feeState> | null = null;
+      if (fee > 0 && fee !== Number(s.totalFee || 0)) {
+        const currentTotal = Number(s.totalFee || 0);
+        const paidAmount = Math.max(currentTotal - Number(s.outstandingBalance || 0), 0);
+        fees = feeState({ totalFee: currentTotal, paidAmount } as any, fee);
+        updates.totalFee = fees.totalFee;
+        updates.outstandingBalance = fees.outstandingBalance;
+        updates.paymentStatus = fees.paymentStatus;
+      }
+
+      if (Object.keys(updates).length > 0) {
+        await stuDoc.ref.update(updates);
+        if (fees) {
+          await adminDb.collection("auditLogs").doc().set({
+            action: "fee.set",
+            actorUid: caller.uid,
+            actorEmail: caller.email,
+            centreId,
+            studentId: stuDoc.id,
+            totalFee: fees.totalFee,
+            previousFee: Number(s.totalFee || 0),
+            paidAmount: fees.paidAmount,
+            reason: "programme-track-change",
+            at: new Date().toISOString(),
+          });
+        }
+      }
+
+      res.json({
+        success: true,
+        department: updates.department !== undefined ? updates.department : String(s.department || ""),
+        programmeName: updates.programmeName !== undefined ? updates.programmeName : String(s.programmeName || ""),
+        feeApplied: !!fees,
+        totalFee: fees ? fees.totalFee : Number(s.totalFee || 0),
+        outstandingBalance: fees ? fees.outstandingBalance : Number(s.outstandingBalance || 0),
+        paymentStatus: fees ? fees.paymentStatus : String(s.paymentStatus || "Pending"),
+      });
+    } catch (error: any) {
+      sendPaymentError(res, error, "student programme change");
     }
   });
 

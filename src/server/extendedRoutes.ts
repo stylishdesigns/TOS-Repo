@@ -829,7 +829,20 @@ export function registerExtendedRoutes(app: express.Express): void {
     const centreId = String(req.query.centreId || '').trim();
     if (!centreId) return res.status(400).json({ error: 'centreId is required.' });
     try {
-      const snap = await adminDb.collection('programmes').where('centreId', '==', centreId).get();
+      // The installed app and the signup flow carry the facility's name slug
+      // (?centre=godzilla) while programme records are keyed to the centre's
+      // document id. Resolve the slug to the document id when the value is not
+      // already one, so the facility's own programmes load either way.
+      let resolvedCentreId = centreId;
+      const centreDoc = await adminDb.collection('centres').doc(centreId).get().catch(() => null);
+      if (!centreDoc || !centreDoc.exists) {
+        const centresSnap = await adminDb.collection('centres').limit(200).get();
+        const doc = centresSnap.docs.find(
+          (d) => slugifyName(String((d.data() as any)?.name || '')) === slugifyName(centreId)
+        );
+        if (doc) resolvedCentreId = doc.id;
+      }
+      const snap = await adminDb.collection('programmes').where('centreId', '==', resolvedCentreId).get();
       const programmes = snap.docs
         .map((d) => d.data() as any)
         .filter((p) => p.status === 'Active')

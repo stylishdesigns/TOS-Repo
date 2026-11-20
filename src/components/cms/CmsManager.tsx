@@ -61,7 +61,7 @@ export const CmsManager: React.FC = () => {
 
   const handleSaveSettings = (e: React.FormEvent) => {
     e.preventDefault();
-    updateSettings(formData);
+    updateSettings(formData, { silent: true });
     addToast({
       type: 'success',
       title: 'Website CMS Updated!',
