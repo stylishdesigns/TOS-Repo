@@ -37,7 +37,6 @@ type TabType = 'home' | 'classes' | 'assessment' | 'chat' | 'more';
 export const TutorPortal: React.FC = () => {
   const { tutors, settings, setViewMode, isAdmin, activeTutor: contextTutor, updateTutor, logout, bgTheme, activeCentre } = useApp();
   const centreName = activeCentre?.name || (settings as any)?.centreName || 'Tutor Portal';
-  const centreLogo = activeCentre?.logoUrl || (settings as any)?.logoUrl || '';
   const { updatePassword } = useFirebase();
 
   const parseInitialTutorTab = (): TabType => {
@@ -60,6 +59,7 @@ export const TutorPortal: React.FC = () => {
 
   const [activeTab, setActiveTabState] = useState<TabType>(parseInitialTutorTab);
   const [chatThreadOpen, setChatThreadOpen] = useState(false);
+  const [bellOpen, setBellOpen] = useState(false);
   // Which thing chat opens: the splash chooser first, then Status or Chat.
   const [chatMode, setChatMode] = useState<ChatMode>('status');
   const [desktopViewMode, setDesktopViewMode] = useState<'mobile_frame' | 'expanded'>('mobile_frame');
@@ -149,24 +149,23 @@ export const TutorPortal: React.FC = () => {
       )}
 
       {/* 1. Top Desktop Control Bar */}
-      <header className="bg-slate-950 border-b border-slate-800 text-white px-4 py-2.5 z-40 sticky top-0">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
-          <div className="flex items-center space-x-2.5 min-w-0">
-            {centreLogo ? (
-              <img src={centreLogo} alt="" className="w-7 h-7 rounded-lg object-cover border border-slate-700 shrink-0" />
-            ) : null}
-            <span className="font-black text-sm text-white truncate">
+      <header className="bg-slate-950 text-white px-4 py-3 z-40 sticky top-0 overflow-hidden shadow-md border-b border-slate-800">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-3 relative">
+          {/* Facility name, dead centre of the header menu, always shown in full */}
+          <div className="flex-1 min-w-0 text-center">
+            <span className="block w-full break-words leading-tight font-black text-sm uppercase tracking-[0.2em] pointer-events-none">
               {centreName}
-            </span>
-            <span className="hidden sm:inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-500/20 text-orange-400 border border-orange-500/30 shrink-0">
-              Tutor Portal
             </span>
           </div>
 
-          <div className="flex items-center space-x-2">
-            <PWAInstallButton variant="pill" />
-            
-            <NotificationsBell feed="tutor" />
+          {/* Right side: notifications + install */}
+          <div className="flex items-center gap-2">
+            <NotificationsBell feed="tutor" onOpenChange={setBellOpen} />
+
+            <PWAInstallButton
+              variant="icon"
+              className="!bg-white/10 !border-white/10 hover:!bg-white/20"
+            />
 
             <button
               onClick={() =>
@@ -240,7 +239,7 @@ export const TutorPortal: React.FC = () => {
           )}
 
           {/* 3. Bottom Navigation (Mobile App Style) */}
-          <nav className={`${chatThreadOpen || chatMode === 'tito' ? 'hidden' : ''} fixed bottom-0 left-0 right-0 sm:absolute z-40 bg-slate-950 border-t border-slate-800 py-2 px-3 shadow-[0_-4px_20px_rgba(0,0,0,0.25)] rounded-t-[24px]`}>
+          <nav className={`${chatThreadOpen || chatMode === 'tito' || bellOpen ? 'hidden' : ''} fixed bottom-0 left-0 right-0 sm:absolute z-40 bg-slate-950 border-t border-slate-800 py-2 px-3 shadow-[0_-4px_20px_rgba(0,0,0,0.25)] rounded-t-[24px]`}>
             <div className="max-w-md mx-auto grid grid-cols-5 gap-1 items-center">
               {/* Home */}
               <button

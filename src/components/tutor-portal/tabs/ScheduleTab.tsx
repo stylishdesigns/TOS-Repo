@@ -9,15 +9,12 @@ import {
   ChevronRight,
   ChevronDown,
   Info,
-  LayoutGrid,
   X,
   User,
   GraduationCap,
   Bell,
   History
 } from 'lucide-react';
-import { CalendarView } from '../../common/CalendarView';
-import { slotsToActivities } from '../../../lib/planner';
 import { ModernSelect } from '../../ui/ModernSelect';
 import { TimetableSlot, Tutor, Student } from '../../../types';
 import { useScrollLock } from '../../../hooks/useScrollLock';
@@ -29,7 +26,6 @@ interface ScheduleTabProps {
 
 export const ScheduleTab: React.FC<ScheduleTabProps> = ({ tutor }) => {
   const { timetable, programmes, settings, consentToTimetableSlot, updateTimetableSlot, students, plannerReminders, addPlannerReminder, removePlannerReminder, updatePlannerReminder } = useApp();
-  const [showCalendar, setShowCalendar] = useState(false);
   const [showPastClasses, setShowPastClasses] = useState(false);
   const [selectedDay, setSelectedDay] = useState<'All' | string>('All');
   const [selectedStatus, setSelectedStatus] = useState<string>('All');
@@ -40,7 +36,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({ tutor }) => {
   const [actionReason, setActionReason] = useState('');
   const [actionType, setActionType] = useState<'none' | 'postpone'>('none');
 
-  useScrollLock(!!viewingSession || showCalendar);
+  useScrollLock(!!viewingSession);
 
   // Current week range (Monday to Sunday)
   const currentWeekRange = React.useMemo(() => {
@@ -197,7 +193,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({ tutor }) => {
           <Calendar className="w-6 h-6" />
         </div>
         <div className="flex-1 min-w-0">
-          <h2 className="text-2xl font-black text-slate-900 tracking-tight truncate">My Classes</h2>
+          <h2 className="text-2xl font-black text-slate-900 tracking-tight">My Classes</h2>
           <p className="text-[11px] text-slate-500 font-bold uppercase tracking-wider">{settings.academicSession} Schedule</p>
         </div>
         
@@ -212,13 +208,6 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({ tutor }) => {
           <span>Past Classes</span>
         </button>
 
-        <button 
-          onClick={() => setShowCalendar(true)} 
-          className="w-10 h-10 bg-white border border-slate-200 rounded-xl flex items-center justify-center text-slate-400 hover:text-orange-500 transition-all shadow-xs cursor-pointer shrink-0"
-          aria-label="View Calendar Schedule"
-        >
-          <LayoutGrid className="w-5 h-5" />
-        </button>
       </div>
 
       {/* Status Filter Pills (All Exam filter removed per user instructions) */}
@@ -286,7 +275,6 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({ tutor }) => {
         </div>
       </div>
 
-      <CalendarView isOpen={showCalendar} onClose={() => setShowCalendar(false)} activities={[...slotsToActivities(myClasses), ...plannerReminders]} title="My Teaching Schedule" onAddActivity={addPlannerReminder} onRemoveActivity={removePlannerReminder} onEditActivity={updatePlannerReminder} />
 
       {pendingClasses.length > 0 && (
         <div className="space-y-3">
