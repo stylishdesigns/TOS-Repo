@@ -677,10 +677,8 @@ export const StudentSignupFlow: React.FC<StudentSignupFlowProps> = ({
                 placeholder="Select exam"
               />
             </div>
-            {form.examToRegister && (
-              <>
-                <div className="mb-4">
-                  <label className={labelCls}>Department</label>
+            <div className="mb-4">
+              <label className={labelCls}>Department</label>
                   <ModernSelect
                     value={form.department}
                     onChange={(v: any) => { setVal('department')(v); setForm((f) => ({ ...f, selectedSubjects: [] })); }}
@@ -728,9 +726,7 @@ export const StudentSignupFlow: React.FC<StudentSignupFlowProps> = ({
                       Choose your department to see the subjects you can register.
                     </p>
                   )}
-                </div>
-              </>
-            )}
+            </div>
             <div className="mb-4">
               <label className={labelCls}>Intended course</label>
               <ModernSelect
