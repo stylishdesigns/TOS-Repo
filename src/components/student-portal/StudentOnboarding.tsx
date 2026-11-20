@@ -3,7 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { doc, setDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase';
 import { User, GraduationCap, School, BookOpen, Heart, Users, ArrowRight } from 'lucide-react';
-import { COURSES, UNIVERSITIES, SUBJECTS } from '../../data/academicLists';
+import { COURSES, UNIVERSITIES } from '../../data/academicLists';
 import { ModernSelect } from '../ui/ModernSelect';
 
 interface StudentOnboardingProps {
@@ -11,8 +11,18 @@ interface StudentOnboardingProps {
 }
 
 export const StudentOnboarding: React.FC<StudentOnboardingProps> = ({ onComplete }) => {
-  const { addToast, activeCentreId, centreName, programmes } = useApp();
+  const { addToast, activeCentreId, centreName, programmes, subjects } = useApp();
   const [loading, setLoading] = useState(false);
+  // The facility's own registered subjects; General ones are open to every
+  // student, department-specific ones only to that department.
+  const centreSubjects = subjects.filter(
+    (s) => !activeCentreId || !s.centreId || s.centreId === activeCentreId
+  );
+  const bestSubjectOptions = (() => {
+    const dept = formData.department;
+    const list = centreSubjects.filter((s) => s.department === 'General' || (!!dept && s.department === dept));
+    return list.map((s) => ({ value: s.name, label: s.name }));
+  })();
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -20,6 +30,7 @@ export const StudentOnboarding: React.FC<StudentOnboardingProps> = ({ onComplete
     courseOfStudy: '',
     universityChoice: '',
     examToRegister: '',
+    department: '',
     bestSubjects: '',
     parentName: '',
     parentWhatsApp: '',
@@ -41,6 +52,7 @@ export const StudentOnboarding: React.FC<StudentOnboardingProps> = ({ onComplete
         courseOfStudy: formData.courseOfStudy,
         universityChoice: formData.universityChoice,
         examToRegister: formData.examToRegister,
+        department: formData.department,
         bestSubjects: formData.bestSubjects,
         parentName: formData.parentName,
         parentWhatsApp: formData.parentWhatsApp,
@@ -152,11 +164,25 @@ export const StudentOnboarding: React.FC<StudentOnboardingProps> = ({ onComplete
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <ModernSelect
+                label="Department"
+                value={formData.department}
+                onChange={(val) => setFormData({ ...formData, department: val, bestSubjects: '' })}
+                options={[
+                  { value: 'Science', label: 'Science' },
+                  { value: 'Commercial', label: 'Commercial' },
+                  { value: 'Arts', label: 'Arts' },
+                ]}
+                placeholder="Select Department"
+              />
+              <ModernSelect
                 label="Best Subject"
                 value={formData.bestSubjects}
                 onChange={(val) => setFormData({ ...formData, bestSubjects: val })}
-                options={SUBJECTS.map(subject => ({ value: subject, label: subject }))}
-                placeholder="Select Best Subject"
+                options={[
+                  { value: '', label: bestSubjectOptions.length ? 'Select Best Subject' : 'No subjects registered yet' },
+                  ...bestSubjectOptions,
+                ]}
+                placeholder={bestSubjectOptions.length ? 'Select Best Subject' : 'No subjects registered yet'}
               />
               <ModernSelect
                 label="Exam Type"

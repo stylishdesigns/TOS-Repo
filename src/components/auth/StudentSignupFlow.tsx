@@ -6,7 +6,7 @@ import {
 import { auth, db } from '../../firebase';
 import { createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signOut, signInWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
-import { COURSES, UNIVERSITIES, SUBJECTS } from '../../data/academicLists';
+import { COURSES, UNIVERSITIES } from '../../data/academicLists';
 import { ModernSelect } from '../ui/ModernSelect';
 import { BrandDatePicker } from '../ui/BrandDatePicker';
 
@@ -40,18 +40,6 @@ const NIGERIAN_STATES = [
   'Nasarawa', 'Niger', 'Ogun', 'Ondo', 'Osun', 'Oyo', 'Plateau', 'Rivers', 'Sokoto',
   'Taraba', 'Yobe', 'Zamfara',
 ];
-
-const EXAM_LABELS: Record<string, string> = {
-  JAMB: 'JAMB (UTME)',
-  WAEC: 'WAEC (WASSCE)',
-  NECO: 'NECO (SSCE)',
-  'A-Levels': 'A-LEVELS (JUPEB/IJMB)',
-  'A-LEVELS': 'A-LEVELS (JUPEB/IJMB)',
-  'POST-UTME': 'POST-UTME',
-  'SAT / International': 'SAT / International',
-};
-
-const FALLBACK_EXAMS = ['JAMB', 'WAEC', 'NECO', 'POST-UTME', 'A-LEVELS'];
 
 const USERNAME_RE = /^[a-z][a-z0-9_]{2,19}$/;
 
@@ -87,6 +75,7 @@ export const StudentSignupFlow: React.FC<StudentSignupFlowProps> = ({
     phone: '', address: '',
     parentName: '', parentWhatsApp: '',
     examToRegister: '', selectedSubjects: [] as string[],
+    department: '',
     courseOfStudy: '', universityChoice: '',
     email: '', password: '', confirmPassword: '',
   });
@@ -104,6 +93,9 @@ export const StudentSignupFlow: React.FC<StudentSignupFlowProps> = ({
   // The facility's registered programmes, fetched so the exam and subject
   // lists reflect what this facility actually offers.
   const [centreExams, setCentreExams] = useState<{ name: string; category: string; subjects: string[] }[]>([]);
+  // The facility's registered subjects (Subjects Manager), fetched so the
+  // subject picker lists only what the facility actually offers.
+  const [centreSubjects, setCentreSubjects] = useState<{ name: string; department: string }[]>([]);
 
   // Countdown tick so the resend button wakes up on its own.
   useEffect(() => {
@@ -120,6 +112,19 @@ export const StudentSignupFlow: React.FC<StudentSignupFlowProps> = ({
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error('no'))))
       .then((d: any) => {
         if (alive && Array.isArray(d.programmes)) setCentreExams(d.programmes);
+      })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [centreId, previewOnly]);
+
+  // Load the facility's registered subjects once.
+  useEffect(() => {
+    if (previewOnly || !centreId) return;
+    let alive = true;
+    fetch(`/api/public/subjects?centreId=${encodeURIComponent(centreId)}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error('no'))))
+      .then((d: any) => {
+        if (alive && Array.isArray(d.subjects)) setCentreSubjects(d.subjects);
       })
       .catch(() => {});
     return () => { alive = false; };
@@ -178,21 +183,27 @@ export const StudentSignupFlow: React.FC<StudentSignupFlowProps> = ({
     form.phone.length === 11 &&
     form.parentName.trim() && form.parentWhatsApp.length === 11;
 
+  // The exam picker lists only the programmes this facility actually set.
   const examOptions = (() => {
-    const cats: string[] = centreExams.length
-      ? (Array.from(new Set(centreExams.map((p) => p.category).filter(Boolean))) as string[])
-      : FALLBACK_EXAMS;
-    return cats.map((c) => ({ value: c, label: EXAM_LABELS[c] || c }));
+    const names = Array.from(new Set(centreExams.map((p) => p.name).filter(Boolean)));
+    return [
+      { value: '', label: names.length ? 'Select exam' : 'No exam programmes set yet' },
+      ...names.map((n) => ({ value: n, label: n })),
+    ];
   })();
 
-  const subjectsForExam = (cat: string) => {
-    const list = centreExams.filter((p) => p.category === cat).flatMap((p) => p.subjects || []);
-    const unique = Array.from(new Set(list)) as string[];
-    return unique.length ? unique.sort() : SUBJECTS;
-  };
+  // Subjects the student may pick: General subjects are open to everyone and
+  // department-specific ones only to the student's chosen department. The
+  // list is always the facility's own registered subjects, never hardcoded.
+  const selectableSubjects = (() =>
+    centreSubjects
+      .filter((s) => s.department === 'General' || (!!form.department && s.department === form.department))
+      .map((s) => s.name)
+      .sort()
+  )();
 
   const academicOk =
-    form.examToRegister && form.selectedSubjects.length > 0 && form.courseOfStudy;
+    form.examToRegister && form.department && form.selectedSubjects.length > 0 && form.courseOfStudy;
 
   const pwRules = [
     { label: 'At least 8 characters', ok: form.password.length >= 8 },
@@ -235,6 +246,7 @@ export const StudentSignupFlow: React.FC<StudentSignupFlowProps> = ({
       setFormStep(2);
     } else if (formStep === 2) {
       if (!form.examToRegister) { setError('Choose the exam you are registering for.'); return; }
+      if (!form.department) { setError('Choose your department to see your subjects.'); return; }
       if (form.selectedSubjects.length === 0) { setError('Pick at least one subject to register.'); return; }
       if (!form.courseOfStudy) { setError('Choose your intended course.'); return; }
       setFormStep(3);
@@ -257,6 +269,7 @@ export const StudentSignupFlow: React.FC<StudentSignupFlowProps> = ({
       courseOfStudy: form.courseOfStudy,
       universityChoice: form.universityChoice,
       examToRegister: form.examToRegister,
+      department: form.department,
       parentName: form.parentName,
       parentWhatsApp: form.parentWhatsApp,
       parentEmail: email,
@@ -665,31 +678,58 @@ export const StudentSignupFlow: React.FC<StudentSignupFlowProps> = ({
               />
             </div>
             {form.examToRegister && (
-              <div className="mb-4">
-                <label className={labelCls}>Subjects to register <span className="text-slate-400 font-medium normal-case">(from {centreName}'s registered subjects)</span></label>
-                <div className="grid grid-cols-2 gap-2">
-                  {subjectsForExam(form.examToRegister).map((s) => {
-                    const picked = form.selectedSubjects.includes(s);
-                    return (
-                      <button
-                        key={s}
-                        type="button"
-                        onClick={() => toggleSubject(s)}
-                        className={`flex items-center space-x-2 rounded-xl border px-3 py-2.5 text-left text-xs font-bold transition-all ${picked ? '' : 'border-slate-200 bg-slate-50 text-slate-600'}`}
-                        style={picked ? { borderColor: brand, backgroundColor: `${brand}14`, color: brand } : undefined}
-                      >
-                        <span
-                          className="w-4 h-4 rounded-md border-2 flex items-center justify-center shrink-0"
-                          style={picked ? { borderColor: brand, backgroundColor: brand } : { borderColor: '#CBD5E1' }}
-                        >
-                          {picked && <Check className="w-3 h-3 text-white" />}
-                        </span>
-                        <span className="leading-tight">{s}</span>
-                      </button>
-                    );
-                  })}
+              <>
+                <div className="mb-4">
+                  <label className={labelCls}>Department</label>
+                  <ModernSelect
+                    value={form.department}
+                    onChange={(v: any) => { setVal('department')(v); setForm((f) => ({ ...f, selectedSubjects: [] })); }}
+                    options={[
+                      { value: 'Science', label: 'Science' },
+                      { value: 'Commercial', label: 'Commercial' },
+                      { value: 'Arts', label: 'Arts' },
+                    ]}
+                    placeholder="Select department"
+                  />
                 </div>
-              </div>
+                <div className="mb-4">
+                  <label className={labelCls}>Subjects to register <span className="text-slate-400 font-medium normal-case">(from {centreName}'s registered subjects)</span></label>
+                  {form.department ? (
+                    selectableSubjects.length ? (
+                      <div className="grid grid-cols-2 gap-2">
+                        {selectableSubjects.map((s) => {
+                          const picked = form.selectedSubjects.includes(s);
+                          return (
+                            <button
+                              key={s}
+                              type="button"
+                              onClick={() => toggleSubject(s)}
+                              className={`flex items-center space-x-2 rounded-xl border px-3 py-2.5 text-left text-xs font-bold transition-all ${picked ? '' : 'border-slate-200 bg-slate-50 text-slate-600'}`}
+                              style={picked ? { borderColor: brand, backgroundColor: `${brand}14`, color: brand } : undefined}
+                            >
+                              <span
+                                className="w-4 h-4 rounded-md border-2 flex items-center justify-center shrink-0"
+                                style={picked ? { borderColor: brand, backgroundColor: brand } : { borderColor: '#CBD5E1' }}
+                              >
+                                {picked && <Check className="w-3 h-3 text-white" />}
+                              </span>
+                              <span className="leading-tight">{s}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-slate-400 font-medium leading-relaxed">
+                        No subjects registered yet for the {form.department} department. Your facility adds subjects in its Subjects Manager.
+                      </p>
+                    )
+                  ) : (
+                    <p className="text-[11px] text-slate-400 font-medium leading-relaxed">
+                      Choose your department to see the subjects you can register.
+                    </p>
+                  )}
+                </div>
+              </>
             )}
             <div className="mb-4">
               <label className={labelCls}>Intended course</label>

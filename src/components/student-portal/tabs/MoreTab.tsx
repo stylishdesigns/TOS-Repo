@@ -284,10 +284,30 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
     });
     return acc;
   }, [registeredNames, centreSubjects]);
-  const filteredCentreSubjects = centreSubjects.filter(
+  // When adding subjects the student sees General subjects plus the ones for
+  // their own department; everything comes from the facility's registered
+  // subjects, never a hardcoded list.
+  const selectableCentreSubjects = centreSubjects.filter(
+    (sub) => sub.department === 'General' || (!!student.department && sub.department === student.department)
+  );
+  const filteredCentreSubjects = selectableCentreSubjects.filter(
     (sub) => sub.name.toLowerCase().includes(subjectSearch.trim().toLowerCase())
   );
 
+  const [savingDepartment, setSavingDepartment] = useState(false);
+  const handleDepartmentChange = async (val: string) => {
+    if (!val || val === student.department) return;
+    setSavingDepartment(true);
+    try {
+      await updateStudent(student.id, { department: val as any });
+      student.department = val as any;
+      addToast({ type: 'success', title: 'Department Updated', description: `${val} department saved.` });
+    } catch {
+      addToast({ type: 'error', title: 'Not Saved', description: 'Could not save your department. Try again.' });
+    } finally {
+      setSavingDepartment(false);
+    }
+  };
   const openSubjectsEditor = () => {
     setDraftSubjects(new Set(registeredNames));
     setSubjectSearch('');
@@ -381,6 +401,9 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
   const [gender, setGender] = useState(student.gender || 'Male');
   const [dob, setDob] = useState(student.dob || '2008-04-12');
   const [address, setAddress] = useState(student.address || '12 Admiralty Way, Lekki Phase 1, Lagos');
+  // Guardian details live under personal details, not academic details.
+  const [parentName, setParentName] = useState(student.parentName || '');
+  const [parentWhatsapp, setParentWhatsapp] = useState(student.parentWhatsApp || '');
 
 
   // Password fields state
@@ -532,6 +555,8 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
       gender,
       dob,
       address,
+      parentName,
+      parentWhatsApp: parentWhatsapp,
     });
     student.name = updatedFullName;
     student.phone = phone;
@@ -539,6 +564,8 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
     student.gender = gender;
     student.dob = dob;
     student.address = address;
+    student.parentName = parentName;
+    student.parentWhatsApp = parentWhatsapp;
 
     addToast({
       type: 'success',
@@ -1092,6 +1119,34 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                     />
                   </div>
 
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 block mb-1">
+                        Parent / Guardian Name
+                      </label>
+                      <input
+                        type="text"
+                        value={parentName}
+                        onChange={(e) => setParentName(e.target.value)}
+                        placeholder="Mrs Ngozi Okafor"
+                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm font-medium focus:border-orange-500 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 block mb-1">
+                        Guardian WhatsApp Number
+                      </label>
+                      <input
+                        type="tel"
+                        inputMode="numeric"
+                        value={parentWhatsapp}
+                        onChange={(e) => setParentWhatsapp(e.target.value.replace(/\D/g, '').slice(0, 11))}
+                        placeholder="08012345678"
+                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm font-medium focus:border-orange-500 outline-none"
+                      />
+                    </div>
+                  </div>
+
                   <div className="pt-3">
                     <button
                       type="submit"
@@ -1142,30 +1197,29 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                       <span className="font-bold text-slate-900 block">{student.branchName}</span>
                     </div>
                   ) : null}
-                  {student.department ? (
-                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-0.5">
-                      <span className="text-[10px] text-slate-400 font-semibold block uppercase">Department</span>
-                      <span className="font-bold text-slate-900 block">{student.department}</span>
-                    </div>
-                  ) : null}
+                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-1 col-span-2">
+                    <span className="text-[10px] text-slate-400 font-semibold block uppercase">Department</span>
+                    <ModernSelect
+                      value={student.department || ''}
+                      onChange={(val: string) => handleDepartmentChange(val)}
+                      options={[
+                        { value: '', label: student.department ? 'Change department' : 'Not set yet' },
+                        { value: 'Science', label: 'Science' },
+                        { value: 'Commercial', label: 'Commercial' },
+                        { value: 'Arts', label: 'Arts' },
+                      ]}
+                      placeholder="Select department"
+                    />
+                    <p className="text-[10px] text-slate-400 font-medium">
+                      General subjects are open to everyone; your department's subjects show once you pick it.
+                    </p>
+                  </div>
                   {student.registrationDate ? (
                     <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-0.5">
                       <span className="text-[10px] text-slate-400 font-semibold block uppercase">Registered On</span>
                       <span className="font-bold text-slate-900 block">
                         {new Date(student.registrationDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                       </span>
-                    </div>
-                  ) : null}
-                  {student.parentName ? (
-                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-0.5">
-                      <span className="text-[10px] text-slate-400 font-semibold block uppercase">Parent / Guardian</span>
-                      <span className="font-bold text-slate-900 block leading-tight">{student.parentName}</span>
-                    </div>
-                  ) : null}
-                  {student.parentWhatsApp ? (
-                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-0.5 col-span-2">
-                      <span className="text-[10px] text-slate-400 font-semibold block uppercase">Guardian Contact</span>
-                      <span className="font-bold text-slate-900 block">{student.parentWhatsApp}</span>
                     </div>
                   ) : null}
                 </div>
@@ -1194,7 +1248,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                         {registeredNames.length === 0 ? 'None registered yet' : `${registeredNames.length} registered`}
                       </p>
                     </div>
-                    {centreSubjects.length > 0 && (
+                    {selectableCentreSubjects.length > 0 && (
                       <button
                         type="button"
                         onClick={() => (showSubjectsEditor ? setShowSubjectsEditor(false) : openSubjectsEditor())}
@@ -1227,9 +1281,11 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                   )}
 
                   {showSubjectsEditor && (
-                    centreSubjects.length === 0 ? (
+                    selectableCentreSubjects.length === 0 ? (
                       <p className="text-xs text-slate-500 font-medium leading-relaxed">
-                        Your facility hasn't set up its subject list yet. Please ask your facility to add subjects.
+                        {centreSubjects.length === 0
+                          ? "Your facility hasn't set up its subject list yet. Please ask your facility to add subjects."
+                          : 'Choose your department in Academic details to see department subjects.'}
                       </p>
                     ) : (
                       <>

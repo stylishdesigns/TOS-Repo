@@ -844,6 +844,24 @@ export function registerExtendedRoutes(app: express.Express): void {
     }
   });
 
+  // The facility's registered subjects, for the student signup step pages:
+  // the subject picker lists only what the facility itself registered in the
+  // Subjects Manager, each tagged with the department it belongs to.
+  app.get('/api/public/subjects', async (req, res) => {
+    const centreId = String(req.query.centreId || '').trim();
+    if (!centreId) return res.status(400).json({ error: 'centreId is required.' });
+    try {
+      const snap = await adminDb.collection('subjects').where('centreId', '==', centreId).get();
+      const subjects = snap.docs
+        .map((d) => d.data() as any)
+        .map((s) => ({ name: String(s.name || ''), department: String(s.department || 'General') }))
+        .filter((s) => s.name);
+      res.json({ subjects });
+    } catch {
+      res.status(500).json({ error: 'Could not load the facility subjects.' });
+    }
+  });
+
   // Server-side username availability for the student signup form.
   app.get('/api/public/username-check', async (req, res) => {
     const u = String(req.query.u || '').trim().toLowerCase();

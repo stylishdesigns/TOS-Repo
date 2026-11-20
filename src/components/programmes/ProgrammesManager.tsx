@@ -127,17 +127,25 @@ export const ProgrammesManager: React.FC = () => {
     }));
   };
 
+  // The form no longer collects a programme code; derive a short readable one
+  // from the title so cards, search and the inspect modal still have one.
+  const deriveCode = (name: string) => {
+    const words = name.replace(/[^A-Za-z0-9 ]/g, ' ').trim().split(/\s+/).filter(Boolean);
+    const base = (words.map((w) => w[0]).join('') || 'EXAM').toUpperCase().slice(0, 5);
+    return `${base}-${Date.now().toString(36).toUpperCase().slice(-4)}`;
+  };
+
   const handleSaveProgramme = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name.trim() || !formData.code.trim()) {
-      addToast({ type: 'error', title: 'Missing Information', description: 'Please provide programme name and code.' });
+    if (!formData.name.trim()) {
+      addToast({ type: 'error', title: 'Missing Information', description: 'Please provide the exam program title.' });
       return;
     }
 
     if (editingProg) {
       updateProgramme(editingProg.id, {
         name: formData.name,
-        code: formData.code.toUpperCase(),
+        code: (formData.code.trim() || deriveCode(formData.name)).toUpperCase(),
         description: formData.description,
         category: formData.category,
         fee: Number(formData.fee),
@@ -156,7 +164,7 @@ export const ProgrammesManager: React.FC = () => {
     } else {
       addProgramme({
         name: formData.name,
-        code: formData.code.toUpperCase(),
+        code: (formData.code.trim() || deriveCode(formData.name)).toUpperCase(),
         description: formData.description,
         category: formData.category,
         fee: Number(formData.fee),
