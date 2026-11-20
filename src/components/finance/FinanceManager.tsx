@@ -945,7 +945,7 @@ export const FinanceManager: React.FC = () => {
                     Placeholders: {'{{student_name}}'}, {'{{facility_name}}'} (filled in automatically), {'{{outstanding_balance}}'}, {'{{next_payment_due}}'}
                   </p>
                   <p className="text-[10px] text-slate-500 mt-1 italic">
-                    Preview: {renderChatTemplate(remTemplate, { student_name: 'Joy', facility_name: centreName || 'the facility', outstanding_balance: `${settings.currencySymbol}25,000`, next_payment_due: '28 August 2026' })}
+                    Preview (sample): {renderChatTemplate(remTemplate, { student_name: 'Sample Student', facility_name: centreName || 'the facility', outstanding_balance: `${settings.currencySymbol}25,000`, next_payment_due: '28 August 2026' })}
                   </p>
                 </div>
 
