@@ -6,6 +6,7 @@ import { useApp } from '../../../context/AppContext';
 import { api, Json } from '../../tos/tosShared';
 import { Student } from '../../../types';
 import { ModernSelect } from '../../ui/ModernSelect';
+import { brandVars } from '../../../lib/brand';
 import {
   User,
   GraduationCap,
@@ -243,6 +244,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
     setBgTheme,
     isAdmin,
     logout,
+    brandAccent,
     centreName,
     subjects,
   } = useApp();
@@ -365,6 +367,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
     ? createPortal(
         <div
           className="fixed inset-0 z-[70] bg-black/50 backdrop-blur-[2px] flex items-end sm:items-center justify-center"
+          style={brandVars(brandAccent)}
           onClick={() => setShowSubjectsEditor(false)}
         >
           <div
@@ -456,6 +459,30 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
         document.body
       )
     : null;
+
+  // The facility's registered exam programmes, so the Programme Track tile in
+  // Academic details shows the facility's own programme name (a legacy stored
+  // name resolves to it when it matches, case-insensitively).
+  const [centreProgrammeNames, setCentreProgrammeNames] = useState<string[]>([]);
+  useEffect(() => {
+    const slug = new URLSearchParams(window.location.search).get('centre');
+    if (!slug) return;
+    let alive = true;
+    fetch(`/api/public/programmes?centreId=${encodeURIComponent(slug)}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error('no'))))
+      .then((d: any) => {
+        if (alive && Array.isArray(d.programmes)) {
+          setCentreProgrammeNames(d.programmes.map((p: any) => String(p?.name || '')).filter(Boolean));
+        }
+      })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
+  const programmeTrackLabel = useMemo(() => {
+    const wanted = (student.programmeName || '').trim().toLowerCase();
+    if (!wanted) return '';
+    return centreProgrammeNames.find((n) => n.trim().toLowerCase() === wanted) || student.programmeName || '';
+  }, [student.programmeName, centreProgrammeNames]);
 
   // CH1 Step 1: username lives in Profile. One claim per student, set here,
   // shown on chat and the mock leaderboard, changeable once every 30 days.
@@ -1309,7 +1336,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                 <div className="grid grid-cols-2 gap-3 pt-2 text-xs">
                   <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-0.5">
                     <span className="text-[10px] text-slate-400 font-semibold block uppercase">Programme Track</span>
-                    <span className="font-bold text-slate-900 block leading-tight">{student.programmeName || '—'}</span>
+                    <span className="font-bold text-slate-900 block leading-tight">{programmeTrackLabel || '—'}</span>
                   </div>
                   {settings.academicSession ? (
                     <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-0.5">
@@ -1349,18 +1376,6 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                     </div>
                   ) : null}
                 </div>
-
-                {typeof student.attendancePercent === 'number' && (
-                  <div className="bg-emerald-50/80 p-3.5 rounded-xl border border-emerald-200 flex items-center justify-between text-xs">
-                    <div>
-                      <span className="font-bold text-emerald-950 block">Attendance Standing</span>
-                      <span className="text-[11px] text-emerald-800">
-                        Eligible for official facility mock examinations
-                      </span>
-                    </div>
-                    <span className="text-base font-black text-emerald-700">{student.attendancePercent}%</span>
-                  </div>
-                )}
 
                 {/* Registered subjects, moved here from its own section. The
                     student adds or removes subjects right in this popup, and

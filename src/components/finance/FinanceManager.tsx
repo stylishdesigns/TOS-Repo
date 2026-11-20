@@ -4,6 +4,8 @@ import { PaymentRecord, isConfirmedPayment, Student } from '../../types';
 import { DEFAULT_FEE_REMINDER_SETTINGS, FEE_REMINDER_DAY_OPTIONS, normalizeFeeReminderSettings, renderChatTemplate } from '../../lib/feeReminders';
 import { nextPaymentDue, formatDateLong, todayISO } from '../../lib/paymentDates';
 import { ModernSelect } from '../ui/ModernSelect';
+import { uploadPaymentProof } from '../../lib/paymentProof';
+import { ProofOfPaymentUpload } from '../ui/ProofOfPaymentUpload';
 import {
   CreditCard,
   Search,
@@ -68,6 +70,9 @@ export const FinanceManager: React.FC = () => {
   const [amountPaid, setAmountPaid] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'Bank Transfer' | 'Cash'>('Bank Transfer');
   const [adminNote, setAdminNote] = useState('');
+  const [proofUrl, setProofUrl] = useState('');
+  const [proofName, setProofName] = useState('');
+  const [proofBusy, setProofBusy] = useState(false);
   const [paymentFrom, setPaymentFrom] = useState('');
   const [paymentTo, setPaymentTo] = useState('');
 
@@ -303,6 +308,20 @@ export const FinanceManager: React.FC = () => {
     }
   };
 
+  const handleProofPick = async (file: File | null) => {
+    if (!file) return;
+    setProofBusy(true);
+    try {
+      const res = await uploadPaymentProof(file);
+      setProofUrl(res.url);
+      setProofName(res.name);
+    } catch (err) {
+      addToast({ type: 'error', title: 'Proof Upload Failed', description: err instanceof Error ? err.message : 'The proof image could not be uploaded.' });
+    } finally {
+      setProofBusy(false);
+    }
+  };
+
   const handleRecordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const st = students.find((s) => s.id === selectedStudentId);
@@ -320,6 +339,8 @@ export const FinanceManager: React.FC = () => {
       amountPaid: amount,
       method: paymentMethod,
       note: adminNote.trim() || undefined,
+      evidenceUrl: proofUrl || undefined,
+      evidenceName: proofName || undefined,
       effectiveFrom: paymentFrom || undefined,
       expiresAt: paymentTo || undefined,
     });
@@ -336,6 +357,8 @@ export const FinanceManager: React.FC = () => {
     setAdminNote('');
     setPaymentFrom('');
     setPaymentTo('');
+    setProofUrl('');
+    setProofName('');
   };
 
   return (
@@ -523,8 +546,8 @@ export const FinanceManager: React.FC = () => {
       {/* Record Payment Modal */}
       {showRecordModal && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 shrink-0">
               <h3 className="font-extrabold text-slate-900 text-base">Record Tuition Payment</h3>
               <button
                 onClick={() => setShowRecordModal(false)}
@@ -534,7 +557,7 @@ export const FinanceManager: React.FC = () => {
               </button>
             </div>
 
-            <form onSubmit={handleRecordSubmit} className="py-4 space-y-3.5 text-xs">
+            <form onSubmit={handleRecordSubmit} className="py-4 space-y-3.5 overflow-y-auto flex-1 min-h-0 text-xs">
               <ModernSelect
                 label="Select Candidate *"
                 value={selectedStudentId}
@@ -609,6 +632,14 @@ export const FinanceManager: React.FC = () => {
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-medium bg-slate-50 focus:bg-white focus:border-orange-500 outline-none"
                 />
               </div>
+
+              <ProofOfPaymentUpload
+                url={proofUrl}
+                name={proofName}
+                busy={proofBusy}
+                onPick={handleProofPick}
+                onClear={() => { setProofUrl(''); setProofName(''); }}
+              />
 
               <div className="pt-3 border-t border-slate-100 flex justify-end space-x-2">
                 <button
@@ -966,18 +997,7 @@ export const FinanceManager: React.FC = () => {
                 {/* In-chat message */}
                 <div>
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">In-chat message</p>
-                  <textarea
-                    value={remTemplate}
-                    onChange={(e) => setRemTemplate(e.target.value)}
-                    rows={3}
-                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-medium bg-white leading-relaxed focus:border-orange-500 outline-none resize-none"
-                  />
-                  <div className="flex flex-wrap gap-1.5 mt-2">
-                    {['{{student_name}}', '{{facility_name}}', '{{outstanding_balance}}', '{{next_payment_due}}'].map((ph) => (
-                      <span key={ph} className="font-mono text-[10px] font-semibold bg-orange-50 text-orange-800 border border-orange-200 rounded-md px-2 py-0.5">{ph}</span>
-                    ))}
-                  </div>
-                  <p className="text-[10px] text-slate-400 mt-3">Sample preview, filled in automatically:</p>
+                  <p className="text-[10px] text-slate-400 mt-1">Sample preview, filled in automatically:</p>
                   <div className="mt-1.5 max-w-[88%] bg-slate-100 rounded-xl rounded-bl-sm px-3.5 py-2.5">
                     <p className="text-[10px] font-black text-slate-900 mb-1">{centreName || 'The facility'}</p>
                     <p className="text-[11.5px] text-slate-600 leading-relaxed">
@@ -987,7 +1007,7 @@ export const FinanceManager: React.FC = () => {
                 </div>
               </div>
             ) : (
-              <form id="tos-channel-settings-form" onSubmit={handleSaveChannelSettings}>
+              <form id="tos-channel-settings-form" onSubmit={handleSaveChannelSettings} className="py-4 space-y-3 overflow-y-auto flex-1 min-h-0 pr-1">
                 <div className="p-3.5 bg-blue-50/70 border border-blue-200/80 rounded-xl space-y-3">
                   <div className="flex items-center gap-2 text-blue-900 font-bold">
                     <Building2 className="w-4 h-4 text-blue-600" />

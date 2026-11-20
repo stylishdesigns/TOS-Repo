@@ -16,6 +16,8 @@ import {
   Edit2,
   Save,
 } from 'lucide-react';
+import { uploadPaymentProof } from '../../lib/paymentProof';
+import { ProofOfPaymentUpload } from '../ui/ProofOfPaymentUpload';
 
 export const StudentDetailModal: React.FC = () => {
   const {
@@ -38,10 +40,27 @@ export const StudentDetailModal: React.FC = () => {
   const [paymentMethod, setPaymentMethod] = useState<'Bank Transfer' | 'Cash'>('Bank Transfer');
   const [paymentFrom, setPaymentFrom] = useState('');
   const [paymentTo, setPaymentTo] = useState('');
+  const [proofUrl, setProofUrl] = useState('');
+  const [proofName, setProofName] = useState('');
+  const [proofBusy, setProofBusy] = useState(false);
 
   if (!selectedStudent) return null;
 
   const studentPayments = payments.filter((p) => p.studentId === selectedStudent.id);
+
+  const handleProofPick = async (file: File | null) => {
+    if (!file) return;
+    setProofBusy(true);
+    try {
+      const res = await uploadPaymentProof(file);
+      setProofUrl(res.url);
+      setProofName(res.name);
+    } catch (err) {
+      addToast({ type: 'error', title: 'Proof Upload Failed', description: err instanceof Error ? err.message : 'The proof image could not be uploaded.' });
+    } finally {
+      setProofBusy(false);
+    }
+  };
 
   const handleRecordInstallment = (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,6 +80,8 @@ export const StudentDetailModal: React.FC = () => {
       balance: Math.max(0, selectedStudent.outstandingBalance - amount),
       status: amount >= selectedStudent.outstandingBalance ? 'Paid' : 'Partial',
       method: paymentMethod,
+      evidenceUrl: proofUrl || undefined,
+      evidenceName: proofName || undefined,
       effectiveFrom: paymentFrom || undefined,
       expiresAt: paymentTo || undefined,
     });
@@ -69,6 +90,8 @@ export const StudentDetailModal: React.FC = () => {
     setPaymentAmount('');
     setPaymentFrom('');
     setPaymentTo('');
+    setProofUrl('');
+    setProofName('');
   };
 
   // The admin decides what the student owes. The server recomputes the
@@ -252,6 +275,16 @@ export const StudentDetailModal: React.FC = () => {
                     value={paymentTo}
                     onChange={(e) => setPaymentTo(e.target.value)}
                     className="w-full px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg"
+                  />
+                </div>
+
+                <div className="sm:col-span-3">
+                  <ProofOfPaymentUpload
+                    url={proofUrl}
+                    name={proofName}
+                    busy={proofBusy}
+                    onPick={handleProofPick}
+                    onClear={() => { setProofUrl(''); setProofName(''); }}
                   />
                 </div>
 

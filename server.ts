@@ -689,6 +689,26 @@ async function startServer() {
     return res.status(500).json({ error: "Failed to process the payment" });
   };
 
+  //   GET /api/centre/payments/upload-config
+  //     - centre admin only: media-host details for attaching proof of
+  //       payment (a receipt screenshot or photo) when recording a payment
+  //       manually. The host details come from this deployment's own
+  //       environment, never from the client.
+  app.get("/api/centre/payments/upload-config", async (req, res) => {
+    try {
+      const caller = await getCaller(req);
+      await loadPaymentActor(adminDb, caller);
+      const cloud = String(process.env.CLOUDINARY_CLOUD_NAME || "");
+      const preset = String(process.env.CLOUDINARY_UPLOAD_PRESET || "");
+      if (!cloud || !preset) {
+        return res.status(503).json({ error: "File hosting is not configured on this deployment yet." });
+      }
+      res.json({ ok: true, cloud, preset, folder: "tos/payments" });
+    } catch (error) {
+      sendPaymentError(res, error, "payments upload-config");
+    }
+  });
+
   app.post("/api/centre/students/payment", async (req, res) => {
     try {
       const caller = await getCaller(req);
