@@ -53,7 +53,6 @@ import {
   INITIAL_CLASSROOMS,
   INITIAL_ATTENDANCE_SETTINGS,
   INITIAL_SUBJECTS,
-  INITIAL_STUDY_MATERIALS,
 } from '../initialData';
 
 import { 
@@ -551,9 +550,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [studyMaterials, setStudyMaterials] = useState<StudyMaterial[]>(() => {
     try {
       const saved = localStorage.getItem(scopedKey('studyMaterials'));
-      return saved ? JSON.parse(saved) : INITIAL_STUDY_MATERIALS;
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return INITIAL_STUDY_MATERIALS;
+      return [];
     }
   });
 
@@ -608,11 +607,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       try {
         await setDoc(doc(db, 'studyMaterials', newId), tenantWrite(newMaterial));
         // Students taking this subject get a notification about the upload.
+        const typeLabel = newMaterial.type === 'video' ? 'Video link' : newMaterial.type === 'image' ? 'Image' : (newMaterial.fileType || 'PDF');
         void api('/api/notifications/push', { method: 'POST', body: {
           centreId: (newMaterial as any).centreId || activeCentreId,
           type: 'material',
           title: 'New study material',
-          body: `${newMaterial.title} (${newMaterial.subject}, ${newMaterial.fileType})`,
+          body: `${newMaterial.title} (${newMaterial.subject}, ${typeLabel})`,
           subjects: [newMaterial.subject],
         } }).catch(() => {});
       } catch (err) {
@@ -2122,10 +2122,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // Study Materials listener
     const unsubStudyMaterials = onSnapshot(centreQuery('studyMaterials'), (snapshot) => {
-      if (!snapshot.empty) {
-        const data = scopedDocs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as StudyMaterial)));
-        setStudyMaterials(data);
-      }
+      const data = scopedDocs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as StudyMaterial)));
+      setStudyMaterials(data);
     }, (error) => console.warn('studyMaterials snapshot error:', error));
 
     return () => {

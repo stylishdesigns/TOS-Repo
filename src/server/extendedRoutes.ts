@@ -358,6 +358,24 @@ export function registerExtendedRoutes(app: express.Express): void {
   // A data URL in, a hosted Cloudinary URL out (tos/profiles or tos/facility).
   // Profile photos up to 2 MB, facility photos up to 4 MB.
   // ==========================================================================
+  // Cloudinary upload config for study materials (PDFs and images) uploaded by
+  // tutors and centre admins. Videos are never uploaded: the tutor pastes a link.
+  app.get('/api/centre/materials/upload-config', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const centreId = String(req.query.centreId || '').trim().slice(0, 120);
+      if (!centreId) throw httpError(400, 'centreId is required.');
+      await requireMembership(caller, centreId, ['owner', 'admin', 'tutor']);
+      const cloud = String(process.env.CLOUDINARY_CLOUD_NAME || '');
+      const preset = String(process.env.CLOUDINARY_UPLOAD_PRESET || '');
+      if (!cloud || !preset) throw httpError(503, 'Material uploads are not configured yet.');
+      res.json({ ok: true, cloud, preset, folder: 'tos/materials' });
+    } catch (error: any) {
+      const status = Number(error?.status || 500);
+      res.status(status).json({ error: error?.message || 'Material upload config failed.' });
+    }
+  });
+
   app.post('/api/centre/profile-image', async (req, res) => {
     try {
       const caller = getCaller(req);

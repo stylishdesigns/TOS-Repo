@@ -13,11 +13,12 @@ import {
   User,
   GraduationCap,
   Bell,
+  BookOpen,
 } from 'lucide-react';
 import { ModernSelect } from '../../ui/ModernSelect';
-import { TimetableSlot, Tutor, Student } from '../../../types';
+import { TimetableSlot, Tutor } from '../../../types';
 import { useScrollLock } from '../../../hooks/useScrollLock';
-import { StudyMaterialsSection } from '../../student-portal/tabs/classes/StudyMaterialsSection';
+import { TutorMaterialsSection } from './TutorMaterialsSection';
 
 interface ScheduleTabProps {
   tutor: Tutor;
@@ -34,6 +35,9 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({ tutor }) => {
   const [tutorTopic, setTutorTopic] = useState('');
   const [actionReason, setActionReason] = useState('');
   const [actionType, setActionType] = useState<'none' | 'postpone'>('none');
+  // The scheduled class the tutor tapped "Add Material" on; the Study
+  // Materials sheet opens pre-bound to its subject and topic.
+  const [materialClass, setMaterialClass] = useState<TimetableSlot | null>(null);
 
   useScrollLock(!!viewingSession);
 
@@ -221,8 +225,11 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({ tutor }) => {
       </div>
 
       {activeSection === 'materials' ? (
-        <StudyMaterialsSection
-          student={{ id: tutor.id, name: tutor.name, subjects: tutorSubjects } as Student}
+        <TutorMaterialsSection
+          tutor={tutor}
+          subjects={tutorSubjects}
+          addForClass={materialClass}
+          onClassHandled={() => setMaterialClass(null)}
         />
       ) : (
         <>
@@ -420,7 +427,13 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({ tutor }) => {
                               </div>
                             </div>
                           </div>
-                          <div className="pt-4 border-t border-slate-100 flex items-center justify-end">
+                          <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-2">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setMaterialClass(cls); setActiveSection('materials'); }}
+                              className="px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl text-[10px] font-black uppercase tracking-widest hover:border-slate-300 transition-colors"
+                            >
+                              Add Material
+                            </button>
                             <button className="px-6 py-2 bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-orange-600 transition-colors">View Details</button>
                           </div>
                         </div>
@@ -514,6 +527,14 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({ tutor }) => {
                             </div>
                          </div>
                      </div>
+
+                     <button
+                        onClick={() => { const cls = viewingSession; setMaterialClass(cls); setViewingSession(null); setActiveSection('materials'); }}
+                        className="w-full py-3 bg-white border border-slate-200 text-slate-700 font-black text-[10px] uppercase tracking-widest rounded-xl hover:border-slate-300 transition-all flex items-center justify-center gap-2"
+                     >
+                        <BookOpen className="w-3.5 h-3.5" />
+                        Add material to this class
+                     </button>
 
                      {!isFinished(viewingSession.time, viewingSession.date) && actionType === 'none' && (
                         <div className="space-y-4">

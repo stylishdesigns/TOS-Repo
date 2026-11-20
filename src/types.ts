@@ -238,6 +238,16 @@ export interface StudyMaterial {
   description?: string;
   contentSummary?: string;
   downloadUrl?: string;
+  // Where the material lives: 'general' materials float free of the timetable;
+  // 'topic' ones are attached to a scheduled class (topic + classId).
+  kind?: 'general' | 'topic';
+  // Real upload shape: pdf/image carry an uploaded file, video is link-only.
+  type?: 'pdf' | 'image' | 'video';
+  videoUrl?: string;
+  fileName?: string;
+  classId?: string;
+  classDate?: string;
+  classTime?: string;
 }
 
 export interface ClassRating {
