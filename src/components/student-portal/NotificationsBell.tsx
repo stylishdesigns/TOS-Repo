@@ -101,6 +101,16 @@ export function NotificationsBell({ onOpenChange }: { onOpenChange?: (open: bool
   const readRef = React.useRef<Set<string>>(new Set(loadRead()));
   if (readRef.current.size === 0 && loadRead().length > 0) readRef.current = new Set(loadRead());
 
+  // The due/upcoming split depends on the wall clock, so it re-checks every
+  // 30 seconds. Without this, a reminder whose time passes while the page
+  // stays open keeps its old Upcoming badge until the reminder list itself
+  // changes (fixed Nov 20).
+  const [clockTick, setClockTick] = React.useState(0);
+  React.useEffect(() => {
+    const t = window.setInterval(() => setClockTick((n) => n + 1), 30_000);
+    return () => window.clearInterval(t);
+  }, []);
+
   // A reminder the sender already delivered exists in the history as
   // rem-<reminderId>; the planner row then stands down so it never shows
   // twice (once as upcoming, once as delivered).
@@ -127,7 +137,7 @@ export function NotificationsBell({ onOpenChange }: { onOpenChange?: (open: bool
         return t === null ? true : t <= nowMin;
       })
       .filter((r: any) => !deliveredIds.has(String(r.id)));
-  }, [plannerReminders, deliveredIds]);
+  }, [plannerReminders, deliveredIds, clockTick]);
 
   // Upcoming reminders stay visible in the bell until they come due, so a
   // reminder the student just set is never a silent surprise.
@@ -147,7 +157,7 @@ export function NotificationsBell({ onOpenChange }: { onOpenChange?: (open: bool
       .sort((a: any, b: any) =>
         String(a.date).localeCompare(String(b.date)) ||
         String(a.time || '').localeCompare(String(b.time || '')));
-  }, [plannerReminders, deliveredIds]);
+  }, [plannerReminders, deliveredIds, clockTick]);
 
   const toastRef = React.useRef<Set<string>>(new Set());
 

@@ -130,6 +130,38 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
   const clockedInAt = todayLog?.clockInAt ? new Date(todayLog.clockInAt) : null;
   const clockedOutAt = todayLog?.clockOutAt ? new Date(todayLog.clockOutAt) : null;
 
+  // Live attendance rate (Nov 20): days this student actually checked in vs
+  // the centre's class days since they joined. The old stored
+  // student.attendancePercent was set once when the account was created and
+  // never updated, so the home card now reads the real check-in logs.
+  const attendanceRate = React.useMemo(() => {
+    const checked = new Set<string>();
+    for (const l of attendanceLogs) {
+      if (l.studentId !== student.id && l.studentId !== currentUid) continue;
+      if (!l.clockInAt || !l.date) continue;
+      checked.add(l.date);
+    }
+    if (checked.size === 0) return null;
+    let start: Date | null = student.createdAt ? new Date(student.createdAt) : null;
+    if (!start || Number.isNaN(start.getTime())) {
+      const earliest = Array.from(checked).sort()[0];
+      start = earliest ? new Date(`${earliest}T00:00:00`) : null;
+    }
+    if (!start || Number.isNaN(start.getTime())) return null;
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const classDays = new Set<string>((timetable || []).map((sl: any) => sl.day).filter(Boolean));
+    const allowed = classDays.size > 0 ? classDays : new Set<string>(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']);
+    const todayMid = new Date(); todayMid.setHours(0, 0, 0, 0);
+    const startMid = new Date(start); startMid.setHours(0, 0, 0, 0);
+    let expected = 0;
+    for (const d = new Date(startMid); d < todayMid; d.setDate(d.getDate() + 1)) {
+      if (allowed.has(dayNames[d.getDay()])) expected++;
+      if (expected > 3000) break;
+    }
+    if (expected === 0) return null;
+    return Math.min(100, Math.round((checked.size / expected) * 100));
+  }, [attendanceLogs, student.id, student.createdAt, currentUid, timetable]);
+
   const parseTo24H = (timeStr: string) => {
     if (!timeStr) return "00:00";
     const cleaned = timeStr.trim().toUpperCase();
@@ -161,19 +193,9 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
     return d;
   })();
 
-  const elapsedMillis = clockedInAt ? Math.max(0, currentTime.getTime() - clockedInAt.getTime()) : 0;
   const ringProgress = clockedInAt
     ? Math.min(1, Math.max(0, (currentTime.getTime() - clockedInAt.getTime()) / Math.max(60000, closingToday.getTime() - clockedInAt.getTime())))
     : 0;
-  const totalMillis = clockedInAt && clockedOutAt ? Math.max(0, clockedOutAt.getTime() - clockedInAt.getTime()) : 0;
-
-  const formatDuration = (ms: number) => {
-    const total = Math.floor(ms / 1000);
-    const h = Math.floor(total / 3600);
-    const m = Math.floor((total % 3600) / 60);
-    const sec = total % 60;
-    return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}` : `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
-  };
   const fmtClock = (d: Date) => d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
   const clockInLabel = clockedInAt ? fmtClock(clockedInAt) : '';
   const clockOutLabel = clockedOutAt ? fmtClock(clockedOutAt) : '';
@@ -355,16 +377,6 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
             <span className="text-[9px] font-black uppercase tracking-wider text-rose-600">Check Out</span>
           </div>
         </div>
-        {clockedInAt && !clockedOutAt && (
-          <p className="text-center text-[10px] font-bold text-slate-400 mt-2 tabular-nums">
-            In facility {formatDuration(elapsedMillis)} • since {clockInLabel}
-          </p>
-        )}
-        {clockedOutAt && (
-          <p className="text-center text-[10px] font-bold text-slate-400 mt-2 tabular-nums">
-            Total {formatDuration(totalMillis)} in the facility
-          </p>
-        )}
         <p className="text-center text-[10px] font-semibold text-slate-400 mt-2">
           {!clockedInAt
             ? `Tap Check In when you arrive • Resumption ${attendanceSettings.resumptionTime} • Late after ${attendanceSettings.lateArrivalTime}`
@@ -405,23 +417,20 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
           </div>
         </button>
 
-        {/* Card 2: Attendance Rate */}
-        <button
-          onClick={() => onNavigateTab('more')}
-          className="text-left bg-white p-4 sm:p-4.5 rounded-2xl border border-slate-200/90 shadow-sm hover:border-emerald-400 hover:shadow-md transition-all active:scale-98 flex flex-col justify-between min-h-[112px] group"
-        >
+        {/* Card 2: Attendance Rate — live from check-in logs, not clickable */}
+        <div className="text-left bg-white p-4 sm:p-4.5 rounded-2xl border border-slate-200/90 shadow-sm flex flex-col justify-between min-h-[112px]">
           <div className="flex items-center justify-between text-slate-400 mb-2">
-            <div className="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 group-hover:scale-105 transition-transform">
+            <div className="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600">
               <CheckCircle2 className="w-4.5 h-4.5" />
             </div>
           </div>
           <div>
             <div className="text-lg font-black text-slate-900 leading-snug">
-              {student.attendancePercent}%
+              {attendanceRate === null ? '—' : `${attendanceRate}%`}
             </div>
-            <div className="text-xs font-semibold text-slate-500 mt-0.5">Class Attendance</div>
+            <div className="text-xs font-semibold text-slate-500 mt-0.5">Days you checked in</div>
           </div>
-        </button>
+        </div>
 
         {/* Card 3: Fee Settlement Status */}
         <button
