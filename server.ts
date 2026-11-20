@@ -690,12 +690,14 @@ async function startServer() {
   app.post("/api/centre/students/payment", async (req, res) => {
     try {
       const caller = await getCaller(req);
-      const { studentId, amountPaid, method, note, evidenceUrl, evidenceName } = req.body || {};
+      const { studentId, amountPaid, method, note, evidenceUrl, evidenceName, effectiveFrom, expiresAt } = req.body || {};
       if (typeof studentId !== "string" || !/^[a-zA-Z0-9_\-]{1,128}$/.test(studentId)) {
         return res.status(400).json({ error: "Invalid studentId" });
       }
       const amount = parseAmount(amountPaid);
-      const payMethod = method === "Bank Transfer" || method === "Cash" ? method : "Card";
+      // Only Bank Transfer and Cash are offered anywhere now; legacy 'Card'
+      // records stay readable but nothing new mints them.
+      const payMethod = method === "Cash" ? "Cash" : "Bank Transfer";
       if (typeof evidenceUrl === "string" && evidenceUrl.length > 900000) {
         return res.status(400).json({ error: "Payment evidence is too large. Please attach a smaller image." });
       }
@@ -708,6 +710,8 @@ async function startServer() {
         note,
         evidenceUrl,
         evidenceName,
+        effectiveFrom,
+        expiresAt,
       });
       res.json({ success: true, ...result });
     } catch (error: any) {
@@ -718,14 +722,14 @@ async function startServer() {
   app.post("/api/centre/payments/confirm", async (req, res) => {
     try {
       const caller = await getCaller(req);
-      const { paymentId, action, reason } = req.body || {};
+      const { paymentId, action, reason, effectiveFrom, expiresAt } = req.body || {};
       if (typeof paymentId !== "string" || !/^[a-zA-Z0-9_\-]{1,128}$/.test(paymentId)) {
         return res.status(400).json({ error: "Invalid paymentId" });
       }
       const act = parseConfirmAction(action);
 
       const actor = await loadPaymentActor(adminDb, caller);
-      const result = await decidePayment(adminDb, caller, actor, { paymentId, action: act, reason });
+      const result = await decidePayment(adminDb, caller, actor, { paymentId, action: act, reason, effectiveFrom, expiresAt });
       res.json({ success: true, ...result });
     } catch (error: any) {
       sendPaymentError(res, error, "confirm-payment");

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { PaymentRecord, isConfirmedPayment } from '../../types';
+import { nextPaymentDue, formatDateLong, todayISO } from '../../lib/paymentDates';
 import { ModernSelect } from '../ui/ModernSelect';
 import {
   CreditCard,
@@ -23,6 +24,10 @@ import {
   CreditCard as CardIcon,
   Banknote,
   Copy,
+  BellRing,
+  ChevronDown,
+  MessageCircle,
+  Mail,
 } from 'lucide-react';
 
 export const FinanceManager: React.FC = () => {
@@ -69,8 +74,20 @@ export const FinanceManager: React.FC = () => {
   // New payment form
   const [selectedStudentId, setSelectedStudentId] = useState(students[0]?.id || '');
   const [amountPaid, setAmountPaid] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'Bank Transfer' | 'Card' | 'Cash'>('Bank Transfer');
+  const [paymentMethod, setPaymentMethod] = useState<'Bank Transfer' | 'Cash'>('Bank Transfer');
   const [adminNote, setAdminNote] = useState('');
+  const [paymentFrom, setPaymentFrom] = useState('');
+  const [paymentTo, setPaymentTo] = useState('');
+
+  // Review modal: the admin confirms or declines a student's claim from here,
+  // after seeing the evidence, amount, mode and note, and sets the window the
+  // payment covers.
+  const [reviewPayment, setReviewPayment] = useState<PaymentRecord | null>(null);
+  const [reviewFrom, setReviewFrom] = useState('');
+  const [reviewTo, setReviewTo] = useState('');
+  const [reviewReason, setReviewReason] = useState('');
+  const [reviewBusy, setReviewBusy] = useState(false);
+  const [showReminders, setShowReminders] = useState(false);
 
   // Only confirmed payments count as money collected.
   const totalCollected = payments
@@ -79,30 +96,40 @@ export const FinanceManager: React.FC = () => {
   const pendingPayments = payments.filter((p) => p.status === 'Pending');
   const [busyPaymentId, setBusyPaymentId] = useState<string | null>(null);
 
-  const handleConfirmPayment = async (pay: PaymentRecord) => {
-    const ok = window.confirm(
-      `Confirm ${settings.currencySymbol}${(pay.amountPaid || 0).toLocaleString()} from ${pay.studentName}?\n\nOnly confirm after you have checked the proof or your bank statement. This updates the student's balance.`
-    );
-    if (!ok) return;
-    setBusyPaymentId(pay.id);
+  const openReview = (pay: PaymentRecord) => {
+    setReviewPayment(pay);
+    setReviewFrom(pay.effectiveFrom || todayISO());
+    setReviewTo(pay.expiresAt || '');
+    setReviewReason('');
+    setShowReminders(false);
+  };
+
+  const handleReviewConfirm = async () => {
+    if (!reviewPayment) return;
+    if (reviewFrom && reviewTo && reviewTo < reviewFrom) {
+      addToast({ type: 'error', title: 'Invalid Payment Window', description: 'The expiry date must come after the start date.' });
+      return;
+    }
+    setReviewBusy(true);
     try {
-      await confirmPayment(pay.id, 'confirm');
+      const ok = await confirmPayment(reviewPayment.id, 'confirm', undefined, {
+        effectiveFrom: reviewFrom || undefined,
+        expiresAt: reviewTo || undefined,
+      });
+      if (ok) setReviewPayment(null);
     } finally {
-      setBusyPaymentId(null);
+      setReviewBusy(false);
     }
   };
 
-  const handleRejectPayment = async (pay: PaymentRecord) => {
-    const reason = window.prompt(
-      `Reject ${settings.currencySymbol}${(pay.amountPaid || 0).toLocaleString()} from ${pay.studentName}?\nOptional reason (shown to the student):`,
-      ''
-    );
-    if (reason === null) return;
-    setBusyPaymentId(pay.id);
+  const handleReviewReject = async () => {
+    if (!reviewPayment) return;
+    setReviewBusy(true);
     try {
-      await confirmPayment(pay.id, 'reject', reason);
+      const ok = await confirmPayment(reviewPayment.id, 'reject', reviewReason.trim() || undefined);
+      if (ok) setReviewPayment(null);
     } finally {
-      setBusyPaymentId(null);
+      setReviewBusy(false);
     }
   };
   const totalBilled = students.reduce((sum, s) => sum + (s.totalFee || 0), 0);
@@ -157,15 +184,10 @@ export const FinanceManager: React.FC = () => {
     const matchesStatus =
       paymentStatusFilter === 'All' || p.status === paymentStatusFilter;
 
-    // Filter: Exam Type
+    // Filter: Exam Type (only programmes the facility actually set)
     const matchesExamType =
       examTypeFilter === 'All' ||
-      p.programmeName.toUpperCase().includes(examTypeFilter.toUpperCase()) ||
-      programmes.some(
-        (prog) =>
-          prog.name.toLowerCase() === p.programmeName.toLowerCase() &&
-          prog.category.toUpperCase().includes(examTypeFilter.toUpperCase())
-      );
+      p.programmeName.toLowerCase() === examTypeFilter.toLowerCase();
 
     // Filter: Month selector range
     let matchesMonth = true;
@@ -183,6 +205,57 @@ export const FinanceManager: React.FC = () => {
     return matchesSearch && matchesMethod && matchesStatus && matchesExamType && matchesMonth;
   });
 
+  // Merged detail view data: the student's own record, full payment history
+  // and the next payment due date, all read from the live lists.
+  const detailStudent = selectedReceipt
+    ? students.find((s) => s.id === selectedReceipt.studentId) || null
+    : null;
+  const detailHistory = selectedReceipt
+    ? payments
+        .filter((p) => p.studentId === selectedReceipt.studentId)
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    : [];
+  const detailNextDue = selectedReceipt ? nextPaymentDue(detailHistory) : null;
+  const reminderMessage = selectedReceipt
+    ? `Hello ${selectedReceipt.studentName}, this is a reminder from ${centreName}. Your tuition balance is ${settings.currencySymbol}${(detailStudent?.outstandingBalance || selectedReceipt.balance || 0).toLocaleString()}${detailNextDue ? `, due by ${formatDateLong(detailNextDue)}` : ''}. Kindly complete your payment. Thank you.`
+    : '';
+  const waNumber = (() => {
+    const raw = String(detailStudent?.phone || detailStudent?.parentWhatsApp || '').replace(/\D/g, '');
+    if (!raw) return '';
+    if (raw.startsWith('234')) return raw;
+    if (raw.startsWith('0')) return `234${raw.slice(1)}`;
+    return raw;
+  })();
+
+  const sendChatReminder = async () => {
+    setShowReminders(false);
+    try {
+      await navigator.clipboard.writeText(reminderMessage);
+      addToast({ type: 'success', title: 'Reminder Copied', description: `Open the Chat section and paste it to ${selectedReceipt?.studentName || 'the student'}.` });
+    } catch {
+      addToast({ type: 'info', title: 'Copy Failed', description: 'The reminder could not be copied. Please copy it manually.' });
+    }
+  };
+
+  const sendWhatsAppReminder = () => {
+    setShowReminders(false);
+    if (!waNumber) {
+      addToast({ type: 'error', title: 'No WhatsApp Number', description: `${selectedReceipt?.studentName || 'This student'} has no phone number on file.` });
+      return;
+    }
+    window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(reminderMessage)}`, '_blank');
+  };
+
+  const sendEmailReminder = () => {
+    setShowReminders(false);
+    const email = detailStudent?.email;
+    if (!email) {
+      addToast({ type: 'error', title: 'No Email Address', description: `${selectedReceipt?.studentName || 'This student'} has no email address on file.` });
+      return;
+    }
+    window.location.href = `mailto:${email}?subject=${encodeURIComponent(`Payment Reminder - ${centreName}`)}&body=${encodeURIComponent(reminderMessage)}`;
+  };
+
   const handleRecordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const st = students.find((s) => s.id === selectedStudentId);
@@ -190,12 +263,18 @@ export const FinanceManager: React.FC = () => {
 
     const amount = Number(amountPaid);
     if (!amount || amount <= 0) return;
+    if (paymentFrom && paymentTo && paymentTo < paymentFrom) {
+      addToast({ type: 'error', title: 'Invalid Payment Window', description: 'The expiry date must come after the start date.' });
+      return;
+    }
 
     const result = await recordPayment({
       studentId: st.id,
       amountPaid: amount,
       method: paymentMethod,
       note: adminNote.trim() || undefined,
+      effectiveFrom: paymentFrom || undefined,
+      expiresAt: paymentTo || undefined,
     });
     if (result) {
       addToast({
@@ -208,6 +287,8 @@ export const FinanceManager: React.FC = () => {
     setShowRecordModal(false);
     setAmountPaid('');
     setAdminNote('');
+    setPaymentFrom('');
+    setPaymentTo('');
   };
 
   return (
@@ -223,7 +304,11 @@ export const FinanceManager: React.FC = () => {
           </p>
           <div className="mt-3">
             <button
-              onClick={() => setShowRecordModal(true)}
+              onClick={() => {
+                setPaymentFrom(todayISO());
+                setPaymentTo('');
+                setShowRecordModal(true);
+              }}
               className="px-4 py-2.5 text-xs font-semibold text-white bg-orange-600 hover:bg-orange-700 rounded-lg shadow-sm transition-all inline-flex items-center justify-center space-x-2 shrink-0 cursor-pointer"
             >
               <Plus className="w-4 h-4" />
@@ -311,11 +396,7 @@ export const FinanceManager: React.FC = () => {
                 onChange={(val) => setExamTypeFilter(val)}
                 options={[
                   { value: 'All', label: 'All Exam Types' },
-                  { value: 'JAMB', label: 'JAMB / UTME' },
-                  { value: 'WAEC', label: 'WAEC / WASSCE' },
-                  { value: 'NECO', label: 'NECO SSCE' },
-                  { value: 'A-Levels', label: 'Cambridge A-Levels' },
-                  { value: 'SAT', label: 'SAT / International' }
+                  ...programmes.map((prog) => ({ value: prog.name, label: prog.name })),
                 ]}
               />
             </div>
@@ -331,7 +412,6 @@ export const FinanceManager: React.FC = () => {
                 options={[
                   { value: 'All', label: 'All Channels' },
                   { value: 'Bank Transfer', label: 'Bank Transfer' },
-                  { value: 'Card', label: 'POS / Card' },
                   { value: 'Cash', label: 'Cash' }
                 ]}
               />
@@ -499,7 +579,7 @@ export const FinanceManager: React.FC = () => {
                           <button
                             type="button"
                             disabled={busyPaymentId === pay.id}
-                            onClick={() => handleConfirmPayment(pay)}
+                            onClick={() => openReview(pay)}
                             className="px-2.5 py-1 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-md cursor-pointer"
                           >
                             Confirm
@@ -507,7 +587,7 @@ export const FinanceManager: React.FC = () => {
                           <button
                             type="button"
                             disabled={busyPaymentId === pay.id}
-                            onClick={() => handleRejectPayment(pay)}
+                            onClick={() => openReview(pay)}
                             className="px-2.5 py-1 text-xs font-bold text-rose-700 bg-white hover:bg-rose-50 disabled:opacity-50 rounded-md border border-rose-200 cursor-pointer"
                           >
                             Reject
@@ -581,10 +661,36 @@ export const FinanceManager: React.FC = () => {
                 onChange={(val) => setPaymentMethod(val as any)}
                 options={[
                   { value: 'Bank Transfer', label: 'Bank Transfer (Direct Bank Deposit)' },
-                  { value: 'Card', label: 'Debit Card / POS Terminal' },
                   { value: 'Cash', label: 'Cash Receipt at Bursary Desk' }
                 ]}
               />
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">
+                  Payment Window (when this payment takes effect and expires)
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <span className="block text-[10px] font-semibold text-slate-500 mb-1">Takes effect from</span>
+                    <input
+                      type="date"
+                      value={paymentFrom}
+                      onChange={(e) => setPaymentFrom(e.target.value)}
+                      className="w-full px-2.5 py-2 border border-slate-200 rounded-lg text-xs font-semibold"
+                    />
+                  </div>
+                  <div>
+                    <span className="block text-[10px] font-semibold text-slate-500 mb-1">Expires on</span>
+                    <input
+                      type="date"
+                      value={paymentTo}
+                      onChange={(e) => setPaymentTo(e.target.value)}
+                      className="w-full px-2.5 py-2 border border-slate-200 rounded-lg text-xs font-semibold"
+                    />
+                  </div>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1">The expiry date becomes the student's next payment due date.</p>
+              </div>
 
               <div>
                 <label className="block font-bold text-slate-700 mb-1">
@@ -641,11 +747,17 @@ export const FinanceManager: React.FC = () => {
               <div className="space-y-6">
                 <div className="flex items-center space-x-4">
                   <div className="w-16 h-16 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center overflow-hidden shrink-0">
-                    <img 
-                      src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${selectedReceipt.studentName}`} 
-                      alt={selectedReceipt.studentName}
-                      className="w-full h-full object-cover"
-                    />
+                    {detailStudent?.avatar ? (
+                      <img
+                        src={detailStudent.avatar}
+                        alt={detailStudent.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-lg font-black text-slate-500">
+                        {selectedReceipt.studentName.split(' ').map((n) => n[0]).join('').substring(0, 2).toUpperCase()}
+                      </span>
+                    )}
                   </div>
                   <div>
                     <h4 className="font-bold text-slate-900 text-base">{selectedReceipt.studentName}</h4>
@@ -661,33 +773,29 @@ export const FinanceManager: React.FC = () => {
                 </div>
 
                 <div className="space-y-3">
-                  <h5 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Payment History</h5>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-lg border border-slate-100">
-                      <div className="flex items-center space-x-2">
-                        <Clock className="w-3.5 h-3.5 text-slate-400" />
-                        <div>
-                          <p className="text-[11px] font-bold text-slate-800">{selectedReceipt.date || 'Sep 12, 2026'}</p>
-                          <p className="text-[9px] text-slate-500">{selectedReceipt.method}</p>
+                  <h5 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Payment History ({detailHistory.length})</h5>
+                  <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                    {detailHistory.map((h) => (
+                      <div key={h.id} className="flex items-center justify-between p-2.5 bg-slate-50 rounded-lg border border-slate-100">
+                        <div className="flex items-center space-x-2">
+                          <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <div>
+                            <p className="text-[11px] font-bold text-slate-800">{formatDateLong(h.date)}</p>
+                            <p className="text-[9px] text-slate-500">{h.method}{h.expiresAt ? ` • to ${formatDateLong(h.expiresAt)}` : ''}</p>
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="text-[11px] font-black text-slate-900">
+                            {settings.currencySymbol}{(h.amountPaid || 0).toLocaleString()}
+                          </p>
+                          <span className={`text-[9px] font-bold ${
+                            h.status === 'Paid' ? 'text-emerald-600' : h.status === 'Partial' ? 'text-amber-600' : h.status === 'Pending' ? 'text-blue-600' : 'text-rose-600'
+                          }`}>
+                            {h.status === 'Pending' ? 'Awaiting confirmation' : h.status}
+                          </span>
                         </div>
                       </div>
-                      <p className="text-[11px] font-black text-slate-900">
-                        {settings.currencySymbol}{(selectedReceipt.amountPaid || 0).toLocaleString()}
-                      </p>
-                    </div>
-                    {/* Placeholder for previous installments */}
-                    <div className="flex items-center justify-between p-2.5 bg-slate-50/50 rounded-lg border border-slate-100/50 opacity-60">
-                      <div className="flex items-center space-x-2">
-                        <Clock className="w-3.5 h-3.5 text-slate-300" />
-                        <div>
-                          <p className="text-[11px] font-bold text-slate-400">Aug 28, 2026</p>
-                          <p className="text-[9px] text-slate-300">Bank Transfer</p>
-                        </div>
-                      </div>
-                      <p className="text-[11px] font-black text-slate-400">
-                        {settings.currencySymbol}15,000
-                      </p>
-                    </div>
+                    ))}
                   </div>
                 </div>
                 {selectedReceipt.evidenceUrl && (
@@ -734,6 +842,47 @@ export const FinanceManager: React.FC = () => {
                     <p className="font-medium italic">"{selectedReceipt.note}"</p>
                   </div>
                 )}
+
+                {/* Payment reminder actions */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowReminders((v) => !v)}
+                    className="px-3.5 py-2.5 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 rounded-xl border border-slate-200 flex items-center gap-2 cursor-pointer transition-colors"
+                  >
+                    <BellRing className="w-4 h-4 text-orange-600" />
+                    <span>Send Payment Reminder</span>
+                    <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${showReminders ? 'rotate-180' : ''}`} />
+                  </button>
+                  {showReminders && (
+                    <div className="absolute left-0 bottom-full mb-1 w-full sm:w-80 bg-white rounded-xl border border-slate-200 shadow-xl z-20 overflow-hidden">
+                      <button
+                        type="button"
+                        onClick={sendChatReminder}
+                        className="w-full px-3 py-2.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2.5 cursor-pointer border-b border-slate-100"
+                      >
+                        <MessageCircle className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                        <span>In-app Chat<span className="block text-[10px] text-slate-400 font-medium">Copies the message; paste it in the student's chat</span></span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={sendWhatsAppReminder}
+                        className="w-full px-3 py-2.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2.5 cursor-pointer border-b border-slate-100"
+                      >
+                        <MessageCircle className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        <span>WhatsApp<span className="block text-[10px] text-slate-400 font-medium">Opens WhatsApp with the message ready to send</span></span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={sendEmailReminder}
+                        className="w-full px-3 py-2.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2.5 cursor-pointer"
+                      >
+                        <Mail className="w-3.5 h-3.5 text-orange-600 shrink-0" />
+                        <span>Email<span className="block text-[10px] text-slate-400 font-medium">Opens the mail app with the reminder pre-filled</span></span>
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Right Column: Balance Summary */}
@@ -761,7 +910,12 @@ export const FinanceManager: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="mt-8 pt-4 border-t border-slate-800">
+                <div className="mt-4 pt-4 border-t border-slate-800">
+                  <p className="text-xs text-slate-400 font-bold mb-1">Next Payment Due</p>
+                  <p className="text-base font-black text-white">{detailNextDue ? formatDateLong(detailNextDue) : 'Not set yet'}</p>
+                </div>
+
+                <div className="mt-4 pt-4 border-t border-slate-800">
                   <p className="text-xs text-amber-400 font-bold mb-1">Outstanding Balance</p>
                   <p className="text-3xl font-black text-white">
                     {settings.currencySymbol}{(selectedReceipt.balance || 0).toLocaleString()}
@@ -1017,6 +1171,125 @@ export const FinanceManager: React.FC = () => {
                 className="px-4 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
               >
                 Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Payment Review Modal: evidence, details, window, then confirm or decline */}
+      {reviewPayment && (
+        <div className="fixed inset-0 bg-black/60 z-[70] flex items-center justify-center p-4 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-slate-200 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 shrink-0">
+              <div>
+                <h3 className="font-extrabold text-slate-900 text-base">Review Student Payment</h3>
+                <p className="text-xs text-slate-500">Check the proof and details before confirming or declining</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReviewPayment(null)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="py-4 space-y-3.5 overflow-y-auto flex-1 pr-1 text-xs">
+              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200/80 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-900 text-sm">{reviewPayment.studentName}</span>
+                  <span className="font-black text-slate-900">
+                    {settings.currencySymbol}{(reviewPayment.amountPaid || 0).toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-slate-600">
+                  <span>Payment mode: <strong className="text-slate-800">{reviewPayment.method}</strong></span>
+                  <span>Submitted: {formatDateLong(reviewPayment.date)}</span>
+                </div>
+                {reviewPayment.note && (
+                  <p className="text-slate-600 italic">"{reviewPayment.note}"</p>
+                )}
+                {reviewPayment.evidenceUrl ? (
+                  <div className="pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setViewEvidenceModal({ url: reviewPayment.evidenceUrl!, title: `${reviewPayment.studentName} - Payment Evidence` })}
+                      className="text-[10px] font-bold text-orange-600 hover:underline flex items-center gap-1 cursor-pointer mb-1"
+                    >
+                      <Eye className="w-3 h-3" /> Tap to enlarge
+                    </button>
+                    <img
+                      src={reviewPayment.evidenceUrl}
+                      alt="Payment evidence"
+                      className="w-full max-h-48 object-contain rounded-lg border border-slate-200 bg-white cursor-pointer"
+                      onClick={() => setViewEvidenceModal({ url: reviewPayment.evidenceUrl!, title: `${reviewPayment.studentName} - Payment Evidence` })}
+                    />
+                  </div>
+                ) : (
+                  <p className="text-amber-700 font-semibold flex items-center gap-1.5">
+                    <AlertCircle className="w-3.5 h-3.5" /> No proof attached to this payment.
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">
+                  Payment Window (when this payment takes effect and expires)
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <span className="block text-[10px] font-semibold text-slate-500 mb-1">Takes effect from</span>
+                    <input
+                      type="date"
+                      value={reviewFrom}
+                      onChange={(e) => setReviewFrom(e.target.value)}
+                      className="w-full px-2.5 py-2 border border-slate-200 rounded-lg text-xs font-semibold"
+                    />
+                  </div>
+                  <div>
+                    <span className="block text-[10px] font-semibold text-slate-500 mb-1">Expires on</span>
+                    <input
+                      type="date"
+                      value={reviewTo}
+                      onChange={(e) => setReviewTo(e.target.value)}
+                      className="w-full px-2.5 py-2 border border-slate-200 rounded-lg text-xs font-semibold"
+                    />
+                  </div>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1">The expiry date becomes the student's next payment due date.</p>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">
+                  Reason for declining (optional, shown to the student)
+                </label>
+                <textarea
+                  rows={2}
+                  value={reviewReason}
+                  onChange={(e) => setReviewReason(e.target.value)}
+                  placeholder="e.g. Amount does not match the transfer record"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-medium bg-white focus:border-orange-500 outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-slate-100 flex justify-end space-x-2 shrink-0">
+              <button
+                type="button"
+                disabled={reviewBusy}
+                onClick={handleReviewReject}
+                className="px-4 py-2 text-xs font-bold text-rose-700 bg-white hover:bg-rose-50 disabled:opacity-50 rounded-lg border border-rose-200 cursor-pointer"
+              >
+                Decline
+              </button>
+              <button
+                type="button"
+                disabled={reviewBusy}
+                onClick={handleReviewConfirm}
+                className="px-4 py-2 text-xs font-bold text-[var(--on-brand,#fff)] bg-[var(--brand,#0f172a)] hover:brightness-110 disabled:opacity-50 rounded-lg shadow-sm cursor-pointer"
+              >
+                {reviewBusy ? 'Working...' : 'Confirm Payment'}
               </button>
             </div>
           </div>

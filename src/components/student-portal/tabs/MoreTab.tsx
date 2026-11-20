@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { initialsAvatar } from '../../../lib/avatar';
+import { nextPaymentDue, formatDateLong } from '../../../lib/paymentDates';
 import { useApp } from '../../../context/AppContext';
 import { api, Json } from '../../tos/tosShared';
 import { Student } from '../../../types';
@@ -389,9 +390,11 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
   const [showPasswords, setShowPasswords] = useState(false);
 
   // Tuition Payment state
-  const [payAmount, setPayAmount] = useState<number>(
-    student.outstandingBalance > 0 ? student.outstandingBalance : 15000
+  // Keep the raw text so the field clears fully; the number is read on submit.
+  const [payAmount, setPayAmount] = useState<string>(
+    student.outstandingBalance > 0 ? String(student.outstandingBalance) : ''
   );
+  const payNum = Number(payAmount) || 0;
   const [paymentMode, setPaymentMode] = useState<'Bank Transfer' | 'Cash'>('Bank Transfer');
   const [paymentNote, setPaymentNote] = useState('');
   const [evidenceDataUrl, setEvidenceDataUrl] = useState<string | null>(null);
@@ -404,6 +407,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
   const studentPayments = payments.filter(
     (p) => p.studentId === student.id || p.studentName === student.name
   );
+  const nextDueISO = nextPaymentDue(studentPayments);
 
   // Handle personal details save
   // Profile picture: chosen and uploaded right here with the personal
@@ -598,7 +602,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
   // Handle Tuition Payment
   const handleCompletePayment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (payAmount <= 0) {
+    if (!(payNum > 0)) {
       addToast({
         type: 'error',
         title: 'Invalid Amount',
@@ -620,7 +624,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
     try {
       const result = await recordPayment({
         studentId: student.id,
-        amountPaid: payAmount,
+        amountPaid: payNum,
         method: paymentMode,
         evidenceUrl: evidenceDataUrl || undefined,
         evidenceName: evidenceFileName || undefined,
@@ -632,8 +636,8 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
         type: 'success',
         title: result.pending ? 'Payment Sent for Confirmation' : 'Payment Submitted',
         description: result.pending
-          ? `Your payment of ${settings.currencySymbol}${(payAmount || 0).toLocaleString()} via ${paymentMode} was sent to the facility. Your balance updates once the facility confirms it.`
-          : `Your payment of ${settings.currencySymbol}${(payAmount || 0).toLocaleString()} via ${paymentMode} has been recorded. Receipt ${result.receiptNumber}.`,
+          ? `Your payment of ${settings.currencySymbol}${payNum.toLocaleString()} via ${paymentMode} was sent to the facility. Your balance updates once the facility confirms it.`
+          : `Your payment of ${settings.currencySymbol}${payNum.toLocaleString()} via ${paymentMode} has been recorded. Receipt ${result.receiptNumber}.`,
       });
 
       setEvidenceDataUrl(null);
@@ -1517,7 +1521,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                         {student.outstandingBalance > 0 && (
                           <button
                             type="button"
-                            onClick={() => setPayAmount(student.outstandingBalance)}
+                            onClick={() => setPayAmount(String(student.outstandingBalance))}
                             className="text-[10px] font-bold text-orange-600 hover:underline"
                           >
                             Pay Full Balance ({settings.currencySymbol}{(student.outstandingBalance || 0).toLocaleString()})
@@ -1529,8 +1533,8 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                         required
                         min="1000"
                         value={payAmount}
-                        onChange={(e) => setPayAmount(Number(e.target.value))}
-                        className="w-full p-2.5 rounded-xl border border-slate-300 font-mono font-bold text-sm bg-white outline-none focus:border-orange-500"
+                        onChange={(e) => setPayAmount(e.target.value)}
+                        className="w-full p-2.5 rounded-xl border border-slate-300 font-bold text-sm bg-white outline-none focus:border-orange-500"
                       />
                     </div>
 
@@ -1539,7 +1543,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                       <label className="font-bold text-slate-700 block mb-1.5">
                         Select Mode of Payment *
                       </label>
-                      <div className="grid grid-cols-3 gap-2">
+                      <div className="grid grid-cols-2 gap-4">
                         {[
                           { mode: 'Bank Transfer' as const, label: 'Bank Transfer', icon: Building2 },
                           { mode: 'Cash' as const, label: 'Cash Payment', icon: Banknote },
@@ -1609,7 +1613,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                           </div>
 
                           <p className="text-[10px] text-blue-700 leading-relaxed font-medium">
-                            Please make payment of <strong>{settings.currencySymbol}{(payAmount || 0).toLocaleString()}</strong> to the facility account above, then upload your transaction receipt/screenshot below.
+                            Please make payment of <strong>{settings.currencySymbol}{payNum.toLocaleString()}</strong> to the facility account above, then upload your transaction receipt/screenshot below.
                           </p>
                         </div>
 
@@ -1779,7 +1783,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                         <button
                           type="button"
                           onClick={() => {
-                            setPayAmount(student.outstandingBalance);
+                            setPayAmount(String(student.outstandingBalance));
                             setActivePaymentSubView('make_payment');
                           }}
                           className="px-3 py-1.5 text-xs font-bold text-white bg-orange-600 hover:bg-orange-700 rounded-lg shadow-2xs transition-all shrink-0 cursor-pointer"
@@ -1793,7 +1797,12 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                       <span className="text-[11px] font-bold uppercase tracking-wider">
                         Payment History{student.registrationDate ? ` since ${new Date(student.registrationDate).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}` : ''}
                       </span>
-                      <span className="text-[10px] font-bold text-slate-400">
+                      <span className="text-[10px] font-bold text-slate-500 flex items-center gap-3">
+                        {nextDueISO && (
+                          <span className="text-emerald-700">
+                            Next due {formatDateLong(nextDueISO)}
+                          </span>
+                        )}
                         {studentPayments.length} records
                       </span>
                     </div>
@@ -1825,8 +1834,8 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                                       {p.status === 'Pending' ? 'Awaiting confirmation' : p.status}
                                     </span>
                                   </div>
-                                  <p className="text-[10px] text-slate-500 font-mono mt-0.5">
-                                    {p.status === 'Pending' || p.status === 'Rejected' ? p.status === 'Pending' ? 'Not yet counted' : 'Not counted' : p.receiptNumber} • {p.date} • {p.method}
+                                  <p className="text-[11px] text-slate-500 mt-0.5">
+                                    {p.date ? formatDateLong(p.date) : ''}
                                   </p>
                                   {p.status === 'Rejected' && p.rejectionReason && (
                                     <p className="text-[10px] text-rose-700 mt-0.5">Reason: {p.rejectionReason}</p>

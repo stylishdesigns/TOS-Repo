@@ -362,6 +362,9 @@ export interface PaymentRecord {
   status: 'Paid' | 'Partial' | 'Pending' | 'Rejected';
   method: 'Card' | 'Bank Transfer' | 'Cash';
   date: string;
+  // Payment window: when this payment starts covering the student and when it expires.
+  effectiveFrom?: string;
+  expiresAt?: string;
   evidenceUrl?: string;
   evidenceName?: string;
   note?: string;

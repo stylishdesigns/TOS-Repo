@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { todayISO } from '../../lib/paymentDates';
 import { ModernSelect } from '../ui/ModernSelect';
 import {
   X,
@@ -25,6 +26,7 @@ export const StudentDetailModal: React.FC = () => {
     setStudentTotalFee,
     recordPayment,
     payments,
+    addToast,
   } = useApp();
 
   const [isEditing, setIsEditing] = useState(false);
@@ -33,7 +35,9 @@ export const StudentDetailModal: React.FC = () => {
   const [feeAmount, setFeeAmount] = useState('');
   const [feeSaving, setFeeSaving] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'Bank Transfer' | 'Card' | 'Cash'>('Bank Transfer');
+  const [paymentMethod, setPaymentMethod] = useState<'Bank Transfer' | 'Cash'>('Bank Transfer');
+  const [paymentFrom, setPaymentFrom] = useState('');
+  const [paymentTo, setPaymentTo] = useState('');
 
   if (!selectedStudent) return null;
 
@@ -43,6 +47,10 @@ export const StudentDetailModal: React.FC = () => {
     e.preventDefault();
     const amount = Number(paymentAmount);
     if (!amount || amount <= 0) return;
+    if (paymentFrom && paymentTo && paymentTo < paymentFrom) {
+      addToast({ type: 'error', title: 'Invalid Payment Window', description: 'The expiry date must come after the start date.' });
+      return;
+    }
 
     recordPayment({
       studentId: selectedStudent.id,
@@ -53,10 +61,14 @@ export const StudentDetailModal: React.FC = () => {
       balance: Math.max(0, selectedStudent.outstandingBalance - amount),
       status: amount >= selectedStudent.outstandingBalance ? 'Paid' : 'Partial',
       method: paymentMethod,
+      effectiveFrom: paymentFrom || undefined,
+      expiresAt: paymentTo || undefined,
     });
 
     setShowPaymentForm(false);
     setPaymentAmount('');
+    setPaymentFrom('');
+    setPaymentTo('');
   };
 
   // The admin decides what the student owes. The server recomputes the
@@ -165,7 +177,11 @@ export const StudentDetailModal: React.FC = () => {
               </span>
               {(selectedStudent.outstandingBalance || 0) > 0 ? (
                 <button
-                  onClick={() => setShowPaymentForm(true)}
+                  onClick={() => {
+                  setPaymentFrom(todayISO());
+                  setPaymentTo('');
+                  setShowPaymentForm(true);
+                }}
                   className="text-[10px] text-amber-700 font-bold underline hover:text-amber-800"
                 >
                   + Record Payment
@@ -214,13 +230,32 @@ export const StudentDetailModal: React.FC = () => {
                     onChange={(val) => setPaymentMethod(val as any)}
                     options={[
                       { value: 'Bank Transfer', label: 'Bank Transfer' },
-                      { value: 'Card', label: 'POS / Debit Card' },
-                      { value: 'Cash', label: 'Cash at Counter' }
+                      { value: 'Cash', label: 'Cash' }
                     ]}
                   />
                 </div>
 
-                <div className="flex items-end">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Takes effect from</label>
+                  <input
+                    type="date"
+                    value={paymentFrom}
+                    onChange={(e) => setPaymentFrom(e.target.value)}
+                    className="w-full px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Expires on</label>
+                  <input
+                    type="date"
+                    value={paymentTo}
+                    onChange={(e) => setPaymentTo(e.target.value)}
+                    className="w-full px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg"
+                  />
+                </div>
+
+                <div className="sm:col-span-3 flex items-end">
                   <button
                     type="submit"
                     className="w-full px-4 py-2 text-xs font-bold text-[var(--on-brand,#fff)] bg-[var(--brand,#0f172a)] hover:brightness-110 rounded-lg shadow-sm"

@@ -249,9 +249,9 @@ interface AppContextType {
   addCBTQuestion: (question: Omit<CBTQuestion, 'id'>) => void;
 
   payments: PaymentRecord[];
-  recordPayment: (payment: { studentId: string; amountPaid: number; method?: 'Card' | 'Bank Transfer' | 'Cash'; note?: string; evidenceUrl?: string; evidenceName?: string }) => Promise<RecordPaymentResult | void>;
+  recordPayment: (payment: { studentId: string; amountPaid: number; method?: 'Card' | 'Bank Transfer' | 'Cash'; note?: string; evidenceUrl?: string; evidenceName?: string; effectiveFrom?: string; expiresAt?: string }) => Promise<RecordPaymentResult | void>;
   setStudentTotalFee: (input: { studentId: string; totalFee: number }) => Promise<{ totalFee: number; outstandingBalance: number; paymentStatus: string } | void>;
-  confirmPayment: (paymentId: string, action: 'confirm' | 'reject', reason?: string) => Promise<boolean>;
+  confirmPayment: (paymentId: string, action: 'confirm' | 'reject', reason?: string, dates?: { effectiveFrom?: string; expiresAt?: string }) => Promise<boolean>;
 
   announcements: Announcement[];
   addAnnouncement: (announcement: Omit<Announcement, 'id' | 'date'>) => void;
@@ -463,9 +463,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [programmes, setProgrammes] = useState<Programme[]>(() => {
     try {
       const saved = localStorage.getItem(scopedKey('programmes'));
-      return saved ? JSON.parse(saved) : INITIAL_PROGRAMMES;
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return INITIAL_PROGRAMMES;
+      return [];
     }
   });
 
@@ -2856,6 +2856,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     note?: string;
     evidenceUrl?: string;
     evidenceName?: string;
+    effectiveFrom?: string;
+    expiresAt?: string;
   }): Promise<RecordPaymentResult | void> => {
     // Payments go through the server payment route only. A student's call
     // stores a 'Pending' claim and changes no balance; an admin's call is
@@ -2891,7 +2893,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
   // Admin-only: confirm or reject a student's pending payment claim. The server
   // applies the stored amount to the student's balance; the client sends no money.
-  const confirmPayment = async (paymentId: string, action: 'confirm' | 'reject', reason?: string): Promise<boolean> => {
+  const confirmPayment = async (paymentId: string, action: 'confirm' | 'reject', reason?: string, dates?: { effectiveFrom?: string; expiresAt?: string }): Promise<boolean> => {
     try {
       const token = await firebaseAuth.currentUser?.getIdToken();
       if (!token) throw new Error('You are signed out. Sign in and try again.');
@@ -2901,7 +2903,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ paymentId, action, reason }),
+        body: JSON.stringify({ paymentId, action, reason, ...(dates || {}) }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data?.success) {

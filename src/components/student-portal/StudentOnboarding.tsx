@@ -11,7 +11,7 @@ interface StudentOnboardingProps {
 }
 
 export const StudentOnboarding: React.FC<StudentOnboardingProps> = ({ onComplete }) => {
-  const { addToast, activeCentreId, centreName } = useApp();
+  const { addToast, activeCentreId, centreName, programmes } = useApp();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     firstName: '',
@@ -163,12 +163,8 @@ export const StudentOnboarding: React.FC<StudentOnboardingProps> = ({ onComplete
                 value={formData.examToRegister}
                 onChange={(val) => setFormData({ ...formData, examToRegister: val })}
                 options={[
-                  { value: '', label: 'Select Exam' },
-                  { value: 'JAMB', label: 'JAMB (UTME)' },
-                  { value: 'WAEC', label: 'WAEC (WASSCE)' },
-                  { value: 'NECO', label: 'NECO (SSCE)' },
-                  { value: 'POST-UTME', label: 'POST-UTME' },
-                  { value: 'A-LEVELS', label: 'A-LEVELS (JUPEB/IJMB)' }
+                  { value: '', label: programmes.length ? 'Select Exam' : 'No exam programmes set yet' },
+                  ...programmes.map((p) => ({ value: p.name, label: p.name })),
                 ]}
               />
             </div>
