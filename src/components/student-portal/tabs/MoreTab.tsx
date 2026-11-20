@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { initialsAvatar } from '../../../lib/avatar';
 import { nextPaymentDue, formatDateLong } from '../../../lib/paymentDates';
 import { useApp } from '../../../context/AppContext';
@@ -299,7 +300,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
     if (!val || val === student.department) return;
     setSavingDepartment(true);
     try {
-      await updateStudent(student.id, { department: val as any });
+      await updateStudent(student.id, { department: val as any }, { silent: true });
       student.department = val as any;
       addToast({ type: 'success', title: 'Department Updated', description: `${val} department saved.` });
     } catch {
@@ -309,7 +310,19 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
     }
   };
   const openSubjectsEditor = () => {
-    setDraftSubjects(new Set(registeredNames));
+    // The draft starts from this facility's own subject list: names that are
+    // not registered facility subjects (old demo data such as Economics) are
+    // dropped here, so saving writes only real subjects back to the record.
+    const canonical = new Map(
+      centreSubjects.map((sub) => [sub.name.trim().toLowerCase(), sub.name.trim()])
+    );
+    setDraftSubjects(
+      new Set(
+        registeredNames
+          .map((n) => canonical.get(n.trim().toLowerCase()))
+          .filter((n): n is string => !!n)
+      )
+    );
     setSubjectSearch('');
     setShowSubjectsEditor(true);
   };
@@ -324,8 +337,17 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
   const saveSubjects = async () => {
     setSavingSubjects(true);
     try {
-      await updateStudent(student.id, {
-        subjects: Array.from(draftSubjects as Set<string>).sort((a, b) => a.localeCompare(b)),
+      await updateStudent(
+        student.id,
+        {
+          subjects: Array.from(draftSubjects as Set<string>).sort((a, b) => a.localeCompare(b)),
+        },
+        { silent: true }
+      );
+      addToast({
+        type: 'success',
+        title: 'Registered Subjects Updated',
+        description: `${draftSubjects.size} subject${draftSubjects.size === 1 ? '' : 's'} saved to your record.`,
       });
       setShowSubjectsEditor(false);
     } catch (e) {
@@ -334,6 +356,106 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
       setSavingSubjects(false);
     }
   };
+
+  // Subject picker as a popup: the single button on the Registered Subjects
+  // card opens it, the picker lists only the facility's registered subjects,
+  // and Save writes the ticked ones back. Rendered through a portal so it
+  // sits above the Academic details modal on every screen size.
+  const subjectsModal = showSubjectsEditor
+    ? createPortal(
+        <div
+          className="fixed inset-0 z-[70] bg-black/50 backdrop-blur-[2px] flex items-end sm:items-center justify-center"
+          onClick={() => setShowSubjectsEditor(false)}
+        >
+          <div
+            className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl shadow-2xl border border-slate-100 max-h-[85vh] flex flex-col animate-in fade-in zoom-in-95"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3 p-4 border-b border-slate-100">
+              <div>
+                <h3 className="text-lg font-black text-slate-900">Registered subjects</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Pick from your facility's registered subjects. General subjects are open to everyone; your department's subjects show once you pick it.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowSubjectsEditor(false)}
+                className="p-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 cursor-pointer shrink-0"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-4 space-y-3 overflow-y-auto flex-1 min-h-0">
+              {selectableCentreSubjects.length === 0 ? (
+                <p className="text-xs text-slate-500 font-medium leading-relaxed">
+                  {centreSubjects.length === 0
+                    ? "Your facility hasn't set up its subject list yet. Please ask your facility to add subjects."
+                    : 'Choose your department in Academic details to see department subjects.'}
+                </p>
+              ) : (
+                <>
+                  <input
+                    value={subjectSearch}
+                    onChange={(e) => setSubjectSearch(e.target.value)}
+                    placeholder="Search your facility's subjects"
+                    className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-600/30"
+                  />
+                  <div className="max-h-64 overflow-y-auto rounded-xl border border-slate-100 bg-white divide-y divide-slate-100">
+                    {filteredCentreSubjects.map((sub) => {
+                      const checked = draftSubjects.has(sub.name);
+                      return (
+                        <button
+                          key={sub.id}
+                          type="button"
+                          onClick={() => toggleDraftSubject(sub.name)}
+                          className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-slate-50/80 active:bg-slate-100/80 transition-colors text-left"
+                        >
+                          <div className="flex items-center space-x-2.5 min-w-0">
+                            <span
+                              className={`w-4.5 h-4.5 rounded-md border flex items-center justify-center shrink-0 ${
+                                checked ? 'bg-orange-600 border-orange-600 text-white' : 'border-slate-300 bg-white'
+                              }`}
+                            >
+                              {checked ? <Check className="w-3 h-3" /> : null}
+                            </span>
+                            <span className="text-xs font-semibold text-slate-800 truncate">{sub.name}</span>
+                          </div>
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 shrink-0 ml-2">{sub.department}</span>
+                        </button>
+                      );
+                    })}
+                    {filteredCentreSubjects.length === 0 ? (
+                      <div className="px-3 py-2.5 text-xs text-slate-400 font-medium">No subjects match your search.</div>
+                    ) : null}
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[11px] font-bold text-slate-500">{draftSubjects.size} selected</span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowSubjectsEditor(false)}
+                        className="h-10 px-4 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        disabled={savingSubjects}
+                        onClick={saveSubjects}
+                        className="h-10 px-4 rounded-xl bg-orange-600 text-white text-xs font-bold hover:bg-orange-700 transition-colors cursor-pointer disabled:opacity-60"
+                      >
+                        {savingSubjects ? 'Saving...' : 'Save subjects'}
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )
+    : null;
 
   // CH1 Step 1: username lives in Profile. One claim per student, set here,
   // shown on chat and the mock leaderboard, changeable once every 30 days.
@@ -548,16 +670,20 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
       }
     }
     const updatedFullName = `${firstName} ${lastName}`.trim();
-    updateStudent(student.id, {
-      name: updatedFullName,
-      phone,
-      email,
-      gender,
-      dob,
-      address,
-      parentName,
-      parentWhatsApp: parentWhatsapp,
-    });
+    updateStudent(
+      student.id,
+      {
+        name: updatedFullName,
+        phone,
+        email,
+        gender,
+        dob,
+        address,
+        parentName,
+        parentWhatsApp: parentWhatsapp,
+      },
+      { silent: true }
+    );
     student.name = updatedFullName;
     student.phone = phone;
     student.email = email;
@@ -1251,10 +1377,10 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                     {selectableCentreSubjects.length > 0 && (
                       <button
                         type="button"
-                        onClick={() => (showSubjectsEditor ? setShowSubjectsEditor(false) : openSubjectsEditor())}
+                        onClick={openSubjectsEditor}
                         className="h-9 px-3.5 rounded-xl bg-orange-600 text-white text-xs font-bold hover:bg-orange-700 transition-colors cursor-pointer disabled:opacity-60 shrink-0"
                       >
-                        {showSubjectsEditor ? 'Done' : 'Add or remove'}
+                        Add or remove
                       </button>
                     )}
                   </div>
@@ -1280,72 +1406,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                     </div>
                   )}
 
-                  {showSubjectsEditor && (
-                    selectableCentreSubjects.length === 0 ? (
-                      <p className="text-xs text-slate-500 font-medium leading-relaxed">
-                        {centreSubjects.length === 0
-                          ? "Your facility hasn't set up its subject list yet. Please ask your facility to add subjects."
-                          : 'Choose your department in Academic details to see department subjects.'}
-                      </p>
-                    ) : (
-                      <>
-                        <input
-                          value={subjectSearch}
-                          onChange={(e) => setSubjectSearch(e.target.value)}
-                          placeholder="Search your facility's subjects"
-                          className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-600/30"
-                        />
-                        <div className="max-h-48 overflow-y-auto rounded-xl border border-slate-100 bg-white divide-y divide-slate-100">
-                          {filteredCentreSubjects.map((sub) => {
-                            const checked = draftSubjects.has(sub.name);
-                            return (
-                              <button
-                                key={sub.id}
-                                type="button"
-                                onClick={() => toggleDraftSubject(sub.name)}
-                                className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-slate-50/80 active:bg-slate-100/80 transition-colors text-left"
-                              >
-                                <div className="flex items-center space-x-2.5 min-w-0">
-                                  <span
-                                    className={`w-4.5 h-4.5 rounded-md border flex items-center justify-center shrink-0 ${
-                                      checked ? 'bg-orange-600 border-orange-600 text-white' : 'border-slate-300 bg-white'
-                                    }`}
-                                  >
-                                    {checked ? <Check className="w-3 h-3" /> : null}
-                                  </span>
-                                  <span className="text-xs font-semibold text-slate-800 truncate">{sub.name}</span>
-                                </div>
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 shrink-0 ml-2">{sub.department}</span>
-                              </button>
-                            );
-                          })}
-                          {filteredCentreSubjects.length === 0 ? (
-                            <div className="px-3 py-2.5 text-xs text-slate-400 font-medium">No subjects match your search.</div>
-                          ) : null}
-                        </div>
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-[11px] font-bold text-slate-500">{draftSubjects.size} selected</span>
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => setShowSubjectsEditor(false)}
-                              className="h-10 px-4 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer"
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              type="button"
-                              disabled={savingSubjects}
-                              onClick={saveSubjects}
-                              className="h-10 px-4 rounded-xl bg-orange-600 text-white text-xs font-bold hover:bg-orange-700 transition-colors cursor-pointer disabled:opacity-60"
-                            >
-                              {savingSubjects ? 'Saving...' : 'Save subjects'}
-                            </button>
-                          </div>
-                        </div>
-                      </>
-                    )
-                  )}
+                  {subjectsModal}
                 </div>
               </div>
             )}

@@ -2165,18 +2165,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const updateStudent = async (id: string, studentData: Partial<Student>) => {
+  const updateStudent = async (id: string, studentData: Partial<Student>, opts?: { silent?: boolean }) => {
     try {
       await updateDoc(doc(db, 'students', id), studentData);
       // Refresh the in-app copy too: the menu header, tabs and chat read this
       // list, so a saved change (a new profile picture, for instance) shows
       // everywhere at once instead of only after a reload.
       setStudents((prev) => prev.map((st) => (st.id === id ? { ...st, ...studentData } : st)));
-      addToast({
-        type: 'success',
-        title: 'Student Record Updated',
-        description: 'Student profile details saved successfully.',
-      });
+      // Screens with their own tailored message pass { silent: true } so the
+      // action still shows exactly one toast.
+      if (!opts?.silent) {
+        addToast({
+          type: 'success',
+          title: 'Student Record Updated',
+          description: 'Student profile details saved successfully.',
+        });
+      }
     } catch (e) {
       console.error(e);
     }
@@ -2519,11 +2523,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         enrolledStudents: 0,
       };
       await setDoc(doc(db, 'programmes', id), tenantWrite(newProg));
-      addToast({
-        type: 'success',
-        title: 'Programme Created',
-        description: `${progData.name} is now available on the website and registration form.`,
-      });
+      // No toast here: every caller shows exactly one tailored toast for the
+      // programme it just created.
     } catch (e) {
       handleFirestoreError(e, OperationType.CREATE, 'programmes');
     }
@@ -2532,11 +2533,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateProgramme = async (id: string, progData: Partial<Programme>) => {
     try {
       await updateDoc(doc(db, 'programmes', id), progData);
-      addToast({
-        type: 'success',
-        title: 'Programme Updated',
-        description: 'Curriculum & fee changes saved.',
-      });
+      // No toast here: callers show exactly one tailored toast per action.
     } catch (e) {
       handleFirestoreError(e, OperationType.UPDATE, 'programmes');
     }

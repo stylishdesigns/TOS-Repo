@@ -56,7 +56,7 @@ export const ProgrammesManager: React.FC = () => {
     description: '',
     category: 'JAMB' as Programme['category'],
     fee: 45000,
-    duration: '4 Months (Jan - Apr)',
+    duration: '4 Months',
     startDate: '2027-01-10',
     endDate: '2027-05-02',
     maxStudents: 100,
@@ -90,7 +90,7 @@ export const ProgrammesManager: React.FC = () => {
       description: '',
       category: 'JAMB',
       fee: 45000,
-      duration: '4 Months (Jan - Apr)',
+      duration: '4 Months',
       startDate: '2027-01-10',
       endDate: '2027-05-02',
       maxStudents: 100,
@@ -108,7 +108,7 @@ export const ProgrammesManager: React.FC = () => {
       description: prog.description,
       category: prog.category,
       fee: prog.fee,
-      duration: prog.duration,
+      duration: normalizedDuration(prog.duration),
       startDate: prog.startDate,
       endDate: prog.endDate,
       maxStudents: prog.maxStudents,
@@ -135,6 +135,32 @@ export const ProgrammesManager: React.FC = () => {
     return `${base}-${Date.now().toString(36).toUpperCase().slice(-4)}`;
   };
 
+  // Duration is stored as a plain "N Months" / "N Years" string. Older records
+  // carried attached date ranges like "4 Months (Jan - Apr)"; those are
+  // normalised away here so nothing re-attaches them.
+  const parseDuration = (d: string): { value: number; unit: 'Months' | 'Years' } => {
+    const m = String(d || '').match(/(\d+)\s*(month|year)/i);
+    if (m) {
+      const n = Math.max(1, parseInt(m[1], 10));
+      return /^year/i.test(m[2])
+        ? { value: Math.min(n, 5), unit: 'Years' }
+        : { value: Math.min(n, 60), unit: 'Months' };
+    }
+    return { value: 4, unit: 'Months' };
+  };
+  const durationLabel = (n: number, unit: 'Months' | 'Years') => {
+    if (unit === 'Years') return `${n} ${n === 1 ? 'Year' : 'Years'}`;
+    if (n < 12) return `${n} ${n === 1 ? 'Month' : 'Months'}`;
+    const y = Math.floor(n / 12);
+    const r = n % 12;
+    if (r === 0) return `${n} Months (${y} ${y === 1 ? 'Year' : 'Years'})`;
+    return `${n} Months (${y} yr ${r} mo)`;
+  };
+  const normalizedDuration = (d: string) => {
+    const p = parseDuration(d);
+    return `${p.value} ${p.unit}`;
+  };
+
   const handleSaveProgramme = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name.trim()) {
@@ -149,7 +175,7 @@ export const ProgrammesManager: React.FC = () => {
         description: formData.description,
         category: formData.category,
         fee: Number(formData.fee),
-        duration: formData.duration,
+        duration: normalizedDuration(formData.duration),
         startDate: formData.startDate,
         endDate: formData.endDate,
         maxStudents: Number(formData.maxStudents),
@@ -168,7 +194,7 @@ export const ProgrammesManager: React.FC = () => {
         description: formData.description,
         category: formData.category,
         fee: Number(formData.fee),
-        duration: formData.duration,
+        duration: normalizedDuration(formData.duration),
         startDate: formData.startDate,
         endDate: formData.endDate,
         maxStudents: Number(formData.maxStudents),
@@ -422,7 +448,7 @@ export const ProgrammesManager: React.FC = () => {
                       onClick={() => setInspectingProg(prog)}
                       className="px-3 py-1.5 text-xs font-semibold text-orange-600 bg-orange-50 hover:bg-orange-100 rounded-lg border border-orange-200 shadow-2xs transition-colors flex items-center space-x-1"
                     >
-                      <span>Syllabus & Info</span>
+                      <span>Info</span>
                       <ChevronRight className="w-3 h-3" />
                     </button>
                   </div>
@@ -505,7 +531,7 @@ export const ProgrammesManager: React.FC = () => {
                 onClick={() => setInspectingProg(null)}
                 className="px-4 py-2 text-xs font-semibold text-[var(--on-brand,#fff)] bg-[var(--brand,#0f172a)] hover:brightness-110 rounded-lg shadow-sm"
               >
-                Close Syllabus
+                Close
               </button>
             </div>
           </div>
@@ -546,6 +572,20 @@ export const ProgrammesManager: React.FC = () => {
                     { value: 'Archived', label: 'Archived' }
                   ]}
                 />
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1.5">
+                    Tuition fee (&#8358;) *
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    min={0}
+                    step={500}
+                    value={formData.fee}
+                    onChange={(e) => setFormData({ ...formData, fee: Number(e.target.value) })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-900 focus:bg-white focus:border-orange-500 outline-none"
+                  />
+                </div>
               </div>
 
               <div>
@@ -595,23 +635,43 @@ export const ProgrammesManager: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <ModernSelect
-                    label="Duration (Months) *"
-                    value={formData.duration.split(' ')[0]}
-                    onChange={(val) => setFormData({ ...formData, duration: `${val} Months` })}
-                    options={[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(m => ({
-                      value: String(m),
-                      label: `${m} ${m === 1 ? 'Month' : 'Months'}`
-                    }))}
-                  />
-                </div>
-
-                <div className="pt-5">
-                   <span className="text-[10px] text-slate-400 italic">Duration determines cohort lifespan</span>
-                </div>
-              </div>
+              {(() => {
+                const dur = parseDuration(formData.duration);
+                return (
+                  <div className="space-y-1.5">
+                    <div className="grid grid-cols-2 gap-3">
+                      <ModernSelect
+                        label="Duration *"
+                        value={String(dur.value)}
+                        onChange={(val) => setFormData({ ...formData, duration: `${val} ${dur.unit}` })}
+                        options={
+                          dur.unit === 'Years'
+                            ? [1, 2, 3, 4, 5].map((y) => ({ value: String(y), label: durationLabel(y, 'Years') }))
+                            : Array.from({ length: 60 }, (_, i) => i + 1).map((m) => ({ value: String(m), label: durationLabel(m, 'Months') }))
+                        }
+                      />
+                      <ModernSelect
+                        label="Duration unit"
+                        value={dur.unit}
+                        onChange={(val) => {
+                          const unit = val as 'Months' | 'Years';
+                          const converted = unit === 'Years'
+                            ? Math.max(1, Math.round(dur.value / 12))
+                            : Math.min(60, dur.value * 12);
+                          setFormData({ ...formData, duration: `${converted} ${unit}` });
+                        }}
+                        options={[
+                          { value: 'Months', label: 'Months' },
+                          { value: 'Years', label: 'Years' },
+                        ]}
+                      />
+                    </div>
+                    <p className="text-[10px] text-slate-400 italic">
+                      Months or years, anything up to five years. Duration determines cohort lifespan.
+                    </p>
+                  </div>
+                );
+              })()}
 
               <div className="flex items-center justify-end space-x-2 pt-3 border-t border-slate-100">
                 <button
