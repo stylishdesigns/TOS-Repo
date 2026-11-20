@@ -991,7 +991,7 @@ export const FinanceManager: React.FC = () => {
 
             {/* Modal Body */}
             {tariffModalTab === 'fees' ? (
-              <div className="py-4 space-y-3 overflow-y-auto flex-1 pr-1">
+              <div className="py-4 space-y-3 overflow-y-auto flex-1 min-h-0 pr-1">
                 {programmes.map((p) => {
                   const isEditing = editingProgrammeId === p.id;
                   return (
@@ -1072,7 +1072,7 @@ export const FinanceManager: React.FC = () => {
                 })}
               </div>
             ) : (
-              <form onSubmit={handleSaveChannelSettings} className="py-4 space-y-4 overflow-y-auto flex-1 pr-1 text-xs">
+              <form onSubmit={handleSaveChannelSettings} className="py-4 space-y-4 overflow-y-auto flex-1 min-h-0 pr-1 text-xs">
                 <div className="p-3.5 bg-blue-50/70 border border-blue-200/80 rounded-xl space-y-3">
                   <div className="flex items-center gap-2 text-blue-900 font-bold">
                     <Building2 className="w-4 h-4 text-blue-600" />
@@ -1188,7 +1188,7 @@ export const FinanceManager: React.FC = () => {
               </button>
             </div>
 
-            <div className="py-4 space-y-3.5 overflow-y-auto flex-1 pr-1 text-xs">
+            <div className="py-4 space-y-3.5 overflow-y-auto flex-1 min-h-0 pr-1 text-xs">
               <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200/80 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-slate-900 text-sm">{reviewPayment.studentName}</span>
