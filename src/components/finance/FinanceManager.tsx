@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { PaymentRecord, isConfirmedPayment } from '../../types';
+import { PaymentRecord, isConfirmedPayment, Student } from '../../types';
+import { DEFAULT_FEE_REMINDER_SETTINGS, FEE_REMINDER_DAY_OPTIONS, normalizeFeeReminderSettings, renderChatTemplate } from '../../lib/feeReminders';
 import { nextPaymentDue, formatDateLong, todayISO } from '../../lib/paymentDates';
 import { ModernSelect } from '../ui/ModernSelect';
 import {
@@ -10,24 +11,15 @@ import {
   CheckCircle,
   Clock,
   AlertCircle,
-  Receipt,
   X,
   Building2,
-  DollarSign,
-  TrendingUp,
   Settings,
   Edit2,
   Check,
   Image as ImageIcon,
   FileText,
   Eye,
-  CreditCard as CardIcon,
   Banknote,
-  Copy,
-  BellRing,
-  ChevronDown,
-  MessageCircle,
-  Mail,
 } from 'lucide-react';
 
 export const FinanceManager: React.FC = () => {
@@ -38,6 +30,7 @@ export const FinanceManager: React.FC = () => {
     settings,
     recordPayment,
     confirmPayment,
+    runPaymentReminders,
     updateProgramme,
     updateSettings,
     addToast,
@@ -45,17 +38,13 @@ export const FinanceManager: React.FC = () => {
   } = useApp();
 
   const [search, setSearch] = useState('');
-  const [methodFilter, setMethodFilter] = useState('All');
-  const [paymentStatusFilter, setPaymentStatusFilter] = useState<string>('All');
-  const [examTypeFilter, setExamTypeFilter] = useState<string>('All');
-  const [monthRangeStart, setMonthRangeStart] = useState<string>('');
-  const [monthRangeEnd, setMonthRangeEnd] = useState<string>('');
+  const [rosterFilter, setRosterFilter] = useState<'All' | 'Owes' | 'Paid'>('All');
   const [showRecordModal, setShowRecordModal] = useState(false);
-  const [selectedReceipt, setSelectedReceipt] = useState<PaymentRecord | null>(null);
+  const [selectedDetailStudent, setSelectedDetailStudent] = useState<Student | null>(null);
 
   // Exam Program Fee & Channel Settings Modal State
   const [showTariffModal, setShowTariffModal] = useState(false);
-  const [tariffModalTab, setTariffModalTab] = useState<'fees' | 'channels'>('fees');
+  const [tariffModalTab, setTariffModalTab] = useState<'fees' | 'channels' | 'reminders'>('fees');
   const [editingProgrammeId, setEditingProgrammeId] = useState<string | null>(null);
   const [tempFeeValue, setTempFeeValue] = useState<string>('');
 
@@ -87,7 +76,6 @@ export const FinanceManager: React.FC = () => {
   const [reviewTo, setReviewTo] = useState('');
   const [reviewReason, setReviewReason] = useState('');
   const [reviewBusy, setReviewBusy] = useState(false);
-  const [showReminders, setShowReminders] = useState(false);
 
   // Only confirmed payments count as money collected.
   const totalCollected = payments
@@ -96,12 +84,22 @@ export const FinanceManager: React.FC = () => {
   const pendingPayments = payments.filter((p) => p.status === 'Pending');
   const [busyPaymentId, setBusyPaymentId] = useState<string | null>(null);
 
+  // Automatic payment reminder settings (Fees & Payments > settings > Automatic Reminders).
+  const [remEnabled, setRemEnabled] = useState(false);
+  const [remDays, setRemDays] = useState(7);
+  const [remMonday, setRemMonday] = useState(false);
+  const [remEmail, setRemEmail] = useState(true);
+  const [remPush, setRemPush] = useState(true);
+  const [remChat, setRemChat] = useState(true);
+  const [remTemplate, setRemTemplate] = useState(DEFAULT_FEE_REMINDER_SETTINGS.chatTemplate);
+  const [remSaving, setRemSaving] = useState(false);
+  const [remBusy, setRemBusy] = useState(false);
+
   const openReview = (pay: PaymentRecord) => {
     setReviewPayment(pay);
     setReviewFrom(pay.effectiveFrom || todayISO());
     setReviewTo(pay.expiresAt || '');
     setReviewReason('');
-    setShowReminders(false);
   };
 
   const handleReviewConfirm = async () => {
@@ -171,89 +169,135 @@ export const FinanceManager: React.FC = () => {
     setEditingProgrammeId(null);
   };
 
-  const filteredPayments = payments.filter((p) => {
-    const matchesSearch =
-      !search ||
-      p.studentName.toLowerCase().includes(search.toLowerCase()) ||
-      (p.receiptNumber || '').toLowerCase().includes(search.toLowerCase()) ||
-      p.programmeName.toLowerCase().includes(search.toLowerCase());
-
-    const matchesMethod = methodFilter === 'All' || p.method === methodFilter;
-
-    // Filter: Full vs Partial
-    const matchesStatus =
-      paymentStatusFilter === 'All' || p.status === paymentStatusFilter;
-
-    // Filter: Exam Type (only programmes the facility actually set)
-    const matchesExamType =
-      examTypeFilter === 'All' ||
-      p.programmeName.toLowerCase() === examTypeFilter.toLowerCase();
-
-    // Filter: Month selector range
-    let matchesMonth = true;
-    if (p.date) {
-      // p.date format is typically YYYY-MM-DD
-      const paymentMonth = p.date.substring(0, 7); // "YYYY-MM"
-      if (monthRangeStart && paymentMonth < monthRangeStart) {
-        matchesMonth = false;
-      }
-      if (monthRangeEnd && paymentMonth > monthRangeEnd) {
-        matchesMonth = false;
-      }
-    }
-
-    return matchesSearch && matchesMethod && matchesStatus && matchesExamType && matchesMonth;
+  // Payment roster: one row per student, built from the live student and
+  // payment lists. A student's name appears once no matter how many times
+  // they pay; every payment updates their single row.
+  const paymentsByStudent = new Map<string, PaymentRecord[]>();
+  payments.forEach((p) => {
+    const list = paymentsByStudent.get(p.studentId) || [];
+    list.push(p);
+    paymentsByStudent.set(p.studentId, list);
   });
 
-  // Merged detail view data: the student's own record, full payment history
-  // and the next payment due date, all read from the live lists.
-  const detailStudent = selectedReceipt
-    ? students.find((s) => s.id === selectedReceipt.studentId) || null
-    : null;
-  const detailHistory = selectedReceipt
-    ? payments
-        .filter((p) => p.studentId === selectedReceipt.studentId)
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    : [];
-  const detailNextDue = selectedReceipt ? nextPaymentDue(detailHistory) : null;
-  const reminderMessage = selectedReceipt
-    ? `Hello ${selectedReceipt.studentName}, this is a reminder from ${centreName}. Your tuition balance is ${settings.currencySymbol}${(detailStudent?.outstandingBalance || selectedReceipt.balance || 0).toLocaleString()}${detailNextDue ? `, due by ${formatDateLong(detailNextDue)}` : ''}. Kindly complete your payment. Thank you.`
-    : '';
-  const waNumber = (() => {
-    const raw = String(detailStudent?.phone || detailStudent?.parentWhatsApp || '').replace(/\D/g, '');
-    if (!raw) return '';
-    if (raw.startsWith('234')) return raw;
-    if (raw.startsWith('0')) return `234${raw.slice(1)}`;
-    return raw;
-  })();
+  const rosterSearch = search.trim().toLowerCase();
+  const allRows = students
+    .filter((st) => !rosterSearch || st.name.toLowerCase().includes(rosterSearch))
+    .map((st) => {
+      const history = paymentsByStudent.get(st.id) || [];
+      return { st, history, nextDue: nextPaymentDue(history) };
+    });
+  const owesRows = allRows.filter((r) => Number(r.st.outstandingBalance || 0) > 0 || !(Number(r.st.totalFee || 0) > 0));
+  const paidRows = allRows.filter((r) => Number(r.st.outstandingBalance || 0) <= 0 && Number(r.st.totalFee || 0) > 0);
+  const visibleOwes = rosterFilter === 'Paid' ? [] : owesRows;
+  const visiblePaid = rosterFilter === 'Owes' ? [] : paidRows;
+  const owesTotal = owesRows.reduce((sum, r) => sum + Number(r.st.outstandingBalance || 0), 0);
 
-  const sendChatReminder = async () => {
-    setShowReminders(false);
+  const renderRosterRow = (row: { st: Student; history: PaymentRecord[]; nextDue: string | null }) => {
+    const { st, history, nextDue } = row;
+    const owes = Number(st.outstandingBalance || 0) > 0;
+    const noFee = !(Number(st.totalFee || 0) > 0);
+    const pendingCount = history.filter((p) => p.status === 'Pending').length;
+    const overdue = !!nextDue && nextDue < todayISO();
+    const initials = st.name.split(' ').map((n) => n[0]).join('').substring(0, 2).toUpperCase();
+    return (
+      <div key={st.id} className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50/80 transition-colors">
+        <div className="w-9 h-9 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center overflow-hidden shrink-0">
+          {st.avatar ? (
+            <img src={st.avatar} alt={st.name} className="w-full h-full object-cover" />
+          ) : (
+            <span className="text-[11px] font-black text-slate-500">{initials}</span>
+          )}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-slate-900 truncate">{st.name}</span>
+            {pendingCount > 0 && (
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 shrink-0">
+                {pendingCount} awaiting confirmation
+              </span>
+            )}
+          </div>
+          <p className="text-[10px] text-slate-500 truncate">{st.programmeName || 'No programme set'}</p>
+        </div>
+        <div className="text-right shrink-0">
+          {noFee ? (
+            <span className="text-[10px] font-bold text-slate-400">No fee set</span>
+          ) : owes ? (
+            <>
+              <p className="text-xs font-black text-amber-700">{settings.currencySymbol}{Number(st.outstandingBalance || 0).toLocaleString()}</p>
+              {nextDue && (
+                <p className={`text-[10px] font-semibold ${overdue ? 'text-rose-600' : 'text-slate-500'}`}>
+                  {overdue ? `Overdue, was due ${formatDateLong(nextDue)}` : `Due ${formatDateLong(nextDue)}`}
+                </p>
+              )}
+            </>
+          ) : (
+            <span className="text-[10px] font-bold text-emerald-700">Paid up</span>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={() => setSelectedDetailStudent(st)}
+          className="px-3 py-1.5 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 rounded-md border border-slate-200 shadow-xs cursor-pointer flex items-center gap-1 shrink-0"
+        >
+          <Eye className="w-3.5 h-3.5 text-slate-400" />
+          View Details
+        </button>
+      </div>
+    );
+  };
+
+  // Reminder settings stay in step with the facility's saved settings doc.
+  useEffect(() => {
+    const norm = normalizeFeeReminderSettings((settings as any).paymentReminders);
+    setRemEnabled(norm.enabled);
+    setRemDays(norm.daysBefore);
+    setRemMonday(norm.weeklyMonday);
+    setRemEmail(norm.channels.email);
+    setRemPush(norm.channels.push);
+    setRemChat(norm.channels.chat);
+    setRemTemplate(norm.chatTemplate);
+  }, [settings.paymentReminders]);
+
+  const handleSaveReminders = async () => {
+    setRemSaving(true);
     try {
-      await navigator.clipboard.writeText(reminderMessage);
-      addToast({ type: 'success', title: 'Reminder Copied', description: `Open the Chat section and paste it to ${selectedReceipt?.studentName || 'the student'}.` });
-    } catch {
-      addToast({ type: 'info', title: 'Copy Failed', description: 'The reminder could not be copied. Please copy it manually.' });
+      await updateSettings({
+        paymentReminders: {
+          enabled: remEnabled,
+          daysBefore: remDays,
+          weeklyMonday: remMonday,
+          channels: { email: remEmail, push: remPush, chat: remChat },
+          chatTemplate: remTemplate,
+        },
+      });
+      addToast({ type: 'success', title: 'Reminders Saved', description: 'Automatic payment reminders will follow these settings.' });
+    } finally {
+      setRemSaving(false);
     }
   };
 
-  const sendWhatsAppReminder = () => {
-    setShowReminders(false);
-    if (!waNumber) {
-      addToast({ type: 'error', title: 'No WhatsApp Number', description: `${selectedReceipt?.studentName || 'This student'} has no phone number on file.` });
-      return;
+  const handleRunReminders = async () => {
+    setRemBusy(true);
+    try {
+      const r = await runPaymentReminders();
+      if (r.ok) {
+        const pushNote = r.pushReason
+          ? r.pushReason.includes('WEB_PUSH_PRIVATE_KEY')
+            ? ' Device push notifications are not switched on for this deployment yet.'
+            : ` Push note: ${r.pushReason}`
+          : '';
+        addToast({
+          type: 'success',
+          title: 'Reminders Run',
+          description: `${r.emailed || 0} email${(r.emailed || 0) === 1 ? '' : 's'}, ${r.pushed || 0} push notification${(r.pushed || 0) === 1 ? '' : 's'} and ${r.chatted || 0} chat message${(r.chatted || 0) === 1 ? '' : 's'} sent.${pushNote}`,
+        });
+      } else {
+        addToast({ type: 'error', title: 'Could Not Run Reminders', description: r.error || 'Please try again.' });
+      }
+    } finally {
+      setRemBusy(false);
     }
-    window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(reminderMessage)}`, '_blank');
-  };
-
-  const sendEmailReminder = () => {
-    setShowReminders(false);
-    const email = detailStudent?.email;
-    if (!email) {
-      addToast({ type: 'error', title: 'No Email Address', description: `${selectedReceipt?.studentName || 'This student'} has no email address on file.` });
-      return;
-    }
-    window.location.href = `mailto:${email}?subject=${encodeURIComponent(`Payment Reminder - ${centreName}`)}&body=${encodeURIComponent(reminderMessage)}`;
   };
 
   const handleRecordSubmit = async (e: React.FormEvent) => {
@@ -365,112 +409,36 @@ export const FinanceManager: React.FC = () => {
 
       {/* Payments Ledger Table */}
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs space-y-3">
-        {/* Responsive Multi-filter Toolbar */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-slate-50/60 p-3 rounded-xl border border-slate-100">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 w-full lg:w-auto">
-            {/* Full / Partial payment filter */}
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                Payment Status
-              </label>
-              <ModernSelect
-                value={paymentStatusFilter}
-                onChange={(val) => setPaymentStatusFilter(val)}
-                options={[
-                  { value: 'All', label: 'All Statuses' },
-                  { value: 'Paid', label: 'Full Payment (Paid)' },
-                  { value: 'Partial', label: 'Partial Payment' },
-                  { value: 'Pending', label: 'Awaiting Confirmation' },
-                  { value: 'Rejected', label: 'Rejected' }
-                ]}
-              />
-            </div>
-
-            {/* Exam Type filter */}
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                Exam Type
-              </label>
-              <ModernSelect
-                value={examTypeFilter}
-                onChange={(val) => setExamTypeFilter(val)}
-                options={[
-                  { value: 'All', label: 'All Exam Types' },
-                  ...programmes.map((prog) => ({ value: prog.name, label: prog.name })),
-                ]}
-              />
-            </div>
-
-            {/* Payment Channel filter */}
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                Channel
-              </label>
-              <ModernSelect
-                value={methodFilter}
-                onChange={(val) => setMethodFilter(val)}
-                options={[
-                  { value: 'All', label: 'All Channels' },
-                  { value: 'Bank Transfer', label: 'Bank Transfer' },
-                  { value: 'Cash', label: 'Cash' }
-                ]}
-              />
-            </div>
-
-            {/* Month Range Quick Picker */}
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                Month Range
-              </label>
-              <div className="flex items-center space-x-1">
-                <input
-                  type="month"
-                  value={monthRangeStart}
-                  onChange={(e) => setMonthRangeStart(e.target.value)}
-                  placeholder="From"
-                  className="w-1/2 text-[11px] bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-slate-700 font-medium focus:border-orange-500 outline-none shadow-2xs"
-                  title="From Month"
-                />
-                <span className="text-slate-400 text-xs">-</span>
-                <input
-                  type="month"
-                  value={monthRangeEnd}
-                  onChange={(e) => setMonthRangeEnd(e.target.value)}
-                  placeholder="To"
-                  className="w-1/2 text-[11px] bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-slate-700 font-medium focus:border-orange-500 outline-none shadow-2xs"
-                  title="To Month"
-                />
-              </div>
-            </div>
+        {/* Roster toolbar */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/60 p-3 rounded-xl border border-slate-100">
+          <div className="w-full sm:w-56">
+            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+              Student status
+            </label>
+            <ModernSelect
+              value={rosterFilter}
+              onChange={(val) => setRosterFilter(val as 'All' | 'Owes' | 'Paid')}
+              options={[
+                { value: 'All', label: 'All students' },
+                { value: 'Owes', label: 'Owing balance' },
+                { value: 'Paid', label: 'Paid up' },
+              ]}
+            />
           </div>
-
-          {/* Search + Clear filters */}
-          <div className="flex items-center space-x-2 w-full lg:w-72 mt-2 lg:mt-0">
+          <div className="flex items-center space-x-2 w-full sm:w-72">
             <div className="relative flex-1">
               <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
-                placeholder="Search receipt # or student..."
+                placeholder="Search student..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:border-orange-500 shadow-2xs"
               />
             </div>
-            {(paymentStatusFilter !== 'All' ||
-              examTypeFilter !== 'All' ||
-              methodFilter !== 'All' ||
-              monthRangeStart ||
-              monthRangeEnd ||
-              search) && (
+            {search && (
               <button
-                onClick={() => {
-                  setPaymentStatusFilter('All');
-                  setExamTypeFilter('All');
-                  setMethodFilter('All');
-                  setMonthRangeStart('');
-                  setMonthRangeEnd('');
-                  setSearch('');
-                }}
+                onClick={() => setSearch('')}
                 className="px-2.5 py-1.5 text-[11px] font-bold text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg border border-slate-200 transition-colors shrink-0"
               >
                 Reset
@@ -479,132 +447,73 @@ export const FinanceManager: React.FC = () => {
           </div>
         </div>
 
+        {/* Awaiting confirmation */}
         {pendingPayments.length > 0 && (
-          <div className="flex items-center justify-between gap-3 p-3 mt-2 rounded-lg bg-blue-50 border border-blue-200 text-xs text-blue-900">
-            <span className="font-semibold">
-              {pendingPayments.length} student payment{pendingPayments.length === 1 ? '' : 's'} awaiting your confirmation. Balances only change once you confirm.
-            </span>
-            <button
-              type="button"
-              onClick={() => setPaymentStatusFilter('Pending')}
-              className="px-2.5 py-1 font-bold rounded-md bg-white border border-blue-200 hover:bg-blue-100 cursor-pointer shrink-0"
-            >
-              Review
-            </button>
+          <div className="rounded-xl border border-blue-200 bg-blue-50/60 p-3 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-bold text-blue-900">
+                {pendingPayments.length} student payment{pendingPayments.length === 1 ? '' : 's'} awaiting your confirmation
+              </span>
+              <span className="text-[10px] text-blue-700 font-medium hidden sm:block">Balances only change once you confirm.</span>
+            </div>
+            <div className="space-y-1.5">
+              {pendingPayments.map((pay) => (
+                <div key={pay.id} className="flex items-center justify-between gap-2 bg-white rounded-lg border border-blue-100 px-3 py-2">
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-slate-900 truncate">{pay.studentName}</p>
+                    <p className="text-[10px] text-slate-500">
+                      {settings.currencySymbol}{(pay.amountPaid || 0).toLocaleString()} &bull; {pay.method}
+                      {pay.evidenceUrl ? ' &bull; proof attached' : ' &bull; no proof yet'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={busyPaymentId === pay.id}
+                    onClick={() => openReview(pay)}
+                    className="px-3 py-1.5 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 disabled:opacity-50 rounded-md border border-slate-200 shadow-xs cursor-pointer flex items-center gap-1 shrink-0"
+                  >
+                    <Eye className="w-3.5 h-3.5 text-slate-400" />
+                    View Details
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
-        <div className="overflow-x-auto rounded-lg border border-slate-100 mt-2">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-slate-200 bg-slate-50/75 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                <th className="py-3 px-4">Student Name</th>
-                <th className="py-3 px-4">Programme</th>
-                <th className="py-3 px-4">Outstanding Balance</th>
-                <th className="py-3 px-4">Channel</th>
-                <th className="py-3 px-4 text-center">Status</th>
-                <th className="py-3 px-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 text-xs">
-              {filteredPayments.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="py-8 text-center text-slate-400 font-medium">
-                    No payment records match query.
-                  </td>
-                </tr>
-              ) : (
-                filteredPayments.map((pay) => (
-                  <tr key={pay.id} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-slate-900">{pay.studentName}</span>
-                        {pay.submittedBy === 'Student' && (
-                          <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200">
-                            Student Portal
-                          </span>
-                        )}
-                      </div>
-                      {pay.note && (
-                        <p className="text-[10px] text-slate-500 italic mt-0.5 line-clamp-1">
-                          "{pay.note}"
-                        </p>
-                      )}
-                    </td>
-                    <td className="py-3 px-4 text-slate-700">
-                      {pay.programmeName}
-                    </td>
-                    <td className="py-3 px-4 font-black text-amber-700">
-                      {settings.currencySymbol}
-                      {(pay.balance || 0).toLocaleString()}
-                    </td>
-                    <td className="py-3 px-4 text-slate-600">
-                      <div className="flex items-center gap-1.5">
-                        <span>{pay.method}</span>
-                        {pay.status === 'Pending' && !pay.evidenceUrl && (
-                          <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">
-                            No proof
-                          </span>
-                        )}
-                        {pay.evidenceUrl && (
-                          <button
-                            type="button"
-                            onClick={() => setViewEvidenceModal({ url: pay.evidenceUrl!, title: `${pay.studentName} - Payment Evidence` })}
-                            className="p-1 rounded bg-blue-50 hover:bg-blue-100 text-blue-700 transition-colors cursor-pointer"
-                            title="View Payment Evidence"
-                          >
-                            <ImageIcon className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                    <td className="py-3 px-4 text-center">
-                      <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                          pay.status === 'Paid'
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : pay.status === 'Pending'
-                            ? 'bg-blue-100 text-blue-800'
-                            : pay.status === 'Rejected'
-                            ? 'bg-rose-100 text-rose-800'
-                            : 'bg-amber-100 text-amber-800'
-                        }`}
-                      >
-                        {pay.status === 'Pending' ? 'Awaiting' : pay.status}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-right">
-                      {pay.status === 'Pending' ? (
-                        <div className="flex items-center justify-end">
-                          <button
-                            type="button"
-                            disabled={busyPaymentId === pay.id}
-                            onClick={() => openReview(pay)}
-                            className="px-3 py-1.5 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 disabled:opacity-50 rounded-md border border-slate-200 shadow-xs cursor-pointer flex items-center gap-1"
-                          >
-                            <Eye className="w-3.5 h-3.5 text-slate-400" />
-                            View Details
-                          </button>
-                        </div>
-                      ) : pay.status === 'Rejected' ? (
-                        <span className="text-[10px] text-slate-400 italic" title={pay.rejectionReason || ''}>
-                          {pay.rejectionReason ? 'Rejected: ' + pay.rejectionReason : 'Rejected'}
-                        </span>
-                      ) : (
-                        <button
-                          onClick={() => setSelectedReceipt(pay)}
-                          className="px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 rounded-md border border-slate-200 flex items-center space-x-1 ml-auto cursor-pointer"
-                        >
-                          <Receipt className="w-3 h-3 text-orange-600" />
-                          <span>View Detail</span>
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+        {/* Outstanding balances */}
+        <div>
+          <div className="flex items-center justify-between px-1 pb-1.5">
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+              Outstanding balances ({visibleOwes.length})
+            </span>
+            <span className="text-[10px] font-bold text-amber-700">
+              {settings.currencySymbol}{owesTotal.toLocaleString()} owed
+            </span>
+          </div>
+          <div className="rounded-xl border border-slate-100 divide-y divide-slate-100 overflow-hidden">
+            {visibleOwes.length === 0 ? (
+              <p className="py-6 text-center text-xs text-slate-400 font-medium">No student owes right now.</p>
+            ) : (
+              visibleOwes.map((row) => renderRosterRow(row))
+            )}
+          </div>
+        </div>
+
+        {/* Paid up */}
+        <div>
+          <div className="flex items-center justify-between px-1 pb-1.5">
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+              Paid up ({visiblePaid.length})
+            </span>
+          </div>
+          <div className="rounded-xl border border-slate-100 divide-y divide-slate-100 overflow-hidden">
+            {visiblePaid.length === 0 ? (
+              <p className="py-6 text-center text-xs text-slate-400 font-medium">No paid-up students yet.</p>
+            ) : (
+              visiblePaid.map((row) => renderRosterRow(row))
+            )}
+          </div>
         </div>
       </div>
 
@@ -719,207 +628,100 @@ export const FinanceManager: React.FC = () => {
       )}
 
       {/* Payment Detail Modal */}
-      {selectedReceipt && (
+      {/* Student Payment Details */}
+      {selectedDetailStudent && (() => {
+        const history = (paymentsByStudent.get(selectedDetailStudent.id) || [])
+          .slice()
+          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        const nextDue = nextPaymentDue(history);
+        const totalFee = Number(selectedDetailStudent.totalFee || 0);
+        const outstanding = Number(selectedDetailStudent.outstandingBalance || 0);
+        const paidSoFar = Math.max(0, totalFee - outstanding);
+        const initials = selectedDetailStudent.name.split(' ').map((n) => n[0]).join('').substring(0, 2).toUpperCase();
+        return (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95">
-            <div className="flex justify-between items-start pb-4 border-b border-slate-100">
-              <div>
-                <h3 className="font-extrabold text-slate-900 text-lg">Transaction Details</h3>
-                <p className="text-xs text-slate-500">Student payment history and profile identification</p>
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 max-h-[90vh] flex flex-col">
+            <div className="flex justify-between items-start pb-4 border-b border-slate-100 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center overflow-hidden shrink-0">
+                  {selectedDetailStudent.avatar ? (
+                    <img src={selectedDetailStudent.avatar} alt={selectedDetailStudent.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-sm font-black text-slate-500">{initials}</span>
+                  )}
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-slate-900 text-base">{selectedDetailStudent.name}</h3>
+                  <p className="text-[11px] text-slate-500">{selectedDetailStudent.programmeName || 'No programme set'}</p>
+                </div>
               </div>
               <button
-                onClick={() => setSelectedReceipt(null)}
-                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg"
+                onClick={() => setSelectedDetailStudent(null)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-6">
-              {/* Left Column: Student Profile & History */}
-              <div className="space-y-6">
-                <div className="flex items-center space-x-4">
-                  <div className="w-16 h-16 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center overflow-hidden shrink-0">
-                    {detailStudent?.avatar ? (
-                      <img
-                        src={detailStudent.avatar}
-                        alt={detailStudent.name}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <span className="text-lg font-black text-slate-500">
-                        {selectedReceipt.studentName.split(' ').map((n) => n[0]).join('').substring(0, 2).toUpperCase()}
-                      </span>
-                    )}
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-slate-900 text-base">{selectedReceipt.studentName}</h4>
-                    <p className="text-[11px] text-slate-500 font-medium">{selectedReceipt.programmeName}</p>
-                    <span className={`inline-flex mt-1 items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                      selectedReceipt.status === 'Paid'
-                        ? 'bg-emerald-100 text-emerald-800'
-                        : 'bg-amber-100 text-amber-800'
-                    }`}>
-                      {selectedReceipt.status}
-                    </span>
-                  </div>
+            <div className="py-4 space-y-4 overflow-y-auto flex-1 min-h-0 pr-1">
+              <div className="grid grid-cols-3 gap-2">
+                <div className="p-3 rounded-xl bg-amber-50 border border-amber-100 text-center">
+                  <p className="text-[9px] font-bold text-amber-700 uppercase tracking-wider">Outstanding</p>
+                  <p className="text-sm font-black text-amber-700 mt-0.5">{settings.currencySymbol}{outstanding.toLocaleString()}</p>
                 </div>
+                <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 text-center">
+                  <p className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Next due</p>
+                  <p className="text-[11px] font-bold text-slate-800 mt-1">{nextDue ? formatDateLong(nextDue) : 'Not set'}</p>
+                </div>
+                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-center">
+                  <p className="text-[9px] font-bold text-emerald-700 uppercase tracking-wider">Paid so far</p>
+                  <p className="text-sm font-black text-emerald-700 mt-0.5">{settings.currencySymbol}{paidSoFar.toLocaleString()}</p>
+                </div>
+              </div>
 
-                <div className="space-y-3">
-                  <h5 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Payment History ({detailHistory.length})</h5>
-                  <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-                    {detailHistory.map((h) => (
-                      <div key={h.id} className="flex items-center justify-between p-2.5 bg-slate-50 rounded-lg border border-slate-100">
-                        <div className="flex items-center space-x-2">
+              <div className="space-y-2">
+                <h5 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Payment history ({history.length})</h5>
+                {history.length === 0 ? (
+                  <p className="py-4 text-center text-xs text-slate-400 font-medium">No payments recorded yet.</p>
+                ) : (
+                  <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
+                    {history.map((h) => (
+                      <div key={h.id} className="flex items-center justify-between gap-2 p-2.5 bg-slate-50 rounded-lg border border-slate-100">
+                        <div className="flex items-center gap-2 min-w-0">
                           <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          <div>
+                          <div className="min-w-0">
                             <p className="text-[11px] font-bold text-slate-800">{formatDateLong(h.date)}</p>
-                            <p className="text-[9px] text-slate-500">{h.method}{h.expiresAt ? ` • to ${formatDateLong(h.expiresAt)}` : ''}</p>
+                            <p className="text-[9px] text-slate-500 truncate">{h.method}{h.expiresAt ? ` • to ${formatDateLong(h.expiresAt)}` : ''}</p>
                           </div>
                         </div>
-                        <div className="text-right shrink-0">
-                          <p className="text-[11px] font-black text-slate-900">
-                            {settings.currencySymbol}{(h.amountPaid || 0).toLocaleString()}
-                          </p>
-                          <span className={`text-[9px] font-bold ${
-                            h.status === 'Paid' ? 'text-emerald-600' : h.status === 'Partial' ? 'text-amber-600' : h.status === 'Pending' ? 'text-blue-600' : 'text-rose-600'
-                          }`}>
-                            {h.status === 'Pending' ? 'Awaiting confirmation' : h.status}
-                          </span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <div className="text-right">
+                            <p className="text-[11px] font-black text-slate-900">{settings.currencySymbol}{(h.amountPaid || 0).toLocaleString()}</p>
+                            <span className={`text-[9px] font-bold ${h.status === 'Paid' ? 'text-emerald-600' : h.status === 'Partial' ? 'text-amber-600' : h.status === 'Pending' ? 'text-blue-600' : 'text-rose-600'}`}>
+                              {h.status === 'Pending' ? 'Awaiting confirmation' : h.status}
+                            </span>
+                          </div>
+                          {h.evidenceUrl && (
+                            <button
+                              type="button"
+                              onClick={() => setViewEvidenceModal({ url: h.evidenceUrl!, title: `${selectedDetailStudent.name} - Payment Evidence` })}
+                              className="p-1.5 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-700 transition-colors cursor-pointer"
+                              title="View payment evidence"
+                            >
+                              <ImageIcon className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </div>
                       </div>
                     ))}
                   </div>
-                </div>
-                {selectedReceipt.evidenceUrl && (
-                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                        Payment Evidence Uploaded
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setViewEvidenceModal({
-                            url: selectedReceipt.evidenceUrl!,
-                            title: `${selectedReceipt.studentName} - Payment Evidence`,
-                          })
-                        }
-                        className="text-[10px] font-bold text-orange-600 hover:underline flex items-center gap-1 cursor-pointer"
-                      >
-                        <Eye className="w-3 h-3" />
-                        <span>Enlarge</span>
-                      </button>
-                    </div>
-                    <img
-                      src={selectedReceipt.evidenceUrl}
-                      alt="Uploaded Payment Evidence"
-                      className="w-full max-h-44 object-contain rounded-lg border border-slate-200 bg-white cursor-pointer hover:opacity-95"
-                      onClick={() =>
-                        setViewEvidenceModal({
-                          url: selectedReceipt.evidenceUrl!,
-                          title: `${selectedReceipt.studentName} - Payment Evidence`,
-                        })
-                      }
-                    />
-                  </div>
                 )}
-
-                {selectedReceipt.note && (
-                  <div className="p-3 bg-orange-50/60 rounded-xl border border-orange-200 text-xs text-orange-950">
-                    <span className="text-[10px] font-bold text-orange-800 uppercase block mb-1">
-                      {selectedReceipt.method === 'Cash'
-                        ? 'Bursary Cash Statement / Note'
-                        : 'Payment Short Note / Statement'}
-                    </span>
-                    <p className="font-medium italic">"{selectedReceipt.note}"</p>
-                  </div>
-                )}
-
-                {/* Payment reminder actions */}
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setShowReminders((v) => !v)}
-                    className="px-3.5 py-2.5 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 rounded-xl border border-slate-200 flex items-center gap-2 cursor-pointer transition-colors"
-                  >
-                    <BellRing className="w-4 h-4 text-orange-600" />
-                    <span>Send Payment Reminder</span>
-                    <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${showReminders ? 'rotate-180' : ''}`} />
-                  </button>
-                  {showReminders && (
-                    <div className="absolute left-0 bottom-full mb-1 w-full sm:w-80 bg-white rounded-xl border border-slate-200 shadow-xl z-20 overflow-hidden">
-                      <button
-                        type="button"
-                        onClick={sendChatReminder}
-                        className="w-full px-3 py-2.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2.5 cursor-pointer border-b border-slate-100"
-                      >
-                        <MessageCircle className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                        <span>In-app Chat<span className="block text-[10px] text-slate-400 font-medium">Copies the message; paste it in the student's chat</span></span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={sendWhatsAppReminder}
-                        className="w-full px-3 py-2.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2.5 cursor-pointer border-b border-slate-100"
-                      >
-                        <MessageCircle className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                        <span>WhatsApp<span className="block text-[10px] text-slate-400 font-medium">Opens WhatsApp with the message ready to send</span></span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={sendEmailReminder}
-                        className="w-full px-3 py-2.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2.5 cursor-pointer"
-                      >
-                        <Mail className="w-3.5 h-3.5 text-orange-600 shrink-0" />
-                        <span>Email<span className="block text-[10px] text-slate-400 font-medium">Opens the mail app with the reminder pre-filled</span></span>
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Right Column: Balance Summary */}
-              <div className="bg-slate-900 rounded-2xl p-5 text-white flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Financial Summary</span>
-                    <TrendingUp className="w-4 h-4 text-emerald-400" />
-                  </div>
-                  
-                  <div className="space-y-4">
-                    <div>
-                      <p className="text-xs text-slate-400">Total Course Fee</p>
-                      <p className="text-xl font-black">{settings.currencySymbol}{(selectedReceipt.totalFee || 0).toLocaleString()}</p>
-                    </div>
-                    
-                    <div className="h-px bg-slate-800 w-full" />
-                    
-                    <div>
-                      <p className="text-xs text-slate-400">Total Amount Paid</p>
-                      <p className="text-xl font-black text-emerald-400">
-                        {settings.currencySymbol}{((selectedReceipt.totalFee || 0) - (selectedReceipt.balance || 0)).toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-4 pt-4 border-t border-slate-800">
-                  <p className="text-xs text-slate-400 font-bold mb-1">Next Payment Due</p>
-                  <p className="text-base font-black text-white">{detailNextDue ? formatDateLong(detailNextDue) : 'Not set yet'}</p>
-                </div>
-
-                <div className="mt-4 pt-4 border-t border-slate-800">
-                  <p className="text-xs text-amber-400 font-bold mb-1">Outstanding Balance</p>
-                  <p className="text-3xl font-black text-white">
-                    {settings.currencySymbol}{(selectedReceipt.balance || 0).toLocaleString()}
-                  </p>
-                </div>
               </div>
             </div>
 
-            <div className="flex justify-end space-x-2 pt-4 border-t border-slate-100">
+            <div className="flex justify-end pt-4 border-t border-slate-100 shrink-0">
               <button
-                onClick={() => setSelectedReceipt(null)}
+                onClick={() => setSelectedDetailStudent(null)}
                 className="px-6 py-2 text-xs font-bold text-[var(--on-brand,#fff)] bg-[var(--brand,#0f172a)] hover:brightness-110 rounded-lg transition-colors cursor-pointer"
               >
                 Close
@@ -927,7 +729,8 @@ export const FinanceManager: React.FC = () => {
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* Exam Program Fee & Payment Settings Modal */}
       {showTariffModal && (
@@ -986,6 +789,17 @@ export const FinanceManager: React.FC = () => {
                 }`}
               >
                 Facility Account & Cash Guide
+              </button>
+              <button
+                type="button"
+                onClick={() => setTariffModalTab('reminders')}
+                className={`pb-2.5 text-xs font-bold transition-all border-b-2 cursor-pointer ${
+                  tariffModalTab === 'reminders'
+                    ? 'border-orange-600 text-orange-600'
+                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                Automatic Reminders
               </button>
             </div>
 
@@ -1070,6 +884,89 @@ export const FinanceManager: React.FC = () => {
                     </div>
                   );
                 })}
+              </div>
+            ) : tariffModalTab === 'reminders' ? (
+              <div className="py-4 space-y-4 overflow-y-auto flex-1 min-h-0 pr-1 text-xs">
+                <p className="text-[11px] text-slate-500">
+                  Students with an outstanding balance are reminded automatically. Nobody sends reminders by hand again.
+                </p>
+
+                <label className="flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-200 bg-slate-50/60 cursor-pointer">
+                  <span>
+                    <span className="block text-xs font-bold text-slate-800">Automatic reminders</span>
+                    <span className="block text-[10px] text-slate-500">Remind students who owe, on the schedule below.</span>
+                  </span>
+                  <input type="checkbox" checked={remEnabled} onChange={(e) => setRemEnabled(e.target.checked)} className="w-4 h-4 accent-orange-600 cursor-pointer shrink-0" />
+                </label>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Remind how early</label>
+                    <ModernSelect
+                      value={String(remDays)}
+                      onChange={(val) => setRemDays(Number(val))}
+                      options={FEE_REMINDER_DAY_OPTIONS.map((o) => ({ value: String(o.value), label: o.label }))}
+                    />
+                  </div>
+                  <label className="flex items-center gap-2 p-2.5 rounded-lg border border-slate-200 bg-white cursor-pointer self-end">
+                    <input type="checkbox" checked={remMonday} onChange={(e) => setRemMonday(e.target.checked)} className="w-4 h-4 accent-orange-600 cursor-pointer shrink-0" />
+                    <span className="text-xs font-semibold text-slate-700">Also remind everyone owing every Monday</span>
+                  </label>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">How reminders reach students</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <label className="flex items-center gap-2 p-2.5 rounded-lg border border-slate-200 bg-white cursor-pointer">
+                      <input type="checkbox" checked={remEmail} onChange={(e) => setRemEmail(e.target.checked)} className="w-4 h-4 accent-orange-600 cursor-pointer shrink-0" />
+                      <span className="text-xs font-semibold text-slate-700">Email</span>
+                    </label>
+                    <label className="flex items-center gap-2 p-2.5 rounded-lg border border-slate-200 bg-white cursor-pointer">
+                      <input type="checkbox" checked={remPush} onChange={(e) => setRemPush(e.target.checked)} className="w-4 h-4 accent-orange-600 cursor-pointer shrink-0" />
+                      <span className="text-xs font-semibold text-slate-700">Push notification</span>
+                    </label>
+                    <label className="flex items-center gap-2 p-2.5 rounded-lg border border-slate-200 bg-white cursor-pointer">
+                      <input type="checkbox" checked={remChat} onChange={(e) => setRemChat(e.target.checked)} className="w-4 h-4 accent-orange-600 cursor-pointer shrink-0" />
+                      <span className="text-xs font-semibold text-slate-700">In-chat message</span>
+                    </label>
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-1">The in-chat message is posted into the student's chat in the facility's name, never as the admin.</p>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">In-chat message</label>
+                  <textarea
+                    value={remTemplate}
+                    onChange={(e) => setRemTemplate(e.target.value)}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-medium bg-white focus:border-orange-500 outline-none resize-none"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    Placeholders: {'{{student_name}}'}, {'{{facility_name}}'} (filled in automatically), {'{{outstanding_balance}}'}, {'{{next_payment_due}}'}
+                  </p>
+                  <p className="text-[10px] text-slate-500 mt-1 italic">
+                    Preview: {renderChatTemplate(remTemplate, { student_name: 'Joy', facility_name: centreName || 'the facility', outstanding_balance: `${settings.currencySymbol}25,000`, next_payment_due: '28 August 2026' })}
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+                  <button
+                    type="button"
+                    disabled={remBusy}
+                    onClick={handleRunReminders}
+                    className="px-3.5 py-2 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 disabled:opacity-50 rounded-lg border border-slate-200 cursor-pointer"
+                  >
+                    {remBusy ? 'Running…' : 'Run reminders now'}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={remSaving}
+                    onClick={handleSaveReminders}
+                    className="px-4 py-2 text-xs font-bold text-[var(--on-brand,#fff)] bg-[var(--brand,#0f172a)] hover:brightness-110 disabled:opacity-50 rounded-lg shadow-sm cursor-pointer"
+                  >
+                    {remSaving ? 'Saving…' : 'Save reminder settings'}
+                  </button>
+                </div>
               </div>
             ) : (
               <form onSubmit={handleSaveChannelSettings} className="py-4 space-y-4 overflow-y-auto flex-1 min-h-0 pr-1 text-xs">

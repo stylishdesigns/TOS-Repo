@@ -34,6 +34,8 @@ export interface TenantSettings {
   bankAccountName?: string;
   cashPaymentGuide?: string;
   academicSessions?: string[];
+  /** Automated payment reminder settings (Fees & Payments). */
+  paymentReminders?: import('./lib/feeReminders').FeeReminderSettings | null;
 }
 
 export interface Branch {

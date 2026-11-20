@@ -106,10 +106,17 @@ export async function runPushSweep(opts: { limit?: number } = {}): Promise<PushS
     // The notification carries the facility's own logo, so a Godzilla push
     // shows Godzilla's mark, never a default graduation cap.
     const icon = await facilityIcon(String(v.centreId || ''));
+    // Fee-reminder jobs carry their own facility-voiced title and body;
+    // planner jobs keep the platform's wording.
+    const isFee = v.kind === 'fee_reminder';
+    const pushTitle = isFee ? String(v.pushTitle || 'Payment reminder') : 'Planner reminder';
+    const pushBody = isFee
+      ? String(v.pushBody || v.pushTitle || '')
+      : v.time ? `${v.title} (${v.time})` : String(v.title || '');
     const payload = JSON.stringify({
-      title: 'Planner reminder',
-      body: v.time ? `${v.title} (${v.time})` : String(v.title || ''),
-      tag: `planner-${String(v.id || job.id)}`,
+      title: pushTitle,
+      body: pushBody,
+      tag: isFee ? `fee-${String(job.id)}` : `planner-${String(v.id || job.id)}`,
       url: '/',
       icon,
       badge: icon,
@@ -192,8 +199,12 @@ export async function runPushSweep(opts: { limit?: number } = {}): Promise<PushS
       await adminDb.collection('notifications').doc(`rem-${reminderId}`).set({
         centreId,
         type: 'reminder',
-        title: String(v.title || 'Planner reminder').slice(0, 120),
-        body: `Planner reminder for ${String(v.date || '')}${v.time ? ` at ${String(v.time)}` : ''}.`.slice(0, 400),
+        title: isFee
+          ? String(v.pushTitle || 'Payment reminder').slice(0, 120)
+          : String(v.title || 'Planner reminder').slice(0, 120),
+        body: isFee
+          ? String(v.pushBody || '').slice(0, 400)
+          : `Planner reminder for ${String(v.date || '')}${v.time ? ` at ${String(v.time)}` : ''}.`.slice(0, 400),
         subjects: [],
         audienceUid: uid,
         reminderId,

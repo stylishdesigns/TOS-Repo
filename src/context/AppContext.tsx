@@ -252,6 +252,8 @@ interface AppContextType {
   recordPayment: (payment: { studentId: string; amountPaid: number; method?: 'Card' | 'Bank Transfer' | 'Cash'; note?: string; evidenceUrl?: string; evidenceName?: string; effectiveFrom?: string; expiresAt?: string }) => Promise<RecordPaymentResult | void>;
   setStudentTotalFee: (input: { studentId: string; totalFee: number }) => Promise<{ totalFee: number; outstandingBalance: number; paymentStatus: string } | void>;
   confirmPayment: (paymentId: string, action: 'confirm' | 'reject', reason?: string, dates?: { effectiveFrom?: string; expiresAt?: string }) => Promise<boolean>;
+  /** Admin-only: run the automated payment reminder sweep for this facility right now. */
+  runPaymentReminders: () => Promise<{ ok: boolean; emailed?: number; pushed?: number; chatted?: number; pushReason?: string; error?: string }>;
 
   announcements: Announcement[];
   addAnnouncement: (announcement: Omit<Announcement, 'id' | 'date'>) => void;
@@ -2924,6 +2926,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  // Admin-only: run the automated payment reminder sweep for this facility
+  // right now (the "Run reminders now" button in Fees & Payments). The server
+  // decides who is due and sends the configured channels; the client sends
+  // nothing itself.
+  const runPaymentReminders = async (): Promise<{ ok: boolean; emailed?: number; pushed?: number; chatted?: number; pushReason?: string; error?: string }> => {
+    try {
+      const token = await firebaseAuth.currentUser?.getIdToken();
+      if (!token) throw new Error('You are signed out. Sign in and try again.');
+      const res = await fetch('/api/centre/reminders/run', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ centreId: activeCentreId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || 'The reminders could not run. Please try again.');
+      }
+      const r = data.reminders || {};
+      return {
+        ok: true,
+        emailed: Number(r.emailed) || 0,
+        pushed: Number(r.pushed) || 0,
+        chatted: Number(r.chatted) || 0,
+        pushReason: String(data.push?.reason || ''),
+      };
+    } catch (e) {
+      console.error(e);
+      return { ok: false, error: (e as Error)?.message || 'Could not run the reminders.' };
+    }
+  };
+
   // Admin-only: set the student's total fee. The server recomputes the
   // outstanding balance and payment status, so no device ever sends balance
   // numbers; the client only reads back what the server wrote.
@@ -3272,6 +3308,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         recordPayment,
         setStudentTotalFee,
         confirmPayment,
+        runPaymentReminders,
         announcements,
         addAnnouncement,
         deleteAnnouncement,

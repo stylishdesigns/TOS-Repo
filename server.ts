@@ -32,6 +32,8 @@ import { registerLandingLeadRoutes } from "./src/server/landingLeadRoutes";
 import { registerMockRoutes } from "./src/server/mockRoutes";
 import { PaymentError, parseAmount, parseConfirmAction, parseFee } from "./src/server/paymentLogic";
 import { loadPaymentActor, submitPayment, decidePayment, setStudentFee } from "./src/server/paymentService";
+import { runFeeReminderSweep } from "./src/server/feeReminders";
+import { runPushSweep } from "./src/server/pushSender";
 import { registerStudentMockRoutes } from "./src/server/studentMockRoutes";
 import { registerNotificationRoutes } from "./src/server/notificationRoutes";
 import { registerTutorAiRoutes } from "./src/server/tutorAiRoutes";
@@ -749,6 +751,35 @@ async function startServer() {
       res.json({ success: true, ...result });
     } catch (error: any) {
       sendPaymentError(res, error, "set-fee");
+    }
+  });
+
+  // 6d. Automated payment reminders. The facility's reminder settings live in
+  // centreSettings/{centreId}__global (paymentReminders); this route runs the
+  // sweep for the caller's own facility right now (the "Run reminders now"
+  // button). The daily schedule runs the same sweep for every facility.
+  app.post("/api/centre/reminders/run", async (req, res) => {
+    try {
+      const caller = await getCaller(req);
+      const centreId = String(req.body?.centreId || req.headers["x-centre-id"] || "");
+      if (!/^[a-zA-Z0-9_\-]{1,160}$/.test(centreId)) {
+        return res.status(400).json({ error: "Missing or invalid centreId" });
+      }
+      const actor = await loadPaymentActor(adminDb, caller);
+      if (!actor.isAdminCaller) {
+        return res.status(403).json({ error: "Only the facility admin can run reminders." });
+      }
+      if (actor.callerCentreId && actor.callerCentreId !== centreId) {
+        return res.status(403).json({ error: "You can only run reminders for your own facility." });
+      }
+      const reminders = await runFeeReminderSweep({ centreId });
+      // Deliver any pushes the sweep just queued without waiting for the
+      // next scheduled push pass.
+      const push = reminders.pushed > 0 ? await runPushSweep({ limit: 50 }) : undefined;
+      res.json({ success: true, reminders, push });
+    } catch (error: any) {
+      console.warn("reminders/run error:", error.message || error);
+      res.status(500).json({ error: error.message || "Could not run the reminders." });
     }
   });
 
