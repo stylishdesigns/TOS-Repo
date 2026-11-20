@@ -773,7 +773,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
                       required
                       value={email}
                       onChange={(e) => onEmailChange(e.target.value)}
-                      placeholder="e.g. name@excellencetutorials.ng"
+                      placeholder="e.g. name@yourfacility.com"
                       className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-4 focus:ring-slate-100 focus:border-slate-900 outline-none transition-all font-medium"
                     />
                   </div>

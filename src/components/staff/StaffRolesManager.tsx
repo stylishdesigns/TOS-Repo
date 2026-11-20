@@ -376,7 +376,7 @@ export const StaffRolesManager: React.FC = () => {
                   <input
                     type="email"
                     required
-                    placeholder="staff@excellencetutorials.ng"
+                    placeholder="staff@yourfacility.com"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-900 focus:bg-white focus:border-orange-500 outline-none"
