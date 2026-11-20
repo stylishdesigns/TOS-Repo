@@ -18,7 +18,7 @@
 // ============================================================================
 import webpush from 'web-push';
 import { adminDb } from './firebaseAdmin';
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldPath, FieldValue } from 'firebase-admin/firestore';
 
 // Our own VAPID key pair (generated Nov 19 for this sender; the key pair
 // Firebase's console mints cannot be used for self-sending because its private
@@ -47,6 +47,107 @@ export function sendAtMs(date: string, time: string): number {
   return Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 0, mins) - 60 * 60 * 1000;
 }
 
+// Facility icon for a push payload: the facility's own Cloudinary logo at
+// 192px, or the default TOS icon. One read per facility, cached per process.
+const logoCache = new Map<string, string>();
+async function facilityIcon(centreId: string): Promise<string> {
+  if (!centreId) return '/pwa-192x192.png';
+  if (logoCache.has(centreId)) return logoCache.get(centreId) as string;
+  let icon = '/pwa-192x192.png';
+  try {
+    const cs = await adminDb.collection('centres').doc(centreId).get();
+    const logoUrl = String((cs.data() as any)?.logoUrl || '');
+    const m = logoUrl.match(/^(https:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/)(.+)$/);
+    if (m) icon = `${m[1]}w_192,h_192,c_pad,b_white,f_png/${m[2]}`;
+  } catch { /* fall back to the default icon */ }
+  logoCache.set(centreId, icon);
+  return icon;
+}
+
+export interface DirectPushResult {
+  sent: number;
+  failed: number;
+  cleaned: number;
+}
+
+/**
+ * Push straight to the registered devices of the given uids, without the
+ * queue (Nov 20). "Send now" broadcasts use this so the push lands at the
+ * same moment as the in-app bell and the emails; only scheduled sends keep
+ * queueing, so the sweep alone controls their timing.
+ */
+export async function sendPushNow(opts: {
+  centreId: string;
+  uids: string[];
+  title: string;
+  body: string;
+  tag?: string;
+}): Promise<DirectPushResult> {
+  const out: DirectPushResult = { sent: 0, failed: 0, cleaned: 0 };
+  const privateKey = process.env.WEB_PUSH_PRIVATE_KEY || '';
+  const uids = (opts.uids || []).filter(Boolean);
+  if (!privateKey || !uids.length) return out;
+  webpush.setVapidDetails(
+    process.env.WEB_PUSH_CONTACT || 'mailto:noreply@tutorialos.com',
+    WEB_PUSH_PUBLIC_KEY,
+    privateKey,
+  );
+  const icon = await facilityIcon(String(opts.centreId || ''));
+  const payload = JSON.stringify({
+    title: String(opts.title || 'Announcement').slice(0, 120),
+    body: String(opts.body || '').slice(0, 200),
+    tag: String(opts.tag || `ann-${Date.now()}`),
+    url: '/',
+    icon,
+    badge: icon,
+  });
+  for (let i = 0; i < uids.length; i += 30) {
+    const chunk = uids.slice(i, i + 30);
+    let snap;
+    try {
+      snap = await adminDb.collection('pushTokens').where(FieldPath.documentId(), 'in', chunk).get();
+    } catch { continue; }
+    for (const d of snap.docs) {
+      const raw = (d.data() || {}) as Record<string, any>;
+      // Fold the legacy dotted-key writes into the real device map.
+      const deviceMap: Record<string, any> =
+        raw.devices && typeof raw.devices === 'object' ? { ...raw.devices } : {};
+      for (const [k, val] of Object.entries(raw)) {
+        if (k.startsWith('devices.') && val && typeof val === 'object') deviceMap[k.slice(8)] = val;
+      }
+      for (const [hash, dev] of Object.entries(deviceMap)) {
+        const endpoint = String(dev?.endpoint || '');
+        if (!endpoint.startsWith('https://')) continue;
+        try {
+          await webpush.sendNotification(
+            { endpoint, keys: { p256dh: String(dev?.keys?.p256dh || ''), auth: String(dev?.keys?.auth || '') } },
+            payload,
+            { TTL: 3600 },
+          );
+          out.sent += 1;
+        } catch (e) {
+          const status = Number((e as any)?.statusCode) || 0;
+          if (status === 404 || status === 410) {
+            // Subscription is gone: remove it so the next send is not wasted.
+            const freshRaw = ((await adminDb.collection('pushTokens').doc(d.id).get()).data() || {}) as Record<string, any>;
+            const freshMap: Record<string, any> =
+              freshRaw.devices && typeof freshRaw.devices === 'object' ? { ...freshRaw.devices } : {};
+            for (const [k, val] of Object.entries(freshRaw)) {
+              if (k.startsWith('devices.') && val && typeof val === 'object') freshMap[k.slice(8)] = val;
+            }
+            delete freshMap[hash];
+            await adminDb.collection('pushTokens').doc(d.id).set({ devices: freshMap, updatedAt: Date.now() }, { merge: true });
+            out.cleaned += 1;
+          } else {
+            out.failed += 1;
+          }
+        }
+      }
+    }
+  }
+  return out;
+}
+
 export interface PushSweepResult {
   reason?: string;
   checked: number;
@@ -72,21 +173,6 @@ export async function runPushSweep(opts: { limit?: number } = {}): Promise<PushS
   );
 
   const now = Date.now();
-  // Per-sweep cache: one read per facility per sweep, not per device.
-  const logoCache = new Map<string, string>();
-  const facilityIcon = async (centreId: string): Promise<string> => {
-    if (!centreId) return '/pwa-192x192.png';
-    if (logoCache.has(centreId)) return logoCache.get(centreId) as string;
-    let icon = '/pwa-192x192.png';
-    try {
-      const cs = await adminDb.collection('centres').doc(centreId).get();
-      const logoUrl = String((cs.data() as any)?.logoUrl || '');
-      const m = logoUrl.match(/^(https:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/)(.+)$/);
-      if (m) icon = `${m[1]}w_192,h_192,c_pad,b_white,f_png/${m[2]}`;
-    } catch { /* fall back to the default icon */ }
-    logoCache.set(centreId, icon);
-    return icon;
-  };
   const snap = await adminDb
     .collection('pushQueue')
     .where('sent', '==', false)
@@ -192,6 +278,10 @@ export async function runPushSweep(opts: { limit?: number } = {}): Promise<PushS
 
     if (ok > 0) {
       await job.ref.set({ sent: true, sentAt: now, delivered: ok }, { merge: true });
+      // Announcement pushes get no bell-history copy here: the broadcast
+      // fan-out already wrote the real in-app notification, and a `rem-`
+      // copy would duplicate it in the bell with planner wording.
+      if (isAnn) continue;
       out.delivered += 1;
       // Bell-history copy (Nov 19): a push the member swipes away must not be
       // lost, so every delivered reminder is also filed as a notification

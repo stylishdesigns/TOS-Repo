@@ -203,7 +203,10 @@ export const AnnouncementsManager: React.FC = () => {
       const r = res?.results || {};
       const parts: string[] = [];
       if (wantsInApp) {
-        const pushed = r.push?.queued ? `${r.inApp?.delivered || 0} in the bell, ${r.push.queued} phone notifications` : `${r.inApp?.delivered || 0} in the bell`;
+        const pushInfo = r.push?.sent !== undefined
+          ? `${r.push.sent} phone notification${r.push.sent === 1 ? '' : 's'}${r.push.failed ? `, ${r.push.failed} failed` : ''}`
+          : r.push?.queued ? `${r.push.queued} phone notifications` : '';
+        const pushed = pushInfo ? `${r.inApp?.delivered || 0} in the bell, ${pushInfo}` : `${r.inApp?.delivered || 0} in the bell`;
         parts.push(`In-app: ${pushed}`);
       }
       if (wantsEmail) {

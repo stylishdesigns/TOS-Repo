@@ -3,6 +3,7 @@ import { FieldPath } from 'firebase-admin/firestore';
 import { adminDb } from './firebaseAdmin';
 import { Caller, httpError, requireMembership } from './tenantService';
 import { pushNotification } from './notificationRoutes';
+import { sendPushNow } from './pushSender';
 import { emailProviderConfigured, sendEmail } from './email';
 
 // ============================================================================
@@ -23,8 +24,10 @@ import { emailProviderConfigured, sendEmail } from './email';
 //
 // Delivery per attached channel:
 //   In-App  one `notifications` document (type 'announcement') every student
-//           sees in their bell, plus one `pushQueue` job per student who has
-//          a registered device so the bell wakes the phone.
+//           sees in their bell. Device wake-up: a "send now" broadcast pushes
+//           directly to every registered device (no queue), while a scheduled
+//           one keeps queueing `pushQueue` jobs so the sweep sends them at the
+//           scheduled moment.
 //   Email   one mail per recipient: the student's own address for Student
 //           broadcasts, the guardian address for Parents broadcasts.
 //
@@ -67,12 +70,12 @@ function parseScheduledAt(value: string): number {
 
 export interface AnnouncementResults {
   inApp?: { delivered: number; skipped: string };
-  push?: { queued: number };
+  push?: { queued?: number; sent?: number; failed?: number };
   email?: { sent: number; failed: number; noAddress: number; skipped: string };
 }
 
 /** Fan one saved announcement out through every channel it names. */
-async function deliverAnnouncement(id: string, v: Record<string, any>): Promise<AnnouncementResults> {
+async function deliverAnnouncement(id: string, v: Record<string, any>, pushInline = false): Promise<AnnouncementResults> {
   const centreId = cleanStr(v.centreId, 120);
   const title = cleanStr(v.title, 200);
   const fullBody = cleanStr(v.body, 4000);
@@ -104,10 +107,17 @@ async function deliverAnnouncement(id: string, v: Record<string, any>): Promise<
       results.inApp = { delivered: 0, skipped: (e as Error).message || 'could not write the notification' };
     }
 
-    // Device wake-up: queue one push job per student who actually has a
-    // registered device. pushTokens is keyed by uid, so the uids are probed
-    // in chunks instead of one read per student.
+    // Device wake-up. A "send now" broadcast pushes straight to every
+    // registered device, so the push lands with the bell and the email and
+    // nothing has to run the sweep afterwards. A scheduled broadcast keeps
+    // queueing `pushQueue` jobs; the sweep alone controls their timing.
+    // pushTokens is keyed by uid, so the uids are probed in chunks instead
+    // of one read per student.
     const uids = students.map((s) => cleanStr(s.uid, 128)).filter(Boolean);
+    if (pushInline) {
+      const r = await sendPushNow({ centreId, uids, title, body: fullBody.slice(0, 200), tag: `ann-${id}` });
+      results.push = { sent: r.sent, failed: r.failed };
+    } else {
     let withDevices = 0;
     for (let i = 0; i < uids.length; i += 30) {
       const chunk = uids.slice(i, i + 30);
@@ -141,6 +151,7 @@ async function deliverAnnouncement(id: string, v: Record<string, any>): Promise<
       }
     }
     results.push = { queued: withDevices };
+    }
   }
 
   // Email: one mail per recipient, ten at a time so a large facility stays
@@ -298,7 +309,7 @@ export function registerAnnouncementRoutes(app: express.Express): void {
       if (sendMode === 'schedule') {
         return res.json({ ok: true, id: ref.id, status: 'Scheduled', scheduledAt });
       }
-      const results = await deliverAnnouncement(ref.id, doc);
+      const results = await deliverAnnouncement(ref.id, doc, true);
       await ref.set({ results, deliveredAt: Date.now() }, { merge: true });
       return res.json({ ok: true, id: ref.id, status: 'Delivered', results });
     } catch (e) {
