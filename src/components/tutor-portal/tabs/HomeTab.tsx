@@ -6,7 +6,8 @@ import {
   Clock,
   BookOpen,
   ChevronRight,
-  Star
+  Star,
+  X
 } from 'lucide-react';
 import { CalendarView } from '../../common/CalendarView';
 import { TutorHistoryView } from './TutorHistoryView';
@@ -22,8 +23,10 @@ export const HomeTab: React.FC<HomeTabProps> = ({ tutor, onNavigateTab }) => {
   const { timetable, settings, plannerReminders, addPlannerReminder, removePlannerReminder, updatePlannerReminder } = useApp();
   const [showSchedule, setShowSchedule] = useState(false);
   const [showRatings, setShowRatings] = useState(false);
+  const [showGreeting, setShowGreeting] = useState(false);
   useScrollLock(showSchedule);
   useScrollLock(showRatings);
+  useScrollLock(showGreeting);
 
   // Filter classes for this tutor
   const myClasses = timetable.filter(slot =>
@@ -79,6 +82,8 @@ export const HomeTab: React.FC<HomeTabProps> = ({ tutor, onNavigateTab }) => {
     return t.getTime() >= now.getTime() - 5 * 60 * 1000;
   });
 
+  const timeOfDay = now.getHours() < 12 ? 'morning' : now.getHours() < 17 ? 'afternoon' : 'evening';
+
   // Classes still awaiting the tutor's consent
   const pendingCount = myClasses.filter(c => c.status === 'pending_tutor_consent').length;
 
@@ -92,8 +97,11 @@ export const HomeTab: React.FC<HomeTabProps> = ({ tutor, onNavigateTab }) => {
 
   return (
     <div className="space-y-4 px-4 py-3 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* 1. Tutor Profile Greeting Card: photo, greeting, date */}
-      <div className="relative overflow-hidden rounded-3xl bg-[var(--brand,#EA580C)] text-[var(--on-brand,#fff)] p-6 shadow-lg shadow-black/10">
+      {/* 1. Tutor Profile Greeting Card: photo, greeting, date; tapping it opens the full greetings splash */}
+      <button
+        onClick={() => setShowGreeting(true)}
+        className="relative overflow-hidden rounded-3xl bg-[var(--brand,#EA580C)] text-[var(--on-brand,#fff)] p-6 shadow-lg shadow-black/10 text-left cursor-pointer active:scale-[0.99] transition-transform w-full"
+      >
         <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl" />
         <div className="absolute bottom-0 left-0 w-24 h-24 bg-black/10 rounded-full translate-y-1/2 -translate-x-1/2 blur-xl" />
 
@@ -122,7 +130,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({ tutor, onNavigateTab }) => {
             </p>
           </div>
         </div>
-      </div>
+      </button>
 
       {/* 2. Quick Stats: real numbers only, no student totals */}
       <div className="grid grid-cols-2 gap-3">
@@ -292,6 +300,62 @@ export const HomeTab: React.FC<HomeTabProps> = ({ tutor, onNavigateTab }) => {
               <div className="w-10 h-1 rounded-full bg-slate-300 mx-auto mt-2.5 shrink-0" />
               <div className="flex-1 overflow-y-auto">
                 <TutorHistoryView tutor={tutor} onBack={() => setShowRatings(false)} />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 7. Full greetings splash: the greeting card opens into a full page from the bottom */}
+      {showGreeting && (
+        <div className="fixed inset-0 z-[70]">
+          <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" onClick={() => setShowGreeting(false)} />
+          <div className="absolute bottom-0 left-0 right-0 top-[6vh]">
+            <div className="h-full max-w-md mx-auto bg-white rounded-t-[28px] overflow-hidden shadow-2xl tos-sheet-up flex flex-col">
+              <button
+                onClick={() => setShowGreeting(false)}
+                aria-label="Close greetings"
+                className="absolute top-3 right-3 z-10 w-9 h-9 rounded-full bg-white/25 backdrop-blur-md border border-white/30 flex items-center justify-center text-white cursor-pointer active:scale-90 transition-transform"
+              >
+                <X className="w-4 h-4" />
+              </button>
+              <div className="relative bg-[var(--brand,#EA580C)] text-[var(--on-brand,#fff)] px-6 pt-10 pb-9 overflow-hidden shrink-0">
+                <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl" />
+                <div className="absolute bottom-0 left-0 w-28 h-28 bg-black/10 rounded-full translate-y-1/2 -translate-x-1/2 blur-xl" />
+                <div className="relative z-10 flex items-center space-x-4">
+                  {tutor.avatar ? (
+                    <img src={tutor.avatar} alt={tutor.name} className="w-20 h-20 rounded-3xl object-cover border-2 border-white/40 shadow-xl shrink-0" />
+                  ) : (
+                    <div className="w-20 h-20 rounded-3xl bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center font-black text-3xl shadow-xl shrink-0">
+                      {tutor.name.split(' ').map(n => n[0]).slice(0, 2).join('')}
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <p className="text-3xl font-black tracking-tight leading-tight">Good {timeOfDay},</p>
+                    <p className="text-xl font-black tracking-tight leading-tight mt-0.5 truncate">{tutor.name}!</p>
+                    <p className="text-[10px] font-black uppercase tracking-widest opacity-90 mt-2 flex items-center gap-1.5">
+                      <Calendar className="w-3 h-3" />
+                      <span>{new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                    </p>
+                  </div>
+                </div>
+                <p className="relative z-10 text-[11px] font-medium opacity-75 mt-4">
+                  {tutor.department || 'Academics'} • {settings.academicSession}
+                </p>
+              </div>
+              <div className="flex-1 overflow-y-auto px-5 py-5 space-y-3">
+                {[
+                  { label: 'Classes today', value: `${todayClasses.length}` },
+                  { label: 'Next class', value: nextClass ? `${nextClass.subject} · ${formatTimeAMPM(nextClass.startTime || nextClass.time.split(' - ')[0])}` : 'Nothing else today' },
+                  { label: 'Awaiting your consent', value: `${pendingCount}` },
+                  { label: 'Classes this week', value: `${weekCount}` },
+                  { label: 'Tutor rating', value: tutor.rating?.toFixed(1) || '0.0' },
+                ].map(row => (
+                  <div key={row.label} className="flex items-center justify-between p-4 bg-white rounded-2xl border border-slate-200">
+                    <span className="text-xs font-black text-slate-500 uppercase tracking-wider">{row.label}</span>
+                    <span className="text-sm font-black text-slate-900 text-right">{row.value}</span>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
