@@ -9,6 +9,7 @@ import {
   Star
 } from 'lucide-react';
 import { CalendarView } from '../../common/CalendarView';
+import { TutorHistoryView } from './TutorHistoryView';
 import { slotsToActivities } from '../../../lib/planner';
 import { useScrollLock } from '../../../hooks/useScrollLock';
 
@@ -20,7 +21,9 @@ interface HomeTabProps {
 export const HomeTab: React.FC<HomeTabProps> = ({ tutor, onNavigateTab }) => {
   const { timetable, settings, plannerReminders, addPlannerReminder, removePlannerReminder, updatePlannerReminder } = useApp();
   const [showSchedule, setShowSchedule] = useState(false);
+  const [showRatings, setShowRatings] = useState(false);
   useScrollLock(showSchedule);
+  useScrollLock(showRatings);
 
   // Filter classes for this tutor
   const myClasses = timetable.filter(slot =>
@@ -65,6 +68,19 @@ export const HomeTab: React.FC<HomeTabProps> = ({ tutor, onNavigateTab }) => {
     const d = new Date(c.date + 'T00:00:00');
     return d >= weekRange.monday && d <= weekRange.sunday;
   }).length;
+
+  // The next class still ahead of us today
+  const nextClass = todayClasses.find(c => {
+    const start = c.startTime || (c.time || '').split(' - ')[0];
+    if (!start || !start.includes(':')) return false;
+    const [h, m] = start.split(':').map(Number);
+    const t = new Date();
+    t.setHours(h, m || 0, 0, 0);
+    return t.getTime() >= now.getTime() - 5 * 60 * 1000;
+  });
+
+  // Classes still awaiting the tutor's consent
+  const pendingCount = myClasses.filter(c => c.status === 'pending_tutor_consent').length;
 
   const formatTimeAMPM = (time: string) => {
     if (!time) return '';
@@ -125,18 +141,60 @@ export const HomeTab: React.FC<HomeTabProps> = ({ tutor, onNavigateTab }) => {
           <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Classes This Week</p>
         </button>
 
-        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs group hover:scale-[1.02] transition-all">
+        <button
+          onClick={() => setShowRatings(true)}
+          className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs text-left group hover:scale-[1.02] hover:border-amber-300 transition-all cursor-pointer"
+        >
           <div className="flex items-center justify-between mb-3">
             <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center">
               <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
             </div>
+            <ChevronRight className="w-3.5 h-3.5 text-slate-300" />
           </div>
           <p className="text-3xl font-black tracking-tighter text-slate-900">{tutor.rating?.toFixed(1) || '0.0'}</p>
           <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">Tutor Rating</p>
-        </div>
+        </button>
       </div>
 
-      {/* 3. Dynamic Classes Preview */}
+      {/* 3. Next Class Banner */}
+      {nextClass && (
+        <button
+          onClick={() => onNavigateTab('classes')}
+          className="w-full flex items-center justify-between p-4 bg-slate-900 rounded-2xl text-white shadow-lg group hover:scale-[1.01] transition-all"
+        >
+          <div className="flex items-center space-x-3.5 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
+              <Clock className="w-5 h-5 text-white/80" />
+            </div>
+            <div className="text-left min-w-0">
+              <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Next Class Today</p>
+              <p className="text-sm font-black truncate">
+                {nextClass.subject} · {formatTimeAMPM(nextClass.startTime || nextClass.time.split(' - ')[0])}
+              </p>
+            </div>
+          </div>
+          <ChevronRight className="w-5 h-5 text-white/40 group-hover:text-white group-hover:translate-x-1 transition-all shrink-0" />
+        </button>
+      )}
+
+      {/* 4. Consent needed banner */}
+      {pendingCount > 0 && (
+        <button
+          onClick={() => onNavigateTab('classes')}
+          className="w-full flex items-center justify-between p-4 bg-amber-50 border border-amber-200 rounded-2xl group hover:scale-[1.01] transition-all"
+        >
+          <div className="flex items-center space-x-3 min-w-0">
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
+            <div className="text-left min-w-0">
+              <p className="text-sm font-black text-amber-900">{pendingCount} {pendingCount === 1 ? 'class' : 'classes'} awaiting your consent</p>
+              <p className="text-[10px] font-bold text-amber-700">Review the schedule and confirm</p>
+            </div>
+          </div>
+          <ChevronRight className="w-5 h-5 text-amber-400 group-hover:translate-x-1 transition-all shrink-0" />
+        </button>
+      )}
+
+      {/* 5. Dynamic Classes Preview */}
       <div className="space-y-4">
         <div className="flex items-center justify-between px-1">
           <h3 className="font-black text-slate-900 text-sm uppercase tracking-wider">{classSectionTitle}</h3>
@@ -223,6 +281,22 @@ export const HomeTab: React.FC<HomeTabProps> = ({ tutor, onNavigateTab }) => {
         onRemoveActivity={removePlannerReminder}
         onEditActivity={updatePlannerReminder}
       />
+
+      {/* 6. Tutor Ratings splash: the full history opens as a bottom sheet */}
+      <style>{`@keyframes tosSheetUp{from{transform:translateY(100%)}to{transform:translateY(0)}}.tos-sheet-up{animation:tosSheetUp .28s cubic-bezier(.22,1,.36,1)}`}</style>
+      {showRatings && (
+        <div className="fixed inset-0 z-[70]">
+          <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" onClick={() => setShowRatings(false)} />
+          <div className="absolute bottom-0 left-0 right-0 top-[8vh]">
+            <div className="h-full max-w-md mx-auto bg-white rounded-t-[28px] overflow-hidden shadow-2xl tos-sheet-up flex flex-col">
+              <div className="w-10 h-1 rounded-full bg-slate-300 mx-auto mt-2.5 shrink-0" />
+              <div className="flex-1 overflow-y-auto">
+                <TutorHistoryView tutor={tutor} onBack={() => setShowRatings(false)} />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

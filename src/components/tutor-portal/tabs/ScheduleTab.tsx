@@ -13,12 +13,11 @@ import {
   User,
   GraduationCap,
   Bell,
-  History
 } from 'lucide-react';
 import { ModernSelect } from '../../ui/ModernSelect';
 import { TimetableSlot, Tutor, Student } from '../../../types';
 import { useScrollLock } from '../../../hooks/useScrollLock';
-import { TutorHistoryView } from './TutorHistoryView';
+import { StudyMaterialsSection } from '../../student-portal/tabs/classes/StudyMaterialsSection';
 
 interface ScheduleTabProps {
   tutor: Tutor;
@@ -26,7 +25,7 @@ interface ScheduleTabProps {
 
 export const ScheduleTab: React.FC<ScheduleTabProps> = ({ tutor }) => {
   const { timetable, programmes, settings, consentToTimetableSlot, updateTimetableSlot, students, plannerReminders, addPlannerReminder, removePlannerReminder, updatePlannerReminder } = useApp();
-  const [showPastClasses, setShowPastClasses] = useState(false);
+  const [activeSection, setActiveSection] = useState<'classes' | 'materials'>('classes');
   const [selectedDay, setSelectedDay] = useState<'All' | string>('All');
   const [selectedStatus, setSelectedStatus] = useState<string>('All');
   
@@ -91,6 +90,16 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({ tutor }) => {
   const activeClasses = myClasses.filter(c => c.status === 'active' || !c.status || c.status === 'postponed');
 
   const daysList = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+  const tutorSubjects = React.useMemo(() => {
+    const set = new Set<string>(tutor.subjects || []);
+    (timetable || []).forEach(slot => {
+      if (slot.tutorId === tutor.id || (slot.tutorName && slot.tutorName.toLowerCase() === tutor.name.toLowerCase())) {
+        set.add(slot.subject);
+      }
+    });
+    return Array.from(set);
+  }, [timetable, tutor.id, tutor.name, tutor.subjects]);
 
   const formatTimeAMPM = (time: string) => {
     if (!time) return '';
@@ -182,33 +191,41 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({ tutor }) => {
     }
   };
 
-  if (showPastClasses) {
-    return <TutorHistoryView tutor={tutor} onBack={() => setShowPastClasses(false)} />;
-  }
-
   return (
     <div className="p-5 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex items-center space-x-3">
-        <div className="w-12 h-12 rounded-2xl bg-orange-500 text-white flex items-center justify-center shadow-lg shadow-orange-200 shrink-0">
-          <Calendar className="w-6 h-6" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <h2 className="text-2xl font-black text-slate-900 tracking-tight">My Classes</h2>
-          <p className="text-[11px] text-slate-500 font-bold uppercase tracking-wider">{settings.academicSession} Schedule</p>
-        </div>
-        
-        {/* Past Classes Button (Upper right corner) */}
+      {/* 1. Switch at top: "My Classes | Study Materials" */}
+      <div className="bg-white rounded-[14px] p-1 border border-slate-200 shadow-xs grid grid-cols-2 gap-1">
         <button
           type="button"
-          onClick={() => setShowPastClasses(true)}
-          className="px-3.5 py-2 bg-slate-900 hover:bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] font-extrabold text-xs rounded-xl flex items-center space-x-1.5 shadow-sm active:scale-95 transition-all cursor-pointer shrink-0"
-          title="View Past Classes and Ratings History"
+          onClick={() => setActiveSection('classes')}
+          className={`h-10 rounded-[10px] text-xs font-extrabold transition-all flex items-center justify-center cursor-pointer ${
+            activeSection === 'classes'
+              ? 'bg-[var(--brand,#0F172A)] text-[var(--on-brand,#fff)] shadow-xs'
+              : 'text-slate-500 hover:text-slate-900'
+          }`}
         >
-          <History className="w-4 h-4 text-orange-500" />
-          <span>Past Classes</span>
+          My Classes
         </button>
 
+        <button
+          type="button"
+          onClick={() => setActiveSection('materials')}
+          className={`h-10 rounded-[10px] text-xs font-extrabold transition-all flex items-center justify-center cursor-pointer ${
+            activeSection === 'materials'
+              ? 'bg-[var(--brand,#0F172A)] text-[var(--on-brand,#fff)] shadow-xs'
+              : 'text-slate-500 hover:text-slate-900'
+          }`}
+        >
+          Study Materials
+        </button>
       </div>
+
+      {activeSection === 'materials' ? (
+        <StudyMaterialsSection
+          student={{ id: tutor.id, name: tutor.name, subjects: tutorSubjects } as Student}
+        />
+      ) : (
+        <>
 
       {/* Status Filter Pills (All Exam filter removed per user instructions) */}
       <div className="bg-white p-1.5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between overflow-hidden">
@@ -416,6 +433,9 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({ tutor }) => {
             );
           })}
         </div>
+      )}
+
+        </>
       )}
 
       {viewingSession && (() => {
