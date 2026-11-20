@@ -23,6 +23,7 @@ import {
   Building,
   ShieldAlert,
 } from 'lucide-react';
+import { getAuth } from 'firebase/auth';
 import { ModernSelect } from '../ui/ModernSelect';
 import { ConfirmationModal } from '../common/ConfirmationModal';
 
@@ -100,7 +101,7 @@ const getRoleInfo = (role: string) => {
 };
 
 export const StaffRolesManager: React.FC = () => {
-  const { addToast, admins, addAdmin, deleteAdmin, toggleAdminSuspend, activeUser } = useApp();
+  const { addToast, admins, deleteAdmin, toggleAdminSuspend, activeUser, activeCentreId } = useApp();
 
   const [selectedRoleFilter, setSelectedRoleFilter] = useState<string>('All');
   const [search, setSearch] = useState('');
@@ -117,30 +118,7 @@ export const StaffRolesManager: React.FC = () => {
     email: '',
     phone: '',
     role: 'Tutor' as StaffRole,
-    tempPassword: '',
   });
-
-  const generatePassword = () => {
-    const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
-    const lower = 'abcdefghijkmnopqrstuvwxyz';
-    const numbers = '23456789';
-    const special = '!@#$%&*';
-    const all = upper + lower + numbers + special;
-    
-    let pass = '';
-    pass += upper.charAt(Math.floor(Math.random() * upper.length));
-    pass += lower.charAt(Math.floor(Math.random() * lower.length));
-    pass += numbers.charAt(Math.floor(Math.random() * numbers.length));
-    pass += special.charAt(Math.floor(Math.random() * special.length));
-    
-    for (let i = 0; i < 6; i++) {
-      pass += all.charAt(Math.floor(Math.random() * all.length));
-    }
-    
-    // Shuffle
-    const shuffled = pass.split('').sort(() => 0.5 - Math.random()).join('');
-    setFormData(prev => ({ ...prev, tempPassword: shuffled }));
-  };
 
   const filteredStaff = (admins || []).filter((s) => {
     const matchesRole = selectedRoleFilter === 'All' || s.role === selectedRoleFilter;
@@ -154,29 +132,28 @@ export const StaffRolesManager: React.FC = () => {
 
   const handleCreateStaff = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name || !formData.email || !formData.tempPassword) {
-      if (!formData.tempPassword) {
-        addToast({ type: 'error', title: 'Missing Password', description: 'Please generate a temporary password first.' });
-      }
-      return;
-    }
+    if (!formData.name || !formData.email) return;
 
     setIsInviting(true);
     const cleanEmail = formData.email.trim().toLowerCase();
 
     try {
-      // Use AppContext's addAdmin for persistence
-      await addAdmin({
-        name: formData.name,
-        email: cleanEmail,
-        phone: formData.phone || '+234 800 000 0000',
-        role: formData.role,
-        status: 'Invited',
-        department: 'General',
-        jobTitle: formData.role,
-        temporaryPassword: formData.tempPassword,
-        hasChangedPassword: false,
+      // The server generates the temporary password and emails it; nobody
+      // here sees or stores a password.
+      const token = (await getAuth().currentUser?.getIdToken()) || '';
+      const res = await fetch('/api/centre/staff/invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          centreId: activeCentreId,
+          name: formData.name,
+          email: cleanEmail,
+          phone: formData.phone,
+          role: formData.role,
+        }),
       });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || 'Could not send the invitation.');
 
       setShowAddModal(false);
       setFormData({
@@ -184,10 +161,18 @@ export const StaffRolesManager: React.FC = () => {
         email: '',
         phone: '',
         role: 'Tutor',
-        tempPassword: '',
       });
-    } catch (err) {
-      console.error(err);
+      addToast({
+        type: 'success',
+        title: 'Invite Sent',
+        description: `${formData.name} will receive their login details by email.`,
+      });
+    } catch (err: any) {
+      addToast({
+        type: 'error',
+        title: 'Invitation Failed',
+        description: err?.message || 'Could not send the invitation.',
+      });
     } finally {
       setIsInviting(false);
     }
@@ -429,27 +414,6 @@ export const StaffRolesManager: React.FC = () => {
                       { value: 'Super Admin', label: 'Super Admin' },
                     ]}
                   />
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Temporary Password *</label>
-                <div className="flex space-x-2">
-                  <input
-                    type="text"
-                    readOnly
-                    value={formData.tempPassword}
-                    placeholder="Click generate"
-                    className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-900 outline-none font-mono tracking-wider"
-                  />
-                  <button
-                    type="button"
-                    onClick={generatePassword}
-                    className="px-3 py-2 bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] rounded-lg hover:brightness-110 transition-colors flex items-center space-x-1"
-                  >
-                    <KeyRound className="w-3.5 h-3.5" />
-                    <span>Generate</span>
-                  </button>
                 </div>
               </div>
 

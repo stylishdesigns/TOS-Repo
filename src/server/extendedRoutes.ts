@@ -11,6 +11,7 @@ import {
   requireMembership,
 } from './tenantService';
 import {
+  buildStaffInviteEmail,
   buildVerificationEmail,
   emailProviderConfigured,
   sendEmail,
@@ -1020,6 +1021,108 @@ export function registerExtendedRoutes(app: express.Express): void {
       if (error?.status) return res.status(error.status).json({ error: error.message });
       console.error('[access-code] regenerate failed:', error?.message || error);
       res.status(500).json({ error: 'Could not regenerate the access code.' });
+    }
+  });
+
+  // ==========================================================================
+  // CENTRE: staff invitations. The temporary password is generated on the
+  // server and only ever emailed to the invitee; the admin who invites never
+  // sees it, and it is never stored anywhere.
+  // ==========================================================================
+  app.post('/api/centre/staff/invite', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const centreId = String(req.body?.centreId || '');
+      if (!centreId) return res.status(400).json({ error: 'centreId is required.' });
+      await requireMembership(caller, centreId, ['owner', 'admin']);
+
+      const name = String(req.body?.name || '').trim().slice(0, 120);
+      const email = normalizeEmail(String(req.body?.email || ''));
+      const phone = String(req.body?.phone || '').trim().slice(0, 40);
+      const role = String(req.body?.role || '').trim();
+      const allowedRoles = ['Tutor', 'Facility Admin', 'Admin Secretary', 'Finance Admin', 'Super Admin'];
+      if (!name) return res.status(400).json({ error: 'The name is required.' });
+      if (!email || !email.includes('@')) return res.status(400).json({ error: 'A valid email address is required.' });
+      if (!allowedRoles.includes(role)) return res.status(400).json({ error: 'Unknown role.' });
+
+      const cDoc = await adminDb.collection('centres').doc(centreId).get();
+      if (!cDoc.exists) return res.status(404).json({ error: 'Facility not found.' });
+      const centreName = String((cDoc.data() as any)?.name || 'your facility');
+      const accessCode = String((cDoc.data() as any)?.accessCode || '');
+
+      for (const coll of ['admins', 'tutors']) {
+        const dup = await adminDb.collection(coll)
+          .where('centreId', '==', centreId)
+          .where('email', '==', email)
+          .limit(1)
+          .get();
+        if (!dup.empty) return res.status(409).json({ error: `${email} is already on this facility's staff list.` });
+      }
+      try {
+        await adminAuth.getUserByEmail(email);
+        return res.status(409).json({ error: `The email ${email} already has a Tutorial OS account.` });
+      } catch {
+        // No account with that email yet: good, carry on.
+      }
+
+      const tempPassword = crypto.randomBytes(12).toString('base64url');
+      const authUser = await adminAuth.createUser({ email, password: tempPassword, displayName: name });
+
+      const isTutor = role === 'Tutor';
+      const doc: Record<string, any> = {
+        id: authUser.uid,
+        name,
+        email,
+        phone,
+        role,
+        status: 'Invited',
+        temporaryPassword: null,
+        hasChangedPassword: false,
+        createdAt: new Date().toISOString(),
+        centreId,
+      };
+      if (isTutor) {
+        doc.subjects = Array.isArray(req.body?.subjects) ? req.body.subjects.map((x: any) => String(x)).slice(0, 20) : ['General Studies'];
+        doc.departments = Array.isArray(req.body?.departments) ? req.body.departments.map((x: any) => String(x)).slice(0, 5) : ['Science'];
+        doc.examTypes = Array.isArray(req.body?.examTypes) ? req.body.examTypes.map((x: any) => String(x)).slice(0, 10) : [];
+        doc.bio = String(req.body?.bio || '').slice(0, 600);
+        doc.programmeIds = Array.isArray(req.body?.programmeIds) ? req.body.programmeIds.map((x: any) => String(x)).slice(0, 10) : [];
+        doc.rating = 0;
+        doc.totalClassesTaught = 0;
+        doc.ratePerHour = 3500;
+        doc.avatar = '';
+      } else {
+        doc.department = 'General';
+        doc.jobTitle = role;
+      }
+
+      const emailRes = await sendEmail(buildStaffInviteEmail({
+        to: email,
+        fullName: name,
+        centreName,
+        role,
+        loginEmail: email,
+        tempPassword,
+        accessCode,
+        appUrl: baseUrl(req),
+      }));
+      if (!emailRes.delivered) {
+        // Without the email there is no way in, so undo the account entirely
+        // rather than leave anyone stranded without a password.
+        await adminAuth.deleteUser(authUser.uid).catch(() => undefined);
+        return res.status(502).json({ error: 'The welcome email could not be sent, so nobody was invited. Please try again.' });
+      }
+      await adminDb.collection(isTutor ? 'tutors' : 'admins').doc(authUser.uid).set(doc);
+      await audit({ actorUid: caller.uid, centreId, action: 'STAFF_INVITED', after: { email, role, collection: isTutor ? 'tutors' : 'admins' } });
+      res.json({ success: true, emailDelivered: true });
+    } catch (error: any) {
+      if (error?.status) return res.status(error.status).json({ error: error.message });
+      const code = String(error?.code || error?.errorInfo?.code || '');
+      if (code.includes('email-already-exists') || code.includes('email-already-in-use')) {
+        return res.status(409).json({ error: 'That email already has a Tutorial OS account.' });
+      }
+      console.error('[staff invite] failed:', error?.message || error);
+      res.status(500).json({ error: 'Could not send the invitation.' });
     }
   });
 
