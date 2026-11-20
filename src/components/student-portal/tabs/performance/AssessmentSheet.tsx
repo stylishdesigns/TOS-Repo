@@ -236,7 +236,7 @@ export const AssessmentSheet: React.FC<AssessmentSheetProps> = ({
               onClick={() => {
                 onReviewAnswers?.(result);
               }}
-              className="w-full min-h-[44px] px-4 py-3 rounded-2xl bg-slate-900 hover:brightness-110 active:scale-98 text-white font-extrabold text-xs shadow-xs transition-all inline-flex items-center justify-center space-x-2 cursor-pointer"
+              className="w-full min-h-[44px] px-4 py-3 rounded-2xl bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] hover:brightness-110 active:scale-98 font-extrabold text-xs shadow-xs transition-all inline-flex items-center justify-center space-x-2 cursor-pointer"
             >
               <BookOpen className="w-4 h-4 text-orange-400" />
               <span>Review My Answers</span>

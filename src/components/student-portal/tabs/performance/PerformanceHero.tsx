@@ -67,15 +67,9 @@ export const PerformanceHero: React.FC<PerformanceHeroProps> = ({ stats }) => {
   const hasBenchmark = aboveClassAvg.totalWithBenchmark > 0;
 
   return (
-    <div
-      style={{
-        background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 55%, #0B1224 100%)',
-        boxShadow: '0 8px 24px rgba(2, 6, 23, 0.18)',
-      }}
-      className="rounded-[20px] p-5 border border-[#334155] text-white"
-    >
+    <div className="rounded-[20px] p-5 border border-slate-200 bg-white shadow-2xs">
       {/* Eyebrow Label */}
-      <span className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#CBD5E1] block mb-1">
+      <span className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-slate-400 block mb-1">
         OVERALL AVERAGE
       </span>
 
@@ -83,10 +77,10 @@ export const PerformanceHero: React.FC<PerformanceHeroProps> = ({ stats }) => {
       <div className="flex items-center justify-between gap-3">
         {/* Number with Orange % */}
         <div className="flex items-baseline tracking-[-0.03em]">
-          <span className="text-[56px] leading-none font-extrabold tabular-nums text-white">
+          <span className="text-[56px] leading-none font-extrabold tabular-nums text-slate-900">
             {meanPercent}
           </span>
-          <span className="text-[24px] leading-none font-extrabold text-orange-300 ml-0.5">
+          <span className="text-[24px] leading-none font-extrabold text-[var(--brand,#EA580C)] ml-0.5">
             %
           </span>
         </div>
@@ -131,9 +125,9 @@ export const PerformanceHero: React.FC<PerformanceHeroProps> = ({ stats }) => {
       {/* Sparkline or Thin Data Box */}
       <div className="mt-4">
         {isThinData ? (
-          <div className="rounded-[14px] p-4 border border-dashed border-white/20 bg-white/[0.06] flex items-center justify-center space-x-2.5">
+          <div className="rounded-[14px] p-4 border border-dashed border-slate-200 bg-slate-50 flex items-center justify-center space-x-2.5">
             <span className="w-2 h-2 rounded-full bg-orange-400 shrink-0" />
-            <span className="text-xs font-medium text-slate-300">
+            <span className="text-xs font-medium text-slate-500">
               Take one more assessment and your trend line will appear here.
             </span>
           </div>
@@ -148,8 +142,8 @@ export const PerformanceHero: React.FC<PerformanceHeroProps> = ({ stats }) => {
             >
               <defs>
                 <linearGradient id="heroAreaGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#FB923C" stopOpacity="0.35" />
-                  <stop offset="100%" stopColor="#FB923C" stopOpacity="0.0" />
+                  <stop offset="0%" style={{ stopColor: 'var(--brand, #EA580C)' }} stopOpacity="0.35" />
+                  <stop offset="100%" style={{ stopColor: 'var(--brand, #EA580C)' }} stopOpacity="0.0" />
                 </linearGradient>
               </defs>
 
@@ -160,7 +154,7 @@ export const PerformanceHero: React.FC<PerformanceHeroProps> = ({ stats }) => {
               {points.length > 1 && (
                 <polyline
                   fill="none"
-                  stroke="#FB923C"
+                  style={{ stroke: 'var(--brand, #EA580C)' }}
                   strokeWidth="2.5"
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -175,25 +169,25 @@ export const PerformanceHero: React.FC<PerformanceHeroProps> = ({ stats }) => {
                   cx={p.x}
                   cy={p.y}
                   r="2.5"
-                  fill="#FB923C"
+                  style={{ fill: 'var(--brand, #EA580C)' }}
                 />
               ))}
 
-              {/* Last point larger: r=5, filled orange with #0F172A ring */}
+              {/* Last point larger: r=5, filled facility colour with white ring */}
               {points.length > 0 && (
                 <circle
                   cx={points[points.length - 1].x}
                   cy={points[points.length - 1].y}
                   r="5"
-                  fill="#FB923C"
-                  stroke="#0F172A"
+                  style={{ fill: 'var(--brand, #EA580C)' }}
+                  stroke="#ffffff"
                   strokeWidth="2"
                 />
               )}
             </svg>
 
             {/* Dates under sparkline */}
-            <div className="flex items-center justify-between text-[10px] font-semibold text-[#94A3B8] px-1 font-mono">
+            <div className="flex items-center justify-between text-[10px] font-semibold text-slate-400 px-1 font-mono">
               <span>{formatDate(firstDate)}</span>
               <span>{formatDate(lastDate)}</span>
             </div>
@@ -203,32 +197,32 @@ export const PerformanceHero: React.FC<PerformanceHeroProps> = ({ stats }) => {
 
       {/* Stats Row: 3 equal columns */}
       <div
-        style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}
+        style={{ borderTop: '1px solid rgba(100, 116, 139, 0.18)' }}
         className="grid grid-cols-3 text-center pt-[14px] mt-4"
       >
         <div>
-          <span className="text-[18px] leading-tight font-extrabold text-white tabular-nums block">
+          <span className="text-[18px] leading-tight font-extrabold text-slate-900 tabular-nums block">
             {count}
           </span>
-          <span className="text-[10px] font-semibold text-[#94A3B8] block mt-0.5">
+          <span className="text-[10px] font-semibold text-slate-400 block mt-0.5">
             Assessments
           </span>
         </div>
 
         <div>
-          <span className="text-[18px] leading-tight font-extrabold text-white tabular-nums block">
+          <span className="text-[18px] leading-tight font-extrabold text-slate-900 tabular-nums block">
             {bestScore}%
           </span>
-          <span className="text-[10px] font-semibold text-[#94A3B8] block mt-0.5">
+          <span className="text-[10px] font-semibold text-slate-400 block mt-0.5">
             Best score
           </span>
         </div>
 
         <div>
-          <span className="text-[18px] leading-tight font-extrabold text-white tabular-nums block">
+          <span className="text-[18px] leading-tight font-extrabold text-slate-900 tabular-nums block">
             {hasBenchmark ? `${aboveClassAvg.count} of ${aboveClassAvg.totalWithBenchmark}` : '—'}
           </span>
-          <span className="text-[10px] font-semibold text-[#94A3B8] block mt-0.5 truncate">
+          <span className="text-[10px] font-semibold text-slate-400 block mt-0.5 truncate">
             Above class avg
           </span>
         </div>
