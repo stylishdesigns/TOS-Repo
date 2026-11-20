@@ -183,6 +183,10 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
   // checked out it freezes at that moment instead of ticking on.
   const chipTime = (clockedOutAt || currentTime).toLocaleTimeString('en-GB', { hour12: false, hour: '2-digit', minute: '2-digit' });
   const isLate = clockedInAt && (clockedInAt.getHours() * 60 + clockedInAt.getMinutes()) > lateMinutesThreshold;
+  // The student has not checked in and the late gate has passed: nudge them
+  // from inside the Attendance Check card (the old red header pill is gone).
+  const isRunningLate = !clockedInAt && !clockedOutAt && currentMinutes > lateMinutesThreshold;
+
 
   const handleClockInAction = () => {
     clockIn(student.id);
@@ -271,6 +275,27 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
           </div>
         )}
 
+        {isRunningLate && (
+          <button
+            type="button"
+            onClick={handleClockInAction}
+            className="w-full flex items-center gap-3 text-left p-3 rounded-xl bg-amber-50 border border-amber-200 mb-3 cursor-pointer hover:bg-amber-100/70 transition-colors"
+          >
+            <span className="w-8 h-8 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
+              <Clock className="w-4 h-4 text-amber-600" />
+            </span>
+            <span className="flex-1 min-w-0">
+              <span className="block text-[11px] font-black text-amber-900 leading-tight">You haven't checked in yet</span>
+              <span className="block text-[10px] text-amber-700 font-medium leading-snug mt-0.5">
+                It's past the late gate, {attendanceSettings.lateArrivalTime || '08:30 AM'}. Tap to check in.
+              </span>
+            </span>
+            <span className="shrink-0 px-2.5 py-1 rounded-full bg-amber-100 border border-amber-200 text-[9px] font-black uppercase tracking-wider text-amber-700">
+              Running late
+            </span>
+          </button>
+        )}
+
         {isLate && !clockedOutAt && (
           <span className="self-center mb-1 px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 text-[9px] font-black uppercase tracking-wider">Late Arrival</span>
         )}
@@ -286,7 +311,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
               onClick={handleClockInAction}
               disabled={!!clockedInAt}
               aria-label="Check In"
-              className={`w-14 h-14 rounded-full flex items-center justify-center text-white shadow-md transition-all ${clockedInAt ? 'bg-emerald-600 opacity-60 cursor-not-allowed' : 'bg-emerald-600 hover:brightness-110 active:scale-95'}`}
+              className={`w-14 h-14 rounded-full flex items-center justify-center text-white shadow-md transition-all ${clockedInAt ? 'bg-emerald-600 opacity-60 cursor-not-allowed' : `bg-emerald-600 hover:brightness-110 active:scale-95 ${isRunningLate ? 'checkin-breathe' : ''}`}`}
             >
               <LogIn className="w-6 h-6" />
             </button>

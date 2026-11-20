@@ -54,11 +54,12 @@ export interface PushSweepResult {
   failed: number;
   cleaned: number;
   gaveUp: number;
+  skippedLate: number;
 }
 
 /** Send every queued planner reminder whose time has arrived. */
 export async function runPushSweep(opts: { limit?: number } = {}): Promise<PushSweepResult> {
-  const out: PushSweepResult = { checked: 0, delivered: 0, failed: 0, cleaned: 0, gaveUp: 0 };
+  const out: PushSweepResult = { checked: 0, delivered: 0, failed: 0, cleaned: 0, gaveUp: 0, skippedLate: 0 };
   const privateKey = process.env.WEB_PUSH_PRIVATE_KEY || '';
   if (!privateKey) {
     out.reason = 'WEB_PUSH_PRIVATE_KEY is not set yet in Netlify environment variables';
@@ -97,6 +98,20 @@ export async function runPushSweep(opts: { limit?: number } = {}): Promise<PushS
 
   for (const job of snap.docs) {
     const v = job.data() as any;
+    // A planner reminder whose moment passed while its job sat unsent (the app
+    // was closed, the sweep hit its limit) must never arrive late: the job is
+    // closed instead of sent. The 15-minute grace just covers the sweep's own
+    // 10-minute cadence. Fee-reminder jobs are exempt; the fee sweep controls
+    // their timing with its own due-date windows.
+    const isPlannerJob = v.kind !== 'fee_reminder';
+    if (isPlannerJob && Number(v.sendAt || 0) < now - 15 * 60 * 1000) {
+      await job.ref.set(
+        { sent: true, sentAt: now, delivered: 0, note: 'reminder time already passed; not sent late' },
+        { merge: true },
+      );
+      out.skippedLate += 1;
+      continue;
+    }
     const uid = String(v.uid || '');
     if (!uid) {
       await job.ref.set({ sent: true, sentAt: now, note: 'job had no owner' }, { merge: true });

@@ -477,3 +477,11 @@ span.text-slate-600:not(.dark-bg-mode *) {
    today carries any activity; the ring follows the facility brand colour. */
 @keyframes plannerBlink{0%,100%{box-shadow:0 0 0 0 color-mix(in oklab,var(--brand,#EA580C) 0%,transparent)}50%{box-shadow:0 0 0 3px color-mix(in oklab,var(--brand,#EA580C) 45%,transparent)}}
 .planner-blink{animation:plannerBlink 1.6s ease-in-out infinite}
+
+/* Check In button breathes gently while the student is running late (the old
+   red header pill is gone; the nudge now lives in the Attendance Check card). */
+@keyframes checkinBreathe {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.45); }
+  50% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0.12); }
+}
+.checkin-breathe { animation: checkinBreathe 1.8s ease-in-out infinite; }

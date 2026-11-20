@@ -20,6 +20,9 @@ import {
   FileText,
   Eye,
   Banknote,
+  Mail,
+  BellRing,
+  MessageSquare,
 } from 'lucide-react';
 
 export const FinanceManager: React.FC = () => {
@@ -886,90 +889,105 @@ export const FinanceManager: React.FC = () => {
                 })}
               </div>
             ) : tariffModalTab === 'reminders' ? (
-              <div className="py-4 space-y-4 overflow-y-auto flex-1 min-h-0 pr-1 text-xs">
-                <p className="text-[11px] text-slate-500">
+              <div className="py-4 space-y-5 overflow-y-auto flex-1 min-h-0 pr-1">
+                <p className="text-[12px] text-slate-500 leading-relaxed">
                   Students with an outstanding balance are reminded automatically. Nobody sends reminders by hand again.
                 </p>
 
-                <label className="flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-200 bg-slate-50/60 cursor-pointer">
-                  <span>
-                    <span className="block text-xs font-bold text-slate-800">Automatic reminders</span>
-                    <span className="block text-[10px] text-slate-500">Remind students who owe, on the schedule below.</span>
+                {/* Master switch */}
+                <button
+                  type="button"
+                  onClick={() => setRemEnabled(!remEnabled)}
+                  className="w-full flex items-center gap-3 p-4 rounded-xl border border-slate-200 bg-slate-50/60 hover:bg-slate-50 transition-colors text-left cursor-pointer"
+                >
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-[13px] font-bold text-slate-900">Automatic reminders</span>
+                    <span className="block text-[11px] text-slate-500 mt-0.5">Remind every student who owes, on the schedule below.</span>
                   </span>
-                  <input type="checkbox" checked={remEnabled} onChange={(e) => setRemEnabled(e.target.checked)} className="w-4 h-4 accent-orange-600 cursor-pointer shrink-0" />
-                </label>
+                  <span className={`relative w-10 h-[22px] rounded-full transition-colors shrink-0 ${remEnabled ? 'bg-[var(--brand,#EA580C)]' : 'bg-slate-300'}`}>
+                    <span className={`absolute top-[3px] w-4 h-4 rounded-full bg-white shadow-sm transition-all ${remEnabled ? 'left-[21px]' : 'left-[3px]'}`} />
+                  </span>
+                </button>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Remind how early</label>
-                    <ModernSelect
-                      value={String(remDays)}
-                      onChange={(val) => setRemDays(Number(val))}
-                      options={FEE_REMINDER_DAY_OPTIONS.map((o) => ({ value: String(o.value), label: o.label }))}
-                    />
+                {/* Schedule */}
+                <div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Schedule</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Remind how early</label>
+                      <ModernSelect
+                        value={String(remDays)}
+                        onChange={(val) => setRemDays(Number(val))}
+                        options={FEE_REMINDER_DAY_OPTIONS.map((o) => ({ value: String(o.value), label: o.label }))}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Extra sweep</label>
+                      <label className={`flex items-center gap-2.5 p-3 rounded-lg border cursor-pointer transition-colors ${remMonday ? 'border-orange-300 bg-orange-50/60' : 'border-slate-200 bg-white'}`}>
+                        <input type="checkbox" checked={remMonday} onChange={(e) => setRemMonday(e.target.checked)} className="w-4 h-4 accent-orange-600 cursor-pointer shrink-0" />
+                        <span className="text-xs font-semibold text-slate-700">Also remind everyone owing every Monday</span>
+                      </label>
+                    </div>
                   </div>
-                  <label className="flex items-center gap-2 p-2.5 rounded-lg border border-slate-200 bg-white cursor-pointer self-end">
-                    <input type="checkbox" checked={remMonday} onChange={(e) => setRemMonday(e.target.checked)} className="w-4 h-4 accent-orange-600 cursor-pointer shrink-0" />
-                    <span className="text-xs font-semibold text-slate-700">Also remind everyone owing every Monday</span>
-                  </label>
                 </div>
 
+                {/* Channels */}
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">How reminders reach students</label>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    <label className="flex items-center gap-2 p-2.5 rounded-lg border border-slate-200 bg-white cursor-pointer">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Channels</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    <label className={`flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition-colors ${remEmail ? 'border-orange-300 bg-orange-50/60' : 'border-slate-200 bg-white'}`}>
+                      <span className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center shrink-0"><Mail className="w-4 h-4 text-slate-500" /></span>
+                      <span className="flex-1 min-w-0">
+                        <span className="block text-xs font-bold text-slate-900">Email</span>
+                        <span className="block text-[10px] text-slate-500">To the student's email</span>
+                      </span>
                       <input type="checkbox" checked={remEmail} onChange={(e) => setRemEmail(e.target.checked)} className="w-4 h-4 accent-orange-600 cursor-pointer shrink-0" />
-                      <span className="text-xs font-semibold text-slate-700">Email</span>
                     </label>
-                    <label className="flex items-center gap-2 p-2.5 rounded-lg border border-slate-200 bg-white cursor-pointer">
+                    <label className={`flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition-colors ${remPush ? 'border-orange-300 bg-orange-50/60' : 'border-slate-200 bg-white'}`}>
+                      <span className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center shrink-0"><BellRing className="w-4 h-4 text-slate-500" /></span>
+                      <span className="flex-1 min-w-0">
+                        <span className="block text-xs font-bold text-slate-900">Push notification</span>
+                        <span className="block text-[10px] text-slate-500">On their device</span>
+                      </span>
                       <input type="checkbox" checked={remPush} onChange={(e) => setRemPush(e.target.checked)} className="w-4 h-4 accent-orange-600 cursor-pointer shrink-0" />
-                      <span className="text-xs font-semibold text-slate-700">Push notification</span>
                     </label>
-                    <label className="flex items-center gap-2 p-2.5 rounded-lg border border-slate-200 bg-white cursor-pointer">
+                    <label className={`flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition-colors ${remChat ? 'border-orange-300 bg-orange-50/60' : 'border-slate-200 bg-white'}`}>
+                      <span className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center shrink-0"><MessageSquare className="w-4 h-4 text-slate-500" /></span>
+                      <span className="flex-1 min-w-0">
+                        <span className="block text-xs font-bold text-slate-900">In-chat message</span>
+                        <span className="block text-[10px] text-slate-500">Sent as the facility</span>
+                      </span>
                       <input type="checkbox" checked={remChat} onChange={(e) => setRemChat(e.target.checked)} className="w-4 h-4 accent-orange-600 cursor-pointer shrink-0" />
-                      <span className="text-xs font-semibold text-slate-700">In-chat message</span>
                     </label>
                   </div>
-                  <p className="text-[10px] text-slate-400 mt-1">The in-chat message is posted into the student's chat in the facility's name, never as the admin.</p>
+                  <p className="text-[10px] text-slate-400 mt-2">The in-chat message is posted into the student's chat in the facility's name, never as the admin.</p>
                 </div>
 
+                {/* In-chat message */}
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">In-chat message</label>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">In-chat message</p>
                   <textarea
                     value={remTemplate}
                     onChange={(e) => setRemTemplate(e.target.value)}
                     rows={3}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-medium bg-white focus:border-orange-500 outline-none resize-none"
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-medium bg-white leading-relaxed focus:border-orange-500 outline-none resize-none"
                   />
-                  <p className="text-[10px] text-slate-400 mt-1">
-                    Placeholders: {'{{student_name}}'}, {'{{facility_name}}'} (filled in automatically), {'{{outstanding_balance}}'}, {'{{next_payment_due}}'}
-                  </p>
-                  <p className="text-[10px] text-slate-500 mt-1 italic">
-                    Preview (sample): {renderChatTemplate(remTemplate, { student_name: 'Sample Student', facility_name: centreName || 'the facility', outstanding_balance: `${settings.currencySymbol}25,000`, next_payment_due: '28 August 2026' })}
-                  </p>
-                </div>
-
-                <div className="flex items-center justify-between pt-3 border-t border-slate-100">
-                  <button
-                    type="button"
-                    disabled={remBusy}
-                    onClick={handleRunReminders}
-                    className="px-3.5 py-2 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 disabled:opacity-50 rounded-lg border border-slate-200 cursor-pointer"
-                  >
-                    {remBusy ? 'Running…' : 'Run reminders now'}
-                  </button>
-                  <button
-                    type="button"
-                    disabled={remSaving}
-                    onClick={handleSaveReminders}
-                    className="px-4 py-2 text-xs font-bold text-[var(--on-brand,#fff)] bg-[var(--brand,#0f172a)] hover:brightness-110 disabled:opacity-50 rounded-lg shadow-sm cursor-pointer"
-                  >
-                    {remSaving ? 'Saving…' : 'Save reminder settings'}
-                  </button>
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {['{{student_name}}', '{{facility_name}}', '{{outstanding_balance}}', '{{next_payment_due}}'].map((ph) => (
+                      <span key={ph} className="font-mono text-[10px] font-semibold bg-orange-50 text-orange-800 border border-orange-200 rounded-md px-2 py-0.5">{ph}</span>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-3">Sample preview, filled in automatically:</p>
+                  <div className="mt-1.5 max-w-[88%] bg-slate-100 rounded-xl rounded-bl-sm px-3.5 py-2.5">
+                    <p className="text-[10px] font-black text-slate-900 mb-1">{centreName || 'The facility'}</p>
+                    <p className="text-[11.5px] text-slate-600 leading-relaxed">
+                      {renderChatTemplate(remTemplate, { student_name: 'Sample Student', facility_name: centreName || 'the facility', outstanding_balance: `${settings.currencySymbol}25,000`, next_payment_due: '28 August' })}
+                    </p>
+                  </div>
                 </div>
               </div>
             ) : (
-              <form onSubmit={handleSaveChannelSettings} className="py-4 space-y-4 overflow-y-auto flex-1 min-h-0 pr-1 text-xs">
+              <form id="tos-channel-settings-form" onSubmit={handleSaveChannelSettings}>
                 <div className="p-3.5 bg-blue-50/70 border border-blue-200/80 rounded-xl space-y-3">
                   <div className="flex items-center gap-2 text-blue-900 font-bold">
                     <Building2 className="w-4 h-4 text-blue-600" />
@@ -1035,34 +1053,56 @@ export const FinanceManager: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="flex justify-end pt-2">
-                  <button
-                    type="submit"
-                    className="px-4 py-2 text-xs font-bold text-white bg-orange-600 hover:bg-orange-700 rounded-lg shadow-sm transition-all cursor-pointer flex items-center gap-1.5"
-                  >
-                    <Check className="w-4 h-4" />
-                    <span>Save Channel Details & Cash Guide</span>
-                  </button>
-                </div>
               </form>
             )}
 
-            {/* Modal Footer */}
-            <div className="pt-4 border-t border-slate-100 flex items-center justify-between shrink-0">
-              <span className="text-xs text-slate-500">
-                Session: <strong className="text-slate-800">{settings.academicSession}</strong>
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowTariffModal(false);
-                  setEditingProgrammeId(null);
-                }}
-                className="px-4 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
-              >
-                Done
-              </button>
-            </div>
+            {/* Modal Footer: pinned per-tab actions, never scrolling away */}
+            {tariffModalTab === 'reminders' ? (
+              <div className="pt-4 border-t border-slate-100 flex items-center justify-between shrink-0">
+                <button
+                  type="button"
+                  disabled={remBusy}
+                  onClick={handleRunReminders}
+                  className="px-3.5 py-2 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 disabled:opacity-50 rounded-lg border border-slate-200 cursor-pointer"
+                >
+                  {remBusy ? 'Running…' : 'Run reminders now'}
+                </button>
+                <button
+                  type="button"
+                  disabled={remSaving}
+                  onClick={handleSaveReminders}
+                  className="px-4 py-2 text-xs font-bold text-[var(--on-brand,#fff)] bg-[var(--brand,#0f172a)] hover:brightness-110 disabled:opacity-50 rounded-lg shadow-sm cursor-pointer"
+                >
+                  {remSaving ? 'Saving…' : 'Save reminder settings'}
+                </button>
+              </div>
+            ) : tariffModalTab === 'channels' ? (
+              <div className="pt-4 border-t border-slate-100 flex items-center justify-between shrink-0">
+                <span className="text-xs text-slate-500">
+                  Session: <strong className="text-slate-800">{settings.academicSession}</strong>
+                </span>
+                <button
+                  type="submit"
+                  form="tos-channel-settings-form"
+                  className="px-4 py-2 text-xs font-bold text-[var(--on-brand,#fff)] bg-[var(--brand,#0f172a)] hover:brightness-110 rounded-lg shadow-sm cursor-pointer"
+                >
+                  Save Channel Details & Cash Guide
+                </button>
+              </div>
+            ) : (
+              <div className="pt-4 border-t border-slate-100 flex items-center justify-end shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowTariffModal(false);
+                    setEditingProgrammeId(null);
+                  }}
+                  className="px-4 py-2 text-xs font-bold text-[var(--on-brand,#fff)] bg-[var(--brand,#0f172a)] hover:brightness-110 rounded-lg shadow-sm cursor-pointer"
+                >
+                  Done
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

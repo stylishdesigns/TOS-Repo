@@ -573,10 +573,6 @@ export const StudentPortal: React.FC = () => {
 
   const orbBadgeText = orbBadgeLabel(orbUnread);
 
-  const lateMinutesThreshold = parseTime(attendanceSettings.lateArrivalTime || '08:30 AM');
-  const currentMinutes = currentTime.getHours() * 60 + currentTime.getMinutes();
-  const isRunningLate = !todayLog?.clockInAt && currentMinutes > lateMinutesThreshold;
-
   return (
     <div className="h-[100dvh] overflow-hidden bg-slate-50 flex flex-col justify-between selection:bg-orange-500 selection:text-white sm:h-auto sm:min-h-screen sm:overflow-visible">
       {/* 1. Top Desktop Control Bar */}
@@ -588,19 +584,6 @@ export const StudentPortal: React.FC = () => {
               {centreName}
             </span>
           </div>
-
-          {/* Late Notification Animation */}
-          {isRunningLate && (
-            <div
-              onClick={() => { setChatFanOpen(false); setTitoOpen(false); setStatusScreenOpen(false); setActiveTab('home'); }}
-              className="absolute left-1/2 -translate-x-1/2 top-full bg-rose-600 px-4 py-2 rounded-b-2xl shadow-xl border border-white/10 animate-in slide-in-from-top-full duration-700 cursor-pointer flex items-center space-x-2 group active:scale-95"
-            >
-              <div className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
-              <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap">
-                You are Running Late! Clock In Now
-              </span>
-            </div>
-          )}
 
           {/* Right side: notifications (work continues) + install */}
           <div className="flex items-center gap-2">
