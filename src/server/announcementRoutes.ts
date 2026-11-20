@@ -230,8 +230,8 @@ export function registerAnnouncementRoutes(app: express.Express): void {
       const caller = getCaller(req);
       const centreId = cleanStr((req.query.centreId as string) || '', 120);
       if (!centreId) return res.status(400).json({ error: 'A facility id is required.' });
-      await requireMembership(caller, centreId);
-      const role = String((caller as any).role || '');
+      const membership = await requireMembership(caller, centreId);
+      const role = String((membership as any)?.role || '');
       if (!caller.tos && !STAFF_ROLES.includes(role)) {
         return res.status(403).json({ error: 'Only facility staff can view broadcast history.' });
       }
@@ -254,8 +254,8 @@ export function registerAnnouncementRoutes(app: express.Express): void {
       const caller = getCaller(req);
       const centreId = cleanStr(req.body?.centreId, 120);
       if (!centreId) return res.status(400).json({ error: 'A facility id is required.' });
-      await requireMembership(caller, centreId);
-      const role = String((caller as any).role || '');
+      const membership = await requireMembership(caller, centreId);
+      const role = String((membership as any)?.role || '');
       if (!caller.tos && !STAFF_ROLES.includes(role)) {
         return res.status(403).json({ error: 'Only facility staff can send broadcasts.' });
       }
@@ -310,10 +310,12 @@ export function registerAnnouncementRoutes(app: express.Express): void {
   app.post('/api/centre/announcements/send-due', async (req, res) => {
     try {
       const caller = getCaller(req);
-      if (!caller.tos) {
-        const role = String((caller as any).role || '');
-        if (!STAFF_ROLES.includes(role)) {
-          return res.status(403).json({ error: 'Only facility staff can run this.' });
+      const centreId = cleanStr(req.body?.centreId, 120);
+      if (centreId) {
+        const membership = await requireMembership(caller, centreId);
+        const role = String((membership as any)?.role || '');
+        if (!caller.tos && !STAFF_ROLES.includes(role)) {
+          return res.status(403).json({ error: 'Only facility staff can run the broadcast sweep.' });
         }
       }
       const result = await runAnnouncementSweep({ limit: 10 });
