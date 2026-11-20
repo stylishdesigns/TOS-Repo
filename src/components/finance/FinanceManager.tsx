@@ -575,22 +575,15 @@ export const FinanceManager: React.FC = () => {
                     </td>
                     <td className="py-3 px-4 text-right">
                       {pay.status === 'Pending' ? (
-                        <div className="flex items-center justify-end gap-1.5">
+                        <div className="flex items-center justify-end">
                           <button
                             type="button"
                             disabled={busyPaymentId === pay.id}
                             onClick={() => openReview(pay)}
-                            className="px-2.5 py-1 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-md cursor-pointer"
+                            className="px-3 py-1.5 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 disabled:opacity-50 rounded-md border border-slate-200 shadow-xs cursor-pointer flex items-center gap-1"
                           >
-                            Confirm
-                          </button>
-                          <button
-                            type="button"
-                            disabled={busyPaymentId === pay.id}
-                            onClick={() => openReview(pay)}
-                            className="px-2.5 py-1 text-xs font-bold text-rose-700 bg-white hover:bg-rose-50 disabled:opacity-50 rounded-md border border-rose-200 cursor-pointer"
-                          >
-                            Reject
+                            <Eye className="w-3.5 h-3.5 text-slate-400" />
+                            View Details
                           </button>
                         </div>
                       ) : pay.status === 'Rejected' ? (

@@ -97,7 +97,6 @@ export const ExamProgrammesFeesTab: React.FC = () => {
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50/70 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
                 <th className="py-3 px-4">Exam Programme</th>
-                <th className="py-3 px-4">Category</th>
                 <th className="py-3 px-4">Tuition Fee</th>
                 <th className="py-3 px-4">Registration</th>
                 <th className="py-3 px-4">Mock Exam</th>
@@ -113,11 +112,6 @@ export const ExamProgrammesFeesTab: React.FC = () => {
                       <p className="font-bold text-slate-900">{programme.name}</p>
                       <p className="text-[11px] text-slate-400 font-mono">{programme.code}</p>
                     </div>
-                  </td>
-                  <td className="py-3.5 px-4">
-                    <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-100 text-slate-700">
-                      {programme.category}
-                    </span>
                   </td>
                   <td className="py-3.5 px-4 font-bold text-slate-900">
                     ₦{(programme.fee || 0).toLocaleString()}

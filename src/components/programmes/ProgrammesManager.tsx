@@ -41,7 +41,6 @@ export const ProgrammesManager: React.FC = () => {
 
   const [activeSubsection, setActiveSubsection] = useState<ProgrammeSubsection>('Exam Programmes');
 
-  const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [selectedStatus, setSelectedStatus] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
@@ -65,24 +64,17 @@ export const ProgrammesManager: React.FC = () => {
     selectedSubjects: [] as string[],
   });
 
-  const categories: Programme['category'][] = [
-    'JAMB',
-    'WAEC',
-    'NECO',
-    'A-Levels',
-    'SAT / International',
-  ];
-
+  // Programme data still carries a legacy category field, but the UI no longer
+  // shows or asks for it: the exam name is the programme.
   // Filtered programmes
   const filteredProgrammes = (programmes || []).filter((p) => {
-    const matchesCat = selectedCategory === 'All' || p.category === selectedCategory;
     const matchesStatus = selectedStatus === 'All' || p.status === selectedStatus;
     const matchesSearch =
       p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       p.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
       p.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (p.subjects || []).some((s) => s.toLowerCase().includes(searchQuery.toLowerCase()));
-    return matchesCat && matchesStatus && matchesSearch;
+    return matchesStatus && matchesSearch;
   });
 
   // Calculate high-level KPIs
@@ -185,54 +177,6 @@ export const ProgrammesManager: React.FC = () => {
     setShowAddModal(false);
   };
 
-  // Category Badge Colors
-  const getCategoryTheme = (category: Programme['category']) => {
-    switch (category) {
-      case 'JAMB':
-        return {
-          bg: 'bg-orange-50 text-orange-700 border-orange-200',
-          badge: 'bg-orange-600 text-white',
-          border: 'border-orange-500/40',
-          accent: 'text-orange-600',
-        };
-      case 'WAEC':
-        return {
-          bg: 'bg-blue-50 text-blue-700 border-blue-200',
-          badge: 'bg-blue-600 text-white',
-          border: 'border-blue-500/40',
-          accent: 'text-blue-600',
-        };
-      case 'NECO':
-        return {
-          bg: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-          badge: 'bg-emerald-600 text-white',
-          border: 'border-emerald-500/40',
-          accent: 'text-emerald-600',
-        };
-      case 'A-Levels':
-        return {
-          bg: 'bg-purple-50 text-purple-700 border-purple-200',
-          badge: 'bg-purple-600 text-white',
-          border: 'border-purple-500/40',
-          accent: 'text-purple-600',
-        };
-      case 'SAT / International':
-        return {
-          bg: 'bg-sky-50 text-sky-700 border-sky-200',
-          badge: 'bg-sky-600 text-white',
-          border: 'border-sky-500/40',
-          accent: 'text-sky-600',
-        };
-      default:
-        return {
-          bg: 'bg-slate-50 text-slate-700 border-slate-200',
-          badge: 'bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)]',
-          border: 'border-slate-300',
-          accent: 'text-slate-700',
-        };
-    }
-  };
-
   return (
     <div id="academic-programmes-page" className="p-4 sm:p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
       {/* Header Row */}
@@ -317,36 +261,6 @@ export const ProgrammesManager: React.FC = () => {
 
       {/* Filter & Search Bar */}
       <div className="bg-white p-4 rounded-xl border border-slate-200/90 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
-        {/* Category Pills */}
-        <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
-          <button
-            onClick={() => setSelectedCategory('All')}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap ${
-              selectedCategory === 'All'
-                ? 'bg-orange-600 text-white shadow-2xs'
-                : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
-            }`}
-          >
-            All Programmes ({programmes.length})
-          </button>
-          {categories.map((cat) => {
-            const count = programmes.filter((p) => p.category === cat).length;
-            return (
-              <button
-                key={cat}
-                onClick={() => setSelectedCategory(cat)}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap ${
-                  selectedCategory === cat
-                    ? 'bg-orange-600 text-white shadow-2xs'
-                    : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
-                }`}
-              >
-                {cat} ({count})
-              </button>
-            );
-          })}
-        </div>
-
         {/* Search & Status Filter */}
         <div className="flex items-center space-x-2 w-full md:w-auto">
           <ModernSelect
@@ -394,7 +308,6 @@ export const ProgrammesManager: React.FC = () => {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5">
           {filteredProgrammes.map((prog) => {
-            const theme = getCategoryTheme(prog.category);
             const fillRate = Math.min(
               100,
               Math.round(((prog.enrolledStudents || 0) / (prog.maxStudents || 1)) * 100)
@@ -407,12 +320,7 @@ export const ProgrammesManager: React.FC = () => {
               >
                 {/* Top Banner with Exam Tag & Status */}
                 <div className="p-5 pb-4 space-y-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <span
-                      className={`px-2.5 py-1 rounded-md text-[11px] font-bold tracking-wide uppercase border ${theme.bg}`}
-                    >
-                      {prog.category} Programme
-                    </span>
+                  <div className="flex items-center justify-end gap-2">
                     <span
                       className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                         prog.status === 'Active'
@@ -528,13 +436,6 @@ export const ProgrammesManager: React.FC = () => {
             <div className="flex items-start justify-between border-b border-slate-100 pb-4">
               <div>
                 <div className="flex items-center space-x-2">
-                  <span
-                    className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${
-                      getCategoryTheme(inspectingProg.category).bg
-                    }`}
-                  >
-                    {inspectingProg.category} Exam Track
-                  </span>
                   <span className="text-xs font-mono text-slate-400 font-semibold">
                     {inspectingProg.code}
                   </span>
@@ -627,13 +528,6 @@ export const ProgrammesManager: React.FC = () => {
 
             <form onSubmit={handleSaveProgramme} className="mt-4 space-y-3.5 text-xs">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <ModernSelect
-                  label="Exam Category *"
-                  value={formData.category}
-                  onChange={(val) => setFormData({ ...formData, category: val as any })}
-                  options={categories.map(c => ({ value: c, label: c }))}
-                />
-
                 <ModernSelect
                   label="Status"
                   value={formData.status}

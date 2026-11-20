@@ -580,7 +580,7 @@ export const StudentPortal: React.FC = () => {
   return (
     <div className="h-[100dvh] overflow-hidden bg-slate-50 flex flex-col justify-between selection:bg-orange-500 selection:text-white sm:h-auto sm:min-h-screen sm:overflow-visible">
       {/* 1. Top Desktop Control Bar */}
-      <header className="bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] px-4 py-3 z-40 sticky top-0 overflow-hidden shadow-md">
+      <header className="bg-slate-950/95 backdrop-blur-md text-white px-4 py-3 z-40 sticky top-0 overflow-hidden shadow-md border-b border-slate-800">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-3 relative">
           {/* Facility name, dead centre of the header menu, always shown in full */}
           <div className="flex-1 min-w-0 text-center">
