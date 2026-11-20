@@ -1,5 +1,6 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
+import { brandVars } from '../../lib/brand';
 import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
 
 export const ToastContainer: React.FC = () => {
@@ -12,17 +13,9 @@ export const ToastContainer: React.FC = () => {
     <div
       id="toast-notifications-container"
       className="fixed bottom-5 right-3 left-3 sm:left-auto sm:right-5 z-50 flex flex-col gap-2.5 sm:max-w-sm pointer-events-none"
+    style={brandVars(accent)}
     >
       {toasts.map((toast) => {
-        const chipClass =
-          toast.type === 'success'
-            ? 'bg-emerald-50 text-emerald-600'
-            : toast.type === 'error'
-            ? 'bg-rose-50 text-rose-600'
-            : '';
-        const chipStyle =
-          toast.type === 'info' ? { backgroundColor: `${accent}1A`, color: accent } : undefined;
-
         return (
           <div
             key={toast.id}
@@ -31,11 +24,10 @@ export const ToastContainer: React.FC = () => {
             {/* Facility brand accent bar */}
             <span
               aria-hidden="true"
-              className="absolute left-0 top-0 bottom-0 w-1.5"
-              style={{ backgroundColor: accent }}
+              className="absolute left-0 top-0 bottom-0 w-1.5 bg-orange-600"
             />
 
-            <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${chipClass || ''}`} style={chipStyle}>
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-orange-100 text-orange-700">
               {toast.type === 'success' && <CheckCircle2 className="w-5 h-5" />}
               {toast.type === 'error' && <AlertCircle className="w-5 h-5" />}
               {toast.type === 'info' && <Info className="w-5 h-5" />}
