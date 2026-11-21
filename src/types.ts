@@ -165,6 +165,10 @@ export interface Tutor {
   ratePerHour?: number;
   totalClassesTaught?: number;
   programmeIds?: string[];
+  payFrequency?: 'daily' | 'weekly' | 'monthly';
+  payDay?: number;
+  ratePerPeriod?: number;
+  payAmount?: number;
   temporaryPassword?: string;
   hasChangedPassword?: boolean;
   photoUrl?: string;
@@ -424,6 +428,10 @@ export interface AdminUser {
   status: 'Active' | 'Invited' | 'Suspended';
   department: string;
   jobTitle: string;
+  payFrequency?: 'daily' | 'weekly' | 'monthly';
+  payDay?: number;
+  ratePerPeriod?: number;
+  payAmount?: number;
   temporaryPassword?: string;
   hasChangedPassword?: boolean;
 }

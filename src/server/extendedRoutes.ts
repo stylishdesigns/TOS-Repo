@@ -1145,6 +1145,48 @@ export function registerExtendedRoutes(app: express.Express): void {
   // server and only ever emailed to the invitee; the admin who invites never
   // sees it, and it is never stored anywhere.
   // ==========================================================================
+  // CENTRE: staff pay setup. Only owners and admins set how a person is
+  // paid; a tutor's per-class rate is a record of what a class is worth,
+  // never an automatic salary calculation.
+  app.patch('/api/centre/staff/pay', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const centreId = String(req.body?.centreId || '');
+      if (!centreId) return res.status(400).json({ error: 'centreId is required.' });
+      await requireMembership(caller, centreId, ['owner', 'admin']);
+
+      const staffId = String(req.body?.staffId || '').trim();
+      if (!staffId) return res.status(400).json({ error: 'staffId is required.' });
+      const collection = req.body?.collection === 'admins' ? 'admins' : 'tutors';
+      const isTutorDoc = collection === 'tutors';
+
+      const ref = adminDb.collection(collection).doc(staffId);
+      const snap = await ref.get();
+      if (!snap.exists) return res.status(404).json({ error: 'Staff member not found.' });
+      if (String((snap.data() as any)?.centreId || '') !== centreId) {
+        return res.status(403).json({ error: 'This staff member does not belong to your facility.' });
+      }
+
+      const payFrequencyRaw = String(req.body?.payFrequency || '').trim();
+      const payFrequency = ['daily', 'weekly', 'monthly'].includes(payFrequencyRaw) ? payFrequencyRaw : '';
+      const payDayRaw = Number(req.body?.payDay);
+      const ratePerPeriod = Number(req.body?.ratePerPeriod);
+      const payAmount = Number(req.body?.payAmount);
+
+      const update: Record<string, any> = { payUpdatedAt: new Date().toISOString() };
+      update.payFrequency = payFrequency;
+      update.payDay = payFrequency && Number.isFinite(payDayRaw) && payDayRaw >= 0 && payDayRaw <= 28 ? Math.floor(payDayRaw) : null;
+      update.ratePerPeriod = isTutorDoc && payFrequency && Number.isFinite(ratePerPeriod) && ratePerPeriod > 0 ? Math.round(ratePerPeriod) : null;
+      update.payAmount = !isTutorDoc && payFrequency && Number.isFinite(payAmount) && payAmount > 0 ? Math.round(payAmount) : null;
+
+      await ref.set(update, { merge: true });
+      res.json({ ok: true });
+    } catch (error: any) {
+      console.error('[staff pay] failed:', error?.message || error);
+      res.status(error?.status || 500).json({ error: error?.message || 'Could not save the pay setup.' });
+    }
+  });
+
   app.post('/api/centre/staff/invite', async (req, res) => {
     try {
       const caller = getCaller(req);
@@ -1184,6 +1226,12 @@ export function registerExtendedRoutes(app: express.Express): void {
       const tempPassword = crypto.randomBytes(12).toString('base64url');
       const authUser = await adminAuth.createUser({ email, password: tempPassword, displayName: name });
 
+      const payFrequencyRaw = String(req.body?.payFrequency || '').trim();
+      const payFrequency = ['daily', 'weekly', 'monthly'].includes(payFrequencyRaw) ? payFrequencyRaw : '';
+      const payDayRaw = Number(req.body?.payDay);
+      const ratePerPeriod = Number(req.body?.ratePerPeriod);
+      const payAmount = Number(req.body?.payAmount);
+
       const isTutor = role === 'Tutor';
       const doc: Record<string, any> = {
         id: authUser.uid,
@@ -1211,6 +1259,13 @@ export function registerExtendedRoutes(app: express.Express): void {
         doc.department = 'General';
         doc.jobTitle = role;
       }
+
+      if (payFrequency) {
+        doc.payFrequency = payFrequency as any;
+        if (Number.isFinite(payDayRaw) && payDayRaw >= 0 && payDayRaw <= 28) doc.payDay = Math.floor(payDayRaw);
+      }
+      if (isTutor && Number.isFinite(ratePerPeriod) && ratePerPeriod > 0) doc.ratePerPeriod = Math.round(ratePerPeriod);
+      if (!isTutor && Number.isFinite(payAmount) && payAmount > 0) doc.payAmount = Math.round(payAmount);
 
       const emailRes = await sendEmail(buildStaffInviteEmail({
         to: email,

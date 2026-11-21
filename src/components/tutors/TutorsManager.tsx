@@ -21,10 +21,12 @@ import {
   Info,
   CheckCircle2,
   Lock,
+  Pencil,
 } from 'lucide-react';
 import { getAuth } from 'firebase/auth';
 import { ModernSelect } from '../ui/ModernSelect';
 import { ConfirmationModal } from '../common/ConfirmationModal';
+import { PaySetupFields, PayEditModal, emptyPaySetup, payFromDoc, formatPayInfo, PaySetupState } from '../staff/PaySetupFields';
 
 export const TutorsManager: React.FC = () => {
   const { tutors, programmes, subjects: allSubjects, deleteTutor, toggleTutorSuspend, settings, addToast, getTutorRatingStats, classRatings, activeCentreId } = useApp();
@@ -35,6 +37,7 @@ export const TutorsManager: React.FC = () => {
   const [selectedTutor, setSelectedTutor] = useState<Tutor | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isInviting, setIsInviting] = useState(false);
+  const [payEdit, setPayEdit] = useState<Tutor | null>(null);
 
   // Form states for new tutor
   const [formData, setFormData] = useState<{
@@ -45,6 +48,7 @@ export const TutorsManager: React.FC = () => {
     examType: string;
     selectedSubjects: string[];
     bio: string;
+    pay: PaySetupState;
   }>({
     name: '',
     email: '',
@@ -53,6 +57,7 @@ export const TutorsManager: React.FC = () => {
     examType: programmes[0]?.name || 'JAMB UTME Prep',
     selectedSubjects: [],
     bio: 'Experienced subject specialist with proven track record in national examinations.',
+    pay: { ...emptyPaySetup },
   });
 
   const filteredTutors = (tutors || []).filter((t) => {
@@ -121,6 +126,9 @@ export const TutorsManager: React.FC = () => {
           departments: formData.departments,
           examTypes: [formData.examType],
           bio: formData.bio,
+          payFrequency: formData.pay.frequency,
+          payDay: formData.pay.day,
+          ratePerPeriod: formData.pay.ratePerPeriod,
           programmeIds: chosenProg ? [chosenProg.id] : ['prog-jamb'],
         }),
       });
@@ -136,6 +144,7 @@ export const TutorsManager: React.FC = () => {
         examType: programmes[0]?.name || 'JAMB UTME Prep',
         selectedSubjects: [],
         bio: '',
+        pay: { ...emptyPaySetup },
       });
 
       addToast({
@@ -490,6 +499,11 @@ export const TutorsManager: React.FC = () => {
                 </div>
               </div>
 
+              <div className="pt-1 border-t border-slate-100">
+                <p className="font-bold text-slate-800 mb-2">Pay Setup</p>
+                <PaySetupFields pay={formData.pay} setPay={(p) => setFormData({ ...formData, pay: p })} showRatePerClass />
+              </div>
+
               <div className="p-3.5 rounded-xl bg-amber-50/80 border border-amber-200 text-amber-900 flex items-start space-x-2.5">
                 <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                 <p className="text-[11px] leading-relaxed">
@@ -606,6 +620,21 @@ export const TutorsManager: React.FC = () => {
                 </div>
               </div>
 
+              <div className="flex items-center justify-between py-2.5 px-3 rounded-xl bg-slate-50 border border-slate-100">
+                <div className="min-w-0">
+                  <span className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">Pay</span>
+                  <p className="font-semibold text-slate-800 truncate">{formatPayInfo(selectedTutor, true)}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPayEdit(selectedTutor)}
+                  className="px-3 py-1.5 text-[10px] font-bold rounded-lg bg-orange-50 text-orange-700 border border-orange-200 uppercase tracking-wider inline-flex items-center space-x-1.5 shrink-0"
+                >
+                  <Pencil className="w-3 h-3" />
+                  <span>Edit Pay</span>
+                </button>
+              </div>
+
               {selectedTutor.status === 'Invited' && (
                 <div className="p-3 bg-blue-50/70 rounded-xl border border-blue-100 text-blue-900 flex items-start space-x-2">
                   <Lock className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
@@ -659,6 +688,18 @@ export const TutorsManager: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {payEdit && (
+        <PayEditModal
+          staffId={payEdit.id}
+          staffName={payEdit.name}
+          isTutor
+          collection="tutors"
+          centreId={activeCentreId || ''}
+          initial={payFromDoc(payEdit)}
+          onClose={() => setPayEdit(null)}
+        />
       )}
 
       {/* Confirmation Modal */}

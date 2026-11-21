@@ -22,10 +22,12 @@ import {
   KeyRound,
   Building,
   ShieldAlert,
+  Pencil,
 } from 'lucide-react';
 import { getAuth } from 'firebase/auth';
 import { ModernSelect } from '../ui/ModernSelect';
 import { ConfirmationModal } from '../common/ConfirmationModal';
+import { PaySetupFields, PayEditModal, emptyPaySetup, payFromDoc, formatPayInfo, PaySetupState } from './PaySetupFields';
 
 export type StaffRole = AdminUser['role'];
 
@@ -111,6 +113,7 @@ export const StaffRolesManager: React.FC = () => {
   const [showRolesModal, setShowRolesModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isInviting, setIsInviting] = useState(false);
+  const [payEdit, setPayEdit] = useState<AdminUser | null>(null);
 
   // New staff form state
   const [formData, setFormData] = useState({
@@ -118,6 +121,7 @@ export const StaffRolesManager: React.FC = () => {
     email: '',
     phone: '',
     role: 'Tutor' as StaffRole,
+    pay: { ...emptyPaySetup } as PaySetupState,
   });
 
   const filteredStaff = (admins || []).filter((s) => {
@@ -150,6 +154,10 @@ export const StaffRolesManager: React.FC = () => {
           email: cleanEmail,
           phone: formData.phone,
           role: formData.role,
+          payFrequency: formData.pay.frequency,
+          payDay: formData.pay.day,
+          ratePerPeriod: formData.pay.ratePerPeriod,
+          payAmount: formData.pay.payAmount,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -161,6 +169,7 @@ export const StaffRolesManager: React.FC = () => {
         email: '',
         phone: '',
         role: 'Tutor',
+        pay: { ...emptyPaySetup } as PaySetupState,
       });
       addToast({
         type: 'success',
@@ -417,6 +426,15 @@ export const StaffRolesManager: React.FC = () => {
                 </div>
               </div>
 
+              <div className="pt-1 border-t border-slate-100">
+                <p className="font-bold text-slate-800 mb-2">Pay Setup</p>
+                <PaySetupFields
+                  pay={formData.pay}
+                  setPay={(p) => setFormData({ ...formData, pay: p })}
+                  showRatePerClass={formData.role === 'Tutor'}
+                />
+              </div>
+
               {/* Explicit Mandatory Message Required by User */}
               <div className="p-3 bg-orange-50 rounded-xl border border-orange-200 text-[11px] text-orange-900 space-y-1">
                 <p className="font-bold flex items-center space-x-1 text-orange-600">
@@ -501,6 +519,21 @@ export const StaffRolesManager: React.FC = () => {
                 </div>
               </div>
 
+              <div className="flex items-center justify-between py-2.5 px-3 rounded-xl bg-slate-50 border border-slate-200">
+                <div className="min-w-0">
+                  <span className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">Pay</span>
+                  <p className="font-semibold text-slate-800 truncate">{formatPayInfo(viewingStaff, viewingStaff.role === 'Tutor')}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPayEdit(viewingStaff)}
+                  className="px-3 py-1.5 text-[10px] font-bold rounded-lg bg-orange-50 text-orange-700 border border-orange-200 uppercase tracking-wider inline-flex items-center space-x-1.5 shrink-0"
+                >
+                  <Pencil className="w-3 h-3" />
+                  <span>Edit Pay</span>
+                </button>
+              </div>
+
               <div>
                 <p className="font-bold text-slate-800 mb-1">Granted Role Permissions:</p>
                 <ul className="space-y-1 bg-slate-50 p-2.5 rounded-lg border border-slate-200">
@@ -566,7 +599,19 @@ export const StaffRolesManager: React.FC = () => {
         type="danger"
       />
 
-      {/* Roles & Powers Modal */}
+            {payEdit && (
+        <PayEditModal
+          staffId={payEdit.id}
+          staffName={payEdit.name}
+          isTutor={payEdit.role === 'Tutor'}
+          collection={payEdit.role === 'Tutor' ? 'tutors' : 'admins'}
+          centreId={activeCentreId || ''}
+          initial={payFromDoc(payEdit)}
+          onClose={() => setPayEdit(null)}
+        />
+      )}
+
+{/* Roles & Powers Modal */}
       {showRolesModal && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
           <div className="bg-white rounded-2xl max-w-4xl w-full p-6 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto">
