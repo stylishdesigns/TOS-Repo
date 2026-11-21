@@ -172,7 +172,7 @@ export function registerFoAccessDoors(app: express.Express): void {
     if (!rules.trim()) return reject(res, 400, "The rules source is required.");
     if (rules.length > 120000) return reject(res, 400, "The rules source is too large.");
     const head = rules.trim().slice(0, 40);
-    if (!/^rules_version/.test(head) || !/service cloud\. firestore/.test(rules)) {
+    if (!/^rules_version/.test(head) || rules.indexOf("service cloud.firestore") === -1) {
       return reject(res, 400, "The rules source does not look like Firestore rules.");
     }
     const dbId = databaseId || "(default)";
