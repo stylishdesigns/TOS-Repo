@@ -12,7 +12,10 @@ interface LaunchBranding { centreId?: string; logo: string; name: string; accent
 
 let memBranding: LaunchBranding | null = null;
 
-function readPersisted(): LaunchBranding | null {
+// The branding the device already remembers for this facility. Shared so the
+// app-only gate's loading screen paints the same facility-branded splash the
+// real launch splash shows (no gray spinner flash in between).
+export function readLaunchBranding(): LaunchBranding | null {
   if (memBranding) return memBranding;
   try {
     const raw = localStorage.getItem('tos:launch-brand');
@@ -22,6 +25,8 @@ function readPersisted(): LaunchBranding | null {
   } catch { /* private mode */ }
   return null;
 }
+
+const readPersisted = readLaunchBranding;
 
 function persist(b: LaunchBranding) {
   memBranding = b;

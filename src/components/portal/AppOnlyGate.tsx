@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { readLaunchBranding } from '../student-portal/LaunchSplash';
 
 /**
  * App-only gate. When the platform's app-only setting is ON, the three
@@ -31,8 +32,70 @@ export async function isAppOnlyOn(): Promise<boolean> {
   }
 }
 
+// The last known answer is remembered on the device, so an ordinary reload
+// opens the portal on the first paint instead of holding on a loading screen
+// while the setting is re-checked (that hold read as a broken/cached page).
+function readStoredAppOnly(): boolean | null {
+  try {
+    const v = localStorage.getItem('tos:app-only');
+    if (v === 'open') return false;
+    if (v === 'blocked') return true;
+  } catch { /* private mode */ }
+  return null;
+}
+
+// First-ever visits (nothing remembered yet) hold on the same facility-branded
+// launch splash the portals open with, so the wait never looks like an error.
+const GateSplash: React.FC = () => {
+  const b = readLaunchBranding();
+  const accent = b?.accent || '#EA580C';
+  const hasBrand = !!(b && (b.name || b.logo));
+  const dark = (() => {
+    const m = /^#([0-9a-fA-F]{6})$/.exec(accent);
+    if (!m) return false;
+    const n = parseInt(m[1], 16);
+    return (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255 > 0.62;
+  })();
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex flex-col items-center justify-center"
+      style={{ backgroundColor: accent }}
+      role="status"
+      aria-label="Loading"
+    >
+      <div className="w-28 h-28 rounded-3xl bg-white shadow-lg flex items-center justify-center overflow-hidden">
+        {b?.logo ? (
+          <img src={b.logo} alt="" className="w-full h-full object-cover rounded-3xl" />
+        ) : (
+          <span className={`text-4xl font-black ${dark ? 'text-slate-900' : 'text-white'}`}>TO</span>
+        )}
+      </div>
+      {hasBrand && b?.name && (
+        <p className={`mt-6 text-3xl font-black tracking-tight px-6 text-center leading-tight ${dark ? 'text-slate-900' : 'text-white'}`}>
+          {b.name}
+        </p>
+      )}
+      <div className="mt-6 flex items-center gap-2">
+        {[0, 1, 2].map((i) => (
+          <span
+            key={i}
+            className={`w-2.5 h-2.5 rounded-full ${dark ? 'bg-slate-900' : 'bg-white'}`}
+            style={{ animation: `tosLaunchDot 1.05s cubic-bezier(.45,0,.55,1) ${i * 0.16}s infinite` }}
+          />
+        ))}
+      </div>
+      <style>{`@keyframes tosLaunchDot{0%,100%{transform:translateY(0) scale(.85);opacity:.35}40%{transform:translateY(-7px) scale(1.15);opacity:1}}`}</style>
+    </div>
+  );
+};
+
 export const AppOnlyGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [state, setState] = useState<'loading' | 'open' | 'blocked'>('loading');
+  const [state, setState] = useState<'loading' | 'open' | 'blocked'>(() => {
+    if (typeof window !== 'undefined' && isStandaloneDisplay()) return 'open';
+    const stored = readStoredAppOnly();
+    if (stored === null) return 'loading';
+    return stored ? 'blocked' : 'open';
+  });
 
   useEffect(() => {
     let alive = true;
@@ -40,17 +103,17 @@ export const AppOnlyGate: React.FC<{ children: React.ReactNode }> = ({ children 
       setState('open');
       return;
     }
-    isAppOnlyOn().then((on) => { if (alive) setState(on ? 'blocked' : 'open'); });
+    isAppOnlyOn().then((on) => {
+      if (!alive) return;
+      setState(on ? 'blocked' : 'open');
+      try { localStorage.setItem('tos:app-only', on ? 'blocked' : 'open'); } catch { /* private mode */ }
+    });
     return () => { alive = false; };
   }, []);
 
   if (state === 'open') return <>{children}</>;
   if (state === 'loading') {
-    return (
-      <div className="min-h-screen grid place-items-center bg-slate-50">
-        <div className="w-8 h-8 rounded-full border-2 border-orange-400 border-t-transparent animate-spin" />
-      </div>
-    );
+    return <GateSplash />;
   }
   return (
     <div className="min-h-screen bg-[#0F172A] grid place-items-center px-6 text-center">
