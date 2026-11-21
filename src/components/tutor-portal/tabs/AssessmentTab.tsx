@@ -721,7 +721,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
   };
 
   return (
-    <div className={`transition-all duration-500 min-h-screen relative ${activeTab === 'Performance' ? 'bg-slate-950 -m-5 p-5' : 'bg-slate-50 p-5'} ${showArchive ? 'bg-white p-5' : ''}`}>
+    <div className={`transition-all duration-500 min-h-screen relative bg-slate-50 p-5 ${showArchive ? 'bg-white p-5' : ''}`}>
       {/* Tutor Override Modal */}
       {showOverrideModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md animate-in fade-in duration-200 overflow-y-auto">
@@ -833,7 +833,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
       )}
       {/* Overscroll Background Extender */}
       {(activeTab === 'Performance' || showArchive) && (
-        <div className={`absolute top-[-1000px] left-0 right-0 h-[1000px] ${showArchive ? 'bg-white' : 'bg-slate-950'} -z-10`} />
+        <div className={`absolute top-[-1000px] left-0 right-0 h-[1000px] ${showArchive ? 'bg-white' : 'bg-slate-50'} -z-10`} />
       )}
       <div className="flex items-center justify-between relative h-12 mb-6">
         {activeTab === 'Assessment' && !showArchive && (
@@ -855,10 +855,10 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
         )}
         
         <div className="flex-1 text-center">
-          <h2 className={`text-xl font-black tracking-tight ${activeTab === 'Performance' ? 'text-white' : 'text-slate-900'}`}>
+          <h2 className={`text-xl font-black tracking-tight text-slate-900`}>
             {activeTab === 'Performance' ? 'Performance Analytics' : (showArchive ? 'Assessment Archive' : 'Tutor Assessments')}
           </h2>
-          <p className={`text-[11px] font-medium ${activeTab === 'Performance' ? 'text-slate-400' : 'text-slate-500'}`}>
+          <p className={`text-[11px] font-medium text-slate-500`}>
             {activeTab === 'Performance' ? 'In-depth student performance & class leaderboards' : (showArchive ? 'Historical archive of completed tests' : 'Manage CBT tests & simulations')}
           </p>
         </div>
@@ -921,7 +921,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
       {!showArchive && (
         <div className="flex flex-col gap-4 mb-6">
           <div className="flex items-center justify-between gap-3">
-            <div className={`flex items-center space-x-1 p-1.5 rounded-2xl flex-1 border transition-all ${activeTab === 'Performance' ? 'bg-white/5 border-white/10' : 'bg-slate-100 border-slate-200'}`}>
+            <div className="bg-[var(--brand,#0F172A)] p-1.5 rounded-2xl flex-1 transition-all">
               {(['Assessment', 'Performance'] as const).map((tab) => (
                 <button
                   key={tab}
@@ -931,8 +931,8 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
                   }}
                   className={`flex-1 py-3 text-[12px] font-black uppercase tracking-wider rounded-xl transition-all ${
                     activeTab === tab 
-                      ? 'bg-white text-slate-900 shadow-md' 
-                      : (activeTab === 'Performance' ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-600')
+                      ? 'bg-[#ffffff] text-[#1F2937] shadow-md' 
+                      : 'text-[var(--on-brand,#fff)]'
                   }`}
                 >
                   {tab}
@@ -956,11 +956,11 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
 
           if (displayedExams.length === 0) {
             return (
-              <div className={`py-12 rounded-3xl border border-dashed text-center space-y-3 ${activeTab === 'Performance' || showArchive ? 'bg-white/5 border-white/10' : 'bg-white border-slate-200'}`}>
-                 <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mx-auto ${activeTab === 'Performance' || showArchive ? 'bg-white/5' : 'bg-slate-50'}`}>
-                    <Laptop className={`w-8 h-8 ${activeTab === 'Performance' || showArchive ? 'text-slate-600' : 'text-slate-300'}`} />
+              <div className={`py-12 rounded-3xl border border-dashed text-center space-y-3 bg-white border-slate-200`}>
+                 <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mx-auto bg-slate-50`}>
+                    <Laptop className={`w-8 h-8 text-slate-300`} />
                  </div>
-                 <p className={`text-xs font-medium ${activeTab === 'Performance' || showArchive ? 'text-slate-500' : 'text-slate-400'}`}>No assessments found in this category.</p>
+                 <p className={`text-xs font-medium text-slate-400`}>No assessments found in this category.</p>
               </div>
             );
           }
@@ -1342,25 +1342,17 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
               <button
                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
-                className={`px-4 py-2 rounded-xl border font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
-                  activeTab === 'Performance'
-                    ? 'border-white/10 bg-white/5 text-white hover:bg-white/10'
-                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                }`}
+                className={`px-4 py-2 rounded-xl border font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed border-slate-200 bg-white text-slate-600 hover:bg-slate-50`}
               >
                 Previous
               </button>
-              <span className={`text-xs font-bold ${activeTab === 'Performance' ? 'text-slate-400' : 'text-slate-500'}`}>
+              <span className={`text-xs font-bold text-slate-500`}>
                 Page {currentPage} of {totalPages} ({filteredExams.length} assessments)
               </span>
               <button
                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                 disabled={currentPage === totalPages}
-                className={`px-4 py-2 rounded-xl border font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
-                  activeTab === 'Performance'
-                    ? 'border-white/10 bg-white/5 text-white hover:bg-white/10'
-                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                }`}
+                className={`px-4 py-2 rounded-xl border font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed border-slate-200 bg-white text-slate-600 hover:bg-slate-50`}
               >
                 Next
               </button>
