@@ -229,6 +229,8 @@ interface AppContextType {
 
   studyMaterials: StudyMaterial[];
   addStudyMaterial: (material: Omit<StudyMaterial, 'id' | 'uploadedAt'>) => Promise<void>;
+  updateStudyMaterial: (id: string, patch: Partial<StudyMaterial>) => Promise<void>;
+  deleteStudyMaterial: (id: string) => Promise<void>;
 
   attendanceSettings: AttendanceSettings;
   updateAttendanceSettings: (settings: Partial<AttendanceSettings>) => void;
@@ -632,6 +634,61 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
     } catch (e) {
       console.error('Error adding study material:', e);
+    }
+  };
+
+  // Edit an existing study material: update the local list at once, then
+  // replace the Firestore document with the merged copy (undefined fields
+  // stripped, same as the add path).
+  const updateStudyMaterial = async (id: string, patch: Partial<StudyMaterial>) => {
+    try {
+      const current = studyMaterials.find((m) => m.id === id);
+      if (!current) return;
+      const merged: StudyMaterial = { ...current, ...patch };
+      setStudyMaterials((prev) => prev.map((m) => (m.id === id ? merged : m)));
+      try {
+        const payload = JSON.parse(JSON.stringify(tenantWrite(merged)));
+        await setDoc(doc(db, 'studyMaterials', id), payload);
+        addToast({
+          type: 'success',
+          title: 'Material Updated',
+          description: `"${merged.title}" was saved.`,
+        });
+      } catch (err) {
+        console.warn('Firestore studyMaterial update (local only):', err);
+        addToast({
+          type: 'error',
+          title: 'Not Saved',
+          description: 'The change could not be saved. Please try again.',
+        });
+      }
+    } catch (e) {
+      console.error('Error updating study material:', e);
+    }
+  };
+
+  const deleteStudyMaterial = async (id: string) => {
+    try {
+      const removed = studyMaterials.find((m) => m.id === id);
+      setStudyMaterials((prev) => prev.filter((m) => m.id !== id));
+      try {
+        await deleteDoc(doc(db, 'studyMaterials', id));
+        addToast({
+          type: 'success',
+          title: 'Material Deleted',
+          description: removed ? `"${removed.title}" was removed.` : 'The material was removed.',
+        });
+      } catch (err) {
+        console.warn('Firestore studyMaterial delete (local only):', err);
+        if (removed) setStudyMaterials((prev) => [removed, ...prev]);
+        addToast({
+          type: 'error',
+          title: 'Not Deleted',
+          description: 'The material could not be deleted. Please try again.',
+        });
+      }
+    } catch (e) {
+      console.error('Error deleting study material:', e);
     }
   };
 
@@ -3344,6 +3401,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         getClassRatingStats,
         studyMaterials,
         addStudyMaterial,
+        updateStudyMaterial,
+        deleteStudyMaterial,
         attendanceSettings,
         updateAttendanceSettings,
         attendanceLogs,

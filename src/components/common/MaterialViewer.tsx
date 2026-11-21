@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X, ChevronLeft, ChevronRight, FileText, PlayCircle, ExternalLink } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
@@ -13,7 +14,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
 interface ViewerFile { url: string; name?: string; kind: 'image' | 'pdf' | 'video' }
 
-const toEmbedUrl = (raw: string): string | null => {
+export const toEmbedUrl = (raw: string): string | null => {
   try {
     const u = new URL(raw);
     if (u.hostname.includes('youtube.com')) {
@@ -34,7 +35,7 @@ const looksPdf = (f: { url: string; name?: string }, materialType?: string) =>
 // PDF pages rendered straight onto canvases inside the app. An iframe to the
 // file host was dropped: browsers without the PDF plugin (and iOS Safari)
 // show a dead placeholder or an Open-to-host link instead of the document.
-const PdfDocumentView: React.FC<{ url: string; name: string }> = ({ url }) => {
+export const PdfDocumentView: React.FC<{ url: string; name: string }> = ({ url }) => {
   const pagesRef = useRef<HTMLDivElement | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [progressLabel, setProgressLabel] = useState('');
@@ -142,7 +143,7 @@ export const MaterialViewer: React.FC<{
   if (!material || files.length === 0) return null;
   const current = files[Math.min(idx, files.length - 1)];
 
-  return (
+  return createPortal(
     <div
       role="dialog"
       aria-modal="true"
@@ -260,6 +261,7 @@ export const MaterialViewer: React.FC<{
           ))}
         </div>
       )}
-    </div>
+    </div>,
+    document.body,
   );
 };
