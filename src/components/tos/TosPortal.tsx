@@ -717,7 +717,9 @@ const AccountTab: React.FC = () => {
   };
 
   const signOutEverywhere = async () => {
-    window.location.hash = '';
+    // Signing out of the TOS console returns to the TOS staff sign-in door,
+    // never the landing page or a facility's access-code gate.
+    window.location.hash = '#tos-admin';
     try { await signOut(getAuth()); } catch (e) { console.error(e); }
   };
 

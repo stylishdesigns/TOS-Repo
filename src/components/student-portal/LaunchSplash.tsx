@@ -42,7 +42,7 @@ function readableOn(hex: string): boolean {
   return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.62;
 }
 
-export function LaunchSplash() {
+export function LaunchSplash({ tos }: { tos?: boolean } = {}) {
   const { centreName, activeCentre, brandAccent } = useApp() as any;
 
   const branding = React.useMemo<LaunchBranding>(() => {
@@ -73,10 +73,41 @@ export function LaunchSplash() {
   }, [centreName, activeCentre, brandAccent]);
 
   React.useEffect(() => {
+    if (tos) return;
     if (branding.name || branding.logo) persist(branding);
-  }, [branding]);
+  }, [branding, tos]);
 
   const dark = readableOn(branding.accent);
+
+  // TOS mode: Tutorial OS's own surfaces (the TOS console, the landing door)
+  // load on TOS's own white style, never on whatever facility this device
+  // last visited. The hooks above stay mounted so the component keeps one
+  // stable hook order whichever mode it renders.
+  if (tos) {
+    return (
+      <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-white" role="status" aria-label="Loading">
+        <div className="w-28 h-28 rounded-3xl bg-white shadow-lg flex items-center justify-center overflow-hidden border border-slate-100">
+          <img src="/icon.svg" alt="Tutorial OS" className="w-16 h-16" />
+        </div>
+        <p
+          className="mt-6 text-3xl font-black tracking-tight px-6 text-center leading-tight text-slate-900"
+          style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', sans-serif" }}
+        >
+          Tutorial OS
+        </p>
+        <div className="mt-6 flex items-center gap-2">
+          {[0, 1, 2].map((i) => (
+            <span
+              key={i}
+              className="w-2.5 h-2.5 rounded-full bg-slate-400"
+              style={{ animation: `tosLaunchDot 1.05s cubic-bezier(.45,0,.55,1) ${i * 0.16}s infinite` }}
+            />
+          ))}
+        </div>
+        <style>{`@keyframes tosLaunchDot{0%,100%{transform:translateY(0) scale(.85);opacity:.35}40%{transform:translateY(-7px) scale(1.15);opacity:1}}`}</style>
+      </div>
+    );
+  }
 
   return (
     <div

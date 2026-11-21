@@ -409,6 +409,27 @@ const MainLayout: React.FC = () => {
   // The verified `tos` claim is the whole client-side test (Prompt D).
   const isTosAdmin = hasTosClaim;
 
+  // The device remembers which surface it was last on ('tos:last-surface'),
+  // so the pre-app boot splash and the auth splash paint the right world:
+  // facility portals open on the facility's brand, TOS surfaces on TOS's own
+  // white style, never each other's. The TOS console also owns its own door
+  // in the URL (#tos-admin), so a refresh or a sign-out inside it never falls
+  // back into the landing page or a facility's access-code gate.
+  useEffect(() => {
+    try {
+      const onTos = tosLoginRequested || (!!currentUser && isTosAdmin && !centreAppRequested);
+      if (onTos) {
+        localStorage.setItem('tos:last-surface', 'tos');
+        const h = (window.location.hash || '').toLowerCase();
+        if (h !== '#tos-admin' && h !== '#landing') window.location.hash = '#tos-admin';
+      } else if (activeCentreId || viewMode === 'student' || viewMode === 'tutor') {
+        localStorage.setItem('tos:last-surface', 'facility');
+      } else if (!isAuthLoading && !currentUser && !tosLoginRequested && !centreGateRequested && !pendingCentre && !isAppContext) {
+        localStorage.setItem('tos:last-surface', 'tos');
+      }
+    } catch { /* storage unavailable */ }
+  }, [tosLoginRequested, currentUser, isTosAdmin, centreAppRequested, activeCentreId, viewMode, centreGateRequested, pendingCentre, isAppContext]);
+
 
   // If user is already logged in, don't show welcome screen
   useEffect(() => {
@@ -488,8 +509,21 @@ const MainLayout: React.FC = () => {
   // flashes the tenant dashboard before the console opens.
   const claimsPending = !!currentUser && !tosClaimsSettled;
   if (isAuthLoading || claimsPending) {
+    // The splash before any surface is known follows the door in the URL,
+    // then the device's last surface, so TOS surfaces never flash a
+    // facility's colours and facility portals never flash TOS's white splash.
+    const splashTos = (() => {
+      try {
+        const h = (window.location.hash || '').toLowerCase();
+        if (/^#tos(-admin)?$/.test(h) || h === '#landing') return true;
+        if (/^#(student|tutor|install|access|centre)/.test(h)) return false;
+        if (isAppContext) return false;
+        if (!currentUser) return true;
+        try { return localStorage.getItem('tos:last-surface') === 'tos'; } catch { return false; }
+      } catch { return false; }
+    })();
     return (
-      <LaunchSplash />
+      <LaunchSplash tos={splashTos} />
     );
   }
 
