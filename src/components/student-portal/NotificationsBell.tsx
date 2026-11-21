@@ -290,7 +290,7 @@ export function NotificationsBell({ onOpenChange, feed = 'student' }: { onOpenCh
         <div className="fixed inset-0 z-[70]" role="dialog" aria-label="Notifications">
           <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" onClick={closeSplash} />
           <div className="tos-splash-up absolute bottom-0 inset-x-0 bg-white rounded-t-3xl shadow-2xl overflow-hidden flex flex-col max-h-[70vh]">
-            <div className="bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] px-4 py-3.5 flex items-center justify-between shrink-0">
+            <div className="bg-slate-950 text-white px-4 py-3.5 flex items-center justify-between shrink-0">
               <div>
                 <p className="text-base font-black text-white">Notifications</p>
               </div>
@@ -390,7 +390,7 @@ export function NotificationsBell({ onOpenChange, feed = 'student' }: { onOpenCh
 
       {open && view === 'history' && (
         <div className="tos-history-in fixed inset-0 z-[70] bg-white flex flex-col" role="dialog" aria-label="All notifications">
-          <div className="bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] px-4 py-3.5 flex items-center gap-3 shrink-0">
+          <div className="bg-slate-950 text-white px-4 py-3.5 flex items-center gap-3 shrink-0">
             <button onClick={() => setView('splash')} className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors" aria-label="Back to notifications">
               <ArrowLeft className="w-4 h-4" />
             </button>

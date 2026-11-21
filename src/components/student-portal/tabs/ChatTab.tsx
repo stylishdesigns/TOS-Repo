@@ -1072,12 +1072,12 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
     // background first, the messages settle in underneath. No blank card.
     return (
       <div className="fixed inset-0 z-40 flex flex-col bg-[#FFF3E7] animate-in fade-in duration-300" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-        <div className="px-3 sm:px-5 py-2.5 flex items-center gap-2 bg-orange-600 shadow-sm shrink-0">
-          <button onClick={onBack} className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center text-white active:scale-95 transition shrink-0" aria-label="Back">
+        <div className="px-3 sm:px-5 py-3.5 flex items-center gap-2 bg-orange-600 shadow-sm shrink-0">
+          <button onClick={onBack} className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center text-white active:scale-95 transition shrink-0" aria-label="Back">
             <ChevronLeft className="w-4 h-4" />
           </button>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-black text-white truncate">{group?.name || 'Chat'}</p>
+            <p className="text-base font-black text-white truncate">{group?.name || 'Chat'}</p>
           </div>
         </div>
         <div className="flex-1 flex items-center justify-center">
@@ -1307,26 +1307,26 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
   // pinned, and only the messages scroll between them.
   return (
     <div className="fixed inset-0 z-40 flex flex-col bg-[#FFF3E7] animate-in fade-in duration-300" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-      <div className="px-3 sm:px-5 py-2.5 flex items-center gap-2 bg-orange-600 shadow-sm shrink-0">
+      <div className="px-3 sm:px-5 py-3.5 flex items-center gap-2 bg-orange-600 shadow-sm shrink-0">
         <button
           onClick={onBack}
-          className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center text-white active:scale-95 transition shrink-0"
+          className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center text-white active:scale-95 transition shrink-0"
           aria-label="Back"
         >
           <ChevronLeft className="w-4 h-4" />
         </button>
         <div className="flex-1 min-w-0 flex items-center gap-2.5">
           {isPersonal && (
-            <span className="w-8 h-8 rounded-full bg-white/20 text-white flex items-center justify-center text-[11px] font-black overflow-hidden shrink-0">
+            <span className="w-9 h-9 rounded-full bg-white/20 text-white flex items-center justify-center text-[11px] font-black overflow-hidden shrink-0">
               {(resp as any)?.peerAvatar || group?.peerAvatar ? <img src={((resp as any)?.peerAvatar || group?.peerAvatar) as string} alt="" className="w-full h-full object-cover" /> : initialsOf(resp?.groupName || group?.name || '')}
             </span>
           )}
-          <p className="text-sm font-black text-white truncate">{resp?.groupName || group?.name}</p>
+          <p className="text-base font-black text-white truncate">{resp?.groupName || group?.name}</p>
           {!isPersonal && <p className="text-[10px] font-bold uppercase tracking-wider text-orange-100">{kindLabel}</p>}
         </div>
         <button
           onClick={() => setShowInfo(true)}
-          className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center text-white active:scale-95 transition shrink-0"
+          className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center text-white active:scale-95 transition shrink-0"
           aria-label="Group info"
         >
           <Info className="w-4 h-4" />

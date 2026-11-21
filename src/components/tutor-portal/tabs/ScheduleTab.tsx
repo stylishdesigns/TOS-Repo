@@ -22,11 +22,12 @@ import { TutorMaterialsSection } from './TutorMaterialsSection';
 
 interface ScheduleTabProps {
   tutor: Tutor;
+  initialSection?: string | null;
 }
 
-export const ScheduleTab: React.FC<ScheduleTabProps> = ({ tutor }) => {
+export const ScheduleTab: React.FC<ScheduleTabProps> = ({ tutor, initialSection }) => {
   const { timetable, programmes, settings, consentToTimetableSlot, updateTimetableSlot, students, plannerReminders, addPlannerReminder, removePlannerReminder, updatePlannerReminder } = useApp();
-  const [activeSection, setActiveSection] = useState<'classes' | 'materials'>('classes');
+  const [activeSection, setActiveSection] = useState<'classes' | 'materials'>(initialSection === 'materials' ? 'materials' : 'classes');
   const [selectedDay, setSelectedDay] = useState<'All' | string>('All');
   const [selectedStatus, setSelectedStatus] = useState<string>('All');
   
@@ -237,7 +238,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({ tutor }) => {
       {/* Status Filter Pills (All Exam filter removed per user instructions) */}
       <div className="bg-white p-1.5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between overflow-hidden">
         <div className="flex flex-nowrap overflow-x-auto gap-1 scrollbar-none w-full">
-          {[{ id: 'All', label: 'All Classes' }, { id: 'active', label: 'Approved' }, { id: 'pending_tutor_consent', label: 'Pending Consent' }, { id: 'postponed', label: 'Postponed' }].map((status) => (
+          {[{ id: 'All', label: 'All Classes' }, { id: 'active', label: 'Approved' }, { id: 'pending_tutor_consent', label: 'Pending' }, { id: 'postponed', label: 'Postponed' }].map((status) => (
             <button
               key={status.id}
               onClick={() => setSelectedStatus(status.id)}

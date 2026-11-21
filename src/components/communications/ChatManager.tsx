@@ -1326,21 +1326,21 @@ const ThreadPanel: React.FC<{
   // composer both pinned, and only the messages scroll between them.
   return (
     <div className="fixed inset-y-0 right-0 left-0 lg:left-60 z-40 flex flex-col bg-[#FFF3E7]" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-      <div className="px-3 sm:px-5 py-2.5 flex items-center gap-2 bg-orange-600 shadow-sm shrink-0">
-        <button onClick={onBack} className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center text-white active:scale-95 transition shrink-0" aria-label="Back to groups">
+      <div className="px-3 sm:px-5 py-3.5 flex items-center gap-2 bg-orange-600 shadow-sm shrink-0">
+        <button onClick={onBack} className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center text-white active:scale-95 transition shrink-0" aria-label="Back to groups">
           <ChevronLeft className="w-4 h-4" />
         </button>
         <div className="flex-1 min-w-0 flex items-center gap-2.5">
           {group.kind === 'personal' && (
-            <span className="w-8 h-8 rounded-full bg-white/20 text-white flex items-center justify-center text-[11px] font-black overflow-hidden shrink-0">
+            <span className="w-9 h-9 rounded-full bg-white/20 text-white flex items-center justify-center text-[11px] font-black overflow-hidden shrink-0">
               {group.peerAvatar ? <img src={group.peerAvatar} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" /> : (initialsOf(group.name) || <User className="w-5 h-5" />)}
             </span>
           )}
-          <p className="text-sm font-black text-white truncate">{group.name}</p>
+          <p className="text-base font-black text-white truncate">{group.name}</p>
         </div>
         <button
           onClick={() => setInfoOpen(true)}
-          className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center text-white active:scale-95 transition shrink-0"
+          className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center text-white active:scale-95 transition shrink-0"
           aria-label="Group info"
         >
           <Info className="w-4 h-4" />

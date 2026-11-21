@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useFirebase } from '../../context/FirebaseContext';
 import { HomeTab } from './tabs/HomeTab';
@@ -108,6 +108,19 @@ export const TutorPortal: React.FC = () => {
     }
   };
 
+  // Shortcut targets handed over from the tutor homepage ('materials' opens
+  // Classes on the Study Materials view, 'performance' opens Assessment on the
+  // Performance view). Read once when the target tab mounts, then cleared.
+  const homeFocusRef = useRef<string | null>(null);
+  const navigateFromHome = (tab: string, focus?: string) => {
+    homeFocusRef.current = focus || null;
+    setActiveTab(tab as TabType);
+  };
+
+  useEffect(() => {
+    homeFocusRef.current = null;
+  });
+
   useEffect(() => {
     const hash = window.location.hash.toLowerCase();
     if (hash.startsWith('#tutor/')) {
@@ -204,9 +217,9 @@ export const TutorPortal: React.FC = () => {
         >
           {/* Scrollable Content */}
           <div className="flex-1 overflow-y-auto pb-24 relative scroll-smooth">
-            {activeTab === 'home' && <HomeTab tutor={activeTutor} onNavigateTab={setActiveTab} />}
-            {activeTab === 'classes' && <ScheduleTab tutor={activeTutor} />}
-            {activeTab === 'assessment' && <AssessmentTab tutor={activeTutor} />}
+            {activeTab === 'home' && <HomeTab tutor={activeTutor} onNavigateTab={navigateFromHome} />}
+            {activeTab === 'classes' && <ScheduleTab tutor={activeTutor} initialSection={homeFocusRef.current} />}
+            {activeTab === 'assessment' && <AssessmentTab tutor={activeTutor} initialView={homeFocusRef.current} />}
             {activeTab === 'chat' && (
               <>
                 <div className="sticky top-0 z-20 bg-slate-50/95 backdrop-blur px-4 py-3 -mt-1">

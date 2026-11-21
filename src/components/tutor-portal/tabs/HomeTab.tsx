@@ -7,7 +7,9 @@ import {
   BookOpen,
   ChevronRight,
   Star,
-  X
+  X,
+  ClipboardList,
+  BarChart3
 } from 'lucide-react';
 import { CalendarView } from '../../common/CalendarView';
 import { TutorHistoryView } from './TutorHistoryView';
@@ -16,8 +18,16 @@ import { useScrollLock } from '../../../hooks/useScrollLock';
 
 interface HomeTabProps {
   tutor: Tutor;
-  onNavigateTab: (tab: string) => void;
+  onNavigateTab: (tab: string, focus?: string) => void;
 }
+
+// One-tap shortcuts from the homepage into the sections the bottom nav does
+// not carry. focus is read by TutorPortal when the target tab mounts.
+const QUICK_ACCESS = [
+  { key: 'materials', label: 'Study Materials', caption: 'Upload & view', icon: BookOpen, tab: 'classes', focus: 'materials' },
+  { key: 'assessment', label: 'Assessment', caption: 'CBT tests', icon: ClipboardList, tab: 'assessment', focus: 'assessment' },
+  { key: 'performance', label: 'Performance', caption: 'Analytics', icon: BarChart3, tab: 'assessment', focus: 'performance' },
+];
 
 export const HomeTab: React.FC<HomeTabProps> = ({ tutor, onNavigateTab }) => {
   const { timetable, settings, plannerReminders, addPlannerReminder, removePlannerReminder, updatePlannerReminder } = useApp();
@@ -100,17 +110,17 @@ export const HomeTab: React.FC<HomeTabProps> = ({ tutor, onNavigateTab }) => {
       {/* 1. Tutor Profile Greeting Card: photo, greeting, date; tapping it opens the full greetings splash */}
       <button
         onClick={() => setShowGreeting(true)}
-        className="relative overflow-hidden rounded-3xl bg-[var(--brand,#EA580C)] text-[var(--on-brand,#fff)] p-6 shadow-lg shadow-black/10 text-left cursor-pointer active:scale-[0.99] transition-transform w-full"
+        className="relative overflow-hidden rounded-3xl bg-slate-950 text-white border border-slate-800 p-6 shadow-lg shadow-black/10 text-left cursor-pointer active:scale-[0.99] transition-transform w-full"
       >
         <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl" />
-        <div className="absolute bottom-0 left-0 w-24 h-24 bg-black/10 rounded-full translate-y-1/2 -translate-x-1/2 blur-xl" />
+        <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2 blur-xl" />
 
         <div className="relative z-10 flex items-center space-x-4">
           {tutor.avatar ? (
             <img
               src={tutor.avatar}
               alt={tutor.name}
-              className="w-16 h-16 rounded-2xl object-cover border-2 border-white/40 shadow-lg shrink-0"
+              className="w-16 h-16 rounded-2xl object-cover border-2 border-white/20 shadow-lg shrink-0"
             />
           ) : (
             <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center font-black text-2xl shadow-lg shrink-0">
@@ -136,17 +146,17 @@ export const HomeTab: React.FC<HomeTabProps> = ({ tutor, onNavigateTab }) => {
       <div className="grid grid-cols-2 gap-3">
         <button
           onClick={() => onNavigateTab('classes')}
-          className="bg-slate-900 rounded-2xl p-5 text-white text-left shadow-lg relative overflow-hidden group hover:scale-[1.02] transition-all"
+          className="bg-white rounded-2xl p-5 text-slate-900 border border-slate-200 shadow-xs text-left relative overflow-hidden group hover:scale-[1.02] hover:border-slate-300 transition-all cursor-pointer"
         >
-          <div className="absolute -right-4 -top-4 w-16 h-16 bg-white/10 rounded-full blur-xl" />
+          <div className="absolute -right-4 -top-4 w-16 h-16 bg-slate-100 rounded-full blur-xl" />
           <div className="flex items-center justify-between mb-3">
-            <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
-              <BookOpen className="w-4 h-4 text-white/80" />
+            <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center">
+              <BookOpen className="w-4 h-4 text-slate-700" />
             </div>
-            <Calendar className="w-3.5 h-3.5 text-white/50" />
+            <Calendar className="w-3.5 h-3.5 text-slate-300" />
           </div>
-          <p className="text-3xl font-black tracking-tighter">{weekCount}</p>
-          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Classes This Week</p>
+          <p className="text-3xl font-black tracking-tighter text-slate-900">{weekCount}</p>
+          <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">Classes This Week</p>
         </button>
 
         <button
@@ -164,7 +174,27 @@ export const HomeTab: React.FC<HomeTabProps> = ({ tutor, onNavigateTab }) => {
         </button>
       </div>
 
-      {/* 3. Next Class Banner */}
+      {/* 3. Quick Access: one-tap shortcuts into the sections the bottom nav does not carry */}
+      <div className="space-y-2.5">
+        <h3 className="font-black text-slate-900 text-sm uppercase tracking-wider px-1">Quick Access</h3>
+        <div className="grid grid-cols-3 gap-3">
+          {QUICK_ACCESS.map((s) => (
+            <button
+              key={s.key}
+              onClick={() => onNavigateTab(s.tab, s.focus)}
+              className="bg-white rounded-2xl border border-slate-200 shadow-xs p-3.5 text-left group hover:border-[var(--brand,#EA580C)] hover:scale-[1.02] transition-all cursor-pointer"
+            >
+              <div className="w-9 h-9 rounded-xl bg-slate-50 flex items-center justify-center">
+                <s.icon className="w-4 h-4 text-[var(--brand,#EA580C)]" />
+              </div>
+              <p className="text-[11px] font-black text-slate-900 mt-2.5 leading-tight">{s.label}</p>
+              <p className="text-[9px] font-bold text-slate-400 mt-0.5">{s.caption}</p>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* 4. Next Class Banner */}
       {nextClass && (
         <button
           onClick={() => onNavigateTab('classes')}
@@ -185,7 +215,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({ tutor, onNavigateTab }) => {
         </button>
       )}
 
-      {/* 4. Consent needed banner */}
+      {/* 5. Consent needed banner */}
       {pendingCount > 0 && (
         <button
           onClick={() => onNavigateTab('classes')}
@@ -202,7 +232,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({ tutor, onNavigateTab }) => {
         </button>
       )}
 
-      {/* 5. Dynamic Classes Preview */}
+      {/* 6. Dynamic Classes Preview */}
       <div className="space-y-4">
         <div className="flex items-center justify-between px-1">
           <h3 className="font-black text-slate-900 text-sm uppercase tracking-wider">{classSectionTitle}</h3>

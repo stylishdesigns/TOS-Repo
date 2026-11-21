@@ -49,12 +49,13 @@ import { buildAssessmentAIPrompt } from '../../../utils/aiPromptBuilder';
 
 interface AssessmentTabProps {
   tutor: Tutor;
+  initialView?: string | null;
 }
 
-export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
+export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor, initialView }) => {
   const { programmes, subjects: allSubjects, addToast, exams, results, students, activeCentreId, centreName } = useApp();
   const [activeFrequency] = useState<'General'>('General');
-  const [activeTab, setActiveTab] = useState<'Assessment' | 'Performance'>('Assessment');
+  const [activeTab, setActiveTab] = useState<'Assessment' | 'Performance'>(initialView === 'performance' ? 'Performance' : 'Assessment');
   const [expandedExamId, setExpandedExamId] = useState<string | null>(null);
   const [showArchive, setShowArchive] = useState(false);
   const [selectedWeek, setSelectedWeek] = useState<string>('all');
