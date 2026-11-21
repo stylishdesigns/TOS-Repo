@@ -468,7 +468,7 @@ export const TutorMaterialsSection: React.FC<TutorMaterialsSectionProps> = ({
         className="w-full h-12 rounded-2xl bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] text-[11px] font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-slate-200 hover:opacity-95 transition-all cursor-pointer"
       >
         <Plus className="w-4 h-4" />
-        Add Material
+        Upload Material
       </button>
 
       {/* 2. General vs Topic-specific */}

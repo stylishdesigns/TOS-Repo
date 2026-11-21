@@ -432,7 +432,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({ tutor }) => {
                               onClick={(e) => { e.stopPropagation(); setMaterialClass(cls); setActiveSection('materials'); }}
                               className="px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl text-[10px] font-black uppercase tracking-widest hover:border-slate-300 transition-colors"
                             >
-                              Add Material
+                              Upload Material
                             </button>
                             <button className="px-6 py-2 bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-orange-600 transition-colors">View Details</button>
                           </div>
