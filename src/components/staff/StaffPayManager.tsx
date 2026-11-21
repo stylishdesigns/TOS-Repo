@@ -154,6 +154,16 @@ const RecordPaymentModal: React.FC<{
             )}
           </div>
 
+          {(row.doc.bankName || row.doc.bankAccountName || row.doc.bankAccountNumber) && (
+            <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+              <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">Pay Into Account</p>
+              <p className="text-[11px] font-bold text-slate-600">
+                {row.doc.bankName || 'Bank not set'} · {row.doc.bankAccountName || 'Account name not set'}
+              </p>
+              <p className="text-xs font-black text-slate-900">{row.doc.bankAccountNumber || 'Account number not set'}</p>
+            </div>
+          )}
+
           <div>
             <label className="block font-semibold text-slate-700 mb-1.5">Payment Mode *</label>
             <div className="grid grid-cols-2 gap-3">

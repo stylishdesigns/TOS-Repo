@@ -1248,6 +1248,79 @@ export function registerExtendedRoutes(app: express.Express): void {
   // CENTRE: staff pay setup. Only owners and admins set how a person is
   // paid; a tutor's per-class rate is a record of what a class is worth,
   // never an automatic salary calculation.
+  // CENTRE: staff details edit. Everything about a staff member is editable
+  // here except their email, which stays fixed. Bank account details ride
+  // along so the facility always has where to pay them.
+  app.patch('/api/centre/staff/details', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const centreId = String(req.body?.centreId || '');
+      if (!centreId) return res.status(400).json({ error: 'centreId is required.' });
+      await requireMembership(caller, centreId, ['owner', 'admin']);
+
+      const staffId = String(req.body?.staffId || '').trim();
+      if (!staffId) return res.status(400).json({ error: 'staffId is required.' });
+      const collection = req.body?.collection === 'admins' ? 'admins' : 'tutors';
+      const isTutorDoc = collection === 'tutors';
+
+      const ref = adminDb.collection(collection).doc(staffId);
+      const snap = await ref.get();
+      if (!snap.exists) return res.status(404).json({ error: 'Staff member not found.' });
+      if (String((snap.data() as any)?.centreId || '') !== centreId) {
+        return res.status(403).json({ error: 'This staff member does not belong to your facility.' });
+      }
+
+      const body = req.body || {};
+      const update: Record<string, any> = { updatedAt: new Date().toISOString() };
+      const str = (v: unknown, max: number) => String(v ?? '').trim().slice(0, max);
+
+      const name = str(body.name, 120);
+      if (name) update.name = name;
+      update.phone = str(body.phone, 40);
+      update.bankName = str(body.bankName, 80);
+      update.bankAccountName = str(body.bankAccountName, 80);
+      update.bankAccountNumber = str(body.bankAccountNumber, 40);
+
+      if (isTutorDoc) {
+        update.bio = str(body.bio, 600);
+        const depts = Array.isArray(body.departments)
+          ? (body.departments as any[]).map(String).filter((d) => ['Science', 'Commercial', 'Arts'].includes(d)).slice(0, 5)
+          : [];
+        if (depts.length) update.departments = depts;
+        const examTypes = Array.isArray(body.examTypes)
+          ? (body.examTypes as any[]).map((x) => str(x, 80)).filter(Boolean).slice(0, 10)
+          : [];
+        if (examTypes.length) update.examTypes = examTypes;
+        const subjects = Array.isArray(body.subjects)
+          ? (body.subjects as any[]).map((x) => str(x, 80)).filter(Boolean).slice(0, 20)
+          : [];
+        if (subjects.length) update.subjects = subjects;
+      } else {
+        update.department = str(body.department, 80) || 'General';
+        update.jobTitle = str(body.jobTitle, 80);
+        const role = str(body.role, 40);
+        if (['Super Admin', 'Facility Admin', 'Admin Secretary', 'Finance Admin', 'Tutor'].includes(role)) update.role = role;
+      }
+
+      const payFrequencyRaw = String(body.payFrequency || '').trim();
+      const payFrequency = ['daily', 'weekly', 'monthly'].includes(payFrequencyRaw) ? payFrequencyRaw : '';
+      update.payFrequency = payFrequency;
+      const payDayRaw = Number(body.payDay);
+      update.payDay = payFrequency && Number.isFinite(payDayRaw) && payDayRaw >= 0 && payDayRaw <= 28 ? Math.floor(payDayRaw) : null;
+      const ratePerPeriod = Number(body.ratePerPeriod);
+      update.ratePerPeriod = isTutorDoc && payFrequency && Number.isFinite(ratePerPeriod) && ratePerPeriod > 0 ? Math.round(ratePerPeriod) : null;
+      const payAmount = Number(body.payAmount);
+      update.payAmount = !isTutorDoc && payFrequency && Number.isFinite(payAmount) && payAmount > 0 ? Math.round(payAmount) : null;
+      update.payUpdatedAt = new Date().toISOString();
+
+      await ref.set(update, { merge: true });
+      res.json({ ok: true });
+    } catch (error: any) {
+      console.error('[staff details] failed:', error?.message || error);
+      res.status(error?.status || 500).json({ error: error?.message || 'Could not save the changes.' });
+    }
+  });
+
   app.patch('/api/centre/staff/pay', async (req, res) => {
     try {
       const caller = getCaller(req);
@@ -1338,6 +1411,9 @@ export function registerExtendedRoutes(app: express.Express): void {
         name,
         email,
         phone,
+        bankName: String(req.body?.bankName || '').trim().slice(0, 80),
+        bankAccountName: String(req.body?.bankAccountName || '').trim().slice(0, 80),
+        bankAccountNumber: String(req.body?.bankAccountNumber || '').trim().slice(0, 40),
         role,
         status: 'Invited',
         temporaryPassword: null,

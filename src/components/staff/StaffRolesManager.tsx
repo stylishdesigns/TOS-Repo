@@ -27,7 +27,8 @@ import {
 import { getAuth } from 'firebase/auth';
 import { ModernSelect } from '../ui/ModernSelect';
 import { ConfirmationModal } from '../common/ConfirmationModal';
-import { PaySetupFields, PayEditModal, emptyPaySetup, payFromDoc, formatPayInfo, PaySetupState } from './PaySetupFields';
+import { PaySetupFields, emptyPaySetup, formatPayInfo, PaySetupState } from './PaySetupFields';
+import { EditStaffDetailsModal } from './EditStaffDetails';
 
 export type StaffRole = AdminUser['role'];
 
@@ -122,6 +123,9 @@ export const StaffRolesManager: React.FC = () => {
     phone: '',
     role: 'Tutor' as StaffRole,
     pay: { ...emptyPaySetup } as PaySetupState,
+    bankName: '',
+    bankAccountName: '',
+    bankAccountNumber: '',
   });
 
   const filteredStaff = (admins || []).filter((s) => {
@@ -158,6 +162,9 @@ export const StaffRolesManager: React.FC = () => {
           payDay: formData.pay.day,
           ratePerPeriod: formData.pay.ratePerPeriod,
           payAmount: formData.pay.payAmount,
+          bankName: formData.bankName,
+          bankAccountName: formData.bankAccountName,
+          bankAccountNumber: formData.bankAccountNumber,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -170,6 +177,9 @@ export const StaffRolesManager: React.FC = () => {
         phone: '',
         role: 'Tutor',
         pay: { ...emptyPaySetup } as PaySetupState,
+    bankName: '',
+    bankAccountName: '',
+    bankAccountNumber: '',
       });
       addToast({
         type: 'success',
@@ -435,6 +445,27 @@ export const StaffRolesManager: React.FC = () => {
                 />
               </div>
 
+              <div className="pt-1 border-t border-slate-100">
+                <p className="font-bold text-slate-800 mb-1">Bank Account Details</p>
+                <p className="text-[10px] text-slate-400 mb-2">Where their pay goes when you transfer it.</p>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Bank Name</label>
+                    <input type="text" placeholder="e.g. GTBank" value={formData.bankName} onChange={(e) => setFormData({ ...formData, bankName: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-900 focus:bg-white focus:border-orange-500 outline-none" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Account Name</label>
+                      <input type="text" placeholder="e.g. John Okafor" value={formData.bankAccountName} onChange={(e) => setFormData({ ...formData, bankAccountName: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-900 focus:bg-white focus:border-orange-500 outline-none" />
+                    </div>
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Account Number</label>
+                      <input type="text" inputMode="numeric" placeholder="e.g. 0123456789" value={formData.bankAccountNumber} onChange={(e) => setFormData({ ...formData, bankAccountNumber: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-900 focus:bg-white focus:border-orange-500 outline-none" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* Explicit Mandatory Message Required by User */}
               <div className="p-3 bg-orange-50 rounded-xl border border-orange-200 text-[11px] text-orange-900 space-y-1">
                 <p className="font-bold flex items-center space-x-1 text-orange-600">
@@ -530,7 +561,7 @@ export const StaffRolesManager: React.FC = () => {
                   className="px-3 py-1.5 text-[10px] font-bold rounded-lg bg-orange-50 text-orange-700 border border-orange-200 uppercase tracking-wider inline-flex items-center space-x-1.5 shrink-0"
                 >
                   <Pencil className="w-3 h-3" />
-                  <span>Edit Pay</span>
+                  <span>Edit Details</span>
                 </button>
               </div>
 
@@ -600,13 +631,11 @@ export const StaffRolesManager: React.FC = () => {
       />
 
             {payEdit && (
-        <PayEditModal
-          staffId={payEdit.id}
-          staffName={payEdit.name}
-          isTutor={payEdit.role === 'Tutor'}
+        <EditStaffDetailsModal
+          staffDoc={payEdit}
           collection={payEdit.role === 'Tutor' ? 'tutors' : 'admins'}
           centreId={activeCentreId || ''}
-          initial={payFromDoc(payEdit)}
+          isTutor={payEdit.role === 'Tutor'}
           onClose={() => setPayEdit(null)}
         />
       )}

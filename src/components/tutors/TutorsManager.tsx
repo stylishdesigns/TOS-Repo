@@ -26,7 +26,8 @@ import {
 import { getAuth } from 'firebase/auth';
 import { ModernSelect } from '../ui/ModernSelect';
 import { ConfirmationModal } from '../common/ConfirmationModal';
-import { PaySetupFields, PayEditModal, emptyPaySetup, payFromDoc, formatPayInfo, PaySetupState } from '../staff/PaySetupFields';
+import { PaySetupFields, emptyPaySetup, formatPayInfo, PaySetupState } from '../staff/PaySetupFields';
+import { EditStaffDetailsModal } from '../staff/EditStaffDetails';
 
 export const TutorsManager: React.FC = () => {
   const { tutors, programmes, subjects: allSubjects, deleteTutor, toggleTutorSuspend, settings, addToast, getTutorRatingStats, classRatings, activeCentreId } = useApp();
@@ -58,6 +59,9 @@ export const TutorsManager: React.FC = () => {
     selectedSubjects: [],
     bio: 'Experienced subject specialist with proven track record in national examinations.',
     pay: { ...emptyPaySetup },
+    bankName: '',
+    bankAccountName: '',
+    bankAccountNumber: '',
   });
 
   const filteredTutors = (tutors || []).filter((t) => {
@@ -126,6 +130,9 @@ export const TutorsManager: React.FC = () => {
           departments: formData.departments,
           examTypes: [formData.examType],
           bio: formData.bio,
+          bankName: formData.bankName,
+          bankAccountName: formData.bankAccountName,
+          bankAccountNumber: formData.bankAccountNumber,
           payFrequency: formData.pay.frequency,
           payDay: formData.pay.day,
           ratePerPeriod: formData.pay.ratePerPeriod,
@@ -145,6 +152,9 @@ export const TutorsManager: React.FC = () => {
         selectedSubjects: [],
         bio: '',
         pay: { ...emptyPaySetup },
+    bankName: '',
+    bankAccountName: '',
+    bankAccountNumber: '',
       });
 
       addToast({
@@ -504,6 +514,27 @@ export const TutorsManager: React.FC = () => {
                 <PaySetupFields pay={formData.pay} setPay={(p) => setFormData({ ...formData, pay: p })} showRatePerClass />
               </div>
 
+              <div className="pt-1 border-t border-slate-100">
+                <p className="font-bold text-slate-800 mb-1">Bank Account Details</p>
+                <p className="text-[10px] text-slate-400 mb-2">Where their pay goes when you transfer it.</p>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Bank Name</label>
+                    <input type="text" placeholder="e.g. GTBank" value={formData.bankName} onChange={(e) => setFormData({ ...formData, bankName: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-900 focus:bg-white focus:border-orange-500 outline-none" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Account Name</label>
+                      <input type="text" placeholder="e.g. John Okafor" value={formData.bankAccountName} onChange={(e) => setFormData({ ...formData, bankAccountName: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-900 focus:bg-white focus:border-orange-500 outline-none" />
+                    </div>
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Account Number</label>
+                      <input type="text" inputMode="numeric" placeholder="e.g. 0123456789" value={formData.bankAccountNumber} onChange={(e) => setFormData({ ...formData, bankAccountNumber: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-900 focus:bg-white focus:border-orange-500 outline-none" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div className="p-3.5 rounded-xl bg-amber-50/80 border border-amber-200 text-amber-900 flex items-start space-x-2.5">
                 <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                 <p className="text-[11px] leading-relaxed">
@@ -631,7 +662,7 @@ export const TutorsManager: React.FC = () => {
                   className="px-3 py-1.5 text-[10px] font-bold rounded-lg bg-orange-50 text-orange-700 border border-orange-200 uppercase tracking-wider inline-flex items-center space-x-1.5 shrink-0"
                 >
                   <Pencil className="w-3 h-3" />
-                  <span>Edit Pay</span>
+                  <span>Edit Details</span>
                 </button>
               </div>
 
@@ -691,13 +722,11 @@ export const TutorsManager: React.FC = () => {
       )}
 
       {payEdit && (
-        <PayEditModal
-          staffId={payEdit.id}
-          staffName={payEdit.name}
-          isTutor
+        <EditStaffDetailsModal
+          staffDoc={payEdit}
           collection="tutors"
           centreId={activeCentreId || ''}
-          initial={payFromDoc(payEdit)}
+          isTutor
           onClose={() => setPayEdit(null)}
         />
       )}

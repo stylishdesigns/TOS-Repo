@@ -169,6 +169,9 @@ export interface Tutor {
   payDay?: number;
   ratePerPeriod?: number;
   payAmount?: number;
+  bankName?: string;
+  bankAccountName?: string;
+  bankAccountNumber?: string;
   temporaryPassword?: string;
   hasChangedPassword?: boolean;
   photoUrl?: string;
@@ -432,6 +435,9 @@ export interface AdminUser {
   payDay?: number;
   ratePerPeriod?: number;
   payAmount?: number;
+  bankName?: string;
+  bankAccountName?: string;
+  bankAccountNumber?: string;
   temporaryPassword?: string;
   hasChangedPassword?: boolean;
 }
