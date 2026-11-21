@@ -921,7 +921,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
       {!showArchive && (
         <div className="flex flex-col gap-4 mb-6">
           <div className="flex items-center justify-between gap-3">
-            <div className="bg-slate-100 border border-slate-200 p-1.5 rounded-2xl flex-1 transition-all">
+            <div className="bg-white rounded-[14px] p-1 border border-slate-200 shadow-xs grid grid-cols-2 gap-1 flex-1">
               {(['Assessment', 'Performance'] as const).map((tab) => (
                 <button
                   key={tab}
@@ -929,10 +929,10 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
                     setActiveTab(tab);
                     if (tab === 'Performance') setShowArchive(false);
                   }}
-                  className={`flex-1 py-3 text-[12px] font-black uppercase tracking-wider rounded-xl transition-all ${
-                    activeTab === tab 
-                      ? 'bg-[var(--brand,#0F172A)] text-[var(--on-brand,#fff)] shadow-md' 
-                      : 'text-slate-400 hover:text-slate-600'
+                  className={`h-10 rounded-[10px] text-xs font-extrabold transition-all flex items-center justify-center cursor-pointer ${
+                    activeTab === tab
+                      ? 'bg-[var(--brand,#0F172A)] text-[var(--on-brand,#fff)] shadow-xs'
+                      : 'text-slate-500 hover:text-slate-900'
                   }`}
                 >
                   {tab}
