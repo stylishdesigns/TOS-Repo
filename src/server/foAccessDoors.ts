@@ -187,7 +187,7 @@ export function registerFoAccessDoors(app: express.Express): void {
       const rulesetName = String(created.json?.name || "");
       if (!rulesetName) return reject(res, 502, "The rules API returned no ruleset name.");
       const releaseName = `${base}/releases/cloud.firestore${dbId === "(default)" ? "" : "/" + dbId}`;
-      const updated = await googleApi(releaseName, "PATCH", { rulesetName });
+      const updated = await googleApi(releaseName, "PATCH", { release: { rulesetName }, updateMask: "rulesetName" });
       if (updated.status !== 200) {
         return upstreamFail(res, "Updating the rules release failed", updated);
       }
