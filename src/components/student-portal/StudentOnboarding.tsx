@@ -18,11 +18,6 @@ export const StudentOnboarding: React.FC<StudentOnboardingProps> = ({ onComplete
   const centreSubjects = subjects.filter(
     (s) => !activeCentreId || !s.centreId || s.centreId === activeCentreId
   );
-  const bestSubjectOptions = (() => {
-    const dept = formData.department;
-    const list = centreSubjects.filter((s) => s.department === 'General' || (!!dept && s.department === dept));
-    return list.map((s) => ({ value: s.name, label: s.name }));
-  })();
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -36,6 +31,11 @@ export const StudentOnboarding: React.FC<StudentOnboardingProps> = ({ onComplete
     parentWhatsApp: '',
     parentEmail: '',
   });
+  const bestSubjectOptions = (() => {
+    const dept = formData.department;
+    const list = centreSubjects.filter((s) => s.department === 'General' || (!!dept && s.department === dept));
+    return list.map((s) => ({ value: s.name, label: s.name }));
+  })();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
