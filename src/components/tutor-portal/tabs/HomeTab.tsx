@@ -9,8 +9,12 @@ import {
   Star,
   X,
   ClipboardList,
-  BarChart3
+  BarChart3,
+  Wallet
 } from 'lucide-react';
+import { formatPayInfo } from '../../staff/PaySetupFields';
+import { formatDateLong } from '../../../lib/paymentDates';
+import { computeNextPayDate, payDueStatus, overdueDays } from '../../../lib/staffPay';
 import { CalendarView } from '../../common/CalendarView';
 import { TutorHistoryView } from './TutorHistoryView';
 import { slotsToActivities } from '../../../lib/planner';
@@ -141,6 +145,43 @@ export const HomeTab: React.FC<HomeTabProps> = ({ tutor, onNavigateTab }) => {
           </div>
         </div>
       </button>
+
+      {/* 1b. Pay flash: their next pay date, straight from the pay setup */}
+      {(() => {
+        const t = tutor as any;
+        if (!t?.payFrequency) return null;
+        const nextPay = computeNextPayDate(t.payFrequency, t.payDay, t.lastPaidAt);
+        if (!nextPay) return null;
+        const status = payDueStatus(nextPay);
+        const daysLate = status === 'overdue' ? overdueDays(nextPay) : 0;
+        return (
+          <button
+            onClick={() => onNavigateTab('more')}
+            className={`w-full rounded-2xl p-3.5 flex items-center justify-between text-left border transition-all active:scale-[0.99] ${
+              status === 'overdue'
+                ? 'bg-rose-500 border-rose-400 text-white'
+                : 'bg-[var(--brand,#EA580C)] border-black/10 text-white'
+            }`}
+          >
+            <div className="flex items-center space-x-2.5 min-w-0">
+              <Wallet className="w-4 h-4 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-widest opacity-90">
+                  {status === 'overdue'
+                    ? `Pay overdue by ${daysLate} day${daysLate > 1 ? 's' : ''}`
+                    : status === 'due'
+                      ? 'Pay due today'
+                      : 'Next Pay'}
+                </p>
+                <p className="text-xs font-bold truncate">
+                  {formatDateLong(nextPay)} · {formatPayInfo(t, true)}
+                </p>
+              </div>
+            </div>
+            <ChevronRight className="w-4 h-4 opacity-90 shrink-0" strokeWidth={2.75} />
+          </button>
+        );
+      })()}
 
       {/* 2. Quick Stats: real numbers only, no student totals */}
       <div className="grid grid-cols-2 gap-3">

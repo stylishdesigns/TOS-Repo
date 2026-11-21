@@ -13,8 +13,14 @@ import {
   User,
   Palette,
   Pencil,
-  ChevronRight
+  ChevronRight,
+  Wallet,
+  Clock
 } from 'lucide-react';
+import { getAuth } from 'firebase/auth';
+import { formatPayInfo } from '../../staff/PaySetupFields';
+import { formatDateLong } from '../../../lib/paymentDates';
+import { computeNextPayDate } from '../../../lib/staffPay';
 
 interface MoreTabProps {
   tutor: Tutor;
@@ -32,6 +38,9 @@ export const MoreTab: React.FC<MoreTabProps> = ({ tutor, onExit }) => {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const avatarRef = useRef<HTMLInputElement | null>(null);
   const [selectedTheme, setSelectedTheme] = useState<'light' | 'dark'>(() => (bgTheme === 'dark' ? 'dark' : 'light'));
+  const [payOpen, setPayOpen] = useState(false);
+  const [payHistory, setPayHistory] = useState<any[] | null>(null);
+  const [payLoading, setPayLoading] = useState(false);
 
   const initials = tutor.name.trim().split(/\s+/).slice(0, 2).map((n) => n[0]).join('').toUpperCase();
 
@@ -111,6 +120,28 @@ export const MoreTab: React.FC<MoreTabProps> = ({ tutor, onExit }) => {
     { id: 'dark' as const, label: 'Dark', icon: Moon, desc: 'Eye-friendly dim display' }
   ];
 
+  // My Pay: what the centre has set up for this tutor and what they have
+  // actually been paid. History loads when the sheet opens.
+  const openPay = async () => {
+    setPayOpen(true);
+    setPayLoading(true);
+    setPayHistory(null);
+    try {
+      const token = (await getAuth().currentUser?.getIdToken()) || '';
+      const res = await fetch(`/api/centre/staff-payments/mine?centreId=${encodeURIComponent(activeCentreId || '')}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || 'Could not load your pay records.');
+      setPayHistory(data.payments || []);
+    } catch (err: any) {
+      addToast({ type: 'error', title: 'Load Failed', description: err?.message || 'Could not load your pay records.' });
+      setPayHistory([]);
+    } finally {
+      setPayLoading(false);
+    }
+  };
+
   return (
     <div className="p-5 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-32">
       {/* 1. Header Profile */}
@@ -164,6 +195,22 @@ export const MoreTab: React.FC<MoreTabProps> = ({ tutor, onExit }) => {
             <span className="text-[10px] font-bold text-slate-400 capitalize">{selectedTheme}</span>
             <ChevronRightSpacer />
           </span>
+        </button>
+
+        <button
+          onClick={openPay}
+          className="w-full bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs flex items-center justify-between group active:scale-[0.98] transition-all"
+        >
+          <div className="flex items-center space-x-3 min-w-0">
+            <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600">
+              <Wallet className="w-5 h-5" />
+            </div>
+            <div className="text-left min-w-0">
+              <span className="text-xs font-black text-slate-700 tracking-tight">My Pay</span>
+              <p className="text-[10px] font-bold text-slate-400 truncate max-w-[190px]">{formatPayInfo(tutor as any, true)}</p>
+            </div>
+          </div>
+          <ChevronRightSpacer />
         </button>
       </div>
 
@@ -236,6 +283,64 @@ export const MoreTab: React.FC<MoreTabProps> = ({ tutor, onExit }) => {
           <ChevronRightSpacer />
         </button>
       </div>
+
+      {/* My Pay sheet */}
+      {payOpen && (
+        <div className="fixed inset-0 z-[80] bg-slate-950/50 flex flex-col justify-end" onClick={() => setPayOpen(false)}>
+          <div className="bg-white rounded-t-3xl max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="p-5 pb-3 border-b border-slate-100 flex items-center justify-between shrink-0">
+              <h3 className="text-base font-black text-slate-900">My Pay</h3>
+              <button onClick={() => setPayOpen(false)} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500" aria-label="Close">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-5 pt-4 overflow-y-auto space-y-4">
+              <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-100">
+                <p className="text-[10px] font-black uppercase tracking-widest text-emerald-700">Pay Setup</p>
+                <p className="text-sm font-black text-slate-900 mt-1">{formatPayInfo(tutor as any, true)}</p>
+                {(() => {
+                  const nextPay = computeNextPayDate((tutor as any).payFrequency, (tutor as any).payDay, (tutor as any).lastPaidAt);
+                  if (!nextPay) return null;
+                  return (
+                    <p className="text-[11px] font-bold text-emerald-700 mt-1.5 flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5" />
+                      Next pay: {formatDateLong(nextPay)}
+                    </p>
+                  );
+                })()}
+              </div>
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Payment History</p>
+                {payLoading ? (
+                  <p className="text-xs text-slate-400 font-bold py-4 text-center">Loading...</p>
+                ) : !payHistory || payHistory.length === 0 ? (
+                  <p className="text-xs text-slate-400 font-bold py-4 text-center">No payments recorded yet.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {payHistory.map((p) => (
+                      <div key={p.id} className="p-3 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-xs font-black text-slate-900">₦{Number(p.amount).toLocaleString('en-NG')}</p>
+                          <p className="text-[10px] text-slate-400 font-bold">
+                            {formatDateLong(p.datePaid)} · {p.mode}
+                            {(tutor as any).payFrequency && p.periodsCovered ? ` · ${p.periodsCovered} class${p.periodsCovered > 1 ? 'es' : ''}` : ''}
+                          </p>
+                          {p.note && <p className="text-[10px] text-slate-500 mt-0.5 truncate">{p.note}</p>}
+                        </div>
+                        {p.evidenceUrl ? (
+                          <a href={p.evidenceUrl} target="_blank" rel="noreferrer" className="text-[10px] font-black text-orange-600 uppercase tracking-wider shrink-0">
+                            View Proof
+                          </a>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Profile setup sheet */}
       {editOpen && (

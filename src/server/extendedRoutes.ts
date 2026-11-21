@@ -1145,6 +1145,106 @@ export function registerExtendedRoutes(app: express.Express): void {
   // server and only ever emailed to the invitee; the admin who invites never
   // sees it, and it is never stored anywhere.
   // ==========================================================================
+  // CENTRE: staff pay records. Owners and admins record what was actually
+  // paid, with optional screenshot evidence; staff read only their own
+  // records. Amounts are whatever the owner paid, never auto-computed.
+  app.post('/api/centre/staff-payments', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const centreId = String(req.body?.centreId || '');
+      if (!centreId) return res.status(400).json({ error: 'centreId is required.' });
+      await requireMembership(caller, centreId, ['owner', 'admin']);
+
+      const staffId = String(req.body?.staffId || '').trim();
+      if (!staffId) return res.status(400).json({ error: 'staffId is required.' });
+      const collection = req.body?.collection === 'admins' ? 'admins' : 'tutors';
+
+      const staffRef = adminDb.collection(collection).doc(staffId);
+      const staffSnap = await staffRef.get();
+      if (!staffSnap.exists) return res.status(404).json({ error: 'Staff member not found.' });
+      const staff = staffSnap.data() as any;
+      if (String(staff?.centreId || '') !== centreId) {
+        return res.status(403).json({ error: 'This staff member does not belong to your facility.' });
+      }
+
+      const amount = Number(req.body?.amount);
+      if (!Number.isFinite(amount) || amount <= 0) {
+        return res.status(400).json({ error: 'Enter the amount that was paid.' });
+      }
+      const modeRaw = String(req.body?.mode || '').trim();
+      const mode = modeRaw === 'Cash' ? 'Cash' : 'Bank Transfer';
+      const datePaid = /^\d{4}-\d{2}-\d{2}$/.test(String(req.body?.datePaid || ''))
+        ? String(req.body.datePaid)
+        : new Date().toISOString().slice(0, 10);
+      const periodsRaw = Number(req.body?.periodsCovered);
+      const periodsCovered =
+        collection === 'tutors' && Number.isFinite(periodsRaw) && periodsRaw > 0 ? Math.floor(periodsRaw) : null;
+      const note = String(req.body?.note || '').slice(0, 400);
+      const evidenceUrl = /^https:\/\//.test(String(req.body?.evidenceUrl || '')) ? String(req.body.evidenceUrl) : null;
+
+      const doc: Record<string, any> = {
+        centreId,
+        staffId,
+        collection,
+        staffName: String(staff.name || ''),
+        staffRole: String(staff.role || ''),
+        amount: Math.round(amount),
+        mode,
+        datePaid,
+        periodsCovered,
+        note,
+        evidenceUrl,
+        recordedBy: caller.uid,
+        createdAt: new Date().toISOString(),
+      };
+      const added = await adminDb.collection('staffPayments').add(doc);
+      await staffRef.set({ lastPaidAt: datePaid, lastPaidAmount: Math.round(amount) }, { merge: true });
+      res.json({ ok: true, id: added.id });
+    } catch (error: any) {
+      console.error('[staff payments record] failed:', error?.message || error);
+      res.status(error?.status || 500).json({ error: error?.message || 'Could not record the payment.' });
+    }
+  });
+
+  app.get('/api/centre/staff-payments', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const centreId = String(req.query?.centreId || '');
+      if (!centreId) return res.status(400).json({ error: 'centreId is required.' });
+      await requireMembership(caller, centreId, ['owner', 'admin']);
+      const snap = await adminDb
+        .collection('staffPayments')
+        .where('centreId', '==', centreId)
+        .orderBy('createdAt', 'desc')
+        .limit(300)
+        .get();
+      res.json({ ok: true, payments: snap.docs.map((d) => ({ id: d.id, ...d.data() })) });
+    } catch (error: any) {
+      console.error('[staff payments list] failed:', error?.message || error);
+      res.status(error?.status || 500).json({ error: error?.message || 'Could not load the pay records.' });
+    }
+  });
+
+  app.get('/api/centre/staff-payments/mine', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const centreId = String(req.query?.centreId || '');
+      if (!centreId) return res.status(400).json({ error: 'centreId is required.' });
+      await requireMembership(caller, centreId);
+      const snap = await adminDb
+        .collection('staffPayments')
+        .where('centreId', '==', centreId)
+        .where('staffId', '==', caller.uid)
+        .orderBy('createdAt', 'desc')
+        .limit(100)
+        .get();
+      res.json({ ok: true, payments: snap.docs.map((d) => ({ id: d.id, ...d.data() })) });
+    } catch (error: any) {
+      console.error('[staff payments mine] failed:', error?.message || error);
+      res.status(error?.status || 500).json({ error: error?.message || 'Could not load your pay records.' });
+    }
+  });
+
   // CENTRE: staff pay setup. Only owners and admins set how a person is
   // paid; a tutor's per-class rate is a record of what a class is worth,
   // never an automatic salary calculation.

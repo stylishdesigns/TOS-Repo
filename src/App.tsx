@@ -1045,6 +1045,7 @@ const MainLayout: React.FC = () => {
             {adminSection === 'student-portal' && <StudentPortal />}
             {adminSection === 'tutor-portal' && <TutorPortal />}
             {(adminSection === 'finance' || adminSection === 'payments') && <FinanceManager />}
+            {adminSection === 'staff-pay' && <StaffPayManager />}
             {(adminSection === 'account' || adminSection === 'staff-roles') && <StaffRolesManager />}
             {adminSection === 'settings' && <SettingsView mode="facility" />}
             {adminSection === 'profile' && <SettingsView mode="profile" />}
@@ -1076,6 +1077,7 @@ const AdmissionsManager = lazy(() => import('./components/admissions/AdmissionsM
 const SubjectsManager = lazy(() => import('./components/academics/SubjectsManager').then((m) => ({ default: m.SubjectsManager })));
 const ProgrammesManager = lazy(() => import('./components/programmes/ProgrammesManager').then((m) => ({ default: m.ProgrammesManager })));
 const FinanceManager = lazy(() => import('./components/finance/FinanceManager').then((m) => ({ default: m.FinanceManager })));
+const StaffPayManager = lazy(() => import('./components/staff/StaffPayManager').then((m) => ({ default: m.StaffPayManager })));
 const TutorsManager = lazy(() => import('./components/tutors/TutorsManager').then((m) => ({ default: m.TutorsManager })));
 const PerformanceManager = lazy(() => import('./components/academics/PerformanceManager').then((m) => ({ default: m.PerformanceManager })));
 const CBTManager = lazy(() => import('./components/academics/CBTManager').then((m) => ({ default: m.CBTManager })));

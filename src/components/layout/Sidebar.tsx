@@ -20,6 +20,7 @@ import {
   Award,
   Sparkles,
   MessageSquare,
+  Wallet,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -80,6 +81,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
       title: 'FINANCE & ANNOUNCEMENTS',
       items: [
         { id: 'payments', label: 'Fees & Payments', icon: CreditCard },
+        { id: 'staff-pay', label: 'Staff Pay', icon: Wallet },
         { id: 'announcements', label: 'Announcements', icon: Bell },
         { id: 'chat', label: 'Chat', icon: MessageSquare },
       ],

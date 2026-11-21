@@ -155,6 +155,7 @@ export type AdminSection =
   | 'settings'
   | 'account'
   | 'staff-roles'
+  | 'staff-pay'
   | 'parent-portal'
   | 'student-portal'
   | 'tutor-portal';
