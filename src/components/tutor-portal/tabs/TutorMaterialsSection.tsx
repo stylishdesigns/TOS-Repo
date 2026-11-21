@@ -27,8 +27,7 @@ interface TutorMaterialsSectionProps {
   tutor: Tutor;
   // Subjects the tutor takes, including ones picked up from the timetable.
   subjects?: string[];
-  // When set, the add sheet opens straight away for this scheduled class and
-  // the material is tied to its topic (the timetable's Add-material action).
+  // When set, the add sheet opens straight away for this scheduled class.
   addForClass?: TimetableSlot | null;
   onClassHandled?: () => void;
 }
@@ -67,16 +66,13 @@ export const TutorMaterialsSection: React.FC<TutorMaterialsSectionProps> = ({
 }) => {
   const { studyMaterials = [], addStudyMaterial, updateStudyMaterial, deleteStudyMaterial, activeCentreId } = useApp();
 
-  const [view, setView] = useState<'general' | 'topic'>('general');
   const [searchQuery, setSearchQuery] = useState('');
 
   // Add-material sheet state
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [materialKind, setMaterialKind] = useState<'general' | 'topic'>('general');
   const [materialType, setMaterialType] = useState<MaterialType>('pdf');
   const [title, setTitle] = useState('');
   const [subject, setSubject] = useState('');
-  const [topic, setTopic] = useState('');
   const [description, setDescription] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [videoUrl, setVideoUrl] = useState('');
@@ -114,10 +110,8 @@ export const TutorMaterialsSection: React.FC<TutorMaterialsSectionProps> = ({
   useEffect(() => {
     if (classCtx) {
       setSheetOpen(true);
-      setMaterialKind('topic');
       setMaterialType('pdf');
       setSubject(classCtx.subject || '');
-      setTopic(classCtx.topic || '');
       setTitle('');
       setDescription('');
       setFiles([]);
@@ -137,27 +131,17 @@ export const TutorMaterialsSection: React.FC<TutorMaterialsSectionProps> = ({
     if (classCtx) onClassHandled?.();
   };
 
-  const openFresh = (kind: 'general' | 'topic') => {
+  const openFresh = () => {
     setSheetOpen(true);
-    setMaterialKind(kind);
     setMaterialType('pdf');
     setTitle('');
     setSubject('');
-    setTopic('');
     setDescription('');
     setFiles([]);
     setVideoUrl('');
     setFormError('');
   };
 
-  const generalMaterials = useMemo(
-    () => studyMaterials.filter((m) => m.kind !== 'topic'),
-    [studyMaterials],
-  );
-  const topicMaterials = useMemo(
-    () => studyMaterials.filter((m) => m.kind === 'topic'),
-    [studyMaterials],
-  );
 
   const filterBy = (list: StudyMaterial[]) => {
     const q = searchQuery.trim().toLowerCase();
@@ -169,11 +153,11 @@ export const TutorMaterialsSection: React.FC<TutorMaterialsSectionProps> = ({
   };
 
   const shownMaterials = useMemo(
-    () => filterBy(view === 'general' ? generalMaterials : topicMaterials).sort(
+    () => filterBy(studyMaterials).sort(
       (a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime(),
     ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [view, generalMaterials, topicMaterials, searchQuery],
+    [studyMaterials, searchQuery],
   );
 
   const handleSubmit = async () => {
@@ -181,9 +165,6 @@ export const TutorMaterialsSection: React.FC<TutorMaterialsSectionProps> = ({
     if (editId) return handleEditSubmit();
     if (!title.trim()) return setFormError('Give the material a title.');
     if (!subject.trim()) return setFormError('Pick the subject this material belongs to.');
-    if (materialKind === 'topic' && !topic.trim()) {
-      return setFormError('Write the lesson topic this material is for.');
-    }
     if (materialType === 'video') {
       if (!/^https?:\/\//i.test(videoUrl.trim())) {
         return setFormError('Paste the full video link, starting with https://');
@@ -216,7 +197,6 @@ export const TutorMaterialsSection: React.FC<TutorMaterialsSectionProps> = ({
       await addStudyMaterial({
         title: title.trim(),
         subject: subject.trim(),
-        topic: materialKind === 'topic' ? topic.trim() : undefined,
         description: description.trim() || undefined,
         tutorName: tutor.name,
         tutorId: tutor.id,
@@ -224,7 +204,6 @@ export const TutorMaterialsSection: React.FC<TutorMaterialsSectionProps> = ({
         fileSize: sizeLabel,
         downloadUrl: url,
         files: uploadedFiles,
-        kind: materialKind,
         type: materialType,
         videoUrl: materialType === 'video' ? videoUrl.trim() : undefined,
         fileName: fileName || undefined,
@@ -262,11 +241,6 @@ export const TutorMaterialsSection: React.FC<TutorMaterialsSectionProps> = ({
               <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200/70">
                 {m.subject}
               </span>
-              {m.kind === 'topic' && m.topic && (
-                <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md bg-[var(--brand,#EA580C)]/10 text-[var(--brand,#EA580C)] border border-[var(--brand,#EA580C)]/20 truncate max-w-[180px]">
-                  {m.topic}
-                </span>
-              )}
               {m.classDate && (
                 <span className="text-[9px] font-bold text-slate-500 flex items-center">
                   {formatDay(m.classDate)}
@@ -343,11 +317,9 @@ export const TutorMaterialsSection: React.FC<TutorMaterialsSectionProps> = ({
   const openEdit = (m: StudyMaterial) => {
     setDetailsId(null);
     setEditId(m.id);
-    setMaterialKind(m.kind === 'topic' ? 'topic' : 'general');
     setMaterialType((m.type as MaterialType) || 'pdf');
     setTitle(m.title || '');
     setSubject(m.subject || '');
-    setTopic(m.topic || '');
     setDescription(m.description || '');
     setVideoUrl(m.type === 'video' ? m.videoUrl || '' : '');
     setFiles([]);
@@ -366,7 +338,6 @@ export const TutorMaterialsSection: React.FC<TutorMaterialsSectionProps> = ({
     if (!editId || !original) return setFormError('This material could not be found. Close this form and try again.');
     if (!title.trim()) return setFormError('Give the material a title.');
     if (!subject.trim()) return setFormError('Pick the subject this material belongs to.');
-    if (materialKind === 'topic' && !topic.trim()) return setFormError('Write the lesson topic this material is for.');
     if (materialType === 'video' && !/^https?:\/\//i.test(videoUrl.trim())) {
       return setFormError('Paste the full video link, starting with https://');
     }
@@ -379,7 +350,6 @@ export const TutorMaterialsSection: React.FC<TutorMaterialsSectionProps> = ({
         await updateStudyMaterial(editId, {
           title: title.trim(),
           subject: subject.trim(),
-          topic: materialKind === 'topic' ? topic.trim() : undefined,
           description: description.trim() || undefined,
           type: 'video',
           videoUrl: videoUrl.trim(),
@@ -417,7 +387,6 @@ export const TutorMaterialsSection: React.FC<TutorMaterialsSectionProps> = ({
         await updateStudyMaterial(editId, {
           title: title.trim(),
           subject: subject.trim(),
-          topic: materialKind === 'topic' ? topic.trim() : undefined,
           description: description.trim() || undefined,
           type: hasPdf ? 'pdf' : 'image',
           fileType: hasPdf ? 'PDF' : 'NOTES',
@@ -461,49 +430,21 @@ export const TutorMaterialsSection: React.FC<TutorMaterialsSectionProps> = ({
 
       <button
         type="button"
-        onClick={() => openFresh(view)}
+        onClick={() => openFresh()}
         className="w-full h-12 rounded-2xl bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] text-[11px] font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-slate-200 hover:opacity-95 transition-all cursor-pointer"
       >
         <Plus className="w-4 h-4" />
         Upload Material
       </button>
 
-      {/* 2. General vs Topic-specific */}
-      <div className="bg-white rounded-[14px] p-1 border border-slate-200 shadow-xs grid grid-cols-2 gap-1">
-        <button
-          type="button"
-          onClick={() => setView('general')}
-          className={`h-10 rounded-[10px] text-xs font-extrabold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-            view === 'general'
-              ? 'bg-[var(--brand,#0F172A)] text-[var(--on-brand,#fff)] shadow-xs'
-              : 'text-slate-500 hover:text-slate-900'
-          }`}
-        >
-          <Layers className="w-3.5 h-3.5" />
-          General
-        </button>
-        <button
-          type="button"
-          onClick={() => setView('topic')}
-          className={`h-10 rounded-[10px] text-xs font-extrabold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-            view === 'topic'
-              ? 'bg-[var(--brand,#0F172A)] text-[var(--on-brand,#fff)] shadow-xs'
-              : 'text-slate-500 hover:text-slate-900'
-          }`}
-        >
-          <BookOpen className="w-3.5 h-3.5" />
-          Class Topics
-        </button>
-      </div>
-
-      {/* 3. Search */}
+      {/* Search */}
       <div className="relative">
         <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
         <input
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search by title, subject or topic..."
+          placeholder="Search by title or subject..."
           className="w-full h-11 pl-10 pr-4 rounded-xl bg-white border border-[#E2E8F0] text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[var(--brand,#EA580C)] shadow-2xs transition-all"
         />
       </div>
@@ -513,17 +454,11 @@ export const TutorMaterialsSection: React.FC<TutorMaterialsSectionProps> = ({
         {shownMaterials.length === 0 ? (
           <div className="py-12 px-6 bg-slate-50 rounded-3xl border border-slate-100 text-center space-y-3">
             <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto shadow-sm">
-              {view === 'general'
-                ? <Layers className="w-8 h-8 text-slate-300" />
-                : <BookOpen className="w-8 h-8 text-slate-300" />}
+              <Layers className="w-8 h-8 text-slate-300" />
             </div>
-            <h3 className="font-black text-slate-900">
-              {view === 'general' ? 'No general materials yet' : 'No topic materials yet'}
-            </h3>
+            <h3 className="font-black text-slate-900">No materials yet</h3>
             <p className="text-xs text-slate-500 font-medium max-w-[280px] mx-auto leading-relaxed">
-              {view === 'general'
-                ? 'Upload PDFs, images or lesson video links that are not tied to any class.'
-                : 'Open a class in your timetable and tap Upload Material to attach materials to its topic.'}
+              Upload PDFs, images or lesson video links and they show up here.
             </p>
           </div>
         ) : (
@@ -544,9 +479,6 @@ export const TutorMaterialsSection: React.FC<TutorMaterialsSectionProps> = ({
                   </div>
                   <div>
                     <h3 className="text-lg font-black text-slate-900 leading-tight">{editId ? 'Edit Material' : 'Upload Material'}</h3>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">
-                      {materialKind === 'topic' ? 'For a class topic' : 'General material'}
-                    </p>
                   </div>
                 </div>
                 <button onClick={closeSheet} className="p-2 hover:bg-slate-50 rounded-xl transition-all" aria-label="Close">
@@ -565,30 +497,6 @@ export const TutorMaterialsSection: React.FC<TutorMaterialsSectionProps> = ({
                         {classCtx.day || formatDay(classCtx.date)} · {classCtx.time}
                       </p>
                     </div>
-                  </div>
-                )}
-
-                {/* Kind switch (only when not opened from a class) */}
-                {!classCtx && !editId && (
-                  <div className="bg-slate-50 rounded-2xl p-1 border border-slate-100 grid grid-cols-2 gap-1">
-                    <button
-                      type="button"
-                      onClick={() => setMaterialKind('general')}
-                      className={`h-9 rounded-xl text-[10px] font-extrabold uppercase tracking-widest transition-all cursor-pointer ${
-                        materialKind === 'general' ? 'bg-[var(--brand,#0F172A)] text-[var(--on-brand,#fff)] shadow-xs' : 'text-slate-500'
-                      }`}
-                    >
-                      General
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setMaterialKind('topic')}
-                      className={`h-9 rounded-xl text-[10px] font-extrabold uppercase tracking-widest transition-all cursor-pointer ${
-                        materialKind === 'topic' ? 'bg-[var(--brand,#0F172A)] text-[var(--on-brand,#fff)] shadow-xs' : 'text-slate-500'
-                      }`}
-                    >
-                      Class topic
-                    </button>
                   </div>
                 )}
 
@@ -639,7 +547,7 @@ export const TutorMaterialsSection: React.FC<TutorMaterialsSectionProps> = ({
                     <div className="grid grid-cols-3 gap-2">
                       {editId && existingFiles.map((f, i) => (
                         <div key={`saved-${i}`} className="relative aspect-square rounded-xl border border-slate-200 bg-white overflow-hidden">
-                          {/\.(png|jpe?g|gif|webp)(\?|$)/i.test(f.url) ? (
+                          {/\.(png|jpe?g|gif|webp|avif|heic|heif)(\?|$)/i.test(f.url) ? (
                             <img src={f.url} alt={f.name || 'file'} className="w-full h-full object-cover" />
                           ) : (
                             <div className="w-full h-full flex flex-col items-center justify-center gap-1 px-1">
@@ -741,22 +649,6 @@ export const TutorMaterialsSection: React.FC<TutorMaterialsSectionProps> = ({
                   )}
                 </div>
 
-                {/* Topic (topic-bound only) */}
-                {materialKind === 'topic' && (
-                  <div>
-                    <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">
-                      Lesson topic <span className="text-rose-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={topic}
-                      onChange={(e) => setTopic(e.target.value)}
-                      placeholder="What the class is covering"
-                      className="w-full h-11 px-4 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-900 placeholder:text-slate-300 focus:outline-none focus:border-[var(--brand,#EA580C)]"
-                    />
-                  </div>
-                )}
-
                 {/* Description */}
                 <div>
                   <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">
@@ -851,7 +743,6 @@ export const TutorMaterialsSection: React.FC<TutorMaterialsSectionProps> = ({
                     <div className="space-y-2.5">
                       {([
                         ['Subject', detailsMaterial.subject],
-                        detailsMaterial.kind === 'topic' ? ['Lesson topic', detailsMaterial.topic] : null,
                         ['Uploaded by', detailsMaterial.tutorName],
                         ['Uploaded on', formatUploaded(detailsMaterial.uploadedAt)],
                         ['Files', detailFiles.length > 1 ? `${detailFiles.length} files` : detailFirst?.name || (detailIsVideo ? 'Video link' : '')],

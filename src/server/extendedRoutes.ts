@@ -409,7 +409,7 @@ export function registerExtendedRoutes(app: express.Express): void {
       };
       if (membership.role === 'tutor') payload.tutorId = caller.uid;
       delete payload.ownedBy;
-      await adminDb.collection('studyMaterials').doc(id).set(payload);
+      await adminDb.collection('studyMaterials').doc(id).set(JSON.parse(JSON.stringify(payload)));
       res.json({ ok: true, id });
     } catch (error: any) {
       const status = Number(error?.status || 500);
@@ -435,7 +435,9 @@ export function registerExtendedRoutes(app: express.Express): void {
       if (membership.role === 'tutor' && String(data.tutorId || '') !== caller.uid) {
         throw httpError(403, 'You can only edit materials you uploaded.');
       }
-      const patch: Record<string, any> = { ...(req.body?.patch || {}) };
+      // Undefined values make the Admin SDK throw; strip them so a save
+      // cannot fail just because an optional field was left out.
+      const patch: Record<string, any> = JSON.parse(JSON.stringify(req.body?.patch || {}));
       delete patch.centreId;
       delete patch.id;
       delete patch.uploadedAt;

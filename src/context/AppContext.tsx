@@ -659,13 +659,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const current = studyMaterials.find((m) => m.id === id);
       if (!current) return;
-      const merged: StudyMaterial = { ...current, ...patch };
+      // The server rejects undefined field values, and a general material's
+      // edit patch used to carry one (topic: undefined), which silently
+      // failed the whole save. Drop undefined keys before anything leaves.
+      const cleanPatch = JSON.parse(JSON.stringify(patch)) as Partial<StudyMaterial>;
+      const merged: StudyMaterial = { ...current, ...cleanPatch };
       setStudyMaterials((prev) => prev.map((m) => (m.id === id ? merged : m)));
       let saved = false;
       try {
         await api(`/api/centre/study-materials/${encodeURIComponent(id)}?centreId=${encodeURIComponent(activeCentreId || '')}`, {
           method: 'PATCH',
-          body: { centreId: activeCentreId, patch },
+          body: { centreId: activeCentreId, patch: cleanPatch },
         });
         saved = true;
       } catch (serverErr: any) {

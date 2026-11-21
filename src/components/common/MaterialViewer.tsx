@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, ChevronLeft, ChevronRight, FileText, PlayCircle, ExternalLink, Minus, Plus } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, FileText, PlayCircle, ExternalLink, Minus, Plus, ImageOff } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { StudyMaterial } from '../../types';
@@ -29,8 +29,19 @@ export const toEmbedUrl = (raw: string): string | null => {
   }
 };
 
-const looksPdf = (f: { url: string; name?: string }, materialType?: string) =>
-  materialType === 'pdf' || (f.name || '').toLowerCase().endsWith('.pdf') || f.url.toLowerCase().includes('.pdf');
+const IMG_EXT_RE = /\.(png|jpe?g|gif|webp|avif|heic|heif|bmp|svg)(\?|$)/i;
+
+// A file is a PDF only when the FILE itself looks like one. The material's
+// stored type is only a fallback for legacy single-file uploads whose URL
+// carries no extension; a mixed material (PDF + images) must never render
+// its images through the PDF renderer, which is why they used to fail.
+const looksPdf = (f: { url: string; name?: string }, materialType?: string) => {
+  const name = (f.name || '').toLowerCase();
+  const url = (f.url || '').toLowerCase();
+  if (name.endsWith('.pdf') || url.includes('.pdf')) return true;
+  if (IMG_EXT_RE.test(url) || IMG_EXT_RE.test(name)) return false;
+  return materialType === 'pdf';
+};
 
 // PDF pages rendered straight onto canvases inside the app. An iframe to the
 // file host was dropped: browsers without the PDF plugin (and iOS Safari)
@@ -108,7 +119,7 @@ export const PdfDocumentView: React.FC<{ url: string; name: string; zoom?: numbe
 
   return (
     <div className="w-full h-full rounded-xl bg-white shadow-2xl overflow-auto overscroll-contain">
-      <div ref={pagesRef} className="flex flex-col items-center gap-4 p-3 sm:p-5" />
+      <div ref={pagesRef} className="flex w-fit min-w-full flex-col items-center gap-4 p-3 sm:p-5" />
       {status === 'loading' && (
         <div className="flex flex-col items-center justify-center gap-3 py-16 text-slate-500">
           <div className="h-1.5 w-40 overflow-hidden rounded-full bg-slate-200">
@@ -134,15 +145,18 @@ export const MaterialViewer: React.FC<{
 }> = ({ material, onClose }) => {
   const [idx, setIdx] = useState(0);
   const [zoom, setZoom] = useState(1);
+  const [imgBroken, setImgBroken] = useState(false);
 
   useEffect(() => {
     setIdx(0);
     setZoom(1);
+    setImgBroken(false);
   }, [material?.id]);
 
   // A different file starts fresh at its fit-to-screen size.
   useEffect(() => {
     setZoom(1);
+    setImgBroken(false);
   }, [idx]);
 
   const files = useMemo<ViewerFile[]>(() => {
@@ -228,14 +242,32 @@ export const MaterialViewer: React.FC<{
           </div>
         )}
         {current.kind === 'image' && (
-          <div className="w-full h-full overflow-auto flex">
-            <img
-              src={current.url}
-              alt={current.name || material.title}
-              className={zoom > 1 ? 'm-auto rounded-xl shadow-2xl' : 'm-auto max-w-full max-h-full object-contain rounded-xl shadow-2xl'}
-              style={zoom > 1 ? { width: `${zoom * 100}%`, height: 'auto', maxWidth: 'none', maxHeight: 'none' } : undefined}
-            />
-          </div>
+          imgBroken ? (
+            <div className="text-center space-y-3 p-6 max-w-sm">
+              <ImageOff className="w-10 h-10 text-slate-500 mx-auto" />
+              <p className="text-xs font-bold text-slate-300">
+                This image could not be opened here. Try opening it in a new tab instead.
+              </p>
+              <a
+                href={current.url}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-block px-4 py-2 rounded-lg bg-white/10 text-white text-xs font-bold hover:bg-white/20 transition-colors"
+              >
+                Open image in a new tab
+              </a>
+            </div>
+          ) : (
+            <div className="w-full h-full overflow-auto">
+              <img
+                src={current.url}
+                alt={current.name || material.title}
+                onError={() => setImgBroken(true)}
+                className={zoom > 1 ? 'block rounded-xl shadow-2xl' : 'block mx-auto max-w-full max-h-full object-contain rounded-xl shadow-2xl'}
+                style={zoom > 1 ? { width: `${zoom * 100}%`, height: 'auto', maxWidth: 'none', maxHeight: 'none' } : undefined}
+              />
+            </div>
+          )
         )}
         {current.kind === 'pdf' && (
           <PdfDocumentView url={current.url} name={current.name || material.title} zoom={zoom} />
