@@ -40,6 +40,20 @@ export const PdfDocumentView: React.FC<{ url: string; name: string; zoom?: numbe
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [progressLabel, setProgressLabel] = useState('');
 
+  // Re-size the already-rendered pages when the zoom level changes. Done in
+  // JS with explicit widths: the page always grows with the percentage and
+  // the document scrolls both ways.
+  useEffect(() => {
+    const container = pagesRef.current;
+    if (!container) return;
+    container.querySelectorAll('canvas').forEach((c) => {
+      const base = Number((c as HTMLCanvasElement).dataset.baseWidth || '');
+      if (!base) return;
+      c.style.maxWidth = zoom > 1 ? 'none' : '100%';
+      c.style.width = `${Math.round(base * zoom)}px`;
+    });
+  }, [zoom]);
+
   useEffect(() => {
     let cancelled = false;
     let pdf: any = null;
@@ -70,6 +84,7 @@ export const PdfDocumentView: React.FC<{ url: string; name: string; zoom?: numbe
           canvas.style.maxWidth = '100%';
           canvas.style.height = 'auto';
           canvas.style.display = 'block';
+          (canvas as HTMLCanvasElement).dataset.baseWidth = String(Math.round(viewport.width / dpr));
           const ctx = canvas.getContext('2d');
           await page.render({ canvasContext: ctx as CanvasRenderingContext2D, viewport }).promise;
           if (cancelled) return;
@@ -92,8 +107,8 @@ export const PdfDocumentView: React.FC<{ url: string; name: string; zoom?: numbe
   }, [url]);
 
   return (
-    <div className="w-full h-full rounded-xl bg-white shadow-2xl overflow-y-auto overscroll-contain">
-      <div ref={pagesRef} className="flex flex-col items-center gap-4 p-3 sm:p-5" style={zoom !== 1 ? { zoom } : undefined} />
+    <div className="w-full h-full rounded-xl bg-white shadow-2xl overflow-auto overscroll-contain">
+      <div ref={pagesRef} className="flex flex-col items-center gap-4 p-3 sm:p-5" />
       {status === 'loading' && (
         <div className="flex flex-col items-center justify-center gap-3 py-16 text-slate-500">
           <div className="h-1.5 w-40 overflow-hidden rounded-full bg-slate-200">
@@ -217,8 +232,8 @@ export const MaterialViewer: React.FC<{
             <img
               src={current.url}
               alt={current.name || material.title}
-              className="m-auto max-w-full max-h-full object-contain rounded-xl shadow-2xl"
-              style={zoom !== 1 ? { zoom } : undefined}
+              className={zoom > 1 ? 'm-auto rounded-xl shadow-2xl' : 'm-auto max-w-full max-h-full object-contain rounded-xl shadow-2xl'}
+              style={zoom > 1 ? { width: `${zoom * 100}%`, height: 'auto', maxWidth: 'none', maxHeight: 'none' } : undefined}
             />
           </div>
         )}
