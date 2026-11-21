@@ -251,6 +251,9 @@ export interface StudyMaterial {
   classId?: string;
   classDate?: string;
   classTime?: string;
+  // ms epoch stamped at every local save; lets listeners tell a stale replay
+  // from a fresh save.
+  updatedAt?: number;
 }
 
 export interface ClassRating {

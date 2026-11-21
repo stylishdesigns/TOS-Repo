@@ -67,6 +67,9 @@ export const TutorMaterialsSection: React.FC<TutorMaterialsSectionProps> = ({
   const { studyMaterials = [], addStudyMaterial, updateStudyMaterial, deleteStudyMaterial, activeCentreId } = useApp();
 
   const [searchQuery, setSearchQuery] = useState('');
+  // Subject filter under the search bar; '' shows every subject. The subject
+  // picked at upload automatically becomes the active filter.
+  const [subjectFilter, setSubjectFilter] = useState('');
 
   // Add-material sheet state
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -152,12 +155,20 @@ export const TutorMaterialsSection: React.FC<TutorMaterialsSectionProps> = ({
     );
   };
 
+  const filterSubjects = useMemo(
+    () => Array.from(new Set<string>(studyMaterials.map((m) => String(m.subject || '').trim()).filter(Boolean)))
+      .sort((a, b) => a.localeCompare(b)),
+    [studyMaterials],
+  );
+
   const shownMaterials = useMemo(
-    () => filterBy(studyMaterials).sort(
-      (a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime(),
-    ),
+    () => filterBy(studyMaterials)
+      .filter((m) => !subjectFilter || (m.subject || '').trim() === subjectFilter)
+      .sort(
+        (a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime(),
+      ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [studyMaterials, searchQuery],
+    [studyMaterials, searchQuery, subjectFilter],
   );
 
   const handleSubmit = async () => {
@@ -211,6 +222,9 @@ export const TutorMaterialsSection: React.FC<TutorMaterialsSectionProps> = ({
         classDate: classCtx?.date,
         classTime: classCtx?.time,
       } as any);
+      // The subject picked at upload becomes the active filter, so the new
+      // material is what you see first.
+      setSubjectFilter(subject.trim());
       closeSheet();
     } catch (err: any) {
       setFormError(err?.message || 'The material could not be added. Please try again.');
@@ -396,6 +410,9 @@ export const TutorMaterialsSection: React.FC<TutorMaterialsSectionProps> = ({
           fileSize,
         } as any);
       }
+      // Keep the edited material visible if the active filter no longer matches.
+      const savedSubject = subject.trim();
+      if (subjectFilter && subjectFilter !== savedSubject) setSubjectFilter('');
       closeSheet();
     } catch (err: any) {
       setFormError(err?.message || 'The material could not be updated. Please try again.');
@@ -416,9 +433,9 @@ export const TutorMaterialsSection: React.FC<TutorMaterialsSectionProps> = ({
   };
 
   return (
-    <div className="p-5 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="p-5 pt-3 space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <MaterialViewer material={viewing} onClose={() => setViewing(null)} />
-      {/* 1. Heading + add button */}
+      {/* 1. Heading + add button (compact plus, top right) */}
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-xl font-black text-[#0F172A] tracking-tight">Study Materials</h2>
@@ -426,16 +443,15 @@ export const TutorMaterialsSection: React.FC<TutorMaterialsSectionProps> = ({
             Upload PDFs and images, or share lesson video links. Materials show on your students' portal.
           </p>
         </div>
+        <button
+          type="button"
+          onClick={() => openFresh()}
+          aria-label="Upload Material"
+          className="shrink-0 w-10 h-10 rounded-full bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] flex items-center justify-center shadow-lg shadow-slate-200 hover:opacity-95 active:scale-95 transition-all cursor-pointer"
+        >
+          <Plus className="w-5 h-5" />
+        </button>
       </div>
-
-      <button
-        type="button"
-        onClick={() => openFresh()}
-        className="w-full h-12 rounded-2xl bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] text-[11px] font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-slate-200 hover:opacity-95 transition-all cursor-pointer"
-      >
-        <Plus className="w-4 h-4" />
-        Upload Material
-      </button>
 
       {/* Search */}
       <div className="relative">
@@ -449,6 +465,37 @@ export const TutorMaterialsSection: React.FC<TutorMaterialsSectionProps> = ({
         />
       </div>
 
+      {/* Subject filter, keyed to what uploads carry */}
+      {filterSubjects.length > 0 && (
+        <div className="flex gap-2 overflow-x-auto -mx-1 px-1 pb-0.5">
+          <button
+            type="button"
+            onClick={() => setSubjectFilter('')}
+            className={`shrink-0 h-8 px-3.5 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all cursor-pointer ${
+              subjectFilter === ''
+                ? 'bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] border-transparent'
+                : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'
+            }`}
+          >
+            All
+          </button>
+          {filterSubjects.map((sub) => (
+            <button
+              key={sub}
+              type="button"
+              onClick={() => setSubjectFilter(sub)}
+              className={`shrink-0 h-8 px-3.5 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all cursor-pointer ${
+                subjectFilter === sub
+                  ? 'bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] border-transparent'
+                  : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'
+              }`}
+            >
+              {sub}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* 4. List */}
       <div className="space-y-3">
         {shownMaterials.length === 0 ? (
@@ -456,9 +503,11 @@ export const TutorMaterialsSection: React.FC<TutorMaterialsSectionProps> = ({
             <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto shadow-sm">
               <Layers className="w-8 h-8 text-slate-300" />
             </div>
-            <h3 className="font-black text-slate-900">No materials yet</h3>
+            <h3 className="font-black text-slate-900">{subjectFilter ? `No ${subjectFilter} materials yet` : 'No materials yet'}</h3>
             <p className="text-xs text-slate-500 font-medium max-w-[280px] mx-auto leading-relaxed">
-              Upload PDFs, images or lesson video links and they show up here.
+              {subjectFilter
+                ? 'Nothing has been uploaded for this subject yet. Pick All to see every material.'
+                : 'Upload PDFs, images or lesson video links and they show up here.'}
             </p>
           </div>
         ) : (

@@ -561,6 +561,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   });
 
+  // Materials the user just deleted on the server, id -> delete time (ms).
+  // A reconnecting Firestore snapshot can re-deliver a just-deleted doc from
+  // its cache; these are hidden until the stream itself drops them.
+  const recentlyDeletedMaterialsRef = useRef<Map<string, number>>(new Map());
+
   useEffect(() => {
     try {
       localStorage.setItem(scopedKey('studyMaterials'), JSON.stringify(studyMaterials));
@@ -606,6 +611,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ...materialData,
         id: newId,
         uploadedAt: new Date().toISOString(),
+        updatedAt: Date.now(),
       };
       setStudyMaterials((prev) => [newMaterial, ...prev]);
 
@@ -662,7 +668,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // The server rejects undefined field values, and a general material's
       // edit patch used to carry one (topic: undefined), which silently
       // failed the whole save. Drop undefined keys before anything leaves.
-      const cleanPatch = JSON.parse(JSON.stringify(patch)) as Partial<StudyMaterial>;
+      const editStamp = Date.now();
+      const cleanPatch = JSON.parse(JSON.stringify({ ...patch, updatedAt: editStamp })) as Partial<StudyMaterial>;
       const merged: StudyMaterial = { ...current, ...cleanPatch };
       setStudyMaterials((prev) => prev.map((m) => (m.id === id ? merged : m)));
       let saved = false;
@@ -707,6 +714,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setStudyMaterials((prev) => prev.filter((m) => m.id !== id));
       try {
         await api(`/api/centre/study-materials/${encodeURIComponent(id)}?centreId=${encodeURIComponent(activeCentreId || '')}`, { method: 'DELETE' });
+        recentlyDeletedMaterialsRef.current.set(id, Date.now());
         addToast({
           type: 'success',
           title: 'Material Deleted',
@@ -2228,8 +2236,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const data = scopedDocs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as StudyMaterial)));
       setStudyMaterials((prev) => {
         const serverIds = new Set(data.map(d => d.id));
+        const deleted = recentlyDeletedMaterialsRef.current;
+        for (const [k, t] of deleted) if (Date.now() - t > 120000) deleted.delete(k);
+        // A snapshot that reconnects mid-save (or replays the local cache) can
+        // carry a copy that predates the server write; a locally newer edit
+        // (stamped at save time, same stamp the server stores) must win until
+        // the stream itself carries the save.
+        const guarded = data
+          .filter((d) => {
+            const del = deleted.get(d.id);
+            return !(del && ((d as any).updatedAt || 0) <= del);
+          })
+          .map((d) => {
+            const local = prev.find((m) => m.id === d.id);
+            if (local && (((local as any).updatedAt || 0) > ((d as any).updatedAt || 0))) {
+              return { ...d, ...local } as StudyMaterial;
+            }
+            return d;
+          });
         const localOnly = prev.filter(m => !serverIds.has(m.id) && typeof m.id === 'string' && m.id.startsWith('mat-'));
-        return [...localOnly, ...data];
+        return [...localOnly, ...guarded];
       });
     }, (error) => console.warn('studyMaterials snapshot error:', error));
 
