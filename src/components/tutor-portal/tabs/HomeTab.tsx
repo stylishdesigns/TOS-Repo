@@ -10,7 +10,8 @@ import {
   X,
   ClipboardList,
   BarChart3,
-  Wallet
+  Wallet,
+  Award
 } from 'lucide-react';
 import { formatPayInfo } from '../../staff/PaySetupFields';
 import { formatDateLong } from '../../../lib/paymentDates';
@@ -111,40 +112,56 @@ export const HomeTab: React.FC<HomeTabProps> = ({ tutor, onNavigateTab }) => {
 
   return (
     <div className="space-y-4 px-4 py-3 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* 1. Tutor Profile Greeting Card: photo, greeting, date; tapping it opens the full greetings splash */}
-      <button
+      {/* 1. Tutor Hero Welcome Card: the same design language as the student portal */}
+      <div
         onClick={() => setShowGreeting(true)}
-        className="relative overflow-hidden rounded-3xl bg-slate-950 text-white border border-slate-800 p-6 shadow-lg shadow-black/10 text-left cursor-pointer active:scale-[0.99] transition-transform w-full"
+        className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-[#0F172A] text-white p-5 shadow-lg border border-slate-700/60 cursor-pointer active:scale-[0.99] transition-transform"
       >
-        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl" />
-        <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2 blur-xl" />
+        <div className="absolute top-0 right-0 w-36 h-36 bg-orange-500/15 rounded-full blur-2xl pointer-events-none" />
+        <div className="absolute bottom-0 left-10 w-24 h-24 bg-amber-500/10 rounded-full blur-xl pointer-events-none" />
 
-        <div className="relative z-10 flex items-center space-x-4">
-          {tutor.avatar ? (
-            <img
-              src={tutor.avatar}
-              alt={tutor.name}
-              className="w-16 h-16 rounded-2xl object-cover border-2 border-white/20 shadow-lg shrink-0"
-            />
-          ) : (
-            <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center font-black text-2xl shadow-lg shrink-0">
-              {tutor.name.split(' ').map(n => n[0]).slice(0, 2).join('')}
+        <div className="relative z-10 flex items-start justify-between gap-3">
+          <div className="flex items-center space-x-3.5 min-w-0">
+            <div className="relative shrink-0">
+              {tutor.avatar ? (
+                <img
+                  src={tutor.avatar}
+                  alt={tutor.name}
+                  className="w-14 h-14 rounded-2xl object-cover border-2 border-orange-500/70 shadow-md"
+                />
+              ) : (
+                <div className="w-14 h-14 rounded-2xl bg-white/10 border-2 border-orange-500/70 flex items-center justify-center text-lg font-black text-white/80">
+                  {tutor.name.split(' ').map(n => n[0]).slice(0, 2).join('')}
+                </div>
+              )}
             </div>
-          )}
-          <div className="min-w-0">
-            <h2 className="text-2xl font-black tracking-tight leading-tight">
-              Hello, {tutor.name.split(' ')[0]}!
-            </h2>
-            <p className="text-[10px] font-black uppercase tracking-widest opacity-100 mt-1 flex items-center gap-1.5">
-              <Calendar className="w-3 h-3" />
-              <span>{new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</span>
-            </p>
-            <p className="text-xs font-bold opacity-100 mt-1">
-              {tutor.department || 'Academics'} • {settings.academicSession}
-            </p>
+            <div className="min-w-0">
+              <span className="text-xs text-orange-400 font-semibold">{`Good ${timeOfDay},`}</span>
+              <h2 className="text-lg font-black tracking-tight text-white line-clamp-1">
+                {tutor.name}
+              </h2>
+              <p className="text-[10px] font-bold text-slate-400 mt-0.5 flex items-center gap-1">
+                <Calendar className="w-3 h-3 text-orange-400" />
+                <span>Day: {new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</span>
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={(e) => { e.stopPropagation(); setShowGreeting(true); }}
+            className="shrink-0 p-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-slate-200 transition-colors"
+            title="Full greetings"
+          >
+            <Award className="w-5 h-5 text-orange-400" />
+          </button>
+        </div>
+
+        <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs">
+          <div className="flex items-center space-x-1.5 text-slate-300 min-w-0">
+            <BookOpen className="w-3.5 h-3.5 text-orange-400 shrink-0" />
+            <span className="font-semibold truncate">{tutor.department || 'Academics'} • {settings.academicSession}</span>
           </div>
         </div>
-      </button>
+      </div>
 
       {/* 1b. Pay flash: their next pay date, straight from the pay setup */}
       {(() => {
@@ -218,7 +235,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({ tutor, onNavigateTab }) => {
       {/* 3. Quick Access: one-tap shortcuts into the sections the bottom nav does not carry */}
       <div className="space-y-2.5">
         <h3 className="font-black text-slate-900 text-sm uppercase tracking-wider px-1">Quick Access</h3>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 gap-3">
           {QUICK_ACCESS.map((s) => (
             <button
               key={s.key}
@@ -232,6 +249,17 @@ export const HomeTab: React.FC<HomeTabProps> = ({ tutor, onNavigateTab }) => {
               <p className="text-[9px] font-bold text-slate-400 mt-0.5">{s.caption}</p>
             </button>
           ))}
+
+          <button
+            onClick={() => setShowSchedule(true)}
+            className="bg-white rounded-2xl border border-slate-200 shadow-xs p-3.5 text-left group hover:border-[var(--brand,#EA580C)] hover:scale-[1.02] transition-all cursor-pointer"
+          >
+            <div className="w-9 h-9 rounded-xl bg-slate-50 flex items-center justify-center">
+              <Calendar className="w-4 h-4 text-[var(--brand,#EA580C)]" />
+            </div>
+            <p className="text-[11px] font-black text-slate-900 mt-2.5 leading-tight">My Planner</p>
+            <p className="text-[9px] font-bold text-slate-400 mt-0.5">Your schedule</p>
+          </button>
         </div>
       </div>
 
@@ -331,31 +359,11 @@ export const HomeTab: React.FC<HomeTabProps> = ({ tutor, onNavigateTab }) => {
         </div>
       </div>
 
-      {/* 4. My Schedule: the teaching calendar moved here from the Classes header */}
-      <div className="space-y-4">
-        <h3 className="font-black text-slate-900 text-sm uppercase tracking-wider px-1">My Schedule</h3>
-        <button
-          onClick={() => setShowSchedule(true)}
-          className="w-full flex items-center justify-between p-5 bg-white rounded-2xl border border-slate-200 hover:border-[var(--brand,#EA580C)] shadow-xs transition-all group"
-        >
-          <div className="flex items-center space-x-4">
-            <div className="w-12 h-12 rounded-2xl bg-slate-900 flex items-center justify-center shrink-0">
-              <Calendar className="w-6 h-6 text-white" />
-            </div>
-            <div className="text-left">
-              <p className="text-sm font-black text-slate-900">Teaching Calendar</p>
-              <p className="text-[10px] font-bold text-slate-500 mt-0.5">Open your full schedule and planner</p>
-            </div>
-          </div>
-          <ChevronRight strokeWidth={2.75} className="w-5 h-5 text-slate-700 group-hover:text-[var(--brand,#EA580C)] group-hover:translate-x-1 transition-all" />
-        </button>
-      </div>
-
       <CalendarView
         isOpen={showSchedule}
         onClose={() => setShowSchedule(false)}
         activities={[...slotsToActivities(myClasses), ...plannerReminders]}
-        title="My Teaching Schedule"
+        title="My Planner"
         onAddActivity={addPlannerReminder}
         onRemoveActivity={removePlannerReminder}
         onEditActivity={updatePlannerReminder}

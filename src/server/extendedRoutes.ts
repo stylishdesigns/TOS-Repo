@@ -2,6 +2,7 @@ import express from 'express';
 import * as crypto from 'crypto';
 import { STARTING_CONFIG } from './platformDefaults';
 import { adminAuth, adminDb } from './firebaseAdmin';
+import { runStaffPayReminderSweep } from './staffPayReminders';
 import {
   Caller,
   effectiveStatus,
@@ -1148,6 +1149,24 @@ export function registerExtendedRoutes(app: express.Express): void {
   // CENTRE: staff pay records. Owners and admins record what was actually
   // paid, with optional screenshot evidence; staff read only their own
   // records. Amounts are whatever the owner paid, never auto-computed.
+  // CENTRE: run the automatic staff pay reminder sweep for this facility now.
+  // The Netlify scheduled function (staff-pay-reminders.mts) does the same
+  // sweep every morning in production; this route lets an owner test or run
+  // it on demand. Sends are deduplicated per staff member, day and channel.
+  app.post('/api/centre/staff-pay-reminders/run', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const centreId = String(req.body?.centreId || '');
+      if (!centreId) return res.status(400).json({ error: 'centreId is required.' });
+      await requireMembership(caller, centreId, ['owner', 'admin']);
+      const result = await runStaffPayReminderSweep({ centreId });
+      res.json({ ok: true, ...result });
+    } catch (error: any) {
+      console.error('[staff pay reminders] failed:', error?.message || error);
+      res.status(error?.status || 500).json({ error: error?.message || 'Could not run the reminders.' });
+    }
+  });
+
   app.post('/api/centre/staff-payments', async (req, res) => {
     try {
       const caller = getCaller(req);

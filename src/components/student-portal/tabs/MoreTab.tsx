@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { initialsAvatar } from '../../../lib/avatar';
 import { nextPaymentDue, formatDateLong } from '../../../lib/paymentDates';
 import { useApp } from '../../../context/AppContext';
+import { getAuth, signInWithEmailAndPassword, updatePassword } from 'firebase/auth';
 import { api, Json } from '../../tos/tosShared';
 import { Student } from '../../../types';
 import { ModernSelect } from '../../ui/ModernSelect';
@@ -589,6 +590,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
 
 
   // Password fields state
+  const [savingPw, setSavingPw] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -762,7 +764,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
   };
 
   // Handle password update
-  const handleUpdatePassword = (e: React.FormEvent) => {
+  const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentPassword || !newPassword) {
       addToast({
@@ -780,15 +782,36 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
       });
       return;
     }
-    addToast({
-      type: 'success',
-      title: 'Password Changed',
-      description: 'Your portal login password was successfully changed.',
-    });
-    setCurrentPassword('');
-    setNewPassword('');
-    setConfirmPassword('');
-    setActiveModal(null);
+    setSavingPw(true);
+    try {
+      const auth = getAuth();
+      const user = auth.currentUser;
+      if (!user || !user.email) throw new Error('You are signed out.');
+      // Confirming the current password first is what lets Firebase allow the change.
+      await signInWithEmailAndPassword(auth, user.email, currentPassword);
+      await updatePassword(user, newPassword);
+      addToast({
+        type: 'success',
+        title: 'Password Changed',
+        description: 'Your portal login password was successfully changed.',
+      });
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setActiveModal(null);
+    } catch (err: any) {
+      const code = String(err?.code || '');
+      const msg = code.includes('wrong-password') || code.includes('invalid-credential')
+        ? 'Your current password is not correct.'
+        : code.includes('weak-password')
+        ? 'The new password is too weak; use at least 6 characters.'
+        : code.includes('too-many-requests')
+        ? 'Too many attempts. Try again in a few minutes.'
+        : err?.message || 'Could not change the password.';
+      addToast({ type: 'error', title: 'Change Failed', description: msg });
+    } finally {
+      setSavingPw(false);
+    }
   };
 
   const handleEvidenceFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -2199,9 +2222,10 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                   <div className="pt-3">
                     <button
                       type="submit"
-                      className="w-full py-3.5 px-4 rounded-xl bg-slate-900 hover:bg-black text-white font-bold text-sm shadow-md active:scale-98 transition-all"
+                      disabled={savingPw}
+                      className="w-full py-3.5 px-4 rounded-xl bg-slate-900 hover:bg-black text-white font-bold text-sm shadow-md active:scale-98 transition-all disabled:opacity-60"
                     >
-                      Update Password
+                      {savingPw ? 'Updating...' : 'Update Password'}
                     </button>
                   </div>
                 </form>

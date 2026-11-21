@@ -296,6 +296,36 @@ export const StaffPayManager: React.FC = () => {
     }
   };
 
+  // Automatic reminders: the daily server sweep sends these on its own; this
+  // button runs the same sweep for this facility right now (handy for testing).
+  const [remindersRunning, setRemindersRunning] = useState(false);
+  const runReminders = async () => {
+    if (remindersRunning) return;
+    setRemindersRunning(true);
+    try {
+      const token = (await getAuth().currentUser?.getIdToken()) || '';
+      const res = await fetch('/api/centre/staff-pay-reminders/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ centreId: activeCentreId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || 'Could not run the reminders.');
+      const parts = [`chat ${data.chatted || 0}`, `push ${data.pushed || 0}`, `email ${data.emailed || 0}`];
+      addToast({
+        type: 'success',
+        title: (data.reminded || 0) > 0 ? 'Reminders Sent' : 'Nobody To Remind',
+        description: (data.reminded || 0) > 0
+          ? `${data.reminded} staff member(s) due or overdue were reminded (${parts.join(', ')}).`
+          : 'No staff member is due or overdue for pay right now.',
+      });
+    } catch (err: any) {
+      addToast({ type: 'error', title: 'Reminders Failed', description: err?.message || 'Could not run the reminders.' });
+    } finally {
+      setRemindersRunning(false);
+    }
+  };
+
   useEffect(() => {
     if (activeCentreId) loadPayments();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -382,6 +412,15 @@ export const StaffPayManager: React.FC = () => {
             Pay your tutors and admins, keep the record, and attach the screenshot as evidence.
           </p>
         </div>
+        <button
+          onClick={runReminders}
+          disabled={remindersRunning}
+          className="px-3 py-2 text-[10px] font-black text-slate-600 bg-white border border-slate-200 rounded-lg uppercase tracking-wider inline-flex items-center space-x-1.5 hover:bg-slate-50 disabled:opacity-50"
+        >
+          <Bell className="w-3.5 h-3.5" />
+          <span>{remindersRunning ? 'Sending...' : 'Send Reminders'}</span>
+        </button>
+
         <button
           onClick={loadPayments}
           className="px-3 py-2 text-[10px] font-black text-slate-600 bg-white border border-slate-200 rounded-lg uppercase tracking-wider inline-flex items-center space-x-1.5 hover:bg-slate-50"
