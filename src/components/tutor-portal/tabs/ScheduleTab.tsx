@@ -326,7 +326,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({ tutor, initialSection 
                        </div>
                     </div>
                     <div className="w-8 h-8 rounded-full bg-white border border-amber-200 flex items-center justify-center text-amber-500 group-hover:bg-amber-500 group-hover:text-white transition-all">
-                       <ChevronRight className="w-5 h-5" />
+                       <ChevronRight strokeWidth={2.75} className="w-5 h-5" />
                     </div>
                  </div>
               </div>

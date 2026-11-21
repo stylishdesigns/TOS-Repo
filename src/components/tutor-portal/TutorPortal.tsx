@@ -65,6 +65,14 @@ export const TutorPortal: React.FC = () => {
   const [chatMode, setChatMode] = useState<ChatMode>('status');
   const [desktopViewMode, setDesktopViewMode] = useState<'mobile_frame' | 'expanded'>('mobile_frame');
 
+  // Sheets that render straight into the document body (the material viewer)
+  // sit outside this component, so the dark remap has to travel on body too.
+  useEffect(() => {
+    if (bgTheme === 'dark') document.body.classList.add('tos-student-dark');
+    else document.body.classList.remove('tos-student-dark');
+    return () => document.body.classList.remove('tos-student-dark');
+  }, [bgTheme]);
+
   const activeTutor = contextTutor || {
     id: 'loading',
     name: 'Loading Tutor Profile...',

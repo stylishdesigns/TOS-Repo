@@ -1014,7 +1014,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor, initialView
                             onClick={() => setExpandedExamId(expandedExamId === exam.id ? null : exam.id)}
                             className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${expandedExamId === exam.id ? 'bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)]' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
                          >
-                            <ChevronDown className={`w-5 h-5 transition-transform duration-300 ${expandedExamId === exam.id ? 'rotate-180' : 'rotate-0'}`} />
+                            <ChevronDown strokeWidth={2.75} className={`w-5 h-5 transition-transform duration-300 ${expandedExamId === exam.id ? 'rotate-180' : 'rotate-0'}`} />
                          </button>
                       </div>
                    </div>
@@ -1237,7 +1237,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor, initialView
                           <span className="leading-none">
                             Review
                           </span>
-                          <ChevronRight className="w-3.5 h-3.5 text-orange-400" />
+                          <ChevronRight strokeWidth={2.75} className="w-3.5 h-3.5 text-orange-400" />
                         </button>
                       </>
                     ) : (

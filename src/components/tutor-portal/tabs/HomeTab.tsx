@@ -131,11 +131,11 @@ export const HomeTab: React.FC<HomeTabProps> = ({ tutor, onNavigateTab }) => {
             <h2 className="text-2xl font-black tracking-tight leading-tight">
               Hello, {tutor.name.split(' ')[0]}!
             </h2>
-            <p className="text-[10px] font-black uppercase tracking-widest opacity-90 mt-1 flex items-center gap-1.5">
+            <p className="text-[10px] font-black uppercase tracking-widest opacity-100 mt-1 flex items-center gap-1.5">
               <Calendar className="w-3 h-3" />
               <span>{new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</span>
             </p>
-            <p className="text-[11px] font-medium opacity-75 mt-1">
+            <p className="text-xs font-bold opacity-100 mt-1">
               {tutor.department || 'Academics'} • {settings.academicSession}
             </p>
           </div>
@@ -167,7 +167,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({ tutor, onNavigateTab }) => {
             <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center">
               <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
             </div>
-            <ChevronRight className="w-3.5 h-3.5 text-slate-300" />
+            <ChevronRight strokeWidth={2.75} className="w-3.5 h-3.5 text-slate-700" />
           </div>
           <p className="text-3xl font-black tracking-tighter text-slate-900">{tutor.rating?.toFixed(1) || '0.0'}</p>
           <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">Tutor Rating</p>
@@ -211,7 +211,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({ tutor, onNavigateTab }) => {
               </p>
             </div>
           </div>
-          <ChevronRight className="w-5 h-5 text-white/40 group-hover:text-white group-hover:translate-x-1 transition-all shrink-0" />
+          <ChevronRight strokeWidth={2.75} className="w-5 h-5 text-white/90 group-hover:text-white group-hover:translate-x-1 transition-all shrink-0" />
         </button>
       )}
 
@@ -228,7 +228,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({ tutor, onNavigateTab }) => {
               <p className="text-[10px] font-bold text-amber-700">Review the schedule and confirm</p>
             </div>
           </div>
-          <ChevronRight className="w-5 h-5 text-amber-400 group-hover:translate-x-1 transition-all shrink-0" />
+          <ChevronRight strokeWidth={2.75} className="w-5 h-5 text-amber-600 group-hover:translate-x-1 transition-all shrink-0" />
         </button>
       )}
 
@@ -283,7 +283,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({ tutor, onNavigateTab }) => {
                     </div>
                   </div>
                 </div>
-                <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-[var(--brand,#EA580C)] group-hover:translate-x-1 transition-all" />
+                <ChevronRight strokeWidth={2.75} className="w-5 h-5 text-slate-700 group-hover:text-[var(--brand,#EA580C)] group-hover:translate-x-1 transition-all" />
               </div>
             ))
           )}
@@ -306,7 +306,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({ tutor, onNavigateTab }) => {
               <p className="text-[10px] font-bold text-slate-500 mt-0.5">Open your full schedule and planner</p>
             </div>
           </div>
-          <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-[var(--brand,#EA580C)] group-hover:translate-x-1 transition-all" />
+          <ChevronRight strokeWidth={2.75} className="w-5 h-5 text-slate-700 group-hover:text-[var(--brand,#EA580C)] group-hover:translate-x-1 transition-all" />
         </button>
       </div>
 

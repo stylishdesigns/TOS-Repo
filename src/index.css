@@ -261,10 +261,10 @@ span.text-slate-600:not(.dark-bg-mode *) {
 .tos-student-dark .text-slate-900 { color: #f1f5f9; }
 .tos-student-dark .text-slate-800 { color: #e2e8f0; }
 .tos-student-dark .text-slate-700 { color: #cbd5e1; }
-.tos-student-dark .text-slate-600 { color: #94a3b8; }
-.tos-student-dark .text-slate-500 { color: #94a3b8; }
-.tos-student-dark .text-slate-400 { color: #64748b; }
-.tos-student-dark .text-slate-300 { color: #64748b; }
+.tos-student-dark .text-slate-600 { color: #cbd5e1; }
+.tos-student-dark .text-slate-500 { color: #cbd5e1; }
+.tos-student-dark .text-slate-400 { color: #94a3b8; }
+.tos-student-dark .text-slate-300 { color: #94a3b8; }
 .tos-student-dark .text-\[\#0F172A\] { color: #f1f5f9; }
 .tos-student-dark .text-\[\#334155\] { color: #cbd5e1; }
 .tos-student-dark .text-\[\#475569\] { color: #94a3b8; }
@@ -297,6 +297,14 @@ span.text-slate-600:not(.dark-bg-mode *) {
 .tos-student-dark .bg-\[\#FFF7ED\] { background-color: color-mix(in oklab, var(--brand, #EA580C) 14%, #0d1526); }
 .tos-student-dark .bg-\[\#F1F5F9\] { background-color: #1a2438; }
 .tos-student-dark .bg-\[\#F8FAFC\] { background-color: #0d1526; }
+
+/* Fourth wave: in dark mode the secondary slate captions read as darkened
+   remnants of light mode. They now sit near-white and carry weight so the
+   whole screen reads deliberately dark instead of half-lit. */
+.tos-student-dark .text-slate-600,
+.tos-student-dark .text-slate-500,
+.tos-student-dark .text-slate-400,
+.tos-student-dark .text-slate-300 { font-weight: 600; }
 
 /* Second wave: coloured texts that went murky on dark surfaces, the dark
    buttons that looked faded on dark cards, and the remaining tinted

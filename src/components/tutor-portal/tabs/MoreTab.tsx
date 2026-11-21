@@ -378,4 +378,4 @@ export const MoreTab: React.FC<MoreTabProps> = ({ tutor, onExit }) => {
 };
 
 // A small chevron that keeps the row markup short.
-const ChevronRightSpacer = () => <ChevronRight className="w-4 h-4 text-slate-300" />;
+const ChevronRightSpacer = () => <ChevronRight strokeWidth={2.75} className="w-4 h-4 text-slate-700" />;
