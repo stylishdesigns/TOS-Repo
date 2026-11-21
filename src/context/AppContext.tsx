@@ -2127,9 +2127,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }, (error) => console.warn('classRatings snapshot error:', error));
 
     // Study Materials listener
+    // While Firestore rules still deny studyMaterials reads/writes, an upload
+    // only reaches local state (the write fails, so the server stream never
+    // carries it) and an empty or reconnecting snapshot would wipe it, along
+    // with the copy hydrated from localStorage. Merge the server view with
+    // locally-added entries (mat- ids) until the server stream carries them;
+    // once rules allow the write, the doc arrives in the stream and dedupes.
     const unsubStudyMaterials = onSnapshot(centreQuery('studyMaterials'), (snapshot) => {
       const data = scopedDocs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as StudyMaterial)));
-      setStudyMaterials(data);
+      setStudyMaterials((prev) => {
+        const serverIds = new Set(data.map(d => d.id));
+        const localOnly = prev.filter(m => !serverIds.has(m.id) && typeof m.id === 'string' && m.id.startsWith('mat-'));
+        return [...localOnly, ...data];
+      });
     }, (error) => console.warn('studyMaterials snapshot error:', error));
 
     return () => {
