@@ -293,7 +293,7 @@ export const TutorMaterialsSection: React.FC<TutorMaterialsSectionProps> = ({
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); setViewing(m); }}
-            className="w-full h-10 rounded-xl bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-1.5 hover:brightness-110 transition-all cursor-pointer"
+            className="w-full h-8 rounded-lg bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-1.5 hover:brightness-110 transition-all cursor-pointer"
           >
             {isVideo ? <PlayCircle className="w-4 h-4" /> : <BookOpen className="w-4 h-4" />}
             View
@@ -452,9 +452,6 @@ export const TutorMaterialsSection: React.FC<TutorMaterialsSectionProps> = ({
       {/* 1. Heading + add button */}
       <div className="flex items-start justify-between gap-3">
         <div>
-          <span className="text-[10px] font-extrabold uppercase text-[var(--brand,#EA580C)] tracking-wider block">
-            {tutor.name} · Learning Resources
-          </span>
           <h2 className="text-xl font-black text-[#0F172A] tracking-tight">Study Materials</h2>
           <p className="text-xs text-[#64748B] font-medium mt-0.5">
             Upload PDFs and images, or share lesson video links. Materials show on your students' portal.
@@ -690,7 +687,7 @@ export const TutorMaterialsSection: React.FC<TutorMaterialsSectionProps> = ({
                         <input
                           type="file"
                           multiple
-                          accept={editId ? '.pdf,application/pdf,image/*' : materialType === 'pdf' ? 'application/pdf' : 'image/*'}
+                          accept={'.pdf,application/pdf,.jpg,.jpeg,.png,.webp,.gif,.heic,.heif'}
                           className="hidden"
                           onChange={(e) => {
                             const picked = Array.from(e.target.files || []);
