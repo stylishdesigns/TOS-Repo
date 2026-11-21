@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, ChevronLeft, ChevronRight, FileText, PlayCircle, ExternalLink } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, FileText, PlayCircle, ExternalLink, Minus, Plus } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { StudyMaterial } from '../../types';
@@ -35,7 +35,7 @@ const looksPdf = (f: { url: string; name?: string }, materialType?: string) =>
 // PDF pages rendered straight onto canvases inside the app. An iframe to the
 // file host was dropped: browsers without the PDF plugin (and iOS Safari)
 // show a dead placeholder or an Open-to-host link instead of the document.
-export const PdfDocumentView: React.FC<{ url: string; name: string }> = ({ url }) => {
+export const PdfDocumentView: React.FC<{ url: string; name: string; zoom?: number }> = ({ url, zoom = 1 }) => {
   const pagesRef = useRef<HTMLDivElement | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [progressLabel, setProgressLabel] = useState('');
@@ -93,7 +93,7 @@ export const PdfDocumentView: React.FC<{ url: string; name: string }> = ({ url }
 
   return (
     <div className="w-full h-full rounded-xl bg-white shadow-2xl overflow-y-auto overscroll-contain">
-      <div ref={pagesRef} className="flex flex-col items-center gap-4 p-3 sm:p-5" />
+      <div ref={pagesRef} className="flex flex-col items-center gap-4 p-3 sm:p-5" style={zoom !== 1 ? { zoom } : undefined} />
       {status === 'loading' && (
         <div className="flex flex-col items-center justify-center gap-3 py-16 text-slate-500">
           <div className="h-1.5 w-40 overflow-hidden rounded-full bg-slate-200">
@@ -118,10 +118,17 @@ export const MaterialViewer: React.FC<{
   onClose: () => void;
 }> = ({ material, onClose }) => {
   const [idx, setIdx] = useState(0);
+  const [zoom, setZoom] = useState(1);
 
   useEffect(() => {
     setIdx(0);
+    setZoom(1);
   }, [material?.id]);
+
+  // A different file starts fresh at its fit-to-screen size.
+  useEffect(() => {
+    setZoom(1);
+  }, [idx]);
 
   const files = useMemo<ViewerFile[]>(() => {
     if (!material) return [];
@@ -175,15 +182,48 @@ export const MaterialViewer: React.FC<{
 
       {/* Body */}
       <div className="flex-1 min-h-0 relative flex items-center justify-center p-3 sm:p-6">
+        {current.kind !== 'video' && (
+          <div className="absolute top-2 right-2 sm:top-3 sm:right-3 z-20 flex items-center gap-0.5 rounded-full bg-slate-900/90 border border-white/10 px-1.5 py-1 shadow-lg backdrop-blur-sm">
+            <button
+              type="button"
+              onClick={() => setZoom((z) => Math.max(1, Math.round((z - 0.5) * 10) / 10))}
+              disabled={zoom <= 1}
+              aria-label="Zoom out"
+              className="w-8 h-8 rounded-full text-white flex items-center justify-center hover:bg-white/10 disabled:opacity-40 disabled:hover:bg-transparent transition-colors cursor-pointer"
+            >
+              <Minus className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setZoom(1)}
+              aria-label="Reset zoom"
+              className="w-12 h-8 rounded-full text-white text-[10px] font-black tracking-wide hover:bg-white/10 transition-colors cursor-pointer"
+            >
+              {Math.round(zoom * 100)}%
+            </button>
+            <button
+              type="button"
+              onClick={() => setZoom((z) => Math.min(3, Math.round((z + 0.5) * 10) / 10))}
+              disabled={zoom >= 3}
+              aria-label="Zoom in"
+              className="w-8 h-8 rounded-full text-white flex items-center justify-center hover:bg-white/10 disabled:opacity-40 disabled:hover:bg-transparent transition-colors cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+          </div>
+        )}
         {current.kind === 'image' && (
-          <img
-            src={current.url}
-            alt={current.name || material.title}
-            className="max-w-full max-h-full object-contain rounded-xl shadow-2xl"
-          />
+          <div className="w-full h-full overflow-auto flex">
+            <img
+              src={current.url}
+              alt={current.name || material.title}
+              className="m-auto max-w-full max-h-full object-contain rounded-xl shadow-2xl"
+              style={zoom !== 1 ? { zoom } : undefined}
+            />
+          </div>
         )}
         {current.kind === 'pdf' && (
-          <PdfDocumentView url={current.url} name={current.name || material.title} />
+          <PdfDocumentView url={current.url} name={current.name || material.title} zoom={zoom} />
         )}
         {current.kind === 'video' && (
           toEmbedUrl(current.url) ? (

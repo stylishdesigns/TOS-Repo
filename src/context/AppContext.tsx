@@ -610,10 +610,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setStudyMaterials((prev) => [newMaterial, ...prev]);
 
       try {
-        // Firestore rejects `undefined` values (an unset topic/description on
-        // general materials): strip them so the save writes only real fields.
-        const payload = JSON.parse(JSON.stringify(tenantWrite(newMaterial)));
-        await setDoc(doc(db, 'studyMaterials', newId), payload);
+        // The server route writes through the Admin SDK, so the upload reaches
+        // every student of the centre even when the deployed Firestore rules
+        // release is older than the app. The direct write stays as fallback.
+        let saved = false;
+        try {
+          await api(`/api/centre/study-materials?centreId=${encodeURIComponent(activeCentreId || '')}`, {
+            method: 'POST',
+            body: { centreId: activeCentreId, material: newMaterial },
+          });
+          saved = true;
+        } catch (serverErr: any) {
+          console.warn('Study material server save failed, trying direct write:', serverErr?.message || serverErr);
+        }
+        if (!saved) {
+          // Firestore rejects `undefined` values (an unset topic/description on
+          // general materials): strip them so the save writes only real fields.
+          const payload = JSON.parse(JSON.stringify(tenantWrite(newMaterial)));
+          await setDoc(doc(db, 'studyMaterials', newId), payload);
+        }
         // Students taking this subject get a notification about the upload.
         const typeLabel = newMaterial.type === 'video' ? 'Video link' : newMaterial.type === 'image' ? 'Image' : (newMaterial.fileType || 'PDF');
         void api('/api/notifications/push', { method: 'POST', body: {
@@ -646,9 +661,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (!current) return;
       const merged: StudyMaterial = { ...current, ...patch };
       setStudyMaterials((prev) => prev.map((m) => (m.id === id ? merged : m)));
+      let saved = false;
       try {
-        const payload = JSON.parse(JSON.stringify(tenantWrite(merged)));
-        await setDoc(doc(db, 'studyMaterials', id), payload);
+        await api(`/api/centre/study-materials/${encodeURIComponent(id)}?centreId=${encodeURIComponent(activeCentreId || '')}`, {
+          method: 'PATCH',
+          body: { centreId: activeCentreId, patch },
+        });
+        saved = true;
+      } catch (serverErr: any) {
+        console.warn('Study material server update failed, trying direct write:', serverErr?.message || serverErr);
+      }
+      try {
+        if (!saved) {
+          const payload = JSON.parse(JSON.stringify(tenantWrite(merged)));
+          await setDoc(doc(db, 'studyMaterials', id), payload);
+        }
         addToast({
           type: 'success',
           title: 'Material Updated',

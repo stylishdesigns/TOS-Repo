@@ -92,6 +92,9 @@ export const TutorMaterialsSection: React.FC<TutorMaterialsSectionProps> = ({
   const [editSubject, setEditSubject] = useState('');
   const [editTopic, setEditTopic] = useState('');
   const [editDescription, setEditDescription] = useState('');
+  const [editFiles, setEditFiles] = useState<Array<{ url: string; name?: string; sizeLabel?: string }>>([]);
+  const [editFilesBusy, setEditFilesBusy] = useState(false);
+  const [editVideoUrl, setEditVideoUrl] = useState('');
   const [editError, setEditError] = useState('');
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -342,6 +345,14 @@ export const TutorMaterialsSection: React.FC<TutorMaterialsSectionProps> = ({
     setEditSubject(detailsMaterial.subject || '');
     setEditTopic(detailsMaterial.topic || '');
     setEditDescription(detailsMaterial.description || '');
+    setEditFiles(
+      detailsMaterial.files && detailsMaterial.files.length > 0
+        ? detailsMaterial.files.map((f) => ({ url: f.url, name: f.name, sizeLabel: (f as any).sizeLabel }))
+        : detailsMaterial.downloadUrl
+          ? [{ url: detailsMaterial.downloadUrl, name: detailsMaterial.fileName, sizeLabel: undefined }]
+          : [],
+    );
+    setEditVideoUrl(detailsMaterial.type === 'video' ? detailsMaterial.videoUrl || '' : '');
     setEditError('');
     setEditing(true);
   };
@@ -353,17 +364,67 @@ export const TutorMaterialsSection: React.FC<TutorMaterialsSectionProps> = ({
     if (detailsMaterial.kind === 'topic' && !editTopic.trim()) {
       return setEditError('Write the lesson topic this material is for.');
     }
+    if (detailsMaterial.type !== 'video' && editFiles.length === 0) {
+      return setEditError('Keep at least one file (remove the material instead if it should go away).');
+    }
+    if (detailsMaterial.type === 'video' && !/^https?:\/\//i.test(editVideoUrl.trim())) {
+      return setEditError('Paste the full video link, starting with https://');
+    }
     setSaving(true);
     try {
-      await updateStudyMaterial(detailsMaterial.id, {
+      // File swap: if the file set changed, rewrite the file fields so the
+      // card, the info sheet and the viewer all read from the new list.
+      const originalUrls = (detailsMaterial.files && detailsMaterial.files.length > 0
+        ? detailsMaterial.files.map((f) => f.url)
+        : detailsMaterial.downloadUrl ? [detailsMaterial.downloadUrl] : []);
+      const changed = JSON.stringify(originalUrls) !== JSON.stringify(editFiles.map((f) => f.url));
+      const patch: Partial<StudyMaterial> = {
         title: editTitle.trim(),
         subject: editSubject.trim(),
         topic: detailsMaterial.kind === 'topic' ? editTopic.trim() : undefined,
         description: editDescription.trim() || undefined,
-      });
+      };
+      if (detailsMaterial.type === 'video') {
+        if (editVideoUrl.trim() !== (detailsMaterial.videoUrl || '')) {
+          patch.videoUrl = editVideoUrl.trim();
+          patch.downloadUrl = editVideoUrl.trim();
+        }
+      } else if (changed) {
+        let bytes = 0;
+        let parsed = true;
+        for (const f of editFiles) {
+          const m = /([\d.]+)\s*(KB|MB|GB)/i.exec(f.sizeLabel || '');
+          if (!m) { parsed = false; break; }
+          const n = parseFloat(m[1]);
+          bytes += Math.round(n * (m[2].toUpperCase() === 'KB' ? 1024 : m[2].toUpperCase() === 'GB' ? 1024 * 1024 * 1024 : 1024 * 1024));
+        }
+        patch.files = editFiles.map((f) => ({ url: f.url, name: f.name || 'file' })) as any;
+        patch.downloadUrl = editFiles[0].url;
+        patch.fileName = editFiles.length > 1 ? `${editFiles.length} files` : (editFiles[0].name || 'file');
+        patch.fileSize = parsed && bytes > 0 ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : undefined;
+      }
+      await updateStudyMaterial(detailsMaterial.id, patch);
       setEditing(false);
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Upload a replacement file straight away so Save only needs to write the
+  // new list to the material record.
+  const addEditFiles = async (picked: FileList | null) => {
+    if (!picked || picked.length === 0 || editFilesBusy) return;
+    setEditFilesBusy(true);
+    try {
+      for (const file of Array.from(picked)) {
+        const up = await uploadStudyMaterialFile(file, activeCentreId);
+        setEditFiles((prev) => [...prev, { url: up.url, name: up.name, sizeLabel: up.sizeLabel }]);
+      }
+      setEditError('');
+    } catch (err: any) {
+      setEditError(err?.message || 'The file could not be uploaded. Please try again.');
+    } finally {
+      setEditFilesBusy(false);
     }
   };
   const doDelete = async () => {
@@ -847,6 +908,64 @@ export const TutorMaterialsSection: React.FC<TutorMaterialsSectionProps> = ({
                         className="w-full h-20 p-3 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-900 focus:outline-none focus:border-[var(--brand,#EA580C)]"
                       />
                     </div>
+                    {/* Files: tap X to drop a saved file, then add the new one.
+                        Save rewrites the file list on the material record. */}
+                    {detailsMaterial.type !== 'video' && (
+                      <div>
+                        <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Files</label>
+                        <div className="space-y-1.5 mb-2">
+                          {editFiles.map((f, i) => (
+                            <div key={`${f.url}-${i}`} className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-slate-50 border border-slate-200">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <FileText className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                <span className="text-xs font-bold text-slate-800 truncate">{f.name || 'file'}</span>
+                              </div>
+                              <button
+                                type="button"
+                                disabled={editFilesBusy}
+                                onClick={() => setEditFiles(editFiles.filter((_, j) => j !== i))}
+                                aria-label="Remove file"
+                                className="w-6 h-6 rounded-md bg-white border border-slate-200 text-slate-400 hover:text-rose-600 hover:border-rose-200 flex items-center justify-center shrink-0 transition-colors cursor-pointer disabled:opacity-50"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ))}
+                          {editFiles.length === 0 && !editFilesBusy && (
+                            <p className="text-[11px] font-bold text-rose-600">No files on this material yet. Add at least one.</p>
+                          )}
+                        </div>
+                        <label className="w-full h-11 rounded-xl bg-white border-2 border-dashed border-slate-300 text-slate-600 text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:border-[var(--brand,#EA580C)] hover:text-[var(--brand,#EA580C)] transition-colors cursor-pointer">
+                          <input
+                            type="file"
+                            multiple
+                            accept={detailsMaterial.type === 'image' ? 'image/*' : '.pdf,application/pdf'}
+                            className="hidden"
+                            onChange={(e) => { addEditFiles(e.target.files); e.currentTarget.value = ''; }}
+                          />
+                          {editFilesBusy ? (
+                            <span className="text-[11px]">Uploading...</span>
+                          ) : (
+                            <>
+                              <Plus className="w-4 h-4" />
+                              <span>Add file(s)</span>
+                            </>
+                          )}
+                        </label>
+                      </div>
+                    )}
+                    {detailsMaterial.type === 'video' && (
+                      <div>
+                        <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Video link</label>
+                        <input
+                          type="text"
+                          value={editVideoUrl}
+                          onChange={(e) => setEditVideoUrl(e.target.value)}
+                          placeholder="https://..."
+                          className="w-full h-11 px-4 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-900 focus:outline-none focus:border-[var(--brand,#EA580C)]"
+                        />
+                      </div>
+                    )}
                     {editError && (
                       <div className="flex items-start gap-2 p-3 rounded-xl bg-rose-50 border border-rose-100">
                         <Info className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />

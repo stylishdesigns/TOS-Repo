@@ -383,6 +383,71 @@ export function registerExtendedRoutes(app: express.Express): void {
   // their centre. Centre isolation is checked on the material doc itself, so
   // one centre can never delete another centre's material.
   // ==========================================================================
+  // Study-material create runs on the server (Admin SDK) so an upload reaches
+  // every student of the centre even when the deployed Firestore rules release
+  // is older than the app. The browser keeps its local copy either way.
+  app.post('/api/centre/study-materials', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const centreId = String(req.query.centreId || req.body?.centreId || '').trim().slice(0, 120);
+      const material = req.body?.material || {};
+      if (!centreId) throw httpError(400, 'centreId is required.');
+      await requireMembership(caller, centreId, ['owner', 'admin', 'tutor']);
+      const id = String(material.id || '').trim().slice(0, 128);
+      if (!id || !/^[a-zA-Z0-9_-]{1,128}$/.test(id)) throw httpError(400, 'A valid material id is required.');
+      const title = String(material.title || '').trim().slice(0, 200);
+      const subject = String(material.subject || '').trim().slice(0, 120);
+      if (!title || !subject) throw httpError(400, 'Title and subject are required.');
+      const membership = await requireMembership(caller, centreId, ['owner', 'admin', 'tutor']);
+      const payload: Record<string, any> = {
+        ...material,
+        id,
+        title,
+        subject,
+        centreId,
+        uploadedAt: String(material.uploadedAt || new Date().toISOString()),
+      };
+      if (membership.role === 'tutor') payload.tutorId = caller.uid;
+      delete payload.ownedBy;
+      await adminDb.collection('studyMaterials').doc(id).set(payload);
+      res.json({ ok: true, id });
+    } catch (error: any) {
+      const status = Number(error?.status || 500);
+      res.status(status).json({ error: error?.message || 'Material upload failed.' });
+    }
+  });
+
+  // Study-material edit: same server path so an edit (including a replaced
+  // file list) persists for students regardless of the rules release.
+  app.patch('/api/centre/study-materials/:id', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const centreId = String(req.query.centreId || req.body?.centreId || '').trim().slice(0, 120);
+      const materialId = String(req.params?.id || '').trim().slice(0, 128);
+      if (!centreId) throw httpError(400, 'centreId is required.');
+      if (!/^[a-zA-Z0-9_-]{1,128}$/.test(materialId)) throw httpError(400, 'A valid material id is required.');
+      const membership = await requireMembership(caller, centreId, ['owner', 'admin', 'tutor']);
+      const ref = adminDb.collection('studyMaterials').doc(materialId);
+      const snap = await ref.get();
+      if (!snap.exists) throw httpError(404, 'This material no longer exists.');
+      const data = snap.data() || {};
+      if (String(data.centreId || '') !== centreId) throw httpError(403, 'You do not have access to this material.');
+      if (membership.role === 'tutor' && String(data.tutorId || '') !== caller.uid) {
+        throw httpError(403, 'You can only edit materials you uploaded.');
+      }
+      const patch: Record<string, any> = { ...(req.body?.patch || {}) };
+      delete patch.centreId;
+      delete patch.id;
+      delete patch.uploadedAt;
+      if (membership.role === 'tutor') patch.tutorId = caller.uid;
+      await ref.set(patch, { merge: true });
+      res.json({ ok: true });
+    } catch (error: any) {
+      const status = Number(error?.status || 500);
+      res.status(status).json({ error: error?.message || 'Material update failed.' });
+    }
+  });
+
   app.delete('/api/centre/study-materials/:id', async (req, res) => {
     try {
       const caller = getCaller(req);
