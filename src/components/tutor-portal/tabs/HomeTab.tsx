@@ -115,7 +115,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({ tutor, onNavigateTab }) => {
       {/* 1. Tutor Hero Welcome Card: the same design language as the student portal */}
       <div
         onClick={() => setShowGreeting(true)}
-        className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-[#0F172A] text-white p-5 shadow-lg border border-slate-700/60 cursor-pointer active:scale-[0.99] transition-transform"
+        className="relative overflow-hidden rounded-2xl bg-white text-slate-900 p-5 shadow-lg border border-slate-200 cursor-pointer active:scale-[0.99] transition-transform"
       >
         <div className="absolute top-0 right-0 w-36 h-36 bg-orange-500/15 rounded-full blur-2xl pointer-events-none" />
         <div className="absolute bottom-0 left-10 w-24 h-24 bg-amber-500/10 rounded-full blur-xl pointer-events-none" />
@@ -130,17 +130,17 @@ export const HomeTab: React.FC<HomeTabProps> = ({ tutor, onNavigateTab }) => {
                   className="w-14 h-14 rounded-2xl object-cover border-2 border-orange-500/70 shadow-md"
                 />
               ) : (
-                <div className="w-14 h-14 rounded-2xl bg-white/10 border-2 border-orange-500/70 flex items-center justify-center text-lg font-black text-white/80">
+                <div className="w-14 h-14 rounded-2xl bg-slate-50 border-2 border-orange-500/70 flex items-center justify-center text-lg font-black text-slate-500">
                   {tutor.name.split(' ').map(n => n[0]).slice(0, 2).join('')}
                 </div>
               )}
             </div>
             <div className="min-w-0">
               <span className="text-xs text-orange-400 font-semibold">{`Good ${timeOfDay},`}</span>
-              <h2 className="text-lg font-black tracking-tight text-white line-clamp-1">
+              <h2 className="text-lg font-black tracking-tight text-slate-900 line-clamp-1">
                 {tutor.name}
               </h2>
-              <p className="text-[10px] font-bold text-slate-400 mt-0.5 flex items-center gap-1">
+              <p className="text-[10px] font-bold text-slate-500 mt-0.5 flex items-center gap-1">
                 <Calendar className="w-3 h-3 text-orange-400" />
                 <span>Day: {new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</span>
               </p>
@@ -148,15 +148,15 @@ export const HomeTab: React.FC<HomeTabProps> = ({ tutor, onNavigateTab }) => {
           </div>
           <button
             onClick={(e) => { e.stopPropagation(); setShowGreeting(true); }}
-            className="shrink-0 p-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-slate-200 transition-colors"
+            className="shrink-0 p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-500 transition-colors"
             title="Full greetings"
           >
             <Award className="w-5 h-5 text-orange-400" />
           </button>
         </div>
 
-        <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs">
-          <div className="flex items-center space-x-1.5 text-slate-300 min-w-0">
+        <div className="mt-4 pt-3 border-t border-slate-200 flex items-center justify-between text-xs">
+          <div className="flex items-center space-x-1.5 text-slate-500 min-w-0">
             <BookOpen className="w-3.5 h-3.5 text-orange-400 shrink-0" />
             <span className="font-semibold truncate">{tutor.department || 'Academics'} • {settings.academicSession}</span>
           </div>
@@ -267,20 +267,20 @@ export const HomeTab: React.FC<HomeTabProps> = ({ tutor, onNavigateTab }) => {
       {nextClass && (
         <button
           onClick={() => onNavigateTab('classes')}
-          className="w-full flex items-center justify-between p-4 bg-slate-900 rounded-2xl text-white shadow-lg group hover:scale-[1.01] transition-all"
+          className="w-full flex items-center justify-between p-4 bg-white rounded-2xl border border-slate-200 text-slate-900 shadow-lg group hover:scale-[1.01] transition-all"
         >
           <div className="flex items-center space-x-3.5 min-w-0">
-            <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
-              <Clock className="w-5 h-5 text-white/80" />
+            <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
+              <Clock className="w-5 h-5 text-slate-500" />
             </div>
             <div className="text-left min-w-0">
-              <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Next Class Today</p>
+              <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Next Class Today</p>
               <p className="text-sm font-black truncate">
                 {nextClass.subject} · {formatTimeAMPM(nextClass.startTime || nextClass.time.split(' - ')[0])}
               </p>
             </div>
           </div>
-          <ChevronRight strokeWidth={2.75} className="w-5 h-5 text-white/90 group-hover:text-white group-hover:translate-x-1 transition-all shrink-0" />
+          <ChevronRight strokeWidth={2.75} className="w-5 h-5 text-slate-400 group-hover:text-slate-700 group-hover:translate-x-1 transition-all shrink-0" />
         </button>
       )}
 
@@ -329,7 +329,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({ tutor, onNavigateTab }) => {
                 className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between group hover:border-[var(--brand,#EA580C)] transition-all cursor-pointer"
               >
                 <div className="flex items-center space-x-4">
-                  <div className="w-12 h-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <div className="w-12 h-12 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center group-hover:scale-105 transition-transform">
                     <BookOpen className="w-6 h-6" />
                   </div>
                   <div>

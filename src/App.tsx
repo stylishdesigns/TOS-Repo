@@ -812,15 +812,19 @@ const MainLayout: React.FC = () => {
   // it sits above every signed-in screen.
   if (appWelcomeCentre && appWelcomeMode === 'signup') {
     return (
-      <StudentSignupFlow
-        centreName={appWelcomeCentre.centreName}
-        centreId={appWelcomeCentre.centreId}
-        accent={appWelcomeCentre.accent}
-        logoUrl={appWelcomeCentre.logoUrl}
-        onGoToDashboard={() => setAppWelcomeMode(null)}
-        onBack={() => setAppWelcomeMode('welcome')}
-        onSwitchToLogin={() => setAppWelcomeMode('login')}
-      />
+      // The signup flow is a facility-owned surface: wrap it in the facility's
+      // brand so its orange utilities follow the accent (inline styles already do).
+      <div style={brandVars(appWelcomeCentre.accent)}>
+        <StudentSignupFlow
+          centreName={appWelcomeCentre.centreName}
+          centreId={appWelcomeCentre.centreId}
+          accent={appWelcomeCentre.accent}
+          logoUrl={appWelcomeCentre.logoUrl}
+          onGoToDashboard={() => setAppWelcomeMode(null)}
+          onBack={() => setAppWelcomeMode('welcome')}
+          onSwitchToLogin={() => setAppWelcomeMode('login')}
+        />
+      </div>
     );
   }
 
