@@ -15,6 +15,10 @@ import {
   RefreshCw,
   Users,
   CheckCircle2,
+  Bell,
+  MessageSquare,
+  Phone,
+  Mail,
 } from 'lucide-react';
 import { formatPayInfo } from './PaySetupFields';
 import { formatDateLong, todayISO } from '../../lib/paymentDates';
@@ -251,11 +255,12 @@ const RecordPaymentModal: React.FC<{
 };
 
 export const StaffPayManager: React.FC = () => {
-  const { tutors, admins, activeCentreId, addToast } = useApp();
+  const { tutors, admins, activeCentreId, centreName, addToast } = useApp();
   const [payments, setPayments] = useState<StaffPayment[]>([]);
   const [loading, setLoading] = useState(true);
   const [recordFor, setRecordFor] = useState<StaffRow | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [remindFor, setRemindFor] = useState<string | null>(null);
 
   const staffRows: StaffRow[] = useMemo(() => {
     const rows: StaffRow[] = [];
@@ -291,6 +296,61 @@ export const StaffPayManager: React.FC = () => {
   const nextPayFor = (row: StaffRow): string | null => {
     const list = paymentsFor(row);
     return computeNextPayDate(row.doc.payFrequency, row.doc.payDay, list[0]?.datePaid || row.doc.lastPaidAt || null);
+  };
+
+  const waDigits = (v: string): string => {
+    let digits = (v || '').replace(/[^0-9]/g, '');
+    // Nigerian numbers are usually saved locally (0903...); wa.me needs 234....
+    if (digits.length === 11 && digits.startsWith('0')) digits = '234' + digits.slice(1);
+    return digits;
+  };
+
+  const reminderMessage = (row: StaffRow): string | null => {
+    if (!row.doc.payFrequency) return null;
+    const next = nextPayFor(row);
+    if (!next) return null;
+    const status = payDueStatus(next);
+    let due: string;
+    if (status === 'overdue') {
+      const d = overdueDays(next);
+      due = `Your payment from ${formatDateLong(next)} is now ${d} day${d > 1 ? 's' : ''} overdue.`;
+    } else if (status === 'due') {
+      due = `Your payment is due today, ${formatDateLong(next)}.`;
+    } else {
+      due = `Your next payment is due on ${formatDateLong(next)}.`;
+    }
+    return `Hello ${row.name}, this is a payment reminder from ${centreName}. ${due} Pay details: ${formatPayInfo(row.doc, row.collection === 'tutors')}.`;
+  };
+
+  const sendReminder = async (row: StaffRow, channel: 'chat' | 'whatsapp' | 'email') => {
+    setRemindFor(null);
+    const msg = reminderMessage(row);
+    if (!msg) {
+      addToast({ type: 'error', title: 'No Pay Cycle', description: `${row.name} has no pay cycle set yet.` });
+      return;
+    }
+    if (channel === 'chat') {
+      try {
+        await navigator.clipboard.writeText(msg);
+        addToast({ type: 'success', title: 'Copied', description: 'Reminder message copied. Paste it in chat.' });
+      } catch {
+        addToast({ type: 'error', title: 'Copy Failed', description: 'Could not copy the message. Try again.' });
+      }
+    } else if (channel === 'whatsapp') {
+      const digits = waDigits(row.doc.phone || '');
+      if (!digits) {
+        addToast({ type: 'error', title: 'No Phone Number', description: `${row.name} has no phone number on file.` });
+        return;
+      }
+      window.open(`https://wa.me/${digits}?text=${encodeURIComponent(msg)}`, '_blank');
+    } else {
+      const email = row.doc.email || '';
+      if (!email) {
+        addToast({ type: 'error', title: 'No Email', description: `${row.name} has no email address on file.` });
+        return;
+      }
+      window.location.href = `mailto:${email}?subject=${encodeURIComponent(`Payment reminder from ${centreName}`)}&body=${encodeURIComponent(msg)}`;
+    }
   };
 
   const monthPrefix = todayISO().slice(0, 7);
@@ -405,6 +465,33 @@ export const StaffPayManager: React.FC = () => {
                       : `Last paid ${naira(list[0].amount)} on ${formatDateLong(list[0].datePaid)}`}
                   </p>
                   <div className="flex items-center space-x-2">
+                    <div className="relative">
+                      <button
+                        onClick={() => setRemindFor(remindFor === row.id ? null : row.id)}
+                        className="px-3 py-1.5 text-[10px] font-bold rounded-lg border border-slate-200 text-slate-600 uppercase tracking-wider inline-flex items-center space-x-1 hover:bg-slate-50"
+                      >
+                        <Bell className="w-3 h-3" />
+                        <span>Remind</span>
+                      </button>
+                      {remindFor === row.id && (
+                        <div className="absolute right-0 top-full mt-1 z-20 bg-white rounded-xl border border-slate-200 shadow-lg py-1 w-44">
+                          {([
+                            { key: 'chat', label: 'Chat', Icon: MessageSquare },
+                            { key: 'whatsapp', label: 'WhatsApp', Icon: Phone },
+                            { key: 'email', label: 'Email', Icon: Mail },
+                          ] as const).map(({ key, label, Icon }) => (
+                            <button
+                              key={key}
+                              onClick={() => sendReminder(row, key)}
+                              className="w-full px-3 py-2 text-left text-[11px] font-bold text-slate-700 hover:bg-slate-50 flex items-center space-x-2"
+                            >
+                              <Icon className="w-3.5 h-3.5 text-slate-400" />
+                              <span>{label}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                     <button
                       onClick={() => setExpandedId(expandedId === row.id ? null : row.id)}
                       className="px-3 py-1.5 text-[10px] font-bold rounded-lg border border-slate-200 text-slate-600 uppercase tracking-wider inline-flex items-center space-x-1 hover:bg-slate-50"

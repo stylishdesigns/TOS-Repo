@@ -16,7 +16,13 @@ import {
   CalendarDays,
   Trophy,
   Inbox,
+  Wallet,
+  ChevronRight,
 } from 'lucide-react';
+import { getAuth } from 'firebase/auth';
+import { formatPayInfo } from '../staff/PaySetupFields';
+import { formatDateLong } from '../../lib/paymentDates';
+import { computeNextPayDate, payDueStatus, overdueDays } from '../../lib/staffPay';
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -32,6 +38,7 @@ export const DashboardOverview: React.FC = () => {
     results,
     attendanceLogs,
     activeUser,
+    activeCentreId,
     viewMode,
     setViewMode,
     setAdminSection,
@@ -58,6 +65,32 @@ export const DashboardOverview: React.FC = () => {
     if (hour < 12) return 'Good morning';
     if (hour < 17) return 'Good afternoon';
     return 'Good evening';
+  };
+
+  // My Pay: the signed-in staff admin's own pay setup and records. Only
+  // shows when the owner has set a pay cycle for them.
+  const [myPayOpen, setMyPayOpen] = React.useState(false);
+  const [myPayHistory, setMyPayHistory] = React.useState<any[] | null>(null);
+  const [myPayLoading, setMyPayLoading] = React.useState(false);
+
+  const openMyPay = async () => {
+    setMyPayOpen(true);
+    setMyPayLoading(true);
+    setMyPayHistory(null);
+    try {
+      const token = (await getAuth().currentUser?.getIdToken()) || '';
+      const res = await fetch(`/api/centre/staff-payments/mine?centreId=${encodeURIComponent(activeCentreId || '')}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || 'Could not load your pay records.');
+      setMyPayHistory(data.payments || []);
+    } catch (err: any) {
+      addToast({ type: 'error', title: 'Load Failed', description: err?.message || 'Could not load your pay records.' });
+      setMyPayHistory([]);
+    } finally {
+      setMyPayLoading(false);
+    }
   };
 
   // Live "today" for the facility's own clock.
@@ -211,6 +244,105 @@ export const DashboardOverview: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* My Pay flash: shows only when this signed-in admin has a pay setup */}
+      {(() => {
+        const me = activeUser as any;
+        if (!me?.payFrequency) return null;
+        const nextPay = computeNextPayDate(me.payFrequency, me.payDay, me.lastPaidAt);
+        if (!nextPay) return null;
+        const status = payDueStatus(nextPay);
+        const daysLate = status === 'overdue' ? overdueDays(nextPay) : 0;
+        return (
+          <button
+            onClick={openMyPay}
+            className={`w-full rounded-2xl p-4 flex items-center justify-between text-left border transition-all active:scale-[0.99] ${
+              status === 'overdue'
+                ? 'bg-rose-500 border-rose-400 text-white'
+                : 'bg-[var(--brand,#EA580C)] border-black/10 text-white'
+            }`}
+          >
+            <div className="flex items-center space-x-3 min-w-0">
+              <Wallet className="w-5 h-5 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-widest opacity-90">
+                  {status === 'overdue'
+                    ? `Pay overdue by ${daysLate} day${daysLate > 1 ? 's' : ''}`
+                    : status === 'due'
+                      ? 'Pay due today'
+                      : 'Next Pay'}
+                </p>
+                <p className="text-sm font-bold truncate">
+                  {formatDateLong(nextPay)} · {formatPayInfo(me, false)}
+                </p>
+              </div>
+            </div>
+            <ChevronRight className="w-4 h-4 opacity-90 shrink-0" />
+          </button>
+        );
+      })()}
+
+      {/* My Pay modal for non-tutor admins */}
+      {myPayOpen && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-xs" onClick={() => setMyPayOpen(false)}>
+          <div
+            className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 max-h-[88vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h3 className="font-bold text-base text-slate-900 flex items-center space-x-2">
+                <Wallet className="w-5 h-5 text-orange-600" />
+                <span>My Pay</span>
+              </h3>
+              <button onClick={() => setMyPayOpen(false)} className="text-slate-400 hover:text-slate-700">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="mt-4 space-y-4">
+              <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-100">
+                <p className="text-[10px] font-black uppercase tracking-widest text-emerald-700">Pay Setup</p>
+                <p className="text-sm font-black text-slate-900 mt-1">{formatPayInfo(activeUser as any, false)}</p>
+                {(() => {
+                  const me = activeUser as any;
+                  const nextPay = computeNextPayDate(me.payFrequency, me.payDay, me.lastPaidAt);
+                  if (!nextPay) return null;
+                  return (
+                    <p className="text-[11px] font-bold text-emerald-700 mt-1.5 flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5" />
+                      Next pay: {formatDateLong(nextPay)}
+                    </p>
+                  );
+                })()}
+              </div>
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Payment History</p>
+                {myPayLoading ? (
+                  <p className="text-xs text-slate-400 font-bold py-4 text-center">Loading...</p>
+                ) : !myPayHistory || myPayHistory.length === 0 ? (
+                  <p className="text-xs text-slate-400 font-bold py-4 text-center">No payments recorded yet.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {myPayHistory.map((p) => (
+                      <div key={p.id} className="p-3 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-xs font-black text-slate-900">₦{Number(p.amount).toLocaleString('en-NG')}</p>
+                          <p className="text-[10px] text-slate-400 font-bold">{formatDateLong(p.datePaid)} · {p.mode}</p>
+                          {p.note && <p className="text-[10px] text-slate-500 mt-0.5 truncate">{p.note}</p>}
+                        </div>
+                        {p.evidenceUrl ? (
+                          <a href={p.evidenceUrl} target="_blank" rel="noreferrer" className="text-[10px] font-black text-orange-600 uppercase tracking-wider shrink-0 hover:underline">
+                            View Proof
+                          </a>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 4 Stat Cards Row, every figure live from facility data */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
