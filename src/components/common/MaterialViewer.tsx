@@ -1,10 +1,16 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { X, ChevronLeft, ChevronRight, FileText, PlayCircle, ExternalLink } from 'lucide-react';
+import * as pdfjsLib from 'pdfjs-dist';
+import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { StudyMaterial } from '../../types';
 
 // In-app viewer for study materials: images page through full-screen, PDFs
-// render in a document frame, YouTube videos play in an embedded frame.
+// render page by page on canvas (PDF.js) so the document never leaves the app,
+// YouTube videos play in an embedded frame.
 // Nothing here sends the user out to the file host.
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
+
 interface ViewerFile { url: string; name?: string; kind: 'image' | 'pdf' | 'video' }
 
 const toEmbedUrl = (raw: string): string | null => {
@@ -24,6 +30,87 @@ const toEmbedUrl = (raw: string): string | null => {
 
 const looksPdf = (f: { url: string; name?: string }, materialType?: string) =>
   materialType === 'pdf' || (f.name || '').toLowerCase().endsWith('.pdf') || f.url.toLowerCase().includes('.pdf');
+
+// PDF pages rendered straight onto canvases inside the app. An iframe to the
+// file host was dropped: browsers without the PDF plugin (and iOS Safari)
+// show a dead placeholder or an Open-to-host link instead of the document.
+const PdfDocumentView: React.FC<{ url: string; name: string }> = ({ url }) => {
+  const pagesRef = useRef<HTMLDivElement | null>(null);
+  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [progressLabel, setProgressLabel] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    let pdf: any = null;
+    const container = pagesRef.current;
+    if (container) container.innerHTML = '';
+    setStatus('loading');
+    setProgressLabel('');
+
+    const render = async () => {
+      try {
+        const task = pdfjsLib.getDocument({ url, disableRange: true });
+        pdf = await task.promise;
+        if (cancelled) return;
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        for (let pageNo = 1; pageNo <= pdf.numPages; pageNo++) {
+          if (cancelled) return;
+          setProgressLabel(`Page ${pageNo} of ${pdf.numPages}`);
+          const page = await pdf.getPage(pageNo);
+          if (cancelled) return;
+          const targetWidth = container ? Math.min(container.clientWidth || 720, 980) : 720;
+          const base = page.getViewport({ scale: 1 });
+          const scale = (targetWidth / base.width) * dpr;
+          const viewport = page.getViewport({ scale });
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.floor(viewport.width);
+          canvas.height = Math.floor(viewport.height);
+          canvas.style.width = `${Math.round(viewport.width / dpr)}px`;
+          canvas.style.maxWidth = '100%';
+          canvas.style.height = 'auto';
+          canvas.style.display = 'block';
+          const ctx = canvas.getContext('2d');
+          await page.render({ canvasContext: ctx as CanvasRenderingContext2D, viewport }).promise;
+          if (cancelled) return;
+          container?.appendChild(canvas);
+          if (pageNo === 1) setStatus('ready');
+        }
+        if (!cancelled) setProgressLabel('');
+      } catch (e) {
+        if (!cancelled) {
+          console.warn('PDF render failed:', e);
+          setStatus('error');
+        }
+      }
+    };
+    void render();
+    return () => {
+      cancelled = true;
+      try { void pdf?.destroy(); } catch { /* already gone */ }
+    };
+  }, [url]);
+
+  return (
+    <div className="w-full h-full rounded-xl bg-white shadow-2xl overflow-y-auto overscroll-contain">
+      <div ref={pagesRef} className="flex flex-col items-center gap-4 p-3 sm:p-5" />
+      {status === 'loading' && (
+        <div className="flex flex-col items-center justify-center gap-3 py-16 text-slate-500">
+          <div className="h-1.5 w-40 overflow-hidden rounded-full bg-slate-200">
+            <div className="h-full w-1/3 animate-pulse rounded-full bg-[var(--brand,#EA580C)]" />
+          </div>
+          <p className="text-xs font-bold">{progressLabel || 'Opening document…'}</p>
+        </div>
+      )}
+      {status === 'error' && (
+        <div className="flex flex-col items-center justify-center gap-2 py-16 px-6 text-center">
+          <FileText className="w-10 h-10 text-slate-300" />
+          <p className="text-sm font-bold text-slate-600">This document could not be opened.</p>
+          <p className="text-xs text-slate-400">Try uploading it again from the tutor portal.</p>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export const MaterialViewer: React.FC<{
   material: StudyMaterial | null;
@@ -95,12 +182,7 @@ export const MaterialViewer: React.FC<{
           />
         )}
         {current.kind === 'pdf' && (
-          <iframe
-            key={current.url}
-            src={`${current.url}#toolbar=0&navpanes=0`}
-            title={current.name || material.title}
-            className="w-full h-full rounded-xl bg-white shadow-2xl border-0"
-          />
+          <PdfDocumentView url={current.url} name={current.name || material.title} />
         )}
         {current.kind === 'video' && (
           toEmbedUrl(current.url) ? (

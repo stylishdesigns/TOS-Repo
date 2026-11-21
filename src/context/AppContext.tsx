@@ -608,7 +608,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setStudyMaterials((prev) => [newMaterial, ...prev]);
 
       try {
-        await setDoc(doc(db, 'studyMaterials', newId), tenantWrite(newMaterial));
+        // Firestore rejects `undefined` values (an unset topic/description on
+        // general materials): strip them so the save writes only real fields.
+        const payload = JSON.parse(JSON.stringify(tenantWrite(newMaterial)));
+        await setDoc(doc(db, 'studyMaterials', newId), payload);
         // Students taking this subject get a notification about the upload.
         const typeLabel = newMaterial.type === 'video' ? 'Video link' : newMaterial.type === 'image' ? 'Image' : (newMaterial.fileType || 'PDF');
         void api('/api/notifications/push', { method: 'POST', body: {
