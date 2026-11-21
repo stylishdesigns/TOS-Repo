@@ -422,7 +422,7 @@ const MainLayout: React.FC = () => {
         localStorage.setItem('tos:last-surface', 'tos');
         const h = (window.location.hash || '').toLowerCase();
         if (h !== '#tos-admin' && h !== '#landing') window.location.hash = '#tos-admin';
-      } else if (activeCentreId || viewMode === 'student' || viewMode === 'tutor') {
+      } else if (activeCentreId || viewMode === 'student' || viewMode === 'tutor' || (window.location.hash || '').toLowerCase().indexOf('#admin') === 0) {
         localStorage.setItem('tos:last-surface', 'facility');
       } else if (!isAuthLoading && !currentUser && !tosLoginRequested && !centreGateRequested && !pendingCentre && !isAppContext) {
         localStorage.setItem('tos:last-surface', 'tos');
@@ -516,7 +516,7 @@ const MainLayout: React.FC = () => {
       try {
         const h = (window.location.hash || '').toLowerCase();
         if (/^#tos(-admin)?$/.test(h) || h === '#landing') return true;
-        if (/^#(student|tutor|install|access|centre)/.test(h)) return false;
+        if (/^#(student|tutor|install|access|centre|admin)/.test(h)) return false;
         if (isAppContext) return false;
         if (!currentUser) return true;
         try { return localStorage.getItem('tos:last-surface') === 'tos'; } catch { return false; }
@@ -1043,7 +1043,7 @@ const MainLayout: React.FC = () => {
     <div
       id="app-root-layout"
       className={`flex h-screen w-full ${
-        bgTheme === 'dark' ? 'tos-admin-dark bg-[#0B1220]' : 'bg-[#F8FAFC]'
+        bgTheme === 'dark' ? 'tos-canvas-dark bg-[#0B1220]' : 'bg-[#F8FAFC]'
       } text-slate-900 font-sans overflow-hidden transition-colors duration-300`}
     >
       {/* Left Navigation Sidebar (#070F1E) */}

@@ -65,13 +65,9 @@ export const TutorPortal: React.FC = () => {
   const [chatMode, setChatMode] = useState<ChatMode>('status');
   const [desktopViewMode, setDesktopViewMode] = useState<'mobile_frame' | 'expanded'>('mobile_frame');
 
-  // Sheets that render straight into the document body (the material viewer)
-  // sit outside this component, so the dark remap has to travel on body too.
-  useEffect(() => {
-    if (bgTheme === 'dark') document.body.classList.add('tos-student-dark');
-    else document.body.classList.remove('tos-student-dark');
-    return () => document.body.classList.remove('tos-student-dark');
-  }, [bgTheme]);
+  // Dark mode (Nov 21) is canvas-only, matching the admin portal: the page
+  // background stays dark (it always is here) and cards and components keep
+  // their normal look.
 
   const activeTutor = contextTutor || {
     id: 'loading',
@@ -158,7 +154,7 @@ export const TutorPortal: React.FC = () => {
   }, [activeTab]);
 
   return (
-    <div className={`min-h-screen bg-slate-900/95 flex flex-col justify-between selection:bg-orange-500 selection:text-white ${bgTheme === 'dark' ? 'tos-student-dark' : ''}`}>
+    <div className={`min-h-screen bg-slate-900/95 flex flex-col justify-between selection:bg-orange-500 selection:text-white ${bgTheme === 'dark' ? 'tos-canvas-dark' : ''}`}>
       {/* Password Change Overlay for Invited Tutors */}
       {activeTutor.status === 'Invited' && !activeTutor.hasChangedPassword && !isAdmin && (
         <PasswordChangeOverlay

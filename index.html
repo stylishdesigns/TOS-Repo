@@ -50,7 +50,7 @@
               // surfaces (landing, TOS console) load on TOS's own white style,
               // never on whatever facility this device last visited.
               var h = (window.location.hash || '').toLowerCase();
-              var facilityRoute = h.indexOf('#student') === 0 || h.indexOf('#tutor') === 0 || h.indexOf('#install') === 0 || h.indexOf('#access') === 0 || h.indexOf('#centre') === 0;
+              var facilityRoute = h.indexOf('#student') === 0 || h.indexOf('#tutor') === 0 || h.indexOf('#install') === 0 || h.indexOf('#access') === 0 || h.indexOf('#centre') === 0 || h.indexOf('#admin') === 0;
               var tosRoute = h.indexOf('#tos') === 0 || h === '#landing';
               var hint = null;
               try { hint = localStorage.getItem('tos:last-surface'); } catch (e2) { hint = null; }

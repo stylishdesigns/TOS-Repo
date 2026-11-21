@@ -543,13 +543,9 @@ export const StudentPortal: React.FC = () => {
   // written; a scoped stylesheet flips their light surfaces while the body
   let splashShownThisLoad = false;
 
-// carries the marker class. Chat and status portals attach to the body
-  // too, so they follow along.
-  React.useEffect(() => {
-    if (bgTheme === 'dark') document.body.classList.add('tos-student-dark');
-    else document.body.classList.remove('tos-student-dark');
-    return () => document.body.classList.remove('tos-student-dark');
-  }, [bgTheme]);
+  // Dark mode (Nov 21) is canvas-only: the page background goes dark while
+  // every card and component keeps its light-mode look, so nothing travels on
+  // document.body any more.
 
   const [splashHold, setSplashHold] = useState(!splashShownThisLoad);
   useEffect(() => {
@@ -575,7 +571,7 @@ export const StudentPortal: React.FC = () => {
   const orbBadgeText = orbBadgeLabel(orbUnread);
 
   return (
-    <div className="h-[100dvh] overflow-hidden bg-slate-50 flex flex-col justify-between selection:bg-orange-500 selection:text-white sm:h-auto sm:min-h-screen sm:overflow-visible">
+    <div className={`h-[100dvh] overflow-hidden ${bgTheme === 'dark' ? 'tos-canvas-dark bg-[#0B1220]' : 'bg-slate-50'} flex flex-col justify-between selection:bg-orange-500 selection:text-white sm:h-auto sm:min-h-screen sm:overflow-visible`}>
       {/* 1. Top Desktop Control Bar */}
       <header className="bg-slate-950 text-white px-4 py-3 z-40 sticky top-0 overflow-hidden shadow-md border-b border-slate-800">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-3 relative">
