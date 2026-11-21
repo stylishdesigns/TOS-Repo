@@ -66,7 +66,7 @@ export const PublicWebsite: React.FC = () => {
     <div id="public-website-view" className="min-h-screen bg-white text-slate-900 flex flex-col font-sans">
       {/* 1. Announcement Ticker Banner */}
       {settings.announcementTicker && (
-        <div className="bg-slate-950 text-white text-xs py-2 px-4 text-center font-medium border-b border-amber-500/30 flex items-center justify-center space-x-2">
+        <div className="bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] text-xs py-2 px-4 text-center font-medium border-b border-amber-500/30 flex items-center justify-center space-x-2">
           <span className="bg-amber-500 text-slate-950 text-[10px] font-black px-1.5 py-0.5 rounded uppercase">
             Notice
           </span>
@@ -131,7 +131,7 @@ export const PublicWebsite: React.FC = () => {
       </header>
 
       {/* 3. Hero Section */}
-      <section className="relative overflow-hidden bg-slate-950 text-white py-16 sm:py-24 border-b border-slate-800">
+      <section className="relative overflow-hidden bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] py-16 sm:py-24 border-b border-slate-800">
         <div className="absolute inset-0 z-0 opacity-20">
           <img
             src={settings.heroImageUrl}
@@ -167,7 +167,7 @@ export const PublicWebsite: React.FC = () => {
 
               <a
                 href="#programmes"
-                className="px-6 py-3.5 text-sm font-bold text-white bg-slate-800/80 hover:bg-slate-800 border border-slate-700 rounded-xl transition-all text-center"
+                className="px-6 py-3.5 text-sm font-bold text-[var(--on-brand,#fff)] bg-[var(--brand,#0f172a)]/80 hover:brightness-110 border border-slate-700 rounded-xl transition-all text-center"
               >
                 View Programmes & Fees
               </a>
@@ -348,7 +348,7 @@ export const PublicWebsite: React.FC = () => {
       </section>
 
       {/* 6. Hall of Fame / Testimonials */}
-      <section className="py-16 bg-slate-900 text-white">
+      <section className="py-16 bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
           <div className="text-center max-w-2xl mx-auto space-y-2">
             <span className="text-xs font-extrabold text-amber-400 tracking-wider uppercase">
@@ -463,7 +463,7 @@ export const PublicWebsite: React.FC = () => {
                     </button>
                     <button
                       onClick={() => setViewMode('admin_portal')}
-                      className="px-4 py-2 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-lg"
+                      className="px-4 py-2 text-xs font-bold text-[var(--on-brand,#fff)] bg-[var(--brand,#0f172a)] hover:brightness-110 rounded-lg"
                     >
                       Review in Admin Portal
                     </button>

@@ -11,6 +11,7 @@ import {
   requireMembership,
 } from './tenantService';
 import {
+  buildStaffInviteEmail,
   buildVerificationEmail,
   emailProviderConfigured,
   sendEmail,
@@ -301,7 +302,7 @@ export function registerExtendedRoutes(app: express.Express): void {
         short_name: name.slice(0, 12),
         description: `${name} on Tutorial OS.`,
         theme_color: accent || '#EA580C',
-        background_color: '#0F172A',
+        background_color: accent || '#EA580C',
         display: 'standalone',
         // Each facility's app starts at its own address: the access-code page
         // carrying the facility, so Chrome's periodic app refresh re-reads
@@ -357,6 +358,122 @@ export function registerExtendedRoutes(app: express.Express): void {
   // A data URL in, a hosted Cloudinary URL out (tos/profiles or tos/facility).
   // Profile photos up to 2 MB, facility photos up to 4 MB.
   // ==========================================================================
+  // Cloudinary upload config for study materials (PDFs and images) uploaded by
+  // tutors and centre admins. Videos are never uploaded: the tutor pastes a link.
+  app.get('/api/centre/materials/upload-config', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const centreId = String(req.query.centreId || '').trim().slice(0, 120);
+      if (!centreId) throw httpError(400, 'centreId is required.');
+      await requireMembership(caller, centreId, ['owner', 'admin', 'tutor']);
+      const cloud = String(process.env.CLOUDINARY_CLOUD_NAME || '');
+      const preset = String(process.env.CLOUDINARY_UPLOAD_PRESET || '');
+      if (!cloud || !preset) throw httpError(503, 'Material uploads are not configured yet.');
+      res.json({ ok: true, cloud, preset, folder: 'tos/materials' });
+    } catch (error: any) {
+      const status = Number(error?.status || 500);
+      res.status(status).json({ error: error?.message || 'Material upload config failed.' });
+    }
+  });
+
+  // ==========================================================================
+  // AUTHENTICATED: study-material deletion. Delete runs on the server (Admin
+  // SDK) so it cannot be blocked by a stale rules release: a tutor may delete
+  // only a material they uploaded, and centre admins/owners any material in
+  // their centre. Centre isolation is checked on the material doc itself, so
+  // one centre can never delete another centre's material.
+  // ==========================================================================
+  // Study-material create runs on the server (Admin SDK) so an upload reaches
+  // every student of the centre even when the deployed Firestore rules release
+  // is older than the app. The browser keeps its local copy either way.
+  app.post('/api/centre/study-materials', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const centreId = String(req.query.centreId || req.body?.centreId || '').trim().slice(0, 120);
+      const material = req.body?.material || {};
+      if (!centreId) throw httpError(400, 'centreId is required.');
+      await requireMembership(caller, centreId, ['owner', 'admin', 'tutor']);
+      const id = String(material.id || '').trim().slice(0, 128);
+      if (!id || !/^[a-zA-Z0-9_-]{1,128}$/.test(id)) throw httpError(400, 'A valid material id is required.');
+      const title = String(material.title || '').trim().slice(0, 200);
+      const subject = String(material.subject || '').trim().slice(0, 120);
+      if (!title || !subject) throw httpError(400, 'Title and subject are required.');
+      const membership = await requireMembership(caller, centreId, ['owner', 'admin', 'tutor']);
+      const payload: Record<string, any> = {
+        ...material,
+        id,
+        title,
+        subject,
+        centreId,
+        uploadedAt: String(material.uploadedAt || new Date().toISOString()),
+      };
+      if (membership.role === 'tutor') payload.tutorId = caller.uid;
+      delete payload.ownedBy;
+      await adminDb.collection('studyMaterials').doc(id).set(JSON.parse(JSON.stringify(payload)));
+      res.json({ ok: true, id });
+    } catch (error: any) {
+      const status = Number(error?.status || 500);
+      res.status(status).json({ error: error?.message || 'Material upload failed.' });
+    }
+  });
+
+  // Study-material edit: same server path so an edit (including a replaced
+  // file list) persists for students regardless of the rules release.
+  app.patch('/api/centre/study-materials/:id', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const centreId = String(req.query.centreId || req.body?.centreId || '').trim().slice(0, 120);
+      const materialId = String(req.params?.id || '').trim().slice(0, 128);
+      if (!centreId) throw httpError(400, 'centreId is required.');
+      if (!/^[a-zA-Z0-9_-]{1,128}$/.test(materialId)) throw httpError(400, 'A valid material id is required.');
+      const membership = await requireMembership(caller, centreId, ['owner', 'admin', 'tutor']);
+      const ref = adminDb.collection('studyMaterials').doc(materialId);
+      const snap = await ref.get();
+      if (!snap.exists) throw httpError(404, 'This material no longer exists.');
+      const data = snap.data() || {};
+      if (String(data.centreId || '') !== centreId) throw httpError(403, 'You do not have access to this material.');
+      if (membership.role === 'tutor' && String(data.tutorId || '') !== caller.uid) {
+        throw httpError(403, 'You can only edit materials you uploaded.');
+      }
+      // Undefined values make the Admin SDK throw; strip them so a save
+      // cannot fail just because an optional field was left out.
+      const patch: Record<string, any> = JSON.parse(JSON.stringify(req.body?.patch || {}));
+      delete patch.centreId;
+      delete patch.id;
+      delete patch.uploadedAt;
+      if (membership.role === 'tutor') patch.tutorId = caller.uid;
+      await ref.set(patch, { merge: true });
+      res.json({ ok: true });
+    } catch (error: any) {
+      const status = Number(error?.status || 500);
+      res.status(status).json({ error: error?.message || 'Material update failed.' });
+    }
+  });
+
+  app.delete('/api/centre/study-materials/:id', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const centreId = String(req.query.centreId || req.body?.centreId || '').trim().slice(0, 120);
+      const materialId = String(req.params?.id || '').trim().slice(0, 128);
+      if (!centreId) throw httpError(400, 'centreId is required.');
+      if (!/^[a-zA-Z0-9_-]{1,128}$/.test(materialId)) throw httpError(400, 'A valid material id is required.');
+      const membership = await requireMembership(caller, centreId, ['owner', 'admin', 'tutor']);
+      const ref = adminDb.collection('studyMaterials').doc(materialId);
+      const snap = await ref.get();
+      if (!snap.exists) throw httpError(404, 'This material no longer exists.');
+      const data = snap.data() || {};
+      if (String(data.centreId || '') !== centreId) throw httpError(403, 'You do not have access to this material.');
+      if (membership.role === 'tutor' && String(data.tutorId || '') !== caller.uid) {
+        throw httpError(403, 'You can only delete materials you uploaded.');
+      }
+      await ref.delete();
+      res.json({ ok: true });
+    } catch (error: any) {
+      const status = Number(error?.status || 500);
+      res.status(status).json({ error: error?.message || 'Material delete failed.' });
+    }
+  });
+
   app.post('/api/centre/profile-image', async (req, res) => {
     try {
       const caller = getCaller(req);
@@ -829,7 +946,20 @@ export function registerExtendedRoutes(app: express.Express): void {
     const centreId = String(req.query.centreId || '').trim();
     if (!centreId) return res.status(400).json({ error: 'centreId is required.' });
     try {
-      const snap = await adminDb.collection('programmes').where('centreId', '==', centreId).get();
+      // The installed app and the signup flow carry the facility's name slug
+      // (?centre=godzilla) while programme records are keyed to the centre's
+      // document id. Resolve the slug to the document id when the value is not
+      // already one, so the facility's own programmes load either way.
+      let resolvedCentreId = centreId;
+      const centreDoc = await adminDb.collection('centres').doc(centreId).get().catch(() => null);
+      if (!centreDoc || !centreDoc.exists) {
+        const centresSnap = await adminDb.collection('centres').limit(200).get();
+        const doc = centresSnap.docs.find(
+          (d) => slugifyName(String((d.data() as any)?.name || '')) === slugifyName(centreId)
+        );
+        if (doc) resolvedCentreId = doc.id;
+      }
+      const snap = await adminDb.collection('programmes').where('centreId', '==', resolvedCentreId).get();
       const programmes = snap.docs
         .map((d) => d.data() as any)
         .filter((p) => p.status === 'Active')
@@ -841,6 +971,24 @@ export function registerExtendedRoutes(app: express.Express): void {
       res.json({ programmes });
     } catch {
       res.status(500).json({ error: 'Could not load the facility programmes.' });
+    }
+  });
+
+  // The facility's registered subjects, for the student signup step pages:
+  // the subject picker lists only what the facility itself registered in the
+  // Subjects Manager, each tagged with the department it belongs to.
+  app.get('/api/public/subjects', async (req, res) => {
+    const centreId = String(req.query.centreId || '').trim();
+    if (!centreId) return res.status(400).json({ error: 'centreId is required.' });
+    try {
+      const snap = await adminDb.collection('subjects').where('centreId', '==', centreId).get();
+      const subjects = snap.docs
+        .map((d) => d.data() as any)
+        .map((s) => ({ name: String(s.name || ''), department: String(s.department || 'General') }))
+        .filter((s) => s.name);
+      res.json({ subjects });
+    } catch {
+      res.status(500).json({ error: 'Could not load the facility subjects.' });
     }
   });
 
@@ -989,6 +1137,128 @@ export function registerExtendedRoutes(app: express.Express): void {
       if (error?.status) return res.status(error.status).json({ error: error.message });
       console.error('[access-code] regenerate failed:', error?.message || error);
       res.status(500).json({ error: 'Could not regenerate the access code.' });
+    }
+  });
+
+  // ==========================================================================
+  // CENTRE: staff invitations. The temporary password is generated on the
+  // server and only ever emailed to the invitee; the admin who invites never
+  // sees it, and it is never stored anywhere.
+  // ==========================================================================
+  app.post('/api/centre/staff/invite', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const centreId = String(req.body?.centreId || '');
+      if (!centreId) return res.status(400).json({ error: 'centreId is required.' });
+      await requireMembership(caller, centreId, ['owner', 'admin']);
+
+      const name = String(req.body?.name || '').trim().slice(0, 120);
+      const email = normalizeEmail(String(req.body?.email || ''));
+      const phone = String(req.body?.phone || '').trim().slice(0, 40);
+      const role = String(req.body?.role || '').trim();
+      const allowedRoles = ['Tutor', 'Facility Admin', 'Admin Secretary', 'Finance Admin', 'Super Admin'];
+      if (!name) return res.status(400).json({ error: 'The name is required.' });
+      if (!email || !email.includes('@')) return res.status(400).json({ error: 'A valid email address is required.' });
+      if (!allowedRoles.includes(role)) return res.status(400).json({ error: 'Unknown role.' });
+
+      const cDoc = await adminDb.collection('centres').doc(centreId).get();
+      if (!cDoc.exists) return res.status(404).json({ error: 'Facility not found.' });
+      const centreName = String((cDoc.data() as any)?.name || 'your facility');
+      const accessCode = String((cDoc.data() as any)?.accessCode || '');
+
+      for (const coll of ['admins', 'tutors']) {
+        const dup = await adminDb.collection(coll)
+          .where('centreId', '==', centreId)
+          .where('email', '==', email)
+          .limit(1)
+          .get();
+        if (!dup.empty) return res.status(409).json({ error: `${email} is already on this facility's staff list.` });
+      }
+      try {
+        await adminAuth.getUserByEmail(email);
+        return res.status(409).json({ error: `The email ${email} already has a Tutorial OS account.` });
+      } catch {
+        // No account with that email yet: good, carry on.
+      }
+
+      const tempPassword = crypto.randomBytes(12).toString('base64url');
+      const authUser = await adminAuth.createUser({ email, password: tempPassword, displayName: name });
+
+      const isTutor = role === 'Tutor';
+      const doc: Record<string, any> = {
+        id: authUser.uid,
+        name,
+        email,
+        phone,
+        role,
+        status: 'Invited',
+        temporaryPassword: null,
+        hasChangedPassword: false,
+        createdAt: new Date().toISOString(),
+        centreId,
+      };
+      if (isTutor) {
+        doc.subjects = Array.isArray(req.body?.subjects) ? req.body.subjects.map((x: any) => String(x)).slice(0, 20) : ['General Studies'];
+        doc.departments = Array.isArray(req.body?.departments) ? req.body.departments.map((x: any) => String(x)).slice(0, 5) : ['Science'];
+        doc.examTypes = Array.isArray(req.body?.examTypes) ? req.body.examTypes.map((x: any) => String(x)).slice(0, 10) : [];
+        doc.bio = String(req.body?.bio || '').slice(0, 600);
+        doc.programmeIds = Array.isArray(req.body?.programmeIds) ? req.body.programmeIds.map((x: any) => String(x)).slice(0, 10) : [];
+        doc.rating = 0;
+        doc.totalClassesTaught = 0;
+        doc.ratePerHour = 3500;
+        doc.avatar = '';
+      } else {
+        doc.department = 'General';
+        doc.jobTitle = role;
+      }
+
+      const emailRes = await sendEmail(buildStaffInviteEmail({
+        to: email,
+        fullName: name,
+        centreName,
+        role,
+        loginEmail: email,
+        tempPassword,
+        accessCode,
+        appUrl: baseUrl(req),
+      }));
+      if (!emailRes.delivered) {
+        // Without the email there is no way in, so undo the account entirely
+        // rather than leave anyone stranded without a password.
+        await adminAuth.deleteUser(authUser.uid).catch(() => undefined);
+        return res.status(502).json({ error: 'The welcome email could not be sent, so nobody was invited. Please try again.' });
+      }
+      await adminDb.collection(isTutor ? 'tutors' : 'admins').doc(authUser.uid).set(doc);
+
+      // The facility entry path reads memberships, so a new staff account
+      // gets its row here and can enter the facility on first sign-in.
+      const membershipRole = role === 'Tutor'
+        ? 'tutor'
+        : role === 'Admin Secretary'
+          ? 'secretary'
+          : role === 'Finance Admin'
+            ? 'finance'
+            : 'admin';
+      const nowIso = new Date().toISOString();
+      await adminDb.collection('memberships').doc(`${authUser.uid}__${centreId}`).set({
+        uid: authUser.uid,
+        centreId,
+        role: membershipRole,
+        status: 'active',
+        createdAt: nowIso,
+        updatedAt: nowIso,
+      }, { merge: true });
+
+      await audit({ actorUid: caller.uid, centreId, action: 'STAFF_INVITED', after: { email, role, collection: isTutor ? 'tutors' : 'admins' } });
+      res.json({ success: true, emailDelivered: true });
+    } catch (error: any) {
+      if (error?.status) return res.status(error.status).json({ error: error.message });
+      const code = String(error?.code || error?.errorInfo?.code || '');
+      if (code.includes('email-already-exists') || code.includes('email-already-in-use')) {
+        return res.status(409).json({ error: 'That email already has a Tutorial OS account.' });
+      }
+      console.error('[staff invite] failed:', error?.message || error);
+      res.status(500).json({ error: 'Could not send the invitation.' });
     }
   });
 

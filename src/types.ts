@@ -34,6 +34,8 @@ export interface TenantSettings {
   bankAccountName?: string;
   cashPaymentGuide?: string;
   academicSessions?: string[];
+  /** Automated payment reminder settings (Fees & Payments). */
+  paymentReminders?: import('./lib/feeReminders').FeeReminderSettings | null;
 }
 
 export interface Branch {
@@ -81,6 +83,18 @@ export interface CMSContent {
     avatar: string;
   }[];
   gallery: { id: string; title: string; category: string; imageUrl: string }[];
+}
+
+// One item on the academic schedule planner: a timetable class, or a
+// reminder a member added to a day (practice, mock or custom). CalendarView
+// renders every kind uniformly on the shared month grid.
+export interface PlannerActivity {
+  id: string;
+  date: string; // YYYY-MM-DD
+  time?: string; // display time, e.g. "09:00"
+  title: string;
+  kind: 'class' | 'mock' | 'practice' | 'custom';
+  createdAt?: number;
 }
 
 export interface Student {
@@ -133,6 +147,7 @@ export interface AdmissionApplication {
 }
 
 export interface Tutor {
+  plannerReminders?: PlannerActivity[];
   id: string;
   centreId?: string;
   name: string;
@@ -223,6 +238,19 @@ export interface StudyMaterial {
   description?: string;
   contentSummary?: string;
   downloadUrl?: string;
+  // Multi-file uploads: every file on one material lives here. downloadUrl
+  // keeps the first file so older viewers (and old records) keep working.
+  files?: Array<{ url: string; name: string; sizeLabel?: string }>;
+  // Where the material lives: 'general' materials float free of the timetable;
+  // 'topic' ones are attached to a scheduled class (topic + classId).
+  kind?: 'general' | 'topic';
+  // Real upload shape: pdf/image carry an uploaded file, video is link-only.
+  type?: 'pdf' | 'image' | 'video';
+  videoUrl?: string;
+  fileName?: string;
+  classId?: string;
+  classDate?: string;
+  classTime?: string;
 }
 
 export interface ClassRating {
@@ -349,6 +377,9 @@ export interface PaymentRecord {
   status: 'Paid' | 'Partial' | 'Pending' | 'Rejected';
   method: 'Card' | 'Bank Transfer' | 'Cash';
   date: string;
+  // Payment window: when this payment starts covering the student and when it expires.
+  effectiveFrom?: string;
+  expiresAt?: string;
   evidenceUrl?: string;
   evidenceName?: string;
   note?: string;
@@ -380,6 +411,7 @@ export interface Announcement {
 }
 
 export interface AdminUser {
+  plannerReminders?: PlannerActivity[];
   id: string;
   centreId?: string;
   name: string;

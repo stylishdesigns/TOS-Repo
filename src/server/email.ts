@@ -253,6 +253,42 @@ export function buildWelcomeEmail(params: {
   };
 }
 
+export function buildStaffInviteEmail(params: {
+  to: string;
+  fullName: string;
+  centreName: string;
+  role: string;
+  loginEmail: string;
+  tempPassword: string;
+  accessCode?: string;
+  appUrl: string;
+}): OutgoingEmail {
+  const body = `
+  <p style="margin:0 0 16px;">Hi ${escapeHtml(params.fullName || 'there')},</p>
+  <p style="margin:0 0 16px;">You have been added as <strong>${escapeHtml(params.role)}</strong> at <strong>${escapeHtml(params.centreName)}</strong> on Tutorial OS. Here is everything you need to sign in:</p>
+  ${BOX('Login email', escapeHtml(params.loginEmail))}
+  ${BOX('Temporary password', escapeHtml(params.tempPassword))}
+  ${params.accessCode ? BOX('Facility access code', escapeHtml(params.accessCode)) : ''}
+  <p style="font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#64748b;margin:18px 0 8px;">What happens next</p>
+  <ol style="margin:0;padding-left:20px;font-size:14px;line-height:1.6;">
+    <li style="margin:0 0 8px;">Sign in and set your own password. The temporary password only works for 7 days.</li>
+  </ol>
+  <p style="margin:24px 0;">
+    <a href="${params.appUrl}/app" style="background:#ea580c;color:#ffffff;font-weight:700;text-decoration:none;padding:12px 22px;border-radius:10px;display:inline-block;">Sign in to your portal</a>
+  </p>
+  <p style="font-size:12px;color:#64748b;margin:0;">This temporary password expires in 7 days and is never stored anywhere. If it expires, ask your facility admin to send fresh details.</p>`;
+  return {
+    to: params.to,
+    subject: `You have been added to ${params.centreName} on Tutorial OS`,
+    html: WRAP('Welcome to the team', body),
+    text:
+      `Hi ${params.fullName || 'there'},\n\nYou have been added as ${params.role} at ${params.centreName} on Tutorial OS.\n` +
+      `Login email: ${params.loginEmail}\nTemporary password: ${params.tempPassword}\n` +
+      (params.accessCode ? `Facility access code: ${params.accessCode}\n` : '') +
+      `\nSign in at ${params.appUrl}/app and set your own password. The temporary password works for 7 days.\n`,
+  };
+}
+
 export function buildAccessCodeChangedEmail(params: { to: string; centreName: string; accessCode: string; appUrl: string }): OutgoingEmail {
   const body = `
   <p style="margin:0 0 16px;">The access code for <strong>${escapeHtml(params.centreName)}</strong> was changed. The old code stopped working immediately; existing members are unaffected.</p>

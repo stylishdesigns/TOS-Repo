@@ -149,7 +149,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
 
           <button
             onClick={() => setShowIOSGuide(false)}
-            className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition-all shadow-xs"
+            className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] font-bold text-xs transition-all shadow-xs"
           >
             Got it, Close
           </button>

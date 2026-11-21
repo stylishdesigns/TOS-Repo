@@ -65,7 +65,7 @@ const UsernameGate: React.FC<{ onGoToProfile: () => void }> = ({ onGoToProfile }
   return (
     <div className="bg-white rounded-3xl border border-slate-200/90 shadow-sm p-5 space-y-3">
       <div className="flex items-center gap-2">
-        <Medal className="w-5 h-5 text-[#EA580C]" />
+        <Medal className="w-5 h-5 text-orange-600" />
         <h3 className="text-base font-black text-slate-900">One thing before your first mock</h3>
       </div>
       <p className="text-sm text-slate-500 leading-relaxed">
@@ -74,7 +74,7 @@ const UsernameGate: React.FC<{ onGoToProfile: () => void }> = ({ onGoToProfile }
       <button
         type="button"
         onClick={onGoToProfile}
-        className="w-full min-h-[48px] rounded-2xl bg-[#EA580C] text-white text-sm font-black tracking-wide"
+        className="w-full min-h-[48px] rounded-2xl bg-orange-600 text-white text-sm font-black tracking-wide"
       >
         Go to Profile to set it
       </button>
@@ -212,7 +212,7 @@ const MockExam: React.FC<{
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
       {/* Header: back, timer, save state */}
-      <div className="sticky top-0 z-20 bg-[#EA580C] text-white px-4 pt-3 pb-4 rounded-b-3xl">
+      <div className="sticky top-0 z-20 bg-orange-600 text-white px-4 pt-3 pb-4 rounded-b-3xl">
         <div className="flex items-center justify-between">
           <button onClick={onExit} className="w-11 h-11 rounded-xl bg-black/10 flex items-center justify-center active:scale-95" aria-label="Leave the mock">
             <ChevronLeft className="w-6 h-6" />
@@ -239,7 +239,7 @@ const MockExam: React.FC<{
       {/* Question */}
       <div className="flex-1 px-4 py-5 space-y-4">
         <div className="flex items-center justify-between">
-          <span className="px-3 py-1.5 rounded-lg bg-orange-100 text-[#EA580C] text-xs font-black uppercase tracking-wide">{q.subject}</span>
+          <span className="px-3 py-1.5 rounded-lg bg-orange-100 text-orange-600 text-xs font-black uppercase tracking-wide">{q.subject}</span>
           <button onClick={toggleFlag} className={`flex items-center gap-1.5 min-h-[44px] px-3 rounded-xl text-sm font-black ${answers[q.id]?.flag ? 'bg-amber-100 text-amber-700' : 'text-slate-400'}`}>
             <Flag className="w-4 h-4" />
             {answers[q.id]?.flag ? 'Flagged' : 'Flag'}
@@ -256,9 +256,9 @@ const MockExam: React.FC<{
               <button
                 key={letter}
                 onClick={() => pick(letter)}
-                className={`w-full min-h-[56px] px-4 py-3 rounded-2xl border-2 text-left flex items-center gap-3 transition-all ${chosen ? 'border-[#EA580C] bg-orange-50' : 'border-slate-200 bg-white'}`}
+                className={`w-full min-h-[56px] px-4 py-3 rounded-2xl border-2 text-left flex items-center gap-3 transition-all ${chosen ? 'border-orange-600 bg-orange-50' : 'border-slate-200 bg-white'}`}
               >
-                <span className={`w-9 h-9 shrink-0 rounded-full flex items-center justify-center font-black text-sm ${chosen ? 'bg-[#EA580C] text-white' : 'bg-slate-100 text-slate-500'}`}>{letter}</span>
+                <span className={`w-9 h-9 shrink-0 rounded-full flex items-center justify-center font-black text-sm ${chosen ? 'bg-orange-600 text-white' : 'bg-slate-100 text-slate-500'}`}>{letter}</span>
                 <MathText text={cleanOptionText(opt)} className="flex-1 text-[15px] font-bold text-slate-900" />
               </button>
             );
@@ -282,7 +282,7 @@ const MockExam: React.FC<{
           {idx < paper.questions.length - 1 ? (
             <button
               onClick={() => { void flush(); setIdx((v) => Math.min(paper.questions.length - 1, v + 1)); }}
-              className="flex-1 min-h-[48px] rounded-2xl bg-[#EA580C] text-white font-black text-sm flex items-center justify-center gap-1"
+              className="flex-1 min-h-[48px] rounded-2xl bg-orange-600 text-white font-black text-sm flex items-center justify-center gap-1"
             >
               Next <ChevronRight className="w-4 h-4" />
             </button>
@@ -310,7 +310,7 @@ const MockExam: React.FC<{
                   <button
                     key={i}
                     onClick={() => { setIdx(i); setGrid(false); }}
-                    className={`min-h-[44px] rounded-xl font-black text-sm ${i === idx ? 'bg-[#EA580C] text-white' : a?.choice ? 'bg-emerald-100 text-emerald-700' : a?.flag ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'}`}
+                    className={`min-h-[44px] rounded-xl font-black text-sm ${i === idx ? 'bg-orange-600 text-white' : a?.choice ? 'bg-emerald-100 text-emerald-700' : a?.flag ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'}`}
                   >
                     {i + 1}
                   </button>
@@ -381,7 +381,7 @@ const ReviewScreen: React.FC<{ mockId: string; onBack: () => void }> = ({ mockId
   const pct = data.score.scale === 100;
   return (
     <div className="min-h-screen bg-slate-50 pb-10">
-      <div className="bg-[#EA580C] text-white px-4 pt-3 pb-6 rounded-b-3xl">
+      <div className="bg-orange-600 text-white px-4 pt-3 pb-6 rounded-b-3xl">
         <button onClick={onBack} className="w-11 h-11 rounded-xl bg-black/10 flex items-center justify-center mb-3" aria-label="Back"><ChevronLeft className="w-6 h-6" /></button>
         <p className="text-xs font-black uppercase tracking-widest text-white/80">{data.title} · {fmtDay(data.date)}</p>
         <div className="mt-2 flex items-end gap-2">
@@ -396,8 +396,8 @@ const ReviewScreen: React.FC<{ mockId: string; onBack: () => void }> = ({ mockId
 
       <div className="px-4 py-4 space-y-4">
         <div className="flex p-1 rounded-xl bg-slate-200/60">
-          <button onClick={() => setFilter('all')} className={`flex-1 min-h-[40px] rounded-lg text-sm font-black ${filter === 'all' ? 'bg-white text-[#EA580C] shadow-sm' : 'text-slate-500'}`}>All {data.review.length}</button>
-          <button onClick={() => setFilter('wrong')} className={`flex-1 min-h-[40px] rounded-lg text-sm font-black ${filter === 'wrong' ? 'bg-white text-[#EA580C] shadow-sm' : 'text-slate-500'}`}>
+          <button onClick={() => setFilter('all')} className={`flex-1 min-h-[40px] rounded-lg text-sm font-black ${filter === 'all' ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-500'}`}>All {data.review.length}</button>
+          <button onClick={() => setFilter('wrong')} className={`flex-1 min-h-[40px] rounded-lg text-sm font-black ${filter === 'wrong' ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-500'}`}>
             To learn {data.review.filter((r: Json) => !r.isCorrect).length}
           </button>
         </div>
@@ -419,7 +419,7 @@ const ReviewScreen: React.FC<{ mockId: string; onBack: () => void }> = ({ mockId
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="px-2 py-0.5 rounded-md bg-orange-50 text-[#EA580C] text-[11px] font-black uppercase">{r.subject}</span>
+              <span className="px-2 py-0.5 rounded-md bg-orange-50 text-orange-600 text-[11px] font-black uppercase">{r.subject}</span>
               {r.topic && <span className="text-[11px] font-bold text-slate-400 uppercase">{r.topic}</span>}
               {r.flagged && <span className="text-[11px] font-bold text-amber-600 flex items-center gap-1"><Flag className="w-3 h-3" /> flagged</span>}
             </div>
@@ -598,7 +598,7 @@ export const StudentMockTab: React.FC<{
           <div className="bg-white rounded-3xl border border-slate-200 p-6 text-center space-y-3">
             <AlertTriangle className="w-10 h-10 text-amber-500 mx-auto" />
             <p className="text-sm font-bold text-slate-600">{statusErr}</p>
-            <button onClick={loadStatus} className="min-h-[44px] px-6 rounded-2xl bg-[#EA580C] text-white font-black text-sm">Try again</button>
+            <button onClick={loadStatus} className="min-h-[44px] px-6 rounded-2xl bg-orange-600 text-white font-black text-sm">Try again</button>
           </div>
         )}
 
@@ -625,7 +625,7 @@ export const StudentMockTab: React.FC<{
                       <span
                         key={w.date}
                         title={`${fmtDay(w.date)}${w.title ? ` · ${w.title}` : ''}`}
-                        className={`w-6 h-6 rounded-full text-[10px] font-black flex items-center justify-center ${w.date === today ? 'bg-[#EA580C] text-white' : w.status ? 'bg-orange-100 text-[#EA580C]' : 'bg-slate-100 text-slate-400'}`}
+                        className={`w-6 h-6 rounded-full text-[10px] font-black flex items-center justify-center ${w.date === today ? 'bg-orange-600 text-white' : w.status ? 'bg-orange-100 text-orange-600' : 'bg-slate-100 text-slate-400'}`}
                       >
                         {new Date(`${w.date}T12:00:00Z`).toLocaleDateString('en-GB', { weekday: 'narrow' })}
                       </span>
@@ -665,7 +665,7 @@ export const StudentMockTab: React.FC<{
                       <button
                         onClick={() => setRulesOpen(true)}
                         disabled={starting}
-                        className={`w-full min-h-[56px] rounded-2xl font-black text-base uppercase tracking-widest flex items-center justify-center gap-2 ${starting ? 'bg-slate-100 text-slate-400' : 'bg-[#EA580C] text-white active:scale-[0.99]'}`}
+                        className={`w-full min-h-[56px] rounded-2xl font-black text-base uppercase tracking-widest flex items-center justify-center gap-2 ${starting ? 'bg-slate-100 text-slate-400' : 'bg-orange-600 text-white active:scale-[0.99]'}`}
                       >
                         <Play className="w-5 h-5" /> {starting ? 'Opening...' : 'Start the mock'}
                       </button>
@@ -679,7 +679,7 @@ export const StudentMockTab: React.FC<{
                   <h3 className="text-lg font-black text-slate-900">Your mock is waiting</h3>
                   <p className="text-sm text-slate-500">Time keeps running until {fmtClock(status.attempt?.deadline)}. Go back in and finish.</p>
                   {notice && <p className="text-sm font-bold text-rose-600">{notice}</p>}
-                  <button onClick={start} disabled={starting} className="w-full min-h-[56px] rounded-2xl bg-[#EA580C] text-white font-black text-base uppercase tracking-widest flex items-center justify-center gap-2">
+                  <button onClick={start} disabled={starting} className="w-full min-h-[56px] rounded-2xl bg-orange-600 text-white font-black text-base uppercase tracking-widest flex items-center justify-center gap-2">
                     <Play className="w-5 h-5" /> {starting ? 'Opening...' : 'Resume the mock'}
                   </button>
                 </div>
@@ -692,7 +692,7 @@ export const StudentMockTab: React.FC<{
                   <p className="text-sm text-slate-500 mt-1">
                     Your score is already marked but hidden until results are released{status.attempt?.autoSubmitted ? ' (you were auto-submitted at time-up)' : ''}.
                   </p>
-                  <p className="text-sm font-bold text-[#EA580C] mt-2">Results drop tomorrow at {fmtClock(status.releaseAt)}</p>
+                  <p className="text-sm font-bold text-orange-600 mt-2">Results drop tomorrow at {fmtClock(status.releaseAt)}</p>
                 </div>
               )}
 
@@ -701,7 +701,7 @@ export const StudentMockTab: React.FC<{
                   <Hourglass className="w-12 h-12 text-slate-300 mx-auto mb-3" />
                   <p className="text-base font-black text-slate-900">Too late to start today</p>
                   <p className="text-sm text-slate-500 mt-1">A mock must finish before midnight, so starting closed at {fmtClock(status.cutoffAt)}.</p>
-                  {status.nextMockDate && <p className="text-sm font-bold text-[#EA580C] mt-2">Next one: {fmtDay(status.nextMockDate)}</p>}
+                  {status.nextMockDate && <p className="text-sm font-bold text-orange-600 mt-2">Next one: {fmtDay(status.nextMockDate)}</p>}
                 </div>
               )}
 
@@ -724,7 +724,7 @@ export const StudentMockTab: React.FC<{
               <div className="bg-white rounded-3xl border border-slate-200 p-6 text-center space-y-3">
                 <AlertTriangle className="w-10 h-10 text-amber-500 mx-auto" />
                 <p className="text-sm font-bold text-slate-600">{dayErr}</p>
-                <button onClick={() => setDayOffset(dayOffset)} className="min-h-[44px] px-6 rounded-2xl bg-[#EA580C] text-white font-black text-sm">Try again</button>
+                <button onClick={() => setDayOffset(dayOffset)} className="min-h-[44px] px-6 rounded-2xl bg-orange-600 text-white font-black text-sm">Try again</button>
               </div>
             )}
             {dayInfo !== null && !dayErr && (
@@ -737,7 +737,7 @@ export const StudentMockTab: React.FC<{
                 )}
                 {dayInfo.state === 'upcoming' && dayInfo.mock && (
                   <div className="text-center py-2 space-y-3">
-                    <p className="text-xs font-black uppercase tracking-widest text-[#EA580C]">Scheduled</p>
+                    <p className="text-xs font-black uppercase tracking-widest text-orange-600">Scheduled</p>
                     <h3 className="text-lg font-black text-slate-900">{dayInfo.mock.title || 'TOS Mock'}</h3>
                     <p className="text-sm text-slate-500">
                       {dayInfo.mock.subjects?.length ? dayInfo.mock.subjects.join(' · ') : 'All subjects'}
@@ -758,7 +758,7 @@ export const StudentMockTab: React.FC<{
                     </p>
                     <button
                       onClick={() => openReview(String(dayInfo.mock?.id || ''))}
-                      className="w-full min-h-[52px] rounded-2xl bg-[#EA580C] text-white font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2"
+                      className="w-full min-h-[52px] rounded-2xl bg-orange-600 text-white font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2"
                     >
                       <Check className="w-5 h-5" /> See your answers
                     </button>
@@ -824,7 +824,7 @@ export const StudentMockTab: React.FC<{
                 {board.entries.map((e: Json, i: number) => {
                   const mine = board.me && board.me.username === e.username && board.me.rank === e.rank;
                   return (
-                    <div key={`${e.username}-${i}`} className={`rounded-2xl border-2 px-4 py-3 flex items-center gap-3 ${mine ? 'border-[#EA580C] bg-orange-50' : 'border-slate-200 bg-white'}`}>
+                    <div key={`${e.username}-${i}`} className={`rounded-2xl border-2 px-4 py-3 flex items-center gap-3 ${mine ? 'border-orange-600 bg-orange-50' : 'border-slate-200 bg-white'}`}>
                       <span className={`w-9 h-9 shrink-0 rounded-full flex items-center justify-center font-black text-sm ${e.rank === 1 ? 'bg-amber-300 text-amber-900' : e.rank === 2 ? 'bg-slate-200 text-slate-700' : e.rank === 3 ? 'bg-orange-200 text-orange-900' : 'bg-slate-100 text-slate-500'}`}>
                         {e.rank}
                       </span>
@@ -834,8 +834,8 @@ export const StudentMockTab: React.FC<{
                   );
                 })}
                 {board.me && board.me.rank > 100 && (
-                  <div className="rounded-2xl border-2 border-[#EA580C] bg-orange-50 px-4 py-3 flex items-center gap-3">
-                    <span className="text-sm font-black text-[#EA580C]">#{board.me.rank}</span>
+                  <div className="rounded-2xl border-2 border-orange-600 bg-orange-50 px-4 py-3 flex items-center gap-3">
+                    <span className="text-sm font-black text-orange-600">#{board.me.rank}</span>
                     <span className="flex-1 text-[15px] font-black text-slate-900 truncate">{board.me.username} (you)</span>
                     <span className="text-lg font-black text-slate-900">{board.me.score}</span>
                   </div>
@@ -869,7 +869,7 @@ export const StudentMockTab: React.FC<{
                   'Scores, answers and the leaderboard stay hidden until results drop at 6:00 am the next morning.',
                 ].map((rule, i) => (
                   <li key={i} className="flex items-start gap-3">
-                    <span className="w-6 h-6 rounded-full bg-orange-100 text-[#EA580C] text-xs font-black flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
+                    <span className="w-6 h-6 rounded-full bg-orange-100 text-orange-600 text-xs font-black flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
                     <span className="text-sm text-slate-600 font-medium leading-relaxed">{rule}</span>
                   </li>
                 ))}
@@ -877,7 +877,7 @@ export const StudentMockTab: React.FC<{
               <button
                 onClick={start}
                 disabled={starting}
-                className={`w-full min-h-[56px] rounded-2xl font-black text-base uppercase tracking-widest flex items-center justify-center gap-2 ${starting ? 'bg-slate-100 text-slate-400' : 'bg-[#EA580C] text-white active:scale-[0.99]'}`}
+                className={`w-full min-h-[56px] rounded-2xl font-black text-base uppercase tracking-widest flex items-center justify-center gap-2 ${starting ? 'bg-slate-100 text-slate-400' : 'bg-orange-600 text-white active:scale-[0.99]'}`}
               >
                 <Play className="w-5 h-5" /> {starting ? 'Opening...' : "I've read the rules, start"}
               </button>

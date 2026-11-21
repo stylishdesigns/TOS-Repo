@@ -26,6 +26,7 @@ export const ModernSelect: React.FC<ModernSelectProps> = ({
   multiple = false
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [dropUp, setDropUp] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const isSelected = (val: string | number) => {
@@ -80,7 +81,18 @@ export const ModernSelect: React.FC<ModernSelectProps> = ({
       )}
       <button
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => {
+          if (!isOpen && containerRef.current) {
+            // Position-aware: the panel opens downward when there is room below
+            // the trigger (a control near the top of the page) and upward only
+            // when the trigger sits near the bottom of the screen.
+            const rect = containerRef.current.getBoundingClientRect();
+            const spaceBelow = window.innerHeight - rect.bottom;
+            const spaceAbove = rect.top;
+            setDropUp(spaceBelow < 264 && spaceAbove > spaceBelow);
+          }
+          setIsOpen(!isOpen);
+        }}
         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 font-bold outline-none focus:bg-white focus:border-orange-500 transition-all flex items-center justify-between shadow-sm hover:shadow-md active:scale-[0.98]"
       >
         <span className={`truncate mr-2 ${((multiple && Array.isArray(value) && value.length > 0) || (!multiple && value)) ? 'text-slate-900' : 'text-slate-400'}`}>
@@ -90,7 +102,7 @@ export const ModernSelect: React.FC<ModernSelectProps> = ({
       </button>
 
       {isOpen && (
-        <div className="absolute z-[100] bottom-full mb-2 w-full bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200 max-h-60 overflow-y-auto">
+        <div className={`absolute z-[100] ${dropUp ? 'bottom-full mb-2 animate-in fade-in slide-in-from-bottom-2' : 'top-full mt-2 animate-in fade-in slide-in-from-top-2'} w-full bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden duration-200 max-h-60 overflow-y-auto`}>
           <div className="p-1.5">
             {options.map((option) => (
               <button
@@ -99,7 +111,7 @@ export const ModernSelect: React.FC<ModernSelectProps> = ({
                 onClick={() => handleSelect(option.value)}
                 className={`w-full flex items-center justify-between px-3.5 py-2.5 text-sm rounded-xl transition-all ${
                   isSelected(option.value)
-                    ? 'bg-orange-50 text-[#EA580C] font-black'
+                    ? 'bg-orange-50 text-orange-600 font-black'
                     : 'text-slate-700 hover:bg-slate-50 font-bold'
                 }`}
               >

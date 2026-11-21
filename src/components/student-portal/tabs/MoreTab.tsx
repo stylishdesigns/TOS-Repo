@@ -1,17 +1,18 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { initialsAvatar } from '../../../lib/avatar';
+import { nextPaymentDue, formatDateLong } from '../../../lib/paymentDates';
 import { useApp } from '../../../context/AppContext';
 import { api, Json } from '../../tos/tosShared';
 import { Student } from '../../../types';
-import regeneratedStudentAvatar from '../../../assets/images/regenerated_image_1789369642757.jpg';
 import { ModernSelect } from '../../ui/ModernSelect';
+import { brandVars } from '../../../lib/brand';
 import {
   User,
   GraduationCap,
   CreditCard,
   Receipt,
-  Lock,
   KeyRound,
-  Fingerprint,
   Palette,
   Camera,
   HelpCircle,
@@ -223,16 +224,12 @@ type ModalType =
   | 'academic_details'
   | 'id_card'
   | 'tuition_statement'
-  | 'change_pin'
   | 'change_password'
   | 'theme_settings'
   | 'help_support'
   | 'exam_policy'
   | 'logout'
   | null;
-
-const MALE_NIGERIAN_STUDENT_AVATAR =
-  'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=500&q=80';
 
 export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
   const {
@@ -247,6 +244,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
     setBgTheme,
     isAdmin,
     logout,
+    brandAccent,
     centreName,
     subjects,
   } = useApp();
@@ -289,12 +287,30 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
     });
     return acc;
   }, [registeredNames, centreSubjects]);
-  const filteredCentreSubjects = centreSubjects.filter(
+  // When adding subjects the student sees General subjects plus the ones for
+  // their own department; everything comes from the facility's registered
+  // subjects, never a hardcoded list.
+  const selectableCentreSubjects = centreSubjects.filter(
+    (sub) => sub.department === 'General' || (!!student.department && sub.department === student.department)
+  );
+  const filteredCentreSubjects = selectableCentreSubjects.filter(
     (sub) => sub.name.toLowerCase().includes(subjectSearch.trim().toLowerCase())
   );
 
   const openSubjectsEditor = () => {
-    setDraftSubjects(new Set(registeredNames));
+    // The draft starts from this facility's own subject list: names that are
+    // not registered facility subjects (old demo data such as Economics) are
+    // dropped here, so saving writes only real subjects back to the record.
+    const canonical = new Map(
+      centreSubjects.map((sub) => [sub.name.trim().toLowerCase(), sub.name.trim()])
+    );
+    setDraftSubjects(
+      new Set(
+        registeredNames
+          .map((n) => canonical.get(n.trim().toLowerCase()))
+          .filter((n): n is string => !!n)
+      )
+    );
     setSubjectSearch('');
     setShowSubjectsEditor(true);
   };
@@ -309,14 +325,195 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
   const saveSubjects = async () => {
     setSavingSubjects(true);
     try {
-      await updateStudent(student.id, {
-        subjects: Array.from(draftSubjects as Set<string>).sort((a, b) => a.localeCompare(b)),
+      await updateStudent(
+        student.id,
+        {
+          subjects: Array.from(draftSubjects as Set<string>).sort((a, b) => a.localeCompare(b)),
+        },
+        { silent: true }
+      );
+      addToast({
+        type: 'success',
+        title: 'Registered Subjects Updated',
+        description: `${draftSubjects.size} subject${draftSubjects.size === 1 ? '' : 's'} saved to your record.`,
       });
       setShowSubjectsEditor(false);
     } catch (e) {
       console.error(e);
     } finally {
       setSavingSubjects(false);
+    }
+  };
+
+  // Subject picker as a popup: the single button on the Registered Subjects
+  // card opens it, the picker lists only the facility's registered subjects,
+  // and Save writes the ticked ones back. Rendered through a portal so it
+  // sits above the Academic details modal on every screen size.
+  const subjectsModal = showSubjectsEditor
+    ? createPortal(
+        <div
+          className="fixed inset-0 z-[70] bg-black/50 backdrop-blur-[2px] flex items-end sm:items-center justify-center"
+          style={brandVars(brandAccent)}
+          onClick={() => setShowSubjectsEditor(false)}
+        >
+          <div
+            className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl shadow-2xl border border-slate-100 max-h-[85vh] flex flex-col animate-in fade-in zoom-in-95"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3 p-4 border-b border-slate-100">
+              <div>
+                <h3 className="text-lg font-black text-slate-900">Registered subjects</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Pick from your facility's registered subjects. General subjects are open to everyone; your department's subjects show once you pick it.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowSubjectsEditor(false)}
+                className="p-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 cursor-pointer shrink-0"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-4 space-y-3 overflow-y-auto flex-1 min-h-0">
+              {selectableCentreSubjects.length === 0 ? (
+                <p className="text-xs text-slate-500 font-medium leading-relaxed">
+                  {centreSubjects.length === 0
+                    ? "Your facility hasn't set up its subject list yet. Please ask your facility to add subjects."
+                    : 'Choose your department in Academic details to see department subjects.'}
+                </p>
+              ) : (
+                <>
+                  <input
+                    value={subjectSearch}
+                    onChange={(e) => setSubjectSearch(e.target.value)}
+                    placeholder="Search your facility's subjects"
+                    className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-600/30"
+                  />
+                  <div className="max-h-64 overflow-y-auto rounded-xl border border-slate-100 bg-white divide-y divide-slate-100">
+                    {filteredCentreSubjects.map((sub) => {
+                      const checked = draftSubjects.has(sub.name);
+                      return (
+                        <button
+                          key={sub.id}
+                          type="button"
+                          onClick={() => toggleDraftSubject(sub.name)}
+                          className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-slate-50/80 active:bg-slate-100/80 transition-colors text-left"
+                        >
+                          <div className="flex items-center space-x-2.5 min-w-0">
+                            <span
+                              className={`w-4.5 h-4.5 rounded-md border flex items-center justify-center shrink-0 ${
+                                checked ? 'bg-orange-600 border-orange-600 text-white' : 'border-slate-300 bg-white'
+                              }`}
+                            >
+                              {checked ? <Check className="w-3 h-3" /> : null}
+                            </span>
+                            <span className="text-xs font-semibold text-slate-800 truncate">{sub.name}</span>
+                          </div>
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 shrink-0 ml-2">{sub.department}</span>
+                        </button>
+                      );
+                    })}
+                    {filteredCentreSubjects.length === 0 ? (
+                      <div className="px-3 py-2.5 text-xs text-slate-400 font-medium">No subjects match your search.</div>
+                    ) : null}
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[11px] font-bold text-slate-500">{draftSubjects.size} selected</span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowSubjectsEditor(false)}
+                        className="h-10 px-4 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        disabled={savingSubjects}
+                        onClick={saveSubjects}
+                        className="h-10 px-4 rounded-xl bg-orange-600 text-white text-xs font-bold hover:bg-orange-700 transition-colors cursor-pointer disabled:opacity-60"
+                      >
+                        {savingSubjects ? 'Saving...' : 'Save subjects'}
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )
+    : null;
+
+  // The facility's registered exam programmes, so the Programme Track tile in
+  // Academic details shows the facility's own programme name (a legacy stored
+  // name resolves to it when it matches, case-insensitively).
+  const [centreProgrammeNames, setCentreProgrammeNames] = useState<string[]>([]);
+  useEffect(() => {
+    const slug = new URLSearchParams(window.location.search).get('centre');
+    if (!slug) return;
+    let alive = true;
+    fetch(`/api/public/programmes?centreId=${encodeURIComponent(slug)}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error('no'))))
+      .then((d: any) => {
+        if (alive && Array.isArray(d.programmes)) {
+          setCentreProgrammeNames(d.programmes.map((p: any) => String(p?.name || '')).filter(Boolean));
+        }
+      })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
+  const programmeTrackLabel = useMemo(() => {
+    const wanted = (student.programmeName || '').trim().toLowerCase();
+    if (!wanted) return '';
+    return centreProgrammeNames.find((n) => n.trim().toLowerCase() === wanted) || student.programmeName || '';
+  }, [student.programmeName, centreProgrammeNames]);
+  // Academic details holds a draft of the department and the programme track
+  // until the student saves. Saving both together is what switches the fee:
+  // when the track is one of the facility's programmes, that programme's
+  // approved fee becomes the student's fee, applied by the server so the
+  // balance and status stay consistent.
+  const [acadDeptDraft, setAcadDeptDraft] = useState<string>(student.department || '');
+  const [acadTrackDraft, setAcadTrackDraft] = useState<string>(programmeTrackLabel || '');
+  const [savingAcad, setSavingAcad] = useState(false);
+  useEffect(() => {
+    setAcadDeptDraft(student.department || '');
+    setAcadTrackDraft(programmeTrackLabel || '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [student.id, student.department, student.programmeName, centreProgrammeNames]);
+  const academicDirty =
+    (acadDeptDraft || '') !== (student.department || '') ||
+    (acadTrackDraft || '') !== (programmeTrackLabel || '');
+  const handleSaveAcademic = async () => {
+    if (savingAcad || !academicDirty) return;
+    setSavingAcad(true);
+    try {
+      const d: any = await api('/api/student/programme-fee', {
+        method: 'POST',
+        body: { department: acadDeptDraft, programmeName: acadTrackDraft },
+      });
+      const patch: any = {
+        department: (d.department || acadDeptDraft) as any,
+        programmeName: d.programmeName || acadTrackDraft,
+      };
+      if (d.feeApplied) {
+        patch.totalFee = d.totalFee;
+        patch.outstandingBalance = d.outstandingBalance;
+        patch.paymentStatus = d.paymentStatus;
+      }
+      await updateStudent(student.id, patch, { silent: true });
+      addToast({
+        type: 'success',
+        title: 'Academic Details Saved',
+        description: d.feeApplied
+          ? `Programme track set. Your fee is now ${settings.currencySymbol}${Number(d.totalFee || 0).toLocaleString()} for this track.`
+          : 'Your department and programme track are saved.',
+      });
+    } catch (err: any) {
+      addToast({ type: 'error', title: 'Not Saved', description: err?.message || 'Could not save your academic details.' });
+    } finally {
+      setSavingAcad(false);
     }
   };
 
@@ -331,7 +528,6 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
   } | null>(null);
   const [usernameDraft, setUsernameDraft] = useState('');
   const [usernameCheck, setUsernameCheck] = useState<Json | null>(null);
-  const [usernameBusy, setUsernameBusy] = useState(false);
   const [usernameError, setUsernameError] = useState('');
 
   useEffect(() => {
@@ -372,24 +568,6 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
     return () => clearTimeout(t);
   }, [usernameDraft, usernameInfo?.mine, usernameInfo?.username]);
 
-  const saveUsername = async () => {
-    if (!usernameInfo?.mine) return;
-    setUsernameBusy(true);
-    setUsernameError('');
-    try {
-      const r = await api('/api/student/profile/username', { method: 'POST', body: { name: usernameDraft.trim() } });
-      setUsernameInfo({ username: String(r?.username || ''), lastChangedAt: new Date().toISOString(), canChangeAt: null, canChange: true, mine: true });
-      setUsernameCheck(null);
-      addToast({ type: 'success', title: 'Username Saved', description: `${String(r?.username || '')} now shows on chat and the mock leaderboard.` });
-    } catch (e: any) {
-      setUsernameError(e.message || 'Could not save that username.');
-    } finally {
-      setUsernameBusy(false);
-    }
-  };
-
-  // Biometric toggle state
-  const [biometricEnabled, setBiometricEnabled] = useState(true);
 
   // Theme selection state ('system' | 'light' | 'dark')
   const [selectedTheme, setSelectedTheme] = useState<'system' | 'light' | 'dark'>(() => (bgTheme === 'dark' ? 'dark' : 'light'));
@@ -405,9 +583,10 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
   const [gender, setGender] = useState(student.gender || 'Male');
   const [dob, setDob] = useState(student.dob || '2008-04-12');
   const [address, setAddress] = useState(student.address || '12 Admiralty Way, Lekki Phase 1, Lagos');
+  // Guardian details live under personal details, not academic details.
+  const [parentName, setParentName] = useState(student.parentName || '');
+  const [parentWhatsapp, setParentWhatsapp] = useState(student.parentWhatsApp || '');
 
-  // Change PIN keypad state
-  const [pin, setPin] = useState<string>('');
 
   // Password fields state
   const [currentPassword, setCurrentPassword] = useState('');
@@ -416,10 +595,12 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
   const [showPasswords, setShowPasswords] = useState(false);
 
   // Tuition Payment state
-  const [payAmount, setPayAmount] = useState<number>(
-    student.outstandingBalance > 0 ? student.outstandingBalance : 15000
+  // Keep the raw text so the field clears fully; the number is read on submit.
+  const [payAmount, setPayAmount] = useState<string>(
+    student.outstandingBalance > 0 ? String(student.outstandingBalance) : ''
   );
-  const [paymentMode, setPaymentMode] = useState<'Bank Transfer' | 'Card' | 'Cash'>('Bank Transfer');
+  const payNum = Number(payAmount) || 0;
+  const [paymentMode, setPaymentMode] = useState<'Bank Transfer' | 'Cash'>('Bank Transfer');
   const [paymentNote, setPaymentNote] = useState('');
   const [evidenceDataUrl, setEvidenceDataUrl] = useState<string | null>(null);
   const [evidenceFileName, setEvidenceFileName] = useState<string>('');
@@ -431,6 +612,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
   const studentPayments = payments.filter(
     (p) => p.studentId === student.id || p.studentName === student.name
   );
+  const nextDueISO = nextPaymentDue(studentPayments);
 
   // Handle personal details save
   // Profile picture: chosen and uploaded right here with the personal
@@ -533,58 +715,49 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
     }
   };
 
-  const handleSavePersonalDetails = (e: React.FormEvent) => {
+  const handleSavePersonalDetails = async (e: React.FormEvent) => {
     e.preventDefault();
+    const newUsername = usernameDraft.trim();
+    if (usernameInfo?.mine && newUsername && newUsername !== usernameInfo.username) {
+      try {
+        const r = await api('/api/student/profile/username', { method: 'POST', body: { name: newUsername } });
+        setUsernameInfo({ username: String(r?.username || ''), lastChangedAt: new Date().toISOString(), canChangeAt: null, canChange: true, mine: true });
+        setUsernameCheck(null);
+      } catch (err: any) {
+        setUsernameError(err.message || 'Could not save that username.');
+        addToast({ type: 'error', title: 'Username Not Saved', description: err.message || 'Fix the username, then save again.' });
+        return;
+      }
+    }
     const updatedFullName = `${firstName} ${lastName}`.trim();
-    updateStudent(student.id, {
-      name: updatedFullName,
-      phone,
-      email,
-      gender,
-      dob,
-      address,
-    });
+    updateStudent(
+      student.id,
+      {
+        name: updatedFullName,
+        phone,
+        email,
+        gender,
+        dob,
+        address,
+        parentName,
+        parentWhatsApp: parentWhatsapp,
+      },
+      { silent: true }
+    );
     student.name = updatedFullName;
     student.phone = phone;
     student.email = email;
     student.gender = gender;
     student.dob = dob;
     student.address = address;
+    student.parentName = parentName;
+    student.parentWhatsApp = parentWhatsapp;
 
     addToast({
       type: 'success',
       title: 'Profile Updated',
       description: 'Candidate personal details have been updated successfully.',
     });
-    setActiveModal(null);
-  };
-
-  // Handle PIN Keypad press
-  const handlePinKey = (digit: string) => {
-    if (pin.length < 4) {
-      setPin((prev) => prev + digit);
-    }
-  };
-
-  const handlePinBackspace = () => {
-    setPin((prev) => prev.slice(0, -1));
-  };
-
-  const handleConfirmPin = () => {
-    if (pin.length !== 4) {
-      addToast({
-        type: 'error',
-        title: 'Incomplete PIN',
-        description: 'Please enter all 4 digits of your security PIN.',
-      });
-      return;
-    }
-    addToast({
-      type: 'success',
-      title: 'PIN Updated',
-      description: 'Your 4-digit student portal PIN has been securely updated.',
-    });
-    setPin('');
     setActiveModal(null);
   };
 
@@ -642,7 +815,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
   // Handle Tuition Payment
   const handleCompletePayment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (payAmount <= 0) {
+    if (!(payNum > 0)) {
       addToast({
         type: 'error',
         title: 'Invalid Amount',
@@ -664,7 +837,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
     try {
       const result = await recordPayment({
         studentId: student.id,
-        amountPaid: payAmount,
+        amountPaid: payNum,
         method: paymentMode,
         evidenceUrl: evidenceDataUrl || undefined,
         evidenceName: evidenceFileName || undefined,
@@ -676,8 +849,8 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
         type: 'success',
         title: result.pending ? 'Payment Sent for Confirmation' : 'Payment Submitted',
         description: result.pending
-          ? `Your payment of ${settings.currencySymbol}${(payAmount || 0).toLocaleString()} via ${paymentMode} was sent to the facility. Your balance updates once the facility confirms it.`
-          : `Your payment of ${settings.currencySymbol}${(payAmount || 0).toLocaleString()} via ${paymentMode} has been recorded. Receipt ${result.receiptNumber}.`,
+          ? `Your payment of ${settings.currencySymbol}${payNum.toLocaleString()} via ${paymentMode} was sent to the facility. Your balance updates once the facility confirms it.`
+          : `Your payment of ${settings.currencySymbol}${payNum.toLocaleString()} via ${paymentMode} has been recorded. Receipt ${result.receiptNumber}.`,
       });
 
       setEvidenceDataUrl(null);
@@ -703,16 +876,9 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
     }, 2000);
   };
 
-  // Resolved avatar ensuring an authentic Nigerian student portrait
-  const MALE_NIGERIAN_STUDENT_AVATAR =
-    regeneratedStudentAvatar ||
-    'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=500&q=80';
-  const FEMALE_NIGERIAN_STUDENT_AVATAR =
-    'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?auto=format&fit=crop&w=500&q=80';
-
+  // No uploaded photo: the student's initials, never a placeholder portrait
   const studentAvatar =
-    realAvatar(student.avatar) ||
-    (student.gender === 'Female' ? FEMALE_NIGERIAN_STUDENT_AVATAR : MALE_NIGERIAN_STUDENT_AVATAR);
+    realAvatar(student.avatar) || initialsAvatar(student.name);
 
   return (
     <div className="min-h-full bg-slate-50/70 pb-16 px-4 pt-6 max-w-lg mx-auto">
@@ -831,21 +997,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
         </div>
 
         <div className="bg-white rounded-2xl border border-slate-200/90 divide-y divide-slate-100 shadow-2xs overflow-hidden">
-          {/* Item 1: Change Account PIN */}
-          <button
-            onClick={() => setActiveModal('change_pin')}
-            className="w-full flex items-center justify-between p-3.5 hover:bg-slate-50/80 active:bg-slate-100/80 transition-colors text-left group"
-          >
-            <div className="flex items-center space-x-3">
-              <div className="w-9 h-9 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-                <Lock className="w-4.5 h-4.5" />
-              </div>
-              <span className="text-sm font-semibold text-slate-800">Change Account PIN</span>
-            </div>
-            <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-slate-600 transition-colors" />
-          </button>
-
-          {/* Item 2: Change Password */}
+          {/* Item 1: Change Password */}
           <button
             onClick={() => setActiveModal('change_password')}
             className="w-full flex items-center justify-between p-3.5 hover:bg-slate-50/80 active:bg-slate-100/80 transition-colors text-left group"
@@ -858,40 +1010,6 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
             </div>
             <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-slate-600 transition-colors" />
           </button>
-
-          {/* Item 3: Enable Biometric (Interactive toggle matching video 00:02) */}
-          <div className="w-full flex items-center justify-between p-3.5">
-            <div className="flex items-center space-x-3">
-              <div className="w-9 h-9 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-                <Fingerprint className="w-4.5 h-4.5" />
-              </div>
-              <span className="text-sm font-semibold text-slate-800">Enable Biometric</span>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => {
-                const nextState = !biometricEnabled;
-                setBiometricEnabled(nextState);
-                addToast({
-                  type: 'success',
-                  title: nextState ? 'Biometrics Enabled' : 'Biometrics Disabled',
-                  description: nextState
-                    ? 'Fingerprint & FaceID active for quick portal authentication.'
-                    : 'Biometric sign-in turned off.',
-                });
-              }}
-              className={`w-11 h-6 rounded-full transition-colors relative focus:outline-none ${
-                biometricEnabled ? 'bg-slate-900' : 'bg-slate-300'
-              }`}
-            >
-              <span
-                className={`w-5 h-5 rounded-full bg-white shadow-md block transform transition-transform ${
-                  biometricEnabled ? 'translate-x-5' : 'translate-x-0.5'
-                }`}
-              />
-            </button>
-          </div>
 
           {/* Item 4: Appearance */}
           <button
@@ -1022,9 +1140,9 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                 <div className="flex flex-col items-center text-center pb-1">
                   <div className="relative">
                     {avatarPreview ? (
-                      <img src={avatarPreview} alt="" className="w-24 h-24 rounded-full object-cover border-2 border-[#EA580C]" />
+                      <img src={avatarPreview} alt="" className="w-24 h-24 rounded-full object-cover border-2 border-orange-600" />
                     ) : (
-                      <div className="w-24 h-24 rounded-full bg-orange-50 border-2 border-[#EA580C] flex items-center justify-center text-[#C2410C] text-xl font-black">
+                      <div className="w-24 h-24 rounded-full bg-orange-50 border-2 border-orange-600 flex items-center justify-center text-orange-700 text-xl font-black">
                         {student.name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase() || '').join('') || '?'}
                       </div>
                     )}
@@ -1032,7 +1150,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                       type="button"
                       onClick={() => photoInputRef.current?.click()}
                       disabled={photoBusy}
-                      className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-[#EA580C] text-white flex items-center justify-center shadow-md active:scale-95 transition disabled:opacity-60 cursor-pointer"
+                      className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-orange-600 text-white flex items-center justify-center shadow-md active:scale-95 transition disabled:opacity-60 cursor-pointer"
                       aria-label="Change profile picture"
                     >
                       <Camera className="w-4 h-4" />
@@ -1043,7 +1161,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                     type="button"
                     onClick={() => photoInputRef.current?.click()}
                     disabled={photoBusy}
-                    className="text-xs font-bold text-[#EA580C] cursor-pointer disabled:opacity-60"
+                    className="text-xs font-bold text-orange-600 cursor-pointer disabled:opacity-60"
                   >
                     {photoBusy ? 'Uploading…' : avatarPreview ? 'Change picture' : 'Add a picture'}
                   </button>
@@ -1117,14 +1235,6 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                           <p className="text-xs text-slate-400 font-medium">At least 4 characters: letters, numbers, underscores or dashes.</p>
                         )}
                         {usernameError && <p className="text-xs font-bold text-rose-600">{usernameError}</p>}
-                        <button
-                          type="button"
-                          disabled={usernameBusy || usernameDraft.trim() === usernameInfo?.username || !(usernameCheck?.valid && usernameCheck?.available)}
-                          onClick={saveUsername}
-                          className="px-4 min-h-[40px] rounded-xl bg-[#EA580C] text-white text-xs font-black tracking-wide disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-                        >
-                          {usernameBusy ? 'Saving…' : usernameInfo?.username ? 'Save new username' : 'Set username'}
-                        </button>
                       </>
                     )}
                   </div>
@@ -1195,6 +1305,34 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                     />
                   </div>
 
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 block mb-1">
+                        Parent / Guardian Name
+                      </label>
+                      <input
+                        type="text"
+                        value={parentName}
+                        onChange={(e) => setParentName(e.target.value)}
+                        placeholder="Mrs Ngozi Okafor"
+                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm font-medium focus:border-orange-500 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 block mb-1">
+                        Guardian WhatsApp Number
+                      </label>
+                      <input
+                        type="tel"
+                        inputMode="numeric"
+                        value={parentWhatsapp}
+                        onChange={(e) => setParentWhatsapp(e.target.value.replace(/\D/g, '').slice(0, 11))}
+                        placeholder="08012345678"
+                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm font-medium focus:border-orange-500 outline-none"
+                      />
+                    </div>
+                  </div>
+
                   <div className="pt-3">
                     <button
                       type="submit"
@@ -1229,10 +1367,25 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 pt-2 text-xs">
-                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-0.5">
-                    <span className="text-[10px] text-slate-400 font-semibold block uppercase">Programme Track</span>
-                    <span className="font-bold text-slate-900 block leading-tight">{student.programmeName || '—'}</span>
-                  </div>
+                  {centreProgrammeNames.length > 0 ? (
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                      <span className="text-[10px] text-slate-400 font-semibold block uppercase mb-1">Programme Track</span>
+                      <ModernSelect
+                        value={acadTrackDraft}
+                        onChange={(val: string) => setAcadTrackDraft(val)}
+                        options={[
+                          { value: '', label: 'Not set yet' },
+                          ...centreProgrammeNames.map((n) => ({ value: n, label: n })),
+                        ]}
+                        placeholder="Select programme track"
+                      />
+                    </div>
+                  ) : (
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-0.5">
+                      <span className="text-[10px] text-slate-400 font-semibold block uppercase">Programme Track</span>
+                      <span className="font-bold text-slate-900 block leading-tight">{programmeTrackLabel || '—'}</span>
+                    </div>
+                  )}
                   {settings.academicSession ? (
                     <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-0.5">
                       <span className="text-[10px] text-slate-400 font-semibold block uppercase">Academic Session</span>
@@ -1245,12 +1398,23 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                       <span className="font-bold text-slate-900 block">{student.branchName}</span>
                     </div>
                   ) : null}
-                  {student.department ? (
-                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-0.5">
-                      <span className="text-[10px] text-slate-400 font-semibold block uppercase">Department</span>
-                      <span className="font-bold text-slate-900 block">{student.department}</span>
-                    </div>
-                  ) : null}
+                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-1 col-span-2">
+                    <span className="text-[10px] text-slate-400 font-semibold block uppercase">Department</span>
+                    <ModernSelect
+                      value={acadDeptDraft}
+                      onChange={(val: string) => setAcadDeptDraft(val)}
+                      options={[
+                        { value: '', label: 'Not set yet' },
+                        { value: 'Science', label: 'Science' },
+                        { value: 'Commercial', label: 'Commercial' },
+                        { value: 'Arts', label: 'Arts' },
+                      ]}
+                      placeholder="Select department"
+                    />
+                    <p className="text-[10px] text-slate-400 font-medium">
+                      General subjects are open to everyone; your department's subjects show once you pick it.
+                    </p>
+                  </div>
                   {student.registrationDate ? (
                     <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-0.5">
                       <span className="text-[10px] text-slate-400 font-semibold block uppercase">Registered On</span>
@@ -1259,29 +1423,21 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                       </span>
                     </div>
                   ) : null}
-                  {student.parentName ? (
-                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-0.5">
-                      <span className="text-[10px] text-slate-400 font-semibold block uppercase">Parent / Guardian</span>
-                      <span className="font-bold text-slate-900 block leading-tight">{student.parentName}</span>
-                    </div>
-                  ) : null}
-                  {student.parentWhatsApp ? (
-                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-0.5 col-span-2">
-                      <span className="text-[10px] text-slate-400 font-semibold block uppercase">Guardian Contact</span>
-                      <span className="font-bold text-slate-900 block">{student.parentWhatsApp}</span>
-                    </div>
-                  ) : null}
                 </div>
 
-                {typeof student.attendancePercent === 'number' && (
-                  <div className="bg-emerald-50/80 p-3.5 rounded-xl border border-emerald-200 flex items-center justify-between text-xs">
-                    <div>
-                      <span className="font-bold text-emerald-950 block">Attendance Standing</span>
-                      <span className="text-[11px] text-emerald-800">
-                        Eligible for official facility mock examinations
-                      </span>
-                    </div>
-                    <span className="text-base font-black text-emerald-700">{student.attendancePercent}%</span>
+                {centreProgrammeNames.length > 0 && (
+                  <div className="pt-1">
+                    <button
+                      type="button"
+                      disabled={savingAcad || !academicDirty}
+                      onClick={handleSaveAcademic}
+                      className="w-full py-3 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-sm shadow-md disabled:opacity-50 transition-colors cursor-pointer"
+                    >
+                      {savingAcad ? 'Saving…' : 'Save Changes'}
+                    </button>
+                    <p className="text-[10px] text-slate-400 font-medium mt-1.5 text-center">
+                      Saves your department and programme track. Picking a facility programme applies its approved fee.
+                    </p>
                   </div>
                 )}
 
@@ -1297,13 +1453,13 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                         {registeredNames.length === 0 ? 'None registered yet' : `${registeredNames.length} registered`}
                       </p>
                     </div>
-                    {centreSubjects.length > 0 && (
+                    {selectableCentreSubjects.length > 0 && (
                       <button
                         type="button"
-                        onClick={() => (showSubjectsEditor ? setShowSubjectsEditor(false) : openSubjectsEditor())}
-                        className="h-9 px-3.5 rounded-xl bg-[#EA580C] text-white text-xs font-bold hover:bg-[#C2410C] transition-colors cursor-pointer disabled:opacity-60 shrink-0"
+                        onClick={openSubjectsEditor}
+                        className="h-9 px-3.5 rounded-xl bg-orange-600 text-white text-xs font-bold hover:bg-orange-700 transition-colors cursor-pointer disabled:opacity-60 shrink-0"
                       >
-                        {showSubjectsEditor ? 'Done' : 'Add or remove'}
+                        Add or remove
                       </button>
                     )}
                   </div>
@@ -1329,70 +1485,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                     </div>
                   )}
 
-                  {showSubjectsEditor && (
-                    centreSubjects.length === 0 ? (
-                      <p className="text-xs text-slate-500 font-medium leading-relaxed">
-                        Your facility hasn't set up its subject list yet. Please ask your facility to add subjects.
-                      </p>
-                    ) : (
-                      <>
-                        <input
-                          value={subjectSearch}
-                          onChange={(e) => setSubjectSearch(e.target.value)}
-                          placeholder="Search your facility's subjects"
-                          className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#EA580C]/30"
-                        />
-                        <div className="max-h-48 overflow-y-auto rounded-xl border border-slate-100 bg-white divide-y divide-slate-100">
-                          {filteredCentreSubjects.map((sub) => {
-                            const checked = draftSubjects.has(sub.name);
-                            return (
-                              <button
-                                key={sub.id}
-                                type="button"
-                                onClick={() => toggleDraftSubject(sub.name)}
-                                className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-slate-50/80 active:bg-slate-100/80 transition-colors text-left"
-                              >
-                                <div className="flex items-center space-x-2.5 min-w-0">
-                                  <span
-                                    className={`w-4.5 h-4.5 rounded-md border flex items-center justify-center shrink-0 ${
-                                      checked ? 'bg-[#EA580C] border-[#EA580C] text-white' : 'border-slate-300 bg-white'
-                                    }`}
-                                  >
-                                    {checked ? <Check className="w-3 h-3" /> : null}
-                                  </span>
-                                  <span className="text-xs font-semibold text-slate-800 truncate">{sub.name}</span>
-                                </div>
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 shrink-0 ml-2">{sub.department}</span>
-                              </button>
-                            );
-                          })}
-                          {filteredCentreSubjects.length === 0 ? (
-                            <div className="px-3 py-2.5 text-xs text-slate-400 font-medium">No subjects match your search.</div>
-                          ) : null}
-                        </div>
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-[11px] font-bold text-slate-500">{draftSubjects.size} selected</span>
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => setShowSubjectsEditor(false)}
-                              className="h-10 px-4 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer"
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              type="button"
-                              disabled={savingSubjects}
-                              onClick={saveSubjects}
-                              className="h-10 px-4 rounded-xl bg-[#EA580C] text-white text-xs font-bold hover:bg-[#C2410C] transition-colors cursor-pointer disabled:opacity-60"
-                            >
-                              {savingSubjects ? 'Saving...' : 'Save subjects'}
-                            </button>
-                          </div>
-                        </div>
-                      </>
-                    )
-                  )}
+                  {subjectsModal}
                 </div>
               </div>
             )}
@@ -1430,15 +1523,15 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                       <div className="p-5">
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex items-center gap-3 min-w-0">
-                            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-orange-500 to-[#EA580C] flex items-center justify-center text-sm font-black shrink-0">
+                            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center text-sm font-black shrink-0">
                               {logoInitials}
                             </div>
                             <div className="min-w-0">
-                              <p className="text-[15px] font-bold tracking-wide leading-tight truncate">{centreName}</p>
+                              <p className="text-[15px] font-bold tracking-wide leading-tight break-words">{centreName}</p>
                               <p className="text-[10px] text-slate-400 tracking-[0.2em]">STUDENT IDENTITY CARD</p>
                             </div>
                           </div>
-                          <div className="rounded-full border border-[#EA580C]/60 pl-2.5 pr-3 py-1.5 flex items-center gap-1.5 shrink-0">
+                          <div className="rounded-full border border-orange-600/60 pl-2.5 pr-3 py-1.5 flex items-center gap-1.5 shrink-0">
                             <span className={`w-2 h-2 rounded-full ${active ? 'bg-emerald-500' : 'bg-amber-400'}`} />
                             <span className="text-[10px] font-bold text-orange-300 tracking-wide whitespace-nowrap">
                               {String(student.status || 'Active').toUpperCase()}
@@ -1448,7 +1541,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                         </div>
 
                         <div className="flex gap-4 mt-5">
-                          <div className="w-24 h-32 sm:w-[104px] sm:h-[132px] rounded-2xl border-2 border-[#EA580C]/70 bg-[#1B2540] overflow-hidden shrink-0 flex items-center justify-center">
+                          <div className="w-24 h-32 sm:w-[104px] sm:h-[132px] rounded-2xl border-2 border-orange-600/70 bg-[#1B2540] overflow-hidden shrink-0 flex items-center justify-center">
                             {cardPhoto ? (
                               <img src={cardPhoto} alt="" className="w-full h-full object-cover" />
                             ) : (
@@ -1514,7 +1607,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                   type="button"
                   onClick={downloadIdCard}
                   disabled={cardBusy}
-                  className="w-full py-3.5 px-4 rounded-xl bg-[#EA580C] hover:bg-[#C2410C] text-white font-bold text-sm shadow-md active:scale-98 transition-all cursor-pointer disabled:opacity-60"
+                  className="w-full py-3.5 px-4 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-sm shadow-md active:scale-98 transition-all cursor-pointer disabled:opacity-60"
                 >
                   {cardBusy ? 'Preparing the picture…' : 'Download ID Card'}
                 </button>
@@ -1574,6 +1667,17 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                     </span>
                   </div>
                 </div>
+                <p className="text-center text-[11px] font-bold mt-2">
+                  {(student.totalFee || 0) <= 0 ? (
+                    <span className="text-slate-500">Fee not set yet — your facility will confirm what you owe</span>
+                  ) : (student.outstandingBalance || 0) <= 0 ? (
+                    <span className="text-emerald-700">Fully paid</span>
+                  ) : (
+                    <span className="text-amber-700">
+                      Balance {settings.currencySymbol}{(student.outstandingBalance || 0).toLocaleString()} of {settings.currencySymbol}{(student.totalFee || 0).toLocaleString()} remaining
+                    </span>
+                  )}
+                </p>
 
                 {/* Navigation sub-tabs */}
                 <div className="flex rounded-xl bg-slate-100 p-1 text-xs font-bold">
@@ -1593,8 +1697,8 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                     onClick={() => setActivePaymentSubView('make_payment')}
                     className={`flex-1 py-2 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                       activePaymentSubView === 'make_payment'
-                        ? 'bg-[#EA580C] text-white shadow-xs'
-                        : 'text-[#EA580C] hover:bg-orange-50'
+                        ? 'bg-orange-600 text-white shadow-xs'
+                        : 'text-orange-600 hover:bg-orange-50'
                     }`}
                   >
                     <CreditCard className="w-3.5 h-3.5" />
@@ -1613,8 +1717,8 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                         {student.outstandingBalance > 0 && (
                           <button
                             type="button"
-                            onClick={() => setPayAmount(student.outstandingBalance)}
-                            className="text-[10px] font-bold text-[#EA580C] hover:underline"
+                            onClick={() => setPayAmount(String(student.outstandingBalance))}
+                            className="text-[10px] font-bold text-orange-600 hover:underline"
                           >
                             Pay Full Balance ({settings.currencySymbol}{(student.outstandingBalance || 0).toLocaleString()})
                           </button>
@@ -1625,8 +1729,8 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                         required
                         min="1000"
                         value={payAmount}
-                        onChange={(e) => setPayAmount(Number(e.target.value))}
-                        className="w-full p-2.5 rounded-xl border border-slate-300 font-mono font-bold text-sm bg-white outline-none focus:border-orange-500"
+                        onChange={(e) => setPayAmount(e.target.value)}
+                        className="w-full p-2.5 rounded-xl border border-slate-300 font-bold text-sm bg-white outline-none focus:border-orange-500"
                       />
                     </div>
 
@@ -1635,10 +1739,9 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                       <label className="font-bold text-slate-700 block mb-1.5">
                         Select Mode of Payment *
                       </label>
-                      <div className="grid grid-cols-3 gap-2">
+                      <div className="grid grid-cols-2 gap-4">
                         {[
                           { mode: 'Bank Transfer' as const, label: 'Bank Transfer', icon: Building2 },
-                          { mode: 'Card' as const, label: 'Card / POS', icon: CreditCard },
                           { mode: 'Cash' as const, label: 'Cash Payment', icon: Banknote },
                         ].map(({ mode, label, icon: ModeIcon }) => (
                           <button
@@ -1651,15 +1754,15 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                                 : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-600 font-medium'
                             }`}
                           >
-                            <ModeIcon className={`w-4 h-4 ${paymentMode === mode ? 'text-[#EA580C]' : 'text-slate-400'}`} />
+                            <ModeIcon className={`w-4 h-4 ${paymentMode === mode ? 'text-orange-600' : 'text-slate-400'}`} />
                             <span className="text-[11px]">{label}</span>
                           </button>
                         ))}
                       </div>
                     </div>
 
-                    {/* Conditional Box: Bank Transfer / Card */}
-                    {(paymentMode === 'Bank Transfer' || paymentMode === 'Card') && (
+                    {/* Conditional Box: Bank Transfer */}
+                    {paymentMode === 'Bank Transfer' && (
                       <div className="space-y-3">
                         {/* Center Account Details */}
                         <div className="p-3.5 bg-blue-50/80 border border-blue-200 rounded-xl space-y-2">
@@ -1674,18 +1777,19 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                           <div className="bg-white/90 p-2.5 rounded-lg border border-blue-100 space-y-1">
                             <div className="flex justify-between items-center text-xs">
                               <span className="text-slate-500 font-medium">Bank Name:</span>
-                              <span className="font-bold text-slate-900">{settings.bankName || 'Access Bank Plc'}</span>
+                              <span className="font-bold text-slate-900">{settings.bankName || 'Not provided yet'}</span>
                             </div>
                             <div className="flex justify-between items-center text-xs">
                               <span className="text-slate-500 font-medium">Account Number:</span>
                               <div className="flex items-center gap-1.5">
                                 <span className="font-mono font-black text-slate-900 tracking-wider">
-                                  {settings.bankAccountNumber || '0123456789'}
+                                  {settings.bankAccountNumber || 'Not provided yet'}
                                 </span>
                                 <button
                                   type="button"
-                                  onClick={() => handleCopy(settings.bankAccountNumber || '0123456789', 'acc_num')}
-                                  className="p-1 rounded bg-blue-50 hover:bg-blue-100 text-blue-700 cursor-pointer"
+                                  onClick={() => handleCopy(settings.bankAccountNumber || '', 'acc_num')}
+                                  disabled={!settings.bankAccountNumber}
+                                  className={`p-1 rounded text-blue-700 ${settings.bankAccountNumber ? 'bg-blue-50 hover:bg-blue-100 cursor-pointer' : 'bg-slate-100 text-slate-300 cursor-not-allowed'}`}
                                   title="Copy Account Number"
                                 >
                                   {copiedKey === 'acc_num' ? (
@@ -1699,13 +1803,13 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                             <div className="flex justify-between items-center text-xs">
                               <span className="text-slate-500 font-medium">Account Name:</span>
                               <span className="font-bold text-slate-900 truncate max-w-[180px]">
-                                {settings.bankAccountName || centreName}
+                                {settings.bankAccountName || 'Not provided yet'}
                               </span>
                             </div>
                           </div>
 
                           <p className="text-[10px] text-blue-700 leading-relaxed font-medium">
-                            Please make payment of <strong>{settings.currencySymbol}{(payAmount || 0).toLocaleString()}</strong> to the facility account above, then upload your transaction receipt/screenshot below.
+                            Please make payment of <strong>{settings.currencySymbol}{payNum.toLocaleString()}</strong> to the facility account above, then upload your transaction receipt/screenshot below.
                           </p>
                         </div>
 
@@ -1851,7 +1955,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                       <button
                         type="submit"
                         disabled={isSubmittingPayment}
-                        className="flex-2 py-2.5 rounded-xl bg-[#EA580C] hover:bg-[#C2410C] text-white font-bold text-xs shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                        className="flex-2 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                       >
                         <Check className="w-4 h-4" />
                         <span>Confirm & Submit Payment ({settings.currencySymbol}{(payAmount || 0).toLocaleString()})</span>
@@ -1875,10 +1979,10 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                         <button
                           type="button"
                           onClick={() => {
-                            setPayAmount(student.outstandingBalance);
+                            setPayAmount(String(student.outstandingBalance));
                             setActivePaymentSubView('make_payment');
                           }}
-                          className="px-3 py-1.5 text-xs font-bold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg shadow-2xs transition-all shrink-0 cursor-pointer"
+                          className="px-3 py-1.5 text-xs font-bold text-white bg-orange-600 hover:bg-orange-700 rounded-lg shadow-2xs transition-all shrink-0 cursor-pointer"
                         >
                           Pay Now
                         </button>
@@ -1889,7 +1993,12 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                       <span className="text-[11px] font-bold uppercase tracking-wider">
                         Payment History{student.registrationDate ? ` since ${new Date(student.registrationDate).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}` : ''}
                       </span>
-                      <span className="text-[10px] font-bold text-slate-400">
+                      <span className="text-[10px] font-bold text-slate-500 flex items-center gap-3">
+                        {nextDueISO && (
+                          <span className="text-emerald-700">
+                            Next due {formatDateLong(nextDueISO)}
+                          </span>
+                        )}
                         {studentPayments.length} records
                       </span>
                     </div>
@@ -1921,8 +2030,8 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                                       {p.status === 'Pending' ? 'Awaiting confirmation' : p.status}
                                     </span>
                                   </div>
-                                  <p className="text-[10px] text-slate-500 font-mono mt-0.5">
-                                    {p.status === 'Pending' || p.status === 'Rejected' ? p.status === 'Pending' ? 'Not yet counted' : 'Not counted' : p.receiptNumber} • {p.date} • {p.method}
+                                  <p className="text-[11px] text-slate-500 mt-0.5">
+                                    {p.date ? formatDateLong(p.date) : ''}
                                   </p>
                                   {p.status === 'Rejected' && p.rejectionReason && (
                                     <p className="text-[10px] text-rose-700 mt-0.5">Reason: {p.rejectionReason}</p>
@@ -1963,7 +2072,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                         <button
                           type="button"
                           onClick={() => setActivePaymentSubView('make_payment')}
-                          className="mt-2 px-4 py-2 text-xs font-bold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg shadow-2xs transition-all inline-flex items-center gap-1.5 cursor-pointer"
+                          className="mt-2 px-4 py-2 text-xs font-bold text-white bg-orange-600 hover:bg-orange-700 rounded-lg shadow-2xs transition-all inline-flex items-center gap-1.5 cursor-pointer"
                         >
                           <CreditCard className="w-3.5 h-3.5" />
                           <span>Make Tuition Payment</span>
@@ -2000,92 +2109,6 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
             )}
 
             {/* MODAL 5: Change Account PIN (Exact Match to video 00:05!) */}
-            {activeModal === 'change_pin' && (
-              <div className="p-6 overflow-y-auto space-y-4">
-                <div className="flex items-start justify-between">
-                  <div className="w-full text-center">
-                    {/* Pink/Rose icon circle */}
-                    <div className="w-14 h-14 rounded-full bg-rose-50 text-rose-500 flex items-center justify-center mx-auto mb-2">
-                      <Lock className="w-7 h-7" />
-                    </div>
-                    <h3 className="text-lg font-black text-slate-900">Current PIN</h3>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Enter your current 4-digit security PIN
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => {
-                      setPin('');
-                      setActiveModal(null);
-                    }}
-                    className="absolute right-5 top-5 p-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-
-                {/* 4 PIN Dots */}
-                <div className="flex justify-center items-center space-x-4 my-6">
-                  {[0, 1, 2, 3].map((index) => (
-                    <div
-                      key={index}
-                      className={`w-4 h-4 rounded-full border-2 transition-all ${
-                        pin.length > index
-                          ? 'bg-slate-900 border-slate-900 scale-110'
-                          : 'border-slate-300 bg-transparent'
-                      }`}
-                    />
-                  ))}
-                </div>
-
-                {/* Number Keypad (1-9, 0, backspace) */}
-                <div className="grid grid-cols-3 gap-2.5 max-w-xs mx-auto">
-                  {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((digit) => (
-                    <button
-                      key={digit}
-                      type="button"
-                      onClick={() => handlePinKey(digit)}
-                      className="py-3.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-900 font-bold text-lg active:scale-95 transition-all shadow-2xs"
-                    >
-                      {digit}
-                    </button>
-                  ))}
-                  <div />
-                  <button
-                    type="button"
-                    onClick={() => handlePinKey('0')}
-                    className="py-3.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-900 font-bold text-lg active:scale-95 transition-all shadow-2xs"
-                  >
-                    0
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handlePinBackspace}
-                    className="py-3.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm active:scale-95 transition-all flex items-center justify-center shadow-2xs"
-                    title="Backspace"
-                  >
-                    <Delete className="w-5 h-5" />
-                  </button>
-                </div>
-
-                <div className="pt-3 max-w-xs mx-auto">
-                  <button
-                    type="button"
-                    onClick={handleConfirmPin}
-                    disabled={pin.length < 4}
-                    className={`w-full py-3.5 rounded-xl font-bold text-sm transition-all shadow-md ${
-                      pin.length === 4
-                        ? 'bg-slate-900 text-white hover:bg-black active:scale-98'
-                        : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                    }`}
-                  >
-                    Next
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* MODAL 6: Change Password */}
             {activeModal === 'change_password' && (
               <div className="p-6 overflow-y-auto space-y-4">
                 <div className="flex items-start justify-between">
@@ -2299,56 +2322,17 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                         <span className="text-[10px] text-slate-400 font-semibold block uppercase">
                           Support Email
                         </span>
-                        <span className="text-xs font-bold text-slate-800 truncate block">
-                          {settings.email || 'support@excellencetutorials.ng'}
+                        <span className={`text-xs font-bold truncate block ${settings.email ? 'text-slate-800' : 'text-slate-400'}`}>
+                          {settings.email || 'Not provided yet'}
                         </span>
                       </div>
                     </div>
                     <button
-                      onClick={() =>
-                        handleCopy(
-                          settings.email || 'support@excellencetutorials.ng',
-                          'email'
-                        )
-                      }
-                      className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-50 flex items-center space-x-1 shrink-0 ml-2"
+                      onClick={() => settings.email && handleCopy(settings.email, 'email')}
+                      disabled={!settings.email}
+                      className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-50 flex items-center space-x-1 shrink-0 ml-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white"
                     >
                       {copiedKey === 'email' ? (
-                        <>
-                          <Check className="w-3.5 h-3.5 text-emerald-600" />
-                          <span className="text-emerald-700">Copied</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-3.5 h-3.5" />
-                          <span>Copy</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-
-                  {/* Channel 2: Academic Advisory */}
-                  <div className="p-3.5 rounded-2xl border border-slate-200 flex items-center justify-between bg-slate-50/50">
-                    <div className="flex items-center space-x-3 min-w-0">
-                      <div className="w-9 h-9 rounded-full bg-orange-50 text-orange-600 flex items-center justify-center shrink-0">
-                        <GraduationCap className="w-4.5 h-4.5" />
-                      </div>
-                      <div className="min-w-0">
-                        <span className="text-[10px] text-slate-400 font-semibold block uppercase">
-                          Academic Advisory
-                        </span>
-                        <span className="text-xs font-bold text-slate-800 truncate block">
-                          academics@excellencetutorials.ng
-                        </span>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() =>
-                        handleCopy('academics@excellencetutorials.ng', 'academics')
-                      }
-                      className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-50 flex items-center space-x-1 shrink-0 ml-2"
-                    >
-                      {copiedKey === 'academics' ? (
                         <>
                           <Check className="w-3.5 h-3.5 text-emerald-600" />
                           <span className="text-emerald-700">Copied</span>
@@ -2372,16 +2356,15 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                         <span className="text-[10px] text-slate-400 font-semibold block uppercase">
                           Phone Helpline
                         </span>
-                        <span className="text-xs font-bold text-slate-800 truncate block">
-                          {settings.phone || '+234 805 676 5455'}
+                        <span className={`text-xs font-bold truncate block ${settings.phone ? 'text-slate-800' : 'text-slate-400'}`}>
+                          {settings.phone || 'Not provided yet'}
                         </span>
                       </div>
                     </div>
                     <button
-                      onClick={() =>
-                        handleCopy(settings.phone || '+234 805 676 5455', 'phone')
-                      }
-                      className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-50 flex items-center space-x-1 shrink-0 ml-2"
+                      onClick={() => settings.phone && handleCopy(settings.phone, 'phone')}
+                      disabled={!settings.phone}
+                      className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-50 flex items-center space-x-1 shrink-0 ml-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white"
                     >
                       {copiedKey === 'phone' ? (
                         <>
@@ -2407,19 +2390,27 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                         <span className="text-[10px] text-slate-400 font-semibold block uppercase">
                           WhatsApp Support
                         </span>
-                        <span className="text-xs font-bold text-slate-800 truncate block">
-                          {settings.whatsappNumber || settings.whatsapp || settings.phone}
+                        <span className={`text-xs font-bold truncate block ${(settings.whatsappNumber || settings.whatsapp) ? 'text-slate-800' : 'text-slate-400'}`}>
+                          {settings.whatsappNumber || settings.whatsapp || 'Not provided yet'}
                         </span>
                       </div>
                     </div>
-                    <a
-                      href={`https://wa.me/${(settings.whatsappNumber || settings.whatsapp || settings.phone).replace(/\D/g, '')}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 flex items-center space-x-1 shrink-0 ml-2 shadow-2xs"
-                    >
-                      <span>Chat</span>
-                    </a>
+                    {settings.whatsappNumber || settings.whatsapp ? (
+                      <a
+                        href={`https://wa.me/${(settings.whatsappNumber || settings.whatsapp).replace(/\D/g, '')}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 flex items-center space-x-1 shrink-0 ml-2 shadow-2xs"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5" />
+                        <span>Chat</span>
+                      </a>
+                    ) : (
+                      <span className="px-2.5 py-1.5 rounded-lg bg-slate-100 text-slate-400 text-xs font-bold flex items-center space-x-1 shrink-0 ml-2">
+                        <MessageSquare className="w-3.5 h-3.5" />
+                        <span>Chat</span>
+                      </span>
+                    )}
                   </div>
 
                   {/* Channel 5: Campus Address */}
@@ -2432,19 +2423,15 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                         <span className="text-[10px] text-slate-400 font-semibold block uppercase">
                           Main Campus Facility
                         </span>
-                        <span className="text-xs font-bold text-slate-800 line-clamp-1 block">
-                          {settings.address || '14 Allen Avenue, Ikeja, Lagos State, Nigeria'}
+                        <span className={`text-xs font-bold line-clamp-1 block ${settings.address ? 'text-slate-800' : 'text-slate-400'}`}>
+                          {settings.address || 'Not provided yet'}
                         </span>
                       </div>
                     </div>
                     <button
-                      onClick={() =>
-                        handleCopy(
-                          settings.address || '14 Allen Avenue, Ikeja, Lagos State, Nigeria',
-                          'address'
-                        )
-                      }
-                      className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-50 flex items-center space-x-1 shrink-0 ml-2"
+                      onClick={() => settings.address && handleCopy(settings.address, 'address')}
+                      disabled={!settings.address}
+                      className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-50 flex items-center space-x-1 shrink-0 ml-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white"
                     >
                       {copiedKey === 'address' ? (
                         <>

@@ -19,15 +19,15 @@ import {
   CheckSquare,
   Square,
   Info,
-  Key,
   CheckCircle2,
   Lock,
 } from 'lucide-react';
+import { getAuth } from 'firebase/auth';
 import { ModernSelect } from '../ui/ModernSelect';
 import { ConfirmationModal } from '../common/ConfirmationModal';
 
 export const TutorsManager: React.FC = () => {
-  const { tutors, programmes, subjects: allSubjects, addTutor, deleteTutor, toggleTutorSuspend, settings, addToast, getTutorRatingStats, classRatings } = useApp();
+  const { tutors, programmes, subjects: allSubjects, deleteTutor, toggleTutorSuspend, settings, addToast, getTutorRatingStats, classRatings, activeCentreId } = useApp();
 
   const [activeFilter, setActiveFilter] = useState<'All' | 'Active' | 'Invited' | 'Suspended'>('All');
   const [search, setSearch] = useState('');
@@ -45,7 +45,6 @@ export const TutorsManager: React.FC = () => {
     examType: string;
     selectedSubjects: string[];
     bio: string;
-    tempPassword: string;
   }>({
     name: '',
     email: '',
@@ -54,30 +53,7 @@ export const TutorsManager: React.FC = () => {
     examType: programmes[0]?.name || 'JAMB UTME Prep',
     selectedSubjects: [],
     bio: 'Experienced subject specialist with proven track record in national examinations.',
-    tempPassword: '',
   });
-
-  const generatePassword = () => {
-    const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
-    const lower = 'abcdefghijkmnopqrstuvwxyz';
-    const numbers = '23456789';
-    const special = '!@#$%&*';
-    const all = upper + lower + numbers + special;
-    
-    let pass = '';
-    pass += upper.charAt(Math.floor(Math.random() * upper.length));
-    pass += lower.charAt(Math.floor(Math.random() * lower.length));
-    pass += numbers.charAt(Math.floor(Math.random() * numbers.length));
-    pass += special.charAt(Math.floor(Math.random() * special.length));
-    
-    for (let i = 0; i < 6; i++) {
-      pass += all.charAt(Math.floor(Math.random() * all.length));
-    }
-    
-    // Shuffle
-    const shuffled = pass.split('').sort(() => 0.5 - Math.random()).join('');
-    setFormData(prev => ({ ...prev, tempPassword: shuffled }));
-  };
 
   const filteredTutors = (tutors || []).filter((t) => {
     const matchesFilter = activeFilter === 'All' ? true : t.status === activeFilter;
@@ -122,35 +98,34 @@ export const TutorsManager: React.FC = () => {
 
   const handleAddTutorSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name.trim() || !formData.email.trim() || !formData.tempPassword) {
-      if (!formData.tempPassword) {
-        addToast({ type: 'error', title: 'Missing Password', description: 'Please generate a temporary password first.' });
-      }
-      return;
-    }
+    if (!formData.name.trim() || !formData.email.trim()) return;
 
     setIsInviting(true);
     const cleanEmail = formData.email.trim().toLowerCase();
     const chosenProg = programmes.find((p) => p.name === formData.examType) || programmes[0];
 
     try {
-      await addTutor({
-        name: formData.name,
-        email: cleanEmail,
-        phone: formData.phone || '0803 123 4567',
-        subjects: formData.selectedSubjects.length > 0 ? formData.selectedSubjects : ['General Studies'],
-        departments: formData.departments,
-        examTypes: [formData.examType],
-        bio: formData.bio,
-        programmeIds: chosenProg ? [chosenProg.id] : ['prog-jamb'],
-        status: 'Invited',
-        rating: 0.0,
-        totalClassesTaught: 0,
-        ratePerHour: 3500,
-        temporaryPassword: formData.tempPassword,
-        hasChangedPassword: false,
-        avatar: '',
+      // The server generates the temporary password and emails it; nobody
+      // here sees or stores a password.
+      const token = (await getAuth().currentUser?.getIdToken()) || '';
+      const res = await fetch('/api/centre/staff/invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          centreId: activeCentreId,
+          name: formData.name,
+          email: cleanEmail,
+          phone: formData.phone,
+          role: 'Tutor',
+          subjects: formData.selectedSubjects.length > 0 ? formData.selectedSubjects : ['General Studies'],
+          departments: formData.departments,
+          examTypes: [formData.examType],
+          bio: formData.bio,
+          programmeIds: chosenProg ? [chosenProg.id] : ['prog-jamb'],
+        }),
       });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || 'Could not send the invitation.');
 
       setShowAddModal(false);
       setFormData({
@@ -161,17 +136,19 @@ export const TutorsManager: React.FC = () => {
         examType: programmes[0]?.name || 'JAMB UTME Prep',
         selectedSubjects: [],
         bio: '',
-        tempPassword: '',
       });
 
       addToast({
         type: 'success',
         title: 'Tutor Invitation Sent',
-        description: `${formData.name} invited. Access will be granted after password change.`,
+        description: `${formData.name} will receive their login details by email.`,
       });
-    } catch (error) {
-      // Error is already handled with a toast in addTutor, but we can log it here
-      console.error('Error in handleAddTutorSubmit:', error);
+    } catch (error: any) {
+      addToast({
+        type: 'error',
+        title: 'Invitation Failed',
+        description: error?.message || 'Could not send the invitation.',
+      });
     } finally {
       setIsInviting(false);
     }
@@ -196,7 +173,7 @@ export const TutorsManager: React.FC = () => {
         <div className="flex items-center space-x-4">
           <button
             onClick={() => setShowAddModal(true)}
-            className="px-4 py-2 text-xs font-semibold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg shadow-sm transition-all flex items-center space-x-1.5 self-start sm:self-auto"
+            className="px-4 py-2 text-xs font-semibold text-white bg-orange-600 hover:bg-orange-700 rounded-lg shadow-sm transition-all flex items-center space-x-1.5 self-start sm:self-auto"
           >
             <Plus className="w-4 h-4" />
             <span>Add Tutor</span>
@@ -208,7 +185,7 @@ export const TutorsManager: React.FC = () => {
       <div className="grid grid-cols-2 gap-3 md:gap-4">
         <div className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200/90 shadow-xs">
           <div className="flex items-center space-x-2 text-slate-600">
-            <GraduationCap className="w-4 h-4 text-[#EA580C]" />
+            <GraduationCap className="w-4 h-4 text-orange-600" />
             <span className="text-xs font-semibold text-slate-600">Total Tutors</span>
           </div>
           <p className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight mt-2">
@@ -296,7 +273,7 @@ export const TutorsManager: React.FC = () => {
                   >
                     <td className="py-3.5 px-5">
                       <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 rounded-lg bg-orange-100 text-[#EA580C] font-bold text-xs flex items-center justify-center shrink-0">
+                        <div className="w-8 h-8 rounded-lg bg-orange-100 text-orange-600 font-bold text-xs flex items-center justify-center shrink-0">
                           {initials}
                         </div>
                         <div>
@@ -513,31 +490,10 @@ export const TutorsManager: React.FC = () => {
                 </div>
               </div>
 
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Temporary Password *</label>
-                <div className="flex space-x-2">
-                  <input
-                    type="text"
-                    readOnly
-                    value={formData.tempPassword}
-                    placeholder="Click generate to create password"
-                    className="flex-1 bg-slate-100 border border-slate-200 rounded-lg px-3 py-2 text-slate-900 outline-none font-mono tracking-wider"
-                  />
-                  <button
-                    type="button"
-                    onClick={generatePassword}
-                    className="px-3 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors flex items-center space-x-1"
-                  >
-                    <Key className="w-3.5 h-3.5" />
-                    <span>Generate</span>
-                  </button>
-                </div>
-              </div>
-
               <div className="p-3.5 rounded-xl bg-amber-50/80 border border-amber-200 text-amber-900 flex items-start space-x-2.5">
                 <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                 <p className="text-[11px] leading-relaxed">
-                  The tutor will use their email and this temporary password for the first login. They must change it to a permanent one before they can access the Tutor Portal.
+                  The tutor receives their login email and a temporary password by email, and must set their own password before they can access the Tutor Portal.
                 </p>
               </div>
 
@@ -552,7 +508,7 @@ export const TutorsManager: React.FC = () => {
                 <button
                   type="submit"
                   disabled={isInviting}
-                  className="px-4 py-2 font-semibold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                  className="px-4 py-2 font-semibold text-white bg-orange-600 hover:bg-orange-700 rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
                 >
                   {isInviting ? (
                     <>
@@ -583,7 +539,7 @@ export const TutorsManager: React.FC = () => {
             <div className="py-4 space-y-4 text-xs">
               <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                 <div className="flex items-center space-x-3.5">
-                  <div className="w-12 h-12 rounded-xl bg-orange-100 text-[#EA580C] font-extrabold text-base flex items-center justify-center overflow-hidden">
+                  <div className="w-12 h-12 rounded-xl bg-orange-100 text-orange-600 font-extrabold text-base flex items-center justify-center overflow-hidden">
                     {selectedTutor.avatar ? (
                       <img src={selectedTutor.avatar} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                     ) : (
@@ -642,7 +598,7 @@ export const TutorsManager: React.FC = () => {
                   {(selectedTutor.subjects || []).map((sub, idx) => (
                     <span
                       key={idx}
-                      className="px-2.5 py-1 bg-orange-50 text-[#EA580C] font-semibold rounded-md border border-orange-200"
+                      className="px-2.5 py-1 bg-orange-50 text-orange-600 font-semibold rounded-md border border-orange-200"
                     >
                       {sub}
                     </span>
@@ -696,7 +652,7 @@ export const TutorsManager: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setSelectedTutor(null)}
-                className="px-4 py-1.5 text-xs font-semibold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg shadow-sm"
+                className="px-4 py-1.5 text-xs font-semibold text-white bg-orange-600 hover:bg-orange-700 rounded-lg shadow-sm"
               >
                 Close
               </button>

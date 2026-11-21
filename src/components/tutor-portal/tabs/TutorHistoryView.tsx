@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../../../context/AppContext';
 import { Tutor, TimetableSlot } from '../../../types';
-import { ArrowLeft, Star, TrendingUp, Info } from 'lucide-react';
+import { X, Star, TrendingUp, Info } from 'lucide-react';
 import { ModernSelect } from '../../ui/ModernSelect';
 
 interface TutorHistoryViewProps {
@@ -117,24 +117,20 @@ export const TutorHistoryView: React.FC<TutorHistoryViewProps> = ({ tutor, onBac
 
   return (
     <div className="p-4 sm:p-5 max-w-lg mx-auto space-y-4 animate-in fade-in duration-200 pb-20">
-      {/* Header with Back Navigation */}
-      <div className="flex items-center justify-between">
+      {/* Header: a single X close, same behaviour as the greetings splash */}
+      <div className="flex items-center justify-end">
         <button
           type="button"
           onClick={onBack}
-          className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-white border border-[#E2E8F0] text-slate-700 hover:bg-slate-50 font-bold text-xs shadow-2xs transition-all cursor-pointer active:scale-95"
+          aria-label="Close"
+          className="w-9 h-9 rounded-full bg-white border border-[#E2E8F0] text-slate-600 hover:bg-slate-50 flex items-center justify-center shadow-2xs transition-all cursor-pointer active:scale-95"
         >
-          <ArrowLeft className="w-3.5 h-3.5" />
-          <span>Active Classes</span>
+          <X className="w-4 h-4" />
         </button>
-
-        <span className="text-[10px] font-black uppercase text-slate-400 font-mono">
-          Tutor Portal
-        </span>
       </div>
 
       <div>
-        <div className="text-[10px] font-extrabold uppercase tracking-wider text-[#C2410C]">
+        <div className="text-[10px] font-extrabold uppercase tracking-wider text-orange-700">
           {tutor.name} · {primarySubject}
         </div>
         <h1 className="text-2xl font-black text-[#0F172A] tracking-tight mt-0.5">

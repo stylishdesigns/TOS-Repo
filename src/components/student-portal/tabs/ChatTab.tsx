@@ -195,7 +195,6 @@ const RULES_SEEN_KEY = 'tos-chat-rules-seen-v1';
 
 interface ChatTabProps {
   student: Student;
-  onGoToProfile?: () => void;
   onGoToPractice?: () => void;
   onHideBottomNav?: (hide: boolean) => void;
   // Phase 1 A: the orb badge in the shell reads this instead of polling.
@@ -207,7 +206,7 @@ interface ChatTabProps {
 // The chat list's last good copy, scoped to this student and kept across
 // full reloads, so the list renders straight away while the refresh runs
 // behind it.
-export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoToPractice, onHideBottomNav, onUnreadTotal, view = 'chats' }) => {
+export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToPractice, onHideBottomNav, onUnreadTotal, view = 'chats' }) => {
   const [listImage, setListImage] = useState('');
   const [listImageName, setListImageName] = useState('');
   const cachedOverview = loadLastGood<ChatOverview>(`chat:overview:${student.id}`);
@@ -357,17 +356,17 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
           <h2 className="text-xl font-black text-[#0F172A] tracking-tight">Student Chat</h2>
         </div>
         <div className="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-sm space-y-4">
-          <div className="w-12 h-12 rounded-2xl bg-orange-50 border border-orange-100 text-[#EA580C] flex items-center justify-center">
+          <div className="w-12 h-12 rounded-2xl bg-orange-50 border border-orange-100 text-orange-600 flex items-center justify-center">
             <MessageSquare className="w-6 h-6" />
           </div>
           <h3 className="text-lg font-black text-slate-900 tracking-tight">House rules</h3>
           <ul className="space-y-2.5 text-xs text-slate-600 leading-relaxed font-medium">
-            <li className="flex gap-2"><span className="text-[#EA580C] font-black">•</span>Be respectful. Everyone here is working towards the same exams.</li>
-            <li className="flex gap-2"><span className="text-[#EA580C] font-black">•</span>No sharing answers or exam content while a mock is live.</li>
-            <li className="flex gap-2"><span className="text-[#EA580C] font-black">•</span>Some groups open based on your last 7 days of practice. Keep practising to unlock them.</li>
-            <li className="flex gap-2"><span className="text-[#EA580C] font-black">•</span>Announcements are read-only. You can react by messaging in your other groups.</li>
-            <li className="flex gap-2"><span className="text-[#EA580C] font-black">•</span>You can report any message. Reports go privately to your facility, never to the person you reported.</li>
-            <li className="flex gap-2"><span className="text-[#EA580C] font-black">•</span>Your facility can remove messages and mute accounts that break these rules.</li>
+            <li className="flex gap-2"><span className="text-orange-600 font-black">•</span>Be respectful. Everyone here is working towards the same exams.</li>
+            <li className="flex gap-2"><span className="text-orange-600 font-black">•</span>No sharing answers or exam content while a mock is live.</li>
+            <li className="flex gap-2"><span className="text-orange-600 font-black">•</span>Some groups open based on your last 7 days of practice. Keep practising to unlock them.</li>
+            <li className="flex gap-2"><span className="text-orange-600 font-black">•</span>Announcements are read-only. You can react by messaging in your other groups.</li>
+            <li className="flex gap-2"><span className="text-orange-600 font-black">•</span>You can report any message. Reports go privately to your facility, never to the person you reported.</li>
+            <li className="flex gap-2"><span className="text-orange-600 font-black">•</span>Your facility can remove messages and mute accounts that break these rules.</li>
           </ul>
           <button
             onClick={() => {
@@ -376,7 +375,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
               } catch { /* private mode: rules simply show again next time */ }
               setShowRules(false);
             }}
-            className="w-full py-3 rounded-2xl bg-[#EA580C] text-white text-sm font-black tracking-wide shadow-sm shadow-orange-200 active:scale-[0.99] transition"
+            className="w-full py-3 rounded-2xl bg-orange-600 text-white text-sm font-black tracking-wide shadow-sm shadow-orange-200 active:scale-[0.99] transition"
           >
             Got it
           </button>
@@ -423,7 +422,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
             type="button"
             aria-pressed={chatFilter === 'personal'}
             onClick={() => setChatFilter('personal')}
-            className={`flex-1 py-2 rounded-full text-xs font-black shadow-sm transition ${chatFilter === 'personal' ? 'bg-[#EA580C] text-white' : 'bg-white border border-slate-200 text-slate-500'}`}
+            className={`flex-1 py-2 rounded-full text-xs font-black shadow-sm transition ${chatFilter === 'personal' ? 'bg-orange-600 text-white' : 'bg-white border border-slate-200 text-slate-500'}`}
           >
             Personal
           </button>
@@ -431,7 +430,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
             type="button"
             aria-pressed={chatFilter === 'groups'}
             onClick={() => setChatFilter('groups')}
-            className={`flex-1 py-2 rounded-full text-xs font-black shadow-sm transition ${chatFilter === 'groups' ? 'bg-[#EA580C] text-white' : 'bg-white border border-slate-200 text-slate-500'}`}
+            className={`flex-1 py-2 rounded-full text-xs font-black shadow-sm transition ${chatFilter === 'groups' ? 'bg-orange-600 text-white' : 'bg-white border border-slate-200 text-slate-500'}`}
           >
             Groups
           </button>
@@ -439,7 +438,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
             type="button"
             aria-pressed={chatFilter === 'channels'}
             onClick={() => setChatFilter('channels')}
-            className={`flex-1 py-2 rounded-full text-xs font-black shadow-sm transition ${chatFilter === 'channels' ? 'bg-[#EA580C] text-white' : 'bg-white border border-slate-200 text-slate-500'}`}
+            className={`flex-1 py-2 rounded-full text-xs font-black shadow-sm transition ${chatFilter === 'channels' ? 'bg-orange-600 text-white' : 'bg-white border border-slate-200 text-slate-500'}`}
           >
             Channels
           </button>
@@ -456,24 +455,6 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
         </div>
       )}
 
-      {!error && overview && !overview.username && (
-        <div className="bg-orange-50 rounded-3xl p-4 border border-orange-100 flex items-center gap-3">
-          <Info className="w-5 h-5 text-[#EA580C] shrink-0" />
-          <div className="flex-1">
-            <p className="text-xs font-bold text-slate-800">Set your username first</p>
-            <p className="text-[11px] text-slate-500 font-medium">Your chat name is the one you set for mocks.</p>
-          </div>
-          {onGoToProfile && (
-            <button
-              onClick={onGoToProfile}
-              className="px-3 py-2 rounded-xl bg-[#EA580C] text-white text-[11px] font-black shrink-0 active:scale-95 transition"
-            >
-              Go to Profile
-            </button>
-          )}
-        </div>
-      )}
-
       {!error && overview?.paused && (
         <div className="bg-amber-50 rounded-3xl p-4 border border-amber-100 flex items-center gap-3">
           <ShieldAlert className="w-5 h-5 text-amber-600 shrink-0" />
@@ -483,7 +464,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
 
       {!error && overview && (view === 'channels' || chatFilter === 'channels') && listForView.length === 0 && (
         <div className="bg-white rounded-3xl p-8 border border-slate-200/90 shadow-sm text-center space-y-2">
-          <div className="w-14 h-14 rounded-2xl bg-violet-50 border border-violet-100 text-violet-600 flex items-center justify-center mx-auto">
+          <div className="w-14 h-14 rounded-2xl bg-orange-50 border border-orange-100 text-orange-600 flex items-center justify-center mx-auto">
             <Zap className="w-7 h-7" />
           </div>
           <h3 className="text-base font-black text-slate-900 tracking-tight">No channels yet</h3>
@@ -497,7 +478,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
         <button
           onClick={() => setPickerOpen(true)}
           className="fixed bottom-24 right-4 z-40 w-14 h-14 rounded-full text-white flex items-center justify-center shadow-xl active:scale-95 transition"
-          style={{ background: 'linear-gradient(145deg, #EA580C, #9A3412)' }}
+          style={{ background: 'linear-gradient(145deg, var(--brand, #EA580C), color-mix(in oklab, var(--brand, #EA580C) 60%, black))' }}
           aria-label="Start a new chat"
         >
           <UserPlus className="w-6 h-6" />
@@ -515,16 +496,16 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
             className={`w-full text-left rounded-2xl p-3.5 shadow-sm flex items-center gap-3 active:scale-[0.99] transition cursor-pointer ${
               follows[g.id]
                 ? 'bg-white border border-slate-200/90'
-                : 'bg-violet-50/50 border border-dashed border-violet-300'
+                : 'bg-orange-50/50 border border-dashed border-orange-300'
             }`}
           >
-            <div className="w-11 h-11 rounded-2xl bg-violet-50 border border-violet-100 text-violet-600 flex items-center justify-center shrink-0">
+            <div className="w-11 h-11 rounded-2xl bg-orange-50 border border-orange-100 text-orange-600 flex items-center justify-center shrink-0">
               {groupIcon(g.kind, 'w-5 h-5')}
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1.5">
                 <p className="text-sm font-black text-slate-900 truncate">{g.name}</p>
-                <span className="text-[9px] font-black uppercase tracking-wider text-violet-700 bg-violet-50 px-1.5 py-0.5 rounded-full shrink-0">Channel</span>
+                <span className="text-[9px] font-black uppercase tracking-wider text-orange-700 bg-orange-50 px-1.5 py-0.5 rounded-full shrink-0">Channel</span>
               </div>
               <p className="text-[11px] text-slate-500 font-medium truncate">
                 {lastLineFor(g)}
@@ -536,15 +517,15 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
                 onClick={(e) => { e.stopPropagation(); toggleFollow(g.id); }}
                 className={`px-3 py-1.5 rounded-full text-[10px] font-black transition active:scale-95 ${
                   follows[g.id]
-                    ? 'bg-violet-50 text-violet-700 border border-violet-200'
-                    : 'bg-violet-600 text-white hover:bg-violet-700'
+                    ? 'bg-orange-50 text-orange-700 border border-orange-200'
+                    : 'bg-orange-600 text-white hover:bg-orange-700'
                 }`}
                 aria-label={follows[g.id] ? `Unfollow ${g.name}` : `Follow ${g.name}`}
               >
                 {follows[g.id] ? 'Following' : 'Follow'}
               </button>
               {g.unread > 0 && (
-                <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-[#EA580C] text-white text-[10px] font-black flex items-center justify-center">
+                <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-orange-600 text-white text-[10px] font-black flex items-center justify-center">
                   {g.unread > 99 ? '99+' : g.unread}
                 </span>
               )}
@@ -563,10 +544,10 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
               g.kind === 'announcements'
                 ? 'bg-amber-50 border-amber-100 text-amber-600'
                 : g.kind === 'tos_channel'
-                  ? 'bg-violet-50 border-violet-100 text-violet-600'
+                  ? 'bg-orange-50 border-orange-100 text-orange-600'
                   : g.locked
                     ? 'bg-slate-50 border-slate-200 text-slate-400'
-                    : 'bg-orange-50 border-orange-100 text-[#EA580C]'
+                    : 'bg-orange-50 border-orange-100 text-orange-600'
             }`}
           >
             {g.locked ? <Lock className="w-5 h-5" /> : g.kind === 'personal' ? (
@@ -593,7 +574,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
           <div className="flex flex-col items-end gap-1 shrink-0">
             <span className="text-[10px] text-slate-400 font-bold">{g.lastMessage ? fmtListTime(g.lastMessage.at) : ''}</span>
             {g.unread > 0 && (
-              <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-[#EA580C] text-white text-[10px] font-black flex items-center justify-center">
+              <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-orange-600 text-white text-[10px] font-black flex items-center justify-center">
                 {g.unread > 99 ? '99+' : g.unread}
               </span>
             )}
@@ -605,7 +586,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
 
       {loading && !overview && !error && (
         <div className="bg-white rounded-3xl p-8 border border-slate-200/90 shadow-sm flex items-center justify-center">
-          <Loader2 className="w-6 h-6 animate-spin text-[#EA580C]" />
+          <Loader2 className="w-6 h-6 animate-spin text-orange-600" />
         </div>
       )}
       {(listImage || listImageName) && (
@@ -617,7 +598,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({ student, onGoToProfile, onGoTo
             <img src={listImage} alt="Profile photo" className="max-h-full max-w-full object-contain" />
           ) : (
             <div className="w-40 h-40 rounded-3xl bg-orange-50 border-2 border-orange-200 flex items-center justify-center">
-              <span className="text-5xl font-black text-[#EA580C]">{initialsOf(listImageName)}</span>
+              <span className="text-5xl font-black text-orange-600">{initialsOf(listImageName)}</span>
             </div>
           )}
         </div>
@@ -1091,7 +1072,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
     // background first, the messages settle in underneath. No blank card.
     return (
       <div className="fixed inset-0 z-40 flex flex-col bg-[#FFF3E7] animate-in fade-in duration-300" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-        <div className="px-3 sm:px-5 py-2.5 flex items-center gap-2 bg-[#EA580C] shadow-sm shrink-0">
+        <div className="px-3 sm:px-5 py-2.5 flex items-center gap-2 bg-orange-600 shadow-sm shrink-0">
           <button onClick={onBack} className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center text-white active:scale-95 transition shrink-0" aria-label="Back">
             <ChevronLeft className="w-4 h-4" />
           </button>
@@ -1100,7 +1081,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
           </div>
         </div>
         <div className="flex-1 flex items-center justify-center">
-          <Loader2 className="w-5 h-5 animate-spin text-[#EA580C]" />
+          <Loader2 className="w-5 h-5 animate-spin text-orange-600" />
         </div>
       </div>
     );
@@ -1125,7 +1106,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
           </p>
           <div className="grid grid-cols-2 gap-2">
             <div className="rounded-2xl bg-orange-50 border border-orange-100 p-3">
-              <p className="text-[10px] font-black uppercase tracking-wider text-[#C2410C]">Your score</p>
+              <p className="text-[10px] font-black uppercase tracking-wider text-orange-700">Your score</p>
               <p className="text-2xl font-black text-[#0F172A]">{resp.myPercent}%</p>
             </div>
             <div className="rounded-2xl bg-slate-50 border border-slate-200 p-3">
@@ -1139,7 +1120,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
           {onGoToPractice && (
             <button
               onClick={onGoToPractice}
-              className="w-full py-3 rounded-2xl bg-[#EA580C] text-white text-sm font-black tracking-wide shadow-sm shadow-orange-200 active:scale-[0.99] transition"
+              className="w-full py-3 rounded-2xl bg-orange-600 text-white text-sm font-black tracking-wide shadow-sm shadow-orange-200 active:scale-[0.99] transition"
             >
               Practise to unlock
             </button>
@@ -1165,7 +1146,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
       ? 'bg-amber-100 text-amber-700'
       : m.role === 'centre_admin'
         ? 'bg-sky-100 text-sky-700'
-        : 'bg-violet-100 text-violet-700';
+        : 'bg-orange-100 text-orange-700';
 
   const dayKey = (at: number): string => {
     const d = new Date(at);
@@ -1211,7 +1192,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
           {...press}
           className={`max-w-[82%] select-none rounded-2xl px-3.5 py-2.5 ${
             m.mine && !emojiOnly
-              ? 'bg-[#EA580C] text-white rounded-br-md'
+              ? 'bg-orange-600 text-white rounded-br-md'
               : 'bg-white text-slate-800 border border-slate-200/90 rounded-bl-md shadow-sm'
           }`}
         >
@@ -1222,7 +1203,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
           )}
           {m.replyTo && (
             <div className={`mb-1 rounded-lg border-l-2 px-2 py-1 ${m.mine ? 'border-orange-200 bg-white/10' : 'border-orange-300 bg-orange-50/70'}`}>
-              <p className={`text-[10px] font-black ${m.mine ? 'text-orange-100' : 'text-[#C2410C]'}`}>{m.replyTo.username}</p>
+              <p className={`text-[10px] font-black ${m.mine ? 'text-orange-100' : 'text-orange-700'}`}>{m.replyTo.username}</p>
               <p className={`text-[10px] truncate ${m.mine ? 'text-orange-100/80' : 'text-slate-500'}`}>{m.replyTo.excerpt}</p>
             </div>
           )}
@@ -1311,7 +1292,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
         {!m.removed && resp?.kind === 'tos_channel' && resp.commentsEnabled === true && (
           <button
             onClick={() => openComments(m)}
-            className="mt-1 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-orange-50 border border-orange-100 text-[10px] font-black text-[#C2410C] active:scale-95 transition"
+            className="mt-1 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-orange-50 border border-orange-100 text-[10px] font-black text-orange-700 active:scale-95 transition"
             aria-label="Comments"
           >
             <MessageSquare className="w-3 h-3" />
@@ -1326,7 +1307,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
   // pinned, and only the messages scroll between them.
   return (
     <div className="fixed inset-0 z-40 flex flex-col bg-[#FFF3E7] animate-in fade-in duration-300" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-      <div className="px-3 sm:px-5 py-2.5 flex items-center gap-2 bg-[#EA580C] shadow-sm shrink-0">
+      <div className="px-3 sm:px-5 py-2.5 flex items-center gap-2 bg-orange-600 shadow-sm shrink-0">
         <button
           onClick={onBack}
           className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center text-white active:scale-95 transition shrink-0"
@@ -1357,7 +1338,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
           <p className="text-xs text-slate-600 font-medium">{error}</p>
           <button
             onClick={() => { setLoading(true); loadLatest().then(() => setLoading(false)); }}
-            className="px-3 py-2 rounded-xl bg-[#EA580C] text-white text-[11px] font-black active:scale-95 transition"
+            className="px-3 py-2 rounded-xl bg-orange-600 text-white text-[11px] font-black active:scale-95 transition"
           >
             Try again
           </button>
@@ -1404,7 +1385,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
             {replyTo && (
               <div className="absolute bottom-full left-4 right-4 mb-1 flex items-start gap-2 rounded-xl bg-orange-50 border border-orange-100 px-3 py-2">
                 <div className="min-w-0 flex-1">
-                  <p className="text-[10px] font-black text-[#C2410C]">Replying to {replyTo.username}</p>
+                  <p className="text-[10px] font-black text-orange-700">Replying to {replyTo.username}</p>
                   <p className="text-[11px] text-slate-500 truncate">{replyTo.removed ? 'Message removed' : (replyTo.text || 'Photo')}</p>
                 </div>
                 <button
@@ -1437,7 +1418,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
             <button
               onClick={send}
               disabled={!text.trim() && !attachFile}
-              className="w-11 h-11 rounded-2xl bg-[#EA580C] text-white flex items-center justify-center shadow-sm shadow-orange-200 active:scale-95 transition disabled:opacity-50 shrink-0"
+              className="w-11 h-11 rounded-2xl bg-orange-600 text-white flex items-center justify-center shadow-sm shadow-orange-200 active:scale-95 transition disabled:opacity-50 shrink-0"
               aria-label="Send"
             >
               <Send className="w-4 h-4" />
@@ -1486,7 +1467,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
                   className="w-full flex items-center justify-between px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 text-left active:scale-[0.99] transition disabled:opacity-60"
                 >
                   <span className="text-sm font-bold text-slate-800">{g.name}</span>
-                  <Send className="w-4 h-4 text-[#EA580C]" />
+                  <Send className="w-4 h-4 text-orange-600" />
                 </button>
               ))}
             </div>
@@ -1499,7 +1480,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
           <div className="w-full max-w-lg bg-white rounded-t-3xl p-5 space-y-3" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-slate-800">
-                <Info className="w-4 h-4 text-[#EA580C]" />
+                <Info className="w-4 h-4 text-orange-600" />
                 <span className="text-sm font-black">{isPersonal ? 'Contact info' : 'About this group'}</span>
               </div>
               <button onClick={() => setShowInfo(false)} className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500" aria-label="Close">
@@ -1509,7 +1490,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
             {isPersonal ? (
               <div className="bg-slate-50 rounded-2xl p-3.5 space-y-2">
                 <div className="flex items-center gap-3">
-                  <span className="w-12 h-12 rounded-full bg-orange-50 border border-orange-100 text-[#EA580C] flex items-center justify-center text-sm font-black overflow-hidden shrink-0">
+                  <span className="w-12 h-12 rounded-full bg-orange-50 border border-orange-100 text-orange-600 flex items-center justify-center text-sm font-black overflow-hidden shrink-0">
                     {((resp as any)?.peerAvatar || group?.peerAvatar) ? <img src={((resp as any)?.peerAvatar || group?.peerAvatar) as string} alt="" className="w-full h-full object-cover" /> : initialsOf(resp?.groupName || group?.name || '')}
                   </span>
                   <div className="min-w-0">
@@ -1525,7 +1506,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
             ) : (
               <div className="bg-slate-50 rounded-2xl p-3.5 space-y-2">
                 <div className="flex items-center gap-2">
-                  {groupIcon(resp?.kind || 'custom', 'w-4 h-4 text-[#EA580C]')}
+                  {groupIcon(resp?.kind || 'custom', 'w-4 h-4 text-orange-600')}
                   <p className="text-sm font-black text-slate-900">{resp?.groupName || group?.name}</p>
                 </div>
                 <p className="text-[11px] text-slate-500 font-medium">{kindLabel}{group?.subject ? ` · ${group.subject}` : ''}</p>
@@ -1573,7 +1554,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
               onChange={(e) => setAttachCaption(e.target.value)}
               placeholder="Add a caption (optional)"
               aria-label="Caption for the attachment"
-              className="w-full bg-white/10 border border-white/20 rounded-full px-4 py-3 text-[13px] text-white placeholder:text-white/50 font-medium outline-none focus:border-[#EA580C]/60"
+              className="w-full bg-white/10 border border-white/20 rounded-full px-4 py-3 text-[13px] text-white placeholder:text-white/50 font-medium outline-none focus:border-orange-600/60"
             />
           </div>
           <div className="p-4 flex justify-end gap-3">
@@ -1586,7 +1567,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
                 setAttachCaption('');
                 send({ file: cur.file, text: attachCaption.trim() });
               }}
-              className="px-5 py-3 rounded-2xl bg-[#EA580C] text-white text-xs font-black flex items-center gap-2 active:scale-95 transition"
+              className="px-5 py-3 rounded-2xl bg-orange-600 text-white text-xs font-black flex items-center gap-2 active:scale-95 transition"
             >
               <Send className="w-4 h-4" /> Send
             </button>
@@ -1599,15 +1580,15 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
           <div className="w-full max-w-lg bg-white rounded-t-3xl p-5 space-y-2" onClick={(e) => e.stopPropagation()}>
             <p className="text-sm font-black text-slate-900 mb-1">Attach</p>
             <button onClick={() => photoRef.current?.click()} className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-left active:scale-[0.99] transition">
-              <span className="w-9 h-9 rounded-xl bg-orange-50 flex items-center justify-center text-[#C2410C]"><ImageIcon className="w-4 h-4" /></span>
+              <span className="w-9 h-9 rounded-xl bg-orange-50 flex items-center justify-center text-orange-700"><ImageIcon className="w-4 h-4" /></span>
               <span className="text-sm font-bold text-slate-800">Photo</span>
             </button>
             <button onClick={() => videoRef.current?.click()} className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-left active:scale-[0.99] transition">
-              <span className="w-9 h-9 rounded-xl bg-orange-50 flex items-center justify-center text-[#C2410C]"><Play className="w-4 h-4" /></span>
+              <span className="w-9 h-9 rounded-xl bg-orange-50 flex items-center justify-center text-orange-700"><Play className="w-4 h-4" /></span>
               <span className="text-sm font-bold text-slate-800">Video</span>
             </button>
             <button onClick={() => docRef.current?.click()} className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-left active:scale-[0.99] transition">
-              <span className="w-9 h-9 rounded-xl bg-orange-50 flex items-center justify-center text-[#C2410C]"><Plus className="w-4 h-4" /></span>
+              <span className="w-9 h-9 rounded-xl bg-orange-50 flex items-center justify-center text-orange-700"><Plus className="w-4 h-4" /></span>
               <span className="text-sm font-bold text-slate-800">Document</span>
             </button>
           </div>
@@ -1652,7 +1633,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
                 setVvAt(t);
                 if (vvRef.current) vvRef.current.currentTime = t;
               }}
-              className="flex-1 h-1 accent-[#EA580C]"
+              className="flex-1 h-1 accent-orange-600"
               aria-label="Video timeline"
             />
             <span className="text-[10px] font-bold text-white/80 tabular-nums">{fmtVvTime(vvDur)}</span>
@@ -1680,7 +1661,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
             </div>
             <div className="flex-1 min-h-0 overflow-y-auto px-5 py-2 space-y-3">
               {comments === null && (
-                <div className="flex items-center justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-[#EA580C]" /></div>
+                <div className="flex items-center justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-orange-600" /></div>
               )}
               {comments !== null && comments.length === 0 && (
                 <p className="text-xs text-slate-400 font-medium py-4 text-center">No comments yet. Be the first.</p>
@@ -1709,7 +1690,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
               <button
                 onClick={postComment}
                 disabled={!commentText.trim() || postingComment}
-                className="w-11 h-11 rounded-2xl bg-[#EA580C] text-white flex items-center justify-center active:scale-95 transition disabled:opacity-50 shrink-0"
+                className="w-11 h-11 rounded-2xl bg-orange-600 text-white flex items-center justify-center active:scale-95 transition disabled:opacity-50 shrink-0"
                 aria-label="Send comment"
               >
                 {postingComment ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
@@ -1745,7 +1726,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId, group, onBack, onGoToPra
 
       {toast && (
         <div className="fixed bottom-28 left-0 right-0 flex justify-center z-50 pointer-events-none">
-          <div className="bg-slate-900 text-white text-xs font-bold px-4 py-2.5 rounded-full shadow-lg max-w-[85%] text-center">{toast}</div>
+          <div className="bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] text-xs font-bold px-4 py-2.5 rounded-full shadow-lg max-w-[85%] text-center">{toast}</div>
         </div>
       )}
 
@@ -1803,7 +1784,7 @@ const StarredScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       {error && (
         <div className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-sm">
           <p className="text-xs text-slate-600 font-medium">{error}</p>
-          <button onClick={load} className="mt-2 px-3 py-2 rounded-xl bg-[#EA580C] text-white text-[11px] font-black active:scale-95 transition">
+          <button onClick={load} className="mt-2 px-3 py-2 rounded-xl bg-orange-600 text-white text-[11px] font-black active:scale-95 transition">
             Try again
           </button>
         </div>
@@ -1822,7 +1803,7 @@ const StarredScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             <div key={it.key} className="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-3 flex items-start gap-3">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
-                  <span className="text-[10px] font-black text-[#C2410C]">{it.groupName}</span>
+                  <span className="text-[10px] font-black text-orange-700">{it.groupName}</span>
                   <span className="text-[10px] font-black text-slate-400">·</span>
                   <span className="text-[10px] font-black text-slate-500">{it.username}</span>
                   <span className="text-[9px] font-bold text-slate-400">{fmtTime(it.at)}</span>
@@ -1957,7 +1938,7 @@ const ChatSettingsSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
               type="button"
               disabled={!values || saving}
               onClick={() => pick(key, o.value)}
-              className={`px-3.5 min-h-[40px] rounded-full text-xs font-black transition ${active ? 'bg-[#EA580C] text-white' : 'bg-white border border-slate-200 text-slate-600'} ${values && !saving ? 'cursor-pointer' : 'opacity-60'}`}
+              className={`px-3.5 min-h-[40px] rounded-full text-xs font-black transition ${active ? 'bg-orange-600 text-white' : 'bg-white border border-slate-200 text-slate-600'} ${values && !saving ? 'cursor-pointer' : 'opacity-60'}`}
             >
               {o.label}
             </button>
@@ -1994,7 +1975,7 @@ const ChatSettingsSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             <button
               onClick={save}
               disabled={!dirty || saving}
-              className={`w-full py-3.5 rounded-2xl text-sm font-black tracking-wide shadow-sm transition ${dirty && !saving ? 'bg-[#EA580C] text-white cursor-pointer active:scale-[0.99]' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
+              className={`w-full py-3.5 rounded-2xl text-sm font-black tracking-wide shadow-sm transition ${dirty && !saving ? 'bg-orange-600 text-white cursor-pointer active:scale-[0.99]' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
             >
               {saving ? 'Saving…' : dirty ? 'Save changes' : 'Saved'}
             </button>

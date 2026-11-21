@@ -589,9 +589,23 @@ async function lastReadCount(groupId: string, uid: string): Promise<number> {
   return Number(snap.val()) || 0;
 }
 
-async function unreadFor(groupId: string, uid: string): Promise<number> {
+async function unreadFor(groupId: string, uid: string, opts?: { seedIfNew?: boolean }): Promise<number> {
   const meta = await readMeta(groupId);
-  const read = await lastReadCount(groupId, uid);
+  const counterRef = adminRtdb.ref(`chat/groups/${groupId}/counters/${uid}`);
+  const snap = await counterRef.get();
+  if (!snap.exists()) {
+    // A student seeing this chat for the first time never "joined before":
+    // everything already posted is history they can open and read, not an
+    // unread notification. Seed their read marker at the current message
+    // count so only messages posted from now on count as unread.
+    if (opts?.seedIfNew) {
+      const base = Math.max(0, meta.msgCount - meta.pruned);
+      await counterRef.set({ lastReadCount: base, seededAt: Date.now() });
+      return 0;
+    }
+    return Math.max(0, meta.msgCount - meta.pruned);
+  }
+  const read = Number(snap.val()?.lastReadCount) || 0;
   return Math.max(0, meta.msgCount - meta.pruned - read);
 }
 
@@ -915,7 +929,7 @@ export function registerChatRoutes(app: express.Express): void {
         if (!studentInGroup(student.subjects, group)) continue;
         const gate = gateFor(group, centreChat, tosChat);
         const lock = lockState(group, gate, stats, centreChat);
-        const unread = lock.locked ? 0 : await unreadFor(group.id, caller.uid);
+        const unread = lock.locked ? 0 : await unreadFor(group.id, caller.uid, { seedIfNew: true });
         let last: any = null;
         if (!lock.locked) {
           const snap = await adminRtdb.ref(`chat/groups/${group.id}/messages`).limitToLast(1).get();
@@ -959,7 +973,7 @@ export function registerChatRoutes(app: express.Express): void {
       for (const p of personalDocs) {
         const info = personalNames.get(p.other);
         const displayName = info ? (info.username || info.name || 'Chat') : 'Chat';
-        const unread = await unreadFor(p.id, caller.uid);
+        const unread = await unreadFor(p.id, caller.uid, { seedIfNew: true });
         let last: any = null;
         const snap = await adminRtdb.ref(`chat/groups/${p.id}/messages`).limitToLast(1).get();
         snap.forEach((c) => {

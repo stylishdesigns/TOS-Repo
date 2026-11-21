@@ -218,7 +218,7 @@ export const ExamTypeTab: React.FC = () => {
 
         <button
           onClick={handleOpenAdd}
-          className="px-4 py-2 text-xs font-semibold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg shadow-sm transition-all flex items-center justify-center space-x-1.5 shrink-0"
+          className="px-4 py-2 text-xs font-semibold text-white bg-orange-600 hover:bg-orange-700 rounded-lg shadow-sm transition-all flex items-center justify-center space-x-1.5 shrink-0"
         >
           <Plus className="w-4 h-4" />
           <span>Add Exam Type</span>
@@ -235,7 +235,7 @@ export const ExamTypeTab: React.FC = () => {
             <div>
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center space-x-2.5">
-                  <div className="w-9 h-9 rounded-lg bg-orange-100 text-[#EA580C] font-extrabold flex items-center justify-center text-xs">
+                  <div className="w-9 h-9 rounded-lg bg-orange-100 text-orange-600 font-extrabold flex items-center justify-center text-xs">
                     {item.code.slice(0, 3)}
                   </div>
                   <div>
@@ -306,7 +306,7 @@ export const ExamTypeTab: React.FC = () => {
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center space-x-2">
-                <Award className="w-5 h-5 text-[#EA580C]" />
+                <Award className="w-5 h-5 text-orange-600" />
                 <h3 className="font-bold text-base text-slate-900">
                   {editingItem ? 'Edit Exam Type' : 'Add New Exam Type'}
                 </h3>
@@ -407,7 +407,7 @@ export const ExamTypeTab: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 font-semibold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg shadow-sm"
+                  className="px-4 py-2 font-semibold text-white bg-orange-600 hover:bg-orange-700 rounded-lg shadow-sm"
                 >
                   {editingItem ? 'Save Changes' : 'Create Exam Type'}
                 </button>

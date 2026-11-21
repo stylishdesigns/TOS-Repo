@@ -251,7 +251,7 @@ export const PracticeSection: React.FC<PracticeSectionProps> = ({
               onClick={() => setSelectedSubject(subject)}
               className={`h-10 px-4 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer flex items-center justify-center border ${
                 isSelected
-                  ? 'bg-[#C2410C] text-white border-[#C2410C] shadow-sm font-extrabold'
+                  ? 'bg-orange-700 text-white border-orange-700 shadow-sm font-extrabold'
                   : 'bg-white text-slate-700 border-[#E2E8F0] hover:bg-slate-50'
               }`}
             >
@@ -289,7 +289,7 @@ export const PracticeSection: React.FC<PracticeSectionProps> = ({
               className="rounded-[20px] p-5 border border-[#334155] text-white space-y-3.5"
             >
               <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2 text-[#FDBA74]">
+                <div className="flex items-center space-x-2 text-orange-300">
                   <Sparkles className="w-4 h-4 text-orange-400" />
                   <span className="text-[10px] font-extrabold uppercase tracking-wider text-orange-300">
                     SUGGESTED FOR YOU
@@ -317,7 +317,7 @@ export const PracticeSection: React.FC<PracticeSectionProps> = ({
                 <button
                   type="button"
                   onClick={() => handleStartSet(suggestedTopic.topic)}
-                  className="w-full h-11 px-4 rounded-xl bg-[#EA580C] hover:bg-[#C2410C] active:scale-98 text-white font-black text-xs uppercase tracking-wider shadow-sm transition-all flex items-center justify-center space-x-2 cursor-pointer"
+                  className="w-full h-11 px-4 rounded-xl bg-orange-600 hover:bg-orange-700 active:scale-98 text-white font-black text-xs uppercase tracking-wider shadow-sm transition-all flex items-center justify-center space-x-2 cursor-pointer"
                 >
                   <span>Start 10 questions</span>
                   <ArrowRight className="w-4 h-4" />
@@ -364,7 +364,7 @@ export const PracticeSection: React.FC<PracticeSectionProps> = ({
                     >
                       <div className="space-y-1 min-w-0 flex-1">
                         <div className="flex items-center space-x-2">
-                          <h4 className="text-xs font-bold text-slate-800 group-hover:text-[#EA580C] transition-colors truncate">
+                          <h4 className="text-xs font-bold text-slate-800 group-hover:text-orange-600 transition-colors truncate">
                             {t.topic}
                           </h4>
                           <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-blue-50 text-blue-700 border border-blue-200 shrink-0">
@@ -375,7 +375,7 @@ export const PracticeSection: React.FC<PracticeSectionProps> = ({
                           {t.total} questions in bank · Untouched
                         </p>
                       </div>
-                      <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-[#EA580C] transition-colors shrink-0" />
+                      <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-orange-600 transition-colors shrink-0" />
                     </button>
                   );
                 }
@@ -388,7 +388,7 @@ export const PracticeSection: React.FC<PracticeSectionProps> = ({
                     className="w-full min-h-[68px] p-4 rounded-2xl bg-white border border-[#E2E8F0] hover:border-slate-300 text-left transition-all space-y-2.5 group cursor-pointer shadow-2xs"
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <h4 className="text-xs font-bold text-slate-900 group-hover:text-[#EA580C] transition-colors truncate flex-1">
+                      <h4 className="text-xs font-bold text-slate-900 group-hover:text-orange-600 transition-colors truncate flex-1">
                         {t.topic}
                       </h4>
                       <div className="flex items-center space-x-2 shrink-0">

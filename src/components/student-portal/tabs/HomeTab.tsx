@@ -1,4 +1,5 @@
 import React from 'react';
+import { initialsAvatar } from '../../../lib/avatar';
 import { useApp } from '../../../context/AppContext';
 import { Student } from '../../../types';
 import { PWAInstallButton } from '../../pwa/PWAInstallButton';
@@ -10,30 +11,30 @@ import {
   CheckCircle2,
   AlertCircle,
   CreditCard,
-  MessageSquare,
   ArrowRight,
   TrendingUp,
   MapPin,
-  Flame,
   Award,
   BookOpen,
   GraduationCap,
   Bell,
   ShieldCheck,
-  ChevronUp,
-  ChevronDown,
+  LogIn,
+  LogOut,
 } from 'lucide-react';
 
 import { CalendarView } from '../../common/CalendarView';
+import { slotsToActivities } from '../../../lib/planner';
 
 interface HomeTabProps {
   student: Student;
   onNavigateTab: (tab: 'home' | 'timetable' | 'cbt' | 'results' | 'more' | 'profile') => void;
 }
 
+
 export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
   // Attendance & Clock logic
-  const { settings, timetable, announcements, results, attendanceSettings, attendanceLogs, clockIn, clockOut } = useApp();
+  const { settings, timetable, announcements, results, attendanceSettings, attendanceLogs, clockIn, clockOut, plannerReminders, addPlannerReminder, removePlannerReminder, updatePlannerReminder } = useApp();
   const [showAttendanceInfo, setShowAttendanceInfo] = React.useState(false);
   const [showCalendar, setShowCalendar] = React.useState(false);
 
@@ -52,9 +53,6 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
   // Days left to national exams (JAMB UTME 2026 approx April 19)
   const now = new Date();
   const dateStr = now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-  const targetExamDate = new Date('2026-04-19T08:00:00');
-  const diffTime = targetExamDate.getTime() - now.getTime();
-  const daysLeft = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
 
   // Latest mock results for this student
   const currentUid = student.uid || student.id;
@@ -69,6 +67,14 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
   const todayStr = new Date().toISOString().split('T')[0];
   
   const activeTimetable = timetable.filter(s => s.status === 'active' || !s.status);
+
+  // Academic planner: timetable classes plus this member's own reminders.
+  const plannerActivities = React.useMemo(
+    () => [...slotsToActivities(activeTimetable), ...plannerReminders],
+    [activeTimetable, plannerReminders]
+  );
+  const todayKey = new Date().toLocaleDateString('en-CA');
+  const todayHasActivities = plannerActivities.some((a) => a.date === todayKey);
   const todayClasses = activeTimetable.filter(
     (slot) => slot.day === todayName && slot.date === todayStr
   ).sort((a, b) => a.time.localeCompare(b.time));
@@ -112,24 +118,49 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
   // Urgent announcements
   const urgentAnnouncements = announcements.filter((a) => a.priority === 'Urgent' || a.target !== 'Parents');
 
-  const MALE_NIGERIAN_AVATAR =
-    'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=500&q=80';
-  const FEMALE_NIGERIAN_AVATAR =
-    'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?auto=format&fit=crop&w=500&q=80';
-
   const studentAvatar =
     (student.avatar &&
     !student.avatar.includes('photo-1534528741775') &&
     !student.avatar.includes('photo-1517841905240')
       ? student.avatar
-      : student.gender === 'Female'
-      ? FEMALE_NIGERIAN_AVATAR
-      : MALE_NIGERIAN_AVATAR);
+      : initialsAvatar(student.name));
 
   const todayLog = attendanceLogs.find(l => l.studentId === student.id && l.date === todayStr);
 
   const clockedInAt = todayLog?.clockInAt ? new Date(todayLog.clockInAt) : null;
   const clockedOutAt = todayLog?.clockOutAt ? new Date(todayLog.clockOutAt) : null;
+
+  // Live attendance rate (Nov 20): days this student actually checked in vs
+  // the centre's class days since they joined. The old stored
+  // student.attendancePercent was set once when the account was created and
+  // never updated, so the home card now reads the real check-in logs.
+  const attendanceRate = React.useMemo(() => {
+    const checked = new Set<string>();
+    for (const l of attendanceLogs) {
+      if (l.studentId !== student.id && l.studentId !== currentUid) continue;
+      if (!l.clockInAt || !l.date) continue;
+      checked.add(l.date);
+    }
+    if (checked.size === 0) return null;
+    let start: Date | null = student.createdAt ? new Date(student.createdAt) : null;
+    if (!start || Number.isNaN(start.getTime())) {
+      const earliest = Array.from(checked).sort()[0];
+      start = earliest ? new Date(`${earliest}T00:00:00`) : null;
+    }
+    if (!start || Number.isNaN(start.getTime())) return null;
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const classDays = new Set<string>((timetable || []).map((sl: any) => sl.day).filter(Boolean));
+    const allowed = classDays.size > 0 ? classDays : new Set<string>(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']);
+    const todayMid = new Date(); todayMid.setHours(0, 0, 0, 0);
+    const startMid = new Date(start); startMid.setHours(0, 0, 0, 0);
+    let expected = 0;
+    for (const d = new Date(startMid); d < todayMid; d.setDate(d.getDate() + 1)) {
+      if (allowed.has(dayNames[d.getDay()])) expected++;
+      if (expected > 3000) break;
+    }
+    if (expected === 0) return null;
+    return Math.min(100, Math.round((checked.size / expected) * 100));
+  }, [attendanceLogs, student.id, student.createdAt, currentUid, timetable]);
 
   const parseTo24H = (timeStr: string) => {
     if (!timeStr) return "00:00";
@@ -155,17 +186,29 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
   const lateMinutesThreshold = parseTimeToMinutes(attendanceSettings.lateArrivalTime || '08:30 AM');
   const currentMinutes = currentTime.getHours() * 60 + currentTime.getMinutes();
 
-  // Progress percentage (from resumption to closing)
-  const getProgress = () => {
-    const totalMinutes = closingMinutes - resumptionMinutes;
-    if (totalMinutes <= 0) return 0;
-    
-    const elapsed = Math.max(0, currentMinutes - resumptionMinutes);
-    return Math.min(100, (elapsed / totalMinutes) * 100);
-  };
+  // Closing time as today's date, for the check-in ring
+  const closingToday = (() => {
+    const d = new Date(currentTime);
+    d.setHours(Math.floor(closingMinutes / 60), closingMinutes % 60, 0, 0);
+    return d;
+  })();
+
+  const ringProgress = clockedInAt
+    ? Math.min(1, Math.max(0, (currentTime.getTime() - clockedInAt.getTime()) / Math.max(60000, closingToday.getTime() - clockedInAt.getTime())))
+    : 0;
+  const fmtClock = (d: Date) => d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const clockInLabel = clockedInAt ? fmtClock(clockedInAt) : '';
+  const clockOutLabel = clockedOutAt ? fmtClock(clockedOutAt) : '';
 
   const isClosingTime = currentMinutes >= closingMinutes;
+  // The chip on the line shows hour and minutes only; once the student has
+  // checked out it freezes at that moment instead of ticking on.
+  const chipTime = (clockedOutAt || currentTime).toLocaleTimeString('en-GB', { hour12: false, hour: '2-digit', minute: '2-digit' });
   const isLate = clockedInAt && (clockedInAt.getHours() * 60 + clockedInAt.getMinutes()) > lateMinutesThreshold;
+  // The student has not checked in and the late gate has passed: nudge them
+  // from inside the Attendance Check card (the old red header pill is gone).
+  const isRunningLate = !clockedInAt && !clockedOutAt && currentMinutes > lateMinutesThreshold;
+
 
   const handleClockInAction = () => {
     clockIn(student.id);
@@ -226,8 +269,8 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
         </div>
       </div>
 
-      {/* Attendance Clock In/Out Card */}
-      <div className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-sm relative overflow-hidden">
+      {/* Attendance Check Card */}
+      <div className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-sm">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center space-x-2">
             <div className={`p-2 rounded-xl transition-colors ${student.attendancePercent > 90 ? 'bg-emerald-50 text-emerald-600' : 'bg-orange-50 text-orange-600'}`}>
@@ -235,110 +278,114 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
             </div>
             <h4 className="text-[10px] font-black text-slate-900 uppercase tracking-wider">Attendance Check</h4>
           </div>
-          <button 
+          <button
             onClick={() => setShowAttendanceInfo(!showAttendanceInfo)}
-            className="p-1.5 rounded-lg bg-slate-50 text-slate-400 hover:text-orange-500 transition-colors relative"
+            className="p-1.5 rounded-lg bg-slate-50 text-slate-400 hover:text-orange-500 transition-colors"
           >
             <Clock className="w-4 h-4" />
-            {showAttendanceInfo && (
-              <div className="absolute top-full right-0 mt-2 w-48 bg-slate-900 text-white p-3 rounded-xl shadow-xl z-50 text-[10px] text-left animate-in fade-in zoom-in-95">
-                <p className="font-black uppercase tracking-widest text-orange-400 mb-1.5">Facility Hours</p>
-                <ul className="space-y-1.5 opacity-90 font-medium">
-                  <li>• Resumption: {attendanceSettings.resumptionTime}</li>
-                  <li>• Late Gate: {attendanceSettings.lateArrivalTime}</li>
-                  <li>• Closing: {attendanceSettings.closingTime}</li>
-                </ul>
-              </div>
-            )}
           </button>
         </div>
 
-        {/* Compact Controls */}
-        <div className="relative flex items-center justify-between px-2 py-2">
-            {/* Progress Connecting Line (Improved Visuals) */}
-            <div className="absolute top-[33px] left-[45px] right-[45px] h-[6px] bg-slate-200 rounded-full z-0 overflow-hidden shadow-inner">
-              <div 
-                className="h-full bg-gradient-to-r from-orange-500 to-[#EA580C] rounded-full transition-all duration-1000 shadow-[0_0_10px_rgba(234,88,12,0.5)]" 
-                style={{ width: `${getProgress()}%` }}
-              />
-            </div>
+        {showAttendanceInfo && (
+          <div className="mb-4 p-3 rounded-xl bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] text-left">
+            <p className="font-black uppercase tracking-widest text-orange-400 mb-1.5 text-[10px]">Facility Hours</p>
+            <ul className="space-y-1.5 opacity-90 font-medium text-[10px]">
+              <li>• Resumption: {attendanceSettings.resumptionTime}</li>
+              <li>• Late Gate: {attendanceSettings.lateArrivalTime}</li>
+              <li>• Closing: {attendanceSettings.closingTime}</li>
+            </ul>
+          </div>
+        )}
 
-            {/* Clock In Button */}
-            <div className="flex flex-col items-center z-10">
-              <button 
-                onClick={handleClockInAction}
-                disabled={!!clockedInAt}
-                className={`w-14 h-14 rounded-full flex flex-col items-center justify-center shadow-md active:scale-95 transition-all border-4 border-white ${
-                  clockedInAt 
-                    ? 'bg-slate-700 text-white' 
-                    : 'bg-[#475569] text-white'
-                } disabled:cursor-not-allowed`}
-              >
-                <ChevronUp className="w-4 h-4" />
-                <span className="text-[10px] font-black">IN</span>
-                <span className="text-[7px] font-bold opacity-80 uppercase tracking-tighter">{attendanceSettings.resumptionTime || '8:00 AM'}</span>
-              </button>
-              <div className="mt-1 h-3 flex items-center justify-center">
-                {isLate && clockedInAt && (
-                  <span className="text-[7px] font-black uppercase text-amber-600">Late Arrival</span>
-                )}
-              </div>
-            </div>
-
-            {/* Current Time Indicator (Compact) */}
-            <div className="flex flex-col items-center justify-center z-10">
-              <div className="w-12 h-12 rounded-full border-4 border-white bg-slate-50 flex flex-col items-center justify-center shadow-md ring-1 ring-slate-100">
-                <span className="text-slate-900 text-[9px] font-black">
-                  {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
-                </span>
-                <div className="w-6 h-0.5 bg-orange-500 rounded-full mt-0.5" />
-              </div>
-            </div>
-
-            {/* Clock Out Button */}
-            <div className="flex flex-col items-center z-10">
-              <button 
-                onClick={handleClockOutAction}
-                disabled={!clockedInAt || clockedOutAt || !isClosingTime}
-                className={`w-14 h-14 rounded-full flex flex-col items-center justify-center shadow-md active:scale-95 transition-all border-4 border-white ${
-                  clockedOutAt
-                    ? 'bg-emerald-600 text-white'
-                    : clockedInAt && isClosingTime
-                    ? 'bg-[#E11D48] text-white' 
-                    : 'bg-[#E11D48]/30 text-white/50'
-                }`}
-              >
-                <ChevronDown className="w-4 h-4" />
-                <span className="text-[10px] font-black">OUT</span>
-                <span className="text-[7px] font-bold opacity-80 uppercase tracking-tighter">{attendanceSettings.closingTime || '03:30 PM'}</span>
-              </button>
-              <div className="mt-1 h-3 flex items-center justify-center">
-                {clockedInAt && !isClosingTime && !clockedOutAt && (
-                  <span className="text-[7px] font-bold text-slate-400 uppercase italic">On-going</span>
-                )}
-              </div>
-            </div>
-        </div>
-      </div>
-
-      {/* 2. Target Exam Countdown Banner */}
-      <div className="bg-gradient-to-r from-orange-500 to-amber-600 rounded-2xl p-4 text-white shadow-md relative overflow-hidden">
-        <div className="absolute -right-4 -bottom-4 opacity-15">
-          <Flame className="w-28 h-28" />
-        </div>
-        <div className="relative z-10 flex items-center justify-between">
-          <div className="space-y-0.5">
-            <span className="text-[10px] font-bold tracking-wider uppercase opacity-90">
-              Target Examination Milestone
+        {isRunningLate && (
+          <button
+            type="button"
+            onClick={handleClockInAction}
+            className="w-full flex items-center gap-3 text-left p-3 rounded-xl bg-amber-50 border border-amber-200 mb-3 cursor-pointer hover:bg-amber-100/70 transition-colors"
+          >
+            <span className="w-8 h-8 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
+              <Clock className="w-4 h-4 text-amber-600" />
             </span>
-            <h3 className="text-base font-black">JAMB UTME 2026</h3>
-            <p className="text-xs text-orange-100">Intensive cohort syllabus is 74% complete</p>
+            <span className="flex-1 min-w-0">
+              <span className="block text-[11px] font-black text-amber-900 leading-tight">You haven't checked in yet</span>
+              <span className="block text-[10px] text-amber-700 font-medium leading-snug mt-0.5">
+                It's past the late gate, {attendanceSettings.lateArrivalTime || '08:30 AM'}. Tap to check in.
+              </span>
+            </span>
+            <span className="shrink-0 px-2.5 py-1 rounded-full bg-amber-100 border border-amber-200 text-[9px] font-black uppercase tracking-wider text-amber-700">
+              Running late
+            </span>
+          </button>
+        )}
+
+        {isLate && !clockedOutAt && (
+          <span className="self-center mb-1 px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 text-[9px] font-black uppercase tracking-wider">Late Arrival</span>
+        )}
+
+        {/* Check In on the student's left, Check Out on the right, and a small
+            circular time chip sitting centred on the line between them. It
+            starts moving the moment the student checks in, rides the
+            facility-coloured fill toward closing time, and stops at the end
+            of the line when the student checks out. */}
+        <div className="flex items-center gap-2 mt-2">
+          <div className="flex flex-col items-center gap-1 shrink-0 w-[64px]">
+            <button
+              onClick={handleClockInAction}
+              disabled={!!clockedInAt}
+              aria-label="Check In"
+              className={`w-14 h-14 rounded-full flex items-center justify-center text-white shadow-md transition-all ${clockedInAt ? 'bg-emerald-600 opacity-60 cursor-not-allowed' : `bg-emerald-600 hover:brightness-110 active:scale-95 ${isRunningLate ? 'checkin-breathe' : ''}`}`}
+            >
+              <LogIn className="w-6 h-6" />
+            </button>
+            <span className="text-[9px] font-black uppercase tracking-wider text-emerald-600">Check In</span>
           </div>
-          <div className="text-center bg-black/20 backdrop-blur-xs px-3.5 py-2 rounded-xl border border-white/20">
-            <span className="text-2xl font-black block leading-none">{daysLeft}</span>
-            <span className="text-[9px] uppercase tracking-wider font-bold text-orange-100">Days Left</span>
+          <div className="flex-1 relative h-10 flex items-center min-w-[40px]">
+            <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-1.5 rounded-full bg-slate-200" />
+            {clockedInAt && (
+              <div
+                className="absolute left-0 top-1/2 -translate-y-1/2 h-1.5 rounded-full transition-[width] duration-1000 ease-linear"
+                style={{ width: `${Math.round(ringProgress * 100)}%`, background: 'var(--brand, #EA580C)' }}
+              />
+            )}
+            {clockedInAt && (
+              <div
+                className="absolute top-1/2 -translate-y-1/2 transition-[left] duration-1000 ease-linear"
+                style={{ left: `min(max(calc(${Math.round(ringProgress * 100)}% - 18px), 0px), calc(100% - 36px))` }}
+              >
+                <div
+                  className="w-9 h-9 rounded-full flex items-center justify-center text-[10px] font-black tabular-nums select-none"
+                  style={{
+                    background: 'var(--brand, #EA580C)',
+                    color: 'var(--on-brand, #fff)',
+                    boxShadow: '0 2px 8px rgba(15,23,42,0.28), 0 0 0 4px color-mix(in oklab, var(--brand, #EA580C) 20%, transparent)',
+                  }}
+                >
+                  {chipTime}
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="flex flex-col items-center gap-1 shrink-0 w-[64px]">
+            <button
+              onClick={handleClockOutAction}
+              disabled={!clockedInAt || !!clockedOutAt || !isClosingTime}
+              aria-label="Check Out"
+              className={`w-14 h-14 rounded-full flex items-center justify-center text-white shadow-md transition-all ${!clockedInAt || !!clockedOutAt || !isClosingTime ? 'bg-rose-600 opacity-40 cursor-not-allowed' : `bg-rose-600 hover:brightness-110 active:scale-95 ${isClosingTime ? 'animate-pulse' : ''}`}`}
+            >
+              <LogOut className="w-6 h-6" />
+            </button>
+            <span className="text-[9px] font-black uppercase tracking-wider text-rose-600">Check Out</span>
           </div>
         </div>
+        <p className="text-center text-[10px] font-semibold text-slate-400 mt-2">
+          {!clockedInAt
+            ? `Tap Check In when you arrive • Resumption ${attendanceSettings.resumptionTime} • Late after ${attendanceSettings.lateArrivalTime}`
+            : clockedOutAt
+            ? `Checked in ${clockInLabel} • Checked out ${clockOutLabel}`
+            : isClosingTime
+            ? 'Time complete — you can check out now'
+            : `On-going • Check out opens at ${attendanceSettings.closingTime}`}
+        </p>
       </div>
 
       {/* 3. Candidate Vitals Row (Enhanced, comfortable button cards) */}
@@ -370,26 +417,20 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
           </div>
         </button>
 
-        {/* Card 2: Attendance Rate */}
-        <button
-          onClick={() => onNavigateTab('more')}
-          className="text-left bg-white p-4 sm:p-4.5 rounded-2xl border border-slate-200/90 shadow-sm hover:border-emerald-400 hover:shadow-md transition-all active:scale-98 flex flex-col justify-between min-h-[112px] group"
-        >
+        {/* Card 2: Attendance Rate — live from check-in logs, not clickable */}
+        <div className="text-left bg-white p-4 sm:p-4.5 rounded-2xl border border-slate-200/90 shadow-sm flex flex-col justify-between min-h-[112px]">
           <div className="flex items-center justify-between text-slate-400 mb-2">
-            <div className="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 group-hover:scale-105 transition-transform">
+            <div className="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600">
               <CheckCircle2 className="w-4.5 h-4.5" />
             </div>
-            <span className="text-[10px] font-black px-2 py-0.5 bg-emerald-100/80 text-emerald-800 rounded-lg">
-              34/37
-            </span>
           </div>
           <div>
             <div className="text-lg font-black text-slate-900 leading-snug">
-              {student.attendancePercent}%
+              {attendanceRate === null ? '—' : `${attendanceRate}%`}
             </div>
-            <div className="text-xs font-semibold text-slate-500 mt-0.5">Class Attendance</div>
+            <div className="text-xs font-semibold text-slate-500 mt-0.5">Days you checked in</div>
           </div>
-        </button>
+        </div>
 
         {/* Card 3: Fee Settlement Status */}
         <button
@@ -423,13 +464,13 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
         {/* Card 4: Calendar Planner Scheduling */}
         <button
           onClick={() => setShowCalendar(true)}
-          className="text-left bg-white p-4 sm:p-4.5 rounded-2xl border border-slate-200/90 shadow-sm hover:border-[#EA580C] hover:shadow-md transition-all active:scale-98 flex flex-col justify-between min-h-[112px] group cursor-pointer"
+          className={`text-left bg-white p-4 sm:p-4.5 rounded-2xl border border-slate-200/90 shadow-sm hover:border-orange-600 hover:shadow-md transition-all active:scale-98 flex flex-col justify-between min-h-[112px] group cursor-pointer ${todayHasActivities ? 'planner-blink' : ''}`}
         >
           <div className="flex items-center justify-between text-slate-400 mb-2">
-            <div className="w-8 h-8 rounded-xl bg-orange-50 flex items-center justify-center text-[#EA580C] group-hover:scale-105 transition-transform">
+            <div className="w-8 h-8 rounded-xl bg-orange-50 flex items-center justify-center text-orange-600 group-hover:scale-105 transition-transform">
               <Calendar className="w-4.5 h-4.5" />
             </div>
-            <span className="text-[10px] font-black px-2 py-0.5 bg-orange-100 text-[#C2410C] rounded-lg">
+            <span className="text-[10px] font-black px-2 py-0.5 bg-orange-100 text-orange-700 rounded-lg">
               Planner
             </span>
           </div>
@@ -450,12 +491,12 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
         >
           <div className="space-y-1">
             <div className="flex items-center space-x-2 text-sm font-black text-orange-950">
-              <Laptop className="w-5 h-5 text-[#EA580C]" />
+              <Laptop className="w-5 h-5 text-orange-600" />
               <span>Launch CBT</span>
             </div>
             <p className="text-xs text-orange-800/80 font-medium">Timed exam simulations</p>
           </div>
-          <ArrowRight className="w-4 h-4 text-[#EA580C] group-hover:translate-x-1 transition-transform shrink-0 ml-1" />
+          <ArrowRight className="w-4 h-4 text-orange-600 group-hover:translate-x-1 transition-transform shrink-0 ml-1" />
         </button>
 
         <button
@@ -477,14 +518,14 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
       <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
-            <Clock className="w-4 h-4 text-[#EA580C]" />
+            <Clock className="w-4 h-4 text-orange-600" />
             <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
               Today's Lectures ({todayClasses.length})
             </h4>
           </div>
           <button
             onClick={() => onNavigateTab('classes')}
-            className="text-[11px] font-bold text-[#EA580C] hover:underline"
+            className="text-[11px] font-bold text-orange-600 hover:underline"
           >
             Full Week →
           </button>
@@ -562,31 +603,15 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
         </div>
       )}
 
-      {/* 7. WhatsApp Campus Coordinator */}
-      <a
-        href={`https://wa.me/${(settings.whatsappNumber || settings.whatsapp || settings.phone).replace(/\D/g, '')}`}
-        target="_blank"
-        rel="noreferrer"
-        className="flex items-center justify-between p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-emerald-900 hover:bg-emerald-100/80 transition-all shadow-2xs"
-      >
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0">
-            <MessageSquare className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-xs font-bold">Have a Question for Tutor / Coordinator?</div>
-            <div className="text-[10px] text-emerald-700">Chat with Academic Support Desk on WhatsApp</div>
-          </div>
-        </div>
-        <ArrowRight className="w-4 h-4 text-emerald-700" />
-      </a>
-
       {/* Academic Calendar Planner Modal */}
       <CalendarView
         isOpen={showCalendar}
         onClose={() => setShowCalendar(false)}
-        slots={activeTimetable}
+        activities={plannerActivities}
         title="Academic Schedule Planner"
+        onAddActivity={addPlannerReminder}
+        onRemoveActivity={removePlannerReminder}
+        onEditActivity={updatePlannerReminder}
       />
     </div>
   );

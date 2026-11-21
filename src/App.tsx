@@ -2,6 +2,7 @@ import React, { useRef,  useState, useEffect, Component, ErrorInfo, ReactNode, l
 import { AppProvider, useApp } from './context/AppContext';
 import { Sidebar } from './components/layout/Sidebar';
 import { AppOnlyGate } from './components/portal/AppOnlyGate';
+import { LaunchSplash } from './components/student-portal/LaunchSplash';
 import { TopNav } from './components/layout/TopNav';
 import { ToastContainer } from './components/layout/ToastContainer';
 import { PublicWebsite } from './components/public/PublicWebsite';
@@ -55,7 +56,8 @@ const MainLayout: React.FC = () => {
     addToast,
     updateAdmin,
     logout,
-    brandAccent
+    brandAccent,
+    passwordChangePending
   } = useApp();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [showWelcome, setShowWelcome] = useState(true);
@@ -100,7 +102,6 @@ const MainLayout: React.FC = () => {
   // Whitelabel splash: after the account is confirmed to belong to the chosen
   // centre, the centre's own loading screen plays briefly before the
   // dashboard opens.
-  const [centreSplash, setCentreSplash] = useState(false);
   // The login page's email/password live here so they survive every screen
   // swap on the way to a verdict (verification, the no-account popup, the
   // centre loading screen). They clear once the account is inside a centre.
@@ -137,9 +138,18 @@ const MainLayout: React.FC = () => {
       .then((r) => r.json())
       .then((d: any) => {
         if (!alive) return;
-        setAppFacility(d && d.centreId
-          ? { centreId: String(d.centreId), centreName: String(d.centreName || ''), accent: String(d.accent || ''), logoUrl: String(d.logoUrl || '') }
-          : null);
+        if (d && d.centreId) {
+          const facility = { centreId: String(d.centreId), centreName: String(d.centreName || ''), accent: String(d.accent || ''), logoUrl: String(d.logoUrl || '') };
+          // The gate state is prepared in the same update as the facility
+          // itself, so the access-code gate is the very first screen that
+          // paints: the TOS landing never flashes through the gap in between.
+          setShowWelcome(false);
+          setCentreGateRequested(true);
+          setAppWelcomeCentre({ centreId: facility.centreId, centreName: facility.centreName, accent: facility.accent, logoUrl: facility.logoUrl, welcomeImageUrl: '' });
+          setAppFacility(facility);
+        } else {
+          setAppFacility(null);
+        }
       })
       .catch(() => { if (alive) setAppFacility(null); });
     return () => { alive = false; };
@@ -228,6 +238,13 @@ const MainLayout: React.FC = () => {
     // on this device (per facility), so reopening or refreshing the app
     // restores the dashboard without asking for anything again. The restored
     // tenant is always re-validated with the server before it is trusted; a
+    // A first-login password change holds the app: facility entry waits
+    // until the permanent password is set, then runs from the same state.
+    if (passwordChangePending) {
+      centreEntryKeyRef.current = null;
+      return;
+    }
+
     // failed restore falls through to normal automatic entry.
     if (appFacility && !activeCentreId && centreResumeTriedRef.current !== appFacility.centreId) {
       centreResumeTriedRef.current = appFacility.centreId;
@@ -261,10 +278,9 @@ const MainLayout: React.FC = () => {
           setCentreEntryFailed(true);
           return;
         }
-        // Belonging is confirmed: play the centre's own loading screen
-        // briefly before the dashboard opens.
-        setCentreSplash(true);
-        window.setTimeout(() => setCentreSplash(false), 1200);
+        // Belonging is confirmed: the dashboard opens straight away. No
+        // decorative loading screen after entry; spinners belong only to the
+        // login itself and to real background work.
       })
       .catch(async (err: any) => {
         // A failed automatic entry is never silent: the server's reason (a
@@ -309,7 +325,7 @@ const MainLayout: React.FC = () => {
         });
       })
       .finally(() => setCentreEntryBusy(false));
-  }, [currentUser, hasCheckedActiveCentre, activeCentreId, pendingCentre, centreEntryRetry, appWelcomeCentre, appWelcomeMode, appFacility, verifyPending, enterCentreByCode, enterSoleCentre, resumeCentreSession]);
+  }, [currentUser, hasCheckedActiveCentre, activeCentreId, pendingCentre, centreEntryRetry, appWelcomeCentre, appWelcomeMode, appFacility, verifyPending, passwordChangePending, enterCentreByCode, enterSoleCentre, resumeCentreSession]);
 
   // The centre code gate appears only after a login button on the landing
   // page is clicked; the platform-staff door (#tos-admin) never shows it.
@@ -430,25 +446,50 @@ const MainLayout: React.FC = () => {
     }
   };
 
+  // The facility the auth surface belongs to, resolved from the access code,
+  // the facility app's own binding, or its welcome screen. The sign-in and
+  // password screens render ONLY this facility: a stale device-level centre
+  // (the last one used on this device) can never repaint them as another
+  // facility's page.
+  const authCentre: { centreName: string; accent?: string; logoUrl?: string } | null = pendingCentre
+    ? { centreName: pendingCentre.centreName, accent: pendingCentre.accent }
+    : appFacility
+      ? { centreName: appFacility.centreName, accent: appFacility.accent, logoUrl: appFacility.logoUrl }
+      : appWelcomeCentre
+        ? { centreName: appWelcomeCentre.centreName, accent: appWelcomeCentre.accent, logoUrl: appWelcomeCentre.logoUrl }
+        : null;
+
+  // FIRST-LOGIN PASSWORD HOLD: while a staff or tutor account is setting its
+  // permanent password, the whole app stays on that one screen. No splash,
+  // no automatic facility entry and no other screen can take the page over,
+  // and the screen keeps the facility's own branding. A remount re-detects
+  // the account's record, so even a reload mid-flow lands back here.
+  if (passwordChangePending) {
+    return (
+      <AuthPortal
+        portalType="student"
+        forcePasswordChange
+        title={authCentre?.centreName || ''}
+        accent={authCentre?.accent}
+        logoUrl={authCentre?.logoUrl}
+        subtitle=""
+        onSuccess={() => {}}
+        onBack={handleLogout}
+        email={loginEmail}
+        onEmailChange={setLoginEmail}
+        password={loginPassword}
+        onPasswordChange={setLoginPassword}
+      />
+    );
+  }
+
   // Global loading state to prevent auth "flashes". Signed-in users also hold
   // one beat while token claims are read, so a `tos`-claim staff account never
   // flashes the tenant dashboard before the console opens.
   const claimsPending = !!currentUser && !tosClaimsSettled;
   if (isAuthLoading || claimsPending) {
     return (
-      <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-900 text-white">
-        <div className="relative w-24 h-24 mb-8">
-          <div className="absolute inset-0 border-4 border-orange-500/20 rounded-full" />
-          <div className="absolute inset-0 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
-          <div className="absolute inset-4 bg-orange-500/10 rounded-full flex items-center justify-center">
-             <span className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" />
-          </div>
-        </div>
-        <div className="space-y-2 text-center">
-          <h2 className="text-xl font-black tracking-widest uppercase text-orange-500">{activeCentre?.name || ''}</h2>
-          <p className="text-xs text-slate-400 font-medium animate-pulse">Synchronizing academic records...</p>
-        </div>
-      </div>
+      <LaunchSplash />
     );
   }
 
@@ -627,13 +668,7 @@ const MainLayout: React.FC = () => {
   // access-code prompt for the wrong facility.
   if (isAppContext && appFacility === undefined) {
     return (
-      <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-900 text-white">
-        <div className="relative w-20 h-20 mb-6">
-          <div className="absolute inset-0 border-4 border-orange-500/20 rounded-full" />
-          <div className="absolute inset-0 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
-        </div>
-        <p className="text-xs text-slate-400 font-medium animate-pulse">Loading...</p>
-      </div>
+      <LaunchSplash />
     );
   }
 
@@ -658,6 +693,15 @@ const MainLayout: React.FC = () => {
         }}
         onBack={() => { setShowPortals(false); setShowWelcome(true); setCentreGateRequested(false); }}
       />
+    );
+  }
+
+  // Belt over braces: a bound facility app never paints the public TOS
+  // landing, not for a single frame. If the gate state is somehow not ready
+  // yet, hold on the plain loading screen instead.
+  if (isAppContext && appFacility && !currentUser && !appWelcomeCentre) {
+    return (
+      <LaunchSplash />
     );
   }
 
@@ -690,19 +734,7 @@ const MainLayout: React.FC = () => {
   // Shown after belonging is confirmed (centreSplash) and while an automatic
   // centre entry runs for a restored session.
   const centreSpinnerScreen = (
-    <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-900 text-white">
-      <div className="relative w-24 h-24 mb-8">
-        <div className="absolute inset-0 border-4 border-orange-500/20 rounded-full" />
-        <div className="absolute inset-0 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
-        <div className="absolute inset-4 bg-orange-500/10 rounded-full flex items-center justify-center">
-           <span className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" />
-        </div>
-      </div>
-      <div className="space-y-2 text-center">
-        <h2 className="text-xl font-black tracking-widest uppercase text-orange-500">{pendingCentre?.centreName || centreName}</h2>
-        <p className="text-xs text-slate-400 font-medium animate-pulse">Taking you to your dashboard...</p>
-      </div>
-    </div>
+    <LaunchSplash />
   );
 
   // Admin Password Change Guard
@@ -725,18 +757,12 @@ const MainLayout: React.FC = () => {
       <EmailVerificationGate
         uid={verifyPending.uid}
         email={verifyPending.email}
-        centreName={pendingCentre?.centreName || centreName || undefined}
-        accent={appWelcomeCentre?.accent || pendingCentre?.accent || ''}
+        centreName={authCentre?.centreName || undefined}
+        accent={authCentre?.accent || ''}
         onVerified={() => { setVerifyPending(null); setCentreEntryRetry((n) => n + 1); }}
         onSignOut={handleLogout}
       />
     );
-  }
-
-  // Whitelabel splash: belonging was confirmed, the centre's own loading
-  // screen plays before the dashboard opens.
-  if (currentUser && activeCentreId && centreSplash && !isTosAdmin && appWelcomeMode !== 'signup') {
-    return centreSpinnerScreen;
   }
 
   // Multi-Tenant Access Code Screen Guard (Part A, point 2 & Part B). With
@@ -766,12 +792,12 @@ const MainLayout: React.FC = () => {
 
   if (currentUser && !activeCentreId && !isTosAdmin) {
     if (centreEntryBusy || !centreEntryFailed) {
-      if (pendingCentre) {
+      if (authCentre) {
         return (
           <AuthPortal
             portalType="student"
-            title={pendingCentre.centreName}
-            accent={pendingCentre.accent}
+            title={authCentre.centreName}
+            accent={authCentre.accent}
             subtitle=""
             onSuccess={() => {}}
             verifying
@@ -793,16 +819,16 @@ const MainLayout: React.FC = () => {
       const accessBlocked = !!centreEntryError && /cannot access/i.test(centreEntryError);
       const waDigits = accessBlocked && centreEntryWhatsapp ? centreEntryWhatsapp.replace(/\D/g, '') : '';
       const waHref = waDigits
-        ? `https://wa.me/${waDigits}?text=${encodeURIComponent(`Hello, I am a student of ${pendingCentre?.centreName || centreName}. I cannot access the portal at the moment. Please help me regain access. Thank you.`)}`
+        ? `https://wa.me/${waDigits}?text=${encodeURIComponent(`Hello, I am a student of ${authCentre?.centreName || 'your facility'}. I cannot access the portal at the moment. Please help me regain access. Thank you.`)}`
         : '';
       return (
-        <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-900 text-white px-6 text-center">
+        <div className="h-screen w-full flex flex-col items-center justify-center bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] px-6 text-center">
           <div className={accessBlocked
             ? "w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 mb-5"
             : "w-14 h-14 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 mb-5"}>
             <AlertCircle className="w-7 h-7" />
           </div>
-          <h2 className="text-xl font-black tracking-widest uppercase text-orange-500 mb-3">{pendingCentre?.centreName || centreName}</h2>
+          <h2 className="text-xl font-black tracking-widest uppercase text-orange-500 mb-3">{authCentre?.centreName || 'your facility'}</h2>
           <p className="text-sm text-slate-300 font-medium max-w-sm mb-2">
             {accessBlocked
               ? 'Your access to this facility has been switched off. Please contact your facility admin to have it switched back on.'
@@ -827,7 +853,7 @@ const MainLayout: React.FC = () => {
               Try again
             </button>
             {!accessBlocked && (
-              <button onClick={handleLogout} className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-semibold transition-colors">
+              <button onClick={handleLogout} className="px-5 py-2.5 rounded-xl bg-slate-800 hover:brightness-110 text-slate-200 text-sm font-semibold transition-colors">
                 Sign out
               </button>
             )}
@@ -885,8 +911,8 @@ const MainLayout: React.FC = () => {
     return (
       <AuthPortal 
         portalType="student"
-        title={pendingCentre?.centreName || centreName}
-        accent={pendingCentre?.accent}
+        title={authCentre?.centreName || ''}
+        accent={authCentre?.accent}
         subtitle=""
         onSuccess={() => {}}
         onBack={() => { if (appWelcomeCentre) { setAppWelcomeMode('welcome'); } else { setShowPortals(false); setShowWelcome(true); setCentreGateRequested(false); } }}
@@ -907,8 +933,8 @@ const MainLayout: React.FC = () => {
     return (
       <AuthPortal 
         portalType="student"
-        title={pendingCentre?.centreName || centreName}
-        accent={pendingCentre?.accent}
+        title={authCentre?.centreName || ''}
+        accent={authCentre?.accent}
         subtitle=""
         onSuccess={() => {}}
         onBack={() => { if (appWelcomeCentre) { setAppWelcomeMode('welcome'); } else { setShowPortals(false); setShowWelcome(true); setCentreGateRequested(false); } }}
@@ -929,7 +955,7 @@ const MainLayout: React.FC = () => {
   if (viewMode === 'student') {
     return (
       <AppOnlyGate>
-        <div style={brandVars(brandAccent)}><Suspense fallback={<PortalFallback />}><StudentPortal /></Suspense></div>
+        <div style={brandVars(brandAccent)}><Suspense fallback={<LaunchSplash />}><StudentPortal /></Suspense></div>
         <OfflineIndicator />
         <ToastContainer />
       </AppOnlyGate>
@@ -983,7 +1009,7 @@ const MainLayout: React.FC = () => {
     <div
       id="app-root-layout"
       className={`flex h-screen w-full ${
-        bgTheme === 'dark' ? 'bg-[#0B1120]' : 'bg-[#F8FAFC]'
+        'bg-[#F8FAFC]'
       } text-slate-900 font-sans overflow-hidden transition-colors duration-300`}
     >
       {/* Left Navigation Sidebar (#070F1E) */}
@@ -998,7 +1024,7 @@ const MainLayout: React.FC = () => {
         <main
           id="app-main-content"
           className={`flex-1 overflow-y-auto ${
-            bgTheme === 'dark' ? 'bg-[#0B1120] dark-bg-mode' : 'bg-[#F8FAFC]'
+            'bg-[#F8FAFC]'
           } transition-colors duration-300`}
         >
           <div className="pb-12">
@@ -1079,10 +1105,10 @@ const PageFallback = () => (
   </div>
 );
 const ScreenFallback = () => (
-  <div className="h-screen w-full bg-slate-900" aria-busy="true" />
+  <div className="h-screen w-full bg-white" aria-busy="true" />
 );
 const PortalFallback = () => (
-  <div className="h-screen w-full bg-[#FFF3E7]" aria-busy="true" />
+  <div className="h-screen w-full" style={{ backgroundColor: 'var(--brand, #FFF3E7)' }} aria-busy="true" />
 );
 
 interface ErrorBoundaryProps {
@@ -1149,7 +1175,7 @@ class ErrorBoundary extends Component<any, any> {
           <div className="flex flex-wrap items-center justify-center gap-3">
             <button
               onClick={() => window.location.reload()}
-              className="px-6 py-2 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-slate-800 transition-all"
+              className="px-6 py-2 bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] rounded-xl font-bold text-sm hover:brightness-110 transition-all"
             >
               Reload Application
             </button>

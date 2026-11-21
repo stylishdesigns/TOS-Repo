@@ -103,7 +103,7 @@ export const CalculatorModal: React.FC<CalculatorModalProps> = ({ isOpen = true,
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="bg-slate-900 text-white rounded-3xl p-5 w-full max-w-[320px] shadow-2xl border border-slate-700 animate-in zoom-in-95 duration-200">
+      <div className="bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] rounded-3xl p-5 w-full max-w-[320px] shadow-2xl border border-slate-700 animate-in zoom-in-95 duration-200">
         <div className="flex items-center justify-between pb-3 border-b border-slate-800">
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 rounded-lg bg-orange-500 flex items-center justify-center">
@@ -141,13 +141,13 @@ export const CalculatorModal: React.FC<CalculatorModalProps> = ({ isOpen = true,
           </button>
           <button
             onClick={handleSqrt}
-            className="p-4 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-sm transition-all active:scale-95"
+            className="p-4 rounded-2xl bg-slate-800 hover:brightness-110 text-slate-200 font-bold text-sm transition-all active:scale-95"
           >
             √
           </button>
           <button
             onClick={handlePercent}
-            className="p-4 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-sm transition-all active:scale-95"
+            className="p-4 rounded-2xl bg-slate-800 hover:brightness-110 text-slate-200 font-bold text-sm transition-all active:scale-95"
           >
             %
           </button>
@@ -162,7 +162,7 @@ export const CalculatorModal: React.FC<CalculatorModalProps> = ({ isOpen = true,
             <button
               key={n}
               onClick={() => handleNum(n)}
-              className="p-4 rounded-2xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-lg transition-all active:scale-95 shadow-sm"
+              className="p-4 rounded-2xl bg-slate-800 hover:bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] font-bold text-lg transition-all active:scale-95 shadow-sm"
             >
               {n}
             </button>
@@ -178,7 +178,7 @@ export const CalculatorModal: React.FC<CalculatorModalProps> = ({ isOpen = true,
             <button
               key={n}
               onClick={() => handleNum(n)}
-              className="p-4 rounded-2xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-lg transition-all active:scale-95 shadow-sm"
+              className="p-4 rounded-2xl bg-slate-800 hover:bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] font-bold text-lg transition-all active:scale-95 shadow-sm"
             >
               {n}
             </button>
@@ -194,7 +194,7 @@ export const CalculatorModal: React.FC<CalculatorModalProps> = ({ isOpen = true,
             <button
               key={n}
               onClick={() => handleNum(n)}
-              className="p-4 rounded-2xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-lg transition-all active:scale-95 shadow-sm"
+              className="p-4 rounded-2xl bg-slate-800 hover:bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] font-bold text-lg transition-all active:scale-95 shadow-sm"
             >
               {n}
             </button>
@@ -208,13 +208,13 @@ export const CalculatorModal: React.FC<CalculatorModalProps> = ({ isOpen = true,
 
           <button
             onClick={() => handleNum('0')}
-            className="col-span-2 p-4 rounded-2xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-lg transition-all active:scale-95 shadow-sm"
+            className="col-span-2 p-4 rounded-2xl bg-slate-800 hover:bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] font-bold text-lg transition-all active:scale-95 shadow-sm"
           >
             0
           </button>
           <button
             onClick={handleDot}
-            className="p-4 rounded-2xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-lg transition-all active:scale-95 shadow-sm"
+            className="p-4 rounded-2xl bg-slate-800 hover:bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] font-bold text-lg transition-all active:scale-95 shadow-sm"
           >
             .
           </button>

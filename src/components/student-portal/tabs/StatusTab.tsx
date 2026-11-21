@@ -1126,7 +1126,7 @@ export const StatusViewer: React.FC<{
             className="absolute bottom-7 left-4 w-12 h-12 rounded-full bg-white text-[#0F172A] shadow-xl flex items-center justify-center active:scale-95 transition z-10"
           >
             <Eye className="w-5 h-5" />
-            <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#EA580C] text-white text-[9px] font-black flex items-center justify-center">
+            <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-orange-600 text-white text-[9px] font-black flex items-center justify-center">
               {current.views || 0}
             </span>
           </button>
@@ -1136,7 +1136,7 @@ export const StatusViewer: React.FC<{
             className="absolute bottom-7 right-4 w-12 h-12 rounded-full bg-white text-[#0F172A] shadow-xl flex items-center justify-center active:scale-95 transition z-10"
           >
             <MessageCircle className="w-5 h-5" />
-            <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#EA580C] text-white text-[9px] font-black flex items-center justify-center">
+            <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-orange-600 text-white text-[9px] font-black flex items-center justify-center">
               {typeof current.replyCount === 'number' ? current.replyCount + (current.loves || []).length : (current.replies || []).length + (current.loves || []).length}
             </span>
           </button>
@@ -1203,7 +1203,7 @@ export const StatusViewer: React.FC<{
               )}
               {ownerSheet === 'viewers' && (current.viewers || []).map((vp) => (
                 <div key={vp.uid} className="flex items-center gap-3 py-1">
-                  <div className="w-9 h-9 rounded-full bg-[#FFF7ED] text-[#C2410C] border border-[#EA580C]/30 flex items-center justify-center text-[10px] font-black shrink-0">
+                  <div className="w-9 h-9 rounded-full bg-orange-50 text-orange-700 border border-orange-600/30 flex items-center justify-center text-[10px] font-black shrink-0">
                     {initials(vp.name || (vp.username ? `@${vp.username}` : 'Student'))}
                   </div>
                   <div className="min-w-0 flex-1">
@@ -1225,7 +1225,7 @@ export const StatusViewer: React.FC<{
                 }
                 return rows.map((row) => (
                   <div key={row.key} className="flex items-start gap-3 py-1.5">
-                    <div className="w-9 h-9 rounded-full bg-[#FFF7ED] text-[#C2410C] border border-[#EA580C]/30 flex items-center justify-center text-[10px] font-black shrink-0">
+                    <div className="w-9 h-9 rounded-full bg-orange-50 text-orange-700 border border-orange-600/30 flex items-center justify-center text-[10px] font-black shrink-0">
                       {initials(row.name || (row.username ? `@${row.username}` : 'Student'))}
                     </div>
                     <div className="min-w-0 flex-1">
@@ -1296,7 +1296,7 @@ const StatusBubble: React.FC<{ entry: StatusEntry; dimmed?: boolean; now: number
             transform="rotate(-90 32 32)"
           />
         </svg>
-        <span className="absolute inset-[5px] rounded-full overflow-hidden bg-[#FFF7ED] text-[#C2410C] border border-[#EA580C]/30 flex items-center justify-center">
+        <span className="absolute inset-[5px] rounded-full overflow-hidden bg-orange-50 text-orange-700 border border-orange-600/30 flex items-center justify-center">
           {inside}
         </span>
       </span>
@@ -1339,7 +1339,7 @@ const StatusRail: React.FC<{ label: string; items: StatusEntry[]; dimmed?: boole
           >
             <div className="flex items-center gap-2 max-w-[168px]">
               <div
-                className={`w-7 h-7 rounded-full text-[10px] font-black flex items-center justify-center shrink-0 ${dimmed ? 'bg-slate-100 text-slate-400 border border-slate-200' : 'bg-[#FFF7ED] text-[#C2410C] border border-[#EA580C]/40'}`}
+                className={`w-7 h-7 rounded-full text-[10px] font-black flex items-center justify-center shrink-0 ${dimmed ? 'bg-slate-100 text-slate-400 border border-slate-200' : 'bg-orange-50 text-orange-700 border border-orange-600/40'}`}
                 aria-hidden="true"
               >
                 {initials(g.name)}
@@ -1484,7 +1484,7 @@ export const StatusScreenCore: React.FC<{ call: (path: string, opts?: any) => Pr
             aria-label={fanOpen ? 'Close add menu' : 'Add a status update'}
             aria-expanded={fanOpen}
             onClick={() => setFanOpen((o) => !o)}
-            className="relative z-10 w-10 h-10 rounded-xl bg-[#EA580C] text-white flex items-center justify-center shadow-md shrink-0 active:scale-95 transition"
+            className="relative z-10 w-10 h-10 rounded-xl bg-orange-600 text-white flex items-center justify-center shadow-md shrink-0 active:scale-95 transition"
           >
             {fanOpen ? <X className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
           </button>
@@ -1528,7 +1528,7 @@ export const StatusScreenCore: React.FC<{ call: (path: string, opts?: any) => Pr
               through the orange + button in the corner, never here. */}
           {mineRows.length === 0 ? (
             <div className="w-full bg-white rounded-3xl p-4 border border-slate-200/90 shadow-sm flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-[#FFF7ED] border-2 border-[#EA580C] flex items-center justify-center text-[#C2410C] text-sm font-black shrink-0">
+              <div className="w-12 h-12 rounded-full bg-orange-50 border-2 border-orange-600 flex items-center justify-center text-orange-700 text-sm font-black shrink-0">
                 {initials(me?.name || fallbackName)}
               </div>
               <div className="min-w-0 flex-1">
@@ -1545,7 +1545,7 @@ export const StatusScreenCore: React.FC<{ call: (path: string, opts?: any) => Pr
                   role="button"
                   className="w-full text-left bg-white rounded-3xl p-4 border border-slate-200/90 shadow-sm flex items-center gap-3 active:scale-[0.99] transition cursor-pointer"
                 >
-                  <div className="w-12 h-12 rounded-full bg-[#FFF7ED] border-2 border-[#EA580C] flex items-center justify-center text-[#C2410C] shrink-0 overflow-hidden">
+                  <div className="w-12 h-12 rounded-full bg-orange-50 border-2 border-orange-600 flex items-center justify-center text-orange-700 shrink-0 overflow-hidden">
                     <StatusThumb kind={m.kind} photoUrl={m.photoUrl} videoUrl={m.videoUrl} />
                   </div>
                   <div className="min-w-0 flex-1">
@@ -1614,7 +1614,7 @@ export const StatusScreenCore: React.FC<{ call: (path: string, opts?: any) => Pr
             aria-expanded={fanOpen}
             onClick={() => setFanOpen((o) => !o)}
             className={`absolute bottom-24 right-4 w-14 h-14 rounded-full text-white flex items-center justify-center shadow-xl cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-200 pointer-events-auto active:scale-95 transition ${prefersReducedMotion ? '' : 'animate-in fade-in zoom-in-95 duration-200'}`}
-            style={{ background: 'linear-gradient(145deg, #EA580C, #9A3412)' }}
+            style={{ background: 'linear-gradient(145deg, var(--brand, #EA580C), color-mix(in oklab, var(--brand, #EA580C) 60%, black))' }}
           >
             {fanOpen ? <X className="w-7 h-7" /> : <Plus className="w-7 h-7" />}
           </button>

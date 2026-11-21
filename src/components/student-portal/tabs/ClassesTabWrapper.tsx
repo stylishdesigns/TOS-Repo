@@ -47,7 +47,7 @@ export const ClassesTabWrapper: React.FC<ClassesTabWrapperProps> = ({
         onClick={() => onAssessmentViewChange('assessments')}
         className={`h-10 rounded-[10px] text-xs font-extrabold transition-all flex items-center justify-center cursor-pointer ${
           assessmentView === 'assessments'
-            ? 'bg-[#0F172A] text-white shadow-xs'
+            ? 'bg-[var(--brand,#0F172A)] text-[var(--on-brand,#fff)] shadow-xs'
             : 'text-[#64748B] hover:text-[#0F172A]'
         }`}
       >
@@ -58,7 +58,7 @@ export const ClassesTabWrapper: React.FC<ClassesTabWrapperProps> = ({
         onClick={() => onAssessmentViewChange('performance')}
         className={`h-10 rounded-[10px] text-xs font-extrabold transition-all flex items-center justify-center cursor-pointer ${
           assessmentView === 'performance'
-            ? 'bg-[#0F172A] text-white shadow-xs'
+            ? 'bg-[var(--brand,#0F172A)] text-[var(--on-brand,#fff)] shadow-xs'
             : 'text-[#64748B] hover:text-[#0F172A]'
         }`}
       >

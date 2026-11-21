@@ -45,7 +45,7 @@ export const PracticeSummary: React.FC<PracticeSummaryProps> = ({
     <div className="space-y-4 animate-in fade-in duration-300">
       {/* Header */}
       <div>
-        <span className="text-[10px] font-extrabold uppercase text-[#EA580C] tracking-wider block">
+        <span className="text-[10px] font-extrabold uppercase text-orange-600 tracking-wider block">
           Practice Complete · {subject}
         </span>
         <h2 className="text-xl font-black text-slate-900 tracking-tight">
@@ -188,7 +188,7 @@ export const PracticeSummary: React.FC<PracticeSummaryProps> = ({
 
                       {question.explanation && (
                         <div className="pt-2 border-t border-slate-100">
-                          <span className="text-[10px] font-extrabold uppercase text-[#EA580C] tracking-wider block mb-1">
+                          <span className="text-[10px] font-extrabold uppercase text-orange-600 tracking-wider block mb-1">
                             Why
                           </span>
                           <MathText
@@ -231,7 +231,7 @@ export const PracticeSummary: React.FC<PracticeSummaryProps> = ({
         <button
           type="button"
           onClick={onAnotherSet}
-          className="min-h-[48px] px-4 py-3 rounded-2xl bg-[#EA580C] hover:bg-[#C2410C] text-white font-extrabold text-xs uppercase tracking-wider active:scale-98 transition-all flex items-center justify-center space-x-2 cursor-pointer shadow-sm"
+          className="min-h-[48px] px-4 py-3 rounded-2xl bg-orange-600 hover:bg-orange-700 text-white font-extrabold text-xs uppercase tracking-wider active:scale-98 transition-all flex items-center justify-center space-x-2 cursor-pointer shadow-sm"
         >
           <RotateCcw className="w-3.5 h-3.5" />
           <span>Another 10</span>

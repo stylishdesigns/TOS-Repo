@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { PaymentError } from './paymentLogic';
-import { loadPaymentActor, submitPayment, decidePayment, type PaymentCaller } from './paymentService';
+import { loadPaymentActor, submitPayment, decidePayment, setStudentFee, type PaymentCaller } from './paymentService';
 
 console.log('--- Running paymentService.ts Unit Tests (in-memory Firestore) ---');
 
@@ -92,6 +92,8 @@ const claim = (db: FakeDb, who: { c: PaymentCaller; a: any }, studentId: string,
   submitPayment(db as any, who.c, who.a, { studentId, amount, method: 'Bank Transfer' });
 const decide = (db: FakeDb, who: { c: PaymentCaller; a: any }, paymentId: string, action: 'confirm' | 'reject', reason?: string) =>
   decidePayment(db as any, who.c, who.a, { paymentId, action, reason });
+const setFee = (db: FakeDb, who: { c: PaymentCaller; a: any }, studentId: string, totalFee: number) =>
+  setStudentFee(db as any, who.c, who.a, { studentId, totalFee });
 const rejectsWith = async (p: Promise<unknown>, status: number) => {
   await assert.rejects(p, (e: unknown) => e instanceof PaymentError && e.status === status);
 };
@@ -282,6 +284,52 @@ const test = async (name: string, fn: () => Promise<void>) => {
     db.seed('payments', 'pay-bad', { studentId: 'stu-1', centreId: 'c1', status: 'Pending', amountPaid: -5 });
     await rejectsWith(decide(db, adm, 'pay-bad', 'confirm'), 409);
     assert.deepEqual(feesOf(db, 'stu-1'), { paid: 0, out: 100000, status: 'Pending' });
+  });
+
+  // setStudentFee: only an admin of the student's centre, and only the server writes the numbers
+  await test('admin sets the fee: balance and status recompute on the server', async () => {
+    const db = fresh();
+    const adm = await as(db, user('u-adm1'));
+    const r: any = await setFee(db, adm, 'stu-1', 50000);
+    assert.equal(r.student.totalFee, 50000);
+    assert.equal(r.student.outstandingBalance, 50000);
+    assert.equal(r.student.paymentStatus, 'Pending');
+    assert.deepEqual(feesOf(db, 'stu-1'), { paid: 0, out: 50000, status: 'Pending' });
+    assert.equal(db.all('auditLogs').some((l: any) => l.action === 'fee.set' && l.totalFee === 50000), true);
+  });
+
+  await test('a student cannot set their own fee', async () => {
+    const db = fresh();
+    const stu = await as(db, user('u-stu1'));
+    await rejectsWith(setFee(db, stu, 'stu-1', 50000), 403);
+    assert.deepEqual(feesOf(db, 'stu-1'), { paid: 0, out: 100000, status: 'Pending' });
+  });
+
+  await test('an admin of another centre cannot set the fee (centre isolation)', async () => {
+    const db = fresh();
+    const adm2 = await as(db, user('u-adm2'));
+    await rejectsWith(setFee(db, adm2, 'stu-1', 50000), 403);
+    assert.deepEqual(feesOf(db, 'stu-1'), { paid: 0, out: 100000, status: 'Pending' });
+  });
+
+  await test('fee set with a part payment already made reads Partial; fully covered reads Paid', async () => {
+    const db = fresh();
+    const adm = await as(db, user('u-adm1'));
+    await claim(db, adm, 'stu-1', 30000);
+    const r: any = await setFee(db, adm, 'stu-1', 50000);
+    assert.deepEqual(feesOf(db, 'stu-1'), { paid: 30000, out: 20000, status: 'Partial' });
+    const r2: any = await setFee(db, adm, 'stu-1', 30000);
+    assert.deepEqual(feesOf(db, 'stu-1'), { paid: 30000, out: 0, status: 'Paid' });
+    assert.equal(r.student.paymentStatus, 'Partial');
+    assert.equal(r2.student.paymentStatus, 'Paid');
+  });
+
+  await test('fee of 0 clears the fee and resets the status to Pending', async () => {
+    const db = fresh();
+    const adm = await as(db, user('u-adm1'));
+    await setFee(db, adm, 'stu-1', 50000);
+    await setFee(db, adm, 'stu-1', 0);
+    assert.deepEqual(feesOf(db, 'stu-1'), { paid: 0, out: 0, status: 'Pending' });
   });
 
   console.log(`--- ALL ${passed} PAYMENT SERVICE TESTS PASSED SUCCESSFULLY ---`);

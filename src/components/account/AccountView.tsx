@@ -87,7 +87,7 @@ export const AccountView: React.FC = () => {
               onClick={() => setActiveTab(tab)}
               className={`px-4 py-2 rounded-xl text-xs md:text-sm font-semibold transition-all ${
                 isActive
-                  ? 'bg-[#EE7026] text-white shadow-xs'
+                  ? 'bg-[var(--brand,#EE7026)] text-white shadow-xs'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
               }`}
             >
@@ -119,7 +119,7 @@ export const AccountView: React.FC = () => {
                   type="text"
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
-                  className="w-full px-3.5 py-2 text-xs md:text-sm bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-[#EE7026]"
+                  className="w-full px-3.5 py-2 text-xs md:text-sm bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-[var(--brand,#EE7026)]"
                 />
               </div>
 
@@ -129,7 +129,7 @@ export const AccountView: React.FC = () => {
                   type="text"
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
-                  className="w-full px-3.5 py-2 text-xs md:text-sm bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-[#EE7026]"
+                  className="w-full px-3.5 py-2 text-xs md:text-sm bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-[var(--brand,#EE7026)]"
                 />
               </div>
 
@@ -149,7 +149,7 @@ export const AccountView: React.FC = () => {
                   type="text"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  className="w-full px-3.5 py-2 text-xs md:text-sm bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-[#EE7026]"
+                  className="w-full px-3.5 py-2 text-xs md:text-sm bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-[var(--brand,#EE7026)]"
                 />
               </div>
 
@@ -159,7 +159,7 @@ export const AccountView: React.FC = () => {
                   type="text"
                   value={jobTitle}
                   onChange={(e) => setJobTitle(e.target.value)}
-                  className="w-full px-3.5 py-2 text-xs md:text-sm bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-[#EE7026]"
+                  className="w-full px-3.5 py-2 text-xs md:text-sm bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-[var(--brand,#EE7026)]"
                 />
               </div>
 
@@ -169,7 +169,7 @@ export const AccountView: React.FC = () => {
                   type="text"
                   value={department}
                   onChange={(e) => setDepartment(e.target.value)}
-                  className="w-full px-3.5 py-2 text-xs md:text-sm bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-[#EE7026]"
+                  className="w-full px-3.5 py-2 text-xs md:text-sm bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-[var(--brand,#EE7026)]"
                 />
               </div>
             </div>
@@ -207,7 +207,7 @@ export const AccountView: React.FC = () => {
                   placeholder="Enter your current password"
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
-                  className="w-full px-3.5 py-2 pr-10 text-xs md:text-sm bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-[#EE7026]"
+                  className="w-full px-3.5 py-2 pr-10 text-xs md:text-sm bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-[var(--brand,#EE7026)]"
                 />
                 <button
                   type="button"
@@ -227,7 +227,7 @@ export const AccountView: React.FC = () => {
                   placeholder="Enter your new password"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  className="w-full px-3.5 py-2 pr-10 text-xs md:text-sm bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-[#EE7026]"
+                  className="w-full px-3.5 py-2 pr-10 text-xs md:text-sm bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-[var(--brand,#EE7026)]"
                 />
                 <button
                   type="button"
@@ -252,7 +252,7 @@ export const AccountView: React.FC = () => {
                   placeholder="Re-enter your new password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full px-3.5 py-2 pr-10 text-xs md:text-sm bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-[#EE7026]"
+                  className="w-full px-3.5 py-2 pr-10 text-xs md:text-sm bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-[var(--brand,#EE7026)]"
                 />
                 <button
                   type="button"
@@ -266,7 +266,7 @@ export const AccountView: React.FC = () => {
 
             <button
               onClick={() => addToast({ type: 'success', title: 'Password Updated', description: 'Your password has been changed.' })}
-              className="px-4 py-2 text-xs md:text-sm font-semibold text-white bg-[#EE7026] hover:bg-[#D9601A] rounded-xl shadow-xs transition-all"
+              className="px-4 py-2 text-xs md:text-sm font-semibold text-white bg-[var(--brand,#EE7026)] hover:bg-[var(--brand,#D9601A)] rounded-xl shadow-xs transition-all"
             >
               Update Password
             </button>
@@ -287,7 +287,7 @@ export const AccountView: React.FC = () => {
               <button
                 onClick={() => setTwoFactor(!twoFactor)}
                 className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors ${
-                  twoFactor ? 'bg-[#EE7026]' : 'bg-slate-200'
+                  twoFactor ? 'bg-[var(--brand,#EE7026)]' : 'bg-slate-200'
                 }`}
               >
                 <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${twoFactor ? 'translate-x-5' : 'translate-x-0'}`} />

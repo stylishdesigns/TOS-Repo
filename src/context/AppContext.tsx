@@ -1,4 +1,6 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { initialsAvatar } from '../lib/avatar';
+import { api } from '../components/tos/tosShared';
 import {
   TenantSettings,
   Branch,
@@ -28,6 +30,7 @@ import {
   CentreEntitlements,
   CentreSeatsSummary,
   CentreUserRole,
+  PlannerActivity,
 } from '../types';
 
 export const SWITCH_REQUIRES_CODE = false;
@@ -50,7 +53,6 @@ import {
   INITIAL_CLASSROOMS,
   INITIAL_ATTENDANCE_SETTINGS,
   INITIAL_SUBJECTS,
-  INITIAL_STUDY_MATERIALS,
 } from '../initialData';
 
 import { 
@@ -65,7 +67,9 @@ import {
   query,
   where,
   addDoc,
-  getDocFromServer
+  getDocFromServer,
+  arrayUnion,
+  arrayRemove
 } from 'firebase/firestore';
 import { initializeApp, deleteApp } from 'firebase/app';
 import { 
@@ -170,7 +174,7 @@ interface ToastMessage {
 
 interface AppContextType {
   settings: TenantSettings;
-  updateSettings: (newSettings: Partial<TenantSettings>) => void;
+  updateSettings: (newSettings: Partial<TenantSettings>, opts?: { silent?: boolean }) => void;
   resetToDefaults: () => void;
 
   branches: Branch[];
@@ -225,12 +229,18 @@ interface AppContextType {
 
   studyMaterials: StudyMaterial[];
   addStudyMaterial: (material: Omit<StudyMaterial, 'id' | 'uploadedAt'>) => Promise<void>;
+  updateStudyMaterial: (id: string, patch: Partial<StudyMaterial>) => Promise<void>;
+  deleteStudyMaterial: (id: string) => Promise<void>;
 
   attendanceSettings: AttendanceSettings;
   updateAttendanceSettings: (settings: Partial<AttendanceSettings>) => void;
 
   attendanceLogs: AttendanceLog[];
   clockIn: (studentId: string) => Promise<void>;
+  plannerReminders: PlannerActivity[];
+  addPlannerReminder: (input: { date: string; time: string; title: string; kind: 'practice' | 'mock' | 'custom' }) => Promise<boolean>;
+  removePlannerReminder: (id: string) => Promise<boolean>;
+  updatePlannerReminder: (id: string, input: { date: string; time: string; title: string; kind: 'practice' | 'mock' | 'custom' }) => Promise<boolean>;
   clockOut: (studentId: string) => Promise<void>;
 
   results: StudentResult[];
@@ -240,8 +250,11 @@ interface AppContextType {
   addCBTQuestion: (question: Omit<CBTQuestion, 'id'>) => void;
 
   payments: PaymentRecord[];
-  recordPayment: (payment: { studentId: string; amountPaid: number; method?: 'Card' | 'Bank Transfer' | 'Cash'; note?: string; evidenceUrl?: string; evidenceName?: string }) => Promise<RecordPaymentResult | void>;
-  confirmPayment: (paymentId: string, action: 'confirm' | 'reject', reason?: string) => Promise<boolean>;
+  recordPayment: (payment: { studentId: string; amountPaid: number; method?: 'Card' | 'Bank Transfer' | 'Cash'; note?: string; evidenceUrl?: string; evidenceName?: string; effectiveFrom?: string; expiresAt?: string }) => Promise<RecordPaymentResult | void>;
+  setStudentTotalFee: (input: { studentId: string; totalFee: number }) => Promise<{ totalFee: number; outstandingBalance: number; paymentStatus: string } | void>;
+  confirmPayment: (paymentId: string, action: 'confirm' | 'reject', reason?: string, dates?: { effectiveFrom?: string; expiresAt?: string }) => Promise<boolean>;
+  /** Admin-only: run the automated payment reminder sweep for this facility right now. */
+  runPaymentReminders: () => Promise<{ ok: boolean; emailed?: number; pushed?: number; chatted?: number; pushReason?: string; error?: string }>;
 
   announcements: Announcement[];
   addAnnouncement: (announcement: Omit<Announcement, 'id' | 'date'>) => void;
@@ -316,6 +329,8 @@ interface AppContextType {
   entitlements: CentreEntitlements;
   seatsSummary: CentreSeatsSummary | null;
   hasCheckedActiveCentre: boolean;
+  passwordChangePending: boolean;
+  setPasswordChangePending: (v: boolean) => void;
   enterCentreByCode: (code: string, centreId?: string) => Promise<{ success: boolean; centreId?: string; error?: string }>;
   resumeCentreSession: (centreId: string) => Promise<void>;
   enterSoleCentre: () => Promise<{ entered: boolean; count: number; error?: string; whatsapp?: string }>;
@@ -386,14 +401,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const saved = localStorage.getItem(scopedKey('students'));
       if (saved) {
         const parsed: Student[] = JSON.parse(saved);
-        // Ensure student avatars use authentic Nigerian student pictures
-        const MALE_NIGERIAN =
-          'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=500&q=80';
-        const FEMALE_NIGERIAN =
-          'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?auto=format&fit=crop&w=500&q=80';
+        // No profile picture uploaded: the student's own initials, never a
+        // stock-photo placeholder.
         return parsed.map((s) => {
           if (!s.avatar || s.avatar.includes('photo-1534528741775') || s.avatar.includes('photo-1517841905240')) {
-            return { ...s, avatar: s.gender === 'Female' ? FEMALE_NIGERIAN : MALE_NIGERIAN };
+            return { ...s, avatar: initialsAvatar(s.name) };
           }
           return s;
         });
@@ -456,9 +468,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [programmes, setProgrammes] = useState<Programme[]>(() => {
     try {
       const saved = localStorage.getItem(scopedKey('programmes'));
-      return saved ? JSON.parse(saved) : INITIAL_PROGRAMMES;
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return INITIAL_PROGRAMMES;
+      return [];
     }
   });
 
@@ -540,9 +552,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [studyMaterials, setStudyMaterials] = useState<StudyMaterial[]>(() => {
     try {
       const saved = localStorage.getItem(scopedKey('studyMaterials'));
-      return saved ? JSON.parse(saved) : INITIAL_STUDY_MATERIALS;
+      if (!saved) return [];
+      const parsed: StudyMaterial[] = JSON.parse(saved);
+      // Drop the old demo placeholder materials (mat-1..mat-6) cached from earlier builds.
+      return parsed.filter((m) => !/^mat-\d{1,6}$/.test(m.id));
     } catch {
-      return INITIAL_STUDY_MATERIALS;
+      return [];
     }
   });
 
@@ -579,6 +594,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
   const [seatsSummary, setSeatsSummary] = useState<CentreSeatsSummary | null>(null);
   const [hasCheckedActiveCentre, setHasCheckedActiveCentre] = useState(false);
+  // True while a staff or tutor account is mid-way through its first-login
+  // password change: the whole app holds on that one screen until it is done.
+  const [passwordChangePending, setPasswordChangePending] = useState(false);
 
 
   const addStudyMaterial = async (materialData: Omit<StudyMaterial, 'id' | 'uploadedAt'>) => {
@@ -592,7 +610,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setStudyMaterials((prev) => [newMaterial, ...prev]);
 
       try {
-        await setDoc(doc(db, 'studyMaterials', newId), tenantWrite(newMaterial));
+        // The server route writes through the Admin SDK, so the upload reaches
+        // every student of the centre even when the deployed Firestore rules
+        // release is older than the app. The direct write stays as fallback.
+        let saved = false;
+        try {
+          await api(`/api/centre/study-materials?centreId=${encodeURIComponent(activeCentreId || '')}`, {
+            method: 'POST',
+            body: { centreId: activeCentreId, material: newMaterial },
+          });
+          saved = true;
+        } catch (serverErr: any) {
+          console.warn('Study material server save failed, trying direct write:', serverErr?.message || serverErr);
+        }
+        if (!saved) {
+          // Firestore rejects `undefined` values (an unset topic/description on
+          // general materials): strip them so the save writes only real fields.
+          const payload = JSON.parse(JSON.stringify(tenantWrite(newMaterial)));
+          await setDoc(doc(db, 'studyMaterials', newId), payload);
+        }
+        // Students taking this subject get a notification about the upload.
+        const typeLabel = newMaterial.type === 'video' ? 'Video link' : newMaterial.type === 'image' ? 'Image' : (newMaterial.fileType || 'PDF');
+        void api('/api/notifications/push', { method: 'POST', body: {
+          centreId: (newMaterial as any).centreId || activeCentreId,
+          type: 'material',
+          title: 'New study material',
+          body: `${newMaterial.title} (${newMaterial.subject}, ${typeLabel})`,
+          subjects: [newMaterial.subject],
+        } }).catch(() => {});
       } catch (err) {
         console.warn('Firestore studyMaterial save (using local):', err);
       }
@@ -604,6 +649,80 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
     } catch (e) {
       console.error('Error adding study material:', e);
+    }
+  };
+
+  // Edit an existing study material: update the local list at once, then
+  // replace the Firestore document with the merged copy (undefined fields
+  // stripped, same as the add path).
+  const updateStudyMaterial = async (id: string, patch: Partial<StudyMaterial>) => {
+    try {
+      const current = studyMaterials.find((m) => m.id === id);
+      if (!current) return;
+      // The server rejects undefined field values, and a general material's
+      // edit patch used to carry one (topic: undefined), which silently
+      // failed the whole save. Drop undefined keys before anything leaves.
+      const cleanPatch = JSON.parse(JSON.stringify(patch)) as Partial<StudyMaterial>;
+      const merged: StudyMaterial = { ...current, ...cleanPatch };
+      setStudyMaterials((prev) => prev.map((m) => (m.id === id ? merged : m)));
+      let saved = false;
+      try {
+        await api(`/api/centre/study-materials/${encodeURIComponent(id)}?centreId=${encodeURIComponent(activeCentreId || '')}`, {
+          method: 'PATCH',
+          body: { centreId: activeCentreId, patch: cleanPatch },
+        });
+        saved = true;
+      } catch (serverErr: any) {
+        console.warn('Study material server update failed, trying direct write:', serverErr?.message || serverErr);
+      }
+      try {
+        if (!saved) {
+          const payload = JSON.parse(JSON.stringify(tenantWrite(merged)));
+          await setDoc(doc(db, 'studyMaterials', id), payload);
+        }
+        addToast({
+          type: 'success',
+          title: 'Material Updated',
+          description: `"${merged.title}" was saved.`,
+        });
+      } catch (err) {
+        console.warn('Firestore studyMaterial update (local only):', err);
+        addToast({
+          type: 'error',
+          title: 'Not Saved',
+          description: 'The change could not be saved. Please try again.',
+        });
+      }
+    } catch (e) {
+      console.error('Error updating study material:', e);
+    }
+  };
+
+  // Delete runs on the server (ownership + centre isolation checked there, via
+  // the Admin SDK) so it cannot be blocked by a stale rules release. The local
+  // list updates first; on failure the material is put back.
+  const deleteStudyMaterial = async (id: string) => {
+    try {
+      const removed = studyMaterials.find((m) => m.id === id);
+      setStudyMaterials((prev) => prev.filter((m) => m.id !== id));
+      try {
+        await api(`/api/centre/study-materials/${encodeURIComponent(id)}?centreId=${encodeURIComponent(activeCentreId || '')}`, { method: 'DELETE' });
+        addToast({
+          type: 'success',
+          title: 'Material Deleted',
+          description: removed ? `"${removed.title}" was removed.` : 'The material was removed.',
+        });
+      } catch (err: any) {
+        console.warn('Study material delete failed:', err);
+        if (removed) setStudyMaterials((prev) => [removed, ...prev]);
+        addToast({
+          type: 'error',
+          title: 'Not Deleted',
+          description: err?.message || 'The material could not be deleted. Please try again.',
+        });
+      }
+    } catch (e) {
+      console.error('Error deleting study material:', e);
     }
   };
 
@@ -949,15 +1068,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isAdmin, setIsAdmin] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
 
-  // Safety timeout for auth loading to prevent stuck loading screen in case of connectivity issues
+  // Safety timeout for auth loading to prevent stuck loading screen in case of connectivity issues.
+  // A saved facility session on this device means an account is signed in here:
+  // its restore is local and normally instant, so a slow start must wait for it
+  // instead of treating the account as signed out and showing the access-code
+  // gate and login again. Without a saved session the 6-second guard still applies.
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (isAuthLoading) {
-        console.warn("Auth initialization timed out, proceeding with default state.");
-        setIsAuthLoading(false);
+    if (!isAuthLoading) return;
+    const deviceHasSavedSession = () => {
+      try { return Object.keys(localStorage).some((k) => k.startsWith('tos_tenant:')); } catch { return false; }
+    };
+    const proceedAsSignedOut = () => {
+      console.warn("Auth initialization timed out, proceeding with default state.");
+      setIsAuthLoading(false);
+    };
+    let lateTimer: ReturnType<typeof setTimeout> | undefined;
+    const earlyTimer = setTimeout(() => {
+      if (deviceHasSavedSession()) {
+        lateTimer = setTimeout(proceedAsSignedOut, 30000);
+      } else {
+        proceedAsSignedOut();
       }
-    }, 6000); // 6 seconds safety window
-    return () => clearTimeout(timer);
+    }, 6000);
+    return () => { clearTimeout(earlyTimer); if (lateTimer) clearTimeout(lateTimer); };
   }, [isAuthLoading]);
 
   // Auth State Listener & Admin Verification
@@ -1121,6 +1254,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => unsub();
   }, []);
 
+  // The uid the facility session state belongs to: a different account
+  // signing in never inherits the previous account's facility.
+  const lastAuthUidRef = useRef<string | null>(null);
+
   // -------------------------------------------------------------------------
   // MULTI-TENANT INITIALIZATION & REFRESH (Prompt 3)
   // -------------------------------------------------------------------------
@@ -1129,6 +1266,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setHasCheckedActiveCentre(true);
       return;
     }
+
+    // A different account signing in must never inherit the previous
+    // account's facility session, not even for the moment before its own
+    // validation comes back: clear the previous facility first.
+    if (lastAuthUidRef.current && lastAuthUidRef.current !== user.uid) {
+      setActiveCentreId(null);
+      setActiveCentre(null);
+      setUserCentres([]);
+      setSeatsSummary(null);
+      try {
+        sessionStorage.removeItem('tos_activeCentreId');
+        sessionStorage.removeItem('tos_activeCentreOwner');
+      } catch { /* storage unavailable */ }
+    }
+    lastAuthUidRef.current = user.uid;
 
     const initTenantSession = async () => {
       try {
@@ -1157,7 +1309,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         // 3. Check & Validate activeCentreId from sessionStorage (Part A, point 4)
         const savedCentreId = sessionStorage.getItem('tos_activeCentreId');
-        if (savedCentreId) {
+        const savedCentreOwner = sessionStorage.getItem('tos_activeCentreOwner');
+        if (savedCentreId && savedCentreOwner && savedCentreOwner !== user.uid) {
+          // The saved facility session belongs to a different account: drop
+          // it before anything else, so no other user's facility can leak
+          // into this one.
+          sessionStorage.removeItem('tos_activeCentreId');
+          sessionStorage.removeItem('tos_activeCentreOwner');
+        } else if (savedCentreId) {
           const valRes = await fetch('/api/auth/validate-active-centre', {
             method: 'POST',
             headers: {
@@ -1223,6 +1382,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setActiveCentre(data.centre);
     if (data.entitlements) setEntitlements(data.entitlements);
     sessionStorage.setItem('tos_activeCentreId', centreId);
+    try { sessionStorage.setItem('tos_activeCentreOwner', firebaseAuth.currentUser?.uid || ''); } catch { /* storage unavailable */ }
     try { localStorage.setItem(`tos_tenant:${centreId}`, centreId); } catch { /* storage unavailable */ }
     fetch(`/api/centre/seats-summary?centreId=${centreId}`, {
       headers: { Authorization: `Bearer ${token}` },
@@ -1264,6 +1424,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setActiveCentre(data.centre);
     if (data.entitlements) setEntitlements(data.entitlements);
     sessionStorage.setItem('tos_activeCentreId', data.centreId);
+    try { sessionStorage.setItem('tos_activeCentreOwner', firebaseAuth.currentUser?.uid || ''); } catch { /* storage unavailable */ }
     // Keep the tenant on this device per facility, so a facility app (and a
     // page refresh or relaunch) restores its own dashboard without asking for
     // anything. The value is always re-validated with the server before use.
@@ -1289,12 +1450,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } else {
       setViewMode('portal');
     }
-
-    addToast({
-      type: 'success',
-      title: 'Welcome to ' + data.centre.name,
-      description: `Access code verified successfully. Role: ${data.role}`,
-    });
 
     return { success: true, centreId: data.centreId };
   };
@@ -1322,6 +1477,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (data.status === 'active') {
       setActiveCentreId(data.centreId);
       sessionStorage.setItem('tos_activeCentreId', data.centreId);
+      try { sessionStorage.setItem('tos_activeCentreOwner', firebaseAuth.currentUser?.uid || ''); } catch { /* storage unavailable */ }
       setViewMode('student');
       addToast({
         type: 'success',
@@ -1365,6 +1521,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setActiveCentre(data.centre);
       if (data.entitlements) setEntitlements(data.entitlements);
       sessionStorage.setItem('tos_activeCentreId', targetCentreId);
+      try { sessionStorage.setItem('tos_activeCentreOwner', firebaseAuth.currentUser?.uid || ''); } catch { /* storage unavailable */ }
       addToast({
         type: 'success',
         title: 'Switched Facility',
@@ -1438,6 +1595,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setActiveCentre(valData.centre);
       if (valData.entitlements) setEntitlements(valData.entitlements);
       sessionStorage.setItem('tos_activeCentreId', target.centreId);
+      try { sessionStorage.setItem('tos_activeCentreOwner', firebaseAuth.currentUser?.uid || ''); } catch { /* storage unavailable */ }
       refreshSeatsSummary(target.centreId);
       if (valData.role === 'student') setViewMode('student');
       else if (valData.role === 'tutor') setViewMode('tutor');
@@ -1524,9 +1682,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [bgTheme, setBgThemeState] = useState<'light' | 'dark'>(() => {
     try {
       const saved = localStorage.getItem(`${STORAGE_KEY}_bgTheme`);
-      return saved === 'light' ? 'light' : 'dark';
+      return saved === 'dark' ? 'dark' : 'light';
     } catch {
-      return 'dark';
+      return 'light';
     }
   });
 
@@ -1592,16 +1750,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const addToast = (toast: Omit<ToastMessage, 'id'>) => {
     const id = `toast-${Date.now()}-${Math.random()}`;
     setToasts((prev) => [...prev, { ...toast, id }]);
+    const dwell = toast.type === 'error' ? 6000 : 4200;
     setTimeout(() => {
       removeToast(id);
-    }, 1200);
+    }, dwell);
   };
 
   const removeToast = (id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
-  const updateSettings = async (newSettings: Partial<TenantSettings>) => {
+  const updateSettings = async (newSettings: Partial<TenantSettings>, opts?: { silent?: boolean }) => {
     try {
       const updated = { ...settings, ...newSettings };
       if (newSettings.whatsappNumber && !newSettings.whatsapp) {
@@ -1613,11 +1772,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (!activeCentreId) throw new Error('Select your facility before saving settings.');
       await setDoc(doc(db, 'centreSettings', `${activeCentreId}__global`), updated);
       setSettingsState(updated);
-      addToast({
-        type: 'success',
-        title: 'Settings Updated',
-        description: 'Education facility configuration updated successfully.',
-      });
+      // Screens with their own tailored message pass { silent: true } so the
+      // action still shows exactly one toast.
+      if (!opts?.silent) {
+        addToast({
+          type: 'success',
+          title: 'Settings Updated',
+          description: 'Education facility configuration updated successfully.',
+        });
+      }
       logActivity({
         title: 'Facility Configuration Modified',
         subtitle: `Updated by ${activeUser?.name || 'Admin'}`,
@@ -2055,11 +2218,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }, (error) => console.warn('classRatings snapshot error:', error));
 
     // Study Materials listener
+    // While Firestore rules still deny studyMaterials reads/writes, an upload
+    // only reaches local state (the write fails, so the server stream never
+    // carries it) and an empty or reconnecting snapshot would wipe it, along
+    // with the copy hydrated from localStorage. Merge the server view with
+    // locally-added entries (mat- ids) until the server stream carries them;
+    // once rules allow the write, the doc arrives in the stream and dedupes.
     const unsubStudyMaterials = onSnapshot(centreQuery('studyMaterials'), (snapshot) => {
-      if (!snapshot.empty) {
-        const data = scopedDocs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as StudyMaterial)));
-        setStudyMaterials(data);
-      }
+      const data = scopedDocs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as StudyMaterial)));
+      setStudyMaterials((prev) => {
+        const serverIds = new Set(data.map(d => d.id));
+        const localOnly = prev.filter(m => !serverIds.has(m.id) && typeof m.id === 'string' && m.id.startsWith('mat-'));
+        return [...localOnly, ...data];
+      });
     }, (error) => console.warn('studyMaterials snapshot error:', error));
 
     return () => {
@@ -2139,18 +2310,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const updateStudent = async (id: string, studentData: Partial<Student>) => {
+  const updateStudent = async (id: string, studentData: Partial<Student>, opts?: { silent?: boolean }) => {
     try {
       await updateDoc(doc(db, 'students', id), studentData);
       // Refresh the in-app copy too: the menu header, tabs and chat read this
       // list, so a saved change (a new profile picture, for instance) shows
       // everywhere at once instead of only after a reload.
       setStudents((prev) => prev.map((st) => (st.id === id ? { ...st, ...studentData } : st)));
-      addToast({
-        type: 'success',
-        title: 'Student Record Updated',
-        description: 'Student profile details saved successfully.',
-      });
+      // Screens with their own tailored message pass { silent: true } so the
+      // action still shows exactly one toast.
+      if (!opts?.silent) {
+        addToast({
+          type: 'success',
+          title: 'Student Record Updated',
+          description: 'Student profile details saved successfully.',
+        });
+      }
     } catch (e) {
       console.error(e);
     }
@@ -2248,7 +2423,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const newStudent: Student = {
         id: studentId,
         name: app.applicantName,
-        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+        avatar: initialsAvatar(app.applicantName),
         phone: app.phone,
         email: app.email,
         gender: app.gender,
@@ -2493,11 +2668,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         enrolledStudents: 0,
       };
       await setDoc(doc(db, 'programmes', id), tenantWrite(newProg));
-      addToast({
-        type: 'success',
-        title: 'Programme Created',
-        description: `${progData.name} is now available on the website and registration form.`,
-      });
+      // No toast here: every caller shows exactly one tailored toast for the
+      // programme it just created.
     } catch (e) {
       handleFirestoreError(e, OperationType.CREATE, 'programmes');
     }
@@ -2506,11 +2678,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateProgramme = async (id: string, progData: Partial<Programme>) => {
     try {
       await updateDoc(doc(db, 'programmes', id), progData);
-      addToast({
-        type: 'success',
-        title: 'Programme Updated',
-        description: 'Curriculum & fee changes saved.',
-      });
+      // No toast here: callers show exactly one tailored toast per action.
     } catch (e) {
       handleFirestoreError(e, OperationType.UPDATE, 'programmes');
     }
@@ -2529,6 +2697,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       Object.keys(newSlot).forEach(key => newSlot[key] === undefined && delete newSlot[key]);
 
       await setDoc(doc(db, 'timetable', id), tenantWrite(newSlot));
+      // Students taking this subject get a notification about the new class.
+      void api('/api/notifications/push', { method: 'POST', body: {
+        centreId: newSlot.centreId || activeCentreId,
+        type: 'class',
+        title: 'New class scheduled',
+        body: `${newSlot.subject}${newSlot.topic ? ': ' + newSlot.topic : ''} - ${newSlot.day} ${newSlot.time}`,
+        subjects: [newSlot.subject],
+      } }).catch(() => {});
       addToast({
         type: 'success',
         title: 'Timetable Slot Added',
@@ -2552,6 +2728,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         Object.keys(newSlot).forEach(key => newSlot[key] === undefined && delete newSlot[key]);
 
         await setDoc(doc(db, 'timetable', id), tenantWrite(newSlot));
+      // Students taking this subject get a notification about the new class.
+      void api('/api/notifications/push', { method: 'POST', body: {
+        centreId: newSlot.centreId || activeCentreId,
+        type: 'class',
+        title: 'New class scheduled',
+        body: `${newSlot.subject}${newSlot.topic ? ': ' + newSlot.topic : ''} - ${newSlot.day} ${newSlot.time}`,
+        subjects: [newSlot.subject],
+      } }).catch(() => {});
       }
       addToast({
         type: 'success',
@@ -2816,6 +3000,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     note?: string;
     evidenceUrl?: string;
     evidenceName?: string;
+    effectiveFrom?: string;
+    expiresAt?: string;
   }): Promise<RecordPaymentResult | void> => {
     // Payments go through the server payment route only. A student's call
     // stores a 'Pending' claim and changes no balance; an admin's call is
@@ -2851,7 +3037,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
   // Admin-only: confirm or reject a student's pending payment claim. The server
   // applies the stored amount to the student's balance; the client sends no money.
-  const confirmPayment = async (paymentId: string, action: 'confirm' | 'reject', reason?: string): Promise<boolean> => {
+  const confirmPayment = async (paymentId: string, action: 'confirm' | 'reject', reason?: string, dates?: { effectiveFrom?: string; expiresAt?: string }): Promise<boolean> => {
     try {
       const token = await firebaseAuth.currentUser?.getIdToken();
       if (!token) throw new Error('You are signed out. Sign in and try again.');
@@ -2861,7 +3047,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ paymentId, action, reason }),
+        body: JSON.stringify({ paymentId, action, reason, ...(dates || {}) }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data?.success) {
@@ -2882,6 +3068,77 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  // Admin-only: run the automated payment reminder sweep for this facility
+  // right now (the "Run reminders now" button in Fees & Payments). The server
+  // decides who is due and sends the configured channels; the client sends
+  // nothing itself.
+  const runPaymentReminders = async (): Promise<{ ok: boolean; emailed?: number; pushed?: number; chatted?: number; pushReason?: string; error?: string }> => {
+    try {
+      const token = await firebaseAuth.currentUser?.getIdToken();
+      if (!token) throw new Error('You are signed out. Sign in and try again.');
+      const res = await fetch('/api/centre/reminders/run', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ centreId: activeCentreId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || 'The reminders could not run. Please try again.');
+      }
+      const r = data.reminders || {};
+      return {
+        ok: true,
+        emailed: Number(r.emailed) || 0,
+        pushed: Number(r.pushed) || 0,
+        chatted: Number(r.chatted) || 0,
+        pushReason: String(data.push?.reason || ''),
+      };
+    } catch (e) {
+      console.error(e);
+      return { ok: false, error: (e as Error)?.message || 'Could not run the reminders.' };
+    }
+  };
+
+  // Admin-only: set the student's total fee. The server recomputes the
+  // outstanding balance and payment status, so no device ever sends balance
+  // numbers; the client only reads back what the server wrote.
+  const setStudentTotalFee = async (input: { studentId: string; totalFee: number }): Promise<{ totalFee: number; outstandingBalance: number; paymentStatus: string } | void> => {
+    try {
+      const token = await firebaseAuth.currentUser?.getIdToken();
+      if (!token) throw new Error('You are signed out, so the fee cannot be set. Sign in and try again.');
+      const res = await fetch('/api/centre/students/set-fee', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(input),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || 'The fee could not be set. Please try again.');
+      }
+      const s = data.student || {};
+      addToast({
+        type: 'success',
+        title: 'Fee Updated',
+        description: `Total fee set to ${settings.currencySymbol}${Number(input.totalFee).toLocaleString()}. The balance now reflects it.`,
+      });
+      return {
+        totalFee: typeof s.totalFee === 'number' ? s.totalFee : input.totalFee,
+        outstandingBalance: typeof s.outstandingBalance === 'number' ? s.outstandingBalance : 0,
+        paymentStatus: typeof s.paymentStatus === 'string' ? s.paymentStatus : 'Pending',
+      };
+    } catch (e) {
+      console.error(e);
+      addToast({ type: 'error', title: 'Fee Not Updated', description: (e as Error)?.message || 'Could not set the fee.' });
+      return;
+    }
+  };
+
   const login = async () => {
     const provider = new GoogleAuthProvider();
     await signInWithPopup(firebaseAuth, provider);
@@ -2891,6 +3148,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Prompt PF2: wipe every saved last-good copy before the session ends,
     // so nothing is left on the device after sign-out.
     clearAllLastGood();
+    // The active facility's remembered session goes with it too, so a signed-out
+    // account is signed out for good until the account holder signs in again.
+    // Other facility apps on this device keep their own remembered sessions.
+    if (activeCentreId) {
+      try { localStorage.removeItem(`tos_tenant:${activeCentreId}`); } catch { /* ignore */ }
+    }
+    try { sessionStorage.removeItem('tos_activeCentreId'); } catch { /* ignore */ }
+    try { sessionStorage.removeItem('tos_activeCentreOwner'); } catch { /* ignore */ }
+    setPasswordChangePending(false);
     await signOut(firebaseAuth);
   };
 
@@ -3003,6 +3269,92 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  // ---- Academic planner reminders (Nov 19) -------------------------------
+  // Each member's own planner reminders live on their own portal record
+  // (students/tutors/admins document) under plannerReminders, so no new
+  // collection and no extra database reads: the records are already live
+  // here. The shared calendar carries timetable classes plus these.
+  const plannerUid = user?.uid || '';
+  const ownAdminRecord = admins.find((a: any) => a.id === plannerUid);
+  const ownTutorRecord = tutors.find((t: any) => t.uid === plannerUid || t.id === plannerUid);
+  const ownStudentRecord = students.find((st: any) => st.uid === plannerUid || st.id === plannerUid);
+  const plannerReminders = ((ownAdminRecord?.plannerReminders)
+    ?? (ownTutorRecord?.plannerReminders)
+    ?? (ownStudentRecord?.plannerReminders)
+    ?? []) as PlannerActivity[];
+
+  const plannerWriteTarget = (): { col: string; id: string } | null => {
+    if (ownAdminRecord) return { col: 'admins', id: ownAdminRecord.id };
+    // Tutors may only self-update the tutors document whose id is their uid.
+    if (ownTutorRecord && ownTutorRecord.id === plannerUid) return { col: 'tutors', id: plannerUid };
+    if (ownStudentRecord) return { col: 'students', id: ownStudentRecord.id };
+    return null;
+  };
+
+  const addPlannerReminder = async (input: { date: string; time: string; title: string; kind: 'practice' | 'mock' | 'custom' }): Promise<boolean> => {
+    const target = plannerWriteTarget();
+    if (!target || !input.date || !input.title.trim()) return false;
+    const item: PlannerActivity = {
+      id: `pr_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
+      date: input.date,
+      time: (input.time || '').trim(),
+      title: input.title.trim().slice(0, 80),
+      kind: input.kind,
+      createdAt: Date.now(),
+    };
+    try {
+      await updateDoc(doc(db, target.col, target.id), { plannerReminders: arrayUnion(item) });
+      // Queue the web-push job for this reminder (server-side; fire and forget,
+      // the reminder itself already saved so a queue miss is not fatal).
+      void api('/api/push/queue', { method: 'POST', body: { reminder: item } }).catch(() => {});
+      return true;
+    } catch (e) {
+      console.error('planner reminder save failed', e);
+      return false;
+    }
+  };
+
+  const removePlannerReminder = async (id: string): Promise<boolean> => {
+    const target = plannerWriteTarget();
+    const item = plannerReminders.find((r) => r.id === id);
+    if (!target || !item) return false;
+    try {
+      await updateDoc(doc(db, target.col, target.id), { plannerReminders: arrayRemove(item) });
+      // Drop the queued push job for this reminder, if one exists.
+      void api('/api/push/unqueue', { method: 'POST', body: { id } }).catch(() => {});
+      return true;
+    } catch (e) {
+      console.error('planner reminder removal failed', e);
+      return false;
+    }
+  };
+
+  // Editing a reminder keeps its id (and the queued push job id) and rewrites
+  // the fields, so the planner and push sender see one reminder that moved.
+  const updatePlannerReminder = async (id: string, input: { date: string; time: string; title: string; kind: 'practice' | 'mock' | 'custom' }): Promise<boolean> => {
+    const target = plannerWriteTarget();
+    const item = plannerReminders.find((r) => r.id === id);
+    if (!target || !item || !input.date || !input.title.trim()) return false;
+    const next: PlannerActivity = {
+      ...item,
+      date: input.date,
+      time: (input.time || '').trim(),
+      title: input.title.trim().slice(0, 80),
+      kind: input.kind,
+    };
+    try {
+      await updateDoc(doc(db, target.col, target.id), { plannerReminders: arrayRemove(item) });
+      await updateDoc(doc(db, target.col, target.id), { plannerReminders: arrayUnion(next) });
+      // Re-queue the push for the new time and drop the job for the old one.
+      void api('/api/push/unqueue', { method: 'POST', body: { id } }).catch(() => {});
+      void api('/api/push/queue', { method: 'POST', body: { reminder: next } }).catch(() => {});
+      return true;
+    } catch (e) {
+      console.error('planner reminder update failed', e);
+      return false;
+    }
+  };
+
   const toggleAdminSuspend = async (id: string) => {
     try {
       const admin = admins.find((a) => a.id === id);
@@ -3083,10 +3435,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         getClassRatingStats,
         studyMaterials,
         addStudyMaterial,
+        updateStudyMaterial,
+        deleteStudyMaterial,
         attendanceSettings,
         updateAttendanceSettings,
         attendanceLogs,
         clockIn,
+        plannerReminders,
+        addPlannerReminder,
+        removePlannerReminder,
+        updatePlannerReminder,
         clockOut,
         results,
         addResult,
@@ -3094,7 +3452,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addCBTQuestion,
         payments,
         recordPayment,
+        setStudentTotalFee,
         confirmPayment,
+        runPaymentReminders,
         announcements,
         addAnnouncement,
         deleteAnnouncement,
@@ -3148,6 +3508,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         entitlements,
         seatsSummary,
         hasCheckedActiveCentre,
+        passwordChangePending,
+        setPasswordChangePending,
         enterCentreByCode,
         enterSoleCentre,
         resumeCentreSession,

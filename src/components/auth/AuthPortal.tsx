@@ -1,8 +1,8 @@
 import { brandVars } from '../../lib/brand';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useFirebase } from '../../context/FirebaseContext';
 import { useApp } from '../../context/AppContext';
-import { db } from '../../firebase';
+import { db, auth as firebaseAuth } from '../../firebase';
 import { doc, getDoc, updateDoc, query, collection, where, getDocs, setDoc, deleteDoc } from 'firebase/firestore';
 import { 
   GraduationCap, 
@@ -52,6 +52,7 @@ interface AuthPortalProps {
   noticeModal?: boolean;
   onChangeAccessCode?: () => void;
   verifying?: boolean;
+  forcePasswordChange?: boolean;
   logoUrl?: string;
   entryMode?: 'login' | 'signup';
   centreId?: string;
@@ -75,6 +76,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
   noticeModal,
   onChangeAccessCode,
   verifying,
+  forcePasswordChange,
   logoUrl,
   entryMode,
   centreId,
@@ -86,7 +88,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
   accent
 }) => {
   const { loginWithEmail, loginWithGoogle, signUpWithEmail, resetPassword, updatePassword, logout } = useFirebase();
-  const { addToast, activeCentreId, centreName } = useApp();
+  const { addToast, activeCentreId, centreName, setPasswordChangePending } = useApp();
   
   const [currentPassword, setCurrentPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -97,7 +99,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
   const [authMode, setAuthMode] = useState<'login' | 'signup'>(entryMode === 'signup' ? 'signup' : 'login');
 
   // New Password Flow
-  const [needsPasswordChange, setNeedsPasswordChange] = useState(false);
+  const [needsPasswordChange, setNeedsPasswordChange] = useState(forcePasswordChange === true);
   const [passwordChangeStep, setPasswordChangeStep] = useState<'verify' | 'new'>('verify');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -105,6 +107,49 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [userDocInfo, setUserDocInfo] = useState<{ id: string, collection: string } | null>(null);
+
+  // The app holds the whole page while this screen is up: a first-login
+  // password change outranks the splash, the facility entry and the portals.
+  // It clears only when the change completes or the account signs out, never
+  // on an unmount, so a splash or branch switch mid-flow cannot drop it.
+  useEffect(() => {
+    setPasswordChangePending(!!needsPasswordChange);
+  }, [needsPasswordChange, setPasswordChangePending]);
+
+  // Standalone first-login password screen: re-detect the account's own
+  // staff or tutor record on mount, so a remount mid-flow never loses the
+  // change. The first sign-in already ran any legacy migration, so the
+  // record is read by its uid key directly.
+  useEffect(() => {
+    if (!forcePasswordChange) return;
+    const u = firebaseAuth.currentUser;
+    if (!u?.uid || !u.email) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const tutor = await getDoc(doc(db, 'tutors', u.uid));
+        const adminSnap = tutor.exists() ? null : await getDoc(doc(db, 'admins', u.uid));
+        const hit = tutor.exists()
+          ? { id: u.uid, collection: 'tutors' as string, data: tutor.data() }
+          : adminSnap && adminSnap.exists()
+            ? { id: u.uid, collection: 'admins' as string, data: adminSnap.data() }
+            : null;
+        if (cancelled) return;
+        if (hit && !(hit.data as any).hasChangedPassword) {
+          setUserDocInfo({ id: hit.id, collection: hit.collection });
+          setNeedsPasswordChange(true);
+          setPasswordChangeStep('new');
+        } else {
+          // Nothing pending: the flag was stale, hand the app back.
+          setNeedsPasswordChange(false);
+          setPasswordChangePending(false);
+        }
+      } catch (e) {
+        console.error('Password-change re-detection failed:', e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [forcePasswordChange]);
 
   const validatePassword = (pass: string) => {
     const hasUpper = /[A-Z]/.test(pass);
@@ -123,7 +168,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
 
   const portalStyles = {
     admin: {
-      accent: 'bg-slate-900 hover:bg-slate-800',
+      accent: 'bg-slate-900 hover:brightness-110',
       text: 'text-slate-900',
       bg: 'bg-slate-50',
       border: 'border-slate-100',
@@ -148,7 +193,9 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
 
   const style = portalStyles[portalType];
   const isStudent = portalType === 'student';
-  const pageBackground = isStudent ? style.pageBg : (accent ? 'bg-orange-950' : 'bg-slate-900');
+  // Facility logins are dark with the facility colour kept for the buttons and
+  // accents (Nov 20); the plain console login keeps its own dark slate.
+  const pageBackground = isStudent || accent ? 'bg-slate-950' : 'bg-slate-900';
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -423,6 +470,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
         title: 'Account Activated',
         description: 'Your permanent password has been set. Welcome!'
       });
+      setPasswordChangePending(false);
       onSuccess();
     } catch (err: any) {
       setError(err.message || 'Failed to update password.');
@@ -529,19 +577,19 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
   };
 
   return (
-    <div className={`min-h-screen ${pageBackground} overflow-y-auto overflow-x-hidden selection:bg-orange-500 selection:text-white`} style={brandVars(accent)}>
+    <div className={`min-h-screen ${pageBackground} overflow-y-auto overflow-x-hidden selection:bg-orange-500 selection:text-white ${(isStudent || accent) ? 'tos-student-dark' : ''}`} style={brandVars(accent)}>
       <div className="min-h-screen w-full flex flex-col items-center justify-center py-8 md:py-12 px-4">
         <div className="w-full max-w-md bg-white rounded-[2.5rem] shadow-2xl shadow-black/50 border border-white/10 overflow-hidden animate-in fade-in zoom-in-95 duration-500 relative">
-          <div className={`p-8 ${accent ? '' : style.bg} border-b ${style.border} text-center relative`} style={accent ? { background: 'var(--brand)' } : undefined}>
+          <div className={`p-8 ${accent ? 'border-b border-slate-800' : `${style.bg} border-b ${style.border}`} text-center relative`}>
           {logoUrl ? (
             <img src={logoUrl} alt="Facility logo" className="w-14 h-14 rounded-xl object-contain bg-white p-1.5 mx-auto mb-4 shadow-lg" />
           ) : (
-            <div className={`w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-black/5`} style={accent ? { background: 'color-mix(in oklab, var(--on-brand) 22%, transparent)', color: 'var(--on-brand)' } : undefined}>
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-black/5`} style={accent ? { background: 'var(--brand)', color: 'var(--on-brand)' } : undefined}>
               {style.icon}
             </div>
           )}
-          <h1 className="text-2xl font-bold text-slate-900" style={accent ? { color: 'var(--on-brand)' } : undefined}>{title}</h1>
-          <p className="text-slate-500 text-sm mt-1" style={accent ? { color: 'var(--on-brand)', opacity: 0.78 } : undefined}>{subtitle}</p>
+          <h1 className="text-2xl font-bold text-slate-900">{title}</h1>
+          <p className="text-slate-500 text-sm mt-1">{subtitle}</p>
         </div>
 
         <div className="p-8">
@@ -727,7 +775,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
                       required
                       value={email}
                       onChange={(e) => onEmailChange(e.target.value)}
-                      placeholder="e.g. name@excellencetutorials.ng"
+                      placeholder="e.g. name@yourfacility.com"
                       className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-4 focus:ring-slate-100 focus:border-slate-900 outline-none transition-all font-medium"
                     />
                   </div>

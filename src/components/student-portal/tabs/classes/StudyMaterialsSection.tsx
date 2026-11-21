@@ -12,9 +12,12 @@ import {
   Sparkles,
   FileDown,
   Layers,
+  PlayCircle,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { Student, StudyMaterial } from '../../../../types';
 import { useApp } from '../../../../context/AppContext';
+import { MaterialViewer } from '../../../common/MaterialViewer';
 
 interface StudyMaterialsSectionProps {
   student: Student;
@@ -29,7 +32,7 @@ const SUBJECT_COLORS: Record<string, { bg: string; text: string; border: string 
   Chemistry: { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200' },
   Biology: { bg: 'bg-teal-50', text: 'text-teal-700', border: 'border-teal-200' },
   'Further Mathematics': { bg: 'bg-indigo-50', text: 'text-indigo-700', border: 'border-indigo-200' },
-  General: { bg: 'bg-orange-50', text: 'text-[#C2410C]', border: 'border-orange-200' },
+  General: { bg: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-200' },
 };
 
 export const StudyMaterialsSection: React.FC<StudyMaterialsSectionProps> = ({
@@ -41,6 +44,7 @@ export const StudyMaterialsSection: React.FC<StudyMaterialsSectionProps> = ({
   const [selectedSubject, setSelectedSubject] = useState<string>(initialSubject || 'All');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [readingMaterial, setReadingMaterial] = useState<StudyMaterial | null>(null);
+  const [viewing, setViewing] = useState<StudyMaterial | null>(null);
 
   // Extract unique subjects
   const availableSubjects = useMemo(() => {
@@ -72,11 +76,16 @@ export const StudyMaterialsSection: React.FC<StudyMaterialsSectionProps> = ({
 
   const handleDownload = (material: StudyMaterial, e?: React.MouseEvent) => {
     e?.stopPropagation();
-    addToast({
-      type: 'success',
-      title: 'Downloading Handout',
-      description: `"${material.title}" is downloading (${material.fileSize || '2.4 MB'}).`,
-    });
+    const target = material.type === 'video' ? material.videoUrl : material.downloadUrl;
+    if (target) {
+      setViewing(material);
+    } else {
+      addToast({
+        type: 'info',
+        title: 'No file yet',
+        description: 'This material has no file attached yet.',
+      });
+    }
   };
 
   const formatUploadedDate = (isoStr: string) => {
@@ -93,7 +102,7 @@ export const StudyMaterialsSection: React.FC<StudyMaterialsSectionProps> = ({
     <div className="space-y-4 animate-in fade-in duration-200">
       {/* Header Banner */}
       <div className="pt-1">
-        <span className="text-[10px] font-extrabold uppercase text-[#C2410C] tracking-wider block">
+        <span className="text-[10px] font-extrabold uppercase text-orange-700 tracking-wider block">
           {student.name} · Learning Resources
         </span>
         <h2 className="text-xl font-black text-[#0F172A] tracking-tight">
@@ -132,7 +141,7 @@ export const StudyMaterialsSection: React.FC<StudyMaterialsSectionProps> = ({
           onClick={() => setSelectedSubject('All')}
           className={`px-3 py-1.5 rounded-full text-xs font-extrabold transition-all shrink-0 cursor-pointer ${
             selectedSubject === 'All'
-              ? 'bg-[#0F172A] text-white shadow-xs'
+              ? 'bg-[var(--brand,#0F172A)] text-[var(--on-brand,#fff)] shadow-xs'
               : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
           }`}
         >
@@ -148,7 +157,7 @@ export const StudyMaterialsSection: React.FC<StudyMaterialsSectionProps> = ({
               onClick={() => setSelectedSubject(sub)}
               className={`px-3 py-1.5 rounded-full text-xs font-extrabold transition-all shrink-0 cursor-pointer ${
                 isSelected
-                  ? 'bg-[#EA580C] text-white shadow-xs'
+                  ? 'bg-orange-600 text-white shadow-xs'
                   : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
               }`}
             >
@@ -162,7 +171,7 @@ export const StudyMaterialsSection: React.FC<StudyMaterialsSectionProps> = ({
       <div className="space-y-3">
         {filteredMaterials.length === 0 ? (
           <div className="text-center py-12 bg-white rounded-2xl border border-slate-200/90 p-6 space-y-3">
-            <div className="w-12 h-12 rounded-2xl bg-orange-50 border border-orange-100 text-[#EA580C] flex items-center justify-center mx-auto">
+            <div className="w-12 h-12 rounded-2xl bg-orange-50 border border-orange-100 text-orange-600 flex items-center justify-center mx-auto">
               <BookOpen className="w-6 h-6" />
             </div>
             <h4 className="text-sm font-black text-slate-900">No Study Materials Found</h4>
@@ -175,7 +184,7 @@ export const StudyMaterialsSection: React.FC<StudyMaterialsSectionProps> = ({
               <button
                 type="button"
                 onClick={onSwitchToTimetable}
-                className="inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-slate-900 text-white font-extrabold text-xs shadow-sm hover:bg-slate-800 transition-all cursor-pointer"
+                className="inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] font-extrabold text-xs shadow-sm hover:brightness-110 transition-all cursor-pointer"
               >
                 <span>View Timetable</span>
               </button>
@@ -204,19 +213,25 @@ export const StudyMaterialsSection: React.FC<StudyMaterialsSectionProps> = ({
                   </span>
 
                   <span className="text-[11px] font-mono font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded-md border border-slate-200/60 flex items-center gap-1">
-                    <FileText className="w-3 h-3 text-slate-400" />
-                    <span>{material.fileType || 'PDF'}</span>
+                    {material.type === 'video' ? (
+                      <PlayCircle className="w-3 h-3 text-slate-400" />
+                    ) : material.type === 'image' ? (
+                      <ImageIcon className="w-3 h-3 text-slate-400" />
+                    ) : (
+                      <FileText className="w-3 h-3 text-slate-400" />
+                    )}
+                    <span>{material.type === 'video' ? 'VIDEO' : material.type === 'image' ? 'IMAGE' : (material.fileType || 'PDF')}</span>
                     {material.fileSize && <span>· {material.fileSize}</span>}
                   </span>
                 </div>
 
                 {/* Title & Topic */}
                 <div className="space-y-1">
-                  <h3 className="text-[15px] font-black text-[#0F172A] tracking-tight group-hover:text-[#C2410C] transition-colors leading-snug">
+                  <h3 className="text-[15px] font-black text-[#0F172A] tracking-tight group-hover:text-[var(--brand,#EA580C)] transition-colors leading-snug">
                     {material.title}
                   </h3>
                   {material.topic && (
-                    <p className="text-xs text-[#EA580C] font-extrabold">
+                    <p className="text-xs text-orange-600 font-extrabold">
                       Topic: {material.topic}
                     </p>
                   )}
@@ -243,16 +258,20 @@ export const StudyMaterialsSection: React.FC<StudyMaterialsSectionProps> = ({
                       type="button"
                       onClick={(e) => handleDownload(material, e)}
                       className="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-[11px] flex items-center space-x-1 cursor-pointer transition-colors active:scale-95"
-                      title="Download PDF Handout"
+                      title={material.type === 'video' ? 'Watch video' : material.type === 'image' ? 'View image' : 'Open file'}
                     >
-                      <Download className="w-3 h-3 text-slate-500" />
-                      <span>Download</span>
+                      {material.type === 'video' ? (
+                        <PlayCircle className="w-3 h-3 text-slate-500" />
+                      ) : (
+                        <Download className="w-3 h-3 text-slate-500" />
+                      )}
+                      <span>{material.type === 'video' ? 'Watch' : material.type === 'image' ? 'View' : 'Open'}</span>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => setReadingMaterial(material)}
-                      className="px-3 py-1.5 rounded-lg bg-[#C2410C] hover:bg-[#EA580C] text-white font-extrabold text-[11px] flex items-center space-x-1 shadow-2xs cursor-pointer transition-all active:scale-95"
+                      className="px-3 py-1.5 rounded-lg bg-orange-700 hover:bg-orange-600 text-white font-extrabold text-[11px] flex items-center space-x-1 shadow-2xs cursor-pointer transition-all active:scale-95"
                     >
                       <span>Read</span>
                     </button>
@@ -280,14 +299,14 @@ export const StudyMaterialsSection: React.FC<StudyMaterialsSectionProps> = ({
             {/* Modal Header */}
             <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-100">
               <div className="min-w-0 flex-1">
-                <span className="text-[10px] font-black uppercase text-[#C2410C] tracking-wider block">
+                <span className="text-[10px] font-black uppercase text-orange-700 tracking-wider block">
                   {readingMaterial.subject} · {readingMaterial.topic || 'Lecture Note'}
                 </span>
                 <h3 className="text-base font-black text-slate-900 tracking-tight leading-snug mt-0.5">
                   {readingMaterial.title}
                 </h3>
                 <p className="text-[11px] text-slate-500 font-medium mt-0.5">
-                  Uploaded by {readingMaterial.tutorName} · {readingMaterial.pages || 16} Pages ({readingMaterial.fileSize || '2.4 MB'})
+                  Uploaded by {readingMaterial.tutorName}{readingMaterial.fileSize ? ` · ${readingMaterial.fileSize}` : ''}{readingMaterial.pages ? ` · ${readingMaterial.pages} pages` : ''}
                 </p>
               </div>
 
@@ -304,13 +323,12 @@ export const StudyMaterialsSection: React.FC<StudyMaterialsSectionProps> = ({
             {/* Modal Content Scroll */}
             <div className="flex-1 overflow-y-auto py-4 space-y-4 text-xs text-slate-700 leading-relaxed font-medium">
               <div className="p-3.5 bg-orange-50/60 rounded-2xl border border-orange-100 space-y-1">
-                <h4 className="text-xs font-black text-[#C2410C] uppercase tracking-wider flex items-center gap-1.5">
+                <h4 className="text-xs font-black text-orange-700 uppercase tracking-wider flex items-center gap-1.5">
                   <Sparkles className="w-3.5 h-3.5" />
                   <span>Overview & Objectives</span>
                 </h4>
                 <p className="text-slate-600">
-                  {readingMaterial.description ||
-                    'Comprehensive syllabus guide prepared to help students master core principles and tackle typical exam questions with confidence.'}
+                  {readingMaterial.description || 'The tutor has not added a description for this material yet.'}
                 </p>
               </div>
 
@@ -321,15 +339,8 @@ export const StudyMaterialsSection: React.FC<StudyMaterialsSectionProps> = ({
                 </h4>
                 <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2.5">
                   <p>
-                    {readingMaterial.contentSummary ||
-                      'Includes comprehensive definitions, worked calculations, formula derivations, and common examiner traps highlighted by the department.'}
+                    {readingMaterial.contentSummary || 'The tutor has not added a summary for this material yet.'}
                   </p>
-                  <ul className="list-disc list-inside space-y-1 text-slate-600 pl-1">
-                    <li>Core definitions and standard international units</li>
-                    <li>Step-by-step worked examples mapped to latest JAMB and WAEC standards</li>
-                    <li>Speed-drill tips for calculator-free algebraic evaluation</li>
-                    <li>End-of-chapter self-diagnostic review questions</li>
-                  </ul>
                 </div>
               </div>
             </div>
@@ -347,15 +358,20 @@ export const StudyMaterialsSection: React.FC<StudyMaterialsSectionProps> = ({
               <button
                 type="button"
                 onClick={() => handleDownload(readingMaterial)}
-                className="h-11 px-5 rounded-xl bg-[#C2410C] hover:bg-[#EA580C] text-white font-extrabold text-xs flex items-center space-x-2 shadow-sm transition-all cursor-pointer active:scale-95"
+                className="h-11 px-5 rounded-xl bg-orange-700 hover:bg-orange-600 text-white font-extrabold text-xs flex items-center space-x-2 shadow-sm transition-all cursor-pointer active:scale-95"
               >
-                <Download className="w-4 h-4" />
-                <span>Download Full Handout ({readingMaterial.fileSize || '2.4 MB'})</span>
+                {readingMaterial.type === 'video' ? (
+                  <PlayCircle className="w-4 h-4" />
+                ) : (
+                  <BookOpen className="w-4 h-4" />
+                )}
+                <span>{readingMaterial.type === 'video' ? 'Watch video' : readingMaterial.type === 'image' ? 'View image' : 'Open file'}</span>
               </button>
             </div>
           </div>
         </div>
       )}
+      <MaterialViewer material={viewing} onClose={() => setViewing(null)} />
     </div>
   );
 };

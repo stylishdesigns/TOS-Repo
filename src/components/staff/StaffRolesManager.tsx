@@ -23,6 +23,7 @@ import {
   Building,
   ShieldAlert,
 } from 'lucide-react';
+import { getAuth } from 'firebase/auth';
 import { ModernSelect } from '../ui/ModernSelect';
 import { ConfirmationModal } from '../common/ConfirmationModal';
 
@@ -100,7 +101,7 @@ const getRoleInfo = (role: string) => {
 };
 
 export const StaffRolesManager: React.FC = () => {
-  const { addToast, admins, addAdmin, deleteAdmin, toggleAdminSuspend, activeUser } = useApp();
+  const { addToast, admins, deleteAdmin, toggleAdminSuspend, activeUser, activeCentreId } = useApp();
 
   const [selectedRoleFilter, setSelectedRoleFilter] = useState<string>('All');
   const [search, setSearch] = useState('');
@@ -117,30 +118,7 @@ export const StaffRolesManager: React.FC = () => {
     email: '',
     phone: '',
     role: 'Tutor' as StaffRole,
-    tempPassword: '',
   });
-
-  const generatePassword = () => {
-    const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
-    const lower = 'abcdefghijkmnopqrstuvwxyz';
-    const numbers = '23456789';
-    const special = '!@#$%&*';
-    const all = upper + lower + numbers + special;
-    
-    let pass = '';
-    pass += upper.charAt(Math.floor(Math.random() * upper.length));
-    pass += lower.charAt(Math.floor(Math.random() * lower.length));
-    pass += numbers.charAt(Math.floor(Math.random() * numbers.length));
-    pass += special.charAt(Math.floor(Math.random() * special.length));
-    
-    for (let i = 0; i < 6; i++) {
-      pass += all.charAt(Math.floor(Math.random() * all.length));
-    }
-    
-    // Shuffle
-    const shuffled = pass.split('').sort(() => 0.5 - Math.random()).join('');
-    setFormData(prev => ({ ...prev, tempPassword: shuffled }));
-  };
 
   const filteredStaff = (admins || []).filter((s) => {
     const matchesRole = selectedRoleFilter === 'All' || s.role === selectedRoleFilter;
@@ -154,29 +132,28 @@ export const StaffRolesManager: React.FC = () => {
 
   const handleCreateStaff = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name || !formData.email || !formData.tempPassword) {
-      if (!formData.tempPassword) {
-        addToast({ type: 'error', title: 'Missing Password', description: 'Please generate a temporary password first.' });
-      }
-      return;
-    }
+    if (!formData.name || !formData.email) return;
 
     setIsInviting(true);
     const cleanEmail = formData.email.trim().toLowerCase();
 
     try {
-      // Use AppContext's addAdmin for persistence
-      await addAdmin({
-        name: formData.name,
-        email: cleanEmail,
-        phone: formData.phone || '+234 800 000 0000',
-        role: formData.role,
-        status: 'Invited',
-        department: 'General',
-        jobTitle: formData.role,
-        temporaryPassword: formData.tempPassword,
-        hasChangedPassword: false,
+      // The server generates the temporary password and emails it; nobody
+      // here sees or stores a password.
+      const token = (await getAuth().currentUser?.getIdToken()) || '';
+      const res = await fetch('/api/centre/staff/invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          centreId: activeCentreId,
+          name: formData.name,
+          email: cleanEmail,
+          phone: formData.phone,
+          role: formData.role,
+        }),
       });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || 'Could not send the invitation.');
 
       setShowAddModal(false);
       setFormData({
@@ -184,10 +161,18 @@ export const StaffRolesManager: React.FC = () => {
         email: '',
         phone: '',
         role: 'Tutor',
-        tempPassword: '',
       });
-    } catch (err) {
-      console.error(err);
+      addToast({
+        type: 'success',
+        title: 'Invite Sent',
+        description: `${formData.name} will receive their login details by email.`,
+      });
+    } catch (err: any) {
+      addToast({
+        type: 'error',
+        title: 'Invitation Failed',
+        description: err?.message || 'Could not send the invitation.',
+      });
     } finally {
       setIsInviting(false);
     }
@@ -225,7 +210,7 @@ export const StaffRolesManager: React.FC = () => {
           </button>
           <button
             onClick={() => setShowAddModal(true)}
-            className="px-4 py-2.5 text-xs font-semibold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg shadow-sm transition-all flex items-center justify-center space-x-2 shrink-0"
+            className="px-4 py-2.5 text-xs font-semibold text-white bg-orange-600 hover:bg-orange-700 rounded-lg shadow-sm transition-all flex items-center justify-center space-x-2 shrink-0"
           >
             <Plus className="w-4 h-4" />
             <span>Add Staff Member</span>
@@ -242,7 +227,7 @@ export const StaffRolesManager: React.FC = () => {
               onClick={() => setSelectedRoleFilter('All')}
               className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap ${
                 selectedRoleFilter === 'All'
-                  ? 'bg-[#EA580C] text-white shadow-2xs'
+                  ? 'bg-orange-600 text-white shadow-2xs'
                   : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
               }`}
             >
@@ -254,7 +239,7 @@ export const StaffRolesManager: React.FC = () => {
                 onClick={() => setSelectedRoleFilter(r)}
                 className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap ${
                   selectedRoleFilter === r
-                    ? 'bg-[#EA580C] text-white shadow-2xs'
+                    ? 'bg-orange-600 text-white shadow-2xs'
                     : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
                 }`}
               >
@@ -357,7 +342,7 @@ export const StaffRolesManager: React.FC = () => {
           <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center space-x-2">
-                <Briefcase className="w-5 h-5 text-[#EA580C]" />
+                <Briefcase className="w-5 h-5 text-orange-600" />
                 <h3 className="font-bold text-base text-slate-900">Add Staff Member</h3>
               </div>
               <button
@@ -391,7 +376,7 @@ export const StaffRolesManager: React.FC = () => {
                   <input
                     type="email"
                     required
-                    placeholder="staff@excellencetutorials.ng"
+                    placeholder="staff@yourfacility.com"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-900 focus:bg-white focus:border-orange-500 outline-none"
@@ -432,30 +417,9 @@ export const StaffRolesManager: React.FC = () => {
                 </div>
               </div>
 
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Temporary Password *</label>
-                <div className="flex space-x-2">
-                  <input
-                    type="text"
-                    readOnly
-                    value={formData.tempPassword}
-                    placeholder="Click generate"
-                    className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-900 outline-none font-mono tracking-wider"
-                  />
-                  <button
-                    type="button"
-                    onClick={generatePassword}
-                    className="px-3 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors flex items-center space-x-1"
-                  >
-                    <KeyRound className="w-3.5 h-3.5" />
-                    <span>Generate</span>
-                  </button>
-                </div>
-              </div>
-
               {/* Explicit Mandatory Message Required by User */}
               <div className="p-3 bg-orange-50 rounded-xl border border-orange-200 text-[11px] text-orange-900 space-y-1">
-                <p className="font-bold flex items-center space-x-1 text-[#EA580C]">
+                <p className="font-bold flex items-center space-x-1 text-orange-600">
                   <KeyRound className="w-3.5 h-3.5 shrink-0" />
                   <span>Onboarding & Password Provisioning:</span>
                 </p>
@@ -475,7 +439,7 @@ export const StaffRolesManager: React.FC = () => {
                 <button
                   type="submit"
                   disabled={isInviting}
-                  className="px-4 py-2 font-semibold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                  className="px-4 py-2 font-semibold text-white bg-orange-600 hover:bg-orange-700 rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
                 >
                   {isInviting ? (
                     <>
@@ -508,7 +472,7 @@ export const StaffRolesManager: React.FC = () => {
 
             <div className="mt-4 space-y-3.5 text-xs">
               <div className="flex items-center space-x-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
-                <div className="w-12 h-12 rounded-full bg-orange-100 text-[#EA580C] font-black text-base flex items-center justify-center">
+                <div className="w-12 h-12 rounded-full bg-orange-100 text-orange-600 font-black text-base flex items-center justify-center">
                   {viewingStaff.name.slice(0, 2).toUpperCase()}
                 </div>
                 <div>
@@ -608,7 +572,7 @@ export const StaffRolesManager: React.FC = () => {
           <div className="bg-white rounded-2xl max-w-4xl w-full p-6 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <div className="flex items-center space-x-3">
-                <div className="p-2.5 bg-orange-50 text-[#EA580C] rounded-xl">
+                <div className="p-2.5 bg-orange-50 text-orange-600 rounded-xl">
                   <Shield className="w-6 h-6" />
                 </div>
                 <div>
@@ -656,7 +620,7 @@ export const StaffRolesManager: React.FC = () => {
             <div className="flex justify-end pt-6 mt-6 border-t border-slate-100">
               <button
                 onClick={() => setShowRolesModal(false)}
-                className="px-6 py-2.5 font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-xl shadow-sm transition-all"
+                className="px-6 py-2.5 font-bold text-[var(--on-brand,#fff)] bg-[var(--brand,#0f172a)] hover:brightness-110 rounded-xl shadow-sm transition-all"
               >
                 Understood
               </button>

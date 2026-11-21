@@ -105,7 +105,7 @@ export const CentreCodeGate: React.FC<CentreCodeGateProps> = ({ onProceed, onBac
         return;
       }
       if (lockedCentre && data.centreId && lockedCentre.centreId && String(data.centreId) !== String(lockedCentre.centreId)) {
-        setError(`That access code is not for ${lockedCentre.centreName}. Check it and try again.`);
+        setError('That access code is incorrect. Check it and try again, or reach out to your facility admin.');
         return;
       }
       setCentre(data);

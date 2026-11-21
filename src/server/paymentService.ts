@@ -14,6 +14,7 @@ import {
   assertCentreAccess,
   assertOwnStudentRecord,
   applyPayment,
+  feeState,
   assertPending,
   assertPendingCapacity,
   type ConfirmAction,
@@ -56,7 +57,14 @@ export interface SubmitPaymentInput {
   note?: unknown;
   evidenceUrl?: unknown;
   evidenceName?: unknown;
+  /** When the payment starts covering the student (YYYY-MM-DD). */
+  effectiveFrom?: unknown;
+  /** When the payment window expires (YYYY-MM-DD). */
+  expiresAt?: unknown;
 }
+
+const isISODate = (v: unknown): v is string =>
+  typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v.trim());
 
 /**
  * Student: store a 'Pending' claim and change nothing else.
@@ -68,7 +76,7 @@ export async function submitPayment(
   actor: PaymentActor,
   input: SubmitPaymentInput
 ) {
-  const { studentId, amount, method, note, evidenceUrl, evidenceName } = input;
+  const { studentId, amount, method, note, evidenceUrl, evidenceName, effectiveFrom, expiresAt } = input;
   const { isAdminCaller, callerCentreId } = actor;
 
   return db.runTransaction(async (tx) => {
@@ -115,6 +123,8 @@ export async function submitPayment(
     if (typeof note === 'string' && note.trim()) basePayment.note = note.trim().slice(0, 500);
     if (typeof evidenceUrl === 'string' && evidenceUrl) basePayment.evidenceUrl = evidenceUrl;
     if (typeof evidenceName === 'string' && evidenceName) basePayment.evidenceName = evidenceName.slice(0, 200);
+    if (isISODate(effectiveFrom)) basePayment.effectiveFrom = effectiveFrom.trim();
+    if (isISODate(expiresAt)) basePayment.expiresAt = expiresAt.trim();
 
     if (!isAdminCaller) {
       assertPendingCapacity(pendingCount);
@@ -190,10 +200,71 @@ export async function submitPayment(
   });
 }
 
+export interface SetFeeInput {
+  studentId: string;
+  totalFee: number;
+}
+
+/**
+ * Admin: set the total fee a student owes. This is the only way a fee moves
+ * (the admin decides what each student pays), and the server recomputes the
+ * balance and status from it, so no device ever sends balance numbers.
+ */
+export async function setStudentFee(
+  db: Firestore,
+  caller: PaymentCaller,
+  actor: PaymentActor,
+  input: SetFeeInput
+) {
+  if (!actor.isAdminCaller) {
+    throw new PaymentError(403, 'Only a facility admin can set the total fee');
+  }
+  const { studentId, totalFee } = input;
+
+  return db.runTransaction(async (tx) => {
+    const studentRef = db.collection('students').doc(studentId);
+    const studentSnap = await tx.get(studentRef);
+    if (!studentSnap.exists) {
+      throw new PaymentError(404, 'Student record not found');
+    }
+    const s = studentSnap.data() as Record<string, any>;
+    const studentCentreId = typeof s.centreId === 'string' ? s.centreId : '';
+    assertCentreAccess({
+      tos: tosOverride(caller, actor),
+      callerCentreId: actor.callerCentreId,
+      recordCentreId: studentCentreId,
+    });
+
+    const fees = feeState(s, totalFee);
+    tx.update(studentRef, {
+      totalFee: fees.totalFee,
+      outstandingBalance: fees.outstandingBalance,
+      paymentStatus: fees.paymentStatus,
+      feeSetBy: caller.uid,
+      feeSetAt: Date.now(),
+    });
+    tx.set(db.collection('auditLogs').doc(), {
+      action: 'fee.set',
+      actorUid: caller.uid,
+      actorEmail: caller.email,
+      centreId: studentCentreId,
+      studentId,
+      totalFee: fees.totalFee,
+      previousFee: typeof s.totalFee === 'number' ? s.totalFee : 0,
+      paidAmount: fees.paidAmount,
+      at: new Date().toISOString(),
+    });
+    return { student: fees };
+  });
+}
+
 export interface DecidePaymentInput {
   paymentId: string;
   action: ConfirmAction;
   reason?: unknown;
+  /** Admin may set the payment window when confirming (YYYY-MM-DD). */
+  effectiveFrom?: unknown;
+  expiresAt?: unknown;
 }
 
 /** Admin: confirm or reject a pending claim, exactly once. */
@@ -206,7 +277,7 @@ export async function decidePayment(
   if (!actor.isAdminCaller) {
     throw new PaymentError(403, 'Only a facility admin can confirm payments');
   }
-  const { paymentId, action, reason } = input;
+  const { paymentId, action, reason, effectiveFrom, expiresAt } = input;
   const { callerCentreId } = actor;
 
   return db.runTransaction(async (tx) => {
@@ -267,13 +338,16 @@ export async function decidePayment(
       throw e;
     }
     const receipt = receiptNumber();
-    tx.update(paymentRef, {
+    const confirmUpdate: Record<string, any> = {
       status: fees.paymentStatus,
       balance: fees.outstandingBalance,
       receiptNumber: receipt,
       confirmedBy: caller.uid,
       confirmedAt: Date.now(),
-    });
+    };
+    if (isISODate(effectiveFrom)) confirmUpdate.effectiveFrom = effectiveFrom.trim();
+    if (isISODate(expiresAt)) confirmUpdate.expiresAt = expiresAt.trim();
+    tx.update(paymentRef, confirmUpdate);
     tx.update(studentRef, {
       paidAmount: fees.paidAmount,
       outstandingBalance: fees.outstandingBalance,

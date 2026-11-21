@@ -518,4 +518,39 @@ export function registerFoDbProxy(app: express.Express): void {
       reject(res, 500, "The plan update failed on the server.");
     }
   });
+
+  // 9. Centre brand color repair (user-approved, 2026-11-19): writes EXACTLY
+  //    one field, centres/{centreId}.accentColor, as an uppercase #RRGGBB
+  //    string. Refuses unless the centre document exists and never touches
+  //    any other field, collection, or record. Requires confirm:"SET-BRAND".
+  app.post("/api/internal/fs/set-centre-brand", async (req, res) => {
+    const body = (req.body || {}) as Record<string, unknown>;
+    const centreId = typeof body.centreId === "string" ? body.centreId : "";
+    const accent = typeof body.accentColor === "string" ? body.accentColor.trim() : "";
+    const confirm = typeof body.confirm === "string" ? body.confirm : "";
+    if (!centreId || centreId.length > 128 || !ID_RE.test(centreId)) {
+      return reject(res, 400, "A valid centreId is required.");
+    }
+    if (!/^#[0-9a-fA-F]{6}$/.test(accent)) {
+      return reject(res, 400, "accentColor must be a #RRGGBB hex color.");
+    }
+    if (confirm !== "SET-BRAND") {
+      return reject(res, 400, 'Send confirm: "SET-BRAND" to change a brand color.');
+    }
+    try {
+      const ref = adminDb.collection("centres").doc(centreId);
+      const snap = await ref.get();
+      if (!snap.exists) {
+        return reject(res, 404, "That centre document does not exist.");
+      }
+      const before = snap.get("accentColor") ?? null;
+      const value = accent.toUpperCase();
+      await ref.set({ accentColor: value, updatedAt: new Date().toISOString() }, { merge: true });
+      console.log(`[fo-db-proxy] set-centre-brand ${centreId}: ${String(before)} -> ${value}`);
+      res.json({ ok: true, centreId, before, after: value });
+    } catch (err: any) {
+      console.error("[fo-db-proxy] set-centre-brand failed:", err?.message || err);
+      reject(res, 500, "The brand color write failed on the server.");
+    }
+  });
 }

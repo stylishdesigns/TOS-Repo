@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { api } from '../tos/tosShared';
 import { ModernSelect } from '../ui/ModernSelect';
 import { useApp } from '../../context/AppContext';
 import {
@@ -724,6 +725,16 @@ export const CBTManager: React.FC = () => {
       const examPayload = JSON.parse(JSON.stringify(examData)) as Record<string, any>;
       if (activeCentreId) examPayload.centreId = activeCentreId;
       await setDoc(doc(db, 'cbt_exams', examId), examPayload);
+      if (!editingExamId) {
+        // Students taking this exam's subjects get a notification.
+        void api('/api/notifications/push', { method: 'POST', body: {
+          centreId: activeCentreId,
+          type: 'mock',
+          title: 'New CBT exam',
+          body: `${examData.title} - ${examData.questionCount} questions, ${examData.durationMinutes} minutes`,
+          subjects: examData.subjects || [],
+        } }).catch(() => {});
+      }
       addToast({ 
         type: 'success', 
         title: editingExamId ? 'Assessment Updated' : 'Assessment Published', 
@@ -829,7 +840,7 @@ export const CBTManager: React.FC = () => {
         <div className="absolute top-4 right-4 sm:top-8 sm:right-8 z-10">
           <button
             onClick={() => setShowGlobalGradingModal(true)}
-            className="p-3 text-slate-400 hover:text-[#EA580C] hover:bg-orange-50 bg-white border border-slate-200 rounded-2xl shadow-sm transition-all group"
+            className="p-3 text-slate-400 hover:text-orange-600 hover:bg-orange-50 bg-white border border-slate-200 rounded-2xl shadow-sm transition-all group"
             title="Global Mock Grading Settings"
           >
             <Settings className="w-5 h-5 group-hover:rotate-90 transition-transform duration-500" />
@@ -852,7 +863,7 @@ export const CBTManager: React.FC = () => {
           <div className="flex items-center justify-between gap-4">
             <button
               onClick={handleOpenSetup}
-              className="px-4 py-2.5 text-xs font-bold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-xl shadow-sm transition-all flex items-center space-x-2"
+              className="px-4 py-2.5 text-xs font-bold text-white bg-orange-600 hover:bg-orange-700 rounded-xl shadow-sm transition-all flex items-center space-x-2"
             >
               <Plus className="w-4 h-4" />
               <span>Set up Assessment</span>
@@ -861,7 +872,7 @@ export const CBTManager: React.FC = () => {
               onClick={() => setShowArchive(!showArchive)}
               className={`px-4 py-2.5 text-xs font-bold rounded-xl shadow-sm transition-all flex items-center space-x-2 border ml-auto ${
                 showArchive 
-                  ? 'bg-slate-900 text-white border-slate-900' 
+                  ? 'bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] border-slate-900' 
                   : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
               }`}
             >
@@ -874,7 +885,7 @@ export const CBTManager: React.FC = () => {
           <div className="flex items-center justify-end">
             <button
               onClick={() => setShowArchive(false)}
-              className="px-4 py-2.5 text-xs font-bold rounded-xl shadow-sm transition-all flex items-center space-x-2 border bg-slate-900 text-white border-slate-900"
+              className="px-4 py-2.5 text-xs font-bold rounded-xl shadow-sm transition-all flex items-center space-x-2 border bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] border-slate-900"
             >
               <BookOpen className="w-4 h-4" />
               <span>Back to Current</span>
@@ -887,7 +898,7 @@ export const CBTManager: React.FC = () => {
       {!showArchive && (
         <div className="grid grid-cols-2 gap-3 sm:gap-4">
           <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200/90 shadow-xs flex flex-col sm:flex-row sm:items-center sm:space-x-5">
-            <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-orange-50 text-[#EA580C] flex items-center justify-center shrink-0 mb-2 sm:mb-0">
+            <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center shrink-0 mb-2 sm:mb-0">
               <BookOpen className="w-5 h-5 sm:w-7 sm:h-7" />
             </div>
             <div>
@@ -916,7 +927,7 @@ export const CBTManager: React.FC = () => {
       <div className="bg-white p-4 md:p-6 rounded-3xl border border-slate-200/90 shadow-sm space-y-4">
         <div className="flex items-center space-x-3 mb-1">
            <div className="w-8 h-8 rounded-xl bg-orange-50 flex items-center justify-center">
-              <Filter className="w-4 h-4 text-[#EA580C]" />
+              <Filter className="w-4 h-4 text-orange-600" />
            </div>
            <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest leading-none">
              {showArchive ? 'Assessment & Archive Filters' : 'Assessment Filters'}
@@ -978,7 +989,7 @@ export const CBTManager: React.FC = () => {
               onClick={() => setActiveFrequency(freq)}
               className={`px-8 py-2.5 text-[11px] font-black rounded-xl transition-all ${
                 activeFrequency === freq
-                  ? 'bg-white text-[#EA580C] shadow-md scale-105 ring-1 ring-slate-200'
+                  ? 'bg-white text-orange-600 shadow-md scale-105 ring-1 ring-slate-200'
                   : 'text-slate-500 hover:text-slate-700'
               }`}
             >
@@ -988,7 +999,7 @@ export const CBTManager: React.FC = () => {
         </div>
 
         {showArchive && (
-          <div className="px-6 py-2.5 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] flex items-center justify-center gap-3 w-fit mx-auto shadow-xl ring-4 ring-slate-100">
+          <div className="px-6 py-2.5 bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] flex items-center justify-center gap-3 w-fit mx-auto shadow-xl ring-4 ring-slate-100">
              <BookOpen className="w-4 h-4 text-orange-400" />
              Archive View: Past {activeFrequency === 'General' ? 'Tutors' : 'Tutors Mock'} Assessments
           </div>
@@ -1085,7 +1096,7 @@ export const CBTManager: React.FC = () => {
                         </div>
 
                         {/* Top Right Tip - Start Time or Created Date (Deep Grey Color) */}
-                        <div className="absolute top-0 right-0 px-3 py-1 bg-slate-700 text-white text-[8px] font-black uppercase tracking-widest flex items-center gap-1 border-b border-l border-slate-600">
+                        <div className="absolute top-0 right-0 px-3 py-1 bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] text-[8px] font-black uppercase tracking-widest flex items-center gap-1 border-b border-l border-slate-600">
                           <Clock className="w-2.5 h-2.5 text-orange-400" />
                           {isPast 
                             ? <span>Created: <span className="text-orange-300">{exam.createdAt ? new Date(exam.createdAt).toLocaleDateString() : 'N/A'}</span></span>
@@ -1113,7 +1124,7 @@ export const CBTManager: React.FC = () => {
                     </div>
 
                     <div className="mt-3 space-y-1">
-                      <h3 className="font-black text-slate-900 text-lg group-hover:text-[#EA580C] transition-colors leading-tight">
+                      <h3 className="font-black text-slate-900 text-lg group-hover:text-orange-600 transition-colors leading-tight">
                         {exam.title.replace(/General Assessment/g, 'Tutors Assessment').replace(/General/g, 'Tutors')}
                       </h3>
                       {exam.topic && (
@@ -1128,7 +1139,7 @@ export const CBTManager: React.FC = () => {
                       {exam.subjects.map((sub, idx) => (
                         <span
                           key={idx}
-                          className="px-2.5 py-1 rounded-md bg-orange-50/50 text-[#EA580C] text-[11px] font-bold border border-orange-100"
+                          className="px-2.5 py-1 rounded-md bg-orange-50/50 text-orange-600 text-[11px] font-bold border border-orange-100"
                         >
                           {sub}
                         </span>
@@ -1168,7 +1179,7 @@ export const CBTManager: React.FC = () => {
 
                     {/* Mode Tag at Bottom - Q Count ONLY (Mode differentiated in Performance) */}
                     <div className="absolute left-1/2 -translate-x-1/2 -bottom-6 px-4 py-2 bg-slate-50 text-slate-600 text-[9px] font-black uppercase tracking-[0.2em] rounded-b-md border-x border-b border-slate-100 shadow-sm flex items-center gap-2 whitespace-nowrap">
-                      <span className="text-[#EA580C]">{exam.questions?.length || exam.questionCount || 0} Qs</span>
+                      <span className="text-orange-600">{exam.questions?.length || exam.questionCount || 0} Qs</span>
                     </div>
 
                     <div className="flex items-center space-x-2">
@@ -1195,7 +1206,7 @@ export const CBTManager: React.FC = () => {
                         return (
                             <button
                               onClick={() => handleStartExam(exam)}
-                              className="px-5 py-2.5 text-xs font-black text-white rounded-xl shadow-lg transition-all flex items-center space-x-2 bg-slate-900 hover:bg-slate-800"
+                              className="px-5 py-2.5 text-xs font-black text-white rounded-xl shadow-lg transition-all flex items-center space-x-2 bg-slate-900 hover:brightness-110"
                             >
                               <span className="leading-none">
                                 Review
@@ -1323,7 +1334,7 @@ export const CBTManager: React.FC = () => {
                         <div className="mt-10 space-y-5">
                           <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                             <h4 className="font-black text-slate-900 text-[11px] uppercase tracking-[0.1em] flex items-center gap-2">
-                               <Users className="w-4 h-4 text-[#EA580C]" />
+                               <Users className="w-4 h-4 text-orange-600" />
                                Live Student Attempt Record
                             </h4>
                             <div className="flex items-center gap-2">
@@ -1359,7 +1370,7 @@ export const CBTManager: React.FC = () => {
                                     <tr key={idx} className="hover:bg-slate-50/50 transition-colors group">
                                       <td className="px-5 py-4">
                                         <div className="flex flex-col">
-                                          <span className="font-black text-slate-900 group-hover:text-[#EA580C] transition-colors">{res.studentName}</span>
+                                          <span className="font-black text-slate-900 group-hover:text-orange-600 transition-colors">{res.studentName}</span>
                                           <span className="text-[9px] text-slate-400 font-bold uppercase">{res.programmeName}</span>
                                         </div>
                                       </td>
@@ -1388,7 +1399,7 @@ export const CBTManager: React.FC = () => {
               <div className="pt-6 border-t border-slate-100">
                  <button
                    onClick={() => setShowAnalyticsModal(null)}
-                   className="w-full py-5 bg-slate-950 text-white font-black uppercase tracking-[0.2em] rounded-2xl hover:bg-black transition-all shadow-xl active:scale-[0.98] text-[10px]"
+                   className="w-full py-5 bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] font-black uppercase tracking-[0.2em] rounded-2xl hover:bg-black transition-all shadow-xl active:scale-[0.98] text-[10px]"
                  >
                    Return to Dashboard
                  </button>
@@ -1402,7 +1413,7 @@ export const CBTManager: React.FC = () => {
       {showSetupModal && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
           <div className="bg-white rounded-3xl max-w-5xl w-full shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 overflow-hidden flex flex-col h-[90vh] max-h-[90vh]">
-            <div className="bg-[#EA580C] p-5 md:p-6 text-white relative shrink-0">
+            <div className="bg-orange-600 p-5 md:p-6 text-white relative shrink-0">
               <div className="flex items-center space-x-3">
                 <div className="w-10 h-10 md:w-12 md:h-12 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-md">
                   <Sparkles className="w-6 h-6 text-white" />
@@ -1666,7 +1677,7 @@ export const CBTManager: React.FC = () => {
                           type="button"
                           disabled={parsedQuestions.length > 0}
                           onClick={() => setSetupData({...setupData, mode: 'MCQ'})}
-                          className={`py-3 rounded-xl font-black transition-all border text-[10px] uppercase tracking-widest ${setupData.mode === 'MCQ' ? 'bg-orange-50 border-orange-200 text-[#EA580C]' : 'bg-slate-50 border-slate-200 text-slate-400'} ${parsedQuestions.length > 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          className={`py-3 rounded-xl font-black transition-all border text-[10px] uppercase tracking-widest ${setupData.mode === 'MCQ' ? 'bg-orange-50 border-orange-200 text-orange-600' : 'bg-slate-50 border-slate-200 text-slate-400'} ${parsedQuestions.length > 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
                           MCQ
                         </button>
@@ -1674,7 +1685,7 @@ export const CBTManager: React.FC = () => {
                           type="button"
                           disabled={parsedQuestions.length > 0}
                           onClick={() => setSetupData({...setupData, mode: 'Essay'})}
-                          className={`py-3 rounded-xl font-black transition-all border text-[10px] uppercase tracking-widest ${setupData.mode === 'Essay' ? 'bg-orange-50 border-orange-200 text-[#EA580C]' : 'bg-slate-50 border-slate-200 text-slate-400'} ${parsedQuestions.length > 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          className={`py-3 rounded-xl font-black transition-all border text-[10px] uppercase tracking-widest ${setupData.mode === 'Essay' ? 'bg-orange-50 border-orange-200 text-orange-600' : 'bg-slate-50 border-slate-200 text-slate-400'} ${parsedQuestions.length > 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
                           ESSAY
                         </button>
@@ -1682,7 +1693,7 @@ export const CBTManager: React.FC = () => {
                           type="button"
                           disabled={parsedQuestions.length > 0}
                           onClick={() => setSetupData({...setupData, mode: 'Both'})}
-                          className={`py-3 rounded-xl font-black transition-all border text-[10px] uppercase tracking-widest ${setupData.mode === 'Both' ? 'bg-orange-50 border-orange-200 text-[#EA580C]' : 'bg-slate-50 border-slate-200 text-slate-400'} ${parsedQuestions.length > 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          className={`py-3 rounded-xl font-black transition-all border text-[10px] uppercase tracking-widest ${setupData.mode === 'Both' ? 'bg-orange-50 border-orange-200 text-orange-600' : 'bg-slate-50 border-slate-200 text-slate-400'} ${parsedQuestions.length > 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
                           BOTH
                         </button>
@@ -1698,7 +1709,7 @@ export const CBTManager: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => setSetupData({...setupData, questionInputMode: 'Paste'})}
-                        className={`flex-1 p-4 rounded-2xl border-2 flex flex-col items-center space-y-2 transition-all ${setupData.questionInputMode === 'Paste' ? 'border-[#EA580C] bg-orange-50 text-[#EA580C]' : 'border-slate-100 bg-slate-50 text-slate-400'}`}
+                        className={`flex-1 p-4 rounded-2xl border-2 flex flex-col items-center space-y-2 transition-all ${setupData.questionInputMode === 'Paste' ? 'border-orange-600 bg-orange-50 text-orange-600' : 'border-slate-100 bg-slate-50 text-slate-400'}`}
                       >
                         <FileText className="w-6 h-6" />
                         <span className="text-[10px] font-black uppercase tracking-widest">Paste Copied Text</span>
@@ -1706,7 +1717,7 @@ export const CBTManager: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => setSetupData({...setupData, questionInputMode: 'AI'})}
-                        className={`flex-1 p-4 rounded-2xl border-2 flex flex-col items-center space-y-2 transition-all ${setupData.questionInputMode === 'AI' ? 'border-[#EA580C] bg-orange-50 text-[#EA580C]' : 'border-slate-100 bg-slate-50 text-slate-400'}`}
+                        className={`flex-1 p-4 rounded-2xl border-2 flex flex-col items-center space-y-2 transition-all ${setupData.questionInputMode === 'AI' ? 'border-orange-600 bg-orange-50 text-orange-600' : 'border-slate-100 bg-slate-50 text-slate-400'}`}
                       >
                         <Cpu className="w-6 h-6" />
                         <span className="text-[10px] font-black uppercase tracking-widest">AI Generation</span>
@@ -1724,7 +1735,7 @@ export const CBTManager: React.FC = () => {
                             key={sid}
                             type="button"
                             onClick={() => setActiveMockSubjectId(sid)}
-                            className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border flex items-center gap-2 ${activeMockSubjectId === sid ? 'bg-slate-900 text-white border-slate-900 shadow-md' : 'bg-white text-slate-500 border-slate-200'}`}
+                            className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border flex items-center gap-2 ${activeMockSubjectId === sid ? 'bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] border-slate-900 shadow-md' : 'bg-white text-slate-500 border-slate-200'}`}
                           >
                             {s?.name || 'Subject'}
                             {hasQuestions && <CheckCircle2 className="w-3 h-3 text-emerald-400" />}
@@ -1797,7 +1808,7 @@ Number of Questions: ${setupData.questionCount}`;
                                 </button>
                                 <div className="flex items-center justify-between">
                                     <span className="font-black uppercase tracking-widest text-slate-900 flex items-center gap-2 text-[10px]">
-                                      <FileText className="w-4 h-4 text-[#EA580C]" />
+                                      <FileText className="w-4 h-4 text-orange-600" />
                                       MCQ AI Prompt Guide
                                     </span>
                                 </div>
@@ -1912,7 +1923,7 @@ Number of Questions: ${setupData.questionCount}`;
                                   parsePastedQuestions(pastedText);
                                 }
                               }}
-                              className="w-full py-4 bg-slate-900 text-white font-black uppercase tracking-widest rounded-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-2 shadow-lg"
+                              className="w-full py-4 bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] font-black uppercase tracking-widest rounded-xl hover:brightness-110 transition-all flex items-center justify-center gap-2 shadow-lg"
                             >
                               <Plus className="w-4 h-4" />
                               Process & Parse Questions
@@ -1971,7 +1982,7 @@ Number of Questions: ${setupData.questionCount}`;
                                 }}
                                 disabled={generatingAI}
                                 className={`w-full py-4 text-white font-black uppercase tracking-widest rounded-xl shadow-md transition-all flex items-center justify-center space-x-2 disabled:opacity-50 ${
-                                  hasGeneratedBefore ? 'bg-slate-900 hover:bg-slate-800' : 'bg-orange-500 hover:bg-orange-600'
+                                  hasGeneratedBefore ? 'bg-slate-900 hover:brightness-110' : 'bg-orange-500 hover:bg-orange-600'
                                 }`}
                               >
                                 {generatingAI ? (
@@ -2071,7 +2082,7 @@ Number of Questions: ${setupData.questionCount}`;
                     type="submit" 
                     form="assessmentSetupForm"
                     disabled={isSaving}
-                    className="px-10 py-3.5 bg-slate-900 text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-xl shadow-xl hover:bg-slate-800 transition-all active:scale-95 ring-4 ring-slate-100 flex items-center justify-center gap-2 min-w-[160px]"
+                    className="px-10 py-3.5 bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] text-[10px] font-black uppercase tracking-[0.2em] rounded-xl shadow-xl hover:brightness-110 transition-all active:scale-95 ring-4 ring-slate-100 flex items-center justify-center gap-2 min-w-[160px]"
                   >
                     {isSaving ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -2101,7 +2112,7 @@ Number of Questions: ${setupData.questionCount}`;
             <div className="flex items-center justify-between p-6 border-b border-slate-200 shrink-0">
               <div className="flex items-center space-x-3">
                 <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center">
-                  <Laptop className="w-5 h-5 text-[#EA580C]" />
+                  <Laptop className="w-5 h-5 text-orange-600" />
                 </div>
                 <div>
                   <h3 className="font-black text-slate-900 text-lg">{activeQuizModal.title}</h3>
@@ -2131,7 +2142,7 @@ Number of Questions: ${setupData.questionCount}`;
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-2">
-                             <span className="px-2 py-0.5 bg-slate-900 text-white text-[10px] font-black rounded-md">Q{idx + 1}</span>
+                             <span className="px-2 py-0.5 bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] text-[10px] font-black rounded-md">Q{idx + 1}</span>
                              <span className={`px-2 py-0.5 text-[10px] font-black rounded-md uppercase tracking-widest ${(q as any).type === 'Essay' ? 'bg-blue-50 text-blue-600 border border-blue-100' : 'bg-orange-50 text-orange-600 border border-orange-100'}`}>
                                 {(q as any).type || (activeQuizModal.mode === 'Essay' ? 'Essay' : 'MCQ')}
                              </span>
@@ -2240,7 +2251,7 @@ Number of Questions: ${setupData.questionCount}`;
                    setActiveQuizModal(null);
                    setShowDeleteConfirm(false);
                  }}
-                 className="px-6 py-2 bg-slate-900 text-white text-xs font-black uppercase tracking-widest rounded-xl shadow-md hover:bg-slate-800 transition-all"
+                 className="px-6 py-2 bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] text-xs font-black uppercase tracking-widest rounded-xl shadow-md hover:brightness-110 transition-all"
                >
                  Close Review
                </button>
@@ -2353,7 +2364,7 @@ Number of Questions: ${setupData.questionCount}`;
               <div className="pt-6 border-t border-slate-100">
                 <button 
                   onClick={() => setShowFormatGuide(false)}
-                  className="w-full py-5 bg-slate-900 text-white font-black uppercase tracking-widest rounded-2xl shadow-xl hover:bg-slate-800 transition-all transform active:scale-[0.98]"
+                  className="w-full py-5 bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] font-black uppercase tracking-widest rounded-2xl shadow-xl hover:brightness-110 transition-all transform active:scale-[0.98]"
                 >
                   I'm ready to paste my questions
                 </button>
@@ -2447,7 +2458,7 @@ Number of Questions: ${setupData.questionCount}`;
                       addToast({ type: 'error', title: 'Save Failed', description: 'Permission denied.' });
                     }
                   }}
-                  className="flex-1 py-4 bg-slate-900 text-white font-black uppercase tracking-widest rounded-xl hover:bg-slate-800 transition-all shadow-lg"
+                  className="flex-1 py-4 bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] font-black uppercase tracking-widest rounded-xl hover:brightness-110 transition-all shadow-lg"
                 >
                   Save All Rules
                 </button>

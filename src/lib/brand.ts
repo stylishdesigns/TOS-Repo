@@ -12,12 +12,14 @@ export function isBrandHex(v?: string | null): boolean {
 
 // Phone-browser and installed-app top-bar colour. Chrome paints the strip
 // above the page (and the installed app's status bar) from this meta tag.
-// Facility surfaces take the facility's colour; TOS surfaces keep orange.
-export function setThemeColor(accent?: string | null): void {
+// The strip above the page sits directly over the facility's dark header
+// menu, so it is permanently dark (#020617, the slate-950 header colour) on
+// every facility surface: the top of the screen and the menu blend as one.
+export function setThemeColor(_accent?: string | null): void {
   try {
     const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
     if (!meta) return;
-    meta.content = isBrandHex(accent) ? String(accent).trim() : '#EA580C';
+    meta.content = '#020617';
   } catch { /* progressive: the default stays */ }
 }
 
@@ -37,7 +39,7 @@ export function brandVars(accent?: string | null): CSSProperties {
     '--color-orange-300': mix(48, 'white'),
     '--color-orange-400': mix(74, 'white'),
     '--color-orange-500': a,
-    '--color-orange-600': mix(88, 'black'),
+    '--color-orange-600': a,
     '--color-orange-700': mix(74, 'black'),
     '--color-orange-800': mix(60, 'black'),
     '--color-orange-900': mix(46, 'black'),

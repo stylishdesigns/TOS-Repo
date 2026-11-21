@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { api } from '../../tos/tosShared';
 import { ModernSelect } from '../../ui/ModernSelect';
+import { BrandDatePicker } from '../../ui/BrandDatePicker';
 import { useApp } from '../../../context/AppContext';
 import {
   Laptop,
@@ -28,7 +30,6 @@ import {
   AlertCircle,
   XCircle,
   History,
-  Check,
   Wand2,
 } from 'lucide-react';
 import { 
@@ -141,6 +142,12 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
     essayMarksPerQuestion: 5,
     questionCount: 10,
   });
+
+  // The Start/End Window fields split the stored datetime into a branded
+  // calendar (date) and a plain time input; both halves are required before
+  // the value exists, so the save validation still holds.
+  const startTimePart = (setupData.startTime || '').split('T')[1] || '';
+  const endTimePart = (setupData.endTime || '').split('T')[1] || '';
 
   const [pastedText, setPastedText] = useState('');
   const [parsedQuestions, setParsedQuestions] = useState<QuizQuestion[]>([]);
@@ -634,6 +641,16 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
       const examPayload = JSON.parse(JSON.stringify(examData)) as Record<string, any>;
       if (activeCentreId) examPayload.centreId = activeCentreId;
       await setDoc(doc(db, 'cbt_exams', examId), examPayload);
+      if (!editingExamId) {
+        // Students taking this exam's subjects get a notification.
+        void api('/api/notifications/push', { method: 'POST', body: {
+          centreId: activeCentreId,
+          type: 'mock',
+          title: 'New CBT exam',
+          body: `${examData.title} - ${examData.questionCount} questions, ${examData.durationMinutes} minutes`,
+          subjects: examData.subjects || [],
+        } }).catch(() => {});
+      }
       addToast({ type: 'success', title: editingExamId ? 'Assessment Updated' : 'Assessment Published' });
       setShowSetupModal(false);
     } catch (err) {
@@ -704,7 +721,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
   };
 
   return (
-    <div className={`transition-all duration-500 min-h-screen relative ${activeTab === 'Performance' ? 'bg-slate-950 -m-5 p-5' : 'bg-slate-50 p-5'} ${showArchive ? 'bg-white p-5' : ''}`}>
+    <div className={`transition-all duration-500 min-h-screen relative bg-slate-50 p-5 ${showArchive ? 'bg-white p-5' : ''}`}>
       {/* Tutor Override Modal */}
       {showOverrideModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md animate-in fade-in duration-200 overflow-y-auto">
@@ -805,7 +822,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
               <button 
                 onClick={handleSaveOverride}
                 disabled={isSaving}
-                className="flex-[2] py-4 rounded-2xl bg-slate-900 text-white font-black text-[10px] uppercase tracking-[0.2em] shadow-xl hover:bg-black transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+                className="flex-[2] py-4 rounded-2xl bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] font-black text-[10px] uppercase tracking-[0.2em] shadow-xl hover:bg-black transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
                 <span>Save Manual Grades</span>
@@ -816,13 +833,13 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
       )}
       {/* Overscroll Background Extender */}
       {(activeTab === 'Performance' || showArchive) && (
-        <div className={`absolute top-[-1000px] left-0 right-0 h-[1000px] ${showArchive ? 'bg-white' : 'bg-slate-950'} -z-10`} />
+        <div className={`absolute top-[-1000px] left-0 right-0 h-[1000px] ${showArchive ? 'bg-white' : 'bg-slate-50'} -z-10`} />
       )}
       <div className="flex items-center justify-between relative h-12 mb-6">
         {activeTab === 'Assessment' && !showArchive && (
           <button 
             onClick={handleOpenSetup}
-            className="w-10 h-10 rounded-xl bg-[#EA580C] text-white flex items-center justify-center shadow-lg shadow-orange-100 absolute left-0"
+            className="w-10 h-10 rounded-xl bg-orange-600 text-white flex items-center justify-center shadow-lg shadow-orange-100 absolute left-0"
           >
             <Plus className="w-5 h-5" />
           </button>
@@ -838,10 +855,10 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
         )}
         
         <div className="flex-1 text-center">
-          <h2 className={`text-xl font-black tracking-tight ${activeTab === 'Performance' ? 'text-white' : 'text-slate-900'}`}>
+          <h2 className={`text-xl font-black tracking-tight text-slate-900`}>
             {activeTab === 'Performance' ? 'Performance Analytics' : (showArchive ? 'Assessment Archive' : 'Tutor Assessments')}
           </h2>
-          <p className={`text-[11px] font-medium ${activeTab === 'Performance' ? 'text-slate-400' : 'text-slate-500'}`}>
+          <p className={`text-[11px] font-medium text-slate-500`}>
             {activeTab === 'Performance' ? 'In-depth student performance & class leaderboards' : (showArchive ? 'Historical archive of completed tests' : 'Manage CBT tests & simulations')}
           </p>
         </div>
@@ -861,7 +878,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
       {activeTab === 'Assessment' && !showArchive && (
         <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-6">
           <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center sm:space-x-4">
-            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-orange-50 text-[#EA580C] flex items-center justify-center shrink-0 mb-2 sm:mb-0">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center shrink-0 mb-2 sm:mb-0">
               <BookOpen className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
             <div>
@@ -904,7 +921,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
       {!showArchive && (
         <div className="flex flex-col gap-4 mb-6">
           <div className="flex items-center justify-between gap-3">
-            <div className={`flex items-center space-x-1 p-1.5 rounded-2xl flex-1 border transition-all ${activeTab === 'Performance' ? 'bg-white/5 border-white/10' : 'bg-slate-100 border-slate-200'}`}>
+            <div className="bg-white rounded-[14px] p-1 border border-slate-200 shadow-xs grid grid-cols-2 gap-1 flex-1">
               {(['Assessment', 'Performance'] as const).map((tab) => (
                 <button
                   key={tab}
@@ -912,10 +929,10 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
                     setActiveTab(tab);
                     if (tab === 'Performance') setShowArchive(false);
                   }}
-                  className={`flex-1 py-3 text-[12px] font-black uppercase tracking-wider rounded-xl transition-all ${
-                    activeTab === tab 
-                      ? 'bg-white text-slate-900 shadow-md' 
-                      : (activeTab === 'Performance' ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-600')
+                  className={`h-10 rounded-[10px] text-xs font-extrabold transition-all flex items-center justify-center cursor-pointer ${
+                    activeTab === tab
+                      ? 'bg-[var(--brand,#0F172A)] text-[var(--on-brand,#fff)] shadow-xs'
+                      : 'text-slate-500 hover:text-slate-900'
                   }`}
                 >
                   {tab}
@@ -939,11 +956,11 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
 
           if (displayedExams.length === 0) {
             return (
-              <div className={`py-12 rounded-3xl border border-dashed text-center space-y-3 ${activeTab === 'Performance' || showArchive ? 'bg-white/5 border-white/10' : 'bg-white border-slate-200'}`}>
-                 <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mx-auto ${activeTab === 'Performance' || showArchive ? 'bg-white/5' : 'bg-slate-50'}`}>
-                    <Laptop className={`w-8 h-8 ${activeTab === 'Performance' || showArchive ? 'text-slate-600' : 'text-slate-300'}`} />
+              <div className={`py-12 rounded-3xl border border-dashed text-center space-y-3 bg-white border-slate-200`}>
+                 <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mx-auto bg-slate-50`}>
+                    <Laptop className={`w-8 h-8 text-slate-300`} />
                  </div>
-                 <p className={`text-xs font-medium ${activeTab === 'Performance' || showArchive ? 'text-slate-500' : 'text-slate-400'}`}>No assessments found in this category.</p>
+                 <p className={`text-xs font-medium text-slate-400`}>No assessments found in this category.</p>
               </div>
             );
           }
@@ -961,7 +978,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
                   return (
                     <div key={exam.id} className="bg-white border border-slate-200 rounded-2xl overflow-hidden transition-all shadow-lg hover:border-orange-200 relative">
                        {/* Top Right Corner - Created Date */}
-                       <div className="absolute top-0 right-0 px-3 py-1 bg-slate-700 text-white text-[8px] font-black uppercase tracking-widest flex items-center gap-1 border-b border-l border-slate-600 rounded-bl-lg z-10">
+                       <div className="absolute top-0 right-0 px-3 py-1 bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] text-[8px] font-black uppercase tracking-widest flex items-center gap-1 border-b border-l border-slate-600 rounded-bl-lg z-10">
                           <Clock className="w-2.5 h-2.5 text-orange-400" />
                           <span>Created: <span className="text-orange-300">{exam.createdAt ? new Date(exam.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : (exam.startTime ? new Date(exam.startTime).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A')}</span></span>
                        </div>
@@ -994,7 +1011,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
                          </div>
                          <button
                             onClick={() => setExpandedExamId(expandedExamId === exam.id ? null : exam.id)}
-                            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${expandedExamId === exam.id ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
+                            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${expandedExamId === exam.id ? 'bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)]' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
                          >
                             <ChevronDown className={`w-5 h-5 transition-transform duration-300 ${expandedExamId === exam.id ? 'rotate-180' : 'rotate-0'}`} />
                          </button>
@@ -1063,7 +1080,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
                                                             <Pencil className="w-3 h-3" />
                                                          </button>
                                                       )}
-                                                      <span className="text-sm font-black text-[#EA580C]">{res.totalScore}</span>
+                                                      <span className="text-sm font-black text-orange-600">{res.totalScore}</span>
                                                    </div>
                                                    <span className="text-[9px] font-bold text-slate-400 uppercase">{res.averagePercent}% Acc.</span>
                                                 </div>
@@ -1109,7 +1126,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
                       </div>
 
                       {/* Top Right Tip - Start Time or Created Date (Deep Grey Color) */}
-                      <div className="absolute top-0 right-0 px-3 py-1 bg-slate-700 text-white text-[8px] font-black uppercase tracking-widest flex items-center gap-1 border-b border-l border-slate-600">
+                      <div className="absolute top-0 right-0 px-3 py-1 bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] text-[8px] font-black uppercase tracking-widest flex items-center gap-1 border-b border-l border-slate-600">
                         <Clock className="w-2.5 h-2.5 text-orange-500" />
                         {isActuallyPast 
                           ? <span>Created: <span className="text-orange-300">{exam.createdAt ? new Date(exam.createdAt).toLocaleDateString() : 'N/A'}</span></span>
@@ -1139,7 +1156,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
                   </div>
 
                   <div className="mt-3 space-y-1">
-                    <h3 className="font-black text-slate-900 text-lg group-hover:text-[#EA580C] transition-colors leading-tight">
+                    <h3 className="font-black text-slate-900 text-lg group-hover:text-orange-600 transition-colors leading-tight">
                       {exam.title.replace(/General Assessment/g, 'CBT Assessment').replace(/General/g, 'CBT')}
                     </h3>
                     {exam.topic && (
@@ -1154,7 +1171,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
                     {exam.subjects.map((sub, idx) => (
                       <span
                         key={idx}
-                        className="px-2.5 py-1 rounded-md bg-orange-50/50 text-[#EA580C] text-[11px] font-bold border border-orange-100"
+                        className="px-2.5 py-1 rounded-md bg-orange-50/50 text-orange-600 text-[11px] font-bold border border-orange-100"
                       >
                         {sub}
                       </span>
@@ -1189,7 +1206,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
 
                   {/* Mode Tag at Bottom - Q Count ONLY (Mode differentiated in Performance) */}
                   <div className="absolute left-1/2 -translate-x-1/2 -bottom-6 px-4 py-2 bg-slate-50 text-slate-600 text-[9px] font-black uppercase tracking-[0.2em] rounded-b-md border-x border-b border-slate-100 shadow-sm flex items-center gap-2 whitespace-nowrap">
-                    <span className="text-[#EA580C] uppercase">{exam.questions?.length || exam.questionCount || 0} Qs</span>
+                    <span className="text-orange-600 uppercase">{exam.questions?.length || exam.questionCount || 0} Qs</span>
                   </div>
 
                   <div className="flex items-center space-x-2">
@@ -1214,7 +1231,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
                         
                         <button
                           onClick={() => handleStartExam(exam)}
-                          className="px-5 py-2.5 text-xs font-black text-white rounded-xl shadow-lg transition-all flex items-center space-x-2 bg-slate-900 hover:bg-slate-800"
+                          className="px-5 py-2.5 text-xs font-black text-white rounded-xl shadow-lg transition-all flex items-center space-x-2 bg-slate-900 hover:brightness-110"
                         >
                           <span className="leading-none">
                             Review
@@ -1243,7 +1260,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
                   <div className="mt-4 pt-4 border-t border-slate-100 animate-in slide-in-from-top-4 duration-300">
                     <div className="flex items-center justify-between mb-4">
                        <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-900 flex items-center gap-2">
-                          <Users className="w-4 h-4 text-[#EA580C]" />
+                          <Users className="w-4 h-4 text-orange-600" />
                           Student Participation
                        </h4>
                     </div>
@@ -1251,7 +1268,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
                     <div className="bg-slate-50 rounded-2xl overflow-hidden border border-slate-200">
                       <div className="overflow-x-auto">
                         <table className="w-full text-left text-[11px]">
-                          <thead className="bg-slate-900 text-white font-black uppercase tracking-widest">
+                          <thead className="bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] font-black uppercase tracking-widest">
                             <tr>
                               <th className="px-4 py-3 w-16">Rank</th>
                               <th className="px-4 py-3">Student</th>
@@ -1302,7 +1319,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
                                     </td>
                                     <td className="px-4 py-3 text-right">
                                       <div className="flex flex-col items-end">
-                                        <span className="text-sm font-black text-[#EA580C]">{res.totalScore}</span>
+                                        <span className="text-sm font-black text-orange-600">{res.totalScore}</span>
                                         <span className="text-[9px] text-slate-400 uppercase font-bold tracking-tighter">{res.averagePercent}% Acc.</span>
                                       </div>
                                     </td>
@@ -1325,25 +1342,17 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
               <button
                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
-                className={`px-4 py-2 rounded-xl border font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
-                  activeTab === 'Performance'
-                    ? 'border-white/10 bg-white/5 text-white hover:bg-white/10'
-                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                }`}
+                className={`px-4 py-2 rounded-xl border font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed border-slate-200 bg-white text-slate-600 hover:bg-slate-50`}
               >
                 Previous
               </button>
-              <span className={`text-xs font-bold ${activeTab === 'Performance' ? 'text-slate-400' : 'text-slate-500'}`}>
+              <span className={`text-xs font-bold text-slate-500`}>
                 Page {currentPage} of {totalPages} ({filteredExams.length} assessments)
               </span>
               <button
                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                 disabled={currentPage === totalPages}
-                className={`px-4 py-2 rounded-xl border font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
-                  activeTab === 'Performance'
-                    ? 'border-white/10 bg-white/5 text-white hover:bg-white/10'
-                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                }`}
+                className={`px-4 py-2 rounded-xl border font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed border-slate-200 bg-white text-slate-600 hover:bg-slate-50`}
               >
                 Next
               </button>
@@ -1360,7 +1369,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
             <div className="bg-white rounded-[32px] max-w-3xl w-full p-6 sm:p-8 shadow-2xl animate-in zoom-in-95 duration-300 relative">
               <div className="flex items-center justify-between mb-8 border-b border-slate-100 pb-4">
                 <div className="flex items-center space-x-3">
-                   <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center text-[#EA580C]">
+                   <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center text-orange-600">
                       <Laptop className="w-6 h-6" />
                    </div>
                    <div>
@@ -1472,43 +1481,43 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
                       <div className="grid grid-cols-2 gap-4">
                           <div className="flex flex-col">
                             <label className="block font-black text-slate-700 uppercase tracking-widest mb-1.5 text-[10px]">Start Window</label>
-                            <div className="relative flex items-center group/input">
-                              <input
-                                type="datetime-local"
-                                value={setupData.startTime || ''}
-                                onChange={(e) => setSetupData({...setupData, startTime: e.target.value})}
-                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 font-medium outline-none focus:bg-white focus:border-orange-500 transition-all text-[10px] pr-16"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => (document.activeElement as HTMLElement)?.blur()}
-                                className="absolute right-1 top-1/2 -translate-y-1/2 px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all flex items-center gap-1 shadow-lg active:scale-95 z-20 border border-emerald-500"
-                                title="Confirm Time"
-                              >
-                                <span className="text-[10px] font-black uppercase tracking-tighter">ok</span>
-                                <Check className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
+                            <BrandDatePicker
+                              value={(setupData.startTime || '').split('T')[0] || ''}
+                              onChange={(d) => setSetupData({ ...setupData, startTime: d && startTimePart ? `${d}T${startTimePart}` : '' })}
+                              accent="var(--brand, #EA580C)"
+                              ariaLabel="Start window date"
+                            />
+                            <input
+                              type="time"
+                              value={startTimePart}
+                              onChange={(e) => {
+                                const t = e.target.value;
+                                const d = (setupData.startTime || '').split('T')[0] || '';
+                                setSetupData({ ...setupData, startTime: d && t ? `${d}T${t}` : '' });
+                              }}
+                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 font-medium outline-none focus:bg-white focus:border-orange-500 transition-all text-xs mt-2"
+                              aria-label="Start window time"
+                            />
                           </div>
                           <div className="flex flex-col">
                             <label className="block font-black text-slate-700 uppercase tracking-widest mb-1.5 text-[10px]">End Window</label>
-                            <div className="relative flex items-center group/input">
-                              <input
-                                type="datetime-local"
-                                value={setupData.endTime || ''}
-                                onChange={(e) => setSetupData({...setupData, endTime: e.target.value})}
-                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 font-medium outline-none focus:bg-white focus:border-orange-500 transition-all text-[10px] pr-16"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => (document.activeElement as HTMLElement)?.blur()}
-                                className="absolute right-1 top-1/2 -translate-y-1/2 px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all flex items-center gap-1 shadow-lg active:scale-95 z-20 border border-emerald-500"
-                                title="Confirm Time"
-                              >
-                                <span className="text-[10px] font-black uppercase tracking-tighter">ok</span>
-                                <Check className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
+                            <BrandDatePicker
+                              value={(setupData.endTime || '').split('T')[0] || ''}
+                              onChange={(d) => setSetupData({ ...setupData, endTime: d && endTimePart ? `${d}T${endTimePart}` : '' })}
+                              accent="var(--brand, #EA580C)"
+                              ariaLabel="End window date"
+                            />
+                            <input
+                              type="time"
+                              value={endTimePart}
+                              onChange={(e) => {
+                                const t = e.target.value;
+                                const d = (setupData.endTime || '').split('T')[0] || '';
+                                setSetupData({ ...setupData, endTime: d && t ? `${d}T${t}` : '' });
+                              }}
+                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 font-medium outline-none focus:bg-white focus:border-orange-500 transition-all text-xs mt-2"
+                              aria-label="End window time"
+                            />
                           </div>
                       </div>
 
@@ -1563,7 +1572,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
                           type="button"
                           disabled={parsedQuestions.length > 0}
                           onClick={() => setSetupData({...setupData, mode: m})}
-                          className={`py-3 rounded-xl font-black transition-all border text-[12px] uppercase tracking-widest ${setupData.mode === m ? 'bg-orange-50 border-orange-200 text-[#EA580C]' : 'bg-slate-50 border-slate-200 text-slate-400'} ${parsedQuestions.length > 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          className={`py-3 rounded-xl font-black transition-all border text-[12px] uppercase tracking-widest ${setupData.mode === m ? 'bg-orange-50 border-orange-200 text-orange-600' : 'bg-slate-50 border-slate-200 text-slate-400'} ${parsedQuestions.length > 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
                           {m}
                         </button>
@@ -1577,7 +1586,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
                       <button
                         type="button"
                         onClick={() => setSetupData({...setupData, questionInputMode: 'Paste'})}
-                        className={`flex-1 p-4 rounded-2xl border-2 flex flex-col items-center space-y-2 transition-all ${setupData.questionInputMode === 'Paste' ? 'border-[#EA580C] bg-orange-50 text-[#EA580C]' : 'border-slate-100 bg-slate-50 text-slate-400'}`}
+                        className={`flex-1 p-4 rounded-2xl border-2 flex flex-col items-center space-y-2 transition-all ${setupData.questionInputMode === 'Paste' ? 'border-orange-600 bg-orange-50 text-orange-600' : 'border-slate-100 bg-slate-50 text-slate-400'}`}
                       >
                         <FileText className="w-6 h-6" />
                         <span className="text-[10px] font-black uppercase tracking-widest">Paste Copied Text</span>
@@ -1585,7 +1594,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
                       <button
                         type="button"
                         onClick={() => setSetupData({...setupData, questionInputMode: 'AI'})}
-                        className={`flex-1 p-4 rounded-2xl border-2 flex flex-col items-center space-y-2 transition-all ${setupData.questionInputMode === 'AI' ? 'border-[#EA580C] bg-orange-50 text-[#EA580C]' : 'border-slate-100 bg-slate-50 text-slate-400'}`}
+                        className={`flex-1 p-4 rounded-2xl border-2 flex flex-col items-center space-y-2 transition-all ${setupData.questionInputMode === 'AI' ? 'border-orange-600 bg-orange-50 text-orange-600' : 'border-slate-100 bg-slate-50 text-slate-400'}`}
                       >
                         <Cpu className="w-6 h-6" />
                         <span className="text-[10px] font-black uppercase tracking-widest">AI Generation</span>
@@ -1597,13 +1606,13 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
                     <div className="p-5 bg-orange-50 border border-orange-100 rounded-2xl space-y-4 animate-in slide-in-from-top-2">
                        <div className="flex items-center justify-between">
                          <div className="flex items-center gap-2">
-                           <Sparkles className="w-4 h-4 text-[#EA580C]" />
+                           <Sparkles className="w-4 h-4 text-orange-600" />
                            <label className="block font-black text-orange-950 uppercase tracking-widest text-[10px]">AI Instruction Prompt</label>
                          </div>
                          <button
                            type="button"
                            onClick={handleAutoFillPrompt}
-                           className="px-3 py-1.5 bg-white text-[#EA580C] hover:bg-orange-100/60 border border-orange-200 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all shadow-xs active:scale-95"
+                           className="px-3 py-1.5 bg-white text-orange-600 hover:bg-orange-100/60 border border-orange-200 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all shadow-xs active:scale-95"
                            title="Auto-fill dynamic prompt from current setup settings"
                          >
                            <Wand2 className="w-3.5 h-3.5" />
@@ -1637,7 +1646,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
                              disabled={generatingAI}
                              onClick={handleGenerateAIQuestions}
                              className={`w-full py-3 text-white font-black uppercase tracking-widest rounded-xl flex items-center justify-center gap-2 shadow-md transition-all disabled:opacity-50 ${
-                               hasGeneratedBefore ? 'bg-slate-900 hover:bg-slate-800' : 'bg-[#EA580C] hover:bg-orange-600'
+                               hasGeneratedBefore ? 'bg-slate-900 hover:brightness-110' : 'bg-orange-600 hover:bg-orange-600'
                              }`}
                            >
                              {generatingAI ? (
@@ -1710,7 +1719,7 @@ Number of Questions: ${setupData.questionCount}`;
                             </button>
                             <div className="flex items-center justify-between">
                                 <span className="font-black uppercase tracking-widest text-slate-900 flex items-center gap-2 text-[10px]">
-                                  <FileText className="w-4 h-4 text-[#EA580C]" />
+                                  <FileText className="w-4 h-4 text-orange-600" />
                                   MCQ AI Prompt Guide
                                 </span>
                             </div>
@@ -1804,7 +1813,7 @@ Number of Questions: ${setupData.questionCount}`;
                         <button 
                           type="button"
                           onClick={() => parsePastedQuestions(pastedText)}
-                          className="w-full py-4 bg-slate-900 text-white font-black uppercase tracking-widest rounded-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-2 shadow-lg"
+                          className="w-full py-4 bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] font-black uppercase tracking-widest rounded-xl hover:brightness-110 transition-all flex items-center justify-center gap-2 shadow-lg"
                         >
                           <Plus className="w-4 h-4" />
                           Process & Parse Questions
@@ -1878,7 +1887,7 @@ Number of Questions: ${setupData.questionCount}`;
                   <button 
                     type="submit" 
                     disabled={isSaving || (parsedQuestions.length === 0 && generatedQuestions.length === 0)}
-                    className="px-10 py-3.5 bg-[#EA580C] text-white font-black text-[12px] uppercase tracking-widest rounded-xl shadow-xl shadow-orange-100 disabled:opacity-50 transition-all active:scale-95 flex items-center justify-center gap-2 min-w-[160px]"
+                    className="px-10 py-3.5 bg-orange-600 text-white font-black text-[12px] uppercase tracking-widest rounded-xl shadow-xl shadow-orange-100 disabled:opacity-50 transition-all active:scale-95 flex items-center justify-center gap-2 min-w-[160px]"
                   >
                     {isSaving ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -1899,7 +1908,7 @@ Number of Questions: ${setupData.questionCount}`;
             <div className="flex items-center justify-between p-6 border-b border-slate-200 shrink-0">
               <div className="flex items-center space-x-3">
                 <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center">
-                  <Laptop className="w-5 h-5 text-[#EA580C]" />
+                  <Laptop className="w-5 h-5 text-orange-600" />
                 </div>
                 <div>
                   <h3 className="font-black text-slate-900 text-lg">{activeQuizModal.title}</h3>
@@ -1929,7 +1938,7 @@ Number of Questions: ${setupData.questionCount}`;
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-2">
-                             <span className="px-2 py-0.5 bg-slate-900 text-white text-[10px] font-black rounded-md">Q{idx + 1}</span>
+                             <span className="px-2 py-0.5 bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] text-[10px] font-black rounded-md">Q{idx + 1}</span>
                              <span className={`px-2 py-0.5 text-[10px] font-black rounded-md uppercase tracking-widest ${(q as any).type === 'Essay' ? 'bg-blue-50 text-blue-600 border border-blue-100' : 'bg-orange-50 text-orange-600 border border-orange-100'}`}>
                                 {(q as any).type || (activeQuizModal.mode === 'Essay' ? 'Essay' : 'MCQ')}
                              </span>
@@ -2002,7 +2011,7 @@ Number of Questions: ${setupData.questionCount}`;
                    setActiveQuizModal(null);
                    setShowDeleteConfirm(false);
                  }}
-                 className="px-6 py-2 bg-slate-900 text-white text-xs font-black uppercase tracking-widest rounded-xl shadow-md hover:bg-slate-800 transition-all"
+                 className="px-6 py-2 bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] text-xs font-black uppercase tracking-widest rounded-xl shadow-md hover:brightness-110 transition-all"
                >
                  Close Review
                </button>
@@ -2096,7 +2105,7 @@ Number of Questions: ${setupData.questionCount}`;
               <div className="pt-4 border-t border-slate-100">
                  <button
                    onClick={() => setShowAnalyticsModal(null)}
-                   className="w-full py-3 bg-slate-900 text-white font-black uppercase tracking-widest rounded-xl hover:bg-slate-800 transition-all shadow-lg"
+                   className="w-full py-3 bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] font-black uppercase tracking-widest rounded-xl hover:brightness-110 transition-all shadow-lg"
                  >
                    Close Insights
                  </button>
@@ -2111,7 +2120,7 @@ Number of Questions: ${setupData.questionCount}`;
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-3 bg-black/90 backdrop-blur-md overflow-y-auto">
           <div className="bg-white rounded-[32px] max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden my-6 animate-in fade-in zoom-in-95 duration-300">
             {/* Modal Header */}
-            <div className="bg-slate-950 text-white p-4 flex items-center justify-between">
+            <div className="bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] p-4 flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <BarChart2 className="w-4 h-4 text-orange-400" />
                 <span className="text-[10px] font-black uppercase tracking-widest text-slate-300">
@@ -2130,7 +2139,7 @@ Number of Questions: ${setupData.questionCount}`;
             <div className="p-6 space-y-6 bg-white text-slate-900">
               {/* Slip Header */}
               <div className="text-center pb-5 border-b-2 border-slate-900 space-y-1.5">
-                <div className="w-12 h-12 rounded-2xl bg-[#EA580C] text-white flex items-center justify-center font-black text-xl mx-auto mb-2 shadow-lg shadow-orange-100">
+                <div className="w-12 h-12 rounded-2xl bg-orange-600 text-white flex items-center justify-center font-black text-xl mx-auto mb-2 shadow-lg shadow-orange-100">
                   EX
                 </div>
                 <h2 className="text-lg font-black tracking-tight uppercase text-slate-900">
@@ -2160,7 +2169,7 @@ Number of Questions: ${setupData.questionCount}`;
               {/* Score Breakdown */}
               <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
                 <table className="w-full text-[11px] text-left">
-                  <thead className="bg-slate-900 text-white font-black uppercase tracking-widest">
+                  <thead className="bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] font-black uppercase tracking-widest">
                     <tr>
                       <th className="p-3">Subject</th>
                       <th className="p-3 text-center">Max</th>
@@ -2181,7 +2190,7 @@ Number of Questions: ${setupData.questionCount}`;
                             {displaySubject}
                           </td>
                           <td className="p-3 text-center font-mono text-slate-500">{s.maxScore}</td>
-                          <td className="p-3 text-center font-mono font-black text-[#EA580C]">
+                          <td className="p-3 text-center font-mono font-black text-orange-600">
                             {s.score}
                           </td>
                           <td className="p-3 text-right font-black text-emerald-700">
@@ -2205,7 +2214,7 @@ Number of Questions: ${setupData.questionCount}`;
 
               <button
                 onClick={() => setSelectedStudentResult(null)}
-                className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-xl hover:bg-slate-800 transition-all active:scale-95 mt-4"
+                className="w-full py-4 bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-xl hover:brightness-110 transition-all active:scale-95 mt-4"
               >
                 Back to Analytics
               </button>
