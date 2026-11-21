@@ -667,24 +667,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  // Delete runs on the server (ownership + centre isolation checked there, via
+  // the Admin SDK) so it cannot be blocked by a stale rules release. The local
+  // list updates first; on failure the material is put back.
   const deleteStudyMaterial = async (id: string) => {
     try {
       const removed = studyMaterials.find((m) => m.id === id);
       setStudyMaterials((prev) => prev.filter((m) => m.id !== id));
       try {
-        await deleteDoc(doc(db, 'studyMaterials', id));
+        await api(`/api/centre/study-materials/${encodeURIComponent(id)}?centreId=${encodeURIComponent(activeCentreId || '')}`, { method: 'DELETE' });
         addToast({
           type: 'success',
           title: 'Material Deleted',
           description: removed ? `"${removed.title}" was removed.` : 'The material was removed.',
         });
-      } catch (err) {
-        console.warn('Firestore studyMaterial delete (local only):', err);
+      } catch (err: any) {
+        console.warn('Study material delete failed:', err);
         if (removed) setStudyMaterials((prev) => [removed, ...prev]);
         addToast({
           type: 'error',
           title: 'Not Deleted',
-          description: 'The material could not be deleted. Please try again.',
+          description: err?.message || 'The material could not be deleted. Please try again.',
         });
       }
     } catch (e) {

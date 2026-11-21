@@ -376,6 +376,37 @@ export function registerExtendedRoutes(app: express.Express): void {
     }
   });
 
+  // ==========================================================================
+  // AUTHENTICATED: study-material deletion. Delete runs on the server (Admin
+  // SDK) so it cannot be blocked by a stale rules release: a tutor may delete
+  // only a material they uploaded, and centre admins/owners any material in
+  // their centre. Centre isolation is checked on the material doc itself, so
+  // one centre can never delete another centre's material.
+  // ==========================================================================
+  app.delete('/api/centre/study-materials/:id', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const centreId = String(req.query.centreId || req.body?.centreId || '').trim().slice(0, 120);
+      const materialId = String(req.params?.id || '').trim().slice(0, 128);
+      if (!centreId) throw httpError(400, 'centreId is required.');
+      if (!/^[a-zA-Z0-9_-]{1,128}$/.test(materialId)) throw httpError(400, 'A valid material id is required.');
+      const membership = await requireMembership(caller, centreId, ['owner', 'admin', 'tutor']);
+      const ref = adminDb.collection('studyMaterials').doc(materialId);
+      const snap = await ref.get();
+      if (!snap.exists) throw httpError(404, 'This material no longer exists.');
+      const data = snap.data() || {};
+      if (String(data.centreId || '') !== centreId) throw httpError(403, 'You do not have access to this material.');
+      if (membership.role === 'tutor' && String(data.tutorId || '') !== caller.uid) {
+        throw httpError(403, 'You can only delete materials you uploaded.');
+      }
+      await ref.delete();
+      res.json({ ok: true });
+    } catch (error: any) {
+      const status = Number(error?.status || 500);
+      res.status(status).json({ error: error?.message || 'Material delete failed.' });
+    }
+  });
+
   app.post('/api/centre/profile-image', async (req, res) => {
     try {
       const caller = getCaller(req);

@@ -244,9 +244,10 @@ export const TutorMaterialsSection: React.FC<TutorMaterialsSectionProps> = ({
     return (
       <div
         key={m.id}
-        className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-start justify-between gap-3 hover:border-slate-300 transition-all"
+        className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col gap-3 hover:border-slate-300 transition-all"
       >
-        <div className="flex items-start space-x-3.5 min-w-0 flex-1">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start space-x-3.5 min-w-0 flex-1">
           <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
             isVideo ? 'bg-rose-50 text-rose-500' : isImage ? 'bg-sky-50 text-sky-500' : 'bg-slate-100 text-slate-500'
           }`}>
@@ -274,30 +275,31 @@ export const TutorMaterialsSection: React.FC<TutorMaterialsSectionProps> = ({
             </p>
           </div>
         </div>
-        <div className="shrink-0 flex items-center gap-1.5">
-          {target ? (
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); setViewing(m); }}
-              className="px-3 py-2 rounded-xl bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 hover:brightness-110 transition-all cursor-pointer"
-            >
-              {isVideo ? <PlayCircle className="w-3.5 h-3.5" /> : <BookOpen className="w-3.5 h-3.5" />}
-              View
-            </button>
-          ) : (
-            <span className="px-3 py-2 rounded-xl bg-slate-50 text-slate-400 text-[9px] font-black uppercase tracking-widest border border-slate-100">
-              No file
-            </span>
-          )}
           <button
             type="button"
             aria-label="Material details"
             onClick={(e) => { e.stopPropagation(); openDetails(m); }}
-            className="w-9 h-9 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center hover:bg-slate-200 transition-all cursor-pointer"
+            className="w-9 h-9 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center shrink-0 hover:bg-slate-200 transition-all cursor-pointer"
           >
             <Info className="w-4 h-4" />
           </button>
         </div>
+
+        {/* View action sits at the bottom of the card, full width. */}
+        {target ? (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setViewing(m); }}
+            className="w-full h-10 rounded-xl bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-1.5 hover:brightness-110 transition-all cursor-pointer"
+          >
+            {isVideo ? <PlayCircle className="w-4 h-4" /> : <BookOpen className="w-4 h-4" />}
+            View
+          </button>
+        ) : (
+          <span className="w-full h-10 rounded-xl bg-slate-50 text-slate-400 text-[10px] font-black uppercase tracking-widest border border-slate-100 flex items-center justify-center">
+            No file
+          </span>
+        )}
       </div>
     );
   };
@@ -783,13 +785,6 @@ export const TutorMaterialsSection: React.FC<TutorMaterialsSectionProps> = ({
                       )}
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => { setViewing(detailsMaterial); }}
-                      className="w-full h-11 rounded-2xl bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:brightness-110 transition-all cursor-pointer"
-                    >
-                      <BookOpen className="w-4 h-4" /> Open full view
-                    </button>
                     {editError && (
                       <div className="flex items-start gap-2 p-3 rounded-xl bg-rose-50 border border-rose-100">
                         <Info className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
