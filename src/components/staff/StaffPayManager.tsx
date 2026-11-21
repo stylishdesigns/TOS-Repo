@@ -265,7 +265,7 @@ const RecordPaymentModal: React.FC<{
 };
 
 export const StaffPayManager: React.FC = () => {
-  const { tutors, admins, activeCentreId, centreName, addToast } = useApp();
+  const { tutors, admins, activeCentreId, centreName, addToast, planCaps } = useApp();
   const [payments, setPayments] = useState<StaffPayment[]>([]);
   const [loading, setLoading] = useState(true);
   const [recordFor, setRecordFor] = useState<StaffRow | null>(null);
@@ -528,7 +528,7 @@ export const StaffPayManager: React.FC = () => {
                             { key: 'chat', label: 'Chat', Icon: MessageSquare },
                             { key: 'whatsapp', label: 'WhatsApp', Icon: Phone },
                             { key: 'email', label: 'Email', Icon: Mail },
-                          ] as const).map(({ key, label, Icon }) => (
+                          ] as const).filter((ch) => ch.key !== 'whatsapp' || planCaps?.whatsappNotifications).map(({ key, label, Icon }) => (
                             <button
                               key={key}
                               onClick={() => sendReminder(row, key)}

@@ -329,6 +329,7 @@ interface AppContextType {
   userCentres: CentreUserRole[];
   entitlements: CentreEntitlements;
   seatsSummary: CentreSeatsSummary | null;
+  planCaps: { planId: string; planName: string; whatsappNotifications: boolean } | null;
   hasCheckedActiveCentre: boolean;
   passwordChangePending: boolean;
   setPasswordChangePending: (v: boolean) => void;
@@ -599,6 +600,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     aiPerformanceAnalysis: true,
   });
   const [seatsSummary, setSeatsSummary] = useState<CentreSeatsSummary | null>(null);
+  // Plan capabilities for the active facility (WhatsApp reminders are Facility Plus only).
+  const [planCaps, setPlanCaps] = useState<{ planId: string; planName: string; whatsappNotifications: boolean } | null>(null);
   const [hasCheckedActiveCentre, setHasCheckedActiveCentre] = useState(false);
   // True while a staff or tutor account is mid-way through its first-login
   // password change: the whole app holds on that one screen until it is done.
@@ -1350,6 +1353,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 if (sData.success && sData.summary) setSeatsSummary(sData.summary);
               })
               .catch((e) => console.warn('seats summary error:', e));
+            fetchPlanCaps(savedCentreId);
           } else {
             sessionStorage.removeItem('tos_activeCentreId');
             setActiveCentreId(null);
@@ -1401,6 +1405,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (sData.success && sData.summary) setSeatsSummary(sData.summary);
       })
       .catch((e) => console.warn('seats summary error:', e));
+    fetchPlanCaps(centreId);
     fetch('/api/session/sync', {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
@@ -1615,10 +1620,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  // Plan capabilities gate notification methods: WhatsApp reminders are a
+  // Facility Plus feature; Standard facilities never see WhatsApp options.
+  const fetchPlanCaps = async (cId?: string) => {
+    const centre = cId || activeCentreId;
+    if (!centre || !user) return;
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/centre/plan?centreId=${encodeURIComponent(centre)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (data?.ok) setPlanCaps({ planId: data.planId, planName: data.planName, whatsappNotifications: data.whatsappNotifications === true });
+      else setPlanCaps(null); // unknown plan: fail closed (no WhatsApp)
+    } catch {
+      setPlanCaps(null); // unknown plan: fail closed (no WhatsApp)
+    }
+  };
+
   const refreshSeatsSummary = async (targetId?: string) => {
     const cId = targetId || activeCentreId;
     if (!cId || !user) return;
     try {
+      fetchPlanCaps(cId);
       const token = await user.getIdToken();
       const res = await fetch(`/api/centre/seats-summary?centreId=${cId}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -3534,6 +3558,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         userCentres,
         entitlements,
         seatsSummary,
+        planCaps,
         hasCheckedActiveCentre,
         passwordChangePending,
         setPasswordChangePending,

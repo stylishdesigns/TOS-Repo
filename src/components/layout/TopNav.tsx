@@ -281,79 +281,58 @@ export const TopNav: React.FC<TopNavProps> = ({ onToggleMobileMenu }) => {
                 </div>
               </div>
 
-              {/* Background Theme Mode Toggle Switch (App Background Alone) */}
+              {/* Appearance: App Background (Light / Dark) */}
               <div
                 id="bg-theme-toggle-container"
-                className="px-4 py-3 border-b border-slate-100 bg-slate-50/70"
+                className="px-4 py-3.5 border-b border-slate-100 bg-slate-50/70"
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2.5">
-                    <div
-                      className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${
-                        bgTheme === 'dark'
-                          ? 'bg-slate-800 text-amber-300'
-                          : 'bg-amber-100 text-amber-600'
-                      }`}
-                    >
-                      {bgTheme === 'dark' ? (
-                        <Moon className="w-3.5 h-3.5" />
-                      ) : (
-                        <Sun className="w-3.5 h-3.5" />
-                      )}
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center space-x-1.5">
+                      <span className="text-xs font-bold text-slate-800 tracking-tight">Appearance</span>
+                      <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-white border border-slate-200 text-slate-400 uppercase tracking-widest">
+                        App canvas
+                      </span>
                     </div>
-                    <div>
-                      <div className="flex items-center space-x-1.5">
-                        <span className="text-xs font-semibold text-slate-800">
-                          App Background
-                        </span>
-                        <span
-                          className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
-                            bgTheme === 'dark'
-                              ? 'bg-slate-800 text-slate-200'
-                              : 'bg-slate-200 text-slate-700'
-                          }`}
-                        >
-                          {bgTheme}
-                        </span>
-                      </div>
-                      <p className="text-[10px] text-slate-400 mt-0.5">
-                        {bgTheme === 'dark' ? 'Dark canvas enabled' : 'Light canvas enabled'}
-                      </p>
-                    </div>
+                    <p className="text-[10px] text-slate-400 mt-0.5">
+                      How the dashboard background looks.
+                    </p>
                   </div>
 
-                  {/* Toggle Switch Component */}
-                  <button
-                    id="profile-theme-toggle-switch"
-                    type="button"
-                    role="switch"
-                    aria-checked={bgTheme === 'dark'}
-                    aria-label="Toggle App Background Dark/Light Mode"
-                    onClick={() => {
-                      toggleBgTheme();
-                      addToast({
-                        type: 'info',
-                        title: bgTheme === 'light' ? 'Dark Background Activated' : 'Light Background Activated',
-                        description: `App background switched to ${bgTheme === 'light' ? 'Dark' : 'Light'} mode. Cards and sidebar are preserved.`,
-                      });
-                    }}
-                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-orange-500/20 ${
-                      bgTheme === 'dark' ? 'bg-orange-600' : 'bg-slate-300'
-                    }`}
-                  >
-                    <span
-                      aria-hidden="true"
-                      className={`pointer-events-none inline-flex h-5 w-5 transform items-center justify-center rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
-                        bgTheme === 'dark' ? 'translate-x-5' : 'translate-x-0'
-                      }`}
-                    >
-                      {bgTheme === 'dark' ? (
-                        <Moon className="w-2.5 h-2.5 text-orange-600" />
-                      ) : (
-                        <Sun className="w-2.5 h-2.5 text-amber-500" />
-                      )}
-                    </span>
-                  </button>
+                  <div className="flex items-center rounded-xl bg-white border border-slate-200 p-0.5 shadow-sm shrink-0">
+                    {([
+                      { key: 'light', label: 'Light', Icon: Sun },
+                      { key: 'dark', label: 'Dark', Icon: Moon },
+                    ] as const).map(({ key, label, Icon }) => {
+                      const active = bgTheme === key;
+                      return (
+                        <button
+                          key={key}
+                          id={`profile-theme-${key}`}
+                          type="button"
+                          aria-pressed={active}
+                          aria-label={`App background ${label} mode`}
+                          onClick={() => {
+                            if (bgTheme === key) return;
+                            toggleBgTheme();
+                            addToast({
+                              type: 'info',
+                              title: key === 'dark' ? 'Dark Background Activated' : 'Light Background Activated',
+                              description: `App background switched to ${key === 'dark' ? 'Dark' : 'Light'} mode. Cards and sidebar are preserved.`,
+                            });
+                          }}
+                          className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-[10px] text-[11px] font-bold transition-all duration-200 ${
+                            active
+                              ? 'bg-[var(--brand,#0F172A)] text-[var(--on-brand,#fff)] shadow-sm'
+                              : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                          }`}
+                        >
+                          <Icon className="w-3.5 h-3.5" />
+                          <span>{label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
 

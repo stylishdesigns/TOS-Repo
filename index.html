@@ -45,21 +45,33 @@
         <script>
           (function () {
             try {
+              // The boot splash follows the door the visitor knocked on: facility
+              // portals open on the facility's brand, while Tutorial OS's own
+              // surfaces (landing, TOS console) load on TOS's own white style,
+              // never on whatever facility this device last visited.
+              var h = (window.location.hash || '').toLowerCase();
+              var facilityRoute = h.indexOf('#student') === 0 || h.indexOf('#tutor') === 0 || h.indexOf('#install') === 0 || h.indexOf('#access') === 0 || h.indexOf('#centre') === 0;
               var b = null;
               try { b = JSON.parse(localStorage.getItem('tos:launch-brand') || 'null'); } catch (e) { b = null; }
               var el = document.getElementById('boot-splash');
-              var hex = b && /^#[0-9a-fA-F]{6}$/.test(String(b.accent || '')) ? String(b.accent) : '';
+              var nm = document.getElementById('boot-name');
+              var img = document.getElementById('boot-logo');
+              var hex = facilityRoute && b && /^#[0-9a-fA-F]{6}$/.test(String(b.accent || '')) ? String(b.accent) : '';
               if (hex) {
-                el.style.background = hex;
                 var n = parseInt(hex.slice(1), 16);
                 var lum = (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
                 var darkText = lum > 0.62;
+                el.style.background = hex;
                 el.style.color = darkText ? '#0f172a' : '#ffffff';
                 var dots = document.getElementById('boot-dots');
                 if (dots) Array.prototype.forEach.call(dots.children, function (d) { d.style.background = darkText ? '#0f172a' : '#ffffff'; });
-                var nm = document.getElementById('boot-name');
                 if (b.name) nm.textContent = String(b.name);
-                if (b.logo) { var img = document.getElementById('boot-logo'); img.src = String(b.logo); img.style.display = 'block'; }
+                if (b.logo) { img.src = String(b.logo); img.style.display = 'block'; }
+              } else {
+                el.style.background = '#ffffff';
+                el.style.color = '#0f172a';
+                if (nm) nm.textContent = 'Tutorial OS';
+                if (img) { img.src = '/icon.svg'; img.style.display = 'block'; }
               }
             } catch (e) { /* never block the app on splash styling */ }
           })();

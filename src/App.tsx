@@ -1009,7 +1009,7 @@ const MainLayout: React.FC = () => {
     <div
       id="app-root-layout"
       className={`flex h-screen w-full ${
-        'bg-[#F8FAFC]'
+        bgTheme === 'dark' ? 'tos-student-dark bg-[#0B1220]' : 'bg-[#F8FAFC]'
       } text-slate-900 font-sans overflow-hidden transition-colors duration-300`}
     >
       {/* Left Navigation Sidebar (#070F1E) */}
@@ -1024,7 +1024,7 @@ const MainLayout: React.FC = () => {
         <main
           id="app-main-content"
           className={`flex-1 overflow-y-auto ${
-            'bg-[#F8FAFC]'
+            bgTheme === 'dark' ? 'bg-[#0B1220]' : 'bg-[#F8FAFC]'
           } transition-colors duration-300`}
         >
           <div className="pb-12">

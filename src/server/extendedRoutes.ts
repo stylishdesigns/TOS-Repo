@@ -1167,6 +1167,32 @@ export function registerExtendedRoutes(app: express.Express): void {
     }
   });
 
+  // Plan capabilities for the active facility: which notification channels the
+  // facility's plan allows. WhatsApp is a Facility Plus (centre_plus) feature;
+  // Facility Standard facilities never see WhatsApp as a notification method.
+  app.get('/api/centre/plan', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const centreId = String(req.query?.centreId || '');
+      if (!centreId) return res.status(400).json({ error: 'centreId is required.' });
+      await requireMembership(caller, centreId, ['owner', 'admin']);
+      const bDoc = await adminDb.collection('centreBilling').doc(centreId).get();
+      const billing = (bDoc.exists ? bDoc.data() : null) as any;
+      const planId = String(billing?.planId || '') || 'centre_standard';
+      let planName = '';
+      let whatsappNotifications = false;
+      try {
+        const plan = await getPlatformPlan(planId);
+        planName = String(plan?.name || '');
+        whatsappNotifications = plan?.whatsappNotifications === true;
+      } catch { /* unknown plan: fail closed, WhatsApp stays hidden */ }
+      res.json({ ok: true, planId, planName, whatsappNotifications });
+    } catch (error: any) {
+      console.error('[centre plan] failed:', error?.message || error);
+      res.status(error?.status || 500).json({ error: error?.message || 'Could not load the plan.' });
+    }
+  });
+
   app.post('/api/centre/staff-payments', async (req, res) => {
     try {
       const caller = getCaller(req);
