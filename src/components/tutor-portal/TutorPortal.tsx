@@ -12,6 +12,7 @@ import { ChatModeToggle, ChatMode } from '../communications/ChatSplash';
 import TutorAiChat from '../tutor-ai/TutorAiChat';
 import { PWAInstallButton } from '../pwa/PWAInstallButton';
 import { NotificationsBell } from '../student-portal/NotificationsBell';
+import { RetryButton } from '../common/RetryButton';
 import {
   Home,
   Calendar,
@@ -161,6 +162,8 @@ export const TutorPortal: React.FC = () => {
           {/* Right side: notifications + install */}
           <div className="flex items-center gap-2">
             <NotificationsBell feed="tutor" onOpenChange={setBellOpen} />
+
+            <RetryButton dark />
 
             <PWAInstallButton
               variant="icon"

@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { PWAInstallButton } from '../pwa/PWAInstallButton';
 import { useScrollLock } from '../../hooks/useScrollLock';
+import { RetryButton } from '../common/RetryButton';
 import {
   Search,
   Bell,
@@ -143,6 +144,9 @@ export const TopNav: React.FC<TopNavProps> = ({ onToggleMobileMenu }) => {
           <span>{viewMode === 'portal' ? 'Public Website' : 'Return to Admin'}</span>
           <ExternalLink className="w-3 h-3 text-slate-400" />
         </button>
+
+        {/* Retry: one tap refreshes the whole app */}
+        <RetryButton />
 
         {/* Notifications Bell (00:00, 02:15) */}
         <div className="relative" ref={notifRef}>

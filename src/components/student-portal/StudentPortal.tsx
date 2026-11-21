@@ -20,6 +20,7 @@ import { StudentResult } from '../../types';
 import { PWAInstallButton } from '../pwa/PWAInstallButton';
 import { NotificationsBell } from './NotificationsBell';
 import { PushPrompt } from './PushPrompt';
+import { RetryButton } from '../common/RetryButton';
 import {
   Bell,
   Home,
@@ -588,6 +589,7 @@ export const StudentPortal: React.FC = () => {
           {/* Right side: notifications (work continues) + install */}
           <div className="flex items-center gap-2">
             <NotificationsBell onOpenChange={setBellOpen} />
+            <RetryButton dark />
             <PWAInstallButton
               variant="icon"
               className="!bg-white/10 !border-white/10 hover:!bg-white/20"
