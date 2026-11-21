@@ -238,6 +238,9 @@ export interface StudyMaterial {
   description?: string;
   contentSummary?: string;
   downloadUrl?: string;
+  // Multi-file uploads: every file on one material lives here. downloadUrl
+  // keeps the first file so older viewers (and old records) keep working.
+  files?: Array<{ url: string; name: string; sizeLabel?: string }>;
   // Where the material lives: 'general' materials float free of the timetable;
   // 'topic' ones are attached to a scheduled class (topic + classId).
   kind?: 'general' | 'topic';

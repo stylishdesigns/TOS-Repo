@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { Student, StudyMaterial } from '../../../../types';
 import { useApp } from '../../../../context/AppContext';
+import { MaterialViewer } from '../../../common/MaterialViewer';
 
 interface StudyMaterialsSectionProps {
   student: Student;
@@ -43,6 +44,7 @@ export const StudyMaterialsSection: React.FC<StudyMaterialsSectionProps> = ({
   const [selectedSubject, setSelectedSubject] = useState<string>(initialSubject || 'All');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [readingMaterial, setReadingMaterial] = useState<StudyMaterial | null>(null);
+  const [viewing, setViewing] = useState<StudyMaterial | null>(null);
 
   // Extract unique subjects
   const availableSubjects = useMemo(() => {
@@ -76,7 +78,7 @@ export const StudyMaterialsSection: React.FC<StudyMaterialsSectionProps> = ({
     e?.stopPropagation();
     const target = material.type === 'video' ? material.videoUrl : material.downloadUrl;
     if (target) {
-      window.open(target, '_blank', 'noopener,noreferrer');
+      setViewing(material);
     } else {
       addToast({
         type: 'info',
@@ -361,7 +363,7 @@ export const StudyMaterialsSection: React.FC<StudyMaterialsSectionProps> = ({
                 {readingMaterial.type === 'video' ? (
                   <PlayCircle className="w-4 h-4" />
                 ) : (
-                  <Download className="w-4 h-4" />
+                  <BookOpen className="w-4 h-4" />
                 )}
                 <span>{readingMaterial.type === 'video' ? 'Watch video' : readingMaterial.type === 'image' ? 'View image' : 'Open file'}</span>
               </button>
@@ -369,6 +371,7 @@ export const StudyMaterialsSection: React.FC<StudyMaterialsSectionProps> = ({
           </div>
         </div>
       )}
+      <MaterialViewer material={viewing} onClose={() => setViewing(null)} />
     </div>
   );
 };

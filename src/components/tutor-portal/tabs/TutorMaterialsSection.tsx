@@ -10,13 +10,13 @@ import {
   Layers,
   UploadCloud,
   Link2,
-  ExternalLink,
   Info,
 } from 'lucide-react';
 import { Tutor, TimetableSlot, StudyMaterial } from '../../../types';
 import { useApp } from '../../../context/AppContext';
 import { useScrollLock } from '../../../hooks/useScrollLock';
 import { uploadStudyMaterialFile } from '../../../lib/studyMaterialUpload';
+import { MaterialViewer } from '../../common/MaterialViewer';
 
 type MaterialType = 'pdf' | 'image' | 'video';
 
@@ -62,7 +62,7 @@ export const TutorMaterialsSection: React.FC<TutorMaterialsSectionProps> = ({
   addForClass,
   onClassHandled,
 }) => {
-  const { studyMaterials = [], addStudyMaterial, activeCentreId, addToast } = useApp();
+  const { studyMaterials = [], addStudyMaterial, activeCentreId } = useApp();
 
   const [view, setView] = useState<'general' | 'topic'>('general');
   const [searchQuery, setSearchQuery] = useState('');
@@ -75,10 +75,19 @@ export const TutorMaterialsSection: React.FC<TutorMaterialsSectionProps> = ({
   const [subject, setSubject] = useState('');
   const [topic, setTopic] = useState('');
   const [description, setDescription] = useState('');
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [videoUrl, setVideoUrl] = useState('');
   const [uploading, setUploading] = useState(false);
   const [formError, setFormError] = useState('');
+  const [viewing, setViewing] = useState<StudyMaterial | null>(null);
+  const [uploadProgress, setUploadProgress] = useState('');
+
+  // Live thumbnails for the picked files (object URLs, revoked when they change).
+  const previews = useMemo(
+    () => files.map((f) => (f.type.startsWith('image/') ? URL.createObjectURL(f) : '')),
+    [files],
+  );
+  useEffect(() => () => { previews.forEach((u) => u && URL.revokeObjectURL(u)); }, [previews]);
 
   const classCtx = addForClass || null;
   const subjects: string[] =
@@ -98,7 +107,7 @@ export const TutorMaterialsSection: React.FC<TutorMaterialsSectionProps> = ({
       setTopic(classCtx.topic || '');
       setTitle('');
       setDescription('');
-      setFile(null);
+      setFiles([]);
       setVideoUrl('');
       setFormError('');
     }
@@ -119,7 +128,7 @@ export const TutorMaterialsSection: React.FC<TutorMaterialsSectionProps> = ({
     setSubject('');
     setTopic('');
     setDescription('');
-    setFile(null);
+    setFiles([]);
     setVideoUrl('');
     setFormError('');
   };
@@ -161,8 +170,8 @@ export const TutorMaterialsSection: React.FC<TutorMaterialsSectionProps> = ({
       if (!/^https?:\/\//i.test(videoUrl.trim())) {
         return setFormError('Paste the full video link, starting with https://');
       }
-    } else if (!file) {
-      return setFormError(`Choose the ${materialType === 'pdf' ? 'PDF' : 'image'} file to upload.`);
+    } else if (files.length === 0) {
+      return setFormError(`Choose at least one ${materialType === 'pdf' ? 'PDF' : 'image'} to upload.`);
     }
 
     setUploading(true);
@@ -170,11 +179,21 @@ export const TutorMaterialsSection: React.FC<TutorMaterialsSectionProps> = ({
       let url = videoUrl.trim();
       let fileName = '';
       let sizeLabel: string | undefined;
-      if (materialType !== 'video' && file) {
-        const up = await uploadStudyMaterialFile(file, activeCentreId);
-        url = up.url;
-        fileName = up.name;
-        sizeLabel = up.sizeLabel;
+      let uploadedFiles: Array<{ url: string; name: string; sizeLabel?: string }> | undefined;
+      if (materialType !== 'video' && files.length > 0) {
+        const results: Array<{ url: string; name: string; sizeLabel?: string }> = [];
+        let bytes = 0;
+        for (let i = 0; i < files.length; i++) {
+          setUploadProgress(`${i + 1} of ${files.length}`);
+          const up = await uploadStudyMaterialFile(files[i], activeCentreId);
+          results.push({ url: up.url, name: up.name, sizeLabel: up.sizeLabel });
+          bytes += files[i].size;
+        }
+        setUploadProgress('');
+        uploadedFiles = results;
+        url = results[0].url;
+        fileName = results.length > 1 ? `${results.length} files` : results[0].name;
+        sizeLabel = bytes > 0 ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : undefined;
       }
       await addStudyMaterial({
         title: title.trim(),
@@ -186,6 +205,7 @@ export const TutorMaterialsSection: React.FC<TutorMaterialsSectionProps> = ({
         fileType: materialType === 'pdf' ? 'PDF' : 'NOTES',
         fileSize: sizeLabel,
         downloadUrl: url,
+        files: uploadedFiles,
         kind: materialKind,
         type: materialType,
         videoUrl: materialType === 'video' ? videoUrl.trim() : undefined,
@@ -194,11 +214,6 @@ export const TutorMaterialsSection: React.FC<TutorMaterialsSectionProps> = ({
         classDate: classCtx?.date,
         classTime: classCtx?.time,
       } as any);
-      addToast({
-        type: 'success',
-        title: 'Material Added',
-        description: `"${title.trim()}" was added to ${materialKind === 'topic' ? 'the class topic' : 'general materials'}.`,
-      });
       closeSheet();
     } catch (err: any) {
       setFormError(err?.message || 'The material could not be added. Please try again.');
@@ -245,16 +260,14 @@ export const TutorMaterialsSection: React.FC<TutorMaterialsSectionProps> = ({
           </div>
         </div>
         {target ? (
-          <a
-            href={target}
-            target="_blank"
-            rel="noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            className="shrink-0 px-3 py-2 rounded-xl bg-slate-900 text-white text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 hover:bg-slate-700 transition-colors cursor-pointer"
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setViewing(m); }}
+            className="shrink-0 px-3 py-2 rounded-xl bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 hover:brightness-110 transition-all cursor-pointer"
           >
-            {isVideo ? <PlayCircle className="w-3.5 h-3.5" /> : <ExternalLink className="w-3.5 h-3.5" />}
-            {isVideo ? 'Watch' : 'Open'}
-          </a>
+            {isVideo ? <PlayCircle className="w-3.5 h-3.5" /> : <BookOpen className="w-3.5 h-3.5" />}
+            View
+          </button>
         ) : (
           <span className="shrink-0 px-3 py-2 rounded-xl bg-slate-50 text-slate-400 text-[9px] font-black uppercase tracking-widest border border-slate-100">
             No file
@@ -266,6 +279,7 @@ export const TutorMaterialsSection: React.FC<TutorMaterialsSectionProps> = ({
 
   return (
     <div className="p-5 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <MaterialViewer material={viewing} onClose={() => setViewing(null)} />
       {/* 1. Heading + add button */}
       <div className="flex items-start justify-between gap-3">
         <div>
@@ -454,25 +468,53 @@ export const TutorMaterialsSection: React.FC<TutorMaterialsSectionProps> = ({
                 ) : (
                   <div>
                     <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">
-                      Upload {materialType === 'pdf' ? 'PDF' : 'image'}
+                      Upload {materialType === 'pdf' ? 'PDFs' : 'images'} <span className="text-slate-300 normal-case font-bold">(you can pick several)</span>
                     </label>
-                    <label className="flex items-center justify-between gap-3 h-12 px-4 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 cursor-pointer hover:border-[var(--brand,#EA580C)] transition-all">
-                      <span className="text-xs font-bold text-slate-500 truncate">
-                        {file ? file.name : `Choose a ${materialType === 'pdf' ? 'PDF' : 'photo or scan'}`}
-                      </span>
-                      <UploadCloud className="w-4 h-4 text-slate-400 shrink-0" />
-                      <input
-                        type="file"
-                        accept={materialType === 'pdf' ? 'application/pdf' : 'image/*'}
-                        className="hidden"
-                        onChange={(e) => { setFile(e.target.files?.[0] || null); setFormError(''); }}
-                      />
-                    </label>
-                    {file && (
-                      <p className="text-[10px] font-bold text-emerald-600 mt-1.5">
-                        {file.name} · {(file.size / (1024 * 1024)).toFixed(1)} MB
-                      </p>
-                    )}
+                    <div className="grid grid-cols-3 gap-2">
+                      {files.map((f, i) => (
+                        <div key={`${f.name}-${i}`} className="relative aspect-square rounded-xl border border-slate-200 bg-white overflow-hidden group">
+                          {previews[i] ? (
+                            <img src={previews[i]} alt={f.name} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex flex-col items-center justify-center gap-1 px-1">
+                              <FileText className="w-5 h-5 text-slate-400 shrink-0" />
+                              <p className="text-[8px] font-bold text-slate-500 text-center leading-tight line-clamp-2 break-all">{f.name}</p>
+                            </div>
+                          )}
+                          <button
+                            type="button"
+                            aria-label={`Remove ${f.name}`}
+                            onClick={() => { setFiles(files.filter((_, j) => j !== i)); setFormError(''); }}
+                            className="absolute top-1 right-1 w-6 h-6 rounded-full bg-slate-900/80 text-white flex items-center justify-center hover:bg-slate-900 transition-colors cursor-pointer"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                          <div className="absolute inset-x-0 bottom-0 bg-slate-950/60 px-1.5 py-0.5">
+                            <p className="text-[8px] font-bold text-white truncate">{(f.size / (1024 * 1024)).toFixed(1)} MB</p>
+                          </div>
+                        </div>
+                      ))}
+                      <label className="aspect-square rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center gap-1 cursor-pointer hover:border-[var(--brand,#EA580C)] transition-all">
+                        <Plus className="w-5 h-5 text-slate-400" />
+                        <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Add</span>
+                        <UploadCloud className="w-4 h-4 text-slate-300" />
+                        <input
+                          type="file"
+                          multiple
+                          accept={materialType === 'pdf' ? 'application/pdf' : 'image/*'}
+                          className="hidden"
+                          onChange={(e) => {
+                            const picked = Array.from(e.target.files || []);
+                            if (picked.length > 0) setFiles((prev) => [...prev, ...picked]);
+                            e.target.value = '';
+                            setFormError('');
+                          }}
+                        />
+                      </label>
+                    </div>
+                    <p className="text-[10px] text-slate-400 font-medium mt-1.5">
+                      Tap X on a file to remove it before uploading.
+                    </p>
                   </div>
                 )}
 
@@ -558,7 +600,7 @@ export const TutorMaterialsSection: React.FC<TutorMaterialsSectionProps> = ({
                   onClick={handleSubmit}
                   className="w-full h-12 rounded-2xl bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] text-[11px] font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-slate-200 disabled:opacity-60 cursor-pointer"
                 >
-                  {uploading ? 'Uploading...' : materialType === 'video' ? 'Add Video Link' : 'Upload Material'}
+                  {uploading ? (uploadProgress ? `Uploading ${uploadProgress}...` : 'Uploading...') : materialType === 'video' ? 'Add Video Link' : 'Upload Material'}
                 </button>
               </div>
             </div>
