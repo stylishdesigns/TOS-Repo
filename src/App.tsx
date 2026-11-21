@@ -1043,7 +1043,7 @@ const MainLayout: React.FC = () => {
     <div
       id="app-root-layout"
       className={`flex h-screen w-full ${
-        bgTheme === 'dark' ? 'tos-student-dark bg-[#0B1220]' : 'bg-[#F8FAFC]'
+        bgTheme === 'dark' ? 'tos-admin-dark bg-[#0B1220]' : 'bg-[#F8FAFC]'
       } text-slate-900 font-sans overflow-hidden transition-colors duration-300`}
     >
       {/* Left Navigation Sidebar (#070F1E) */}
