@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../tos/tosShared';
 import { ModernSelect } from '../../ui/ModernSelect';
+import { BrandDatePicker } from '../../ui/BrandDatePicker';
 import { useApp } from '../../../context/AppContext';
 import {
   Laptop,
@@ -29,7 +30,6 @@ import {
   AlertCircle,
   XCircle,
   History,
-  Check,
   Wand2,
 } from 'lucide-react';
 import { 
@@ -142,6 +142,12 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
     essayMarksPerQuestion: 5,
     questionCount: 10,
   });
+
+  // The Start/End Window fields split the stored datetime into a branded
+  // calendar (date) and a plain time input; both halves are required before
+  // the value exists, so the save validation still holds.
+  const startTimePart = (setupData.startTime || '').split('T')[1] || '';
+  const endTimePart = (setupData.endTime || '').split('T')[1] || '';
 
   const [pastedText, setPastedText] = useState('');
   const [parsedQuestions, setParsedQuestions] = useState<QuizQuestion[]>([]);
@@ -1483,43 +1489,43 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
                       <div className="grid grid-cols-2 gap-4">
                           <div className="flex flex-col">
                             <label className="block font-black text-slate-700 uppercase tracking-widest mb-1.5 text-[10px]">Start Window</label>
-                            <div className="relative flex items-center group/input">
-                              <input
-                                type="datetime-local"
-                                value={setupData.startTime || ''}
-                                onChange={(e) => setSetupData({...setupData, startTime: e.target.value})}
-                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 font-medium outline-none focus:bg-white focus:border-orange-500 transition-all text-[10px] pr-16"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => (document.activeElement as HTMLElement)?.blur()}
-                                className="absolute right-1 top-1/2 -translate-y-1/2 px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all flex items-center gap-1 shadow-lg active:scale-95 z-20 border border-emerald-500"
-                                title="Confirm Time"
-                              >
-                                <span className="text-[10px] font-black uppercase tracking-tighter">ok</span>
-                                <Check className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
+                            <BrandDatePicker
+                              value={(setupData.startTime || '').split('T')[0] || ''}
+                              onChange={(d) => setSetupData({ ...setupData, startTime: d && startTimePart ? `${d}T${startTimePart}` : '' })}
+                              accent="var(--brand, #EA580C)"
+                              ariaLabel="Start window date"
+                            />
+                            <input
+                              type="time"
+                              value={startTimePart}
+                              onChange={(e) => {
+                                const t = e.target.value;
+                                const d = (setupData.startTime || '').split('T')[0] || '';
+                                setSetupData({ ...setupData, startTime: d && t ? `${d}T${t}` : '' });
+                              }}
+                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 font-medium outline-none focus:bg-white focus:border-orange-500 transition-all text-xs mt-2"
+                              aria-label="Start window time"
+                            />
                           </div>
                           <div className="flex flex-col">
                             <label className="block font-black text-slate-700 uppercase tracking-widest mb-1.5 text-[10px]">End Window</label>
-                            <div className="relative flex items-center group/input">
-                              <input
-                                type="datetime-local"
-                                value={setupData.endTime || ''}
-                                onChange={(e) => setSetupData({...setupData, endTime: e.target.value})}
-                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 font-medium outline-none focus:bg-white focus:border-orange-500 transition-all text-[10px] pr-16"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => (document.activeElement as HTMLElement)?.blur()}
-                                className="absolute right-1 top-1/2 -translate-y-1/2 px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all flex items-center gap-1 shadow-lg active:scale-95 z-20 border border-emerald-500"
-                                title="Confirm Time"
-                              >
-                                <span className="text-[10px] font-black uppercase tracking-tighter">ok</span>
-                                <Check className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
+                            <BrandDatePicker
+                              value={(setupData.endTime || '').split('T')[0] || ''}
+                              onChange={(d) => setSetupData({ ...setupData, endTime: d && endTimePart ? `${d}T${endTimePart}` : '' })}
+                              accent="var(--brand, #EA580C)"
+                              ariaLabel="End window date"
+                            />
+                            <input
+                              type="time"
+                              value={endTimePart}
+                              onChange={(e) => {
+                                const t = e.target.value;
+                                const d = (setupData.endTime || '').split('T')[0] || '';
+                                setSetupData({ ...setupData, endTime: d && t ? `${d}T${t}` : '' });
+                              }}
+                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 font-medium outline-none focus:bg-white focus:border-orange-500 transition-all text-xs mt-2"
+                              aria-label="End window time"
+                            />
                           </div>
                       </div>
 

@@ -40,15 +40,19 @@ export const ClassesTabWrapper: React.FC<ClassesTabWrapperProps> = ({
     return <TimetableTab student={student} />;
   }
 
+  // The toggle carries the facility colour: the whole bar is painted with the
+  // centre's accent, the active side is a white button with dark text, and the
+  // resting side sits straight on the colour. Arbitrary hexes for the knob keep
+  // it white in dark mode too (the dark remap only touches the named utilities).
   const renderToggle = () => (
-    <div className="bg-white rounded-[14px] p-1 border border-[#E2E8F0] shadow-2xs grid grid-cols-2 gap-1">
+    <div className="bg-[var(--brand,#0F172A)] rounded-[14px] p-1 grid grid-cols-2 gap-1">
       <button
         type="button"
         onClick={() => onAssessmentViewChange('assessments')}
         className={`h-10 rounded-[10px] text-xs font-extrabold transition-all flex items-center justify-center cursor-pointer ${
           assessmentView === 'assessments'
-            ? 'bg-[var(--brand,#0F172A)] text-[var(--on-brand,#fff)] shadow-xs'
-            : 'text-[#64748B] hover:text-[#0F172A]'
+            ? 'bg-[#ffffff] text-[#1F2937] shadow-xs'
+            : 'text-[var(--on-brand,#fff)]'
         }`}
       >
         Assessments
@@ -58,8 +62,8 @@ export const ClassesTabWrapper: React.FC<ClassesTabWrapperProps> = ({
         onClick={() => onAssessmentViewChange('performance')}
         className={`h-10 rounded-[10px] text-xs font-extrabold transition-all flex items-center justify-center cursor-pointer ${
           assessmentView === 'performance'
-            ? 'bg-[var(--brand,#0F172A)] text-[var(--on-brand,#fff)] shadow-xs'
-            : 'text-[#64748B] hover:text-[#0F172A]'
+            ? 'bg-[#ffffff] text-[#1F2937] shadow-xs'
+            : 'text-[var(--on-brand,#fff)]'
         }`}
       >
         Performance

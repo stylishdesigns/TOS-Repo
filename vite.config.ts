@@ -33,7 +33,7 @@ export default defineConfig(({mode}) => {
           short_name: 'TOS',
           description:
             'Multi-Tenant Tutorial Centre Management System, CBT Testing Engine & Student Mobile Portal.',
-          theme_color: '#EA580C',
+          theme_color: '#020617',
           background_color: '#0F172A',
           display: 'standalone',
           start_url: '/#access',
