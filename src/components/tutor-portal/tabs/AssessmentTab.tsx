@@ -921,7 +921,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
       {!showArchive && (
         <div className="flex flex-col gap-4 mb-6">
           <div className="flex items-center justify-between gap-3">
-            <div className="bg-[var(--brand,#0F172A)] p-1.5 rounded-2xl flex-1 transition-all">
+            <div className="bg-slate-100 border border-slate-200 p-1.5 rounded-2xl flex-1 transition-all">
               {(['Assessment', 'Performance'] as const).map((tab) => (
                 <button
                   key={tab}
@@ -931,8 +931,8 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor }) => {
                   }}
                   className={`flex-1 py-3 text-[12px] font-black uppercase tracking-wider rounded-xl transition-all ${
                     activeTab === tab 
-                      ? 'bg-[#ffffff] text-[#1F2937] shadow-md' 
-                      : 'text-[var(--on-brand,#fff)]'
+                      ? 'bg-[var(--brand,#0F172A)] text-[var(--on-brand,#fff)] shadow-md' 
+                      : 'text-slate-400 hover:text-slate-600'
                   }`}
                 >
                   {tab}
