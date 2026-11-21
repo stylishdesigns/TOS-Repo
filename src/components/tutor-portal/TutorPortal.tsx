@@ -250,7 +250,7 @@ export const TutorPortal: React.FC = () => {
               >
                 <Home className={`w-5 h-5 ${activeTab === 'home' ? 'fill-white/10' : ''}`} />
                 <span className="text-[10px] mt-1 font-bold">Home</span>
-                {activeTab === 'home' && <div className="w-1 h-1 bg-[var(--brand,#EA580C)] rounded-full mt-0.5" />}
+                <div className="w-1 h-1 rounded-full mt-0.5" />
               </button>
 
               {/* Classes */}
@@ -262,7 +262,7 @@ export const TutorPortal: React.FC = () => {
               >
                 <Calendar className={`w-5 h-5 ${activeTab === 'classes' ? 'fill-white/10' : ''}`} />
                 <span className="text-[10px] mt-1 font-bold">Classes</span>
-                {activeTab === 'classes' && <div className="w-1 h-1 bg-[var(--brand,#EA580C)] rounded-full mt-0.5" />}
+                <div className="w-1 h-1 rounded-full mt-0.5" />
               </button>
 
               {/* Chat */}
@@ -274,7 +274,7 @@ export const TutorPortal: React.FC = () => {
               >
                 <MessageSquare className={`w-5 h-5 ${activeTab === 'chat' ? 'fill-white/10' : ''}`} />
                 <span className="text-[10px] mt-1 font-bold">Chat</span>
-                {activeTab === 'chat' && <div className="w-1 h-1 bg-[var(--brand,#EA580C)] rounded-full mt-0.5" />}
+                <div className="w-1 h-1 rounded-full mt-0.5" />
               </button>
 
               {/* Assessment */}
@@ -286,7 +286,7 @@ export const TutorPortal: React.FC = () => {
               >
                 <Laptop className={`w-5 h-5 ${activeTab === 'assessment' ? 'fill-white/10' : ''}`} />
                 <span className="text-[10px] mt-1 font-bold">Assessment</span>
-                {activeTab === 'assessment' && <div className="w-1 h-1 bg-[var(--brand,#EA580C)] rounded-full mt-0.5" />}
+                <div className="w-1 h-1 rounded-full mt-0.5" />
               </button>
 
               {/* More */}
@@ -298,7 +298,7 @@ export const TutorPortal: React.FC = () => {
               >
                 <Menu className={`w-5 h-5 ${activeTab === 'more' ? 'fill-white/10' : ''}`} />
                 <span className="text-[10px] mt-1 font-bold">More</span>
-                {activeTab === 'more' && <div className="w-1 h-1 bg-[var(--brand,#EA580C)] rounded-full mt-0.5" />}
+                <div className="w-1 h-1 rounded-full mt-0.5" />
               </button>
             </div>
           </nav>
