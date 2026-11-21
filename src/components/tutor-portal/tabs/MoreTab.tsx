@@ -5,7 +5,7 @@ import {
   LogOut,
   X,
   Check,
-  Moon,
+
   Sun,
   Monitor,
   Loader2,
@@ -28,7 +28,7 @@ interface MoreTabProps {
 }
 
 export const MoreTab: React.FC<MoreTabProps> = ({ tutor, onExit }) => {
-  const { addToast, activeCentreId, centreName, bgTheme, setBgTheme, updateTutor } = useApp();
+  const { addToast, activeCentreId, centreName, updateTutor } = useApp();
   const [editOpen, setEditOpen] = useState(false);
   const [themeOpen, setThemeOpen] = useState(false);
   const [draftName, setDraftName] = useState(tutor.name);
@@ -37,7 +37,9 @@ export const MoreTab: React.FC<MoreTabProps> = ({ tutor, onExit }) => {
   const [saving, setSaving] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const avatarRef = useRef<HTMLInputElement | null>(null);
-  const [selectedTheme, setSelectedTheme] = useState<'light' | 'dark'>(() => (bgTheme === 'dark' ? 'dark' : 'light'));
+  // Light only: the tutor portal keeps one fixed appearance, so there is no
+  // dark option to pick here (user decision, 2026-11-21).
+  const [selectedTheme, setSelectedTheme] = useState<'light' | 'dark'>('light');
   const [payOpen, setPayOpen] = useState(false);
   const [payHistory, setPayHistory] = useState<any[] | null>(null);
   const [payLoading, setPayLoading] = useState(false);
@@ -146,15 +148,17 @@ export const MoreTab: React.FC<MoreTabProps> = ({ tutor, onExit }) => {
     }
   };
 
-  const applyTheme = (id: 'light' | 'dark') => {
-    setSelectedTheme(id);
-    setBgTheme(id);
-    addToast({ type: 'success', title: 'Theme Updated', description: `Display theme set to ${id === 'dark' ? 'Dark' : 'Light'}.` });
+  const applyTheme = (_id: 'light' | 'dark') => {
+    // The tutor portal does not follow the shared dark setting; picking the
+    // only option just confirms it and never rewrites the device theme the
+    // student app uses.
+    setSelectedTheme('light');
+    addToast({ type: 'success', title: 'Theme Updated', description: 'Display theme set to Light.' });
   };
 
+  // Light only: the tutor portal keeps its fixed look, so Dark is not offered.
   const themeItems = [
-    { id: 'light' as const, label: 'Light', icon: Sun, desc: 'Bright and clear' },
-    { id: 'dark' as const, label: 'Dark', icon: Moon, desc: 'Eye-friendly dim display' }
+    { id: 'light' as const, label: 'Light', icon: Sun, desc: 'Bright and clear' }
   ];
 
   // My Pay: what the centre has set up for this tutor and what they have
@@ -534,7 +538,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ tutor, onExit }) => {
                 );
               })}
               <p className="text-[10px] text-slate-400 font-medium pt-1 flex items-center gap-1.5">
-                <Monitor className="w-3.5 h-3.5" /> Dark mode dims the screens that support it.
+                <Monitor className="w-3.5 h-3.5" /> The tutor portal uses the light look.
               </p>
             </div>
           </div>

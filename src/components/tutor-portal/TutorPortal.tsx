@@ -36,7 +36,7 @@ import { useScrollLock } from '../../hooks/useScrollLock';
 type TabType = 'home' | 'classes' | 'assessment' | 'chat' | 'more';
 
 export const TutorPortal: React.FC = () => {
-  const { tutors, settings, setViewMode, isAdmin, activeTutor: contextTutor, updateTutor, logout, bgTheme, activeCentre } = useApp();
+  const { tutors, settings, setViewMode, isAdmin, activeTutor: contextTutor, updateTutor, logout, activeCentre } = useApp();
   const centreName = activeCentre?.name || (settings as any)?.centreName || 'Tutor Portal';
   const { updatePassword } = useFirebase();
 
@@ -154,7 +154,7 @@ export const TutorPortal: React.FC = () => {
   }, [activeTab]);
 
   return (
-    <div className={`min-h-screen bg-slate-900/95 flex flex-col justify-between selection:bg-orange-500 selection:text-white ${bgTheme === 'dark' ? 'tos-canvas-dark' : ''}`}>
+    <div className="min-h-screen bg-slate-900/95 flex flex-col justify-between selection:bg-orange-500 selection:text-white">
       {/* Password Change Overlay for Invited Tutors */}
       {activeTutor.status === 'Invited' && !activeTutor.hasChangedPassword && !isAdmin && (
         <PasswordChangeOverlay
