@@ -172,9 +172,8 @@ export const HomeTab: React.FC<HomeTabProps> = ({ tutor, onNavigateTab }) => {
         const status = payDueStatus(nextPay);
         const daysLate = status === 'overdue' ? overdueDays(nextPay) : 0;
         return (
-          <button
-            onClick={() => onNavigateTab('more')}
-            className={`w-full rounded-2xl p-3.5 flex items-center justify-between text-left border transition-all active:scale-[0.99] ${
+          <div
+            className={`w-full rounded-2xl p-3.5 flex items-center justify-between text-left border ${
               status === 'overdue'
                 ? 'bg-rose-500 border-rose-400 text-white'
                 : 'bg-[var(--brand,#EA580C)] border-black/10 text-white'
@@ -195,8 +194,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({ tutor, onNavigateTab }) => {
                 </p>
               </div>
             </div>
-            <ChevronRight className="w-4 h-4 opacity-90 shrink-0" strokeWidth={2.75} />
-          </button>
+          </div>
         );
       })()}
 

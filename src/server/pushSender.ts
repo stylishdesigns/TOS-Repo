@@ -148,6 +148,43 @@ export async function sendPushNow(opts: {
   return out;
 }
 
+/** Bell-history copy for a finished push-queue job, delivered or not:
+ * the reminder log never depends on a device being reachable. Planner
+ * heads-up copies file under rem-<id>-pre so both records survive. */
+async function fileReminderBell(v: Record<string, any>, reminderId: string, opts: { pre?: boolean } = {}): Promise<void> {
+  const isFee = String(v.kind || '') === 'fee_reminder';
+  let centreId = String(v.centreId || '');
+  if (!centreId) {
+    const [stu, tut, adm] = await Promise.all([
+      adminDb.collection('students').where('uid', '==', String(v.uid || '')).limit(1).get(),
+      adminDb.collection('tutors').where('uid', '==', String(v.uid || '')).limit(1).get(),
+      adminDb.collection('admins').doc(String(v.uid || '')).get(),
+    ]);
+    centreId = String(
+      (!stu.empty ? stu.docs[0].data()?.centreId : undefined) ||
+      (!tut.empty ? tut.docs[0].data()?.centreId : undefined) ||
+      (adm.exists ? adm.data()?.centreId : undefined) || ''
+    );
+  }
+  const timePart = v.time ? ` at ${String(v.time)}` : '';
+  await adminDb.collection('notifications').doc(`rem-${reminderId}${opts.pre ? '-pre' : ''}`).set({
+    centreId,
+    type: 'reminder',
+    title: isFee
+      ? String(v.pushTitle || 'Payment reminder').slice(0, 120)
+      : String(v.title || 'Planner reminder').slice(0, 120),
+    body: isFee
+      ? String(v.pushBody || '').slice(0, 400)
+      : opts.pre
+        ? `Planner reminder for ${String(v.date || '')}${timePart} (10 minutes ahead).`.slice(0, 400)
+        : `Planner reminder for ${String(v.date || '')}${timePart}.`.slice(0, 400),
+    subjects: [],
+    audienceUid: String(v.uid || ''),
+    reminderId: opts.pre ? `${reminderId}-pre` : reminderId,
+    createdAt: Date.now(),
+  }, { merge: true });
+}
+
 export interface PushSweepResult {
   reason?: string;
   checked: number;
@@ -190,11 +227,18 @@ export async function runPushSweep(opts: { limit?: number } = {}): Promise<PushS
     // 10-minute cadence. Fee-reminder jobs are exempt; the fee sweep controls
     // their timing with its own due-date windows.
     const isPlannerJob = v.kind !== 'fee_reminder' && v.kind !== 'announcement';
+    const isPre = String(v.phase || '') === 'pre';
+    // One reminder id for the pair of jobs (on-time + 10-minute heads-up);
+    // the heads-up copy files under rem-<id>-pre.
+    const reminderId = String(v.id || job.id.replace(/^prq_/, '')).replace(/_pre$/, '');
     if (isPlannerJob && Number(v.sendAt || 0) < now - 15 * 60 * 1000) {
       await job.ref.set(
         { sent: true, sentAt: now, delivered: 0, note: 'reminder time already passed; not sent late' },
         { merge: true },
       );
+      // Even a reminder whose moment passed unsent keeps its bell record:
+      // the history log never depends on a push arriving.
+      if (isPlannerJob) await fileReminderBell(v, reminderId, { pre: isPre });
       out.skippedLate += 1;
       continue;
     }
@@ -214,7 +258,9 @@ export async function runPushSweep(opts: { limit?: number } = {}): Promise<PushS
     const pushTitle = isFee || isAnn ? String(v.pushTitle || 'Announcement') : 'Planner reminder';
     const pushBody = isFee || isAnn
       ? String(v.pushBody || v.pushTitle || '')
-      : v.time ? `${v.title} (${v.time})` : String(v.title || '');
+      : isPre
+        ? `${String(v.title || '')} starts in 10 minutes${v.time ? ` (${String(v.time)})` : ''}`
+        : v.time ? `${v.title} (${v.time})` : String(v.title || '');
     const payload = JSON.stringify({
       title: pushTitle,
       body: pushBody,
@@ -237,6 +283,8 @@ export async function runPushSweep(opts: { limit?: number } = {}): Promise<PushS
     console.log(`[push-sender] job ${job.id} uid=${uid} devices=${endpoints.length}`);
     if (!endpoints.length) {
       await job.ref.set({ sent: true, sentAt: now, delivered: 0, note: 'no device subscribed' }, { merge: true });
+      // No device to buzz, but the reminder still earns its history record.
+      if (isPlannerJob) await fileReminderBell(v, reminderId, { pre: isPre });
       continue;
     }
 
@@ -283,39 +331,11 @@ export async function runPushSweep(opts: { limit?: number } = {}): Promise<PushS
       // copy would duplicate it in the bell with planner wording.
       if (isAnn) continue;
       out.delivered += 1;
-      // Bell-history copy (Nov 19): a push the member swipes away must not be
-      // lost, so every delivered reminder is also filed as a notification
-      // with a deterministic id (rem-<reminderId>) the bell de-dupes against
-      // its upcoming row. One write per delivered job, no reads.
-      const reminderId = String(v.id || job.id.replace(/^prq_/, ''));
-      let centreId = String(v.centreId || '');
-      if (!centreId) {
-        // Jobs queued before centreId was stored: resolve it once here.
-        const [stu, tut, adm] = await Promise.all([
-          adminDb.collection('students').where('uid', '==', uid).limit(1).get(),
-          adminDb.collection('tutors').where('uid', '==', uid).limit(1).get(),
-          adminDb.collection('admins').doc(uid).get(),
-        ]);
-        centreId = String(
-          (!stu.empty ? stu.docs[0].data()?.centreId : undefined) ||
-          (!tut.empty ? tut.docs[0].data()?.centreId : undefined) ||
-          (adm.exists ? adm.data()?.centreId : undefined) || ''
-        );
-      }
-      await adminDb.collection('notifications').doc(`rem-${reminderId}`).set({
-        centreId,
-        type: 'reminder',
-        title: isFee
-          ? String(v.pushTitle || 'Payment reminder').slice(0, 120)
-          : String(v.title || 'Planner reminder').slice(0, 120),
-        body: isFee
-          ? String(v.pushBody || '').slice(0, 400)
-          : `Planner reminder for ${String(v.date || '')}${v.time ? ` at ${String(v.time)}` : ''}.`.slice(0, 400),
-        subjects: [],
-        audienceUid: uid,
-        reminderId,
-        createdAt: now,
-      }, { merge: true });
+      // Bell-history copy (Nov 19, widened Nov 22): every reminder is filed
+      // as a bell notification with a deterministic id the bell de-dupes
+      // against its upcoming row, delivered or missed, on time or heads-up
+      // (rem-<id> / rem-<id>-pre). The history is never wiped.
+      await fileReminderBell(v, reminderId, { pre: isPre });
     } else if (hardFail) {
       const attempts = Number(v.attempts) + 1;
       if (attempts >= 3) {

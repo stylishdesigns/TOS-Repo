@@ -93,6 +93,15 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   const bumpMinute = (d: number) => setTimeParts(h24, ((mm + d * 5) % 60 + 60) % 60);
   const setAmpm = (pm: boolean) => setTimeParts(h24 % 12 + (pm ? 12 : 0), mm);
 
+  // Past guard (Nov 22): a reminder can only point at today and the future.
+  // Days before today are blocked outright; on today, times that already
+  // passed are blocked too, so a "reminder" can never be born overdue.
+  const selDate = selectedDate || todayKey;
+  const isPastSelection = selDate < todayKey;
+  const isPastForm =
+    isPastSelection ||
+    (selDate === todayKey && h24 * 60 + mm <= new Date().getHours() * 60 + new Date().getMinutes());
+
   const openDay = (dateStr: string) => {
     setSelectedDate(dateStr);
     resetForm();
@@ -243,6 +252,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                   </div>
                 </div>
                 {addError && <p className="text-xs font-bold text-rose-600">{addError}</p>}
+                {isPastForm && <p className="text-xs font-bold text-slate-500">You can't set a reminder in the past. Pick today or a later time.</p>}
                 <div className="flex gap-2">
                   <button
                     type="button"
@@ -253,7 +263,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                   </button>
                   <button
                     type="button"
-                    disabled={saving}
+                    disabled={saving || isPastForm}
                     onClick={handleSave}
                     className="flex-1 py-3 rounded-xl bg-orange-600 text-white text-xs font-black uppercase disabled:opacity-60"
                   >
@@ -265,8 +275,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
             {!adding && onAddActivity && (
               <button
                 type="button"
-                onClick={() => setAdding(true)}
-                className="w-full flex items-center gap-3 border-2 border-dashed border-slate-300 rounded-2xl px-4 py-4 text-left hover:border-orange-400 hover:bg-orange-50/40 transition-colors"
+                disabled={isPastSelection}
+                onClick={() => { if (!isPastSelection) setAdding(true); }}
+                className={`w-full flex items-center gap-3 border-2 border-dashed border-slate-300 rounded-2xl px-4 py-4 text-left transition-colors ${isPastSelection ? 'opacity-40 cursor-not-allowed' : 'hover:border-orange-400 hover:bg-orange-50/40'}`}
               >
                 <span className="w-8 h-8 rounded-full border-2 border-orange-500 text-orange-600 flex items-center justify-center shrink-0">
                   <Plus className="w-4 h-4" />

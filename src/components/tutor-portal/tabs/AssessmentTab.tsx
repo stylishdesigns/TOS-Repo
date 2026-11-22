@@ -53,7 +53,7 @@ interface AssessmentTabProps {
 }
 
 export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor, initialView }) => {
-  const { programmes, subjects: allSubjects, addToast, exams, results, students, activeCentreId, centreName } = useApp();
+  const { programmes, subjects: allSubjects, addToast, exams, results, students, activeCentreId, centreName, bgTheme } = useApp();
   const [activeFrequency] = useState<'General'>('General');
   const [activeTab, setActiveTab] = useState<'Assessment' | 'Performance'>(initialView === 'performance' ? 'Performance' : 'Assessment');
   const [expandedExamId, setExpandedExamId] = useState<string | null>(null);
@@ -722,7 +722,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor, initialView
   };
 
   return (
-    <div className={`transition-all duration-500 min-h-screen relative bg-slate-50 p-5 ${showArchive ? 'bg-white p-5' : ''}`}>
+    <div className={`transition-all duration-500 min-h-screen relative p-5 ${bgTheme === 'dark' ? 'bg-[#0B1220]' : (showArchive ? 'bg-white' : 'bg-slate-50')}`}>
       {/* Tutor Override Modal */}
       {showOverrideModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md animate-in fade-in duration-200 overflow-y-auto">
@@ -834,7 +834,7 @@ export const AssessmentTab: React.FC<AssessmentTabProps> = ({ tutor, initialView
       )}
       {/* Overscroll Background Extender */}
       {(activeTab === 'Performance' || showArchive) && (
-        <div className={`absolute top-[-1000px] left-0 right-0 h-[1000px] ${showArchive ? 'bg-white' : 'bg-slate-50'} -z-10`} />
+        <div className={`absolute top-[-1000px] left-0 right-0 h-[1000px] ${bgTheme === 'dark' ? 'bg-[#0B1220]' : (showArchive ? 'bg-white' : 'bg-slate-50')} -z-10`} />
       )}
       <div className="flex items-center justify-between relative h-12 mb-6">
         {activeTab === 'Assessment' && !showArchive && (

@@ -359,10 +359,25 @@ export function registerNotificationRoutes(app: express.Express): void {
       const sendAt = sendAtMs(date, time);
       if (!sendAt) return res.status(400).json({ error: 'A valid reminder date is required.' });
       const resolved = await resolveMemberCentre(caller.uid);
+      const queuedAt = Date.now();
       await adminDb.collection('pushQueue').doc(`prq_${id}`).set(
-        { id: `prq_${id}`, uid: caller.uid, date, time, title, kind, centreId: resolved.centreId, sendAt, sent: false, attempts: 0, createdAt: Date.now() },
+        { id: `prq_${id}`, uid: caller.uid, date, time, title, kind, centreId: resolved.centreId, sendAt, sent: false, attempts: 0, createdAt: queuedAt },
         { merge: true }
       );
+      // 10-minute heads-up (Nov 22): a second job ten minutes ahead of the
+      // reminder, so the member gets an early nudge as well as the on-time
+      // one. Queued only while its own moment is still ahead; once the
+      // window has passed, any stale pre job is dropped instead.
+      const preAt = sendAt - 10 * 60 * 1000;
+      const preRef = adminDb.collection('pushQueue').doc(`prq_${id}_pre`);
+      if (preAt > queuedAt + 30 * 1000) {
+        await preRef.set(
+          { id: `prq_${id}_pre`, uid: caller.uid, date, time, title, kind, centreId: resolved.centreId, sendAt: preAt, phase: 'pre', sent: false, attempts: 0, createdAt: queuedAt },
+          { merge: true }
+        );
+      } else {
+        await preRef.delete().catch(() => {});
+      }
       return res.json({ ok: true });
     } catch (e) {
       return res.status(errStatus(e)).json({ error: (e as Error).message || 'Could not queue this reminder.' });
@@ -378,6 +393,12 @@ export function registerNotificationRoutes(app: express.Express): void {
       const snap = await ref.get();
       if (snap.exists && String((snap.data() as any).uid) === caller.uid) {
         await ref.delete().catch(() => {});
+        // The heads-up job that rides the same reminder goes with it.
+        const preRef = adminDb.collection('pushQueue').doc(`prq_${id}_pre`);
+        const preSnap = await preRef.get().catch(() => null);
+        if (preSnap && preSnap.exists && String((preSnap.data() as any).uid) === caller.uid) {
+          await preRef.delete().catch(() => {});
+        }
       }
       return res.json({ ok: true });
     } catch (e) {

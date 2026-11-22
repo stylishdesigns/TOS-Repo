@@ -279,7 +279,6 @@ export const MoreTab: React.FC<MoreTabProps> = ({ tutor, onExit }) => {
             </div>
             <div className="text-left">
               <p className="text-xs font-black text-slate-700 tracking-tight">Log out</p>
-              <p className="text-[10px] font-medium text-slate-400">End your session on this device</p>
             </div>
           </div>
           <ChevronRightSpacer />
