@@ -217,7 +217,7 @@ export const TutorPortal: React.FC = () => {
             desktopViewMode === 'mobile_frame'
               ? 'max-w-md mx-auto sm:rounded-[36px] sm:shadow-[0_0_60px_rgba(0,0,0,0.5)] sm:border-[8px] sm:border-slate-800'
               : 'max-w-4xl mx-auto sm:rounded-3xl sm:border sm:border-slate-800'
-          } bg-slate-50 min-h-screen sm:min-h-[844px] flex flex-col relative overflow-hidden`}
+          } ${bgTheme === 'dark' ? 'bg-[#0B1220]' : 'bg-slate-50'} min-h-screen sm:min-h-[844px] flex flex-col relative overflow-hidden`}
         >
           {/* Scrollable Content */}
           <div className="flex-1 overflow-y-auto pb-24 relative scroll-smooth">
