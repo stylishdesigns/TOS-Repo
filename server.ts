@@ -31,7 +31,7 @@ import { registerLandingAdminRoutes } from "./src/server/landingAdminRoutes";
 import { registerLandingLeadRoutes } from "./src/server/landingLeadRoutes";
 import { registerMockRoutes } from "./src/server/mockRoutes";
 import { PaymentError, feeState, parseAmount, parseConfirmAction, parseFee } from "./src/server/paymentLogic";
-import { loadPaymentActor, submitPayment, decidePayment, setStudentFee } from "./src/server/paymentService";
+import { loadPaymentActor, submitPayment, decidePayment, setStudentFee, syncProgrammeFee } from "./src/server/paymentService";
 import { runFeeReminderSweep } from "./src/server/feeReminders";
 import { runPushSweep } from "./src/server/pushSender";
 import { registerStudentMockRoutes } from "./src/server/studentMockRoutes";
@@ -772,6 +772,24 @@ async function startServer() {
       res.json({ success: true, ...result });
     } catch (error: any) {
       sendPaymentError(res, error, "set-fee");
+    }
+  });
+
+  //   POST /api/programme/sync-fee
+  //     - admin only: pulls every student registered on an exam programme to
+  //       the programme's current fee. Paid amounts are preserved and
+  //       balance and payment status are recomputed, the same rule as
+  //       set-fee. Runs when an admin changes a programme's fee so every
+  //       registered student owes the programme's current amount.
+  app.post("/api/programme/sync-fee", async (req, res) => {
+    try {
+      const caller = await getCaller(req);
+      const { programmeId } = req.body || {};
+      const actor = await loadPaymentActor(adminDb, caller);
+      const result = await syncProgrammeFee(adminDb, caller, actor, { programmeId });
+      res.json({ success: true, ...result });
+    } catch (error: any) {
+      sendPaymentError(res, error, "programme-fee-sync");
     }
   });
 

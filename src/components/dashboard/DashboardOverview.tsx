@@ -120,11 +120,24 @@ export const DashboardOverview: React.FC = () => {
   const maxScoreOf = (r: typeof results[number]) =>
     r.scores && r.scores.length > 0 ? r.scores.reduce((s, x) => s + (x.maxScore || 0), 0) : 0;
 
-  // Real programme fill rates, most filled first.
+  // Live programme enrollment, most enrolled first. Suspended students and
+  // students whose seat access is switched off stay out of the count.
+  const seatActiveOf = (s: { uid?: string; id: string; status: string }) => {
+    const access = seatsSummary?.studentAccess?.[s.uid || s.id];
+    return access ? access.status === 'active' : s.status !== 'Suspended';
+  };
   const programmeCapacity = programmes
-    .filter((p) => p.maxStudents > 0 && p.status !== 'Archived')
-    .slice()
-    .sort((a, b) => b.enrolledStudents / b.maxStudents - a.enrolledStudents / a.maxStudents)
+    .filter((p) => p.status !== 'Archived')
+    .map((p) => ({
+      prog: p,
+      enrolled: students.filter((s) =>
+        (s.programmeId
+          ? s.programmeId === p.id
+          : String(s.programmeName || '').trim().toLowerCase() === String(p.name || '').trim().toLowerCase()) &&
+        seatActiveOf(s)
+      ).length,
+    }))
+    .sort((a, b) => b.enrolled - a.enrolled)
     .slice(0, 4);
 
   const money = (n: number) =>
@@ -649,33 +662,18 @@ export const DashboardOverview: React.FC = () => {
             {programmeCapacity.length === 0 ? (
               <div className="p-5 rounded-xl border border-dashed border-slate-200 text-center">
                 <BookOpen className="w-6 h-6 text-slate-300 mx-auto" />
-                <p className="text-xs font-semibold text-slate-500 mt-2">No programmes with a capacity set</p>
-                <p className="text-[11px] text-slate-400 mt-0.5">Add a capacity on a programme to see its fill rate.</p>
+                <p className="text-xs font-semibold text-slate-500 mt-2">No exam programmes yet</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">Add an exam programme and registrations will count here live.</p>
               </div>
             ) : (
-              programmeCapacity.map((p) => {
-                const pct = Math.max(0, Math.min(100, Math.round((p.enrolledStudents / p.maxStudents) * 100)));
-                const barColor = pct >= 90 ? 'bg-rose-500' : pct >= 70 ? 'bg-emerald-500' : 'bg-amber-500';
-                const chip =
-                  pct >= 90
-                    ? 'bg-rose-50 text-rose-700 border-rose-200'
-                    : pct >= 70
-                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                    : 'bg-amber-50 text-amber-700 border-amber-200';
-                return (
-                  <div key={p.id} className="space-y-1.5">
-                    <div className="flex items-center justify-between text-xs gap-2">
-                      <span className="text-slate-700 font-medium truncate">{p.name}</span>
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border shrink-0 ${chip}`}>
-                        {p.enrolledStudents} / {p.maxStudents} ({pct}%)
-                      </span>
-                    </div>
-                    <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                      <div className={`h-full ${barColor} rounded-full`} style={{ width: `${pct}%` }} />
-                    </div>
-                  </div>
-                );
-              })
+              programmeCapacity.map(({ prog: p, enrolled }) => (
+                <div key={p.id} className="flex items-center justify-between text-xs gap-2">
+                  <span className="text-slate-700 font-medium truncate">{p.name}</span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold border shrink-0 bg-slate-50 text-slate-700 border-slate-200">
+                    {enrolled} students
+                  </span>
+                </div>
+              ))
             )}
           </div>
         </div>

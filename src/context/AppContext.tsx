@@ -2729,6 +2729,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateProgramme = async (id: string, progData: Partial<Programme>) => {
     try {
       await updateDoc(doc(db, 'programmes', id), progData);
+      // Fee changed: pull every student registered on this exam programme to
+      // the programme's new fee. The server keeps each paid amount and
+      // recomputes the balance and payment status.
+      if (typeof progData.fee === 'number' && progData.fee > 0) {
+        const current = (programmes || []).find((p) => p.id === id);
+        if (current && current.fee !== progData.fee) {
+          try {
+            await api('/api/programme/sync-fee', { method: 'POST', body: { programmeId: id } });
+          } catch (syncErr) {
+            console.warn('Programme fee sync failed:', syncErr);
+            addToast({
+              type: 'error',
+              title: 'Fee sync failed',
+              description: 'The fee was saved, but student balances could not be updated. Open the exam programme and save the fee again.',
+            });
+          }
+        }
+      }
       // No toast here: callers show exactly one tailored toast per action.
     } catch (e) {
       handleFirestoreError(e, OperationType.UPDATE, 'programmes');

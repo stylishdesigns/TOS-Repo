@@ -200,7 +200,7 @@ export interface Programme {
   duration: string;
   startDate: string;
   endDate: string;
-  maxStudents: number;
+  maxStudents?: number;
   enrolledStudents: number;
   status: 'Active' | 'Upcoming' | 'Archived';
   category: 'JAMB' | 'WAEC' | 'NECO' | 'A-Levels' | 'SAT / International';

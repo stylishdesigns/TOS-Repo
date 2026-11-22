@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { Programme } from '../../types';
+import { Programme, Student } from '../../types';
 import {
   BookOpen,
   GraduationCap,
@@ -37,7 +37,7 @@ type ProgrammeSubsection =
   | 'Archived Exam Programs';
 
 export const ProgrammesManager: React.FC = () => {
-  const { programmes, subjects: allSubjects, addProgramme, updateProgramme, students, settings, updateSettings, addToast } = useApp();
+  const { programmes, subjects: allSubjects, addProgramme, updateProgramme, students, settings, updateSettings, addToast, seatsSummary, refreshSeatsSummary } = useApp();
 
   const [activeSubsection, setActiveSubsection] = useState<ProgrammeSubsection>('Exam Programmes');
 
@@ -59,7 +59,6 @@ export const ProgrammesManager: React.FC = () => {
     duration: '4 Months',
     startDate: '2027-01-10',
     endDate: '2027-05-02',
-    maxStudents: 100,
     status: 'Active' as Programme['status'],
     selectedSubjects: [] as string[],
   });
@@ -77,9 +76,26 @@ export const ProgrammesManager: React.FC = () => {
     return matchesStatus && matchesSearch;
   });
 
+  // Live cohort counts: the number on each exam programme is the real count
+  // of students registered on it, excluding suspended students and students
+  // whose seat access has been switched off. There is no capacity or limit.
+  React.useEffect(() => {
+    if (!seatsSummary) void refreshSeatsSummary();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const seatActiveOf = (s: Student) => {
+    const access = seatsSummary?.studentAccess?.[s.uid || s.id];
+    return access ? access.status === 'active' : s.status !== 'Suspended';
+  };
+  const matchesProgramme = (s: Student, prog: Programme) =>
+    s.programmeId
+      ? s.programmeId === prog.id
+      : String(s.programmeName || '').trim().toLowerCase() === String(prog.name || '').trim().toLowerCase();
+  const enrolledOf = (prog: Programme) =>
+    students.filter((s) => matchesProgramme(s, prog) && seatActiveOf(s)).length;
+
   // Calculate high-level KPIs
-  const totalEnrolled = (programmes || []).reduce((acc, p) => acc + (p.enrolledStudents || 0), 0);
-  const totalCapacity = (programmes || []).reduce((acc, p) => acc + (p.maxStudents || 1), 0);
+  const totalEnrolled = (programmes || []).reduce((acc, p) => acc + enrolledOf(p), 0);
   const activeCount = (programmes || []).filter((p) => p.status === 'Active').length;
 
   const handleOpenAdd = () => {
@@ -93,7 +109,6 @@ export const ProgrammesManager: React.FC = () => {
       duration: '4 Months',
       startDate: '2027-01-10',
       endDate: '2027-05-02',
-      maxStudents: 100,
       status: 'Active',
       selectedSubjects: [],
     });
@@ -111,7 +126,6 @@ export const ProgrammesManager: React.FC = () => {
       duration: normalizedDuration(prog.duration),
       startDate: prog.startDate,
       endDate: prog.endDate,
-      maxStudents: prog.maxStudents,
       status: prog.status,
       selectedSubjects: prog.subjects || [],
     });
@@ -178,7 +192,6 @@ export const ProgrammesManager: React.FC = () => {
         duration: normalizedDuration(formData.duration),
         startDate: formData.startDate,
         endDate: formData.endDate,
-        maxStudents: Number(formData.maxStudents),
         status: formData.status,
         subjects: formData.selectedSubjects,
       });
@@ -197,7 +210,6 @@ export const ProgrammesManager: React.FC = () => {
         duration: normalizedDuration(formData.duration),
         startDate: formData.startDate,
         endDate: formData.endDate,
-        maxStudents: Number(formData.maxStudents),
         status: formData.status,
         subjects: formData.selectedSubjects,
       });
@@ -342,11 +354,6 @@ export const ProgrammesManager: React.FC = () => {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5">
           {filteredProgrammes.map((prog) => {
-            const fillRate = Math.min(
-              100,
-              Math.round(((prog.enrolledStudents || 0) / (prog.maxStudents || 1)) * 100)
-            );
-
             return (
               <div
                 key={prog.id}
@@ -381,26 +388,14 @@ export const ProgrammesManager: React.FC = () => {
                     {prog.description}
                   </p>
 
-                  {/* Enrollment Progress Bar */}
-                  <div className="pt-2 border-t border-slate-100 space-y-1.5">
+                  {/* Live cohort count */}
+                  <div className="pt-2 border-t border-slate-100">
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-slate-500 font-medium">Cohort Enrollment:</span>
                       <span className="font-bold text-slate-800">
-                        {prog.enrolledStudents || 0}{' '}
-                        <span className="font-normal text-slate-400">/ {prog.maxStudents} desks</span>
+                        {enrolledOf(prog)}{' '}
+                        <span className="font-normal text-slate-400">students</span>
                       </span>
-                    </div>
-                    <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all duration-500 ${
-                          fillRate >= 90
-                            ? 'bg-rose-500'
-                            : fillRate >= 70
-                            ? 'bg-orange-600'
-                            : 'bg-emerald-500'
-                        }`}
-                        style={{ width: `${fillRate}%` }}
-                      />
                     </div>
                   </div>
 
@@ -502,9 +497,48 @@ export const ProgrammesManager: React.FC = () => {
               <div>
                 <span className="text-[10px] text-slate-400 block font-medium">ENROLLMENT</span>
                 <p className="font-bold text-slate-800">
-                  {inspectingProg.enrolledStudents || 0} / {inspectingProg.maxStudents}
+                  {enrolledOf(inspectingProg)} students
                 </p>
               </div>
+            </div>
+
+            {/* Registered Students (live) */}
+            <div className="space-y-3">
+              <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center space-x-1.5">
+                <Users className="w-4 h-4 text-orange-600" />
+                <span>Registered Students</span>
+              </h4>
+              {(() => {
+                const roster = students.filter((s) => matchesProgramme(s, inspectingProg));
+                if (roster.length === 0) {
+                  return (
+                    <p className="text-xs text-slate-500">No student has registered for this exam programme yet.</p>
+                  );
+                }
+                return (
+                  <div className="space-y-2">
+                    {roster.map((s) => {
+                      const seatOn = seatActiveOf(s);
+                      return (
+                        <div key={s.id} className="flex items-center justify-between gap-3 p-2.5 bg-slate-50/70 border border-slate-200/80 rounded-lg text-xs">
+                          <span className="font-semibold text-slate-800 truncate">{s.name}</span>
+                          <span className="flex items-center gap-1.5 shrink-0">
+                            {!seatOn && (
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-600">
+                                {s.status === 'Suspended' ? 'Suspended' : 'Seat off'}
+                              </span>
+                            )}
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${s.paymentStatus === 'Paid' ? 'bg-emerald-50 text-emerald-700' : s.paymentStatus === 'Partial' ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>
+                              {s.paymentStatus || 'Pending'}
+                            </span>
+                            <span className="font-bold text-slate-700">&#8358;{(s.outstandingBalance || 0).toLocaleString()}</span>
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Subjects & Syllabus Structure */}

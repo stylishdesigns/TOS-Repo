@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { Programme } from '../../types';
+import { Programme, Student } from '../../types';
 import {
   DollarSign,
   CreditCard,
@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 
 export const ExamProgrammesFeesTab: React.FC = () => {
-  const { programmes, students, updateProgramme, addToast } = useApp();
+  const { programmes, students, updateProgramme, addToast, seatsSummary } = useApp();
 
   const [editingProg, setEditingProg] = useState<Programme | null>(null);
   const [tuitionFee, setTuitionFee] = useState<number>(0);
@@ -24,13 +24,22 @@ export const ExamProgrammesFeesTab: React.FC = () => {
 
   // Compute metrics per programme
   const programmeFeeData = programmes.map((prog) => {
-    const progStudents = students.filter((s) => s.programmeId === prog.id);
+    const seatActiveOf = (s: Student) => {
+      const access = seatsSummary?.studentAccess?.[s.uid || s.id];
+      return access ? access.status === 'active' : s.status !== 'Suspended';
+    };
+    const progStudents = students.filter((s) =>
+      (s.programmeId
+        ? s.programmeId === prog.id
+        : String(s.programmeName || '').trim().toLowerCase() === String(prog.name || '').trim().toLowerCase()) &&
+      seatActiveOf(s)
+    );
     const totalEnrolled = progStudents.length;
     const paidFull = progStudents.filter((s) => s.paymentStatus === 'Paid').length;
     const paidPartial = progStudents.filter((s) => s.paymentStatus === 'Partial').length;
     const unpaid = progStudents.filter((s) => s.paymentStatus === 'Pending').length;
 
-    const totalCollected = progStudents.reduce((sum, s) => sum + (s.totalPaid || 0), 0);
+    const totalCollected = progStudents.reduce((sum, s) => sum + (s.paidAmount || 0), 0);
     const expectedTotal = totalEnrolled * prog.fee;
     const outstanding = Math.max(0, expectedTotal - totalCollected);
 

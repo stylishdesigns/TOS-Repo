@@ -26,6 +26,58 @@ const ACCENT = '#EA580C';
 const INK = '#0F172A';
 const MUT = '#64748B';
 
+// The guide names the install button by its colour, and the colour name
+// follows the facility's own brand colour: it first matches the swatches
+// admins pick from, then falls back to the closest hue for custom colours.
+const SWATCH_NAMES: Array<[string, string]> = [
+  ['#F2A93B', 'gold'],
+  ['#EA580C', 'orange'],
+  ['#2563EB', 'blue'],
+  ['#059669', 'green'],
+  ['#7C3AED', 'purple'],
+  ['#DB2777', 'pink'],
+  ['#B45309', 'brown'],
+];
+
+const hexToRgb = (hex: string): [number, number, number] | null => {
+  const m = /^#?([0-9a-fA-F]{6})$/.exec(String(hex || '').trim());
+  if (!m) return null;
+  const n = parseInt(m[1], 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+};
+
+const colourNameOf = (hex: string): string => {
+  const rgb = hexToRgb(hex);
+  if (!rgb) return 'orange';
+  const [r, g, b] = rgb;
+  let best = '';
+  let bestD = Infinity;
+  for (const [swatch, name] of SWATCH_NAMES) {
+    const sc = hexToRgb(swatch);
+    if (!sc) continue;
+    const d = (r - sc[0]) ** 2 + (g - sc[1]) ** 2 + (b - sc[2]) ** 2;
+    if (d < bestD) { bestD = d; best = name; }
+  }
+  if (bestD <= 4600) return best;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  if (max - min < 28) return max > 220 ? 'white' : max < 60 ? 'black' : 'grey';
+  let hue = 0;
+  if (max === r) hue = 60 * (((g - b) / (max - min)) % 6);
+  else if (max === g) hue = 60 * ((b - r) / (max - min) + 2);
+  else hue = 60 * ((r - g) / (max - min) + 4);
+  if (hue < 0) hue += 360;
+  if (hue < 15) return 'red';
+  if (hue < 45) return 'orange';
+  if (hue < 70) return 'gold';
+  if (hue < 165) return 'green';
+  if (hue < 195) return 'teal';
+  if (hue < 255) return 'blue';
+  if (hue < 290) return 'purple';
+  if (hue < 330) return 'pink';
+  return 'red';
+};
+
 const initialsOf = (name: string) => {
   const words = String(name || '').trim().split(/\s+/).filter(Boolean).slice(0, 2);
   return (words.map((w) => Array.from(w)[0]).join('') || 'TO').toUpperCase();
@@ -46,7 +98,7 @@ const isNotSafari = () => /CriOS|FxiOS|EdgiOS|OPiOS|GSA/.test(navigator.userAgen
 
 const CAPTIONS: Record<'a' | 'i', Array<[string, string]>> = {
   a: [
-    ['Tap Install app', 'Tap the orange Install app button right below this guide.'],
+    ['Tap Install app', 'Tap the {colour} Install app button right below this guide.'],
     ['Confirm the pop-up', 'Android asks "Install app?" Tap Install.'],
     ['Find your app', "Your facility's icon is now on your home screen."],
     ['Open it and sign in', 'Open it like any other app. There is no browser bar and no typing a web address.'],
@@ -294,7 +346,7 @@ export const InstallGuide: React.FC<InstallGuideProps> = ({ centreName, url, acc
         <div style={{ textAlign: 'center', margin: '8px 0 0' }}>
         <span style={{ font: '700 11px Inter, sans-serif', letterSpacing: '0.06em', textTransform: 'uppercase', color: accent }}>Step {idx + 1} of 4</span>
         <h3 style={{ font: '800 17px Inter, sans-serif', margin: '6px 0 4px' }}>{captions[idx][0]}</h3>
-        <p style={{ font: '600 15.5px/1.65 Inter, sans-serif', color: '#334155', margin: 0 }}>{captions[idx][1]}</p>
+        <p style={{ font: '600 15.5px/1.65 Inter, sans-serif', color: '#334155', margin: 0 }}>{captions[idx][1].replace('{colour}', colourNameOf(accent))}</p>
       </div>
 
         </div>

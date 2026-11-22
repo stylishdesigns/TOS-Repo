@@ -258,6 +258,83 @@ export async function setStudentFee(
   });
 }
 
+export interface SyncProgrammeFeeInput {
+  programmeId: string;
+}
+
+/**
+ * Admin pulls every student registered on an exam programme to the
+ * programme's current fee. The paid amount is preserved and balance and
+ * payment status are recomputed with the same feeState rule as set-fee;
+ * only students whose stored fee differs are written, so a re-run is a
+ * no-op. Every fee switch lands in the audit log.
+ */
+export async function syncProgrammeFee(
+  db: Firestore,
+  caller: PaymentCaller,
+  actor: PaymentActor,
+  input: SyncProgrammeFeeInput
+) {
+  if (!actor.isAdminCaller) {
+    throw new PaymentError(403, 'Only a facility admin can sync exam programme fees');
+  }
+  const programmeId = String(input.programmeId || '');
+  if (!/^[a-zA-Z0-9_\-]{1,128}$/.test(programmeId)) {
+    throw new PaymentError(400, 'Invalid programmeId');
+  }
+  const progRef = db.collection('programmes').doc(programmeId);
+  const progSnap = await progRef.get();
+  if (!progSnap.exists) {
+    throw new PaymentError(404, 'Exam programme not found');
+  }
+  const p = progSnap.data() as Record<string, any>;
+  const progCentreId = typeof p.centreId === 'string' ? p.centreId : '';
+  assertCentreAccess({
+    tos: tosOverride(caller, actor),
+    callerCentreId: actor.callerCentreId,
+    recordCentreId: progCentreId,
+  });
+  const fee = Math.round(Number(p.fee));
+  if (!Number.isFinite(fee) || fee <= 0) {
+    throw new PaymentError(400, 'That exam programme has no fee set yet');
+  }
+
+  const stuSnap = await db.collection('students').where('centreId', '==', progCentreId).get();
+  const batch = db.batch();
+  let updated = 0;
+  let unchanged = 0;
+  stuSnap.forEach((docSnap) => {
+    const s = docSnap.data() as Record<string, any>;
+    if (String(s.programmeId || '') !== programmeId) return;
+    const fees = feeState(s, fee);
+    const previousFee = typeof s.totalFee === 'number' ? s.totalFee : 0;
+    if (previousFee === fees.totalFee) {
+      unchanged++;
+      return;
+    }
+    batch.update(docSnap.ref, {
+      totalFee: fees.totalFee,
+      outstandingBalance: fees.outstandingBalance,
+      paymentStatus: fees.paymentStatus,
+    });
+    batch.set(db.collection('auditLogs').doc(), {
+      action: 'fee.sync',
+      actorUid: caller.uid,
+      actorEmail: caller.email,
+      centreId: progCentreId,
+      studentId: docSnap.id,
+      programmeId,
+      totalFee: fees.totalFee,
+      previousFee,
+      paidAmount: fees.paidAmount,
+      at: new Date().toISOString(),
+    });
+    updated++;
+  });
+  await batch.commit();
+  return { programmeId, fee, updated, unchanged };
+}
+
 export interface DecidePaymentInput {
   paymentId: string;
   action: ConfirmAction;
