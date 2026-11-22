@@ -154,7 +154,7 @@ export const TutorPortal: React.FC = () => {
   }, [activeTab]);
 
   return (
-    <div className={`min-h-screen bg-slate-900/95 flex flex-col justify-between selection:bg-orange-500 selection:text-white ${bgTheme === 'dark' ? 'tos-canvas-dark' : ''}`}>
+    <div className={`min-h-screen flex flex-col justify-between selection:bg-orange-500 selection:text-white ${bgTheme === 'dark' ? 'tos-canvas-dark bg-[#0B1220]' : 'bg-slate-50'}`}>
       {/* Password Change Overlay for Invited Tutors */}
       {activeTutor.status === 'Invited' && !activeTutor.hasChangedPassword && !isAdmin && (
         <PasswordChangeOverlay
