@@ -49,14 +49,13 @@ export const StudyMaterialsSection: React.FC<StudyMaterialsSectionProps> = ({
   // Extract unique subjects
   const availableSubjects = useMemo(() => {
     const list = new Set<string>();
-    if (student.subjects && Array.isArray(student.subjects)) {
-      student.subjects.forEach((s) => list.add(s));
-    }
+    // Only subjects that actually have materials here get a filter chip; a
+    // student subject with no uploads shows no chip.
     studyMaterials.forEach((m) => {
       if (m.subject) list.add(m.subject);
     });
     return Array.from(list);
-  }, [student.subjects, studyMaterials]);
+  }, [studyMaterials]);
 
   // Filtered materials
   const filteredMaterials = useMemo(() => {
@@ -102,13 +101,10 @@ export const StudyMaterialsSection: React.FC<StudyMaterialsSectionProps> = ({
     <div className="space-y-4 animate-in fade-in duration-200">
       {/* Header Banner */}
       <div className="pt-1">
-        <span className="text-[10px] font-extrabold uppercase text-orange-700 tracking-wider block">
-          {student.name} · Learning Resources
-        </span>
-        <h2 className="text-xl font-black text-[#0F172A] tracking-tight">
+        <h2 className="text-xl font-black text-slate-900 tracking-tight">
           Study Materials & Handouts
         </h2>
-        <p className="text-xs text-[#64748B] font-medium mt-0.5">
+        <p className="text-xs text-slate-500 font-medium mt-0.5">
           Revision notes, lecture handouts, and syllabus guides uploaded by your specialist tutors.
         </p>
       </div>
@@ -161,7 +157,7 @@ export const StudyMaterialsSection: React.FC<StudyMaterialsSectionProps> = ({
                   : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
               }`}
             >
-              {sub} {count > 0 ? `(${count})` : ''}
+              {sub} ({count})
             </button>
           );
         })}

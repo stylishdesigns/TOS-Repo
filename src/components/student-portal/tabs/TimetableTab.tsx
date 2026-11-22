@@ -35,7 +35,8 @@ const DAYS: ('Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Satur
 ];
 
 export const TimetableTab: React.FC<TimetableTabProps> = ({ student }) => {
-  const { timetable, classRatings } = useApp();
+  const { timetable, classRatings, bgTheme } = useApp();
+  const dark = bgTheme === 'dark';
   const [activeSection, setActiveSection] = useState<'timetable' | 'materials'>('timetable');
 
   const [viewingSession, setViewingSession] = useState<TimetableSlot | null>(null);
@@ -219,14 +220,14 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({ student }) => {
   return (
     <div className="space-y-4 px-4 py-3 max-w-lg mx-auto animate-in fade-in duration-300">
       {/* 1. Switch at top: "Timetable | Study Materials" */}
-      <div className="bg-white rounded-[14px] p-1 border border-[#E2E8F0] shadow-2xs grid grid-cols-2 gap-1">
+      <div className={`${dark ? 'bg-slate-800/90 p-1 border border-slate-700 shadow-2xs grid grid-cols-2 gap-1' : 'bg-white rounded-[14px] p-1 border border-[#E2E8F0] shadow-2xs grid grid-cols-2 gap-1'}`}>
         <button
           type="button"
           onClick={() => setActiveSection('timetable')}
           className={`h-10 rounded-[10px] text-xs font-extrabold transition-all flex items-center justify-center cursor-pointer ${
             activeSection === 'timetable'
               ? 'bg-[var(--brand,#0F172A)] text-[var(--on-brand,#fff)] shadow-xs'
-              : 'text-[#64748B] hover:text-[#0F172A]'
+              : dark ? 'text-slate-300' : 'text-[#64748B] hover:text-[#0F172A]'
           }`}
         >
           Timetable
@@ -238,7 +239,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({ student }) => {
           className={`h-10 rounded-[10px] text-xs font-extrabold transition-all flex items-center justify-center cursor-pointer ${
             activeSection === 'materials'
               ? 'bg-[var(--brand,#0F172A)] text-[var(--on-brand,#fff)] shadow-xs'
-              : 'text-[#64748B] hover:text-[#0F172A]'
+              : dark ? 'text-slate-300' : 'text-[#64748B] hover:text-[#0F172A]'
           }`}
         >
           Study Materials

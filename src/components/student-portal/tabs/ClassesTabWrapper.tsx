@@ -3,6 +3,7 @@ import { Student, StudentResult } from '../../../types';
 import { TimetableTab } from './TimetableTab';
 import { CbtTab } from './CbtTab';
 import { PerformanceTab } from './PerformanceTab';
+import { useApp } from '../../../context/AppContext';
 
 interface ClassesTabWrapperProps {
   student: Student;
@@ -36,19 +37,21 @@ export const ClassesTabWrapper: React.FC<ClassesTabWrapperProps> = ({
   onExitReview,
   onNavigateTab,
 }) => {
+  const { bgTheme } = useApp();
+  const dark = bgTheme === 'dark';
   if (subPage === 'timetable') {
     return <TimetableTab student={student} />;
   }
 
   const renderToggle = () => (
-    <div className="bg-white rounded-[14px] p-1 border border-[#E2E8F0] shadow-2xs grid grid-cols-2 gap-1">
+    <div className={`${dark ? 'bg-slate-800/90 p-1 border border-slate-700 shadow-2xs grid grid-cols-2 gap-1' : 'bg-white rounded-[14px] p-1 border border-[#E2E8F0] shadow-2xs grid grid-cols-2 gap-1'}`}>
       <button
         type="button"
         onClick={() => onAssessmentViewChange('assessments')}
         className={`h-10 rounded-[10px] text-xs font-extrabold transition-all flex items-center justify-center cursor-pointer ${
           assessmentView === 'assessments'
             ? 'bg-[var(--brand,#0F172A)] text-[var(--on-brand,#fff)] shadow-xs'
-            : 'text-[#64748B] hover:text-[#0F172A]'
+            : dark ? 'text-slate-300' : 'text-[#64748B] hover:text-[#0F172A]'
         }`}
       >
         Assessments
@@ -59,7 +62,7 @@ export const ClassesTabWrapper: React.FC<ClassesTabWrapperProps> = ({
         className={`h-10 rounded-[10px] text-xs font-extrabold transition-all flex items-center justify-center cursor-pointer ${
           assessmentView === 'performance'
             ? 'bg-[var(--brand,#0F172A)] text-[var(--on-brand,#fff)] shadow-xs'
-            : 'text-[#64748B] hover:text-[#0F172A]'
+            : dark ? 'text-slate-300' : 'text-[#64748B] hover:text-[#0F172A]'
         }`}
       >
         Performance

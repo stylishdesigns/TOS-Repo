@@ -67,7 +67,8 @@ export const CbtTab: React.FC<CbtTabProps> = ({
   renderUnderHeader,
   onGoToProfile,
 }) => {
-  const { addToast, exams, results, addResult, centreName } = useApp();
+  const { addToast, exams, results, addResult, centreName, bgTheme } = useApp();
+  const dark = bgTheme === 'dark';
 
   const [examState, setExamState] = useState<ExamState>('select');
   const [selectedExam, setSelectedExam] = useState<CBTExam | null>(null);
@@ -731,11 +732,11 @@ export const CbtTab: React.FC<CbtTabProps> = ({
       );
     }
     return (
-      <div className={`space-y-4 transition-all duration-500 min-h-screen relative ${showArchive ? 'bg-slate-50' : (activeFrequency === 'Mock' ? 'bg-orange-600' : 'bg-slate-50')} p-4`}>
+      <div className={`space-y-4 transition-all duration-500 min-h-screen relative ${showArchive ? (dark ? 'bg-transparent' : 'bg-slate-50') : (activeFrequency === 'Mock' ? 'bg-orange-600' : (dark ? 'bg-transparent' : 'bg-slate-50'))} p-4`}>
         {renderModals()}
         {/* Overscroll Background Extender */}
         {(isMock || showArchive) && (
-          <div className={`absolute top-[-1000px] left-0 right-0 h-[1000px] ${showArchive ? 'bg-slate-50' : 'bg-orange-600'} -z-10`} />
+          <div className={`absolute top-[-1000px] left-0 right-0 h-[1000px] ${showArchive ? (dark ? 'bg-transparent' : 'bg-slate-50') : 'bg-orange-600'} -z-10`} />
         )}
         <div className="flex items-center justify-between">
           {!showArchive ? (

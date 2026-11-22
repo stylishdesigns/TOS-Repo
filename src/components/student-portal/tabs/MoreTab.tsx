@@ -251,6 +251,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
     subjects,
     programmes,
   } = useApp();
+  const dark = bgTheme === 'dark';
 
   // Fee read live from the student's programme, so an admin fee change lands here at once.
   const liveFee = resolveStudentFee(student, programmes);
@@ -910,7 +911,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
     realAvatar(student.avatar) || initialsAvatar(student.name);
 
   return (
-    <div className="min-h-full bg-slate-50/70 pb-16 px-4 pt-6 max-w-lg mx-auto">
+    <div className={`min-h-full ${dark ? 'bg-transparent' : 'bg-slate-50/70'} pb-16 px-4 pt-6 max-w-lg mx-auto`}>
       {/* 1. Centered Profile Header (Exact Layout from reference video) */}
       <div className="flex flex-col items-center justify-center text-center">
         <div className="relative">

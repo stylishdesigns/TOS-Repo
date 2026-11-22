@@ -765,7 +765,7 @@ export const StudentPortal: React.FC = () => {
               allow-status flag and status limits. No back control: the chat
               orb is the way back to the fan. */}
           {statusScreenOpen && !hideBottomNav && (
-            <div className="fixed inset-0 z-40 bg-slate-50 overflow-y-auto animate-in fade-in duration-200">
+            <div className={`fixed inset-0 z-40 ${bgTheme === 'dark' ? 'bg-[#0B1220]' : 'bg-slate-50'} overflow-y-auto animate-in fade-in duration-200`}>
               <div className="p-4 sm:p-5 max-w-lg mx-auto pt-6 pb-24">
                 <StatusScreen student={activeStudent} />
               </div>

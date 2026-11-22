@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { api } from '../../tos/tosShared';
 import { MathText, cleanOptionText } from '../../common/MathText';
+import { useApp } from '../../../context/AppContext';
 
 /**
  * TOS student mock screens (prompt S, pieces S3-S5). One day view wired to
@@ -93,6 +94,8 @@ const MockExam: React.FC<{
   onExit: () => void;
 }> = ({ data, onDone, onExit }) => {
   const { paper, attempt } = data;
+  const { bgTheme } = useApp();
+  const dark = bgTheme === 'dark';
   const skew = useRef(Date.parse(data.serverNow) - Date.now()).current;
   const order = useMemo(() => seededOrder(paper.questions.length, attempt.shuffleSeed), [paper.questions.length, attempt.shuffleSeed]);
   const [answers, setAnswers] = useState<Record<string, Json>>(() => ({ ...(attempt.savedAnswers || {}) }));
@@ -210,7 +213,7 @@ const MockExam: React.FC<{
   const toggleFlag = () => record(q.id, { flag: !answers[q.id]?.flag });
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
+    <div className={`min-h-screen ${dark ? 'bg-transparent' : 'bg-slate-50'} flex flex-col`}>
       {/* Header: back, timer, save state */}
       <div className="sticky top-0 z-20 bg-orange-600 text-white px-4 pt-3 pb-4 rounded-b-3xl">
         <div className="flex items-center justify-between">
@@ -347,6 +350,8 @@ const MockExam: React.FC<{
 // exists after release; the server refuses earlier.
 // ---------------------------------------------------------------------------
 const ReviewScreen: React.FC<{ mockId: string; onBack: () => void }> = ({ mockId, onBack }) => {
+  const { bgTheme } = useApp();
+  const dark = bgTheme === 'dark';
   const [data, setData] = useState<Json | null>(null);
   const [error, setError] = useState('');
   const [filter, setFilter] = useState<'all' | 'wrong'>('all');
@@ -364,7 +369,7 @@ const ReviewScreen: React.FC<{ mockId: string; onBack: () => void }> = ({ mockId
 
   if (error) {
     return (
-      <div className="min-h-screen bg-slate-50 p-4">
+      <div className={`min-h-screen ${dark ? 'bg-transparent' : 'bg-slate-50'} p-4`}>
         <button onClick={onBack} className="w-11 h-11 rounded-xl bg-white border border-slate-200 flex items-center justify-center mb-4"><ChevronLeft className="w-5 h-5 text-slate-600" /></button>
         <div className="bg-white rounded-3xl border border-slate-200 p-6 text-center">
           <AlertTriangle className="w-10 h-10 text-amber-500 mx-auto mb-3" />
@@ -374,13 +379,13 @@ const ReviewScreen: React.FC<{ mockId: string; onBack: () => void }> = ({ mockId
     );
   }
   if (!data) {
-    return <div className="min-h-screen bg-slate-50 p-4"><div className="h-32 rounded-3xl bg-slate-200/60 animate-pulse" /></div>;
+    return <div className={`min-h-screen ${dark ? 'bg-transparent' : 'bg-slate-50'} p-4`}><div className="h-32 rounded-3xl bg-slate-200/60 animate-pulse" /></div>;
   }
 
   const rows = data.review.filter((r: Json) => (filter === 'all' ? true : !r.isCorrect));
   const pct = data.score.scale === 100;
   return (
-    <div className="min-h-screen bg-slate-50 pb-10">
+    <div className={`min-h-screen ${dark ? 'bg-transparent' : 'bg-slate-50'} pb-10`}>
       <div className="bg-orange-600 text-white px-4 pt-3 pb-6 rounded-b-3xl">
         <button onClick={onBack} className="w-11 h-11 rounded-xl bg-black/10 flex items-center justify-center mb-3" aria-label="Back"><ChevronLeft className="w-6 h-6" /></button>
         <p className="text-xs font-black uppercase tracking-widest text-white/80">{data.title} · {fmtDay(data.date)}</p>
@@ -395,9 +400,9 @@ const ReviewScreen: React.FC<{ mockId: string; onBack: () => void }> = ({ mockId
       </div>
 
       <div className="px-4 py-4 space-y-4">
-        <div className="flex p-1 rounded-xl bg-slate-200/60">
-          <button onClick={() => setFilter('all')} className={`flex-1 min-h-[40px] rounded-lg text-sm font-black ${filter === 'all' ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-500'}`}>All {data.review.length}</button>
-          <button onClick={() => setFilter('wrong')} className={`flex-1 min-h-[40px] rounded-lg text-sm font-black ${filter === 'wrong' ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-500'}`}>
+        <div className={`flex p-1 rounded-xl ${dark ? 'bg-slate-800/60' : 'bg-slate-200/60'}`}>
+          <button onClick={() => setFilter('all')} className={`flex-1 min-h-[40px] rounded-lg text-sm font-black ${filter === 'all' ? (dark ? 'bg-slate-900 text-orange-400 shadow-sm' : 'bg-white text-orange-600 shadow-sm') : (dark ? 'text-slate-400' : 'text-slate-500')}`}>All {data.review.length}</button>
+          <button onClick={() => setFilter('wrong')} className={`flex-1 min-h-[40px] rounded-lg text-sm font-black ${filter === 'wrong' ? (dark ? 'bg-slate-900 text-orange-400 shadow-sm' : 'bg-white text-orange-600 shadow-sm') : (dark ? 'text-slate-400' : 'text-slate-500')}`}>
             To learn {data.review.filter((r: Json) => !r.isCorrect).length}
           </button>
         </div>
@@ -462,6 +467,8 @@ export const StudentMockTab: React.FC<{
   onHideBottomNav?: (hide: boolean) => void;
   onGoToProfile?: () => void;
 }> = ({ initialTab, onHideBottomNav, onGoToProfile }) => {
+  const { bgTheme } = useApp();
+  const dark = bgTheme === 'dark';
   const [tab, setTab] = useState<'day' | 'board'>(initialTab === 'board' ? 'board' : 'day');
   const [status, setStatus] = useState<Json | null>(null);
   const [statusErr, setStatusErr] = useState('');
@@ -557,19 +564,19 @@ export const StudentMockTab: React.FC<{
   const unseen = status?.unseen || null;
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className={`min-h-screen ${dark ? 'bg-transparent' : 'bg-slate-50'}`}>
       {/* MB2: the date strip is the one control. Every day (past, today,
           upcoming) renders the same day card, so there is no Today/Past
           toggle to wonder about; the leaderboard keeps its own switch on the
           CBT tab above this screen. */}
       {tab === 'day' && status && (
         <div className="px-4 pt-3 max-w-lg mx-auto">
-          <div className="bg-white rounded-[14px] border border-[#E2E8F0] shadow-2xs px-2 py-2 flex items-center gap-2">
+          <div className={`${dark ? 'bg-slate-800/90 border border-slate-700' : 'bg-white border border-[#E2E8F0]'} rounded-[14px] shadow-2xs px-2 py-2 flex items-center gap-2`}>
             <button
               onClick={() => setDayOffset((n) => Math.max(-62, n - 1))}
               disabled={dayOffset <= -62}
               aria-label="Previous day"
-              className="w-11 h-11 shrink-0 rounded-xl bg-slate-100 flex items-center justify-center disabled:opacity-40 cursor-pointer"
+              className={`w-11 h-11 shrink-0 rounded-xl ${dark ? 'bg-slate-800' : 'bg-slate-100'} flex items-center justify-center disabled:opacity-40 cursor-pointer`}
             >
               <ChevronLeft className="w-5 h-5 text-slate-600" />
             </button>
@@ -583,7 +590,7 @@ export const StudentMockTab: React.FC<{
               onClick={() => setDayOffset((n) => Math.min(62, n + 1))}
               disabled={dayOffset >= 62}
               aria-label="Next day"
-              className="w-11 h-11 shrink-0 rounded-xl bg-slate-100 flex items-center justify-center disabled:opacity-40 cursor-pointer"
+              className={`w-11 h-11 shrink-0 rounded-xl ${dark ? 'bg-slate-800' : 'bg-slate-100'} flex items-center justify-center disabled:opacity-40 cursor-pointer`}
             >
               <ChevronRight className="w-5 h-5 text-slate-600" />
             </button>

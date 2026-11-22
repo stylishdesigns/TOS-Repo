@@ -538,9 +538,9 @@ export const DashboardOverview: React.FC = () => {
                           {act.title}
                         </p>
                         <div className="flex items-center space-x-1.5 mt-0.5">
-                          <span className="text-[10px] text-slate-400">{act.subtitle || 'Facility record'}</span>
+                          <span className="text-[10px] text-slate-400">{act.actorName ? `${act.actorName} · ${act.subtitle || 'Facility record'}` : (act.subtitle || 'Facility record')}</span>
                           <span className="text-[10px] text-slate-300">•</span>
-                          <span className="text-[10px] text-slate-400">{formatActivityTime(act.createdAt) || act.timeAgo || 'Earlier'}</span>
+                          <span className="text-[10px] text-slate-400">{formatActivityTime(act.createdAt) || 'Earlier'}</span>
                         </div>
                       </div>
                     </div>

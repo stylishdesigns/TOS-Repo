@@ -2262,7 +2262,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Activities listener
     let qActivities = centreQuery('activities');
     const unsubActivities = isAdmin ? onSnapshot(qActivities, (snapshot) => {
-      const data = scopedDocs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as ActivityLog)));
+      // Newest first, and every record carries the real moment it happened.
+      // Older records hold the moment only inside their id (act-<ms>), so the
+      // id backfills the stamp before the feed sorts.
+      const data = scopedDocs(snapshot.docs.map(doc => {
+        const act: ActivityLog = { ...(doc.data() as ActivityLog), id: doc.id };
+        if (!act.createdAt) {
+          const ms = Number(String(act.id).replace(/^act-/, ''));
+          if (Number.isFinite(ms) && ms > 0) act.createdAt = ms;
+        }
+        return act;
+      }));
+      data.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
       setActivities(data);
     }, (error) => handleFirestoreError(error, OperationType.GET, 'activities')) : () => {};
 
