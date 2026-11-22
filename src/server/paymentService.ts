@@ -303,9 +303,15 @@ export async function syncProgrammeFee(
   const batch = db.batch();
   let updated = 0;
   let unchanged = 0;
+  const progName = String(p.name || '').trim().toLowerCase();
   stuSnap.forEach((docSnap) => {
     const s = docSnap.data() as Record<string, any>;
-    if (String(s.programmeId || '') !== programmeId) return;
+    const byId = String(s.programmeId || '') === programmeId;
+    const byName =
+      !String(s.programmeId || '') &&
+      progName !== '' &&
+      String(s.programmeName || '').trim().toLowerCase() === progName;
+    if (!byId && !byName) return;
     const fees = feeState(s, fee);
     const previousFee = typeof s.totalFee === 'number' ? s.totalFee : 0;
     if (previousFee === fees.totalFee) {

@@ -2733,8 +2733,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // the programme's new fee. The server keeps each paid amount and
       // recomputes the balance and payment status.
       if (typeof progData.fee === 'number' && progData.fee > 0) {
-        const current = (programmes || []).find((p) => p.id === id);
-        if (current && current.fee !== progData.fee) {
+        {
           try {
             await api('/api/programme/sync-fee', { method: 'POST', body: { programmeId: id } });
           } catch (syncErr) {
