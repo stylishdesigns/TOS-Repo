@@ -448,9 +448,15 @@ export interface ActivityLog {
   centreId?: string;
   title: string;
   subtitle: string;
-  category: 'Schools' | 'Students' | 'Finance' | 'CMS' | 'Admissions';
+  category: 'Schools' | 'Students' | 'Finance' | 'CMS' | 'Admissions' | 'Timetable' | 'Staff';
   timeAgo: string;
   type: 'success' | 'pending' | 'danger' | 'info';
+  // When it actually happened (ms epoch) and who did it, so the owner can see
+  // every admin's actions with the exact time attached.
+  createdAt?: number;
+  actorName?: string;
+  actorRole?: string;
+  details?: string;
 }
 
 export interface QuizQuestion {

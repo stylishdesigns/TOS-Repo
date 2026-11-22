@@ -616,9 +616,9 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({ tutor, initialSection 
                               <button disabled={isProcessing || (!viewingSession.topic && !tutorTopic.trim())} onClick={handleConsent} className="w-full py-4 bg-orange-600 text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-lg shadow-orange-200 disabled:opacity-50">
                                 {isProcessing ? 'Processing...' : 'Approve Class'}
                               </button>
-                           ) : (
+                           ) : !inSession ? (
                               <button disabled={isProcessing} onClick={() => setActionType('postpone')} className="w-full py-3 bg-amber-50 border border-amber-200 text-amber-700 font-black text-[10px] uppercase tracking-widest rounded-xl hover:bg-amber-100 transition-all">Request for a postponement</button>
-                           )}
+                           ) : null}
                         </div>
                      )}
                      {actionType !== 'none' && (

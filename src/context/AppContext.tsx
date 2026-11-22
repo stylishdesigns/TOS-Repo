@@ -1798,6 +1798,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (!activeCentreId) throw new Error('Select your facility before saving settings.');
       await setDoc(doc(db, 'centreSettings', `${activeCentreId}__global`), updated);
       setSettingsState(updated);
+      // Name exactly what changed, never a generic "settings were updated".
+      const changedSettings = (Object.keys(updated) as (keyof typeof updated)[])
+        .filter((k) => {
+          const before = (settings as any)[k];
+          const after = (updated as any)[k];
+          if (typeof before === 'object' || typeof after === 'object') {
+            return JSON.stringify(before) !== JSON.stringify(after);
+          }
+          return before !== after;
+        })
+        .slice(0, 4)
+        .map((k) => {
+          const before = (settings as any)[k];
+          const after = (updated as any)[k];
+          const short = (v: any) => {
+            const str = String(v ?? 'empty');
+            return str.length > 40 ? `${str.slice(0, 40)}…` : str;
+          };
+          return `${String(k)}: ${short(before)} → ${short(after)}`;
+        });
       // Screens with their own tailored message pass { silent: true } so the
       // action still shows exactly one toast.
       if (!opts?.silent) {
@@ -1808,8 +1828,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         });
       }
       logActivity({
-        title: 'Facility Configuration Modified',
-        subtitle: `Updated by ${activeUser?.name || 'Admin'}`,
+        title: changedSettings.length > 0
+          ? `Settings Changed: ${changedSettings[0].split(':')[0]}`
+          : 'Facility Settings Opened & Saved',
+        subtitle: changedSettings.length > 0 ? changedSettings.join(' · ') : 'No field values changed',
+        details: changedSettings.join('; '),
         category: 'CMS',
         type: 'info',
       });
@@ -1850,14 +1873,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (!activeCentreId) throw new Error('Select your facility before saving website content.');
       await setDoc(doc(db, 'centreSettings', `${activeCentreId}__cms`), updated);
       setCmsState(updated);
+      const changedCms = (Object.keys(newCms) as (keyof CMSContent)[])
+        .filter((k) => JSON.stringify((cms as any)[k]) !== JSON.stringify((newCms as any)[k]))
+        .map((k) => String(k));
       addToast({
         type: 'success',
         title: 'Website CMS Saved',
         description: 'Changes are now live on your public education facility website.',
       });
       logActivity({
-        title: 'Live Website Content Published',
-        subtitle: 'CMS sections synchronized',
+        title: changedCms.length > 0
+          ? `Website Content Published: ${changedCms.slice(0, 3).join(', ')}`
+          : 'Website Content Saved',
+        subtitle: changedCms.length > 0 ? `Updated ${changedCms.length} section${changedCms.length === 1 ? '' : 's'}` : 'No sections changed',
+        details: changedCms.join(', '),
         category: 'CMS',
         type: 'success',
       });
@@ -2343,6 +2372,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         description: `${studentData.name} has been registered successfully.`,
       });
       refreshSeatsSummary(cId);
+      logActivity({
+        title: `Student Enrolled: ${studentData.name}`,
+        subtitle: `${studentData.programmeName || 'Programme'} • Registered by ${activeUser?.name || 'Admin'}`,
+        category: 'Students',
+        type: 'success',
+      });
     } catch (e: any) {
       console.error(e);
       addToast({ 
@@ -2361,6 +2396,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // list, so a saved change (a new profile picture, for instance) shows
       // everywhere at once instead of only after a reload.
       setStudents((prev) => prev.map((st) => (st.id === id ? { ...st, ...studentData } : st)));
+      logActivity({
+        title: `Student Record Updated: ${studentData.name || 'a student'}`,
+        subtitle: `Changed ${(Object.keys(studentData) as string[]).slice(0, 3).join(', ') || 'profile details'} • By ${activeUser?.name || 'Admin'}`,
+        category: 'Students',
+        type: 'info',
+      });
       // Screens with their own tailored message pass { silent: true } so the
       // action still shows exactly one toast.
       if (!opts?.silent) {
@@ -2381,6 +2422,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       addToast({
         type: 'info',
         title: 'Student Removed',
+      });
+      logActivity({
+        title: 'Student Removed',
+        subtitle: `Student record deleted • By ${activeUser?.name || 'Admin'}`,
+        category: 'Students',
+        type: 'danger',
       });
     } catch (e) {
       console.error(e);
@@ -2553,6 +2600,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         title: 'Tutor Added',
         description: `${tutorData.name} has been enrolled in the faculty team.`,
       });
+      logActivity({
+        title: `Tutor Added: ${tutorData.name}`,
+        subtitle: `${(tutorData.subjects || []).slice(0, 2).join(', ') || 'Faculty'} • Added by ${activeUser?.name || 'Admin'}`,
+        category: 'Schools',
+        type: 'success',
+      });
     } catch (e: any) {
       console.error(e);
       addToast({ 
@@ -2578,6 +2631,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         title: 'Tutor Profile Updated',
         description: 'Faculty details saved successfully.',
       });
+      logActivity({
+        title: `Tutor Record Updated: ${tutorData.name || 'a tutor'}`,
+        subtitle: `Changed ${(Object.keys(tutorData) as string[]).slice(0, 3).join(', ') || 'profile details'} • By ${activeUser?.name || 'Admin'}`,
+        category: 'Schools',
+        type: 'info',
+      });
     } catch (e: any) {
       console.error(e);
       addToast({ type: 'error', title: 'Update Failed', description: 'Could not sync with database.' });
@@ -2592,6 +2651,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         type: 'info',
         title: 'Tutor Removed',
         description: 'Tutor removed from faculty.',
+      });
+      logActivity({
+        title: 'Tutor Removed',
+        subtitle: `Tutor deleted from faculty • By ${activeUser?.name || 'Admin'}`,
+        category: 'Schools',
+        type: 'danger',
       });
     } catch (e) {
       console.error(e);
@@ -2712,6 +2777,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         enrolledStudents: 0,
       };
       await setDoc(doc(db, 'programmes', id), tenantWrite(newProg));
+      logActivity({
+        title: `Programme Created: ${progData.name}`,
+        subtitle: `Fee ${progData.fee} • Created by ${activeUser?.name || 'Admin'}`,
+        category: 'Schools',
+        type: 'success',
+      });
       // No toast here: every caller shows exactly one tailored toast for the
       // programme it just created.
     } catch (e) {
@@ -2771,6 +2842,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         title: 'Timetable Slot Added',
         description: `${slotData.subject} on ${slotData.day} at ${slotData.time}`,
       });
+      logActivity({
+        title: `Class Scheduled: ${slotData.subject}`,
+        subtitle: `${slotData.day} ${slotData.time} • Tutor: ${slotData.tutorName} • By ${activeUser?.name || 'Admin'}`,
+        category: 'Timetable',
+        type: 'success',
+      });
     } catch (e) {
       handleFirestoreError(e, OperationType.CREATE, 'timetable');
     }
@@ -2803,6 +2880,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         title: 'Multiple Classes Scheduled',
         description: `${slotsData.length} classes have been added to the timetable.`,
       });
+      logActivity({
+        title: `${slotsData.length} Classes Scheduled`,
+        subtitle: `${slotsData[0]?.subject || 'Classes'} and more • By ${activeUser?.name || 'Admin'}`,
+        category: 'Timetable',
+        type: 'success',
+      });
     } catch (e) {
       handleFirestoreError(e, OperationType.CREATE, 'timetable');
     }
@@ -2832,6 +2915,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         title: 'Timetable Slot Removed',
         description: 'Schedule slot removed.',
       });
+      logActivity({
+        title: 'Scheduled Class Deleted',
+        subtitle: `Timetable slot removed • By ${activeUser?.name || 'Admin'}`,
+        category: 'Timetable',
+        type: 'danger',
+      });
     } catch (e) {
       handleFirestoreError(e, OperationType.DELETE, 'timetable');
     }
@@ -2859,6 +2948,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         type: 'success',
         title: 'Timetable Updated',
         description: 'Class schedule updated successfully.',
+      });
+      logActivity({
+        title: 'Class Schedule Modified',
+        subtitle: `Changed ${(Object.keys(slotData) as string[]).filter((k) => k !== 'status').slice(0, 3).join(', ') || 'schedule details'} • By ${activeUser?.name || 'Admin'}`,
+        category: 'Timetable',
+        type: 'info',
       });
     } catch (e) {
       handleFirestoreError(e, OperationType.UPDATE, 'timetable');
@@ -3121,6 +3216,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           ? `Receipt ${data.receiptNumber} issued and the student's balance updated.`
           : 'The student has been shown the payment as rejected.',
       });
+      logActivity({
+        title: action === 'confirm' ? `Payment Confirmed: ${data.studentName || 'student payment'}` : 'Payment Claim Rejected',
+        subtitle: action === 'confirm'
+          ? `Receipt ${data.receiptNumber} issued${data.amount ? ` • ${settings.currencySymbol || '₦'}${Number(data.amount).toLocaleString()}` : ''} • By ${activeUser?.name || 'Admin'}`
+          : `Reason: ${reason || 'not stated'} • By ${activeUser?.name || 'Admin'}`,
+        category: 'Finance',
+        type: action === 'confirm' ? 'success' : 'danger',
+      });
       return true;
     } catch (e) {
       console.error(e);
@@ -3231,6 +3334,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         date: new Date().toISOString().split('T')[0],
       };
       await setDoc(doc(db, 'announcements', id), tenantWrite(newAnn));
+      logActivity({
+        title: `Announcement Published: ${annData.title || 'Notice'}`,
+        subtitle: `To ${annData.target || 'the facility'} • By ${activeUser?.name || 'Admin'}`,
+        category: 'CMS',
+        type: 'success',
+      });
       addToast({
         type: 'success',
         title: 'Announcement Published',
@@ -3437,10 +3546,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const logActivity = async (activityData: Omit<ActivityLog, 'id' | 'timeAgo'>) => {
     try {
       const id = `act-${Date.now()}`;
+      // Admin actions carry who did them and the real moment, so the owner
+      // sees every admin's work with the exact time attached. Portal actions
+      // (students, tutors) stay out of the facility activity feed.
+      const isAdminAction = viewMode === 'portal';
       const newAct: ActivityLog = {
         ...activityData,
         id,
         timeAgo: 'Just now',
+        createdAt: Date.now(),
+        ...(isAdminAction && activeUser
+          ? { actorName: activeUser.name, actorRole: activeUser.role || 'admin' }
+          : {}),
       };
       await setDoc(doc(db, 'activities', id), tenantWrite(newAct));
     } catch (e) {

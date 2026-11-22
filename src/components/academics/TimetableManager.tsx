@@ -19,8 +19,8 @@ import {
   Trash2,
 } from 'lucide-react';
 import { ClassroomSettingsModal } from './ClassroomSettingsModal';
-import { CalendarView } from '../common/CalendarView';
-import { slotsToActivities } from '../../lib/planner';
+import { BrandDatePicker } from '../ui/BrandDatePicker';
+import { BrandTimePicker } from '../ui/BrandTimePicker';
 import { ConfirmationModal } from '../common/ConfirmationModal';
 import { ModernSelect } from '../ui/ModernSelect';
 import { TimetableSlot } from '../../types';
@@ -50,7 +50,7 @@ export const TimetableManager: React.FC = () => {
   const [selectedWeek, setSelectedWeek] = useState<string>('');
   const [currentDate, setCurrentDate] = useState(new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }));
 
-  const [showCalendar, setShowCalendar] = useState(false);
+
 
   // Generate weeks dynamically (Date ranges only)
   const generateWeeks = () => {
@@ -119,7 +119,7 @@ export const TimetableManager: React.FC = () => {
   const [viewingSession, setViewingSession] = useState<TimetableSlot | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
 
-  useScrollLock(showAddModal || !!postponingSession || !!viewingSession || !!showDeleteConfirm || showCalendar);
+  useScrollLock(showAddModal || !!postponingSession || !!viewingSession || !!showDeleteConfirm);
 
   const formatTimeAMPM = (time: string) => {
     if (!time) return '';
@@ -387,11 +387,11 @@ export const TimetableManager: React.FC = () => {
         />
 
         <button
-          onClick={() => setShowCalendar(true)}
+          onClick={handleOpenAdd}
           className="px-3 sm:px-5 py-3 text-[9px] sm:text-[10px] font-black text-[var(--on-brand,#fff)] bg-[var(--brand,#0f172a)] hover:bg-black rounded-xl shadow-lg shadow-slate-200 transition-all uppercase tracking-widest flex items-center justify-center space-x-2"
         >
-          <LayoutGrid className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-orange-500" />
-          <span>Calendar</span>
+          <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+          <span>Schedule Class</span>
         </button>
       </div>
 
@@ -433,13 +433,6 @@ export const TimetableManager: React.FC = () => {
         </div>
       </div>
 
-      <button
-        onClick={handleOpenAdd}
-        className="w-full py-2.5 text-sm font-black text-white bg-orange-600 hover:bg-orange-700 rounded-2xl shadow-lg shadow-orange-200/50 transition-all flex items-center justify-center space-x-2"
-      >
-        <Plus className="w-5 h-5" />
-        <span>SCHEDULE CLASS</span>
-      </button>
 
       {/* Day Selection Tabs */}
       <div className="space-y-4">
@@ -631,13 +624,11 @@ export const TimetableManager: React.FC = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block font-black text-slate-700 uppercase tracking-widest mb-1.5">Date *</label>
-                  <input
-                    type="date"
-                    required
+                  <BrandDatePicker
                     value={formData.date || ''}
-                    onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                    onClick={(e) => { if (window.matchMedia('(pointer: fine)').matches) { try { (e.currentTarget as HTMLInputElement & { showPicker?: () => void }).showPicker?.(); } catch { /* noop */ } } }}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 font-bold outline-none focus:bg-white focus:border-orange-500 cursor-pointer [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                    onChange={(val) => setFormData({ ...formData, date: val })}
+                    accent={settings.primaryColor || '#EA580C'}
+                    ariaLabel="Class date"
                   />
                 </div>
                 <ModernSelect
@@ -686,24 +677,20 @@ export const TimetableManager: React.FC = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block font-black text-slate-700 uppercase tracking-widest mb-1.5">Start *</label>
-                  <input
-                    type="time"
-                    required
+                  <BrandTimePicker
                     value={formData.startTime || ''}
-                    onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-                    onClick={(e) => { if (window.matchMedia('(pointer: fine)').matches) { try { (e.currentTarget as HTMLInputElement & { showPicker?: () => void }).showPicker?.(); } catch { /* noop */ } } }}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 font-bold outline-none cursor-pointer [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                    onChange={(val) => setFormData({ ...formData, startTime: val })}
+                    accent={settings.primaryColor || '#EA580C'}
+                    ariaLabel="Class start time"
                   />
                 </div>
                 <div>
                   <label className="block font-black text-slate-700 uppercase tracking-widest mb-1.5">End *</label>
-                  <input
-                    type="time"
-                    required
+                  <BrandTimePicker
                     value={formData.endTime || ''}
-                    onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
-                    onClick={(e) => { if (window.matchMedia('(pointer: fine)').matches) { try { (e.currentTarget as HTMLInputElement & { showPicker?: () => void }).showPicker?.(); } catch { /* noop */ } } }}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 font-bold outline-none cursor-pointer [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                    onChange={(val) => setFormData({ ...formData, endTime: val })}
+                    accent={settings.primaryColor || '#EA580C'}
+                    ariaLabel="Class end time"
                   />
                 </div>
               </div>
@@ -806,14 +793,6 @@ export const TimetableManager: React.FC = () => {
       </div>
     )}
 
-      <CalendarView
-        isOpen={showCalendar}
-        onClose={() => setShowCalendar(false)}
-        activities={[...slotsToActivities(timetable), ...plannerReminders]}
-        title="Facility Master Timetable"
-        onAddActivity={addPlannerReminder}
-        onRemoveActivity={removePlannerReminder}
-      />
 
       {/* View Session Modal */}
       {viewingSession && (() => {

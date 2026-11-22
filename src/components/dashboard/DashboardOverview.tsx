@@ -23,6 +23,8 @@ import { getAuth } from 'firebase/auth';
 import { formatPayInfo } from '../staff/PaySetupFields';
 import { formatDateLong } from '../../lib/paymentDates';
 import { computeNextPayDate, payDueStatus, overdueDays } from '../../lib/staffPay';
+import { CalendarView } from '../common/CalendarView';
+import { slotsToActivities } from '../../lib/planner';
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -47,9 +49,14 @@ export const DashboardOverview: React.FC = () => {
     rejectAdmission,
     seatsSummary,
     centreName,
+    plannerReminders,
+    addPlannerReminder,
+    removePlannerReminder,
   } = useApp();
 
-  const [showRoleDropdown, setShowRoleDropdown] = React.useState(false);
+  // Calendar planner: the same facility master timetable and day planner the
+  // timetable page uses, opened straight from the greeting card.
+  const [showPlanner, setShowPlanner] = React.useState(false);
 
   const pendingAdmissions = admissions.filter((a) => a.status === 'Pending');
   const activeStudents = students.filter((s) => s.status === 'Active');
@@ -65,6 +72,20 @@ export const DashboardOverview: React.FC = () => {
     if (hour < 12) return 'Good morning';
     if (hour < 17) return 'Good afternoon';
     return 'Good evening';
+  };
+
+  // Every activity carries the real moment it happened, so the card shows the
+  // exact clock time and a live "x minutes ago" instead of a frozen stamp.
+  const formatActivityTime = (createdAt?: number) => {
+    if (!createdAt) return '';
+    const d = new Date(createdAt);
+    const exact = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    const mins = Math.floor((Date.now() - createdAt) / 60000);
+    const ago = mins < 1 ? 'Just now'
+      : mins < 60 ? `${mins} min ago`
+      : mins < 1440 ? `${Math.floor(mins / 60)} hr${Math.floor(mins / 60) === 1 ? '' : 's'} ago`
+      : `${Math.floor(mins / 1440)} day${Math.floor(mins / 1440) === 1 ? '' : 's'} ago`;
+    return `${exact} • ${ago}`;
   };
 
   // My Pay: the signed-in staff admin's own pay setup and records. Only
@@ -195,63 +216,16 @@ export const DashboardOverview: React.FC = () => {
                   A live snapshot of students, tutors, classes and money in {centreName}.
                 </p>
 
-              {/* Switch workspace */}
-              <div className="relative shrink-0">
+              {/* Calendar planner: open the facility day planner from here */}
+              <div className="shrink-0">
                 <button
-                  id="dashboard-switch-roles-btn"
-                  onClick={() => setShowRoleDropdown(!showRoleDropdown)}
+                  id="dashboard-planner-btn"
+                  onClick={() => setShowPlanner(true)}
                   className="px-3.5 py-2 text-xs font-bold text-slate-800 bg-white hover:bg-slate-50 border border-slate-200/90 hover:border-orange-400 rounded-xl shadow-xs transition-all flex items-center space-x-2"
                 >
-                  <UserCheck className="w-4 h-4 text-orange-600" />
-                  <span>Switch Workspace</span>
-                  <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                  <Calendar className="w-4 h-4 text-orange-600" />
+                  <span>Calendar Planner</span>
                 </button>
-
-                {showRoleDropdown && (
-                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-200 p-2 z-50 animate-in fade-in zoom-in-95">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-2.5 py-1">
-                      Select Workspace
-                    </p>
-                    <button
-                      onClick={() => {
-                        setViewMode('portal');
-                        setShowRoleDropdown(false);
-                        addToast({
-                          type: 'info',
-                          title: 'Admin Workspace',
-                          description: 'Active in the admin hub.',
-                        });
-                      }}
-                      className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-orange-50 text-xs font-semibold text-slate-800 flex items-center space-x-2 transition-colors"
-                    >
-                      <Shield className="w-4 h-4 text-orange-600" />
-                      <div className="flex-1">
-                        <p className="font-bold text-slate-900">Admin Workspace</p>
-                        <p className="text-[10px] text-slate-400">Full operations access</p>
-                      </div>
-                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        setViewMode('website');
-                        setShowRoleDropdown(false);
-                        addToast({
-                          type: 'info',
-                          title: 'Public Website',
-                          description: 'Viewing public applicant portal.',
-                        });
-                      }}
-                      className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-orange-50 text-xs font-semibold text-slate-800 flex items-center space-x-2 transition-colors"
-                    >
-                      <Globe className="w-4 h-4 text-purple-600" />
-                      <div>
-                        <p className="font-bold text-slate-900">Public Website</p>
-                        <p className="text-[10px] text-slate-400">Online registration landing</p>
-                      </div>
-                    </button>
-                  </div>
-                )}
               </div>
             </div>
           </div>
@@ -566,7 +540,7 @@ export const DashboardOverview: React.FC = () => {
                         <div className="flex items-center space-x-1.5 mt-0.5">
                           <span className="text-[10px] text-slate-400">{act.subtitle || 'Facility record'}</span>
                           <span className="text-[10px] text-slate-300">•</span>
-                          <span className="text-[10px] text-slate-400">{act.timeAgo || 'Just now'}</span>
+                          <span className="text-[10px] text-slate-400">{formatActivityTime(act.createdAt) || act.timeAgo || 'Earlier'}</span>
                         </div>
                       </div>
                     </div>
@@ -672,6 +646,17 @@ export const DashboardOverview: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Calendar planner: the facility master timetable plus the admin's own
+          day plan, opened from the greeting card button. */}
+      <CalendarView
+        isOpen={showPlanner}
+        onClose={() => setShowPlanner(false)}
+        activities={[...slotsToActivities(timetable), ...plannerReminders]}
+        title="Facility Master Timetable"
+        onAddActivity={addPlannerReminder}
+        onRemoveActivity={removePlannerReminder}
+      />
     </div>
   );
 };

@@ -19,7 +19,12 @@ import {
   Sun,
   Moon,
   Shield,
+  Wallet,
+  MessageCircle,
 } from 'lucide-react';
+import { api } from '../tos/tosShared';
+import { computeNextPayDate, payDueStatus, overdueDays } from '../../lib/staffPay';
+import { formatDateLong } from '../../lib/paymentDates';
 
 interface TopNavProps {
   onToggleMobileMenu: () => void;
@@ -33,7 +38,9 @@ export const TopNav: React.FC<TopNavProps> = ({ onToggleMobileMenu }) => {
     globalSearch,
     setGlobalSearch,
     admissions,
-    activities,
+    payments,
+    admins,
+    activeCentreId,
     activeUser,
     viewMode,
     setViewMode,
@@ -53,6 +60,119 @@ export const TopNav: React.FC<TopNavProps> = ({ onToggleMobileMenu }) => {
   const userMenuRef = useRef<HTMLDivElement>(null);
 
   const pendingAdmissions = admissions.filter((a) => a.status === 'Pending');
+
+  // ---------------------------------------------------------------------------
+  // The bell is a notifications inbox, NOT an activity feed. The facility
+  // activity log (with who did what and the exact time) lives on the dashboard
+  // timeline card. The bell itself carries the things an admin must act on:
+  //   1. a new request from the public landing page (pending admission)
+  //   2. a new payment a student submitted and is waiting to be confirmed
+  //   3. a staff salary due date (today or overdue)
+  //   4. new messages in the chat channels this admin belongs to
+  // ---------------------------------------------------------------------------
+
+  type BellNotification = {
+    id: string;
+    kind: 'admission' | 'payment' | 'salary' | 'channel';
+    title: string;
+    detail: string;
+    when: string;
+    section: string;
+  };
+
+  // Channel names + latest message come from the same chat bootstrap the chat
+  // screen uses, refreshed quietly while the admin works.
+  interface ChannelLastMessage { text: string; at: number; removed: boolean; role: string }
+  interface ChannelGroup { id: string; name: string; kind: string; lastMessage?: ChannelLastMessage | null }
+  const [channelGroups, setChannelGroups] = useState<ChannelGroup[]>([]);
+
+  const isAdminPortal = viewMode === 'portal' && !!activeCentreId;
+  useEffect(() => {
+    if (!isAdminPortal || !activeCentreId) return;
+    let alive = true;
+    const pull = async () => {
+      try {
+        const res = await api(`/api/centre/chat/bootstrap?centreId=${encodeURIComponent(activeCentreId)}`);
+        if (alive && res?.groups) setChannelGroups(res.groups as ChannelGroup[]);
+      } catch { /* the bell stays quiet when chat is unreachable */ }
+    };
+    pull();
+    const t = setInterval(pull, 90000);
+    return () => { alive = false; clearInterval(t); };
+  }, [isAdminPortal, activeCentreId]);
+
+  // Channels are read-only until the admin opens them or taps Mark all read.
+  const channelSeenKey = activeUser ? `tos:bell:channelSeen:${activeUser.id || activeUser.email}` : '';
+  const [channelSeenAt, setChannelSeenAt] = useState<number>(() => {
+    try { return Number(localStorage.getItem(channelSeenKey) || 0); } catch { return 0; }
+  });
+  const markChannelsRead = () => {
+    const now = Date.now();
+    try { if (channelSeenKey) localStorage.setItem(channelSeenKey, String(now)); } catch { /* ignore */ }
+    setChannelSeenAt(now);
+  };
+
+  const notifications: BellNotification[] = React.useMemo(() => {
+    const list: BellNotification[] = [];
+
+    // 1. New requests from the landing page
+    pendingAdmissions.forEach((a) => list.push({
+      id: `adm-${a.id}`,
+      kind: 'admission',
+      title: `New request from the landing page: ${a.applicantName}`,
+      detail: `Applied for ${a.programmeName}. Review and approve.`,
+      when: 'Pending review',
+      section: 'admissions',
+    }));
+
+    // 2. New payments students submitted (awaiting confirmation)
+    payments
+      .filter((p) => p.status === 'Pending')
+      .forEach((p) => list.push({
+        id: `pay-${p.id}`,
+        kind: 'payment',
+        title: `New payment from ${p.studentName}`,
+        detail: `${p.method} • ${p.amountPaid.toLocaleString()} claimed for ${p.programmeName}. Confirm or decline.`,
+        when: p.date,
+        section: 'payments',
+      }));
+
+    // 3. Staff salary due dates (today or overdue)
+    admins.forEach((adm) => {
+      if (!adm.payFrequency) return;
+      const nextISO = computeNextPayDate(adm.payFrequency, adm.payDay, adm.lastPaidAt);
+      const st = payDueStatus(nextISO);
+      if (st === 'none') return;
+      list.push({
+        id: `sal-${adm.id}`,
+        kind: 'salary',
+        title: `Staff salary due: ${adm.name}`,
+        detail: st === 'overdue'
+          ? `Was due ${formatDateLong(nextISO)} (${overdueDays(nextISO)} day${overdueDays(nextISO) === 1 ? '' : 's'} overdue).`
+          : `Due today, ${formatDateLong(nextISO)}.`,
+        when: st === 'overdue' ? 'Overdue' : 'Due today',
+        section: 'staff-pay',
+      });
+    });
+
+    // 4. New messages in the channels this admin belongs to
+    channelGroups
+      .filter((g) => g.kind === 'tos_channel'
+        && g.lastMessage
+        && !g.lastMessage.removed
+        && g.lastMessage.at > channelSeenAt
+        && g.lastMessage.at > Date.now() - 7 * 86400000)
+      .forEach((g) => list.push({
+        id: `chn-${g.id}-${g.lastMessage!.at}`,
+        kind: 'channel',
+        title: `New message in ${g.name}`,
+        detail: g.lastMessage!.text.length > 90 ? `${g.lastMessage!.text.slice(0, 90)}…` : g.lastMessage!.text,
+        when: new Date(g.lastMessage!.at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+        section: 'chat',
+      }));
+
+    return list;
+  }, [pendingAdmissions, payments, admins, channelGroups, channelSeenAt]);
 
   const handleLogout = async () => {
     setShowLogoutConfirm(false);
@@ -157,8 +277,10 @@ export const TopNav: React.FC<TopNavProps> = ({ onToggleMobileMenu }) => {
             aria-label="Notifications"
           >
             <Bell className="w-4 h-4 text-slate-600" />
-            {pendingAdmissions.length > 0 && (
-              <span className="absolute top-2 right-2 w-2 h-2 bg-orange-600 rounded-full ring-2 ring-white animate-pulse" />
+            {notifications.length > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-orange-600 rounded-full ring-2 ring-white text-white text-[9px] font-black flex items-center justify-center">
+                {notifications.length > 9 ? '9+' : notifications.length}
+              </span>
             )}
           </button>
 
@@ -171,64 +293,61 @@ export const TopNav: React.FC<TopNavProps> = ({ onToggleMobileMenu }) => {
                 <div className="flex items-center space-x-2">
                   <h2 className="text-xs font-bold text-slate-900">Notifications</h2>
                   <span className="px-2 py-0.5 text-[10px] font-bold bg-orange-50 text-orange-600 rounded-md">
-                    {activities.length} Recent
+                    {notifications.length} New
                   </span>
                 </div>
-                <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
-                  All Activity
-                </span>
+                <button
+                  onClick={markChannelsRead}
+                  className="text-[10px] font-bold uppercase tracking-wider text-slate-400 hover:text-orange-600"
+                >
+                  Mark all read
+                </button>
               </div>
 
               <div className="max-h-80 overflow-y-auto divide-y divide-slate-100">
-                {pendingAdmissions.map((app) => (
-                  <div
-                    key={app.id}
-                    onClick={() => {
-                      setAdminSection('admissions');
-                      setShowNotifications(false);
-                    }}
-                    className="p-3 hover:bg-orange-50/40 cursor-pointer transition-colors flex items-start space-x-3"
-                  >
-                    <div className="w-8 h-8 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center shrink-0 text-xs font-bold mt-0.5">
-                      {app.applicantName.charAt(0)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold text-slate-900 truncate">
-                        New Registration: {app.applicantName}
-                      </p>
-                      <p className="text-[11px] text-slate-500 truncate">
-                        Applied for {app.programmeName}
-                      </p>
-                      <span className="inline-block mt-1 bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded text-[10px] font-bold">
-                        Awaiting Review
-                      </span>
-                    </div>
+                {notifications.length === 0 && (
+                  <div className="p-6 text-center">
+                    <CheckCircle2 className="w-8 h-8 text-slate-200 mx-auto mb-2" />
+                    <p className="text-xs font-bold text-slate-700">You're all caught up</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">New requests, payments, salary dates and channel messages will land here.</p>
                   </div>
-                ))}
-
-                {activities.slice(0, 5).map((act) => (
-                  <div
-                    key={act.id}
-                    className="p-3 hover:bg-slate-50 transition-colors flex items-start space-x-3"
-                  >
-                    <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center shrink-0 text-xs mt-0.5">
-                      <Clock className="w-3.5 h-3.5 text-slate-400" />
+                )}
+                {notifications.map((n) => {
+                  const Icon = n.kind === 'admission' ? User
+                    : n.kind === 'payment' ? Wallet
+                    : n.kind === 'salary' ? Clock
+                    : MessageCircle;
+                  const tone = n.kind === 'admission' ? 'bg-orange-100 text-orange-600'
+                    : n.kind === 'payment' ? 'bg-emerald-100 text-emerald-600'
+                    : n.kind === 'salary' ? 'bg-rose-100 text-rose-600'
+                    : 'bg-indigo-100 text-indigo-600';
+                  return (
+                    <div
+                      key={n.id}
+                      onClick={() => {
+                        setAdminSection(n.section as any);
+                        setShowNotifications(false);
+                      }}
+                      className="p-3 hover:bg-orange-50/40 cursor-pointer transition-colors flex items-start space-x-3"
+                    >
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 text-xs font-bold mt-0.5 ${tone}`}>
+                        <Icon className="w-4 h-4" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-slate-900 leading-snug">{n.title}</p>
+                        <p className="text-[11px] text-slate-500 leading-snug">{n.detail}</p>
+                        <p className="text-[10px] text-slate-400 mt-0.5 font-semibold">{n.when}</p>
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-slate-900 leading-snug">
-                        {act.title}
-                      </p>
-                      <p className="text-[11px] text-slate-500 truncate">{act.subtitle}</p>
-                      <p className="text-[10px] text-slate-400 mt-0.5">{act.timeAgo}</p>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
             </div>
           )}
         </div>
 
+        {/* User Profile Avatar Dropdown (matches video 00:00, 02:10: PA circle in peach) */}
         {/* User Profile Avatar Dropdown (matches video 00:00, 02:10: PA circle in peach) */}
         <div className="relative" ref={userMenuRef}>
           <button
