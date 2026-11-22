@@ -24,7 +24,6 @@ import {
   Plus,
   Calendar,
   X,
-  Camera,
   ImagePlus,
   Trash2,
   RefreshCw,
@@ -219,9 +218,7 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
   const [newSessionName, setNewSessionName] = useState('');
 
   // ---- Profile photo: uploaded to Cloudinary through the server, saved on the admin record.
-  const photoInputRef = useRef<HTMLInputElement>(null);
   const [photoUrl, setPhotoUrl] = useState(activeUser?.photoUrl || '');
-  const [photoBusy, setPhotoBusy] = useState(false);
 
   const readFileAsDataUrl = (file: File): Promise<string> =>
     new Promise((resolve, reject) => {
@@ -230,33 +227,6 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
       reader.onerror = () => reject(reader.error);
       reader.readAsDataURL(file);
     });
-
-  const handlePhotoPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
-    if (!/^image\/(png|jpe?g|webp)$/i.test(file.type)) {
-      addToast({ type: 'error', title: 'Unsupported Image', description: 'Upload a PNG, JPG or WebP picture.' });
-      return;
-    }
-    if (file.size > 2 * 1024 * 1024) {
-      addToast({ type: 'error', title: 'Image Too Large', description: 'Your profile photo can be up to 2 MB.' });
-      return;
-    }
-    if (!activeUser) return;
-    setPhotoBusy(true);
-    try {
-      const dataUrl = await readFileAsDataUrl(file);
-      const url = await uploadCentreImage(dataUrl, 'profile');
-      setPhotoUrl(url);
-      await updateAdmin(activeUser.id, { photoUrl: url });
-      addToast({ type: 'success', title: 'Profile Photo Updated', description: 'Your new photo shows on the avatar and dropdown.' });
-    } catch (err: any) {
-      addToast({ type: 'error', title: 'Upload Failed', description: err?.message || 'The photo could not be uploaded. Please try again.' });
-    } finally {
-      setPhotoBusy(false);
-    }
-  };
 
   // ---- Session expiry: this account decides how long a login lasts.
   const [expiryDays, setExpiryDays] = useState<number>(activeUser?.sessionExpiryDays ?? 0);
@@ -545,21 +515,7 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
                   {firstName[0]}{lastName[0]}
                 </div>
               )}
-              <button
-                type="button"
-                onClick={() => photoInputRef.current?.click()}
-                disabled={photoBusy}
-                aria-label="Upload profile photo"
-                className="absolute -bottom-1.5 -right-1.5 w-7 h-7 rounded-full bg-orange-600 text-white shadow flex items-center justify-center hover:bg-orange-700 disabled:opacity-60 transition-colors"
-              >
-                {photoBusy ? <div className="w-3.5 h-3.5 rounded-full border-2 border-white border-t-transparent animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
-              </button>
             </div>
-            <div>
-              <p className="text-xs font-bold text-slate-800">Profile photo</p>
-              <p className="text-[11px] text-slate-500">PNG, JPG or WebP, up to 2 MB. Shows on your avatar and dropdown.</p>
-            </div>
-            <input ref={photoInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={handlePhotoPick} />
           </div>
 
           <form onSubmit={handleUpdateProfile} className="space-y-4 text-xs">

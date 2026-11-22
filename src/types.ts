@@ -227,6 +227,7 @@ export interface TimetableSlot {
   changeRequestReason?: string;
   postponedNote?: string;
   cancellationReason?: string;
+  materials?: { id: string; title: string }[];
 }
 
 export interface StudyMaterial {

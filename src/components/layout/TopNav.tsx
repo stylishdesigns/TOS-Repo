@@ -250,9 +250,6 @@ export const TopNav: React.FC<TopNavProps> = ({ onToggleMobileMenu }) => {
             <div className="w-7 h-7 rounded-full bg-orange-200 text-orange-700 flex items-center justify-center font-bold text-xs">
               {activeUser?.name ? activeUser.name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase() : 'PA'}
             </div>
-            <span className="hidden md:inline text-xs font-semibold text-slate-800">
-              {activeUser?.name ? activeUser.name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase() : 'PA'}
-            </span>
             <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
           </button>
 
@@ -286,18 +283,7 @@ export const TopNav: React.FC<TopNavProps> = ({ onToggleMobileMenu }) => {
                 id="bg-theme-toggle-container"
                 className="px-4 py-3.5 border-b border-slate-100 bg-slate-50/70"
               >
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex items-center space-x-1.5">
-                      <span className="text-xs font-bold text-slate-800 tracking-tight">Appearance</span>
-                      <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-white border border-slate-200 text-slate-400 uppercase tracking-widest">
-                        App canvas
-                      </span>
-                    </div>
-                    <p className="text-[10px] text-slate-400 mt-0.5">
-                      How the dashboard background looks.
-                    </p>
-                  </div>
+                <div className="flex items-center justify-end gap-3">
 
                   <div className="flex items-center rounded-xl bg-white border border-slate-200 p-0.5 shadow-sm shrink-0">
                     {([
@@ -318,7 +304,6 @@ export const TopNav: React.FC<TopNavProps> = ({ onToggleMobileMenu }) => {
                             addToast({
                               type: 'info',
                               title: key === 'dark' ? 'Dark Background Activated' : 'Light Background Activated',
-                              description: `App background switched to ${key === 'dark' ? 'Dark' : 'Light'} mode. Cards and sidebar are preserved.`,
                             });
                           }}
                           className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-[10px] text-[11px] font-bold transition-all duration-200 ${
@@ -328,7 +313,6 @@ export const TopNav: React.FC<TopNavProps> = ({ onToggleMobileMenu }) => {
                           }`}
                         >
                           <Icon className="w-3.5 h-3.5" />
-                          <span>{label}</span>
                         </button>
                       );
                     })}
@@ -346,16 +330,6 @@ export const TopNav: React.FC<TopNavProps> = ({ onToggleMobileMenu }) => {
                 >
                   <User className="w-4 h-4 text-orange-600" />
                   <span>Go to Profile</span>
-                </button>
-                <button
-                  onClick={() => {
-                    setAdminSection('cms-editor');
-                    setShowUserMenu(false);
-                  }}
-                  className="w-full px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center space-x-2.5"
-                >
-                  <Globe className="w-4 h-4 text-slate-400" />
-                  <span>Customise Website CMS</span>
                 </button>
               </div>
 

@@ -49,7 +49,6 @@ import {
   INITIAL_PAYMENTS,
   INITIAL_ANNOUNCEMENTS,
   INITIAL_ADMINS,
-  INITIAL_ACTIVITIES,
   INITIAL_CLASSROOMS,
   INITIAL_ATTENDANCE_SETTINGS,
   INITIAL_SUBJECTS,
@@ -539,14 +538,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   });
 
-  const [activities, setActivities] = useState<ActivityLog[]>(() => {
-    try {
-      const saved = localStorage.getItem(scopedKey('activities'));
-      return saved ? JSON.parse(saved) : INITIAL_ACTIVITIES;
-    } catch {
-      return INITIAL_ACTIVITIES;
-    }
-  });
+  // Recent activities come only from the live Firestore stream; no sample
+  // data and no local cache, so the panel never shows invented logs.
+  const [activities, setActivities] = useState<ActivityLog[]>([]);
 
   const [attendanceLogs, setAttendanceLogs] = useState<AttendanceLog[]>([]);
   const [exams, setExams] = useState<CBTExam[]>([]);
@@ -1757,7 +1751,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       localStorage.setItem(scopedKey('announcements'), JSON.stringify(announcements));
       localStorage.setItem(scopedKey('admins'), JSON.stringify(admins));
       localStorage.setItem(`${STORAGE_KEY}_testimonials`, JSON.stringify(testimonials));
-      localStorage.setItem(scopedKey('activities'), JSON.stringify(activities));
     } catch {
       // ignore storage quota errors in private browsing
     }
@@ -1839,7 +1832,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setPayments(INITIAL_PAYMENTS);
     setAnnouncements(INITIAL_ANNOUNCEMENTS);
     setAdmins(INITIAL_ADMINS);
-    setActivities(INITIAL_ACTIVITIES);
+    setActivities([]);
     setClassrooms(INITIAL_CLASSROOMS);
     setAttendanceSettings(INITIAL_ATTENDANCE_SETTINGS);
     setActiveTutor(INITIAL_TUTORS[0] || null);

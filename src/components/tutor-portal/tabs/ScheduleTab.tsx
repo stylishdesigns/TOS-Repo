@@ -26,7 +26,7 @@ interface ScheduleTabProps {
 }
 
 export const ScheduleTab: React.FC<ScheduleTabProps> = ({ tutor, initialSection }) => {
-  const { timetable, programmes, settings, consentToTimetableSlot, updateTimetableSlot, students, plannerReminders, addPlannerReminder, removePlannerReminder, updatePlannerReminder } = useApp();
+  const { timetable, programmes, settings, consentToTimetableSlot, updateTimetableSlot, studyMaterials, currentUser, students, plannerReminders, addPlannerReminder, removePlannerReminder, updatePlannerReminder } = useApp();
   const [activeSection, setActiveSection] = useState<'classes' | 'materials'>(initialSection === 'materials' ? 'materials' : 'classes');
   const [selectedDay, setSelectedDay] = useState<'All' | string>('All');
   const [selectedStatus, setSelectedStatus] = useState<string>('All');
@@ -36,11 +36,32 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({ tutor, initialSection 
   const [tutorTopic, setTutorTopic] = useState('');
   const [actionReason, setActionReason] = useState('');
   const [actionType, setActionType] = useState<'none' | 'postpone'>('none');
-  // The scheduled class the tutor tapped "Add Material" on; the Study
-  // Materials sheet opens pre-bound to its subject and topic.
-  const [materialClass, setMaterialClass] = useState<TimetableSlot | null>(null);
-
   useScrollLock(!!viewingSession);
+
+  // Materials this tutor has already uploaded. Attaching a material to a
+  // class only picks from these; uploads happen in Study Materials.
+  const myMaterials = studyMaterials.filter((m) =>
+    (m.tutorId && (m.tutorId === tutor.id || m.tutorId === currentUser?.uid)) ||
+    (!m.tutorId && !!m.tutorName && m.tutorName.toLowerCase() === (tutor.name || '').toLowerCase())
+  );
+  const attachedIds = new Set((viewingSession?.materials || []).map((m) => m.id));
+  const availableMaterials = myMaterials.filter((m) => !attachedIds.has(m.id));
+
+  const handleAttachMaterial = async (materialId: string) => {
+    if (!materialId || !viewingSession) return;
+    const mat = myMaterials.find((m) => m.id === materialId);
+    if (!mat || attachedIds.has(mat.id)) return;
+    const next = [...(viewingSession.materials || []), { id: mat.id, title: mat.title }];
+    setViewingSession({ ...viewingSession, materials: next });
+    await updateTimetableSlot(viewingSession.id, { materials: next });
+  };
+
+  const handleDetachMaterial = async (materialId: string) => {
+    if (!viewingSession) return;
+    const next = (viewingSession.materials || []).filter((m) => m.id !== materialId);
+    setViewingSession({ ...viewingSession, materials: next });
+    await updateTimetableSlot(viewingSession.id, { materials: next });
+  };
 
   // Current week range (Monday to Sunday)
   const currentWeekRange = React.useMemo(() => {
@@ -229,8 +250,6 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({ tutor, initialSection 
         <TutorMaterialsSection
           tutor={tutor}
           subjects={tutorSubjects}
-          addForClass={materialClass}
-          onClassHandled={() => setMaterialClass(null)}
         />
       ) : (
         <>
@@ -430,10 +449,10 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({ tutor, initialSection 
                           </div>
                           <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-2">
                             <button
-                              onClick={(e) => { e.stopPropagation(); setMaterialClass(cls); setActiveSection('materials'); }}
+                              onClick={(e) => { e.stopPropagation(); setViewingSession(cls); setTutorTopic(cls.topic || ''); setActionType('none'); setHasConsented(false); }}
                               className="px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl text-[10px] font-black uppercase tracking-widest hover:border-slate-300 transition-colors"
                             >
-                              Upload Material
+                              Add Material
                             </button>
                             <button className="px-6 py-2 bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-orange-600 transition-colors">View Details</button>
                           </div>
@@ -507,7 +526,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({ tutor, initialSection 
                   <div className="space-y-4">
                      <div className="pt-4 border-t border-slate-100">
                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Schedule Status</span>
-                         <div className={`p-3 rounded-xl border-2 flex items-center justify-between shadow-sm ${
+                         <div className={`inline-flex w-fit items-center gap-2 px-3.5 py-2 rounded-full border-2 shadow-sm ${
                             inSession ? 'bg-emerald-600 border-emerald-500 text-white' : 
                             finished ? 'bg-slate-400 border-slate-300 text-white' : 
                             isNextUp(viewingSession.time, viewingSession.date) ? 'bg-blue-600 border-blue-500 text-white' : 
@@ -529,13 +548,35 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({ tutor, initialSection 
                          </div>
                      </div>
 
-                     <button
-                        onClick={() => { const cls = viewingSession; setMaterialClass(cls); setViewingSession(null); setActiveSection('materials'); }}
-                        className="w-full py-3 bg-white border border-slate-200 text-slate-700 font-black text-[10px] uppercase tracking-widest rounded-xl hover:border-slate-300 transition-all flex items-center justify-center gap-2"
-                     >
-                        <BookOpen className="w-3.5 h-3.5" />
-                        Add material to this class
-                     </button>
+                     <div className="pt-4 border-t border-slate-100">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Class Materials</span>
+                        <select
+                           value=""
+                           onChange={(e) => handleAttachMaterial(e.target.value)}
+                           className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-700 focus:outline-none focus:border-orange-500"
+                        >
+                           <option value="">Attach a material…</option>
+                           {availableMaterials.map((m) => (
+                              <option key={m.id} value={m.id}>{m.title}</option>
+                           ))}
+                        </select>
+                        {myMaterials.length === 0 && (
+                           <p className="text-[10px] text-slate-400 mt-1.5">Upload a material in Study Materials first, then attach it here.</p>
+                        )}
+                        {(viewingSession.materials || []).length > 0 && (
+                           <div className="flex flex-wrap gap-1.5 mt-2.5">
+                              {(viewingSession.materials || []).map((mat) => (
+                                 <span key={mat.id} className="inline-flex items-center gap-1.5 bg-white border border-slate-200 rounded-lg pl-2.5 pr-1.5 py-1">
+                                    <BookOpen className="w-3 h-3 text-orange-500 shrink-0" />
+                                    <span className="text-[10px] font-bold text-slate-700">{mat.title}</span>
+                                    <button type="button" onClick={() => handleDetachMaterial(mat.id)} className="text-slate-300 hover:text-rose-500 transition-colors" aria-label={`Remove ${mat.title}`}>
+                                       <X className="w-3 h-3" />
+                                    </button>
+                                 </span>
+                              ))}
+                           </div>
+                        )}
+                     </div>
 
                      {!isFinished(viewingSession.time, viewingSession.date) && actionType === 'none' && (
                         <div className="space-y-4">
