@@ -515,3 +515,21 @@ span.text-slate-600:not(.dark-bg-mode *) {
   50% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0.12); }
 }
 .checkin-breathe { animation: checkinBreathe 1.8s ease-in-out infinite; }
+
+/* ===== Dark mode: translucent light cards stay light ===== */
+/* A translucent light surface (bg-amber-50/50 and friends) blends into the
+   dark canvas and reads as a darkened card. From 40% opacity up, light
+   surfaces render solid at their base colour in dark mode; lower tints on
+   dark chrome keep their translucency. */
+.tos-canvas-dark .bg-slate-200\/60, .tos-canvas-dark .bg-slate-200\/70 { background-color: #e2e8f0; }
+.tos-canvas-dark .bg-emerald-50\/50, .tos-canvas-dark .bg-emerald-50\/70 { background-color: #ecfdf5; }
+.tos-canvas-dark .bg-blue-50\/60, .tos-canvas-dark .bg-blue-50\/70, .tos-canvas-dark .bg-blue-50\/80 { background-color: #eff6ff; }
+.tos-canvas-dark .bg-slate-100\/80, .tos-canvas-dark .bg-slate-100\/90 { background-color: #f1f5f9; }
+.tos-canvas-dark .bg-violet-50\/70 { background-color: #f5f3ff; }
+.tos-canvas-dark .bg-slate-50\/50, .tos-canvas-dark .bg-slate-50\/60, .tos-canvas-dark .bg-slate-50\/70, .tos-canvas-dark .bg-slate-50\/75, .tos-canvas-dark .bg-slate-50\/80, .tos-canvas-dark .bg-slate-50\/95 { background-color: #f8fafc; }
+.tos-canvas-dark .bg-red-50\/70 { background-color: #fef2f2; }
+.tos-canvas-dark .bg-amber-100\/50 { background-color: #fef3c7; }
+.tos-canvas-dark .bg-orange-100\/60, .tos-canvas-dark .bg-orange-100\/70, .tos-canvas-dark .bg-orange-100\/80 { background-color: #ffedd5; }
+.tos-canvas-dark .bg-orange-50\/40, .tos-canvas-dark .bg-orange-50\/50, .tos-canvas-dark .bg-orange-50\/60, .tos-canvas-dark .bg-orange-50\/70, .tos-canvas-dark .bg-orange-50\/80 { background-color: #fff7ed; }
+.tos-canvas-dark .bg-amber-50\/50, .tos-canvas-dark .bg-amber-50\/60, .tos-canvas-dark .bg-amber-50\/70, .tos-canvas-dark .bg-amber-50\/80 { background-color: #fffbeb; }
+.tos-canvas-dark .bg-white\/50, .tos-canvas-dark .bg-white\/60, .tos-canvas-dark .bg-white\/70, .tos-canvas-dark .bg-white\/90, .tos-canvas-dark .bg-white\/95 { background-color: #ffffff; }
