@@ -302,6 +302,7 @@ export interface AttendanceSettings {
   resumptionTime: string; // e.g. "08:00 AM"
   closingTime: string;    // e.g. "03:30 PM"
   lateArrivalTime: string; // e.g. "08:30 AM"
+  operatingDays?: string[]; // days the facility opens; check-in is required only on these
 }
 
 export interface AttendanceLog {

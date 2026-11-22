@@ -213,6 +213,7 @@ const PALETTES = {
     backBtn: 'text-slate-500 hover:text-orange-600 hover:bg-orange-50',
     ghostBtn: 'text-slate-500 hover:text-orange-600 hover:bg-orange-50',
     aiBubble: 'bg-slate-100 text-slate-800',
+    aiText: 'text-slate-800 font-medium',
     aiTime: 'text-slate-400',
     imgBorder: 'border-slate-200',
     dayChip: 'text-slate-500 bg-slate-100',
@@ -245,6 +246,7 @@ const PALETTES = {
     backBtn: 'text-slate-400 hover:text-orange-400 hover:bg-orange-500/10',
     ghostBtn: 'text-slate-400 hover:text-orange-400 hover:bg-orange-500/10',
     aiBubble: 'bg-slate-800/90 text-white',
+    aiText: 'text-white font-semibold',
     aiTime: 'text-slate-500',
     imgBorder: 'border-slate-700/60',
     dayChip: 'text-slate-500 bg-slate-800/60',
@@ -459,7 +461,7 @@ const TutorAiChat: React.FC<Props> = ({
           />
         )}
         {m.role === 'ai' ? (
-          <div className="text-[15px] leading-relaxed">{renderRichText(typewriter ?? m.text)}</div>
+          <div className={`text-[15px] leading-relaxed ${th.aiText}`}>{renderRichText(typewriter ?? m.text)}</div>
         ) : (
           <p className="text-[15px] leading-relaxed whitespace-pre-wrap break-words font-medium text-white">{m.text}</p>
         )}

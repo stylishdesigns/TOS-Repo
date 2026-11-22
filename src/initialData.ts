@@ -23,6 +23,7 @@ export const INITIAL_ATTENDANCE_SETTINGS: AttendanceSettings = {
   resumptionTime: '08:00 AM',
   closingTime: '03:30 PM',
   lateArrivalTime: '08:30 AM',
+  operatingDays: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
 };
 
 export const INITIAL_CLASSROOMS: Classroom[] = [

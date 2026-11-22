@@ -17,13 +17,18 @@
  */
 import { runPushSweep } from '../../src/server/pushSender';
 import { runAnnouncementSweep } from '../../src/server/announcementRoutes';
+import { runCheckInReminderSweep } from '../../src/server/checkInReminders';
 
 export default async () => {
   const result = await runPushSweep({ limit: 20 });
   // Scheduled broadcasts (compose page, "Schedule" mode) ride the same
   // 10-minute cadence: due ones deliver here, minutes after their moment.
   const announcements = await runAnnouncementSweep({ limit: 10 });
-  console.log('[push-sender]', JSON.stringify(result), '[announcements]', JSON.stringify(announcements));
+  // Check-in reminders ride the same cadence: on open days, once the
+  // facility's check-in time passes, students who have not checked in get
+  // one in-app notification and one push.
+  const checkins = await runCheckInReminderSweep();
+  console.log('[push-sender]', JSON.stringify(result), '[announcements]', JSON.stringify(announcements), '[checkin-reminders]', JSON.stringify(checkins));
   return new Response(JSON.stringify(result), {
     status: 200,
     headers: { 'content-type': 'application/json' },

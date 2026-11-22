@@ -34,7 +34,7 @@ interface HomeTabProps {
 
 export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
   // Attendance & Clock logic
-  const { settings, timetable, announcements, results, attendanceSettings, attendanceLogs, clockIn, clockOut, plannerReminders, addPlannerReminder, removePlannerReminder, updatePlannerReminder } = useApp();
+  const { settings, timetable, announcements, results, attendanceSettings, attendanceLogs, clockIn, clockOut, plannerReminders, addPlannerReminder, removePlannerReminder, updatePlannerReminder, centreName } = useApp();
   const [showAttendanceInfo, setShowAttendanceInfo] = React.useState(false);
   const [showCalendar, setShowCalendar] = React.useState(false);
 
@@ -116,7 +116,6 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
   };
 
   // Urgent announcements
-  const urgentAnnouncements = announcements.filter((a) => a.priority === 'Urgent' || a.target !== 'Parents');
 
   const studentAvatar =
     (student.avatar &&
@@ -185,6 +184,16 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
   const closingMinutes = parseTimeToMinutes(attendanceSettings.closingTime || '03:30 PM');
   const lateMinutesThreshold = parseTimeToMinutes(attendanceSettings.lateArrivalTime || '08:30 AM');
   const currentMinutes = currentTime.getHours() * 60 + currentTime.getMinutes();
+
+  // Open days (Nov 23): the facility picks its open days in Attendance
+  // Settings; check-in is only required on those days. Until the facility
+  // saves a setup, every day counts as open (the old behaviour).
+  const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const operatingDays: string[] = Array.isArray(attendanceSettings.operatingDays) && attendanceSettings.operatingDays.length > 0
+    ? attendanceSettings.operatingDays
+    : DAY_NAMES;
+  const openToday = operatingDays.includes(todayName);
+  const openDaysShort = operatingDays.map((d) => d.slice(0, 3)).join(', ');
 
   // Closing time as today's date, for the check-in ring
   const closingToday = (() => {
@@ -293,11 +302,12 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
               <li>• Resumption: {attendanceSettings.resumptionTime}</li>
               <li>• Late Gate: {attendanceSettings.lateArrivalTime}</li>
               <li>• Closing: {attendanceSettings.closingTime}</li>
+              <li>• Open days: {openDaysShort}</li>
             </ul>
           </div>
         )}
 
-        {isRunningLate && (
+        {openToday && isRunningLate && (
           <button
             type="button"
             onClick={handleClockInAction}
@@ -318,10 +328,12 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
           </button>
         )}
 
-        {isLate && !clockedOutAt && (
+        {openToday && isLate && !clockedOutAt && (
           <span className="self-center mb-1 px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 text-[9px] font-black uppercase tracking-wider">Late Arrival</span>
         )}
 
+        {openToday ? (
+          <>
         {/* Check In on the student's left, Check Out on the right, and a small
             circular time chip sitting centred on the line between them. It
             starts moving the moment the student checks in, rides the
@@ -386,6 +398,18 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
             ? 'Time complete — you can check out now'
             : `On-going • Check out opens at ${attendanceSettings.closingTime}`}
         </p>
+          </>
+        ) : (
+          <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-start gap-3">
+            <Calendar className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-[11px] font-black text-slate-800 leading-snug">{centreName || 'Your facility'} does not open today</p>
+              <p className="text-[10px] text-slate-500 font-medium mt-0.5 leading-snug">
+                Check-in is only required on open days: {openDaysShort}. See you on your next class day.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 3. Candidate Vitals Row (Enhanced, comfortable button cards) */}
@@ -585,23 +609,6 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
         </div>
       </div>
 
-      {/* 6. Important Centre Notice */}
-      {urgentAnnouncements.length > 0 && (
-        <div className="bg-amber-50/80 border border-amber-200 rounded-2xl p-4 shadow-2xs flex items-start space-x-3">
-          <div className="p-2 bg-amber-100 text-amber-800 rounded-xl shrink-0 mt-0.5">
-            <Bell className="w-4.5 h-4.5" />
-          </div>
-          <div className="space-y-0.5">
-            <span className="text-[10px] font-extrabold uppercase text-amber-900 tracking-wider">
-              Facility Notice • {urgentAnnouncements[0].date}
-            </span>
-            <h5 className="text-xs font-bold text-slate-900">{urgentAnnouncements[0].title}</h5>
-            <p className="text-[11px] text-slate-600 line-clamp-2 leading-relaxed">
-              {urgentAnnouncements[0].content}
-            </p>
-          </div>
-        </div>
-      )}
 
       {/* Academic Calendar Planner Modal */}
       <CalendarView

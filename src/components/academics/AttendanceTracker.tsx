@@ -31,6 +31,9 @@ interface AttendanceRecord {
   totalAttendanceCount?: number;
 }
 
+const ALL_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const shortDays = (days?: string[]) => (days && days.length ? days : ALL_DAYS).map((d) => d.slice(0, 3)).join(', ');
+
 export const AttendanceTracker: React.FC = () => {
   const { students, programmes, settings, attendanceSettings, updateAttendanceSettings, attendanceLogs, addToast, centreName } =
     useApp();
@@ -47,6 +50,9 @@ export const AttendanceTracker: React.FC = () => {
     resumptionTime: attendanceSettings?.resumptionTime || '08:00 AM',
     closingTime: attendanceSettings?.closingTime || '03:30 PM',
     lateArrivalTime: attendanceSettings?.lateArrivalTime || '08:30 AM',
+    operatingDays: Array.isArray(attendanceSettings?.operatingDays) && attendanceSettings.operatingDays.length
+      ? attendanceSettings.operatingDays
+      : ALL_DAYS,
   });
 
   // Map attendance logs to records
@@ -129,11 +135,19 @@ export const AttendanceTracker: React.FC = () => {
 
   const handleSaveTimingSettings = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!timingForm.operatingDays.length) {
+      addToast({
+        type: 'error',
+        title: 'Pick at least one open day',
+        description: 'Select the days your facility opens so students know when to check in.',
+      });
+      return;
+    }
     updateAttendanceSettings(timingForm);
     addToast({
       type: 'success',
-      title: 'Attendance Timing Saved',
-      description: `Resumption: ${timingForm.resumptionTime} | Late Arrival: ${timingForm.lateArrivalTime} | Closing: ${timingForm.closingTime}`,
+      title: 'Attendance Settings Saved',
+      description: `Open days: ${timingForm.operatingDays.map((d) => d.slice(0, 3)).join(', ')} | Resumption: ${timingForm.resumptionTime} | Late Arrival: ${timingForm.lateArrivalTime} | Closing: ${timingForm.closingTime}`,
     });
     setShowSettingsModal(false);
   };
@@ -155,7 +169,7 @@ export const AttendanceTracker: React.FC = () => {
           className="self-start sm:self-auto inline-flex items-center space-x-1.5 px-3.5 py-2 text-[11px] font-bold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 active:scale-[0.98] transition-all"
         >
           <Settings className="w-3.5 h-3.5" />
-          <span>Timing Settings</span>
+          <span>Attendance Settings</span>
         </button>
       </div>
 
@@ -175,6 +189,9 @@ export const AttendanceTracker: React.FC = () => {
             </span>
             <span className="px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200 text-[11px] text-slate-500 font-medium">
               Closing <span className="font-bold text-slate-800 ml-1">{attendanceSettings?.closingTime || '03:30 PM'}</span>
+            </span>
+            <span className="px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200 text-[11px] text-slate-500 font-medium">
+              Open days <span className="font-bold text-slate-800 ml-1">{shortDays(attendanceSettings?.operatingDays)}</span>
             </span>
           </div>
         </div>
@@ -397,7 +414,7 @@ export const AttendanceTracker: React.FC = () => {
                 <div className="w-9 h-9 rounded-xl bg-orange-50 flex items-center justify-center">
                   <Clock className="w-4.5 h-4.5 text-orange-600" />
                 </div>
-                <h3 className="font-black text-base text-slate-900 tracking-tight">Attendance Timing Settings</h3>
+                <h3 className="font-black text-base text-slate-900 tracking-tight">Attendance Settings</h3>
               </div>
               <button
                 onClick={() => setShowSettingsModal(false)}
@@ -409,7 +426,7 @@ export const AttendanceTracker: React.FC = () => {
 
             <form onSubmit={handleSaveTimingSettings} className="mt-4 space-y-4 text-xs">
               <p className="text-slate-500 font-medium">
-                Configure facility roll-call timings, resumption gates, late arrival threshold, and departure checkout hours.
+                Set your check-in and check-out times and pick the days your facility opens. Students are asked to check in only on the open days you select.
               </p>
 
               <div className="grid grid-cols-2 gap-3">
@@ -461,6 +478,31 @@ export const AttendanceTracker: React.FC = () => {
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900 font-semibold focus:bg-white focus:border-orange-500 outline-none"
                   />
                   <span className="text-[10px] text-slate-400 font-medium">End of regular classes</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1.5">Open Days *</label>
+                <p className="text-[10px] text-slate-400 font-medium mb-2">Tap the days your facility opens. Students are only asked to check in on these days.</p>
+                <div className="grid grid-cols-4 gap-2">
+                  {ALL_DAYS.map((d) => {
+                    const on = timingForm.operatingDays.includes(d);
+                    return (
+                      <button
+                        key={d}
+                        type="button"
+                        onClick={() =>
+                          setTimingForm((f) => ({
+                            ...f,
+                            operatingDays: on ? f.operatingDays.filter((x) => x !== d) : [...f.operatingDays, d],
+                          }))
+                        }
+                        className={`py-2 rounded-xl border text-[10px] font-black uppercase tracking-wider transition-all ${on ? 'bg-orange-600 text-white border-orange-600' : 'bg-slate-50 text-slate-500 border-slate-200 hover:border-slate-300'}`}
+                      >
+                        {d.slice(0, 3)}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 

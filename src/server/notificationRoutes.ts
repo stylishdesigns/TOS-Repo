@@ -4,6 +4,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { adminDb } from './firebaseAdmin';
 import { Caller, httpError, requireMembership } from './tenantService';
 import { sendAtMs, runPushSweep } from './pushSender';
+import { runCheckInReminderSweep } from './checkInReminders';
 
 // ============================================================================
 // In-app notifications for the student portal.
@@ -333,7 +334,8 @@ export function registerNotificationRoutes(app: express.Express): void {
         return res.status(403).json({ error: 'Only facility staff can run the push sweep.' });
       }
       const result = await runPushSweep({ limit: 20 });
-      return res.json(result);
+      const checkins = await runCheckInReminderSweep();
+      return res.json({ ...result, checkInReminders: checkins });
     } catch (e) {
       return res.status(errStatus(e)).json({ error: (e as Error).message || 'Could not run the push sweep.' });
     }

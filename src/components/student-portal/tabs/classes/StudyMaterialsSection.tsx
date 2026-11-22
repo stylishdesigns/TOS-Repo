@@ -9,7 +9,6 @@ import {
   CheckCircle,
   X,
   ExternalLink,
-  Sparkles,
   FileDown,
   Layers,
   PlayCircle,
@@ -320,24 +319,11 @@ export const StudyMaterialsSection: React.FC<StudyMaterialsSectionProps> = ({
             <div className="flex-1 overflow-y-auto py-4 space-y-4 text-xs text-slate-700 leading-relaxed font-medium">
               <div className="p-3.5 bg-orange-50/60 rounded-2xl border border-orange-100 space-y-1">
                 <h4 className="text-xs font-black text-orange-700 uppercase tracking-wider flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5" />
                   <span>Overview & Objectives</span>
                 </h4>
                 <p className="text-slate-600">
                   {readingMaterial.description || 'The tutor has not added a description for this material yet.'}
                 </p>
-              </div>
-
-              <div className="space-y-2">
-                <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                  <BookOpen className="w-3.5 h-3.5 text-slate-500" />
-                  <span>Key Points & Summary</span>
-                </h4>
-                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2.5">
-                  <p>
-                    {readingMaterial.contentSummary || 'The tutor has not added a summary for this material yet.'}
-                  </p>
-                </div>
               </div>
             </div>
 

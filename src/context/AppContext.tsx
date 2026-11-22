@@ -460,7 +460,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [attendanceSettings, setAttendanceSettings] = useState<AttendanceSettings>(() => {
     try {
       const saved = localStorage.getItem(scopedKey('attendanceSettings'));
-      return saved ? JSON.parse(saved) : INITIAL_ATTENDANCE_SETTINGS;
+      return saved ? { ...INITIAL_ATTENDANCE_SETTINGS, ...JSON.parse(saved) } : INITIAL_ATTENDANCE_SETTINGS;
     } catch {
       return INITIAL_ATTENDANCE_SETTINGS;
     }
