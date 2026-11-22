@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../../context/AppContext';
 import { 
   Calendar, 
@@ -46,6 +46,9 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({ tutor, initialSection 
   );
   const attachedIds = new Set((viewingSession?.materials || []).map((m) => m.id));
   const availableMaterials = myMaterials.filter((m) => !attachedIds.has(m.id));
+  const canAttach = viewingSession?.status === 'pending_tutor_consent';
+  const [attachOpen, setAttachOpen] = useState(false);
+  useEffect(() => { setAttachOpen(false); }, [viewingSession?.id]);
 
   const handleAttachMaterial = async (materialId: string) => {
     if (!materialId || !viewingSession) return;
@@ -448,12 +451,14 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({ tutor, initialSection 
                             </div>
                           </div>
                           <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-2">
-                            <button
-                              onClick={(e) => { e.stopPropagation(); setViewingSession(cls); setTutorTopic(cls.topic || ''); setActionType('none'); setHasConsented(false); }}
-                              className="px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl text-[10px] font-black uppercase tracking-widest hover:border-slate-300 transition-colors"
-                            >
-                              Add Material
-                            </button>
+                            {cls.status === 'pending_tutor_consent' && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setViewingSession(cls); setTutorTopic(cls.topic || ''); setActionType('none'); setHasConsented(false); }}
+                                className="px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl text-[10px] font-black uppercase tracking-widest hover:border-slate-300 transition-colors"
+                              >
+                                Add Material
+                              </button>
+                            )}
                             <button className="px-6 py-2 bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-orange-600 transition-colors">View Details</button>
                           </div>
                         </div>
@@ -550,17 +555,35 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({ tutor, initialSection 
 
                      <div className="pt-4 border-t border-slate-100">
                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Class Materials</span>
-                        <select
-                           value=""
-                           onChange={(e) => handleAttachMaterial(e.target.value)}
-                           className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-700 focus:outline-none focus:border-orange-500"
-                        >
-                           <option value="">Attach a material…</option>
-                           {availableMaterials.map((m) => (
-                              <option key={m.id} value={m.id}>{m.title}</option>
-                           ))}
-                        </select>
-                        {myMaterials.length === 0 && (
+                        {canAttach && (
+                           <div className="relative">
+                              <button
+                                 type="button"
+                                 onClick={() => setAttachOpen((o) => !o)}
+                                 className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-left text-slate-700 focus:outline-none focus:border-orange-500 flex items-center justify-between"
+                              >
+                                 <span className={availableMaterials.length === 0 ? 'text-slate-400' : ''}>
+                                    {availableMaterials.length === 0 ? 'No unattached materials yet' : 'Attach a material…'}
+                                 </span>
+                                 <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${attachOpen ? 'rotate-180' : ''}`} />
+                              </button>
+                              {attachOpen && availableMaterials.length > 0 && (
+                                 <div className="absolute left-0 right-0 top-full mt-1 z-30 max-h-48 overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-xl">
+                                    {availableMaterials.map((m) => (
+                                       <button
+                                          key={m.id}
+                                          type="button"
+                                          onClick={() => { setAttachOpen(false); handleAttachMaterial(m.id); }}
+                                          className="w-full text-left px-3 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 border-b border-slate-100 last:border-0"
+                                       >
+                                          {m.title}
+                                       </button>
+                                    ))}
+                                 </div>
+                              )}
+                           </div>
+                        )}
+                        {canAttach && myMaterials.length === 0 && (
                            <p className="text-[10px] text-slate-400 mt-1.5">Upload a material in Study Materials first, then attach it here.</p>
                         )}
                         {(viewingSession.materials || []).length > 0 && (
@@ -569,9 +592,11 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({ tutor, initialSection 
                                  <span key={mat.id} className="inline-flex items-center gap-1.5 bg-white border border-slate-200 rounded-lg pl-2.5 pr-1.5 py-1">
                                     <BookOpen className="w-3 h-3 text-orange-500 shrink-0" />
                                     <span className="text-[10px] font-bold text-slate-700">{mat.title}</span>
-                                    <button type="button" onClick={() => handleDetachMaterial(mat.id)} className="text-slate-300 hover:text-rose-500 transition-colors" aria-label={`Remove ${mat.title}`}>
-                                       <X className="w-3 h-3" />
-                                    </button>
+                                    {canAttach && (
+                                       <button type="button" onClick={() => handleDetachMaterial(mat.id)} className="text-slate-300 hover:text-rose-500 transition-colors" aria-label={`Remove ${mat.title}`}>
+                                          <X className="w-3 h-3" />
+                                       </button>
+                                    )}
                                  </span>
                               ))}
                            </div>

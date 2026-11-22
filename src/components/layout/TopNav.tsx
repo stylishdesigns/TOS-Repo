@@ -225,17 +225,6 @@ export const TopNav: React.FC<TopNavProps> = ({ onToggleMobileMenu }) => {
                 ))}
               </div>
 
-              <div className="p-2 border-t border-slate-100 text-center">
-                <button
-                  onClick={() => {
-                    setAdminSection('dashboard');
-                    setShowNotifications(false);
-                  }}
-                  className="text-xs font-semibold text-orange-600 hover:underline"
-                >
-                  View Activity Timeline
-                </button>
-              </div>
             </div>
           )}
         </div>

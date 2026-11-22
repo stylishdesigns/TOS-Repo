@@ -590,7 +590,7 @@ export const TimetableManager: React.FC = () => {
                               >
                                 View
                               </button>
-                              {!finished && (
+                              {!finished && !inSession && (
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -636,7 +636,8 @@ export const TimetableManager: React.FC = () => {
                     required
                     value={formData.date || ''}
                     onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 font-bold outline-none focus:bg-white focus:border-orange-500"
+                    onClick={(e) => { if (window.matchMedia('(pointer: fine)').matches) { try { (e.currentTarget as HTMLInputElement & { showPicker?: () => void }).showPicker?.(); } catch { /* noop */ } } }}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 font-bold outline-none focus:bg-white focus:border-orange-500 cursor-pointer [&::-webkit-calendar-picker-indicator]:cursor-pointer"
                   />
                 </div>
                 <ModernSelect
@@ -690,7 +691,8 @@ export const TimetableManager: React.FC = () => {
                     required
                     value={formData.startTime || ''}
                     onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 font-bold outline-none"
+                    onClick={(e) => { if (window.matchMedia('(pointer: fine)').matches) { try { (e.currentTarget as HTMLInputElement & { showPicker?: () => void }).showPicker?.(); } catch { /* noop */ } } }}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 font-bold outline-none cursor-pointer [&::-webkit-calendar-picker-indicator]:cursor-pointer"
                   />
                 </div>
                 <div>
@@ -700,7 +702,8 @@ export const TimetableManager: React.FC = () => {
                     required
                     value={formData.endTime || ''}
                     onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 font-bold outline-none"
+                    onClick={(e) => { if (window.matchMedia('(pointer: fine)').matches) { try { (e.currentTarget as HTMLInputElement & { showPicker?: () => void }).showPicker?.(); } catch { /* noop */ } } }}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 font-bold outline-none cursor-pointer [&::-webkit-calendar-picker-indicator]:cursor-pointer"
                   />
                 </div>
               </div>
@@ -907,18 +910,10 @@ export const TimetableManager: React.FC = () => {
                 </div>
              </div>
 
-             <div className="pt-8 grid grid-cols-2 gap-3">
-                {!isFinished(viewingSession.time, viewingSession.date) && (
-                  <button 
-                    onClick={() => setShowDeleteConfirm(viewingSession.id)}
-                    className="py-3 bg-rose-600 text-white font-black text-[10px] uppercase tracking-widest rounded-2xl hover:bg-rose-700 transition-all shadow-lg shadow-rose-100"
-                  >
-                    Delete Schedule
-                  </button>
-                )}
+             <div className="pt-8">
                 <button 
                   onClick={() => setViewingSession(null)}
-                  className={`py-3 bg-slate-100 text-slate-600 font-black text-[10px] uppercase tracking-widest rounded-2xl hover:bg-slate-200 transition-all ${isFinished(viewingSession.time, viewingSession.date) ? 'col-span-2' : ''}`}
+                  className="w-full py-3 bg-slate-100 text-slate-600 font-black text-[10px] uppercase tracking-widest rounded-2xl hover:bg-slate-200 transition-all"
                 >
                   Close
                 </button>
