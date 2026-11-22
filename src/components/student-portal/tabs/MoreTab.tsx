@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { initialsAvatar } from '../../../lib/avatar';
 import { nextPaymentDue, formatDateLong } from '../../../lib/paymentDates';
 import { useApp } from '../../../context/AppContext';
+import { resolveStudentFee } from '../../../lib/fees';
 import { getAuth, signInWithEmailAndPassword, updatePassword } from 'firebase/auth';
 import { api, Json } from '../../tos/tosShared';
 import { Student } from '../../../types';
@@ -248,7 +249,12 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
     brandAccent,
     centreName,
     subjects,
+    programmes,
   } = useApp();
+
+  // Fee read live from the student's programme, so an admin fee change lands here at once.
+  const liveFee = resolveStudentFee(student, programmes);
+  const liveBalance = Math.max(0, liveFee - Number(student.paidAmount || 0));
 
   // Active bottom splash-up modal
   const [activeModal, setActiveModal] = useState<ModalType>(null);
@@ -1004,7 +1010,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                 }`}
               >
                 {student.outstandingBalance > 0
-                  ? `${settings.currencySymbol}${(student.outstandingBalance || 0).toLocaleString()}`
+                  ? `${settings.currencySymbol}${liveBalance.toLocaleString()}`
                   : 'Cleared'}
               </span>
               <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-slate-600 transition-colors" />
@@ -1668,7 +1674,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                     </span>
                     <span className="text-sm font-black text-slate-900">
                       {settings.currencySymbol}
-                      {(student.totalFee || 0).toLocaleString()}
+                      {liveFee.toLocaleString()}
                     </span>
                   </div>
                   <div>
@@ -1686,18 +1692,18 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                     </span>
                     <span className="text-sm font-black text-rose-700">
                       {settings.currencySymbol}
-                      {(student.outstandingBalance || 0).toLocaleString()}
+                      {liveBalance.toLocaleString()}
                     </span>
                   </div>
                 </div>
                 <p className="text-center text-[11px] font-bold mt-2">
-                  {(student.totalFee || 0) <= 0 ? (
+                  {liveFee <= 0 ? (
                     <span className="text-slate-500">Fee not set yet — your facility will confirm what you owe</span>
-                  ) : (student.outstandingBalance || 0) <= 0 ? (
+                  ) : liveBalance <= 0 ? (
                     <span className="text-emerald-700">Fully paid</span>
                   ) : (
                     <span className="text-amber-700">
-                      Balance {settings.currencySymbol}{(student.outstandingBalance || 0).toLocaleString()} of {settings.currencySymbol}{(student.totalFee || 0).toLocaleString()} remaining
+                      Balance {settings.currencySymbol}{liveBalance.toLocaleString()} of {settings.currencySymbol}{liveFee.toLocaleString()} remaining
                     </span>
                   )}
                 </p>
@@ -1743,7 +1749,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                             onClick={() => setPayAmount(String(student.outstandingBalance))}
                             className="text-[10px] font-bold text-orange-600 hover:underline"
                           >
-                            Pay Full Balance ({settings.currencySymbol}{(student.outstandingBalance || 0).toLocaleString()})
+                            Pay Full Balance ({settings.currencySymbol}{liveBalance.toLocaleString()})
                           </button>
                         )}
                       </div>
@@ -1996,7 +2002,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ student }) => {
                         <div>
                           <p className="text-xs font-bold text-orange-950">Tuition Balance Outstanding</p>
                           <p className="text-[10px] text-orange-800">
-                            {settings.currencySymbol}{(student.outstandingBalance || 0).toLocaleString()} pending payment
+                            {settings.currencySymbol}{liveBalance.toLocaleString()} pending payment
                           </p>
                         </div>
                         <button

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { resolveStudentFee } from '../../lib/fees';
 import { todayISO } from '../../lib/paymentDates';
 import { ModernSelect } from '../ui/ModernSelect';
 import {
@@ -29,7 +30,12 @@ export const StudentDetailModal: React.FC = () => {
     recordPayment,
     payments,
     addToast,
+    programmes,
   } = useApp();
+
+  // Fee read live from the student's programme, so an admin fee change lands here at once.
+  const liveFee = resolveStudentFee(selectedStudent, programmes);
+  const liveBalance = Math.max(0, liveFee - Number(selectedStudent?.paidAmount || 0));
 
   const [isEditing, setIsEditing] = useState(false);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
@@ -77,8 +83,8 @@ export const StudentDetailModal: React.FC = () => {
       programmeName: selectedStudent.programmeName,
       amountPaid: amount,
       totalFee: selectedStudent.totalFee,
-      balance: Math.max(0, selectedStudent.outstandingBalance - amount),
-      status: amount >= selectedStudent.outstandingBalance ? 'Paid' : 'Partial',
+      balance: Math.max(0, liveBalance - amount),
+      status: amount >= liveBalance ? 'Paid' : 'Partial',
       method: paymentMethod,
       evidenceUrl: proofUrl || undefined,
       evidenceName: proofName || undefined,
@@ -170,7 +176,7 @@ export const StudentDetailModal: React.FC = () => {
               <span className="text-[11px] font-semibold text-slate-500 block">Total Tuition</span>
               <span className="text-xl font-extrabold text-slate-900 mt-0.5 block">
                 {settings.currencySymbol}
-                {(selectedStudent.totalFee || 0).toLocaleString()}
+                {liveFee.toLocaleString()}
               </span>
               <span className="text-[10px] text-slate-500 font-medium">
                 Paid: {settings.currencySymbol}{(selectedStudent.paidAmount || 0).toLocaleString()}
@@ -192,13 +198,13 @@ export const StudentDetailModal: React.FC = () => {
               </span>
               <span
                 className={`text-xl font-extrabold mt-0.5 block ${
-                  (selectedStudent.outstandingBalance || 0) > 0 ? 'text-amber-600' : 'text-emerald-600'
+                  (liveBalance || 0) > 0 ? 'text-amber-600' : 'text-emerald-600'
                 }`}
               >
                 {settings.currencySymbol}
-                {(selectedStudent.outstandingBalance || 0).toLocaleString()}
+                {(liveBalance || 0).toLocaleString()}
               </span>
-              {(selectedStudent.outstandingBalance || 0) > 0 ? (
+              {(liveBalance || 0) > 0 ? (
                 <button
                   onClick={() => {
                   setPaymentFrom(todayISO());
@@ -238,8 +244,8 @@ export const StudentDetailModal: React.FC = () => {
                   <input
                     type="number"
                     required
-                    max={selectedStudent.outstandingBalance}
-                    placeholder={`Max ${selectedStudent.outstandingBalance}`}
+                    max={liveBalance}
+                    placeholder={`Max ${liveBalance}`}
                     value={paymentAmount}
                     onChange={(e) => setPaymentAmount(e.target.value)}
                     className="w-full px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg"

@@ -25,6 +25,7 @@ import { ConfirmationModal } from '../common/ConfirmationModal';
 import { ModernSelect } from '../ui/ModernSelect';
 import { TimetableSlot } from '../../types';
 import { useScrollLock } from '../../hooks/useScrollLock';
+import { dayNameFromDate, localDateKey } from '../../lib/planner';
 
 export const TimetableManager: React.FC = () => {
   const { 
@@ -186,7 +187,7 @@ export const TimetableManager: React.FC = () => {
   const [postponeNote, setPostponeNote] = useState('');
 
   const [formData, setFormData] = useState({
-    date: new Date().toISOString().split('T')[0],
+    date: localDateKey(),
     startTime: '09:00',
     endTime: '11:00',
     subject: subjects[0]?.name || '',
@@ -199,7 +200,8 @@ export const TimetableManager: React.FC = () => {
 
   const filteredSessions = timetable.filter((s) => {
     const matchesProg = selectedProgramme === 'All' || s.programmeId === selectedProgramme;
-    const matchesDay = selectedDay === 'All' || s.day === selectedDay;
+    const slotDay = (s.date ? dayNameFromDate(s.date) : s.day);
+    const matchesDay = selectedDay === 'All' || slotDay === selectedDay;
     const matchesStatus = selectedStatus === 'All' || s.status === selectedStatus;
     
     // Week filter: parse selectedWeek range
@@ -228,7 +230,7 @@ export const TimetableManager: React.FC = () => {
   const handleOpenAdd = () => {
     setEditingSession(null);
     setFormData({
-      date: new Date().toISOString().split('T')[0],
+      date: localDateKey(),
       startTime: '09:00',
       endTime: '11:00',
       subject: subjects[0]?.name || '',
@@ -288,7 +290,7 @@ export const TimetableManager: React.FC = () => {
 
       const slotBase: any = {
         date: formData.date,
-        day: new Date(formData.date).toLocaleDateString('en-US', { weekday: 'long' }) as any,
+        day: (dayNameFromDate(formData.date) || new Date(formData.date).toLocaleDateString('en-US', { weekday: 'long' })) as any,
         startTime: formData.startTime,
         endTime: formData.endTime,
         time: `${formData.startTime} - ${formData.endTime}`,
@@ -316,11 +318,11 @@ export const TimetableManager: React.FC = () => {
           const d = new Date(year, month, 1);
           while (d.getMonth() === month) {
             if (d.getDay() === dayOfWeek) {
-              const dateStr = d.toISOString().split('T')[0];
+              const dateStr = localDateKey(d);
               slots.push({
                 ...finalSlot,
                 date: dateStr,
-                day: finalSlot.day
+                day: (dayNameFromDate(dateStr) || finalSlot.day) as any,
               });
             }
             d.setDate(d.getDate() + 1);
@@ -446,7 +448,7 @@ export const TimetableManager: React.FC = () => {
             Entire Week
           </button>
           {daysList.map((day) => {
-            const daySessionsCount = filteredSessions.filter((s) => s.day === day).length;
+            const daySessionsCount = filteredSessions.filter((s) => (s.date ? dayNameFromDate(s.date) : s.day) === day).length;
             return (
               <div key={day} className="flex flex-col items-center">
                 <button
@@ -473,7 +475,7 @@ export const TimetableManager: React.FC = () => {
         {daysList
           .filter((day) => selectedDay === 'All' || selectedDay === day)
           .map((day) => {
-            const daySessions = filteredSessions.filter((s) => s.day === day);
+            const daySessions = filteredSessions.filter((s) => (s.date ? dayNameFromDate(s.date) : s.day) === day);
             if (daySessions.length === 0) return null;
 
             return (
@@ -649,7 +651,7 @@ export const TimetableManager: React.FC = () => {
                     className="w-4 h-4 rounded border-slate-300 text-orange-500 focus:ring-orange-500"
                   />
                   <label htmlFor="repeatForMonth" className="text-[10px] font-black text-slate-700 uppercase tracking-tight">
-                    Repeat for all {new Date(formData.date).toLocaleDateString('en-US', { weekday: 'long' })}s of the month
+                    Repeat for all {(dayNameFromDate(formData.date) || new Date(formData.date).toLocaleDateString('en-US', { weekday: 'long' }))}s of the month
                   </label>
                 </div>
               )}

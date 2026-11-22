@@ -603,7 +603,7 @@ export const StudentPortal: React.FC = () => {
             desktopViewMode === 'mobile_frame'
               ? 'max-w-md mx-auto sm:rounded-[36px] sm:shadow-2xl sm:border-[6px] sm:border-slate-800'
               : 'max-w-4xl mx-auto sm:rounded-3xl sm:border sm:border-slate-800'
-          } bg-slate-50 h-full sm:h-[100svh] flex flex-col relative overflow-hidden`}
+          } ${bgTheme === 'dark' ? 'bg-[#0B1220]' : 'bg-slate-50'} h-full sm:h-[100svh] flex flex-col relative overflow-hidden`}
         >
           {/* Parent Mode Indicator Notification if active */}
           {portalMode === 'parent' && (

@@ -124,6 +124,7 @@ export interface Student {
   paidAmount: number;
   outstandingBalance: number;
   paymentStatus?: 'Pending' | 'Partial' | 'Paid';
+  feeOverride?: boolean;
   department?: 'Science' | 'Commercial' | 'Arts';
   totalAttendanceCount?: number;
 }

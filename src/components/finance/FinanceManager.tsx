@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { resolveStudentFee, resolveStudentBalance } from '../../lib/fees';
 import { PaymentRecord, isConfirmedPayment, Student } from '../../types';
 import { DEFAULT_FEE_REMINDER_SETTINGS, FEE_REMINDER_DAY_OPTIONS, normalizeFeeReminderSettings, renderChatTemplate } from '../../lib/feeReminders';
 import { nextPaymentDue, formatDateLong, todayISO } from '../../lib/paymentDates';
@@ -138,8 +139,11 @@ export const FinanceManager: React.FC = () => {
       setReviewBusy(false);
     }
   };
-  const totalBilled = students.reduce((sum, s) => sum + (s.totalFee || 0), 0);
-  const totalOutstanding = students.reduce((sum, s) => sum + (s.outstandingBalance || 0), 0);
+  const feeOf = (st: Student) => resolveStudentFee(st, programmes);
+  const balOf = (st: Student) => resolveStudentBalance(st, programmes).balance;
+
+  const totalBilled = students.reduce((sum, s) => sum + feeOf(s), 0);
+  const totalOutstanding = students.reduce((sum, s) => sum + balOf(s), 0);
 
   const handleSaveChannelSettings = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -194,16 +198,16 @@ export const FinanceManager: React.FC = () => {
       const history = paymentsByStudent.get(st.id) || [];
       return { st, history, nextDue: nextPaymentDue(history) };
     });
-  const owesRows = allRows.filter((r) => Number(r.st.outstandingBalance || 0) > 0 || !(Number(r.st.totalFee || 0) > 0));
-  const paidRows = allRows.filter((r) => Number(r.st.outstandingBalance || 0) <= 0 && Number(r.st.totalFee || 0) > 0);
+  const owesRows = allRows.filter((r) => balOf(r.st) > 0 || feeOf(r.st) <= 0);
+  const paidRows = allRows.filter((r) => balOf(r.st) <= 0 && feeOf(r.st) > 0);
   const visibleOwes = rosterFilter === 'Paid' ? [] : owesRows;
   const visiblePaid = rosterFilter === 'Owes' ? [] : paidRows;
-  const owesTotal = owesRows.reduce((sum, r) => sum + Number(r.st.outstandingBalance || 0), 0);
+  const owesTotal = owesRows.reduce((sum, r) => sum + balOf(r.st), 0);
 
   const renderRosterRow = (row: { st: Student; history: PaymentRecord[]; nextDue: string | null }) => {
     const { st, history, nextDue } = row;
-    const owes = Number(st.outstandingBalance || 0) > 0;
-    const noFee = !(Number(st.totalFee || 0) > 0);
+    const owes = balOf(st) > 0;
+    const noFee = feeOf(st) <= 0;
     const pendingCount = history.filter((p) => p.status === 'Pending').length;
     const overdue = !!nextDue && nextDue < todayISO();
     const initials = st.name.split(' ').map((n) => n[0]).join('').substring(0, 2).toUpperCase();
@@ -232,7 +236,7 @@ export const FinanceManager: React.FC = () => {
             <span className="text-[10px] font-bold text-slate-400">No fee set</span>
           ) : owes ? (
             <>
-              <p className="text-xs font-black text-amber-700">{settings.currencySymbol}{Number(st.outstandingBalance || 0).toLocaleString()}</p>
+              <p className="text-xs font-black text-amber-700">{settings.currencySymbol}{Number(balOf(st) || 0).toLocaleString()}</p>
               {nextDue && (
                 <p className={`text-[10px] font-semibold ${overdue ? 'text-rose-600' : 'text-slate-500'}`}>
                   {overdue ? `Overdue, was due ${formatDateLong(nextDue)}` : `Due ${formatDateLong(nextDue)}`}
@@ -564,7 +568,7 @@ export const FinanceManager: React.FC = () => {
                 onChange={(val) => setSelectedStudentId(val)}
                 options={students.map(st => ({
                   value: st.id,
-                  label: `${st.name} — Bal: ${settings.currencySymbol}${(st.outstandingBalance || 0).toLocaleString()}`
+                  label: `${st.name} — Bal: ${settings.currencySymbol}${(balOf(st) || 0).toLocaleString()}`
                 }))}
               />
 
@@ -668,8 +672,8 @@ export const FinanceManager: React.FC = () => {
           .slice()
           .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         const nextDue = nextPaymentDue(history);
-        const totalFee = Number(selectedDetailStudent.totalFee || 0);
-        const outstanding = Number(selectedDetailStudent.outstandingBalance || 0);
+        const totalFee = feeOf(selectedDetailStudent);
+        const outstanding = balOf(selectedDetailStudent);
         const paidSoFar = Math.max(0, totalFee - outstanding);
         const initials = selectedDetailStudent.name.split(' ').map((n) => n[0]).join('').substring(0, 2).toUpperCase();
         return (

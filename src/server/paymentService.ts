@@ -240,6 +240,7 @@ export async function setStudentFee(
       totalFee: fees.totalFee,
       outstandingBalance: fees.outstandingBalance,
       paymentStatus: fees.paymentStatus,
+      feeOverride: true,
       feeSetBy: caller.uid,
       feeSetAt: Date.now(),
     });
@@ -312,6 +313,7 @@ export async function syncProgrammeFee(
       progName !== '' &&
       String(s.programmeName || '').trim().toLowerCase() === progName;
     if (!byId && !byName) return;
+    if (s.feeOverride) return; // a fee the admin set for this one student stands
     const fees = feeState(s, fee);
     const previousFee = typeof s.totalFee === 'number' ? s.totalFee : 0;
     if (previousFee === fees.totalFee) {

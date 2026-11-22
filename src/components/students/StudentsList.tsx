@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { resolveStudentFee } from '../../lib/fees';
 import { Student } from '../../types';
 import { ModernSelect } from '../ui/ModernSelect';
 import {
@@ -354,7 +355,7 @@ export const StudentsList: React.FC = () => {
                     {/* Fee Status */}
                     <td className="py-3.5 px-5">
                       {(() => {
-                        const fee = st.totalFee || 0;
+                        const fee = resolveStudentFee(st, programmes);
                         const paid = st.paidAmount || 0;
                         const bal = st.outstandingBalance || 0;
                         if (fee <= 0) {

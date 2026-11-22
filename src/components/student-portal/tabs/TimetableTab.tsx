@@ -18,6 +18,7 @@ import { StudyMaterialsSection } from './classes/StudyMaterialsSection';
 import { ClassRatingSheet } from './classes/ClassRatingSheet';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../../firebase';
+import { dayNameFromDate } from '../../../lib/planner';
 
 interface TimetableTabProps {
   student: Student;
@@ -78,7 +79,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({ student }) => {
   }, [timetable, currentWeekRange]);
 
   const daySlots = useMemo(() => {
-    return activeTimetable.filter((slot) => slot.day === selectedDay);
+    return activeTimetable.filter((slot) => slot.date ? dayNameFromDate(slot.date) === selectedDay : slot.day === selectedDay);
   }, [activeTimetable, selectedDay]);
 
   // Reactive class ratings for this student directly from AppContext Firestore listener
@@ -181,7 +182,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({ student }) => {
 
   // Find "Next class" today (Live now, or next upcoming today)
   const nextClassToday = useMemo(() => {
-    const todaySlots = activeTimetable.filter((s) => s.day === todayName);
+    const todaySlots = activeTimetable.filter((s) => s.date ? dayNameFromDate(s.date) === todayName : s.day === todayName);
     const live = todaySlots.find((s) => isInSession(s.time, s.date));
     if (live) {
       return { slot: live, isLive: true, minutesUntilStart: 0 };

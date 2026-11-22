@@ -19,6 +19,7 @@ import { ModernSelect } from '../../ui/ModernSelect';
 import { TimetableSlot, Tutor } from '../../../types';
 import { useScrollLock } from '../../../hooks/useScrollLock';
 import { TutorMaterialsSection } from './TutorMaterialsSection';
+import { dayNameFromDate } from '../../../lib/planner';
 
 interface ScheduleTabProps {
   tutor: Tutor;
@@ -113,7 +114,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({ tutor, initialSection 
 
   // Apply Status & Day Filters
   if (selectedStatus !== 'All') myClasses = myClasses.filter(s => s.status === selectedStatus || (!s.status && selectedStatus === 'active'));
-  if (selectedDay !== 'All') myClasses = myClasses.filter(s => s.day === selectedDay);
+  if (selectedDay !== 'All') myClasses = myClasses.filter(s => s.date ? dayNameFromDate(s.date) === selectedDay : s.day === selectedDay);
 
   const pendingClasses = myClasses.filter(c => c.status === 'pending_tutor_consent');
   const activeClasses = myClasses.filter(c => c.status === 'active' || !c.status || c.status === 'postponed');
@@ -293,7 +294,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({ tutor, initialSection 
             </span>
           </button>
           {daysList.map((day) => {
-            const daySessionsCount = activeClasses.filter(s => s.day === day).length;
+            const daySessionsCount = activeClasses.filter(s => s.date ? dayNameFromDate(s.date) === day : s.day === day).length;
             const dateNum = getWeekDateForDay(day);
             const isSelected = selectedDay === day;
 
@@ -368,7 +369,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({ tutor, initialSection 
       ) : (
         <div className="space-y-6">
           {daysList.filter((day) => selectedDay === 'All' || selectedDay === day).map((day) => {
-            const daySessions = activeClasses.filter(s => s.day === day);
+            const daySessions = activeClasses.filter(s => s.date ? dayNameFromDate(s.date) === day : s.day === day);
             if (daySessions.length === 0) return null;
             return (
               <div key={day} className="space-y-3">

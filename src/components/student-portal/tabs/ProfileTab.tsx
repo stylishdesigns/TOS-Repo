@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { initialsAvatar } from '../../../lib/avatar';
 import { useApp } from '../../../context/AppContext';
+import { resolveStudentFee } from '../../../lib/fees';
 import { Student } from '../../../types';
 import studentHeroAvatar from '../../../assets/images/regenerated_image_1789369642757.jpg';
 import { ModernSelect } from '../../ui/ModernSelect';
@@ -24,11 +25,15 @@ interface ProfileTabProps {
 }
 
 export const ProfileTab: React.FC<ProfileTabProps> = ({ student, onSelectStudent }) => {
-  const { students, settings, payments, recordPayment, addToast, centreName } = useApp();
+  const { students, settings, payments, recordPayment, addToast, centreName, programmes } = useApp();
+
+  // Fee read live from the student's programme, so an admin fee change lands here at once.
+  const liveFee = resolveStudentFee(student, programmes);
+  const liveBalance = Math.max(0, liveFee - Number(student.paidAmount || 0));
 
   const [showPayModal, setShowPayModal] = useState(false);
   const [payAmount, setPayAmount] = useState<number>(
-    student.outstandingBalance > 0 ? student.outstandingBalance : 10000
+    liveBalance > 0 ? liveBalance : 10000
   );
 
   // Student payments
@@ -187,12 +192,12 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({ student, onSelectStudent
           </div>
           <span
             className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
-              student.outstandingBalance > 0
+              liveBalance > 0
                 ? 'bg-amber-100 text-amber-800'
                 : 'bg-emerald-100 text-emerald-800'
             }`}
           >
-            {student.outstandingBalance > 0 ? 'Balance Due' : 'Fully Cleared'}
+            {liveBalance > 0 ? 'Balance Due' : 'Fully Cleared'}
           </span>
         </div>
 
@@ -202,7 +207,7 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({ student, onSelectStudent
             <span className="text-[10px] text-slate-400 uppercase font-semibold block">Total Tuition</span>
             <span className="text-xs font-bold text-slate-900">
               {settings.currencySymbol}
-              {(student.totalFee || 0).toLocaleString()}
+              {liveFee.toLocaleString()}
             </span>
           </div>
           <div>
@@ -216,13 +221,13 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({ student, onSelectStudent
             <span className="text-[10px] text-slate-400 uppercase font-semibold block">Outstanding</span>
             <span className="text-xs font-bold text-rose-700">
               {settings.currencySymbol}
-              {(student.outstandingBalance || 0).toLocaleString()}
+              {(liveBalance || 0).toLocaleString()}
             </span>
           </div>
         </div>
 
         {/* Pay Button if balance exists */}
-        {student.outstandingBalance > 0 ? (
+        {liveBalance > 0 ? (
           <button
             onClick={() => setShowPayModal(true)}
             className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white font-bold text-xs shadow-xs active:scale-98 transition-all flex items-center justify-center space-x-2"
@@ -230,7 +235,7 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({ student, onSelectStudent
             <CreditCard className="w-4 h-4" />
             <span>
               Pay Outstanding Balance ({settings.currencySymbol}
-              {(student.outstandingBalance || 0).toLocaleString()})
+              {(liveBalance || 0).toLocaleString()})
             </span>
           </button>
         ) : (
@@ -349,14 +354,14 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({ student, onSelectStudent
                 <input
                   type="number"
                   min="1000"
-                  max={student.outstandingBalance}
+                  max={liveBalance}
                   value={payAmount}
                   onChange={(e) => setPayAmount(Number(e.target.value))}
                   className="w-full p-2.5 rounded-xl border border-slate-300 font-mono font-bold text-sm outline-none focus:border-orange-500"
                 />
                 <span className="text-[10px] text-slate-400 mt-1 block">
                   Outstanding balance: {settings.currencySymbol}
-                  {(student.outstandingBalance || 0).toLocaleString()}
+                  {(liveBalance || 0).toLocaleString()}
                 </span>
               </div>
 

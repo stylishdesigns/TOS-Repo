@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 
 import { CalendarView } from '../../common/CalendarView';
-import { slotsToActivities } from '../../../lib/planner';
+import { dayNameFromDate, localDateKey, slotsToActivities } from '../../../lib/planner';
 
 interface HomeTabProps {
   student: Student;
@@ -64,7 +64,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
   // Today's classes from timetable
   const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const todayName = daysOfWeek[new Date().getDay()];
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = localDateKey();
   
   const activeTimetable = timetable.filter(s => s.status === 'active' || !s.status);
 
@@ -76,7 +76,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
   const todayKey = new Date().toLocaleDateString('en-CA');
   const todayHasActivities = plannerActivities.some((a) => a.date === todayKey);
   const todayClasses = activeTimetable.filter(
-    (slot) => slot.day === todayName && slot.date === todayStr
+    (slot) => slot.date ? slot.date === todayStr : slot.day === todayName
   ).sort((a, b) => a.time.localeCompare(b.time));
 
   const getLocalDateTime = (dateStr: string, time24: string) => {
