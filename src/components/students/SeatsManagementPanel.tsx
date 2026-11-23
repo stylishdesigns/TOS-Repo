@@ -63,7 +63,6 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
   const [flowStep, setFlowStep] = useState<'plan' | 'students' | 'account' | 'receipt'>('plan');
   const [chosenPlan, setChosenPlan] = useState<{ id: string; name: string; price: number } | null>(null);
   const [seatCountPick, setSeatCountPick] = useState('5');
-  const [requestCreating, setRequestCreating] = useState(false);
   const [requestId, setRequestId] = useState('');
   const [receiptUploading, setReceiptUploading] = useState(false);
   const [receiptDone, setReceiptDone] = useState(false);
@@ -174,7 +173,7 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
 
   // Batch 27: Add seat opens the upgrade flow: pick a plan, pick how many
   // students, pay by bank transfer, upload the receipt. The seats land by
-  // themselves once the Tutorial OS admin confirms the payment.
+  // themselves once Tutorial OS confirms the payment.
   const openUpgradeFlow = () => {
     const minimum = Number(planState?.paidSeatMinimum ?? 5);
     const activePaid = Number(planState?.activePaidSeats ?? 0);
@@ -205,27 +204,11 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
   const seatTotal = chosenPlan ? pickedSeats * Number(chosenPlan.price || 0) : 0;
   const nairaFmt = (n: number) => `\u20A6${Number(n || 0).toLocaleString()}`;
 
-  const handleCreateRequest = async () => {
-    if (!activeCentreId || !chosenPlan) return;
-    setRequestCreating(true);
-    setErrorMessage(null);
-    try {
-      const d: any = await api('/api/centre/seats/upgrade-request', {
-        method: 'POST',
-        body: { centreId: activeCentreId, planId: chosenPlan.id, seats: pickedSeats },
-      });
-      setRequestId(String(d?.request?.id || ''));
-      setReceiptDone(false);
-      setFlowStep('receipt');
-    } catch (err: any) {
-      addToast({ type: 'error', title: 'Could not file the upgrade', description: err.message || 'Try again.' });
-    } finally {
-      setRequestCreating(false);
-    }
-  };
-
+  // The payment is filed only together with its receipt: upload + request in
+  // one step, so a payment without proof can never sit waiting for
+  // confirmation. The Done button stays locked until the receipt is in.
   const handleReceiptUpload = async (file: File) => {
-    if (!activeCentreId || !requestId || !file) return;
+    if (!activeCentreId || !chosenPlan || !file) return;
     if (file.size > 4 * 1024 * 1024) {
       addToast({ type: 'error', title: 'Too large', description: 'The receipt can be up to 4 MB.' });
       return;
@@ -240,13 +223,15 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
         reader.readAsDataURL(file);
       });
       setReceiptPreview(data);
-      await api('/api/centre/seats/upgrade-request/receipt', {
+      const d: any = await api('/api/centre/seats/upgrade-request', {
         method: 'POST',
-        body: { centreId: activeCentreId, requestId, data },
+        body: { centreId: activeCentreId, planId: chosenPlan.id, seats: pickedSeats, receiptData: data },
       });
+      setRequestId(String(d?.request?.id || ''));
       setReceiptDone(true);
-      addToast({ type: 'success', title: 'Receipt uploaded', description: 'It is with the Tutorial OS admin now.' });
+      addToast({ type: 'success', title: 'Receipt uploaded', description: 'Your payment is now awaiting confirmation from Tutorial OS.' });
     } catch (err: any) {
+      setReceiptDone(false);
       addToast({ type: 'error', title: 'Could not upload the receipt', description: err.message || 'Try again.' });
     } finally {
       setReceiptUploading(false);
@@ -299,10 +284,10 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
             </span>
             <div>
               <p className="text-xs font-black text-amber-800 dark:text-amber-300">
-                Payment under confirmation{planState.pendingUpgrade.receiptUploaded ? '' : ' \u00B7 receipt not yet uploaded'}
+                Awaiting confirmation from Tutorial OS
               </p>
               <p className="text-[11px] text-amber-700/90 dark:text-amber-300/80 mt-0.5">
-                {planState.pendingUpgrade.planName || 'Your'} upgrade, {planState.pendingUpgrade.seats} seat{Number(planState.pendingUpgrade.seats) === 1 ? '' : 's'} ({nairaFmt(planState.pendingUpgrade.total || 0)}), is with the Tutorial OS admin. Once it is confirmed, the seats appear here by themselves. Nothing else to do.
+                {planState.pendingUpgrade.planName || 'Your'} upgrade, {planState.pendingUpgrade.seats} seat{Number(planState.pendingUpgrade.seats) === 1 ? '' : 's'} ({nairaFmt(planState.pendingUpgrade.total || 0)}), is awaiting confirmation from Tutorial OS. Once it is confirmed, the seats appear here by themselves. Nothing else to do.
               </p>
             </div>
           </div>
@@ -311,7 +296,7 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
           <button
             onClick={openUpgradeFlow}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-white bg-[var(--brand,#0F172A)] hover:brightness-110 rounded-xl transition-all"
-            title="Pick a plan, pay and upload your receipt; your seats land once the Tutorial OS admin confirms"
+            title="Pick a plan, pay and upload your receipt; your seats land once Tutorial OS confirms"
           >
             <UserPlus className="w-4 h-4" />
             Add seat
@@ -425,7 +410,7 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
           <div className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 p-6 text-center text-xs text-slate-400">
             No seats in this facility&apos;s pool yet. Free seats appear here automatically, and
             Add seat opens the upgrade flow: pick a plan, pay, and your seats land once the
-            Tutorial OS admin confirms.
+            Tutorial OS confirms.
           </div>
         ) : (
           <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-700/60">
@@ -693,11 +678,11 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
       {/* Batch 27: the upgrade flow. Step 1 picks a plan, step 2 how many
           students (never below the minimum), step 3 the account details,
           step 4 the receipt upload with the WhatsApp contact. The seats land
-          by themselves once the Tutorial OS admin confirms the payment. */}
+          by themselves once Tutorial OS confirms the payment. */}
       {flowOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"
-          onClick={() => !requestCreating && !receiptUploading && setFlowOpen(false)}
+          onClick={() => !receiptUploading && setFlowOpen(false)}
         >
           <div
             className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-3xl p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-xl"
@@ -851,11 +836,10 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
                   <p className="text-[11px] text-slate-400 mt-2">Use this account only for this payment.</p>
                   <button
                     type="button"
-                    disabled={requestCreating}
-                    onClick={handleCreateRequest}
-                    className="mt-5 w-full py-3 text-xs font-bold text-white bg-[var(--brand,#0F172A)] hover:brightness-110 rounded-xl transition-all disabled:opacity-50"
+                    onClick={() => setFlowStep('receipt')}
+                    className="mt-5 w-full py-3 text-xs font-bold text-white bg-[var(--brand,#0F172A)] hover:brightness-110 rounded-xl transition-all"
                   >
-                    {requestCreating ? 'Filing your request...' : 'I have made the payment'}
+                    I have made the payment
                   </button>
                 </>
               );
@@ -899,7 +883,7 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
                     )}
                   </div>
                 )}
-                <p className="text-[11px] text-slate-400 mt-2">Your receipt goes straight to the Tutorial OS admin team.</p>
+                <p className="text-[11px] text-slate-400 mt-2">Your receipt goes straight to Tutorial OS.</p>
                 <button
                   type="button"
                   disabled={!receiptDone}
@@ -907,22 +891,23 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
                   className={`mt-4 w-full py-3 text-xs font-bold rounded-xl transition-all inline-flex items-center justify-center gap-2 text-white ${receiptDone ? 'bg-emerald-500 hover:brightness-110' : 'bg-emerald-500/40 cursor-not-allowed'}`}
                 >
                   <MessageCircle className="w-4 h-4" />
-                  Contact admin on WhatsApp
+                  Contact Tutorial OS on WhatsApp
                 </button>
                 <p className="text-[10px] text-slate-400 mt-1.5 text-center">
-                  {receiptDone ? 'Ask the admin to confirm your payment and activate your seats.' : 'This unlocks once your receipt is uploaded.'}
+                  {receiptDone ? 'Ask Tutorial OS to confirm your payment and activate your seats.' : 'This unlocks once your receipt is uploaded.'}
                 </p>
                 <div className="mt-5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700/60 px-4 py-3">
                   <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                    Once the Tutorial OS admin confirms your payment, the {chosenPlan.name} seats you paid for appear on this
+                    Once Tutorial OS confirms your payment, the {chosenPlan.name} seats you paid for appear on this
                     dashboard by themselves, on top of your free seats. Nothing else to do.
                   </p>
                 </div>
                 <div className="flex justify-end mt-4">
                   <button
                     type="button"
+                    disabled={!receiptDone}
                     onClick={() => { setFlowOpen(false); refreshSeatsSummary(); refreshPlan(); }}
-                    className="px-3.5 py-2 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all"
+                    className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all ${receiptDone ? 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800' : 'text-slate-400 cursor-not-allowed'}`}
                   >
                     Done
                   </button>

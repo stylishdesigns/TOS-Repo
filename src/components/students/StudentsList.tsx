@@ -22,12 +22,13 @@ import {
   Eye,
 } from 'lucide-react';
 import { SeatsManagementPanel } from './SeatsManagementPanel';
+import { SeatPaymentsHistoryPanel } from './SeatPaymentsHistoryPanel';
 
 export const StudentsList: React.FC = () => {
   const { students, programmes, branches, subjects, addStudent, seatsSummary, refreshSeatsSummary, activeCentreId, setSelectedStudent, addToast } = useApp();
 
 
-  const [activeViewTab, setActiveViewTab] = useState<'directory' | 'seats'>('directory');
+  const [activeViewTab, setActiveViewTab] = useState<'directory' | 'seats' | 'payments'>('directory');
   const [programmeFilter, setProgrammeFilter] = useState('All Programmes');
   const [statusFilter, setStatusFilter] = useState('All Status');
   const [search, setSearch] = useState('');
@@ -206,7 +207,7 @@ export const StudentsList: React.FC = () => {
         </div>
       </div>
       {/* Filter toolbar: shown above the switcher in the directory view */}
-      {activeViewTab !== 'seats' && (
+      {activeViewTab === 'directory' && (
       <div className="bg-white p-3 md:p-4 rounded-xl border border-slate-200/90 shadow-xs space-y-3 sm:space-y-0 sm:flex sm:items-center sm:justify-between sm:gap-3">
         {/* Search: on mobile appears above the filters */}
         <div className="flex items-center gap-2.5 w-full sm:w-auto sm:order-2">
@@ -262,13 +263,18 @@ export const StudentsList: React.FC = () => {
 
       )}
 
-      {/* Sub-header View Switcher: Directory vs Seats Panel. The white thumb
-          slides to the active side so it reads as a toggle at a glance. */}
-      <div className="relative grid grid-cols-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl w-full sm:w-80 mx-auto sm:mx-0" role="tablist">
+      {/* Sub-header View Switcher: Directory vs Seats Panel vs Seat Payment
+          History. The white thumb slides to the active side so it reads as a
+          toggle at a glance. */}
+      <div className="relative grid grid-cols-3 bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl w-full sm:w-[27rem] mx-auto sm:mx-0" role="tablist">
         <span
           aria-hidden="true"
-          className={`absolute top-1 bottom-1 left-1 w-[calc(50%-0.25rem)] rounded-xl bg-white dark:bg-slate-700 shadow-sm transition-transform duration-300 ease-out ${
-            activeViewTab === 'seats' ? 'translate-x-full' : 'translate-x-0'
+          className={`absolute top-1 bottom-1 left-1 w-[calc(33.333%-0.333rem)] rounded-xl bg-white dark:bg-slate-700 shadow-sm transition-transform duration-300 ease-out ${
+            activeViewTab === 'seats'
+              ? 'translate-x-full'
+              : activeViewTab === 'payments'
+                ? 'translate-x-[200%]'
+                : 'translate-x-0'
           }`}
         />
         <button
@@ -298,10 +304,25 @@ export const StudentsList: React.FC = () => {
           <span>Seats &amp; Access Limits</span>
           <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
         </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeViewTab === 'payments'}
+          onClick={() => setActiveViewTab('payments')}
+          className={`relative z-10 px-2 py-2 rounded-xl text-[11px] sm:text-xs font-bold text-center transition-colors cursor-pointer ${
+            activeViewTab === 'payments'
+              ? 'text-orange-600 dark:text-orange-400'
+              : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+          }`}
+        >
+          Seat Payment History
+        </button>
       </div>
 
       {activeViewTab === 'seats' ? (
         <SeatsManagementPanel students={students || []} />
+      ) : activeViewTab === 'payments' ? (
+        <SeatPaymentsHistoryPanel />
       ) : (
         <>
       {/* Students Data Table (matches video 00:23 - 00:26) */}

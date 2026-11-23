@@ -5,7 +5,7 @@ import { adminAuth, adminDb } from './firebaseAdmin';
 import { runStaffPayReminderSweep } from './staffPayReminders';
 import { provisionSeats, getSeatPool, facilityTier, countPaidSeatsForCentre, addSeatsForCentre, enforceSeatConfigAcrossFacilities } from './seatDays';
 import { runSeatPolicySweep } from './seatSweep';
-import { payAccount, paidSeatStats, createUpgradeRequest, attachReceiptToUpgradeRequest, listUpgradeRequests, decideUpgradeRequest } from './seatUpgrades';
+import { payAccount, paidSeatStats, createUpgradeRequest, attachReceiptToUpgradeRequest, listUpgradeRequests, decideUpgradeRequest, listSeatPayments } from './seatUpgrades';
 import {
   Caller,
   countActiveStudents,
@@ -421,11 +421,32 @@ export function registerExtendedRoutes(app: express.Express): void {
       await requireMembership(caller, centreId, ['owner', 'admin']);
       const centreDoc = await adminDb.collection('centres').doc(centreId).get();
       const centreName = String((centreDoc.data() as any)?.name || '');
+      // The receipt comes with the request, always: a payment without proof
+      // can never exist, so nothing is ever filed "awaiting confirmation"
+      // before the facility uploads its receipt.
+      const dataUrl = String(req.body?.receiptData || '');
+      const m = /^data:(image\/(?:png|jpe?g|webp)|application\/pdf);base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl);
+      if (!m) return res.status(400).json({ error: 'Upload your receipt as a PNG, JPG or WebP image, or a PDF.' });
+      const bytes = Math.floor((m[2].length * 3) / 4);
+      if (bytes > 4 * 1024 * 1024) return res.status(413).json({ error: 'The receipt can be up to 4 MB.' });
+      const cloud = String(process.env.CLOUDINARY_CLOUD_NAME || '');
+      const preset = String(process.env.CLOUDINARY_UPLOAD_PRESET || '');
+      if (!cloud || !preset) return res.status(500).json({ error: 'Receipt hosting is not configured on this deployment.' });
+      const endpoint = m[1] === 'application/pdf' ? 'raw' : 'image';
+      const form = new FormData();
+      form.append('upload_preset', preset);
+      form.append('folder', 'tos/receipts');
+      form.append('file', dataUrl);
+      const resp = await fetch(`https://api.cloudinary.com/v1_1/${cloud}/${endpoint}/upload`, { method: 'POST', body: form });
+      const cd: any = await resp.json().catch(() => null);
+      const receiptUrl = cd && typeof cd.secure_url === 'string' ? cd.secure_url : '';
+      if (!resp.ok || !receiptUrl) return res.status(502).json({ error: 'The receipt could not be uploaded. Please try again.' });
       const result = await createUpgradeRequest({
         centreId,
         centreName,
         planId: String(req.body?.planId || ''),
         seats: Number(req.body?.seats || 0),
+        receiptUrl,
         requestedByUid: caller.uid,
       });
       if (!result.ok) {
@@ -474,6 +495,22 @@ export function registerExtendedRoutes(app: express.Express): void {
     } catch (error: any) {
       const status = Number(error?.status || 500);
       res.status(status).json({ error: error?.message || 'The receipt could not be uploaded.' });
+    }
+  });
+
+  // Seat payment history for a facility: every seat payment made, with the
+  // receipt, when it was paid and when Tutorial OS confirmed it.
+  app.get('/api/centre/seats/payment-history', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const centreId = String(req.query.centreId || '').trim().slice(0, 120);
+      if (!centreId) throw httpError(400, 'centreId is required.');
+      await requireMembership(caller, centreId, ['owner', 'admin', 'tutor']);
+      const payments = await listSeatPayments(centreId);
+      return res.json({ success: true, payments });
+    } catch (error: any) {
+      const status = Number(error?.status || 500);
+      res.status(status).json({ error: error.message || 'Could not load the seat payment history.' });
     }
   });
 

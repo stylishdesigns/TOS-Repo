@@ -584,7 +584,7 @@ const MainLayout: React.FC = () => {
   // Platform staff never see the centre access-code screen (Prompt E). When a
   // staff member opens a centre door without an active centre membership,
   // explain the way to test a centre instead of showing code entry.
-  if (currentUser && isTosAdmin && !activeCentreId) {
+  if (currentUser && isTosAdmin && !activeCentreId && !forceLanding) {
     return (
       <div className="min-h-screen w-full bg-slate-950 flex flex-col items-center justify-center text-center p-6">
         <div className="w-14 h-14 rounded-2xl bg-orange-500/10 border border-orange-500/30 flex items-center justify-center mb-5">
@@ -771,8 +771,14 @@ const MainLayout: React.FC = () => {
         <TutorialOsLanding
           onAdminSignIn={() => {
             setForceLanding(false);
-            setViewMode('portal');
             setShowWelcome(false);
+            setViewMode('portal');
+            if (currentUser && isTosAdmin) {
+              // A signed-in platform admin tapping Login returns to their
+              // console; no sign-out, no facility access-code gate.
+              window.location.hash = '#tos-admin';
+              return;
+            }
             setCentreGateRequested(true);
           }}
           onStudentAccess={() => {

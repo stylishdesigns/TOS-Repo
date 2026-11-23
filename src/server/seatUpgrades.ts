@@ -154,6 +154,7 @@ export async function createUpgradeRequest(input: {
   centreName: string;
   planId: string;
   seats: number;
+  receiptUrl: string;
   requestedByUid: string;
 }): Promise<UpgradeRequestOutcome> {
   const seats = Math.max(1, Math.floor(Number(input.seats || 0)));
@@ -199,6 +200,9 @@ export async function createUpgradeRequest(input: {
 
   const perSeat = Math.max(0, Number(plan.price || 0));
   const total = seats * perSeat;
+  // A request never leaves this function without its receipt: the receipt is
+  // uploaded before the request exists, so a payment without proof can never
+  // sit waiting for confirmation.
   const doc = await adminDb.collection('centreUpgradeRequests').add({
     centreId: input.centreId,
     centreName: String(input.centreName || ''),
@@ -208,7 +212,8 @@ export async function createUpgradeRequest(input: {
     perSeatPrice: perSeat,
     total,
     status: 'pending',
-    receiptUrl: '',
+    receiptUrl: String(input.receiptUrl || ''),
+    receiptUploadedAt: new Date().toISOString(),
     createdAt: new Date().toISOString(),
     requestedByUid: String(input.requestedByUid || ''),
   });
@@ -216,7 +221,7 @@ export async function createUpgradeRequest(input: {
     actorUid: input.requestedByUid,
     centreId: input.centreId,
     action: 'UPGRADE_REQUEST_CREATED',
-    after: { requestId: doc.id, planId: input.planId, seats, total },
+    after: { requestId: doc.id, planId: input.planId, seats, total, hasReceipt: true },
     at: new Date().toISOString(),
   });
   return {
@@ -243,6 +248,57 @@ export async function attachReceiptToUpgradeRequest(
     after: { requestId, receiptUrl: String(receiptUrl || '') },
     at: new Date().toISOString(),
   });
+}
+
+// Every seat payment a facility has made, newest first: bank-transfer
+// upgrade requests (with their receipt and confirmation times) plus payments a
+// platform admin recorded directly that bought seats. Awaiting rows are
+// confirmed only when Tutorial OS has approved them.
+export async function listSeatPayments(centreId: string): Promise<any[]> {
+  const rows: any[] = [];
+  const reqSnap = await adminDb
+    .collection('centreUpgradeRequests')
+    .where('centreId', '==', centreId)
+    .get();
+  reqSnap.forEach((d) => {
+    const v = d.data() as any;
+    const status = String(v.status || 'pending');
+    rows.push({
+      id: d.id,
+      source: 'transfer',
+      planName: String(v.planName || ''),
+      seats: Number(v.seats || 0),
+      amount: Number(v.total || 0),
+      paidAt: String(v.createdAt || ''),
+      status,
+      confirmedAt: status === 'approved' ? String(v.decidedAt || '') : '',
+      receiptUrl: String(v.receiptUrl || ''),
+      reference: String(v.reference || ''),
+    });
+  });
+  const paySnap = await adminDb
+    .collection('billingPayments')
+    .where('centreId', '==', centreId)
+    .get();
+  paySnap.forEach((d) => {
+    const v = d.data() as any;
+    const seats = Math.max(0, Math.floor(Number(v.seats || 0)));
+    if (seats <= 0) return; // only payments that bought seats belong here
+    rows.push({
+      id: d.id,
+      source: 'recorded',
+      planName: '',
+      seats,
+      amount: Number(v.amount || 0),
+      paidAt: String(v.at || ''),
+      status: 'approved',
+      confirmedAt: String(v.at || ''),
+      receiptUrl: String(v.receiptUrl || ''),
+      reference: String(v.reference || ''),
+    });
+  });
+  rows.sort((a, b) => String(b.paidAt || '').localeCompare(String(a.paidAt || '')));
+  return rows;
 }
 
 export async function listUpgradeRequests(): Promise<any[]> {
