@@ -9,7 +9,17 @@ import {
   CentreSeatsSummary,
   MembershipRole,
   MembershipStatus,
+  SeatSummary,
+  SeatStatus,
+  SeatPool,
 } from '../types';
+import {
+  ensureSeatsForCentre,
+  lockExpiredSeatsForCentre,
+  drawFreeSeatForCentre,
+  listSeats,
+  seatUsage,
+} from './seatDays';
 
 // ============================================================================
 // SHARED HELPERS
@@ -1027,31 +1037,63 @@ export async function joinCentreService(params: {
 // STUDENT SEAT MANAGEMENT (Step 7: transactions)
 // ============================================================================
 
-/** Enable/reactivate a student membership transactionally, checking the seat
- *  cap in the same transaction. Seat swaps (disable/enable) are unlimited. */
+/** Enable/reactivate a student membership transactionally, seat-days style:
+ *  the student draws the free seat with the most days left and their seat
+ *  starts burning its days the day it is switched on, student or not. */
 async function activateStudentTransactional(params: {
   caller: Caller;
   studentUid: string;
   centreId: string;
-}): Promise<{ used: number; cap: number }> {
+}): Promise<{ used: number; cap: number; seatNo?: number; seatRemaining?: number }> {
   const { caller, studentUid, centreId } = params;
 
   const billing = await getBillingDoc(centreId);
   const centre = await getCentreDoc(centreId);
   const config = await getPlatformConfig();
-  const plan = billing ? await getPlatformPlan(billing.planId) : null;
   const preSeedCount = await countActiveStudents(centreId);
   const membershipId = `${studentUid}__${centreId}`;
+
+  // Seat-days first: seed the pool on first use, lock seats whose days ran
+  // out, then draw the free seat with the most days left for this student.
+  try {
+    await ensureSeatsForCentre(centreId, { billing, trialSeatCap: Number((config as any)?.trialSeatCap || 10) });
+  } catch {
+    /* seeding retries on the next seats read */
+  }
+  try {
+    await lockExpiredSeatsForCentre(centreId, { centreName: centre?.name || '' });
+  } catch {
+    /* the sweep also locks expired seats */
+  }
+  const drawn = await drawFreeSeatForCentre(centreId);
+  if (!drawn) {
+    throw httpError(
+      409,
+      'No seats available. Switch an unused seat off to free one, or ask Tutorial OS to record a payment for more seats.'
+    );
+  }
+
+  // The student's display name rides onto the seat so the control room shows
+  // exactly who holds each seat.
+  let studentName = '';
+  try {
+    const stuDoc = await adminDb.collection('students').doc(studentUid).get();
+    studentName = String((stuDoc.data() as any)?.name || '');
+  } catch {
+    /* the seat still shows its number */
+  }
 
   return adminDb.runTransaction(async (tx) => {
     const centreRef = adminDb.collection('centres').doc(centreId);
     const billingRef = adminDb.collection('centreBilling').doc(centreId);
     const memRef = adminDb.collection('memberships').doc(membershipId);
+    const seatRef = adminDb.collection('centreSeats').doc(drawn.id);
 
-    const [centreDoc, billingDoc, memDoc] = await Promise.all([
+    const [centreDoc, billingDoc, memDoc, seatDoc] = await Promise.all([
       tx.get(centreRef),
       tx.get(billingRef),
       tx.get(memRef),
+      tx.get(seatRef),
     ]);
 
     if (!memDoc.exists) throw httpError(404, 'Student membership not found.');
@@ -1068,38 +1110,54 @@ async function activateStudentTransactional(params: {
     // Already active: nothing to do.
     if (current.status === 'active') {
       const used = billingDoc.data()?.activeStudentCount ?? preSeedCount;
-      return { used, cap: seatCapFor(freshBilling, plan, status) };
+      const pool = await listSeats(centreId);
+      return {
+        used,
+        cap: pool.length,
+        seatNo: Number((current as any).seatNo || 0),
+        seatRemaining: drawn.remaining,
+      };
     }
 
-    const cap = seatCapFor(freshBilling, plan, status);
+    if (!seatDoc.exists || (seatDoc.data() as any)?.status !== 'available') {
+      throw httpError(409, 'That seat was just taken by another switch-on. Try again in a moment.');
+    }
+
     // The stored counter can drift upward (a disable that found the student
     // already off does not decrement, a later enable still increments), so
-    // the cap is checked against the live count of active student
-    // memberships and the counter self-heals to the true number.
+    // the counter self-heals to the live number of active memberships.
     const used = Math.min(
       billingDoc.data()?.activeStudentCount ?? preSeedCount,
       preSeedCount
     );
-    if (used >= cap) {
-      throw httpError(
-        409,
-        `Seat limit reached: ${used} of ${cap}. Free a seat or ask Tutorial OS to raise your limit.`
-      );
-    }
 
     const nowIso = new Date().toISOString();
     tx.set(
       memRef,
       {
         status: 'active',
+        seatId: drawn.id,
+        seatNo: drawn.seatNo,
         lastAccessToggledAt: nowIso,
         updatedAt: nowIso,
       },
       { merge: true }
     );
+    tx.set(
+      seatRef,
+      {
+        status: 'active',
+        studentUid,
+        studentName,
+        assignedAt: nowIso,
+        startedAt: nowIso,
+      },
+      { merge: true }
+    );
     tx.set(billingRef, { activeStudentCount: used + 1 }, { merge: true });
 
-    return { used: used + 1, cap };
+    const pool = await listSeats(centreId);
+    return { used: used + 1, cap: pool.length, seatNo: drawn.seatNo, seatRemaining: drawn.remaining };
   });
 }
 
@@ -1170,14 +1228,47 @@ export async function toggleStudentAccessService(params: {
       const [memDoc, billingDoc] = await Promise.all([tx.get(memRef), tx.get(billingRef)]);
       if (!memDoc.exists) throw httpError(404, 'Student membership not found.');
       const wasActive = memDoc.data()?.status === 'active';
+      const seatId = String((memDoc.data() as any)?.seatId || '');
       tx.set(
         memRef,
-        { status: 'disabled', lastAccessToggledAt: nowIso, updatedAt: nowIso },
+        { status: 'disabled', seatId: '', seatNo: 0, lastAccessToggledAt: nowIso, updatedAt: nowIso },
         { merge: true }
       );
       if (wasActive) {
         const used = billingDoc.data()?.activeStudentCount ?? preSeedCount;
         tx.set(billingRef, { activeStudentCount: Math.max(0, used - 1) }, { merge: true });
+      }
+      // Seat-days: switching a student off freezes their used days on the seat
+      // and returns the seat, with its remaining days, to the facility's pool.
+      if (wasActive && seatId) {
+        const seatRef = adminDb.collection('centreSeats').doc(seatId);
+        const seatDoc = await tx.get(seatRef);
+        if (seatDoc.exists) {
+          const seat = seatDoc.data() as any;
+          const { daysUsed } = seatUsage(seat, new Date());
+          const history: any[] = Array.isArray(seat.history) ? seat.history.slice(-50) : [];
+          history.push({
+            uid: studentUid,
+            name: String(seat.studentName || ''),
+            from: seat.assignedAt || seat.startedAt || null,
+            to: nowIso,
+            reason: 'switched off',
+          });
+          tx.set(
+            seatRef,
+            {
+              status: 'available',
+              startedAt: null,
+              studentUid: '',
+              studentName: '',
+              assignedAt: null,
+              daysUsedBase: daysUsed,
+              history,
+              freedAt: nowIso,
+            },
+            { merge: true }
+          );
+        }
       }
       return wasActive;
     });
@@ -1238,13 +1329,11 @@ export async function getSeatsSummaryService(centreId: string): Promise<CentreSe
   const centre = await getCentreDoc(centreId);
   const config = await getPlatformConfig();
   const status = effectiveStatus(centre, billing, config);
-  const plan = billing ? await getPlatformPlan(billing.planId) : null;
-  const cap = seatCapFor(billing, plan, status);
 
   let used = 0;
   const studentAccess: Record<
     string,
-    { status: MembershipStatus; lastToggledAt?: string }
+    { status: MembershipStatus; lastToggledAt?: string; seatNo?: number; seatRemaining?: number }
   > = {};
 
   try {
@@ -1266,6 +1355,54 @@ export async function getSeatsSummaryService(centreId: string): Promise<CentreSe
     dbFailure('getSeatsSummaryService', err);
   }
 
+  // Seat-days: seed the pool on first read, lock seats whose days ran out,
+  // then expose the whole pool for the control room.
+  let seats: SeatSummary[] = [];
+  try {
+    await ensureSeatsForCentre(centreId, { billing, trialSeatCap: Number((config as any)?.trialSeatCap || 10) });
+    await lockExpiredSeatsForCentre(centreId, { centreName: centre?.name || '' });
+    const seatDocs = await listSeats(centreId);
+    const now = new Date();
+    const seatByUid = new Map<string, { seatNo: number; remaining: number }>();
+    seats = seatDocs.map((d) => {
+      const s = d.data() as any;
+      const { daysUsed, remaining } = seatUsage(s, now);
+      const summary: SeatSummary = {
+        id: d.id,
+        seatNo: Number(s.seatNo || 0),
+        status: (s.status || 'available') as SeatStatus,
+        daysTotal: Number(s.daysTotal || 30),
+        daysUsed,
+        remaining,
+        startedAt: s.startedAt || null,
+        studentUid: s.studentUid || '',
+        studentName: s.studentName || '',
+        assignedAt: s.assignedAt || null,
+        history: Array.isArray(s.history) ? s.history : [],
+      };
+      if (summary.status === 'active' && summary.studentUid) {
+        seatByUid.set(summary.studentUid, { seatNo: summary.seatNo, remaining: summary.remaining });
+      }
+      return summary;
+    });
+    for (const [uid, info] of seatByUid) {
+      if (studentAccess[uid]) {
+        studentAccess[uid].seatNo = info.seatNo;
+        studentAccess[uid].seatRemaining = info.remaining;
+      }
+    }
+  } catch (err) {
+    dbFailure('getSeatsSummaryService(seats)', err);
+  }
+
+  const pool: SeatPool = {
+    total: seats.length,
+    active: seats.filter((s) => s.status === 'active').length,
+    available: seats.filter((s) => s.status === 'available').length,
+    locked: seats.filter((s) => s.status === 'locked').length,
+    bankedDays: seats.filter((s) => s.status === 'available').reduce((n, s) => n + s.remaining, 0),
+  };
+
   let trialDaysLeft: number | undefined;
   if (status === 'trial' && billing?.trialEndsAt) {
     const diff = new Date(billing.trialEndsAt).getTime() - Date.now();
@@ -1274,11 +1411,13 @@ export async function getSeatsSummaryService(centreId: string): Promise<CentreSe
 
   return {
     used,
-    cap,
+    cap: pool.total,
     isTrial: status === 'trial',
     trialDaysLeft,
     trialEndsAt: billing?.trialEndsAt || null,
     studentAccess,
+    seats,
+    pool,
   };
 }
 

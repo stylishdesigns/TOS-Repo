@@ -3,6 +3,7 @@ import * as crypto from 'crypto';
 import { STARTING_CONFIG } from './platformDefaults';
 import { adminAuth, adminDb } from './firebaseAdmin';
 import { runStaffPayReminderSweep } from './staffPayReminders';
+import { provisionSeats, getSeatPool } from './seatDays';
 import {
   Caller,
   countActiveStudents,
@@ -1565,6 +1566,20 @@ export function registerExtendedRoutes(app: express.Express): void {
         adminDb.collection('auditLogs').orderBy('at', 'desc').limit(10).get(),
       ]);
       const billingMap = await loadBillingMap(centresSnap.docs.map((d) => d.id));
+      // Seat-days: facilities with a pool report active/total seats, not the
+      // legacy billing counters.
+      const seatPoolByCentre: Record<string, { active: number; total: number }> = {};
+      try {
+        const seatSnap = await adminDb.collection('centreSeats').get();
+        for (const d of seatSnap.docs) {
+          const cid = String((d.data() as any).centreId || '');
+          const st = String((d.data() as any).status || 'available');
+          if (!cid) continue;
+          seatPoolByCentre[cid] = seatPoolByCentre[cid] || { active: 0, total: 0 };
+          seatPoolByCentre[cid].total += 1;
+          if (st === 'active') seatPoolByCentre[cid].active += 1;
+        }
+      } catch { /* the legacy counters stay the fallback */ }
       const counts: Record<string, number> = { trial: 0, pending_payment: 0, active: 0, overdue: 0, suspended: 0 };
       let seatsUsed = 0;
       let seatsCap = 0;
@@ -1576,8 +1591,14 @@ export function registerExtendedRoutes(app: express.Express): void {
         const status = effectiveStatus(centre, billing, config);
         counts[status] = (counts[status] || 0) + 1;
         if (billing) {
-          seatsUsed += billing.activeStudentCount || 0;
-          seatsCap += billing.seatCap || 0;
+          const pool = seatPoolByCentre[d.id];
+          if (pool && pool.total > 0) {
+            seatsUsed += pool.active;
+            seatsCap += pool.total;
+          } else {
+            seatsUsed += billing.activeStudentCount || 0;
+            seatsCap += billing.seatCap || 0;
+          }
           const endsAt = billing.trialEndsAt ? new Date(billing.trialEndsAt) : null;
           if (endsAt && !isNaN(endsAt.getTime()) && endsAt.getTime() > Date.now() && endsAt.getTime() <= weekAhead) {
             trialsEndingSoon.push({ centreId: d.id, name: centre.name, endsAt: billing.trialEndsAt });
@@ -1820,15 +1841,19 @@ export function registerExtendedRoutes(app: express.Express): void {
       let plan: any = null;
       if (billing?.planId) { try { plan = await getPlatformPlan(billing.planId); } catch { plan = null; } }
       const status = billing ? effectiveStatus(centre, billing, config) : 'active';
+      const seatPool = await getSeatPool(req.params.id).catch(() => null);
       let seatsUsed = billing?.activeStudentCount ?? 0;
       try { seatsUsed = await countActiveStudents(req.params.id); } catch { /* keep the stored counter */ }
-      const seats = { used: seatsUsed, cap: billing ? seatCapFor(billing, plan, status) : 0 };
+      const seats = seatPool && seatPool.total > 0
+        ? { used: seatPool.active, cap: seatPool.total }
+        : { used: seatsUsed, cap: billing ? seatCapFor(billing, plan, status) : 0 };
       const paymentsSnap = await adminDb.collection('billingPayments').where('centreId', '==', req.params.id).limit(100).get();
       const auditSnap = await adminDb.collection('auditLogs').where('centreId', '==', req.params.id).limit(50).get();
       res.json({
         centre: { id: cDoc.id, ...cDoc.data() },
         billing: bDoc.exists ? bDoc.data() : null,
         seats,
+        seatPool: seatPool || undefined,
         payments: paymentsSnap.docs
           .map((d) => ({ id: d.id, ...d.data() } as any))
           .sort((a: any, b: any) => String(b.at || '').localeCompare(String(a.at || ''))),
@@ -1912,6 +1937,7 @@ export function registerExtendedRoutes(app: express.Express): void {
         const method = String(req.body?.method || '').trim().slice(0, 60);
         const reference = String(req.body?.reference || '').trim().slice(0, 120);
         const note = String(req.body?.note || '').trim().slice(0, 500);
+        const seats = Math.max(0, Math.floor(Number(req.body?.seats || 0)));
         if (!Number.isFinite(amount) || amount <= 0) return res.status(400).json({ error: 'Enter a payment amount.' });
         if (!periodEnd || isNaN(new Date(periodEnd).getTime())) return res.status(400).json({ error: 'Enter the period the payment covers.' });
         if (!bDoc.exists) return res.status(400).json({ error: 'This facility has no billing document yet.' });
@@ -1927,8 +1953,14 @@ export function registerExtendedRoutes(app: express.Express): void {
         });
         await bRef.update({ paidThrough: new Date(periodEnd).toISOString() });
         await cRef.update({ status: 'active', credentialsNotDelivered: false });
-        await auditChange('PAYMENT_RECORDED', { amount, periodCoveredUntil: new Date(periodEnd).toISOString(), method, reference });
-        return res.json({ success: true });
+        // Seat-days: the payment tops the facility's seat pool. Locked seats
+        // reopen with a fresh 30 days first, then new seats are added.
+        let seatResult: { reopened: number; added: number; total: number } | null = null;
+        if (seats > 0) {
+          try { seatResult = await provisionSeats(req.params.id, seats); } catch (e) { console.error('[tos/facilities] seat provisioning failed:', (e as Error).message); }
+        }
+        await auditChange('PAYMENT_RECORDED', { amount, periodCoveredUntil: new Date(periodEnd).toISOString(), method, reference, seats, seatResult });
+        return res.json({ success: true, ...(seatResult ? { seats: seatResult } : {}) });
       }
       if (type === 'suspend') {
         const reason = String(req.body?.reason || '').trim().slice(0, 300);

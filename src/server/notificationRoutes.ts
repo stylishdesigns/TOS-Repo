@@ -5,6 +5,7 @@ import { adminDb } from './firebaseAdmin';
 import { Caller, httpError, requireMembership } from './tenantService';
 import { sendAtMs, runPushSweep } from './pushSender';
 import { runCheckInReminderSweep } from './checkInReminders';
+import { runSeatDaysSweep } from './seatDaysSweep';
 
 // ============================================================================
 // In-app notifications for the student portal.
@@ -335,7 +336,8 @@ export function registerNotificationRoutes(app: express.Express): void {
       }
       const result = await runPushSweep({ limit: 20 });
       const checkins = await runCheckInReminderSweep();
-      return res.json({ ...result, checkInReminders: checkins });
+      const seatdays = await runSeatDaysSweep();
+      return res.json({ ...result, checkInReminders: checkins, seatDays: seatdays });
     } catch (e) {
       return res.status(errStatus(e)).json({ error: (e as Error).message || 'Could not run the push sweep.' });
     }

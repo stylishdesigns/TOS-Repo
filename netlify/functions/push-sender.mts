@@ -18,6 +18,7 @@
 import { runPushSweep } from '../../src/server/pushSender';
 import { runAnnouncementSweep } from '../../src/server/announcementRoutes';
 import { runCheckInReminderSweep } from '../../src/server/checkInReminders';
+import { runSeatDaysSweep } from '../../src/server/seatDaysSweep';
 
 export default async () => {
   const result = await runPushSweep({ limit: 20 });
@@ -28,7 +29,10 @@ export default async () => {
   // facility's check-in time passes, students who have not checked in get
   // one in-app notification and one push.
   const checkins = await runCheckInReminderSweep();
-  console.log('[push-sender]', JSON.stringify(result), '[announcements]', JSON.stringify(announcements), '[checkin-reminders]', JSON.stringify(checkins));
+  // Seat-days ride the same cadence: seats whose 30 (or trial 14) days ran out
+  // lock themselves, and admins get a reminder at 7, 3 and 1 days left.
+  const seatdays = await runSeatDaysSweep();
+  console.log('[push-sender]', JSON.stringify(result), '[announcements]', JSON.stringify(announcements), '[checkin-reminders]', JSON.stringify(checkins), '[seat-days]', JSON.stringify(seatdays));
   return new Response(JSON.stringify(result), {
     status: 200,
     headers: { 'content-type': 'application/json' },

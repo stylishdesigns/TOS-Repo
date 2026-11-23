@@ -674,6 +674,34 @@ export interface CentreEntitlements {
   aiPerformanceAnalysis: boolean;
 }
 
+export type SeatStatus = 'available' | 'active' | 'locked';
+export interface SeatHistoryEntry {
+  uid: string;
+  name?: string;
+  from?: string | null;
+  to?: string | null;
+  reason?: string;
+}
+export interface SeatSummary {
+  id: string;
+  seatNo: number;
+  status: SeatStatus;
+  daysTotal: number;
+  daysUsed: number;
+  remaining: number;
+  startedAt?: string | null;
+  studentUid?: string;
+  studentName?: string;
+  assignedAt?: string | null;
+  history: SeatHistoryEntry[];
+}
+export interface SeatPool {
+  total: number;
+  active: number;
+  available: number;
+  locked: number;
+  bankedDays: number;
+}
 export interface CentreSeatsSummary {
   used: number;
   cap: number;
@@ -683,7 +711,11 @@ export interface CentreSeatsSummary {
   studentAccess?: Record<string, {
     status: MembershipStatus;
     lastToggledAt?: string;
+    seatNo?: number;
+    seatRemaining?: number;
   }>;
+  seats?: SeatSummary[];
+  pool?: SeatPool;
 }
 
 export interface CentreUserRole {
