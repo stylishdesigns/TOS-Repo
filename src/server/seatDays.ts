@@ -646,17 +646,155 @@ export async function countPaidSeatsForCentre(centreId: string): Promise<number>
   return seats.filter((d) => seatKind(d.data() as SeatRead) === 'paid').length;
 }
 
-/** Batch 22: keep the facility's free-seat grant current. Tops the pool up to
- *  the allocation with kind-'free' seats; never removes seats already there,
- *  so lowering a grant only stops future top-ups. */
-export async function reconcileFreeSeats(centreId: string, allocation: number): Promise<number> {
+/** Batch 25: the seat allocation a platform-settings trim removes, one row
+ *  each. Trim always takes the highest seat numbers first and takes vacant
+ *  seats before occupied ones, so students keep their seats wherever
+ *  possible and the survivors keep the low numbers. */
+type TrimSeat = { id: string } & Record<string, any>;
+
+function pickSeatsToTrim(seats: TrimSeat[], count: number): TrimSeat[] {
+  const vacant = seats.filter((s) => !String(s.studentUid || ''));
+  const occupied = seats.filter((s) => String(s.studentUid || ''));
+  const byNoDesc = (a: TrimSeat, b: TrimSeat) => Number(b.seatNo || 0) - Number(a.seatNo || 0);
+  return [...vacant.sort(byNoDesc), ...occupied.sort(byNoDesc)].slice(0, Math.max(0, count));
+}
+
+/** Remove ONE seat the platform trimmed away. A student on it is detached
+ *  exactly like a manual switch-off: membership disabled, access off, the
+ *  running-students counter drops, their stay is written into the seat's
+ *  history. The seat document itself is then deleted. */
+async function removeSeatDoc(centreId: string, seat: TrimSeat, reason: string, nowIso: string): Promise<boolean> {
+  const uid = String(seat.studentUid || '');
+  const name = String(seat.studentName || '');
+  const seatNo = Number(seat.seatNo || 0);
+  await adminDb.runTransaction(async (tx) => {
+    const billingRef = adminDb.collection('centreBilling').doc(centreId);
+    const history: SeatHistoryEntry[] = Array.isArray(seat.history) ? seat.history.slice(-50) : [];
+    if (uid) {
+      const bDoc = await tx.get(billingRef);
+      const used = Number((bDoc.data() as any)?.activeStudentCount || 0);
+      history.push({ uid, name, from: seat.assignedAt || seat.startedAt || null, to: nowIso, reason });
+      tx.set(
+        adminDb.collection('memberships').doc(`${uid}__${centreId}`),
+        { status: 'disabled', seatId: '', seatNo: 0, lastAccessToggledAt: nowIso, updatedAt: nowIso },
+        { merge: true }
+      );
+      tx.set(adminDb.collection('students').doc(uid), { accessStatus: 'off' }, { merge: true });
+      tx.set(billingRef, { activeStudentCount: Math.max(0, used - 1) }, { merge: true });
+    }
+    tx.delete(adminDb.collection('centreSeats').doc(seat.id));
+  });
+  if (uid) {
+    try {
+      await adminDb.collection('auditLogs').add({
+        actorUid: 'platform-config',
+        centreId,
+        action: 'SEAT_REMOVED_BY_CONFIG',
+        seatNo,
+        kind: seatKind(seat as SeatRead),
+        studentUid: uid,
+        studentName: name,
+        reason,
+        at: nowIso,
+      });
+    } catch { /* audit is best effort */ }
+    try {
+      await notifySeatRemoved(centreId, seatNo, name, nowIso);
+    } catch { /* notification is best effort */ }
+  }
+  return Boolean(uid);
+}
+
+/** Tells a facility's admins one of their seats was removed by a platform
+ *  settings change, once per seat per day. */
+async function notifySeatRemoved(centreId: string, seatNo: number, studentName: string, nowIso: string): Promise<void> {
+  const key = `seat-removed-${centreId}-seat${seatNo}-${lagosDateKey(nowIso)}`;
+  const guard = adminDb.collection('reminderSends').doc(key);
+  const g = await guard.get();
+  if (g.exists) return;
+  await guard.set({ createdAt: Date.now() });
+
+  const who = studentName ? `Seat ${seatNo} (${studentName})` : `Seat ${seatNo}`;
+  const title = `${who} removed`;
+  const body = `Tutorial OS tightened the seat settings and ${who} fell outside them${studentName ? `; ${studentName}'s access was switched off` : ''}. Add the student to an open seat.`;
+
+  let admins;
+  try {
+    admins = await adminDb.collection('admins').where('centreId', '==', centreId).get();
+  } catch {
+    return;
+  }
+  for (const a of admins.docs) {
+    const v = a.data() as any;
+    const uid = String(v.uid || '');
+    const role = String(v.role || '');
+    if (!uid) continue;
+    if (role && !['owner', 'admin', 'centre_admin'].includes(role)) continue;
+    try {
+      await adminDb.collection('notifications').doc(`not-${key}-${uid.slice(0, 8)}`).set({
+        centreId,
+        type: 'billing',
+        title,
+        body,
+        audienceUid: uid,
+        createdAt: Date.now(),
+        subjects: [],
+        programmes: [],
+      });
+    } catch { /* in-app is best effort; the push still tries */ }
+    try {
+      await adminDb.collection('pushQueue').doc(`push-${key}-${uid.slice(0, 8)}`).set({
+        kind: 'seat_removed',
+        uid,
+        centreId,
+        pushTitle: title,
+        pushBody: body,
+        sendAt: Date.now(),
+        sent: false,
+        attempts: 0,
+      });
+    } catch { /* push failures are caught by the sender's own retry */ }
+  }
+}
+
+/** The facility's free-seat allocation: a per-facility override wins, else
+ *  the platform-wide default (batch 22). Shared by the seats read and the
+ *  settings sweep so both judge the same number. */
+export function effectiveFreeSeats(billing: any, config: any): number {
+  const custom = billing?.freeSeatsCustom;
+  if (custom !== null && custom !== undefined && String(custom).trim() !== '') {
+    return Math.max(0, Math.floor(Number(custom)));
+  }
+  return Math.max(0, Math.floor(Number((config as any)?.freeSeatsGeneral ?? 5)));
+}
+
+/** Batch 22, tightened by batch 25: keep the facility's free-seat grant in
+ *  step with the platform setting, live. Below the allocation the pool is
+ *  topped up with kind-'free' seats; above it the pool is TRIMMED back
+ *  down, so lowering the setting removes seats the same moment it saves
+ *  instead of only stopping future top-ups. A student on a trimmed seat is
+ *  detached with their access switched off, exactly like a manual
+ *  switch-off. The allocation handed in is already the facility's
+ *  effective one (override wins). */
+export async function reconcileFreeSeats(centreId: string, allocation: number): Promise<{ added: number; removed: number; detached: number }> {
   const want = Math.max(0, Math.floor(Number(allocation || 0)));
   const seats = await listSeats(centreId);
-  const held = seats.filter((d) => seatKind(d.data() as SeatRead) === 'free').length;
-  const missing = want - held;
-  if (missing <= 0) return 0;
-  const nextNo = seats.reduce((m, d) => Math.max(m, Number((d.data() as any).seatNo || 0)), 0);
+  const freeDocs = seats.filter((d) => seatKind(d.data() as SeatRead) === 'free');
   const nowIso = new Date().toISOString();
+
+  if (freeDocs.length > want) {
+    let detached = 0;
+    const victims = pickSeatsToTrim(freeDocs.map((d) => ({ id: d.id, ...(d.data() as any) })), freeDocs.length - want);
+    for (const v of victims) {
+      const took = await removeSeatDoc(centreId, v, 'free-seat allocation reduced', nowIso);
+      if (took) detached += 1;
+    }
+    return { added: 0, removed: victims.length, detached };
+  }
+
+  const missing = want - freeDocs.length;
+  if (missing <= 0) return { added: 0, removed: 0, detached: 0 };
+  const nextNo = seats.reduce((m, d) => Math.max(m, Number((d.data() as any).seatNo || 0)), 0);
   const batch = adminDb.batch();
   for (let i = 1; i <= missing; i++) {
     batch.set(adminDb.collection('centreSeats').doc(`${centreId}__seat-${nextNo + i}`), {
@@ -676,7 +814,65 @@ export async function reconcileFreeSeats(centreId: string, allocation: number): 
     });
   }
   await batch.commit();
-  return missing;
+  return { added: missing, removed: 0, detached: 0 };
+}
+
+/** Batch 25: hold a trial facility to its paid-seat cap live. Seats created
+ *  above the cap go: highest numbers first, vacant before occupied, and a
+ *  student on a trimmed seat is detached with their access switched off.
+ *  Locked seats count toward the cap too; they are vacant, so they are
+ *  trimmed first. */
+export async function trimPaidSeatsForCap(centreId: string, cap: number): Promise<{ removed: number; detached: number }> {
+  const want = Math.max(0, Math.floor(Number(cap)));
+  const seats = await listSeats(centreId);
+  const paidDocs = seats.filter((d) => seatKind(d.data() as SeatRead) === 'paid');
+  const excess = paidDocs.length - want;
+  if (excess <= 0) return { removed: 0, detached: 0 };
+  const nowIso = new Date().toISOString();
+  let detached = 0;
+  const victims = pickSeatsToTrim(paidDocs.map((d) => ({ id: d.id, ...(d.data() as any) })), excess);
+  for (const v of victims) {
+    const took = await removeSeatDoc(centreId, v, 'trial seat cap reduced', nowIso);
+    if (took) detached += 1;
+  }
+  return { removed: victims.length, detached };
+}
+
+/** Batch 25: apply the saved seat settings to EVERY facility at once, the
+ *  moment the platform saves them. Each facility's free-seat grant is
+ *  reconciled (top-up or trim, its own override wins) and each trial
+ *  facility is held to the trial paid-seat cap. One facility failing never
+ *  blocks the rest; the seats read self-heals the stragglers. */
+export async function enforceSeatConfigAcrossFacilities(config: any): Promise<{
+  facilities: number;
+  freeSeatsAdded: number;
+  freeSeatsRemoved: number;
+  studentsDetached: number;
+  trialSeatsRemoved: number;
+}> {
+  const snap = await adminDb.collection('centreBilling').get();
+  let freeSeatsAdded = 0;
+  let freeSeatsRemoved = 0;
+  let studentsDetached = 0;
+  let trialSeatsRemoved = 0;
+  for (const d of snap.docs) {
+    const billing = d.data() as any;
+    try {
+      const free = await reconcileFreeSeats(d.id, effectiveFreeSeats(billing, config));
+      freeSeatsAdded += free.added;
+      freeSeatsRemoved += free.removed;
+      studentsDetached += free.detached;
+    } catch { /* this facility retries on its next seats read */ }
+    if (isOnTrial(billing)) {
+      try {
+        const cap = Math.max(0, Math.floor(Number((config as any)?.trialMaxSeats ?? 10)));
+        const r = await trimPaidSeatsForCap(d.id, cap);
+        trialSeatsRemoved += r.removed;
+        studentsDetached += r.detached;
+      } catch { /* this facility retries on its next seats read */ }
+    }
+  }
+  return { facilities: snap.size, freeSeatsAdded, freeSeatsRemoved, studentsDetached, trialSeatsRemoved };
 }
 
 /** One in-app notification and one push per facility admin, guarded by a

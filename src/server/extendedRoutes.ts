@@ -3,7 +3,7 @@ import * as crypto from 'crypto';
 import { STARTING_CONFIG } from './platformDefaults';
 import { adminAuth, adminDb } from './firebaseAdmin';
 import { runStaffPayReminderSweep } from './staffPayReminders';
-import { provisionSeats, getSeatPool, isOnTrial, countPaidSeatsForCentre, addSeatsForCentre } from './seatDays';
+import { provisionSeats, getSeatPool, isOnTrial, countPaidSeatsForCentre, addSeatsForCentre, enforceSeatConfigAcrossFacilities } from './seatDays';
 import { runSeatPolicySweep } from './seatSweep';
 import {
   Caller,
@@ -2160,6 +2160,7 @@ export function registerExtendedRoutes(app: express.Express): void {
         }
       }
 
+      let applied: any = null;
       if (config) {
         const update: Record<string, any> = {};
         ['trialDays', 'skipTrialDiscountPct', 'trialGraceDays', 'aiRouteRateLimitPerHour', 'billedSeatsMinimum', 'trialMaxSeats', 'paidMaxSeats', 'freeSeatsGeneral', 'paidSeatMinimum'].forEach((k) => {
@@ -2172,10 +2173,19 @@ export function registerExtendedRoutes(app: express.Express): void {
         if (config.paidSeatsUnlimited !== undefined) update.paidSeatsUnlimited = config.paidSeatsUnlimited === true;
         if (Object.keys(update).length) {
           await adminDb.collection('platformConfig').doc('global').update(update);
-          await audit({ actorUid: caller.uid, action: 'CONFIG_UPDATED', after: update });
+          // Batch 25: the saved numbers reach every facility NOW. The sweep
+          // trims or tops up each facility's free-seat grant (override wins)
+          // and holds trial facilities to the trial paid-seat cap, detaching
+          // the students on removed seats.
+          try {
+            applied = await enforceSeatConfigAcrossFacilities(await getPlatformConfig());
+            await audit({ actorUid: caller.uid, action: 'CONFIG_ENFORCED', after: { update, applied } });
+          } catch (sweepError: any) {
+            console.error('[tos/plans] config enforcement sweep failed:', sweepError?.message || sweepError);
+          }
         }
       }
-      res.json({ success: true });
+      res.json({ success: true, ...(applied ? { applied } : {}) });
     } catch (error: any) {
       if (error?.status) return res.status(error.status).json({ error: error.message });
       console.error('[tos/plans] update failed:', error?.message || error);

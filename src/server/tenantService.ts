@@ -24,6 +24,7 @@ import {
   isOnTrial,
   countPaidSeatsForCentre,
   reconcileFreeSeats,
+  trimPaidSeatsForCap,
   freezeSeatRunMs,
 } from './seatDays';
 
@@ -1717,6 +1718,10 @@ export async function getSeatsSummaryService(centreId: string): Promise<CentreSe
   try {
     await ensureSeatsForCentre(centreId, { billing, trialSeatCap: Number((config as any)?.trialSeatCap || 10), freeSeats: freeSeatAllocation(config, billing) });
     try { await reconcileFreeSeats(centreId, freeSeatAllocation(config, billing)); } catch { /* tops up on the next read */ }
+    // Batch 25: a trial facility held to its paid-seat cap is trimmed live too.
+    try {
+      if (isOnTrial(billing)) await trimPaidSeatsForCap(centreId, Number((config as any)?.trialMaxSeats ?? 10));
+    } catch { /* trims on the next read */ }
     await lockExpiredSeatsForCentre(centreId, { centreName: centre?.name || '' });
     const seatDocs = await listSeats(centreId);
     const now = new Date();

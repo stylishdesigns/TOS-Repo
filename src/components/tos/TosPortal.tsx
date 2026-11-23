@@ -416,8 +416,18 @@ const SettingsTab: React.FC = () => {
     setMessage('');
     setError('');
     try {
-      await api('/api/tos/plans', { method: 'POST', body: { plans: [], config } });
-      setMessage('Saved. The platform reads these values fresh on every seat action and checks them on the server.');
+      const d = await api('/api/tos/plans', { method: 'POST', body: { plans: [], config } });
+      const a = d?.applied;
+      if (a) {
+        const parts: string[] = [];
+        if (a.freeSeatsRemoved > 0) parts.push(`${a.freeSeatsRemoved} free seat${a.freeSeatsRemoved === 1 ? '' : 's'} removed`);
+        if (a.freeSeatsAdded > 0) parts.push(`${a.freeSeatsAdded} free seat${a.freeSeatsAdded === 1 ? '' : 's'} added`);
+        if (a.trialSeatsRemoved > 0) parts.push(`${a.trialSeatsRemoved} trial seat${a.trialSeatsRemoved === 1 ? '' : 's'} removed`);
+        if (a.studentsDetached > 0) parts.push(`${a.studentsDetached} student${a.studentsDetached === 1 ? '' : 's'} detached`);
+        setMessage(`Saved. Applied across ${a.facilities} facilit${a.facilities === 1 ? 'y' : 'ies'}${parts.length ? `: ${parts.join(', ')}.` : ', nothing to change.'}`);
+      } else {
+        setMessage('Saved. The platform reads these values fresh on every seat action and checks them on the server.');
+      }
       await load();
     } catch (e: any) {
       setError(e.message);
@@ -463,7 +473,7 @@ const SettingsTab: React.FC = () => {
           </Field>
         </div>
         <p className="text-[11px] text-slate-500 mt-3">
-          The minimum is judged on paid seats only; free seats never count toward it. A facility below it must create enough seats in one go to reach it; from the minimum up, any number goes. Meeting the minimum also unlocks the free-seat grant. Free seats apply to trial and paid facilities alike, and each facility can carry its own override on its page. If the minimum sits above the trial cap, a trial facility cannot create seats until it upgrades.
+          Saving applies these numbers to every facility right away: lowering a number trims the extra seats live and moves students off removed seats (their access switches off), raising it adds seats. The minimum is judged on paid seats only; free seats never count toward it. A facility below it must create enough seats in one go to reach it; from the minimum up, any number goes. Meeting the minimum also unlocks the free-seat grant. Free seats apply to trial and paid facilities alike, and each facility can carry its own override on its page. If the minimum sits above the trial cap, a trial facility cannot create seats until it upgrades.
         </p>
       </Card>
 
