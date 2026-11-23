@@ -1431,7 +1431,13 @@ export async function setSeatSwitchService(params: {
     const { daysUsed } = isFreeSeat ? { daysUsed: 0 } : seatUsage(seat, now);
     await adminDb.runTransaction(async (tx) => {
       const history: any[] = Array.isArray(seat.history) ? seat.history.slice(-50) : [];
+      // Firestore requires every read inside a transaction to run before the
+      // first write, so the billing counter is read up front.
+      const billingRef = adminDb.collection('centreBilling').doc(params.centreId);
+      let used = 0;
       if (uid) {
+        const bDoc = await tx.get(billingRef);
+        used = Number((bDoc.data() as any)?.activeStudentCount || 0);
         history.push({
           uid,
           name,
@@ -1449,9 +1455,6 @@ export async function setSeatSwitchService(params: {
           { accessStatus: 'off' },
           { merge: true }
         );
-        const billingRef = adminDb.collection('centreBilling').doc(params.centreId);
-        const bDoc = await tx.get(billingRef);
-        const used = Number((bDoc.data() as any)?.activeStudentCount || 0);
         tx.set(billingRef, { activeStudentCount: Math.max(0, used - 1) }, { merge: true });
       }
       tx.set(
