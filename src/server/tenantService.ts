@@ -1,4 +1,5 @@
 import { adminDb, adminAuth } from './firebaseAdmin';
+import { reconcileSeatOrder } from './seatDays';
 import {
   Centre,
   CentreBilling,
@@ -1664,6 +1665,9 @@ export async function getCentreEntitlements(centreId: string): Promise<CentreEnt
 }
 
 export async function getSeatsSummaryService(centreId: string): Promise<CentreSeatsSummary> {
+  // One-time pool tidy-up (free seats first, no default paid seats): runs on
+  // the seats summary read the facility panel makes, guarded in seatDays.
+  try { await reconcileSeatOrder(centreId); } catch { /* retried on the next seats read */ }
   const billing = await getBillingDoc(centreId);
   const centre = await getCentreDoc(centreId);
   const config = await getPlatformConfig();
