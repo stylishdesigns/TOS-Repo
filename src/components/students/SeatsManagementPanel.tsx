@@ -108,7 +108,13 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
   const used = seatsSummary?.used ?? students.filter((s) => s.status !== 'Suspended').length;
   // Batch 26: a lead (signed up, never upgraded) gets a lead chip in place
   // of the old trial countdown.
-  const isLead = (seatsSummary?.tier ?? 'lead') === 'lead';
+  // Batch 29: the plan the facility is on, as a big tag beside the title.
+  const planTagLabel = (() => {
+    const current = (planState?.plans || []).find((p: any) => p.id === planState?.planId);
+    return `${current?.name || 'Free'} plan`;
+  })();
+  const occupiedSeatsCount = seats.filter((x) => String((x as any).studentUid || '')).length;
+  const withoutSeatCount = Math.max(0, enrolled - occupiedSeatsCount);
 
   // Which seat each student holds, straight from the pool.
   const seatByUid = new Map<string, SeatSummary>();
@@ -260,12 +266,12 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
             <div>
               <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 <span>Seat Control Room</span>
-                {isLead && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
-                    <Sparkles className="w-3 h-3" />
-                    Lead · free seats
-                  </span>
-                )}
+                <span
+                  className="inline-flex items-center px-3 py-1.5 rounded-xl text-[11px] sm:text-sm font-black bg-[var(--brand,#0F172A)] text-white"
+                  title="The plan this facility's seats are billed on"
+                >
+                  {planTagLabel}
+                </span>
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400 max-w-xl">
                 You pay for seats, not students. A seat only counts while a student is on it:
@@ -312,7 +318,7 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
       </div>
 
       {/* Pool metrics */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-6">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6">
         <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700/60 rounded-2xl p-3.5">
           <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 block">
             Seats
@@ -321,7 +327,7 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
         </div>
         <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700/60 rounded-2xl p-3.5">
           <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 block">
-            Running now
+            Occupied seats
           </span>
           <span className="text-2xl font-black text-[var(--brand,#0F172A)] dark:text-[var(--brand-tint,#93c5fd)]">
             {pool.active}
@@ -329,24 +335,18 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
         </div>
         <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700/60 rounded-2xl p-3.5">
           <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 block">
-            Paused seats
+            Unoccupied seats
           </span>
           <span className="text-2xl font-black text-slate-900 dark:text-white">
             {pool.available}
           </span>
         </div>
-        <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700/60 rounded-2xl p-3.5">
-          <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 block">
-            Locked
-          </span>
-          <span className="text-2xl font-black text-rose-500">{pool.locked}</span>
-        </div>
         <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700/60 rounded-2xl p-3.5 col-span-2 sm:col-span-1">
           <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 block">
-            Paused days
+            Students without a seat
           </span>
-          <span className="text-2xl font-black text-slate-900 dark:text-white">
-            {pool.bankedDays}
+          <span className="text-2xl font-black text-amber-600 dark:text-amber-400">
+            {withoutSeatCount}
           </span>
         </div>
       </div>

@@ -266,7 +266,7 @@ export const StudentsList: React.FC = () => {
       {/* Sub-header View Switcher: Directory vs Seats Panel vs Seat Payment
           History. The white thumb slides to the active side so it reads as a
           toggle at a glance. */}
-      <div className="relative grid grid-cols-3 bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl w-full sm:w-[27rem] mx-auto sm:mx-0" role="tablist">
+      <div className="relative grid grid-cols-3 bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl w-full" role="tablist">
         <span
           aria-hidden="true"
           className={`absolute top-1 bottom-1 left-1 w-[calc(33.333%-0.333rem)] rounded-xl bg-white dark:bg-slate-700 shadow-sm transition-transform duration-300 ease-out ${

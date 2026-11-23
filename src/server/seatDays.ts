@@ -277,6 +277,59 @@ export async function reconcileSeatOrder(centreId: string): Promise<{ moved: num
   return { moved, deleted, renumbered };
 }
 
+/** Batch 29: seat numbers stay a clean ascending run, 1..N, free seats
+ *  first and paid seats after, because students are drawn onto free seats
+ *  before paid ones. Runs on every seats read: after a seat is removed or a
+ *  new one is added, the next read closes any gap, so a facility never sees
+ *  a disorganised numbering again. Writes only when something is stale. */
+export async function renumberSeatsForCentre(centreId: string): Promise<{ renumbered: number }> {
+  const seats = await listSeats(centreId);
+  if (!seats.length) return { renumbered: 0 };
+  const nowIso = new Date().toISOString();
+  const frees = seats
+    .filter((d) => seatKind(d.data() as SeatRead) === 'free')
+    .sort((a, b) => Number((a.data() as any).seatNo || 0) - Number((b.data() as any).seatNo || 0));
+  const paids = seats
+    .filter((d) => seatKind(d.data() as SeatRead) === 'paid')
+    .sort((a, b) => Number((a.data() as any).seatNo || 0) - Number((b.data() as any).seatNo || 0));
+  const finals = [
+    ...frees.map((d, i) => ({ src: d, no: i + 1 })),
+    ...paids.map((d, i) => ({ src: d, no: frees.length + i + 1 })),
+  ];
+  const stale = finals.some(
+    (f) => Number((f.src.data() as any).seatNo || 0) !== f.no || f.src.id !== `${centreId}__seat-${f.no}`
+  );
+  if (!stale) return { renumbered: 0 };
+  // Stage at temporary ids first: a final id can still be held by another
+  // seat until the whole pass finishes, so nothing is overwritten mid-way.
+  const staged = finals.map((f) => ({
+    no: f.no,
+    data: { ...((f.src.data() as any) || {}), seatNo: f.no },
+    holderUid: String((f.src.data() as any).studentUid || ''),
+  }));
+  const b1 = adminDb.batch();
+  staged.forEach((st) => b1.set(adminDb.collection('centreSeats').doc(`${centreId}__seat-staged-${st.no}`), st.data));
+  await b1.commit();
+  const b2 = adminDb.batch();
+  seats.forEach((d) => b2.delete(d.ref));
+  await b2.commit();
+  const b3 = adminDb.batch();
+  staged.forEach((st) => {
+    b3.set(adminDb.collection('centreSeats').doc(`${centreId}__seat-${st.no}`), st.data);
+    b3.delete(adminDb.collection('centreSeats').doc(`${centreId}__seat-staged-${st.no}`));
+  });
+  await b3.commit();
+  for (const st of staged) {
+    if (st.holderUid) {
+      await adminDb
+        .collection('memberships')
+        .doc(`${st.holderUid}__${centreId}`)
+        .set({ seatId: `${centreId}__seat-${st.no}`, seatNo: st.no, updatedAt: nowIso }, { merge: true });
+    }
+  }
+  return { renumbered: staged.length };
+}
+
 /** Batch 23/24: the facility creates its own paid seats from the control
  *  room. The Add seat pop-up sends how many seats to create. The platform
  *  minimum (paidSeatMinimum, judged on PAID seats only: free seats never
@@ -614,6 +667,12 @@ export async function getSeatPool(centreId: string): Promise<{
 }> {
   try {
     await reconcileSeatOrder(centreId);
+  } catch {
+    /* retried on the next seats read */
+  }
+  // Batch 29: numbering self-heals on every read as well.
+  try {
+    await renumberSeatsForCentre(centreId);
   } catch {
     /* retried on the next seats read */
   }
