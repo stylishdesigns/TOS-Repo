@@ -204,9 +204,10 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
                 )}
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400 max-w-xl">
-                You pay for seats, not students. Each seat runs 30 days from the day it is switched
-                on, with or without a student attached. When a seat's days run out it locks until a
-                new payment reopens it.
+                You pay for seats, not students. A seat only counts while a student is on it:
+                adding a student switches the seat on and starts its count, and switching them off
+                banks it with its remaining days. When a seat's days run out it locks until a new
+                payment reopens it.
               </p>
             </div>
           </div>
@@ -363,31 +364,32 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
                         )}
                       </td>
                       <td className="py-3 px-4 text-center">
-                        <button
-                          type="button"
-                          disabled={seat.status === 'locked' || seatBusy}
-                          onClick={() => handleSeatSwitch(seat, seat.status !== 'active')}
-                          title={
-                            seat.status === 'locked'
-                              ? 'Locked: a new payment reopens it'
-                              : seat.status === 'active'
-                              ? 'Switch off: the count stops and the seat is banked'
-                              : 'Switch on: the count starts now, with or without a student'
-                          }
-                          className={`relative inline-flex h-7 w-14 shrink-0 items-center rounded-full border transition-colors duration-200 ${
-                            seat.status === 'locked'
-                              ? 'bg-slate-200 dark:bg-slate-700 border-slate-300 dark:border-slate-600 opacity-50 cursor-not-allowed'
-                              : seat.status === 'active'
-                              ? 'bg-emerald-500 border-emerald-500'
-                              : 'bg-slate-200 dark:bg-slate-700 border-slate-300 dark:border-slate-600'
-                          } ${seatBusy ? 'opacity-60 cursor-wait' : ''}`}
-                        >
+                        {seat.studentUid ? (
+                          <button
+                            type="button"
+                            disabled={seatBusy}
+                            onClick={() => handleSeatSwitch(seat, false)}
+                            title="Switch off: the count stops, the student leaves and the seat is banked"
+                            className={`relative inline-flex h-7 w-14 shrink-0 items-center rounded-full border transition-colors duration-200 ${
+                              seat.status === 'active'
+                                ? 'bg-emerald-500 border-emerald-500'
+                                : 'bg-slate-200 dark:bg-slate-700 border-slate-300 dark:border-slate-600'
+                            } ${seatBusy ? 'opacity-60 cursor-wait' : ''}`}
+                          >
+                            <span
+                              className={`inline-block h-6 w-6 transform rounded-full bg-white shadow transition-transform duration-200 ${
+                                seat.status === 'active' ? 'translate-x-7' : 'translate-x-0.5'
+                              }`}
+                            />
+                          </button>
+                        ) : (
                           <span
-                            className={`inline-block h-6 w-6 transform rounded-full bg-white shadow transition-transform duration-200 ${
-                              seat.status === 'active' ? 'translate-x-7' : 'translate-x-0.5'
-                            }`}
-                          />
-                        </button>
+                            className="text-[11px] text-slate-300 dark:text-slate-600 font-bold"
+                            title="A seat switches on only when a student is added to it"
+                          >
+                            —
+                          </span>
+                        )}
                       </td>
                       <td className="py-3 px-4 text-right">
                         <div className="flex items-center justify-end gap-2">
@@ -591,10 +593,93 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
       <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-400 flex items-center gap-1.5">
         <Info className="w-3.5 h-3.5 text-slate-400 shrink-0" />
         <span>
-          Switching a student off banks their seat with its remaining days. A new student draws a seat
-          that is already counting first, then the banked seat with the most days left.
+          A seat counts only while a student is on it; empty seats stay banked and never count.
+          Adding a student switches the seat on, and a student can hold only one seat.
         </span>
       </div>
+
+      {/* Add-student-to-seat modal: this is also the only way a seat turns on */}
+      {assignSeat && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => !assigning && setAssignSeat(null)}
+        >
+          <div
+            className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 border border-slate-200 dark:border-slate-700"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h3 className="text-base font-black text-slate-900 dark:text-white">
+                  Add a student to Seat {assignSeat.seatNo}
+                </h3>
+                <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                  The seat starts counting the day it takes the student. Only students without a
+                  seat are listed here.
+                </p>
+              </div>
+              <button
+                onClick={() => setAssignSeat(null)}
+                disabled={assigning}
+                className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-white rounded-lg"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+              Choose student
+            </label>
+            {(() => {
+              const unseated = students.filter((s) => !seatByUid.get(s.uid || s.id));
+              if (unseated.length === 0) {
+                return (
+                  <p className="text-[11px] text-slate-400 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-3">
+                    Every student in this facility already holds a seat. Switch a student off to
+                    free their seat first, or enrol a new student.
+                  </p>
+                );
+              }
+              return (
+                <select
+                  value={assignPick}
+                  onChange={(e) => setAssignPick(e.target.value)}
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs text-slate-900 dark:text-white outline-none focus:border-[var(--brand,#0F172A)]"
+                >
+                  <option value="">Select a student...</option>
+                  {unseated.map((s) => {
+                    const uid = s.uid || s.id;
+                    return (
+                      <option key={uid} value={uid}>
+                        {s.name}
+                      </option>
+                    );
+                  })}
+                </select>
+              );
+            })()}
+
+            <div className="flex items-center justify-end gap-2 mt-5">
+              <button
+                type="button"
+                onClick={() => setAssignSeat(null)}
+                disabled={assigning}
+                className="px-3 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:brightness-110 rounded-xl transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={!assignPick || assigning}
+                onClick={handleAssign}
+                className="px-4 py-2 text-xs font-bold text-white bg-[var(--brand,#0F172A)] hover:brightness-110 rounded-xl transition-all disabled:opacity-40"
+              >
+                {assigning ? 'Adding...' : 'Add student'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Seat details + history modal */}
       {detailSeat && (

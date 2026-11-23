@@ -139,21 +139,21 @@ export async function ensureSeatsForCentre(centreId: string, ctx: SeedContext): 
   };
   const seats: NewSeat[] = [];
 
+  // Batch 21: every seat arrives switched OFF, trial or paid. A seat starts
+  // counting only on the day a student is added to it, so the pool seeds
+  // entirely banked; active students at seed time are assigned by the admin
+  // through the normal add-student flow.
   if (trialSeed) {
     const n = Math.max(1, Number(ctx.trialSeatCap || 10));
-    const startedAt = billing.trialStartsAt
-      ? String(billing.trialStartsAt)
-      : new Date(trialEndsAt!.getTime() - SEAT_DAYS_TRIAL * 86400000).toISOString();
     for (let i = 1; i <= n; i++) {
-      const holder = activeStudents[i - 1];
       seats.push({
         seatNo: i,
-        status: 'active',
+        status: 'available',
         daysTotal: SEAT_DAYS_TRIAL,
-        startedAt,
-        studentUid: holder ? holder.uid : '',
-        studentName: holder ? holder.name : '',
-        assignedAt: holder ? nowIso : null,
+        startedAt: null,
+        studentUid: '',
+        studentName: '',
+        assignedAt: null,
         history: [],
         daysUsedBase: 0,
       });
@@ -239,6 +239,21 @@ export async function lockExpiredSeatsForCentre(
   const locked: LockOutcome[] = [];
   for (const doc of snap.docs) {
     const seat = doc.data() as SeatRead;
+    // A seat with no student on it never counts. Bank any empty running seat
+    // so its used days freeze and it waits in the pool instead.
+    if (!String(seat.studentUid || '')) {
+      const { daysUsed } = seatUsage(seat, now);
+      await doc.ref.update({
+        status: 'available' as SeatStatus,
+        startedAt: null,
+        studentUid: '',
+        studentName: '',
+        assignedAt: null,
+        daysUsedBase: daysUsed,
+        freedAt: nowIso,
+      });
+      continue;
+    }
     const { remaining } = seatUsage(seat, now);
     if (remaining > 0) continue;
     const total = Math.max(1, Number(seat.daysTotal || SEAT_DAYS_PAID));

@@ -1452,7 +1452,17 @@ export async function setSeatSwitchService(params: {
     };
   }
 
-  // Switch on: the daily count starts (or resumes) now, student or not.
+  // Batch 21: an empty seat never runs. The only way a seat switches on is a
+  // student being added to it, so a bare switch-on is refused.
+  if (!String(seat.studentUid || '')) {
+    throw httpError(
+      409,
+      'A seat only switches on when a student is added to it. Use Add student to put one on this seat.'
+    );
+  }
+
+  // Switch on: this seat is being brought back with its student on it, so the
+  // daily count starts now.
   await seatRef.set({ status: 'active', startedAt: nowIso, switchedOnAt: nowIso }, { merge: true });
   const fresh = (await seatRef.get()).data() as any;
   const { daysUsed, remaining } = seatUsage(fresh, now);
