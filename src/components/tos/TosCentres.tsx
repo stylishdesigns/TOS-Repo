@@ -273,7 +273,10 @@ export const CentreDetail: React.FC<{ centreId: string; onBack: () => void; onDa
               <input value={payment.note} onChange={(e) => setPayment((p) => ({ ...p, note: e.target.value }))} className={inputCls} />
             </Field>
             <button
-              onClick={() => doAction('record-payment', { amount: Number(payment.amount), periodEnd: payment.periodEnd, seats: Number(payment.seats) || 0, method: payment.method, reference: payment.reference, note: payment.note }, () => setPayment({ amount: '', periodEnd: '', seats: '', method: '', reference: '', note: '' }))}
+              onClick={() => doAction('record-payment', { amount: Number(payment.amount), periodEnd: payment.periodEnd, seats: Number(payment.seats) || 0, method: payment.method, reference: payment.reference, note: payment.note }, (r: any) => {
+                setPayment({ amount: '', periodEnd: '', seats: '', method: '', reference: '', note: '' });
+                if (r?.seats?.capped) setOwnerNote(r.seats.message || 'Only some seats could be added: the facility is at its seat cap.');
+              })}
               disabled={busy !== '' || !payment.amount || !payment.periodEnd}
               className={btnPrimary}
             >

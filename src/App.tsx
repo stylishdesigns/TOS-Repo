@@ -129,6 +129,9 @@ const MainLayout: React.FC = () => {
   // belong to it. undefined while the lookup runs, null when the visit
   // carries no ?centre= (a plain browser visit keeps today's behaviour).
   const [appFacility, setAppFacility] = useState<{ centreId: string; centreName: string; accent: string; logoUrl: string } | null | undefined>(undefined);
+  // Batch 22: a facility under the paid-seat minimum has no public landing
+  // page; the lookup returns locked and the visitor sees this screen only.
+  const [landingLocked, setLandingLocked] = useState<{ message: string } | null>(null);
   useEffect(() => {
     if (!isAppContext) { setAppFacility(null); return; }
     let alive = true;
@@ -138,6 +141,12 @@ const MainLayout: React.FC = () => {
       .then((r) => r.json())
       .then((d: any) => {
         if (!alive) return;
+        if (d && d.locked) {
+          setAppFacility(null);
+          setLandingLocked({ message: String(d.message || 'This facility page is not available.') });
+          return;
+        }
+        setLandingLocked(null);
         if (d && d.centreId) {
           const facility = { centreId: String(d.centreId), centreName: String(d.centreName || ''), accent: String(d.accent || ''), logoUrl: String(d.logoUrl || '') };
           // The gate state is prepared in the same update as the facility
@@ -700,6 +709,19 @@ const MainLayout: React.FC = () => {
   // While the installed app resolves its own facility from its start
   // address, show a plain loading screen: never the landing page or an
   // access-code prompt for the wrong facility.
+  if (landingLocked) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-6">
+        <div className="max-w-md text-center">
+          <div className="w-12 h-12 rounded-2xl bg-orange-500/10 flex items-center justify-center mx-auto mb-4">
+            <AlertCircle className="w-6 h-6 text-orange-500" />
+          </div>
+          <h1 className="text-xl font-black text-slate-900 dark:text-white mb-2">This facility page is not available</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">{landingLocked.message}</p>
+        </div>
+      </div>
+    );
+  }
   if (isAppContext && appFacility === undefined) {
     return (
       <LaunchSplash />

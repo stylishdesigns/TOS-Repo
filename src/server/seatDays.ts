@@ -14,6 +14,19 @@
 // summary, so no Firestore rule changes are needed.
 // ============================================================================
 import { adminDb } from './firebaseAdmin';
+import { STARTING_CONFIG } from './platformDefaults';
+
+/** The live platform config as one plain object, STARTING_CONFIG underneath.
+ *  Local on purpose: importing getPlatformConfig from tenantService would
+ *  make a cycle. */
+async function readSeatConfig(): Promise<any> {
+  try {
+    const snap = await adminDb.collection('platformConfig').doc('global').get();
+    return { ...STARTING_CONFIG, ...(snap.data() || {}) };
+  } catch {
+    return { ...STARTING_CONFIG };
+  }
+}
 
 export const SEAT_DAYS_PAID = 30;
 export const SEAT_DAYS_TRIAL = 14;
@@ -118,6 +131,7 @@ export async function ensureSeatsForCentre(centreId: string, ctx: SeedContext): 
   const billing = ctx.billing || {};
   const trialEndsAt = billing.trialEndsAt ? new Date(billing.trialEndsAt) : null;
   const trialSeed = Boolean(trialEndsAt) && !billing.skippedTrial;
+  const config = await readSeatConfig();
 
   // Who is switched on right now: they take the first seats, in seat order.
   let activeStudents: { uid: string; name: string }[] = [];
@@ -160,7 +174,10 @@ export async function ensureSeatsForCentre(centreId: string, ctx: SeedContext): 
   // entirely banked; active students at seed time are assigned by the admin
   // through the normal add-student flow.
   if (trialSeed) {
-    const n = Math.max(1, Number(ctx.trialSeatCap || 10));
+    // Batch 22: the trial cap counts PAID seats, on top of the free grant,
+    // and is a plain number, never unlimited.
+    const trialMax = Math.max(1, Math.floor(Number((config as any)?.trialMaxSeats ?? 10)));
+    const n = Math.max(1, Math.min(Number(ctx.trialSeatCap || 10), trialMax));
     for (let i = 1; i <= n; i++) {
       seats.push({
         seatNo: i,
@@ -178,6 +195,12 @@ export async function ensureSeatsForCentre(centreId: string, ctx: SeedContext): 
     let n = Math.max(0, Number(billing.billedSeatsMinimum || 0));
     n = Math.max(n, activeStudents.length);
     if (n === 0 && Number(billing.seatCap || 0) > 0) n = Math.min(Number(billing.seatCap), 50);
+    // Batch 22: the paid-seat cap. Active students always get their seats;
+    // the cap trims spare seats beyond them.
+    if ((config as any)?.paidSeatsUnlimited !== true) {
+      const paidMax = Math.max(1, Math.floor(Number((config as any)?.paidMaxSeats ?? 50)));
+      n = Math.min(n, Math.max(activeStudents.length, paidMax));
+    }
     const paidThrough = billing.paidThrough ? new Date(billing.paidThrough) : null;
     const daysToPaidThrough = paidThrough ? Math.ceil((paidThrough.getTime() - Date.now()) / 86400000) : null;
     const startedAt =
@@ -393,10 +416,23 @@ export async function drawFreeSeatForCentre(
 export async function provisionSeats(
   centreId: string,
   count: number
-): Promise<{ reopened: number; added: number; total: number }> {
+): Promise<{ reopened: number; added: number; total: number; requested: number; capped: boolean; cap: number }> {
   const n = Math.max(0, Math.floor(Number(count || 0)));
   const seats = await listSeats(centreId);
-  if (!n) return { reopened: 0, added: 0, total: seats.length };
+  if (!n) return { reopened: 0, added: 0, total: seats.length, requested: 0, capped: false, cap: 0 };
+  // Batch 22: the paid-seat cap. A facility on trial can hold at most
+  // trialMaxSeats paid seats (on top of its free grant); everyone else at
+  // most paidMaxSeats, unless the platform set paidSeatsUnlimited. Reopening
+  // locked seats adds no seats, so it is never capped.
+  const billing = (await adminDb.collection('centreBilling').doc(centreId).get()).data() || {};
+  const config = await readSeatConfig();
+  const cap = isOnTrial(billing)
+    ? Math.max(1, Math.floor(Number((config as any)?.trialMaxSeats ?? 10)))
+    : (config as any)?.paidSeatsUnlimited === true
+      ? Infinity
+      : Math.max(1, Math.floor(Number((config as any)?.paidMaxSeats ?? 50)));
+  const paidHeld = seats.filter((d) => seatKind(d.data() as SeatRead) === 'paid').length;
+  const allowed = Number.isFinite(cap) ? Math.max(0, cap - paidHeld) : Infinity;
   const locked = seats.filter((d) => (d.data() as any).status === 'locked');
   const nextNo = seats.reduce((m, d) => Math.max(m, Number((d.data() as any).seatNo || 0)), 0);
   const nowIso = new Date().toISOString();
@@ -417,7 +453,9 @@ export async function provisionSeats(
     reopened += 1;
   }
   let added = 0;
-  for (let i = 1; i <= n - reopened; i++) {
+  const wanted = Math.max(0, n - reopened);
+  const canAdd = Number.isFinite(allowed) ? Math.min(wanted, allowed) : wanted;
+  for (let i = 1; i <= canAdd; i++) {
     batch.set(adminDb.collection('centreSeats').doc(`${centreId}__seat-${nextNo + i}`), {
       centreId,
       seatNo: nextNo + i,
@@ -435,7 +473,8 @@ export async function provisionSeats(
   }
   await batch.commit();
   const all = await listSeats(centreId);
-  return { reopened, added, total: all.length };
+  const capped = Number.isFinite(cap) && wanted > added;
+  return { reopened, added, total: all.length, requested: n, capped, cap: Number.isFinite(cap) ? cap : 0 };
 }
 
 /** Pool counts for the TOS console and the admin control room header. */

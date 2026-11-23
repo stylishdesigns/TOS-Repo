@@ -3,7 +3,7 @@ import * as crypto from 'crypto';
 import { STARTING_CONFIG } from './platformDefaults';
 import { adminAuth, adminDb } from './firebaseAdmin';
 import { runStaffPayReminderSweep } from './staffPayReminders';
-import { provisionSeats, getSeatPool } from './seatDays';
+import { provisionSeats, getSeatPool, isOnTrial, countPaidSeatsForCentre } from './seatDays';
 import {
   Caller,
   countActiveStudents,
@@ -269,6 +269,22 @@ export function registerExtendedRoutes(app: express.Express): void {
       const doc = snap.docs.find((d) => slugifyName(String((d.data() as any)?.name || '')) === slug);
       if (!doc) return res.status(404).json({ error: 'Facility not found.' });
       const data = doc.data() as any;
+      // Batch 22: the landing-page gate. A facility that is not on trial
+      // keeps its public landing page only while it holds at least the
+      // platform's minimum paid seats.
+      const billingSnap = await adminDb.collection('centreBilling').doc(doc.id).get();
+      const billing = billingSnap.data() || {};
+      if (!isOnTrial(billing)) {
+        const config = await getPlatformConfig();
+        const minimum = Math.max(0, Math.floor(Number((config as any)?.paidSeatMinimum ?? 5)));
+        const paidHeld = await countPaidSeatsForCentre(doc.id);
+        if (paidHeld < minimum) {
+          return res.json({
+            locked: true,
+            message: `It unlocks once the facility pays for at least ${minimum} seats. It currently holds ${paidHeld}.`,
+          });
+        }
+      }
       const rawAccent = String(data.accentColor || '').trim();
       res.json({
         centreId: doc.id,
@@ -1969,9 +1985,12 @@ export function registerExtendedRoutes(app: express.Express): void {
         await cRef.update({ status: 'active', credentialsNotDelivered: false });
         // Seat-days: the payment tops the facility's seat pool. Locked seats
         // reopen with a fresh 30 days first, then new seats are added.
-        let seatResult: { reopened: number; added: number; total: number } | null = null;
+        let seatResult: any = null;
         if (seats > 0) {
           try { seatResult = await provisionSeats(req.params.id, seats); } catch (e) { console.error('[tos/facilities] seat provisioning failed:', (e as Error).message); }
+          if (seatResult && seatResult.capped) {
+            seatResult.message = `Only ${seatResult.added} of ${seatResult.requested} seat(s) could be added: this facility can hold up to ${seatResult.cap} paid seats.`;
+          }
         }
         await auditChange('PAYMENT_RECORDED', { amount, periodCoveredUntil: new Date(periodEnd).toISOString(), method, reference, seats, seatResult });
         return res.json({ success: true, ...(seatResult ? { seats: seatResult } : {}) });
