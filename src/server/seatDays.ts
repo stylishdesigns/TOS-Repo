@@ -1,10 +1,12 @@
 // ============================================================================
 // Seat-days (batch 19): seats carry days, not students.
 //
-// Each seat the facility pays for holds 30 calendar days (14 on trial). A
-// seat counts only while a student is on it (batch 21): it is switched on by
-// adding a student, burns one Lagos calendar day for every day it runs, and
-// locks when its days run out, switching that student's access off.
+// Each seat the facility pays for holds 30 days (14 on trial). A seat counts
+// only while a student is on it (batch 21): it is switched on by adding a
+// student, and (batch 24) burns one day for every FULL 24 HOURS it runs.
+// Switching off pauses the count; re-adding the student the same day resumes
+// it, so fiddling the switch never counts a day twice. When its days run out
+// it locks, switching that student's access off.
 // Reopening the seat takes a new payment. Batch 22 adds free seats: a
 // platform-granted block that never expires, carries no switch and renders
 // first in the facility's pool.
@@ -88,15 +90,29 @@ export function seatUsage(
   if (seatKind(seat) === 'free') return { daysUsed: 0, remaining: 9999 };
   const total = Math.max(1, Number(seat.daysTotal || SEAT_DAYS_PAID));
   const base = Math.max(0, Number(seat.daysUsedBase || 0));
+  // Batch 24: a day counts only after 24 full hours of the seat actually
+  // running. runMs banks the running time from earlier stretches; the live
+  // stretch adds its elapsed time on top, so a same-day switch off and back
+  // on never counts a second day.
+  const runMs = Math.max(0, Number((seat as any).runMs || 0));
+  let ms = runMs;
   if (seat.status === 'active' && seat.startedAt) {
-    // The day the seat is switched on counts as its first burning day; every
-    // later calendar day adds one more, student or not.
-    const elapsed = Math.max(0, daysBetweenKeys(lagosDateKey(seat.startedAt), lagosDateKey(now)));
-    const daysUsed = Math.min(total, base + elapsed + 1);
-    return { daysUsed, remaining: Math.max(0, total - daysUsed) };
+    const started = new Date(seat.startedAt).getTime();
+    if (Number.isFinite(started)) ms += Math.max(0, now.getTime() - started);
   }
-  const daysUsed = Math.min(total, base);
+  const daysUsed = Math.min(total, base + Math.floor(ms / 86400000));
   return { daysUsed, remaining: Math.max(0, total - daysUsed) };
+}
+
+/** Running milliseconds a seat has banked at the moment it stops running
+ *  (switched off, banked or locked): everything it ran before plus the live
+ *  stretch, frozen until it runs again. */
+export function freezeSeatRunMs(seat: SeatRead, now: Date = new Date()): number {
+  const prior = Math.max(0, Number((seat as any).runMs || 0));
+  if (seat.status !== 'active' || !seat.startedAt) return prior;
+  const started = new Date(seat.startedAt).getTime();
+  if (!Number.isFinite(started)) return prior;
+  return prior + Math.max(0, now.getTime() - started);
 }
 
 /** One facility's seats, oldest seat number first. */
@@ -175,7 +191,7 @@ export async function reconcileSeatOrder(centreId: string): Promise<{ moved: num
       studentUid: '',
       studentName: '',
       assignedAt: null,
-      daysUsedBase: seatUsage(s, now).daysUsed,
+      runMs: freezeSeatRunMs(s, now),
       freedAt: nowIso,
       history,
     });
@@ -186,6 +202,7 @@ export async function reconcileSeatOrder(centreId: string): Promise<{ moved: num
       assignedAt: nowIso,
       startedAt: nowIso,
       daysUsedBase: 0,
+      runMs: 0,
     });
     await adminDb
       .collection('memberships')
@@ -253,17 +270,37 @@ export async function reconcileSeatOrder(centreId: string): Promise<{ moved: num
   return { moved, deleted, renumbered };
 }
 
-/** Batch 23: the facility creates its own paid seat from the control room.
- *  One seat per call, banked with a fresh 30 days, stamped source 'manual'.
- *  The same rules payments respect: off trial the facility chooses its plan
- *  first, and the paid-seat cap bounds how many paid seats it may hold. */
-export async function addSeatForCentre(
-  centreId: string
-): Promise<{ added: boolean; seatNo: number; capped: boolean; cap: number; planRequired?: boolean; message?: string }> {
+/** Batch 23/24: the facility creates its own paid seats from the control
+ *  room. The Add seat pop-up sends how many seats to create. The platform
+ *  minimum (paidSeatMinimum, judged on PAID seats only: free seats never
+ *  count toward it) gates the first creation for trial and paid facilities
+ *  alike: below it, a request that would not reach the minimum is refused
+ *  with the exact shortfall, and the request that reaches it creates every
+ *  selected seat at once. From the minimum up, any number goes. The same
+ *  rules payments respect: off trial the facility chooses its plan first,
+ *  and the paid-seat cap bounds how many paid seats it may hold. */
+export async function addSeatsForCentre(
+  centreId: string,
+  count: number
+): Promise<{
+  added: boolean;
+  count: number;
+  created: number[];
+  underMinimum: boolean;
+  minimum: number;
+  paidHeld: number;
+  needed: number;
+  capped: boolean;
+  cap: number;
+  planRequired?: boolean;
+  message?: string;
+}> {
+  const n = Math.max(1, Math.floor(Number(count || 1)));
   const billing = (await adminDb.collection('centreBilling').doc(centreId).get()).data() || {};
   const config = await readSeatConfig();
+  const minimum = Math.max(0, Math.floor(Number((config as any)?.paidSeatMinimum ?? 5)));
   if (!isOnTrial(billing) && !String(billing.planId || '')) {
-    return { added: false, seatNo: 0, capped: false, cap: 0, planRequired: true, message: 'Choose a plan before creating seats.' };
+    return { added: false, count: n, created: [], underMinimum: false, minimum, paidHeld: 0, needed: 0, capped: false, cap: 0, planRequired: true, message: 'Choose a plan before creating seats.' };
   }
   const cap = isOnTrial(billing)
     ? Math.max(1, Math.floor(Number((config as any)?.trialMaxSeats ?? 10)))
@@ -272,38 +309,71 @@ export async function addSeatForCentre(
       : Math.max(1, Math.floor(Number((config as any)?.paidMaxSeats ?? 50)));
   const seats = await listSeats(centreId);
   const paidHeld = seats.filter((d) => seatKind(d.data() as SeatRead) === 'paid').length;
-  if (Number.isFinite(cap) && paidHeld >= cap) {
+  const allowed = Number.isFinite(cap) ? Math.max(0, cap - paidHeld) : Infinity;
+  // The minimum gates the FIRST creation only: below it, the whole request
+  // must reach the minimum in one go, so the seats arrive together.
+  const needed = paidHeld < minimum ? minimum - paidHeld : 0;
+  if (needed > 0 && n < needed) {
     return {
       added: false,
-      seatNo: 0,
-      capped: true,
-      cap,
-      message: `You have reached your seat cap of ${cap} seats. A new payment or a plan change raises it.`,
+      count: n,
+      created: [],
+      underMinimum: true,
+      minimum,
+      paidHeld,
+      needed,
+      capped: false,
+      cap: Number.isFinite(cap) ? cap : 0,
+      message: `The platform requires at least ${minimum} paid seats before seats can be added one or two at a time. Your facility holds ${paidHeld} paid seat${paidHeld === 1 ? '' : 's'}, so create at least ${needed} more in one go.`,
     };
   }
-  const nextNo = seats.reduce((m, d) => Math.max(m, Number((d.data() as any).seatNo || 0)), 0) + 1;
+  if (n > allowed) {
+    return {
+      added: false,
+      count: n,
+      created: [],
+      underMinimum: false,
+      minimum,
+      paidHeld,
+      needed,
+      capped: true,
+      cap: Number.isFinite(cap) ? cap : 0,
+      message: Number.isFinite(cap)
+        ? `You can add at most ${allowed} more paid seat${allowed === 1 ? '' : 's'} (cap ${cap}, ${paidHeld} held). A new payment or a plan change raises it.`
+        : 'Could not create the seats.',
+    };
+  }
+  const nextNo = seats.reduce((m, d) => Math.max(m, Number((d.data() as any).seatNo || 0)), 0);
   const nowIso = new Date().toISOString();
-  await adminDb.collection('centreSeats').doc(`${centreId}__seat-${nextNo}`).set({
-    centreId,
-    seatNo: nextNo,
-    status: 'available' as SeatStatus,
-    kind: 'paid' as const,
-    source: 'manual',
-    daysTotal: SEAT_DAYS_PAID,
-    daysUsedBase: 0,
-    startedAt: null,
-    studentUid: '',
-    studentName: '',
-    assignedAt: null,
-    history: [] as SeatHistoryEntry[],
-    createdAt: nowIso,
-  });
+  const batch = adminDb.batch();
+  const created: number[] = [];
+  for (let i = 1; i <= n; i++) {
+    const seatNo = nextNo + i;
+    batch.set(adminDb.collection('centreSeats').doc(`${centreId}__seat-${seatNo}`), {
+      centreId,
+      seatNo,
+      status: 'available' as SeatStatus,
+      kind: 'paid' as const,
+      source: 'manual',
+      daysTotal: SEAT_DAYS_PAID,
+      daysUsedBase: 0,
+      runMs: 0,
+      startedAt: null,
+      studentUid: '',
+      studentName: '',
+      assignedAt: null,
+      history: [] as SeatHistoryEntry[],
+      createdAt: nowIso,
+    });
+    created.push(seatNo);
+  }
+  await batch.commit();
   try {
-    await adminDb.collection('auditLogs').add({ action: 'SEAT_ADDED', centreId, seatNo: nextNo, at: nowIso });
+    await adminDb.collection('auditLogs').add({ action: 'SEAT_ADDED', centreId, count: n, seatNos: created, at: nowIso });
   } catch {
     /* audit is best effort */
   }
-  return { added: true, seatNo: nextNo, capped: false, cap: Number.isFinite(cap) ? cap : 0 };
+  return { added: true, count: n, created, underMinimum: false, minimum, paidHeld, needed, capped: false, cap: Number.isFinite(cap) ? cap : 0 };
 }
 
 export interface LockOutcome {
@@ -341,14 +411,13 @@ export async function lockExpiredSeatsForCentre(
     // A seat with no student on it never counts. Bank any empty running seat
     // so its used days freeze and it waits in the pool instead.
     if (!String(seat.studentUid || '')) {
-      const { daysUsed } = seatUsage(seat, now);
       await doc.ref.update({
         status: 'available' as SeatStatus,
         startedAt: null,
         studentUid: '',
         studentName: '',
         assignedAt: null,
-        daysUsedBase: daysUsed,
+        runMs: freezeSeatRunMs(seat, now),
         freedAt: nowIso,
       });
       continue;
@@ -377,6 +446,7 @@ export async function lockExpiredSeatsForCentre(
       studentName: '',
       assignedAt: null,
       daysUsedBase: total,
+      runMs: freezeSeatRunMs(seat, now),
       history,
       lockedAt: nowIso,
     });
@@ -489,6 +559,7 @@ export async function provisionSeats(
       status: 'available' as SeatStatus,
       daysTotal: SEAT_DAYS_PAID,
       daysUsedBase: 0,
+      runMs: 0,
       startedAt: null,
       studentUid: '',
       studentName: '',
@@ -510,6 +581,7 @@ export async function provisionSeats(
       source: 'payment',
       daysTotal: SEAT_DAYS_PAID,
       daysUsedBase: 0,
+      runMs: 0,
       startedAt: null,
       studentUid: '',
       studentName: '',
@@ -599,6 +671,7 @@ export async function reconcileFreeSeats(centreId: string, allocation: number): 
       assignedAt: null,
       history: [] as SeatHistoryEntry[],
       daysUsedBase: 0,
+      runMs: 0,
       grantedAt: nowIso,
     });
   }

@@ -24,6 +24,7 @@ import {
   isOnTrial,
   countPaidSeatsForCentre,
   reconcileFreeSeats,
+  freezeSeatRunMs,
 } from './seatDays';
 
 /** The facility's free-seat allocation: a per-facility override wins, else
@@ -1465,7 +1466,7 @@ export async function setSeatSwitchService(params: {
           studentUid: '',
           studentName: '',
           assignedAt: null,
-          daysUsedBase: isFreeSeat ? 0 : daysUsed,
+          ...(isFreeSeat ? { daysUsedBase: 0 } : { runMs: freezeSeatRunMs(seat, now) }),
           history,
           freedAt: nowIso,
         },

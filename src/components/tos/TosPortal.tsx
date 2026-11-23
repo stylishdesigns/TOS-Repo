@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, Building2, Wallet, ScrollText, UserPlus, Loader2,
   RefreshCw, Send, Ban, CheckCircle2, PlayCircle, Check, Plus, ShieldCheck,
   Clock, ArrowUpRight, UserRound, BookOpen, CalendarDays, Copy, HelpCircle,
-  AlertTriangle, X, ChevronRight, MessageSquare, Globe, Trash2,
+  AlertTriangle, X, ChevronRight, MessageSquare, Globe, Trash2, Settings,
 } from 'lucide-react';
 import {
   api, fmtDate, fmtDateTime, LEAD_STATUS_LABELS, STATUS_STYLES, Json,
@@ -304,7 +304,6 @@ const LeadsTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
 // ---------------------------------------------------------------------------
 const PlansTab: React.FC = () => {
   const [plans, setPlans] = useState<any[]>(() => loadLastGood<any[]>('tos:plans') || []);
-  const [config, setConfig] = useState<any>(() => loadLastGood<any>('tos:plansConfig') || {});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
@@ -315,9 +314,7 @@ const PlansTab: React.FC = () => {
     try {
       const d = await api('/api/tos/plans');
       setPlans(d.plans || []);
-      setConfig(d.config || {});
       saveLastGood('tos:plans', d.plans || []);
-      saveLastGood('tos:plansConfig', d.config || {});
       setError('');
     } catch (e: any) {
       setError(e.message);
@@ -333,7 +330,7 @@ const PlansTab: React.FC = () => {
     setMessage('');
     setError('');
     try {
-      await api('/api/tos/plans', { method: 'POST', body: { plans, config } });
+      await api('/api/tos/plans', { method: 'POST', body: { plans } });
       setMessage('Saved. Changes apply to new calculations only, never to payments already recorded.');
       await load();
     } catch (e: any) {
@@ -347,13 +344,6 @@ const PlansTab: React.FC = () => {
     setPlans((ps) => ps.map((p) => (p.id === id ? { ...p, [key]: value } : p)));
 
   if (loading && plans.length === 0) return <div className="flex items-center gap-2 text-slate-400 text-sm py-10 justify-center"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</div>;
-
-  const configFields: [string, string][] = [
-    ['trialDays', 'Trial length (days)'],
-    ['skipTrialDiscountPct', 'Skip-trial discount (%)'],
-    ['trialGraceDays', 'Grace days after expiry'],
-    ['aiRouteRateLimitPerHour', 'AI requests per user per hour'],
-  ];
 
   return (
     <div className="space-y-5">
@@ -384,31 +374,102 @@ const PlansTab: React.FC = () => {
         </Card>
       ))}
 
+      <div className="flex items-center gap-3">
+        <button onClick={save} disabled={saving} className={btnPrimary}>
+          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} Save plans
+        </button>
+        {message && <p className="text-xs text-emerald-300">{message}</p>}
+        {error && <p className="text-xs text-rose-300">{error}</p>}
+      </div>
+      <p className="text-[11px] text-slate-500">AI essay marking runs on every plan and is never shown to customers, so it has no switch here. Every change is recorded in the audit log with what it was before.</p>
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// SETTINGS (batch 24): seat policy and platform settings, out of the Plans
+// tab so the pricing page stays pricing. Dropdowns for fixed choices, fields
+// for numbers. Every value is checked on the server and read fresh on each
+// seat action, so nothing here can be worked around with a stale copy.
+// ---------------------------------------------------------------------------
+const SettingsTab: React.FC = () => {
+  const [config, setConfig] = useState<any>(() => loadLastGood<any>('tos:plansConfig') || {});
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+
+  const load = useCallback(async () => {
+    try {
+      const d = await api('/api/tos/plans');
+      setConfig(d.config || {});
+      saveLastGood('tos:plansConfig', d.config || {});
+      setError('');
+    } catch (e: any) {
+      setError(e.message);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const save = async () => {
+    setSaving(true);
+    setMessage('');
+    setError('');
+    try {
+      await api('/api/tos/plans', { method: 'POST', body: { plans: [], config } });
+      setMessage('Saved. The platform reads these values fresh on every seat action and checks them on the server.');
+      await load();
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const platformFields: [string, string][] = [
+    ['trialDays', 'Trial length (days)'],
+    ['skipTrialDiscountPct', 'Skip-trial discount (%)'],
+    ['trialGraceDays', 'Grace days after expiry'],
+    ['aiRouteRateLimitPerHour', 'AI requests per user per hour'],
+  ];
+
+  const unlimited = config.paidSeatsUnlimited === true;
+
+  return (
+    <div className="space-y-5">
       <Card title="Seat policy">
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <Field label="Paid seats for facilities not on trial">
+            <select
+              value={unlimited ? 'unlimited' : 'limited'}
+              onChange={(e) => setConfig((c: any) => ({ ...c, paidSeatsUnlimited: e.target.value === 'unlimited' }))}
+              className={inputCls}
+            >
+              <option value="limited">A set limit</option>
+              <option value="unlimited">Unlimited</option>
+            </select>
+          </Field>
+          <Field label="Max paid seats, facilities not on trial">
+            <input type="number" min="0" value={config.paidMaxSeats ?? ''} disabled={unlimited} onChange={(e) => setConfig((c: any) => ({ ...c, paidMaxSeats: e.target.value }))} className={inputCls} />
+          </Field>
           <Field label="Max seats on free trial (paid seats)">
             <input type="number" min="0" value={config.trialMaxSeats ?? ''} onChange={(e) => setConfig((c: any) => ({ ...c, trialMaxSeats: e.target.value }))} className={inputCls} />
-          </Field>
-          <Field label="Max seats, facilities not on trial">
-            <input type="number" min="0" value={config.paidMaxSeats ?? ''} disabled={config.paidSeatsUnlimited === true} onChange={(e) => setConfig((c: any) => ({ ...c, paidMaxSeats: e.target.value }))} className={inputCls} />
           </Field>
           <Field label="Free seats for every facility">
             <input type="number" min="0" value={config.freeSeatsGeneral ?? ''} onChange={(e) => setConfig((c: any) => ({ ...c, freeSeatsGeneral: e.target.value }))} className={inputCls} />
           </Field>
-          <Field label="Minimum paid seats to unlock free seats">
+          <Field label="Minimum paid seats">
             <input type="number" min="0" value={config.paidSeatMinimum ?? ''} onChange={(e) => setConfig((c: any) => ({ ...c, paidSeatMinimum: e.target.value }))} className={inputCls} />
           </Field>
         </div>
-        <label className="flex items-center gap-2 text-xs text-slate-300 mt-3">
-          <input type="checkbox" checked={config.paidSeatsUnlimited === true} onChange={(e) => setConfig((c: any) => ({ ...c, paidSeatsUnlimited: e.target.checked }))} className="accent-orange-500 w-4 h-4" />
-          Facilities not on trial can create unlimited seats
-        </label>
-        <p className="text-[11px] text-slate-500 mt-2">Free seats apply to trial and paid facilities alike; each facility can also carry its own override on its page. The trial cap counts paid seats only, on top of the free grant.</p>
+        <p className="text-[11px] text-slate-500 mt-3">
+          The minimum is judged on paid seats only; free seats never count toward it. A facility below it must create enough seats in one go to reach it; from the minimum up, any number goes. Meeting the minimum also unlocks the free-seat grant. Free seats apply to trial and paid facilities alike, and each facility can carry its own override on its page. If the minimum sits above the trial cap, a trial facility cannot create seats until it upgrades.
+        </p>
       </Card>
 
       <Card title="Platform settings">
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-          {configFields.map(([key, label]) => (
+          {platformFields.map(([key, label]) => (
             <Field key={key} label={label}>
               <input type="number" min="0" value={config[key] ?? ''} onChange={(e) => setConfig((c: any) => ({ ...c, [key]: e.target.value }))} className={inputCls} />
             </Field>
@@ -418,12 +479,11 @@ const PlansTab: React.FC = () => {
 
       <div className="flex items-center gap-3">
         <button onClick={save} disabled={saving} className={btnPrimary}>
-          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} Save plans and settings
+          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} Save settings
         </button>
         {message && <p className="text-xs text-emerald-300">{message}</p>}
         {error && <p className="text-xs text-rose-300">{error}</p>}
       </div>
-      <p className="text-[11px] text-slate-500">AI essay marking runs on every plan and is never shown to customers, so it has no switch here. Every change is recorded in the audit log with what it was before.</p>
     </div>
   );
 };
@@ -838,6 +898,7 @@ const TABS = [
   { id: 'leads', label: 'Leads', mlabel: 'Leads', icon: UserPlus, group: 'Business' },
   { id: 'centres', label: 'Facilities', mlabel: 'Facilities', icon: Building2, group: 'Business' },
   { id: 'plans', label: 'Plans', mlabel: 'Plans', icon: Wallet, group: 'Business' },
+  { id: 'settings', label: 'Settings', mlabel: 'Settings', icon: Settings, group: 'Business' },
   { id: 'questions', label: 'Question Bank', mlabel: 'Bank', icon: BookOpen, group: 'Content' },
   { id: 'mocks', label: 'Mocks', mlabel: 'Mocks', icon: CalendarDays, group: 'Content' },
   { id: 'chat', label: 'Chat', mlabel: 'Chat', icon: MessageSquare, group: 'Content' },
@@ -1170,7 +1231,8 @@ export const TosPortal: React.FC = () => {
             {tab === 'overview' && 'Everything happening across the platform right now.'}
             {tab === 'leads' && 'Trial owners who have not yet signed in and set their own password.'}
             {tab === 'centres' && 'Facilities whose owners have set their own password. Plan, seats, billing and access code.'}
-            {tab === 'plans' && 'Pricing, caps and feature flags. All stored as data.'}
+            {tab === 'plans' && 'Pricing and feature flags. All stored as data. Seat settings live under Settings.'}
+            {tab === 'settings' && 'Seat policy and platform settings. Saved values are enforced live and checked on the server.'}
             {tab === 'questions' && 'Two separate banks: Practice and Mock. Pick one on the hub to work in.'}
             {tab === 'mocks' && "One mock a day for every facility's students. Create, freeze and manage them from here."}
             {tab === 'chat' && 'The platform channel, chat settings and escalated reports.'}
@@ -1190,6 +1252,7 @@ export const TosPortal: React.FC = () => {
         {tab === 'chat' && <TosChat refreshKey={refreshKey} />}
         {tab === 'website' && <WebsiteTab refreshKey={refreshKey} />}
         {tab === 'plans' && <PlansTab />}
+        {tab === 'settings' && <SettingsTab />}
         {tab === 'audit' && <AuditTab />}
         {tab === 'team' && <TeamTab />}
         {tab === 'account' && <AccountTab />}

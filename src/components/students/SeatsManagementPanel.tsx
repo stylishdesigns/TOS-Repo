@@ -55,6 +55,8 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
   const [planState, setPlanState] = useState<{ planId: string; plans: { id: string; name: string; price: number }[] } | null>(null);
   const [planSaving, setPlanSaving] = useState(false);
   const [addingSeat, setAddingSeat] = useState(false);
+  const [addSeatOpen, setAddSeatOpen] = useState(false);
+  const [seatCountPick, setSeatCountPick] = useState('1');
 
   useEffect(() => {
     refreshSeatsSummary();
@@ -158,20 +160,34 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
     }
   };
 
-  const handleAddSeat = async () => {
+
+  // Batch 24: Add seat opens a pop-up to pick how many paid seats to create;
+  // the platform minimum (paid seats only) and the cap are checked on the
+  // server before anything is written.
+  const openAddSeatModal = () => {
+    const held = Number(seatsSummary?.paidSeatsHeld ?? 0);
+    const minimum = Number(seatsSummary?.paidSeatMinimum ?? 5);
+    const needed = held < minimum ? minimum - held : 0;
+    setSeatCountPick(String(Math.max(1, needed || 1)));
+    setAddSeatOpen(true);
+  };
+
+  const handleCreateSeats = async () => {
     if (!activeCentreId) return;
+    const n = Math.max(1, Math.floor(Number(seatCountPick || 1)));
     setAddingSeat(true);
     setErrorMessage(null);
     try {
-      const d: any = await api('/api/centre/seats/add', { method: 'POST', body: { centreId: activeCentreId } });
+      const d: any = await api('/api/centre/seats/add', { method: 'POST', body: { centreId: activeCentreId, count: n } });
       await refreshSeatsSummary();
+      setAddSeatOpen(false);
       addToast({
         type: 'success',
-        title: `Seat ${d.seatNo} created`,
-        description: 'The new paid seat is in the pool, paused until you add a student to it.',
+        title: `${n} paid seat${n === 1 ? '' : 's'} created`,
+        description: `Seat${n === 1 ? '' : 's'} ${(d.created || []).join(', ')} joined the pool, paused until you add a student to one.`,
       });
     } catch (err: any) {
-      addToast({ type: 'error', title: 'Could not create seat', description: err.message || 'Try again.' });
+      addToast({ type: 'error', title: 'Could not create seats', description: err.message || 'Try again.' });
     } finally {
       setAddingSeat(false);
     }
@@ -208,13 +224,13 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
 
         <div className="flex items-center gap-2 self-start md:self-auto">
           <button
-            onClick={handleAddSeat}
+            onClick={openAddSeatModal}
             disabled={addingSeat}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-white bg-[var(--brand,#0F172A)] hover:brightness-110 rounded-xl transition-all disabled:opacity-50"
-            title="Create a new paid seat; it joins the pool paused until you add a student to it"
+            title="Choose how many paid seats to create; the platform minimum is checked before they are created"
           >
             <UserPlus className="w-4 h-4" />
-            {addingSeat ? 'Adding...' : 'Add seat'}
+            {addingSeat ? 'Creating...' : 'Add seat'}
           </button>
           <button
             onClick={() => refreshSeatsSummary()}
@@ -319,7 +335,8 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
         {seats.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 p-6 text-center text-xs text-slate-400">
             No seats in this facility&apos;s pool yet. Free seats appear here automatically, and the
-            Add seat button creates a paid seat when the facility needs one.
+            Add seat opens a pop-up to choose how many paid seats to create; the platform
+            minimum gates the first batch.
           </div>
         ) : (
           <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-700/60">
@@ -573,6 +590,47 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
       )}
 
       {/* Seat details + history modal */}
+      {/* Add seat pop-up (batch 24): pick how many paid seats to create. The
+          platform minimum (paid seats only) and the cap are checked on the
+          server before anything is written. */}
+      {addSeatOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" onClick={() => !addingSeat && setAddSeatOpen(false)}>
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 max-w-sm w-full shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-base font-black text-slate-900 dark:text-white">Add paid seats</h3>
+            <p className="text-xs text-slate-500 mt-1">
+              You hold {seatsSummary?.paidSeatsHeld ?? 0} paid seats. The platform minimum is {seatsSummary?.paidSeatMinimum ?? 5} paid seats; free seats never count toward it.
+            </p>
+            {(seatsSummary?.paidSeatsHeld ?? 0) < (seatsSummary?.paidSeatMinimum ?? 5) && (
+              <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-2">
+                You need {Math.max(0, (seatsSummary?.paidSeatMinimum ?? 5) - (seatsSummary?.paidSeatsHeld ?? 0))} more paid seats to reach the minimum, so pick at least that many; they are created together.
+              </p>
+            )}
+            <label className="block text-[11px] font-bold text-slate-500 mt-4 mb-1">How many seats</label>
+            <select
+              value={seatCountPick}
+              onChange={(e) => setSeatCountPick(e.target.value)}
+              className="w-full px-3 py-2.5 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+            >
+              {Array.from({ length: 50 }, (_, i) => String(i + 1)).map((v) => (
+                <option key={v} value={v}>{v}</option>
+              ))}
+            </select>
+            <p className="text-[11px] text-slate-400 mt-2">
+              Below the minimum the whole batch must reach it in one go; once your facility holds the minimum, any number goes.
+            </p>
+            <div className="flex justify-end gap-2 mt-4">
+              <button type="button" onClick={() => setAddSeatOpen(false)} disabled={addingSeat} className="px-3.5 py-2 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all">
+                Cancel
+              </button>
+              <button type="button" onClick={handleCreateSeats} disabled={addingSeat} className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-white bg-[var(--brand,#0F172A)] hover:brightness-110 rounded-xl transition-all disabled:opacity-50">
+                <UserPlus className="w-4 h-4" />
+                {addingSeat ? 'Creating...' : `Create ${Math.max(1, Math.floor(Number(seatCountPick || 1)))} seat${Math.max(1, Math.floor(Number(seatCountPick || 1))) === 1 ? '' : 's'}`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {detailSeat && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"

@@ -3,7 +3,7 @@ import * as crypto from 'crypto';
 import { STARTING_CONFIG } from './platformDefaults';
 import { adminAuth, adminDb } from './firebaseAdmin';
 import { runStaffPayReminderSweep } from './staffPayReminders';
-import { provisionSeats, getSeatPool, isOnTrial, countPaidSeatsForCentre, addSeatForCentre } from './seatDays';
+import { provisionSeats, getSeatPool, isOnTrial, countPaidSeatsForCentre, addSeatsForCentre } from './seatDays';
 import { runSeatPolicySweep } from './seatSweep';
 import {
   Caller,
@@ -362,13 +362,18 @@ export function registerExtendedRoutes(app: express.Express): void {
       const centreId = String(req.body?.centreId || '').trim().slice(0, 120);
       if (!centreId) throw httpError(400, 'centreId is required.');
       await requireMembership(caller, centreId, ['owner', 'admin']);
-      const result = await addSeatForCentre(centreId);
+      const count = Math.floor(Number(req.body?.count ?? 1));
+      if (!Number.isFinite(count) || count < 1 || count > 200) throw httpError(400, 'count must be between 1 and 200.');
+      const result = await addSeatsForCentre(centreId, count);
       if (result.planRequired) return res.status(400).json({ error: result.message });
+      if (result.underMinimum) {
+        return res.status(409).json({ error: result.message, underMinimum: true, needed: result.needed, minimum: result.minimum, paidHeld: result.paidHeld });
+      }
       if (result.capped) return res.status(409).json({ error: result.message });
       return res.json(result);
     } catch (error: any) {
       const status = Number(error?.status || 500);
-      res.status(status).json({ error: error.message || 'Could not create the seat.' });
+      res.status(status).json({ error: error.message || 'Could not create the seats.' });
     }
   });
 
