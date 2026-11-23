@@ -3,7 +3,7 @@ import * as crypto from 'crypto';
 import { STARTING_CONFIG } from './platformDefaults';
 import { adminAuth, adminDb } from './firebaseAdmin';
 import { runStaffPayReminderSweep } from './staffPayReminders';
-import { provisionSeats, getSeatPool, isOnTrial, countPaidSeatsForCentre } from './seatDays';
+import { provisionSeats, getSeatPool, isOnTrial, countPaidSeatsForCentre, addSeatForCentre } from './seatDays';
 import { runSeatPolicySweep } from './seatSweep';
 import {
   Caller,
@@ -351,6 +351,24 @@ export function registerExtendedRoutes(app: express.Express): void {
     } catch (error: any) {
       const status = Number(error?.status || 500);
       res.status(status).json({ error: error.message || 'Could not save the plan.' });
+    }
+  });
+
+  // Batch 23: the facility creates its own paid seat from the control room.
+  // One seat per call; the cap and plan rules are the same ones payments use.
+  app.post('/api/centre/seats/add', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const centreId = String(req.body?.centreId || '').trim().slice(0, 120);
+      if (!centreId) throw httpError(400, 'centreId is required.');
+      await requireMembership(caller, centreId, ['owner', 'admin']);
+      const result = await addSeatForCentre(centreId);
+      if (result.planRequired) return res.status(400).json({ error: result.message });
+      if (result.capped) return res.status(409).json({ error: result.message });
+      return res.json(result);
+    } catch (error: any) {
+      const status = Number(error?.status || 500);
+      res.status(status).json({ error: error.message || 'Could not create the seat.' });
     }
   });
 

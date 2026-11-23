@@ -4,16 +4,12 @@ import {
   Sparkles,
   AlertCircle,
   RefreshCw,
-  Search,
-  Power,
-  Info,
   History,
   UserPlus,
   X,
   Lock,
   CircleDot,
   CheckCircle2,
-  Clock3,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { api } from '../tos/tosShared';
@@ -32,7 +28,7 @@ const statusChip = (status: string) => {
 };
 
 const statusLabel = (status: string) =>
-  status === 'active' ? 'Running' : status === 'locked' ? 'Locked' : 'Banked';
+  status === 'active' ? 'Running' : status === 'locked' ? 'Locked' : 'Paused';
 
 const fmtDay = (iso?: string | null) =>
   iso
@@ -45,15 +41,11 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
     activeCentre,
     seatsSummary,
     refreshSeatsSummary,
-    toggleStudentAccess,
     setSeatSwitch,
     assignStudentToSeat,
     addToast,
   } = useApp();
 
-  const [togglingStudentId, setTogglingStudentId] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterMode, setFilterMode] = useState<'all' | 'active' | 'disabled'>('all');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [detailSeat, setDetailSeat] = useState<SeatSummary | null>(null);
   const [seatSwitchingId, setSeatSwitchingId] = useState<string | null>(null);
@@ -62,6 +54,7 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
   const [assigning, setAssigning] = useState(false);
   const [planState, setPlanState] = useState<{ planId: string; plans: { id: string; name: string; price: number }[] } | null>(null);
   const [planSaving, setPlanSaving] = useState(false);
+  const [addingSeat, setAddingSeat] = useState(false);
 
   useEffect(() => {
     refreshSeatsSummary();
@@ -111,34 +104,6 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
     if (s.studentUid) seatByUid.set(s.studentUid, s);
   });
 
-  const handleToggle = async (student: Student, currentStatusActive: boolean) => {
-    const studentUid = student.uid || student.id;
-    setTogglingStudentId(studentUid);
-    setErrorMessage(null);
-
-    try {
-      const newActive = !currentStatusActive;
-      await toggleStudentAccess(studentUid, newActive);
-      addToast({
-        type: 'success',
-        title: newActive ? 'Access Restored' : 'Access Suspended',
-        description: newActive
-          ? `${student.name} now holds a seat; its 30-day count is running.`
-          : `${student.name}'s seat is back in the pool with its remaining days banked.`,
-      });
-      await refreshSeatsSummary();
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Failed to update student access.');
-      addToast({
-        type: 'error',
-        title: 'Action Denied',
-        description: err.message || 'Could not update student seat access.',
-      });
-    } finally {
-      setTogglingStudentId(null);
-    }
-  };
-
   const handleSeatSwitch = async (seat: SeatSummary, active: boolean) => {
     setSeatSwitchingId(seat.id);
     setErrorMessage(null);
@@ -151,8 +116,8 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
         description: active
           ? `Seat ${seat.seatNo}'s day count is running now, with or without a student on it.`
           : seat.studentName
-          ? `${seat.studentName} left Seat ${seat.seatNo}; their access is off and their app now shows the contact-admin banner. The seat is banked with its remaining days.`
-          : `Seat ${seat.seatNo} is banked; its days stop counting and its remaining days are safe.`,
+          ? `${seat.studentName} left Seat ${seat.seatNo}; their access is off and their app now shows the contact-admin banner. The seat is paused with its remaining days.`
+          : `Seat ${seat.seatNo} is paused; its days stop counting and its remaining days are safe.`,
       });
     } catch (err: any) {
       setErrorMessage(err.message || 'Failed to switch the seat.');
@@ -193,24 +158,24 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
     }
   };
 
-  const filteredStudents = students.filter((student) => {
-    const studentUid = student.uid || student.id;
-    const accessData = seatsSummary?.studentAccess?.[studentUid];
-    const isCurrentlyActive = accessData
-      ? accessData.status === 'active'
-      : student.status !== 'Suspended';
-
-    if (filterMode === 'active' && !isCurrentlyActive) return false;
-    if (filterMode === 'disabled' && isCurrentlyActive) return false;
-
-    if (!searchQuery) return true;
-    const query = searchQuery.toLowerCase();
-    return (
-      student.name.toLowerCase().includes(query) ||
-      (student.email && student.email.toLowerCase().includes(query)) ||
-      (student.programmeName && student.programmeName.toLowerCase().includes(query))
-    );
-  });
+  const handleAddSeat = async () => {
+    if (!activeCentreId) return;
+    setAddingSeat(true);
+    setErrorMessage(null);
+    try {
+      const d: any = await api('/api/centre/seats/add', { method: 'POST', body: { centreId: activeCentreId } });
+      await refreshSeatsSummary();
+      addToast({
+        type: 'success',
+        title: `Seat ${d.seatNo} created`,
+        description: 'The new paid seat is in the pool, paused until you add a student to it.',
+      });
+    } catch (err: any) {
+      addToast({ type: 'error', title: 'Could not create seat', description: err.message || 'Try again.' });
+    } finally {
+      setAddingSeat(false);
+    }
+  };
 
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 shadow-sm transition-all mb-8">
@@ -234,27 +199,38 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
               <p className="text-xs text-slate-500 dark:text-slate-400 max-w-xl">
                 You pay for seats, not students. A seat only counts while a student is on it:
                 adding a student switches the seat on and starts its count, and switching them off
-                banks it with its remaining days. When a seat's days run out it locks until a new
+                pauses it with its remaining days. When a seat's days run out it locks until a new
                 payment reopens it.
               </p>
             </div>
           </div>
         </div>
 
-        <button
-          onClick={() => refreshSeatsSummary()}
-          className="p-2 text-slate-400 hover:text-[var(--brand,#0F172A)] rounded-xl hover:bg-slate-50 dark:hover:brightness-110 transition-colors self-start md:self-auto"
-          title="Refresh seats"
-        >
-          <RefreshCw className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-2 self-start md:self-auto">
+          <button
+            onClick={handleAddSeat}
+            disabled={addingSeat}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-white bg-[var(--brand,#0F172A)] hover:brightness-110 rounded-xl transition-all disabled:opacity-50"
+            title="Create a new paid seat; it joins the pool paused until you add a student to it"
+          >
+            <UserPlus className="w-4 h-4" />
+            {addingSeat ? 'Adding...' : 'Add seat'}
+          </button>
+          <button
+            onClick={() => refreshSeatsSummary()}
+            className="p-2 text-slate-400 hover:text-[var(--brand,#0F172A)] rounded-xl hover:bg-slate-50 dark:hover:brightness-110 transition-colors"
+            title="Refresh seats"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* Pool metrics */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-6">
         <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700/60 rounded-2xl p-3.5">
           <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 block">
-            Seats paid
+            Seats
           </span>
           <span className="text-2xl font-black text-slate-900 dark:text-white">{pool.total}</span>
         </div>
@@ -268,7 +244,7 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
         </div>
         <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700/60 rounded-2xl p-3.5">
           <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 block">
-            Banked seats
+            Paused seats
           </span>
           <span className="text-2xl font-black text-slate-900 dark:text-white">
             {pool.available}
@@ -282,7 +258,7 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
         </div>
         <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700/60 rounded-2xl p-3.5 col-span-2 sm:col-span-1">
           <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 block">
-            Banked days
+            Paused days
           </span>
           <span className="text-2xl font-black text-slate-900 dark:text-white">
             {pool.bankedDays}
@@ -342,8 +318,8 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
         )}
         {seats.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 p-6 text-center text-xs text-slate-400">
-            No seats in this facility&apos;s pool yet. Seats arrive when the trial starts or a payment is
-            recorded on the TOS console.
+            No seats in this facility&apos;s pool yet. Free seats appear here automatically, and the
+            Add seat button creates a paid seat when the facility needs one.
           </div>
         ) : (
           <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-700/60">
@@ -453,7 +429,7 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
                             type="button"
                             disabled={seatBusy}
                             onClick={() => handleSeatSwitch(seat, false)}
-                            title="Switch off: the count stops, the student leaves and the seat is banked"
+                            title="Switch off: the count stops, the student leaves and the seat is paused"
                             className={`relative inline-flex h-7 w-14 shrink-0 items-center rounded-full border transition-colors duration-200 ${
                               seat.status === 'active'
                                 ? 'bg-emerald-500 border-emerald-500'
@@ -511,177 +487,6 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
             </table>
           </div>
         )}
-      </div>
-
-      {/* Filter and search controls */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8 mb-4">
-        <div className="relative w-full sm:w-72">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Search students..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:border-[var(--brand,#0F172A)]"
-          />
-        </div>
-
-        <div className="flex items-center gap-1.5 self-end sm:self-auto bg-slate-100 dark:bg-slate-800 p-1 rounded-xl text-xs">
-          <button
-            onClick={() => setFilterMode('all')}
-            className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
-              filterMode === 'all'
-                ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
-                : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-            }`}
-          >
-            All ({students.length})
-          </button>
-          <button
-            onClick={() => setFilterMode('active')}
-            className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
-              filterMode === 'active'
-                ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-xs'
-                : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-            }`}
-          >
-            Access ON ({used})
-          </button>
-          <button
-            onClick={() => setFilterMode('disabled')}
-            className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
-              filterMode === 'disabled'
-                ? 'bg-white dark:bg-slate-700 text-rose-600 dark:text-rose-400 shadow-xs'
-                : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-            }`}
-          >
-            Access OFF ({Math.max(0, students.length - used)})
-          </button>
-        </div>
-      </div>
-
-      {/* Student list */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-xs">
-          <thead>
-            <tr className="border-b border-slate-100 dark:border-slate-800 text-slate-400 font-semibold uppercase tracking-wider text-[10px]">
-              <th className="py-3 px-4">Student</th>
-              <th className="py-3 px-4">Programme</th>
-              <th className="py-3 px-4">Seat</th>
-              <th className="py-3 px-4 text-center">Seat Status</th>
-              <th className="py-3 px-4 text-right">Access Switch</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
-            {filteredStudents.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="py-8 text-center text-slate-400">
-                  No students found matching your filter.
-                </td>
-              </tr>
-            ) : (
-              filteredStudents.map((student) => {
-                const studentUid = student.uid || student.id;
-                const accessData = seatsSummary?.studentAccess?.[studentUid];
-                const isCurrentlyActive = accessData
-                  ? accessData.status === 'active'
-                  : student.status !== 'Suspended';
-                const isBusy = togglingStudentId === studentUid;
-                const heldSeat = seatByUid.get(studentUid);
-
-                return (
-                  <tr
-                    key={student.id}
-                    className="hover:bg-slate-50/50 dark:hover:brightness-110/30 transition-colors"
-                  >
-                    <td className="py-3.5 px-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center font-bold text-slate-600 dark:text-slate-300">
-                          {student.name.charAt(0)}
-                        </div>
-                        <div>
-                          <div className="font-bold text-slate-900 dark:text-white">{student.name}</div>
-                          <div className="text-[11px] text-slate-400">{student.email || 'No email'}</div>
-                        </div>
-                      </div>
-                    </td>
-
-                    <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300 font-medium">
-                      {student.programmeName || 'General'}
-                    </td>
-
-                    <td className="py-3.5 px-4">
-                      {heldSeat && isCurrentlyActive ? (
-                        <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-200">
-                          Seat {heldSeat.seatNo}
-                          <span className="block text-[10px] text-slate-400 font-medium">
-                            {heldSeat.remaining} day{heldSeat.remaining === 1 ? '' : 's'} left
-                          </span>
-                        </span>
-                      ) : (
-                        <span className="text-[11px] text-slate-400">No seat</span>
-                      )}
-                    </td>
-
-                    <td className="py-3.5 px-4 text-center">
-                      <span
-                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold ${
-                          isCurrentlyActive
-                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
-                            : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
-                        }`}
-                      >
-                        {isCurrentlyActive ? (
-                          <>
-                            <Clock3 className="w-3 h-3" />
-                            <span>Running</span>
-                          </>
-                        ) : (
-                          <>
-                            <Power className="w-3 h-3" />
-                            <span>Access Off</span>
-                          </>
-                        )}
-                      </span>
-                    </td>
-
-                    <td className="py-3.5 px-4 text-right">
-                      <button
-                        type="button"
-                        disabled={isBusy}
-                        onClick={() => handleToggle(student, isCurrentlyActive)}
-                        className={`relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border transition-colors duration-200 ${
-                          isCurrentlyActive
-                            ? 'bg-emerald-500 border-emerald-500'
-                            : 'bg-slate-200 dark:bg-slate-700 border-slate-300 dark:border-slate-600'
-                        } ${isBusy ? 'opacity-50 cursor-wait' : ''}`}
-                        title={
-                          isCurrentlyActive
-                            ? 'Switch off access: freezes the used days and banks the seat'
-                            : 'Switch on: the student draws the free seat with the most days left'
-                        }
-                      >
-                        <span
-                          className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ${
-                            isCurrentlyActive ? 'translate-x-7' : 'translate-x-0.5'
-                          }`}
-                        />
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-400 flex items-center gap-1.5">
-        <Info className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-        <span>
-          A seat counts only while a student is on it; empty seats stay banked and never count.
-          Adding a student switches the seat on, and a student can hold only one seat.
-        </span>
       </div>
 
       {/* Add-student-to-seat modal: this is also the only way a seat turns on */}
@@ -803,7 +608,7 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
                   ? 'Running, one day burns each calendar day'
                   : detailSeat.status === 'locked'
                   ? 'Locked, a payment reopens it'
-                  : 'Banked in the pool, not counting'}
+                  : 'Paused in the pool, not counting'}
               </p>
               {detailSeat.status !== 'locked' && (
                 <p>

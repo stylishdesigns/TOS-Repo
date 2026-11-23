@@ -24,9 +24,8 @@ import {
 import { SeatsManagementPanel } from './SeatsManagementPanel';
 
 export const StudentsList: React.FC = () => {
-  const { students, programmes, branches, subjects, addStudent, toggleStudentAccess, seatsSummary, refreshSeatsSummary, activeCentreId, setSelectedStudent, addToast } = useApp();
+  const { students, programmes, branches, subjects, addStudent, seatsSummary, refreshSeatsSummary, activeCentreId, setSelectedStudent, addToast } = useApp();
 
-  const [togglingId, setTogglingId] = useState<string | null>(null);
 
   const [activeViewTab, setActiveViewTab] = useState<'directory' | 'seats'>('directory');
   const [programmeFilter, setProgrammeFilter] = useState('All Programmes');
@@ -93,29 +92,6 @@ export const StudentsList: React.FC = () => {
     const accessUid = st.uid || st.id;
     const accessData = seatsSummary?.studentAccess?.[accessUid];
     return accessData ? accessData.status === 'active' : st.status !== 'Suspended';
-  };
-
-  const handleToggleAccess = async (st: Student, currentOn: boolean) => {
-    const accessUid = st.uid || st.id;
-    setTogglingId(accessUid);
-    try {
-      await toggleStudentAccess(accessUid, !currentOn);
-      addToast({
-        type: 'success',
-        title: !currentOn ? 'Access ON' : 'Access OFF',
-        description: !currentOn
-          ? `${st.name} can sign in again.`
-          : `${st.name}'s app now shows the contact-admin banner and their seat is banked with its remaining days.`,
-      });
-    } catch (err: any) {
-      addToast({
-        type: 'error',
-        title: 'Action Denied',
-        description: err.message || 'Could not toggle access.',
-      });
-    } finally {
-      setTogglingId(null);
-    }
   };
 
   const handleAddStudentSubmit = (e: React.FormEvent) => {
@@ -426,15 +402,15 @@ export const StudentsList: React.FC = () => {
 
                     {/* Status */}
                     <td className="py-3.5 px-5">
-                      {st.status === 'Active' ? (
-                        <span className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                          <span>Active</span>
-                        </span>
-                      ) : st.status === 'Suspended' ? (
+                      {!isAccessOn(st) ? (
                         <span className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
                           <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
                           <span>Suspended</span>
+                        </span>
+                      ) : st.status === 'Active' ? (
+                        <span className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                          <span>Active</span>
                         </span>
                       ) : (
                         <span className="inline-flex items-center space-x-1.5 text-xs font-medium text-slate-500">
@@ -444,38 +420,10 @@ export const StudentsList: React.FC = () => {
                       )}
                     </td>
 
-                    {/* Action column: the access switch sits on the left, details on the right */}
+                    {/* Action column: details only. The access switch lives on
+                        the seat, in the Seats & Access Limits panel. */}
                     <td className="py-3.5 px-5" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center justify-between gap-3 min-w-[240px]">
-                        <div className="flex items-center gap-2.5">
-                          <button
-                            type="button"
-                            disabled={togglingId === (st.uid || st.id)}
-                            onClick={() => handleToggleAccess(st, isAccessOn(st))}
-                            className={`relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border transition-colors duration-200 ${
-                              isAccessOn(st)
-                                ? 'bg-emerald-500 border-emerald-500'
-                                : 'bg-slate-200 dark:bg-slate-700 border-slate-300 dark:border-slate-600'
-                            } ${togglingId === (st.uid || st.id) ? 'opacity-50 cursor-wait' : ''}`}
-                            title={
-                              isAccessOn(st)
-                                ? 'Switch off: their app shows the contact-admin banner and their seat is banked'
-                                : 'Switch on: they draw a seat and can sign in again'
-                            }
-                          >
-                            <span
-                              className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md transition duration-200 ${
-                                isAccessOn(st) ? 'translate-x-7' : 'translate-x-0.5'
-                              }`}
-                            />
-                          </button>
-                          <span
-                            className={`text-[11px] font-black ${isAccessOn(st) ? 'text-emerald-600' : 'text-rose-500'}`}
-                          >
-                            {isAccessOn(st) ? 'Access ON' : 'Access OFF'}
-                          </span>
-                        </div>
-
+                      <div className="flex items-center justify-end">
                         <button
                           type="button"
                           onClick={() => setSelectedStudent(st)}
