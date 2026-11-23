@@ -932,6 +932,9 @@ const UpgradeRequestsTab: React.FC = () => {
   const [busyId, setBusyId] = useState('');
   const [declineId, setDeclineId] = useState('');
   const [declineReason, setDeclineReason] = useState('');
+  // Batch 27: receipts are viewed on the dashboard, never bounced out to the
+  // image host: the receipt opens in a modal here.
+  const [receiptView, setReceiptView] = useState<any>(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
@@ -1017,7 +1020,7 @@ const UpgradeRequestsTab: React.FC = () => {
                       <td className="py-3 px-4 font-bold text-white">\u20A6{Number(r.total || 0).toLocaleString()}</td>
                       <td className="py-3 px-4">
                         {r.receiptUrl ? (
-                          <a href={r.receiptUrl} target="_blank" rel="noopener noreferrer" className="text-orange-400 hover:text-orange-300 underline">View receipt</a>
+                          <button onClick={() => setReceiptView(r)} className="text-orange-400 hover:text-orange-300 underline">View receipt</button>
                         ) : (
                           <span className="text-slate-500">Awaiting receipt</span>
                         )}
@@ -1078,6 +1081,26 @@ const UpgradeRequestsTab: React.FC = () => {
               })}
             </tbody>
           </table>
+        </div>
+      )}
+      {receiptView && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setReceiptView(null)}>
+          <div className="bg-slate-950 border border-white/10 rounded-3xl max-w-2xl w-full max-h-[92vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/5 shrink-0">
+              <div>
+                <p className="text-sm font-bold text-white">{receiptView.centreName || receiptView.centreId}</p>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {receiptView.planName} · {receiptView.seats} seat{Number(receiptView.seats) === 1 ? '' : 's'} · \u20A6{Number(receiptView.total || 0).toLocaleString()}
+                </p>
+              </div>
+              <button onClick={() => setReceiptView(null)} className="p-2 text-slate-400 hover:text-white rounded-lg"><X className="w-4 h-4" /></button>
+            </div>
+            <div className="flex-1 overflow-auto bg-slate-900 min-h-[320px] flex items-center justify-center p-4">
+              {/\.pdf($|\?)/i.test(String(receiptView.receiptUrl || ''))
+                ? <iframe src={String(receiptView.receiptUrl)} className="w-full h-[68vh] rounded-xl bg-white" title="Payment receipt" />
+                : <img src={String(receiptView.receiptUrl)} alt="Payment receipt" className="max-w-full max-h-[68vh] object-contain rounded-xl" />}
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -1402,6 +1425,16 @@ export const TosPortal: React.FC = () => {
             </div>
           ))}
         </nav>
+        <div className="mt-auto pt-4 border-t border-white/5">
+          <button
+            onClick={() => { window.location.hash = '#landing'; }}
+            className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition-colors"
+            title="Open the Tutorial OS landing page. You stay signed in: three quick taps on the Tutorial OS logo bring you straight back here."
+          >
+            <Globe className="w-4 h-4" />
+            Landing page
+          </button>
+        </div>
       </aside>
 
       {/* Mobile tab bar: steps aside while the channel chat is open */}

@@ -319,6 +319,27 @@ export function registerExtendedRoutes(app: express.Express): void {
       const cfg = await getPlatformConfig();
       const stats = await paidSeatStats(centreId);
       const account = await payAccount();
+      // The facility's pending upgrade request, if any, drives the
+      // "payment under confirmation" banner on the admin dashboard.
+      let pendingUpgrade: any = null;
+      try {
+        const prSnap = await adminDb.collection('centreUpgradeRequests')
+          .where('centreId', '==', centreId)
+          .where('status', '==', 'pending')
+          .get();
+        const pendingDocs = prSnap.docs.sort((a, b) =>
+          String((b.data() as any).createdAt || '').localeCompare(String((a.data() as any).createdAt || '')));
+        if (pendingDocs.length) {
+          const p = pendingDocs[0].data() as any;
+          pendingUpgrade = {
+            planName: String(p.planName || ''),
+            seats: Number(p.seats || 0),
+            total: Number(p.total || 0),
+            receiptUploaded: !!p.receiptUrl,
+            createdAt: String(p.createdAt || ''),
+          };
+        }
+      } catch { /* the banner simply hides when this read fails */ }
       const cap = (cfg as any).paidSeatsUnlimited === true ? null : Math.max(1, Math.floor(Number((cfg as any).paidMaxSeats ?? 50)));
       return res.json({
         planId: String(billing.planId || ''),
@@ -329,6 +350,7 @@ export function registerExtendedRoutes(app: express.Express): void {
         paidMaxSeats: cap,
         payAccount: { name: account.name, number: account.number, bank: account.bank },
         whatsappNumber: account.whatsappNumber,
+        pendingUpgrade,
       });
     } catch (error: any) {
       const status = Number(error?.status || 500);

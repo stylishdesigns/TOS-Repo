@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import {
   Users,
   Sparkles,
@@ -67,6 +67,9 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
   const [requestId, setRequestId] = useState('');
   const [receiptUploading, setReceiptUploading] = useState(false);
   const [receiptDone, setReceiptDone] = useState(false);
+  // Batch 27: the facility sees its uploaded receipt before it messages the
+  // admin, so it can be sure the right file went up.
+  const [receiptPreview, setReceiptPreview] = useState('');
 
   useEffect(() => {
     refreshSeatsSummary();
@@ -81,6 +84,17 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
       .then((d: any) => { if (alive) setPlanState(d); })
       .catch(() => { /* the card hides when the plan lookup fails */ });
     return () => { alive = false; };
+  }, [activeCentreId]);
+
+  // Re-reads the plan payload (plans, minimum, pending upgrade) without a
+  // remount, so the pending-confirmation banner stays current after the
+  // upgrade flow closes or the admin acts.
+  const refreshPlan = useCallback(async () => {
+    if (!activeCentreId) return;
+    try {
+      const d: any = await api(`/api/centre/seats/plan?centreId=${encodeURIComponent(activeCentreId)}`);
+      setPlanState(d);
+    } catch { /* the card hides when the plan lookup fails */ }
   }, [activeCentreId]);
 
   const seats = seatsSummary?.seats ?? [];
@@ -170,6 +184,7 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
     setChosenPlan(null);
     setRequestId('');
     setReceiptDone(false);
+    setReceiptPreview('');
     setFlowOpen(true);
   };
 
@@ -224,6 +239,7 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
         reader.onerror = () => reject(new Error('Could not read that file.'));
         reader.readAsDataURL(file);
       });
+      setReceiptPreview(data);
       await api('/api/centre/seats/upgrade-request/receipt', {
         method: 'POST',
         body: { centreId: activeCentreId, requestId, data },
@@ -275,7 +291,22 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
             </div>
           </div>
         </div>
-
+        {planState?.pendingUpgrade && (
+          <div className="mb-5 rounded-2xl border border-amber-300 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 px-4 py-3.5 flex items-start gap-3">
+            <span className="relative flex h-3 w-3 mt-1 shrink-0">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-500 opacity-60" />
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500" />
+            </span>
+            <div>
+              <p className="text-xs font-black text-amber-800 dark:text-amber-300">
+                Payment under confirmation{planState.pendingUpgrade.receiptUploaded ? '' : ' \u00B7 receipt not yet uploaded'}
+              </p>
+              <p className="text-[11px] text-amber-700/90 dark:text-amber-300/80 mt-0.5">
+                {planState.pendingUpgrade.planName || 'Your'} upgrade, {planState.pendingUpgrade.seats} seat{Number(planState.pendingUpgrade.seats) === 1 ? '' : 's'} ({nairaFmt(planState.pendingUpgrade.total || 0)}), is with the Tutorial OS admin. Once it is confirmed, the seats appear here by themselves. Nothing else to do.
+              </p>
+            </div>
+          </div>
+        )}
         <div className="flex items-center gap-2 self-start md:self-auto">
           <button
             onClick={openUpgradeFlow}
@@ -841,6 +872,21 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
                     </p>
                   </div>
                 </label>
+                {receiptPreview && (
+                  <div className="mt-3 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden bg-white dark:bg-slate-800">
+                    <div className="px-4 py-2 flex items-center justify-between border-b border-slate-100 dark:border-slate-700/60">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Receipt preview</p>
+                      <span className={`text-[10px] font-bold ${receiptDone ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>
+                        {receiptUploading ? 'Uploading...' : receiptDone ? 'Uploaded' : 'Not uploaded yet'}
+                      </span>
+                    </div>
+                    {receiptPreview.startsWith('data:application/pdf') ? (
+                      <iframe src={receiptPreview} title="Receipt preview" className="w-full h-56" />
+                    ) : (
+                      <img src={receiptPreview} alt="Receipt preview" className="w-full max-h-64 object-contain" />
+                    )}
+                  </div>
+                )}
                 <p className="text-[11px] text-slate-400 mt-2">Your receipt goes straight to the Tutorial OS admin team.</p>
                 <button
                   type="button"
@@ -863,7 +909,7 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
                 <div className="flex justify-end mt-4">
                   <button
                     type="button"
-                    onClick={() => { setFlowOpen(false); refreshSeatsSummary(); }}
+                    onClick={() => { setFlowOpen(false); refreshSeatsSummary(); refreshPlan(); }}
                     className="px-3.5 py-2 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all"
                   >
                     Done

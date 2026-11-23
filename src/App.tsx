@@ -544,7 +544,11 @@ const MainLayout: React.FC = () => {
   // Signed-in platform staff open the TOS console by default, TOS door or
   // not; #centre in the URL is the way back into the tenant (centre) app.
   // The #tos door still signs visitors in and shows non-staff a not-found.
-  if (currentUser && isTosAdmin && !centreAppRequested) return <Suspense fallback={<ScreenFallback />}><TosPortal /></Suspense>;
+  // #landing is honoured even for signed-in platform staff: the console
+  // sidebar's Landing page button uses it, and the logo's three quick taps
+  // on the landing bring them straight back into the console while the
+  // session lives (a signed-out visitor still gets the staff sign-in).
+  if (currentUser && isTosAdmin && !centreAppRequested && !forceLanding) return <Suspense fallback={<ScreenFallback />}><TosPortal /></Suspense>;
 
   // A signed-in account whose platform check could not finish (a weak
   // connection) is still signed in: say that plainly here instead of showing
@@ -761,16 +765,18 @@ const MainLayout: React.FC = () => {
     );
   }
 
-  if (showWelcome && (forceLanding || !currentUser)) {
+  if (forceLanding || (showWelcome && !currentUser)) {
     if (!showPortals) {
       return (
         <TutorialOsLanding
           onAdminSignIn={() => {
+            setForceLanding(false);
             setViewMode('portal');
             setShowWelcome(false);
             setCentreGateRequested(true);
           }}
           onStudentAccess={() => {
+            setForceLanding(false);
             setViewMode('student');
             setShowWelcome(false);
             setCentreGateRequested(true);
@@ -780,6 +786,7 @@ const MainLayout: React.FC = () => {
       );
     }
     return <WelcomeScreen onSelectRole={(role) => {
+      setForceLanding(false);
       setViewMode(role === 'admin' ? 'portal' : role);
       setShowWelcome(false);
       setCentreGateRequested(true);
