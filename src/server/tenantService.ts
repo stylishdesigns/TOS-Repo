@@ -1410,16 +1410,25 @@ export async function setSeatSwitchService(params: {
     return { success: true, seatNo: Number(seat.seatNo || 0), status: 'locked', daysUsed, remaining: 0 };
   }
 
-  // Batch 22: free seats have no switch. They stay on for as long as the
-  // facility holds them and can never be banked, locked or switched off.
-  if (seatKind(seat) === 'free') {
-    throw httpError(409, 'Free seats have no switch. They stay on for as long as the facility holds them.');
+  // Batch 23: the seat switch is the facility's ONLY access switch, so an
+  // OCCUPIED free seat carries one: switching off detaches the student,
+  // suspends their access and vacates the seat. Free seats never burn days,
+  // so there is nothing to bank. A bare switch-on stays refused: adding a
+  // student is the way a seat switches on.
+  const isFreeSeat = seatKind(seat) === 'free';
+  if (isFreeSeat) {
+    if (params.active) {
+      throw httpError(409, 'A seat only switches on when a student is added to it. Use Add student to put one on this seat.');
+    }
+    if (!String(seat.studentUid || '')) {
+      throw httpError(409, 'Seat is already vacant.');
+    }
   }
 
   if (!params.active) {
     const uid = String(seat.studentUid || '');
     const name = String(seat.studentName || '');
-    const { daysUsed } = seatUsage(seat, now);
+    const { daysUsed } = isFreeSeat ? { daysUsed: 0 } : seatUsage(seat, now);
     await adminDb.runTransaction(async (tx) => {
       const history: any[] = Array.isArray(seat.history) ? seat.history.slice(-50) : [];
       if (uid) {
@@ -1453,7 +1462,7 @@ export async function setSeatSwitchService(params: {
           studentUid: '',
           studentName: '',
           assignedAt: null,
-          daysUsedBase: daysUsed,
+          daysUsedBase: isFreeSeat ? 0 : daysUsed,
           history,
           freedAt: nowIso,
         },

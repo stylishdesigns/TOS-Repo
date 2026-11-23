@@ -417,10 +417,10 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
                         )}
                       </td>
                       <td className="py-3 px-4 text-center">
-                        {isFree ? (
+                        {isFree && !seat.studentUid ? (
                           <span
                             className="text-[10px] font-black text-emerald-600 dark:text-emerald-400"
-                            title="Free seats have no switch: they stay on for as long as the facility holds them"
+                            title="Empty free seat: add a student and the switch appears here"
                           >
                             Free
                           </span>
@@ -429,7 +429,7 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
                             type="button"
                             disabled={seatBusy}
                             onClick={() => handleSeatSwitch(seat, false)}
-                            title="Switch off: the count stops, the student leaves and the seat is paused"
+                            title="Switch off: the student leaves, their access suspends and the seat is vacant"
                             className={`relative inline-flex h-7 w-14 shrink-0 items-center rounded-full border transition-colors duration-200 ${
                               seat.status === 'active'
                                 ? 'bg-emerald-500 border-emerald-500'
