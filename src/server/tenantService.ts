@@ -21,10 +21,9 @@ import {
   listSeats,
   seatUsage,
   seatKind,
-  isOnTrial,
   countPaidSeatsForCentre,
   reconcileFreeSeats,
-  trimPaidSeatsForCap,
+  facilityTier,
   freezeSeatRunMs,
 } from './seatDays';
 
@@ -38,12 +37,12 @@ function freeSeatAllocation(config: any, billing: any): number {
   return Math.max(0, Math.floor(Number((config as any)?.freeSeatsGeneral ?? 5)));
 }
 
-/** Free seats are always open on trial; off trial they unlock once the
- *  facility has paid for at least the platform minimum. */
-async function freeSeatsUnlockedFor(centreId: string, billing: any, config: any): Promise<boolean> {
-  if (isOnTrial(billing)) return true;
-  const minimum = Math.max(0, Math.floor(Number((config as any)?.paidSeatMinimum ?? 5)));
-  return (await countPaidSeatsForCentre(centreId)) >= minimum;
+/** Batch 26: free seats are open to every facility. The old rule (always
+ *  open on trial, unlocked elsewhere once the facility held the platform
+ *  minimum of paid seats) died with the free trial: a lead runs on its free
+ *  grant alone and upgrades when it needs more. */
+async function freeSeatsUnlockedFor(_centreId: string, _billing: any, _config: any): Promise<boolean> {
+  return true;
 }
 
 // ============================================================================
@@ -1718,10 +1717,6 @@ export async function getSeatsSummaryService(centreId: string): Promise<CentreSe
   try {
     await ensureSeatsForCentre(centreId, { billing, trialSeatCap: Number((config as any)?.trialSeatCap || 10), freeSeats: freeSeatAllocation(config, billing) });
     try { await reconcileFreeSeats(centreId, freeSeatAllocation(config, billing)); } catch { /* tops up on the next read */ }
-    // Batch 25: a trial facility held to its paid-seat cap is trimmed live too.
-    try {
-      if (isOnTrial(billing)) await trimPaidSeatsForCap(centreId, Number((config as any)?.trialMaxSeats ?? 10));
-    } catch { /* trims on the next read */ }
     await lockExpiredSeatsForCentre(centreId, { centreName: centre?.name || '' });
     const seatDocs = await listSeats(centreId);
     const now = new Date();
@@ -1773,23 +1768,15 @@ export async function getSeatsSummaryService(centreId: string): Promise<CentreSe
     bankedDays: seats.filter((s) => s.status === 'available').reduce((n, s) => n + s.remaining, 0),
   };
 
-  let trialDaysLeft: number | undefined;
-  if (status === 'trial' && billing?.trialEndsAt) {
-    const diff = new Date(billing.trialEndsAt).getTime() - Date.now();
-    trialDaysLeft = Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
-  }
-
   const paidSeatsHeld = seats.filter((s) => (s as any).kind !== 'free').length;
   const paidSeatMinimum = Math.max(0, Math.floor(Number((config as any)?.paidSeatMinimum ?? 5)));
   const freeSeatsAllocated = freeSeatAllocation(config, billing);
-  const freeSeatsUnlocked = isOnTrial(billing) || paidSeatsHeld >= paidSeatMinimum;
+  const freeSeatsUnlocked = true;
 
   return {
     used,
     cap: pool.total,
-    isTrial: status === 'trial',
-    trialDaysLeft,
-    trialEndsAt: billing?.trialEndsAt || null,
+    tier: facilityTier(billing),
     studentAccess,
     seats,
     pool,

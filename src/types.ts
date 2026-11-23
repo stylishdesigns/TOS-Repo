@@ -707,9 +707,9 @@ export interface SeatPool {
 export interface CentreSeatsSummary {
   used: number;
   cap: number;
-  isTrial: boolean;
-  trialDaysLeft?: number;
-  trialEndsAt?: string | null;
+  /** Batch 26: 'lead' (signed up, never upgraded) or 'facility' (upgraded by
+   *  paying for at least the platform minimum of seats). */
+  tier: 'lead' | 'facility';
   studentAccess?: Record<string, {
     status: MembershipStatus;
     lastToggledAt?: string;

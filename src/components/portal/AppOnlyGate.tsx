@@ -129,7 +129,7 @@ export const AppOnlyGate: React.FC<{ children: React.ReactNode }> = ({ children 
         >
           Get the app
         </a>
-        <p className="mt-4 text-slate-500 text-xs">Free during your 14-day trial.</p>
+        <p className="mt-4 text-slate-500 text-xs">Free seats included. Upgrade any time for more.</p>
       </div>
     </div>
   );

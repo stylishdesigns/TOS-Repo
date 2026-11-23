@@ -3,7 +3,7 @@ import { getAuth, signOut, updateProfile, updatePassword, reauthenticateWithCred
 import {
   LayoutDashboard, Users, Building2, Wallet, ScrollText, UserPlus, Loader2,
   RefreshCw, Send, Ban, CheckCircle2, PlayCircle, Check, Plus, ShieldCheck,
-  Clock, ArrowUpRight, UserRound, BookOpen, CalendarDays, Copy, HelpCircle,
+  ArrowUpRight, UserRound, BookOpen, CalendarDays, Copy, HelpCircle,
   AlertTriangle, X, ChevronRight, MessageSquare, Globe, Trash2, Settings,
 } from 'lucide-react';
 import {
@@ -131,13 +131,13 @@ const OverviewTab: React.FC<{ onOpenCentre: (id: string) => void; refreshKey: nu
         </div>
       </div>
 
-      {(data.trialsEndingSoon || []).length > 0 && (
-        <Card title="Trials ending within 7 days">
+      {(data.leadCentres || []).length > 0 && (
+        <Card title="Leads not yet upgraded">
           <div className="space-y-2">
-            {data.trialsEndingSoon.map((t: any) => (
+            {data.leadCentres.map((t: any) => (
               <button key={t.centreId} onClick={() => onOpenCentre(t.centreId)} className="w-full flex items-center justify-between bg-slate-950/50 border border-white/5 rounded-xl px-4 py-2.5 hover:border-orange-500/40 transition-colors text-left">
                 <span className="text-sm text-white font-semibold">{t.name}</span>
-                <span className="text-xs text-amber-300 flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" /> ends {fmtDate(t.endsAt)}</span>
+                <span className="text-xs text-amber-300 flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5" /> lead · free seats</span>
               </button>
             ))}
           </div>
@@ -260,7 +260,7 @@ const LeadsTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
                     <p className="text-xs text-slate-500">{c.ownerName || '—'} · {c.ownerEmail || 'no owner email'}</p>
                   </td>
                   <td className="px-4 py-3"><StatusPill status={c.billingStatus} /></td>
-                  <td className="px-4 py-3 text-xs text-slate-300">{c.trialEndsAt && c.billingStatus === 'trial' ? fmtDate(c.trialEndsAt) : '—'}</td>
+                  <td className="px-4 py-3 text-xs text-slate-300">{c.tier === 'lead' ? <span className="text-amber-300 font-semibold">Lead · free seats</span> : <span className="text-emerald-300">Facility</span>}</td>
                   <td className="px-4 py-3 text-xs text-slate-500">{c.createdAt ? fmtDate(c.createdAt) : '—'}</td>
                 </tr>
               ))}
@@ -360,7 +360,6 @@ const PlansTab: React.FC = () => {
               <input type="number" min="0" value={p.trialSeatCap ?? ''} onChange={(e) => setPlan(p.id, 'trialSeatCap', e.target.value)} className={inputCls} />
             </Field>
             <Field label="Trial days">
-              <input type="number" min="0" value={p.trialDays ?? ''} onChange={(e) => setPlan(p.id, 'trialDays', e.target.value)} className={inputCls} />
             </Field>
           </div>
           <div className="flex flex-wrap gap-4 mt-4">
@@ -437,9 +436,6 @@ const SettingsTab: React.FC = () => {
   };
 
   const platformFields: [string, string][] = [
-    ['trialDays', 'Trial length (days)'],
-    ['skipTrialDiscountPct', 'Skip-trial discount (%)'],
-    ['trialGraceDays', 'Grace days after expiry'],
     ['aiRouteRateLimitPerHour', 'AI requests per user per hour'],
   ];
 
@@ -462,9 +458,6 @@ const SettingsTab: React.FC = () => {
           <Field label="Max paid seats, facilities not on trial">
             <input type="number" min="0" value={config.paidMaxSeats ?? ''} disabled={unlimited} onChange={(e) => setConfig((c: any) => ({ ...c, paidMaxSeats: e.target.value }))} className={inputCls} />
           </Field>
-          <Field label="Max seats on free trial (paid seats)">
-            <input type="number" min="0" value={config.trialMaxSeats ?? ''} onChange={(e) => setConfig((c: any) => ({ ...c, trialMaxSeats: e.target.value }))} className={inputCls} />
-          </Field>
           <Field label="Free seats for every facility">
             <input type="number" min="0" value={config.freeSeatsGeneral ?? ''} onChange={(e) => setConfig((c: any) => ({ ...c, freeSeatsGeneral: e.target.value }))} className={inputCls} />
           </Field>
@@ -473,7 +466,7 @@ const SettingsTab: React.FC = () => {
           </Field>
         </div>
         <p className="text-[11px] text-slate-500 mt-3">
-          Saving applies these numbers to every facility right away: lowering a number trims the extra seats live and moves students off removed seats (their access switches off), raising it adds seats. The minimum is judged on paid seats only; free seats never count toward it. A facility below it must create enough seats in one go to reach it; from the minimum up, any number goes. Meeting the minimum also unlocks the free-seat grant. Free seats apply to trial and paid facilities alike, and each facility can carry its own override on its page. If the minimum sits above the trial cap, a trial facility cannot create seats until it upgrades.
+          Saving applies these numbers to every facility right away: lowering a number trims the extra seats live and moves students off removed seats (their access switches off), raising it adds seats. The minimum is judged on paid seats only; free seats never count toward it. A lead below the minimum cannot create paid seats at all: it upgrades by paying for the minimum in one go. Every facility runs on its free-seat grant, and each facility can carry its own override on its page.
         </p>
       </Card>
 

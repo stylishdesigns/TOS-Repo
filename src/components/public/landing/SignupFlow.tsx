@@ -106,7 +106,7 @@ const FlowHeader: React.FC = () => (
         </span>
         Tutorial OS
       </a>
-      <span style={{ font: '600 13px Inter, sans-serif', color: '#94A3B8', marginInline: 'auto' }}>Free 14-day trial</span>
+      <span style={{ font: '600 13px Inter, sans-serif', color: '#94A3B8', marginInline: 'auto' }}>Free seats included</span>
     </div>
   </header>
 );
@@ -653,7 +653,6 @@ export const SignupConfirmPage: React.FC = () => {
   }, [owner, facility, result]);
   if (!owner || !facility || !result) return null;
 
-  const endsOn = new Date(result.startedAt + 14 * 24 * 3600 * 1000).toLocaleDateString('en-NG', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   const domain = result.domain || `tutorialos.com/${slugForName(facility.name)}`;
   const firstName = t(owner.fullName).split(/\s+/)[0] || 'there';
   const [copied, setCopied] = useState(false);
@@ -685,7 +684,7 @@ export const SignupConfirmPage: React.FC = () => {
           </span>
           <div>
             <h1 style={{ ...h1Style, fontSize: 25, margin: '0 0 4px' }}>Congratulations, {firstName}!</h1>
-            <p style={{ font: '500 15px/1.55 Inter, sans-serif', color: '#7C2D12' }}>{facility.name} is set up and your free trial has started.</p>
+            <p style={{ font: '500 15px/1.55 Inter, sans-serif', color: '#7C2D12' }}>{facility.name} is set up and your free seats are ready.</p>
           </div>
         </div>
 
@@ -712,18 +711,15 @@ export const SignupConfirmPage: React.FC = () => {
             <button type="button" onClick={copy} style={{ minHeight: '48px', padding: '0 18px', borderRadius: '12px', border: '1px solid #CBD5E1', background: '#fff', font: '700 14px Inter, sans-serif', color: '#334155', cursor: 'pointer' }}>{copied ? 'Copied' : 'Copy link'}</button>
           </div>
           <p style={{ font: '500 14.5px/1.6 Inter, sans-serif', color: '#475569', margin: '12px 0 0' }}>
-            This address is your facility's landing page. Share it on flyers, WhatsApp and social media to market your facility, promote your programmes and let students reach you and fill your forms.
+            This address is your facility's landing page. Share it on flyers, WhatsApp and social media to market your facility, promote your programmes and let students reach you and fill your forms. The page goes live once you upgrade to a plan.
           </p>
         </div>
 
         <div style={CARD}>
           <h2 style={h2Style}>Your plan</h2>
-          <span className="pill" style={{ marginBottom: '12px' }}>Standard plan · included with your free trial</span>
+          <span className="pill" style={{ marginBottom: '12px' }}>Free seats included · upgrade any time</span>
           <p style={{ font: '500 15px/1.6 Inter, sans-serif', color: '#334155', margin: '10px 0 0' }}>
-            Your facility starts on the <b>Standard plan</b> by default. When your trial ends it continues at <b>₦2,000 per student per month</b>.
-          </p>
-          <p style={{ font: '500 15px/1.6 Inter, sans-serif', color: '#0F172A', margin: '10px 0 0' }}>
-            Your free trial ends on <b>{endsOn}</b>.
+            Your facility starts with its <b>free seats</b> on the Standard plan. Upgrade any time: pay for seats (from <b>₦2,000 per seat per month</b>) to add more students and unlock your facility's own public landing page.
           </p>
         </div>
 

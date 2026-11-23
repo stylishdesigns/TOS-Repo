@@ -144,8 +144,7 @@ export const AddCentreModal: React.FC<{ onClose: () => void; onCreated: (centreI
                 </select>
               </Field>
               <label className="flex items-center gap-2 text-xs text-slate-300">
-                <input type="checkbox" checked={form.skipTrial} onChange={(e) => set('skipTrial', e.target.checked)} className="accent-orange-500 w-4 h-4" />
-                Skip the trial (students wait for the first payment)
+
               </label>
               <p className="text-[11px] text-slate-500">The access code is generated automatically, so there is never a mix-up between facilities.</p>
               <Field label="Temporary password">

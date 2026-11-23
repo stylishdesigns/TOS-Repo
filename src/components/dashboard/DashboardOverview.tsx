@@ -424,8 +424,8 @@ export const DashboardOverview: React.FC = () => {
           <div>
             <p className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
               <span>Student Seats</span>
-              {seatsSummary?.isTrial && (
-                <span className="text-[10px] text-amber-600 font-semibold px-1.5 py-0.2 bg-amber-50 rounded">Trial</span>
+              {seatsSummary?.tier === 'lead' && (
+                <span className="text-[10px] text-amber-600 font-semibold px-1.5 py-0.2 bg-amber-50 rounded">Lead</span>
               )}
             </p>
             <p className="text-lg font-extrabold text-slate-900 mt-0.5">

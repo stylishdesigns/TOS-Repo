@@ -1,7 +1,7 @@
 // ============================================================================
 // Seat-days (batch 19): seats carry days, not students.
 //
-// Each seat the facility pays for holds 30 days (14 on trial). A seat counts
+// Each seat the facility pays for holds 30 days. A seat counts
 // only while a student is on it (batch 21): it is switched on by adding a
 // student, and (batch 24) burns one day for every FULL 24 HOURS it runs.
 // Switching off pauses the count; re-adding the student the same day resumes
@@ -9,7 +9,8 @@
 // it locks, switching that student's access off.
 // Reopening the seat takes a new payment. Batch 22 adds free seats: a
 // platform-granted block that never expires, carries no switch and renders
-// first in the facility's pool.
+// first in the facility's pool. Batch 26 retires the free trial: every
+// facility is a lead (free seats only) until it upgrades to a plan.
 //
 // Everything here runs server-side only (admin SDK). The client never reads
 // the centreSeats collection directly; it sees seats through the seats
@@ -31,7 +32,6 @@ async function readSeatConfig(): Promise<any> {
 }
 
 export const SEAT_DAYS_PAID = 30;
-export const SEAT_DAYS_TRIAL = 14;
 
 export type SeatStatus = 'available' | 'active' | 'locked';
 
@@ -79,6 +79,13 @@ export function isOnTrial(billing: any): boolean {
   if (!billing || billing.skippedTrial) return false;
   const t = billing.trialEndsAt ? new Date(billing.trialEndsAt).getTime() : 0;
   return t > Date.now();
+}
+
+/** Batch 26: the facility's tier. A LEAD has signed up and never upgraded: it
+ *  uses only its free-seat grant and has no public landing page. A FACILITY
+ *  has upgraded by paying for at least the minimum seats. */
+export function facilityTier(billing: any): 'lead' | 'facility' {
+  return billing && billing.tier === 'facility' ? 'facility' : 'lead';
 }
 
 /** Days used and days left for one seat right now. */
@@ -838,23 +845,21 @@ export async function trimPaidSeatsForCap(centreId: string, cap: number): Promis
   return { removed: victims.length, detached };
 }
 
-/** Batch 25: apply the saved seat settings to EVERY facility at once, the
- *  moment the platform saves them. Each facility's free-seat grant is
- *  reconciled (top-up or trim, its own override wins) and each trial
- *  facility is held to the trial paid-seat cap. One facility failing never
- *  blocks the rest; the seats read self-heals the stragglers. */
+/** Batch 25, trimmed by batch 26: apply the saved seat settings to EVERY
+ *  facility at once, the moment the platform saves them. Each facility's
+ *  free-seat grant is reconciled (top-up or trim, its own override wins).
+ *  One facility failing never blocks the rest; the seats read self-heals
+ *  the stragglers. */
 export async function enforceSeatConfigAcrossFacilities(config: any): Promise<{
   facilities: number;
   freeSeatsAdded: number;
   freeSeatsRemoved: number;
   studentsDetached: number;
-  trialSeatsRemoved: number;
 }> {
   const snap = await adminDb.collection('centreBilling').get();
   let freeSeatsAdded = 0;
   let freeSeatsRemoved = 0;
   let studentsDetached = 0;
-  let trialSeatsRemoved = 0;
   for (const d of snap.docs) {
     const billing = d.data() as any;
     try {
@@ -863,16 +868,8 @@ export async function enforceSeatConfigAcrossFacilities(config: any): Promise<{
       freeSeatsRemoved += free.removed;
       studentsDetached += free.detached;
     } catch { /* this facility retries on its next seats read */ }
-    if (isOnTrial(billing)) {
-      try {
-        const cap = Math.max(0, Math.floor(Number((config as any)?.trialMaxSeats ?? 10)));
-        const r = await trimPaidSeatsForCap(d.id, cap);
-        trialSeatsRemoved += r.removed;
-        studentsDetached += r.detached;
-      } catch { /* this facility retries on its next seats read */ }
-    }
   }
-  return { facilities: snap.size, freeSeatsAdded, freeSeatsRemoved, studentsDetached, trialSeatsRemoved };
+  return { facilities: snap.size, freeSeatsAdded, freeSeatsRemoved, studentsDetached };
 }
 
 /** One in-app notification and one push per facility admin, guarded by a

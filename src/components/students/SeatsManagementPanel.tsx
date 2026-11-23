@@ -97,8 +97,9 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
   };
   const enrolled = students.filter((s) => s.status !== 'Suspended').length;
   const used = seatsSummary?.used ?? students.filter((s) => s.status !== 'Suspended').length;
-  const isTrial = seatsSummary?.isTrial ?? activeCentre?.status === 'trial';
-  const trialDaysLeft = seatsSummary?.trialDaysLeft ?? 30;
+  // Batch 26: a lead (signed up, never upgraded) gets a lead chip in place
+  // of the old trial countdown.
+  const isLead = (seatsSummary?.tier ?? 'lead') === 'lead';
 
   // Which seat each student holds, straight from the pool.
   const seatByUid = new Map<string, SeatSummary>();
@@ -205,10 +206,10 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
             <div>
               <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 <span>Seat Control Room</span>
-                {isTrial && (
+                {isLead && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
                     <Sparkles className="w-3 h-3" />
-                    Trial Active ({trialDaysLeft} days left)
+                    Lead · free seats
                   </span>
                 )}
               </h2>

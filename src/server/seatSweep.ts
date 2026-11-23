@@ -3,22 +3,20 @@
 //
 // Runs daily from Netlify's scheduler (seat-policy-sweep) and on demand from
 // POST /api/centre/seats/sweep. Three notices:
-//  1. A facility that is not on trial and holds fewer paid seats than the
-//     platform minimum gets a 7-day warning, and its landing-page grace
-//     window starts the day this email lands.
-//  2. When that grace ends with the minimum still unmet, the facility's
-//     public landing page pauses (centre-by-slug enforces it) and the
-//     facility gets one notice that it happened. Portals keep working.
-//  3. Running paid seats with 5 or fewer days left get one "seats finishing"
-//     digest email, marked on the seat so the same seat never warns twice.
-// Meeting the minimum again clears the grace window and the page returns.
-// ============================================================================
+//  1. A LEAD facility (signed up, never upgraded) gets a one-time notice
+//     that its public landing page stays off until it upgrades. Meeting the
+//     minimum by paying for seats turns it into a facility and clears the
+//     notice, so the page goes live the moment the upgrade lands.
+//  2. Seat-day reminders: running paid seats with 7/3/1 days left get a
+//     reminder, and a seat that runs out locks (seatDaysSweep).
+//  3. A seats-finishing digest for running paid seats with 5 or fewer days
+//     left.
+//
 import { adminDb } from './firebaseAdmin';
 import { getPlatformConfig } from './tenantService';
-import { listSeats, seatKind, isOnTrial, countPaidSeatsForCentre, seatUsage } from './seatDays';
+import { listSeats, seatKind, facilityTier, trimPaidSeatsForCap, reconcileFreeSeats, effectiveFreeSeats, seatUsage } from './seatDays';
 import { sendEmail, emailProviderConfigured, OutgoingEmail } from './email';
 
-const DAY_MS = 24 * 60 * 60 * 1000;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export interface SeatSweepResult {
@@ -64,7 +62,65 @@ async function sendToAll(recipients: string[], mail: Omit<OutgoingEmail, 'to'>):
   return delivered;
 }
 
+// ============================================================================
+// Batch 26: lead-tier migration. Runs once: every facility's billing doc
+// drops its trial fields (trialStartsAt / trialEndsAt / skippedTrial /
+// discountPct) and the old grace fields, gains tier ('facility' when the
+// facility ever paid through, 'lead' otherwise), and leads have their paid
+// seats stripped (trimPaidSeatsForCap to 0 handles vacant and occupied
+// seats the same way a manual trim does). Free seats are re-reconciled.
+// Guarded by leadTierMigrationDoneAt on the platform config so it only ever
+// runs once; every later run is a single read.
+// ============================================================================
+export async function migrateToLeadTier(): Promise<{ done: boolean; facilities: number; seatsRemoved: number }> {
+  const cfgRef = adminDb.collection('platformConfig').doc('global');
+  const cfgSnap = await cfgRef.get();
+  if (cfgSnap.exists && (cfgSnap.data() as any)?.leadTierMigrationDoneAt) {
+    return { done: false, facilities: 0, seatsRemoved: 0 };
+  }
+  const config = await getPlatformConfig();
+  const snap = await adminDb.collection('centreBilling').get();
+  let facilities = 0;
+  let seatsRemoved = 0;
+  for (const d of snap.docs) {
+    const billing = d.data() as any;
+    const tier = billing.paidThrough ? 'facility' : 'lead';
+    await d.ref.set({
+      tier,
+      trialStartsAt: null,
+      trialEndsAt: null,
+      skippedTrial: false,
+      discountPct: 0,
+      landingGraceUntil: null,
+      landingLockedNotifiedAt: null,
+    }, { merge: true });
+    facilities += 1;
+    if (tier === 'lead') {
+      // A lead is free-seats-only: paid seats go, occupied or not.
+      try {
+        const r = await trimPaidSeatsForCap(d.id, 0);
+        seatsRemoved += r.removed;
+      } catch (e) {
+        console.error('[lead-migration] trim failed', d.id, (e as Error).message);
+      }
+      try {
+        await reconcileFreeSeats(d.id, effectiveFreeSeats(billing, config));
+      } catch { /* tops up on the next seats read */ }
+    }
+  }
+  await cfgRef.set({ leadTierMigrationDoneAt: new Date().toISOString() }, { merge: true });
+  await adminDb.collection('auditLogs').add({
+    actorUid: 'system',
+    action: 'LEAD_TIER_MIGRATION',
+    after: { facilities, seatsRemoved },
+    at: new Date().toISOString(),
+  });
+  console.log('[lead-migration] done', JSON.stringify({ facilities, seatsRemoved }));
+  return { done: true, facilities, seatsRemoved };
+}
+
 export async function runSeatPolicySweep(opts: { centreId?: string } = {}): Promise<SeatSweepResult> {
+  try { await migrateToLeadTier(); } catch (e) { console.error('[seat-sweep] lead migration failed:', (e as Error).message); }
   const result: SeatSweepResult = {
     checked: 0,
     warned: 0,
@@ -78,7 +134,9 @@ export async function runSeatPolicySweep(opts: { centreId?: string } = {}): Prom
   const centresSnap = await adminDb.collection('centres').limit(500).get();
   const centres = centresSnap.docs.filter((d) => {
     if (opts.centreId && d.id !== opts.centreId) return false;
-    return String((d.data() as any)?.status || 'active') === 'active';
+    const status = String((d.data() as any)?.status || 'active');
+    // Batch 26: lead-status facilities are swept too (their seats still run).
+    return status === 'active' || status === 'lead';
   });
 
   for (const cDoc of centres) {
@@ -90,54 +148,32 @@ export async function runSeatPolicySweep(opts: { centreId?: string } = {}): Prom
     const bDoc = await bRef.get();
     const billing = (bDoc.data() || {}) as any;
 
-    // Trial facilities have nothing to warn about yet.
-    if (isOnTrial(billing)) continue;
-
-    const paidHeld = await countPaidSeatsForCentre(centreId);
-    const recipients = await centreRecipients(centreId, centre.ownerEmail);
-
-    if (paidHeld < minimum) {
-      const graceUntil = billing.landingGraceUntil ? new Date(billing.landingGraceUntil).getTime() : 0;
-      if (!graceUntil) {
-        const until = new Date(Date.now() + 7 * DAY_MS).toISOString();
-        await bRef.set({ landingGraceUntil: until, landingLockedNotifiedAt: null }, { merge: true });
+    // Batch 26: a lead (never upgraded) has no public landing page. One
+    // notice email tells it so; upgrading clears the flag and the page
+    // goes live with the rest of the upgrade.
+    if (facilityTier(billing) === 'lead') {
+      if (!billing.leadLandingNotifiedAt) {
+        await bRef.set({ leadLandingNotifiedAt: new Date().toISOString() }, { merge: true });
         await adminDb.collection('auditLogs').add({
           actorUid: 'system',
           centreId,
-          action: 'LANDING_GATE_WARNED',
-          after: { paidHeld, minimum, landingGraceUntil: until },
+          action: 'LEAD_LANDING_NOTICE',
+          after: { tier: 'lead' },
           at: new Date().toISOString(),
         });
+        const recipients = await centreRecipients(centreId, centre.ownerEmail);
         if (recipients.length) {
           const delivered = await sendToAll(recipients, {
-            subject: `${centreName}: your facility page pauses in 7 days`,
-            html: `<p>Your facility currently holds <b>${paidHeld}</b> paid seat${paidHeld === 1 ? '' : 's'}. Tutorial OS facilities keep their public landing page only while they hold at least <b>${minimum}</b> paid seats.</p><p>Unless you record a payment for at least ${minimum} seats by <b>${new Date(until).toDateString()}</b>, your facility's landing page link will pause. Everything else keeps working: students, tutors and admins stay signed in as usual.</p><p>To keep the page live, record a payment for your seats in the facility app, or let your Tutorial OS contact know.</p>`,
-            text: `Your facility currently holds ${paidHeld} paid seat(s). Tutorial OS facilities keep their public landing page only while they hold at least ${minimum} paid seats.\n\nUnless you record a payment for at least ${minimum} seats by ${new Date(until).toDateString()}, your facility's landing page link will pause. Everything else keeps working: students, tutors and admins stay signed in as usual.\n\nTo keep the page live, record a payment for your seats in the facility app, or let your Tutorial OS contact know.`,
+            subject: `${centreName}: upgrade to unlock your facility page`,
+            html: `<p>Your Tutorial OS facility page (the public landing page with your facility's own web address) goes live as soon as you upgrade.</p><p>You can start upgrading by recording a payment for at least <b>${minimum}</b> seats, and choosing your plan in the facility app. Everything else keeps working: students, tutors and admins stay signed in as usual.</p>`,
+            text: `Your Tutorial OS facility page (the public landing page with your facility's own web address) goes live as soon as you upgrade.\n\nYou can start upgrading by recording a payment for at least ${minimum} seats, and choosing your plan in the facility app. Everything else keeps working: students, tutors and admins stay signed in as usual.`,
           });
-          console.log('[seat-sweep] landing warning', centreId, JSON.stringify({ delivered }));
+          console.log('[seat-sweep] lead landing notice', centreId, JSON.stringify({ delivered }));
         }
         result.warned += 1;
-      } else if (graceUntil <= Date.now() && !billing.landingLockedNotifiedAt) {
-        await bRef.set({ landingLockedNotifiedAt: new Date().toISOString() }, { merge: true });
-        await adminDb.collection('auditLogs').add({
-          actorUid: 'system',
-          centreId,
-          action: 'LANDING_GATE_LOCKED',
-          after: { paidHeld, minimum },
-          at: new Date().toISOString(),
-        });
-        if (recipients.length) {
-          const delivered = await sendToAll(recipients, {
-            subject: `${centreName}: your facility page is now paused`,
-            html: `<p>Your facility's public landing page is now paused because it holds <b>${paidHeld}</b> paid seat${paidHeld === 1 ? '' : 's'}, below the platform minimum of <b>${minimum}</b>.</p><p>Everything else keeps working: students, tutors and admins stay signed in as usual. The page returns as soon as a payment brings you to at least ${minimum} seats.</p>`,
-            text: `Your facility's public landing page is now paused because it holds ${paidHeld} paid seat(s), below the platform minimum of ${minimum}.\n\nEverything else keeps working: students, tutors and admins stay signed in as usual. The page returns as soon as a payment brings you to at least ${minimum} seats.`,
-          });
-          console.log('[seat-sweep] locked notice', centreId, JSON.stringify({ delivered }));
-        }
-        result.lockedNotices += 1;
       }
-    } else if (billing.landingGraceUntil || billing.landingLockedNotifiedAt) {
-      await bRef.set({ landingGraceUntil: null, landingLockedNotifiedAt: null }, { merge: true });
+    } else if (billing.leadLandingNotifiedAt || billing.landingGraceUntil || billing.landingLockedNotifiedAt) {
+      await bRef.set({ leadLandingNotifiedAt: null, landingGraceUntil: null, landingLockedNotifiedAt: null }, { merge: true });
       result.cleared += 1;
     }
 

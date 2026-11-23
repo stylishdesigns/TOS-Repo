@@ -3,7 +3,7 @@ import * as crypto from 'crypto';
 import { STARTING_CONFIG } from './platformDefaults';
 import { adminAuth, adminDb } from './firebaseAdmin';
 import { runStaffPayReminderSweep } from './staffPayReminders';
-import { provisionSeats, getSeatPool, isOnTrial, countPaidSeatsForCentre, addSeatsForCentre, enforceSeatConfigAcrossFacilities } from './seatDays';
+import { provisionSeats, getSeatPool, facilityTier, countPaidSeatsForCentre, addSeatsForCentre, enforceSeatConfigAcrossFacilities } from './seatDays';
 import { runSeatPolicySweep } from './seatSweep';
 import {
   Caller,
@@ -270,26 +270,16 @@ export function registerExtendedRoutes(app: express.Express): void {
       const doc = snap.docs.find((d) => slugifyName(String((d.data() as any)?.name || '')) === slug);
       if (!doc) return res.status(404).json({ error: 'Facility not found.' });
       const data = doc.data() as any;
-      // Batch 22: the landing-page gate. A facility that is not on trial
-      // keeps its public landing page only while it holds at least the
-      // platform's minimum paid seats.
+      // Batch 26: the landing-page gate is the tier, nothing else. A lead
+      // (signed up, never upgraded) has no public landing page; upgrading
+      // by paying for the minimum seats switches it on the same moment.
       const billingSnap = await adminDb.collection('centreBilling').doc(doc.id).get();
       const billing = billingSnap.data() || {};
-      if (!isOnTrial(billing)) {
-        const config = await getPlatformConfig();
-        const minimum = Math.max(0, Math.floor(Number((config as any)?.paidSeatMinimum ?? 5)));
-        const paidHeld = await countPaidSeatsForCentre(doc.id);
-        if (paidHeld < minimum) {
-          // The page pauses only after the 7-day grace that starts the day
-          // the warning email lands (seatSweep sets landingGraceUntil).
-          const graceUntil = billing.landingGraceUntil ? new Date(billing.landingGraceUntil).getTime() : 0;
-          if (graceUntil && graceUntil <= Date.now()) {
-            return res.json({
-              locked: true,
-              message: 'This facility page is not available right now. Please contact the facility admin directly.',
-            });
-          }
-        }
+      if (facilityTier(billing) === 'lead') {
+        return res.json({
+          locked: true,
+          message: 'This facility page is not available right now. Please contact the facility admin directly.',
+        });
       }
       const rawAccent = String(data.accentColor || '').trim();
       res.json({
@@ -1692,7 +1682,6 @@ export function registerExtendedRoutes(app: express.Express): void {
       const counts: Record<string, number> = { trial: 0, pending_payment: 0, active: 0, overdue: 0, suspended: 0 };
       let seatsUsed = 0;
       let seatsCap = 0;
-      const trialsEndingSoon: any[] = [];
       const weekAhead = Date.now() + 7 * DAY_MS;
       centresSnap.docs.forEach((d) => {
         const centre = { id: d.id, ...(d.data() as any) };
@@ -1708,12 +1697,12 @@ export function registerExtendedRoutes(app: express.Express): void {
             seatsUsed += billing.activeStudentCount || 0;
             seatsCap += billing.seatCap || 0;
           }
-          const endsAt = billing.trialEndsAt ? new Date(billing.trialEndsAt) : null;
-          if (endsAt && !isNaN(endsAt.getTime()) && endsAt.getTime() > Date.now() && endsAt.getTime() <= weekAhead) {
-            trialsEndingSoon.push({ centreId: d.id, name: centre.name, endsAt: billing.trialEndsAt });
+          if (facilityTier(billing) === 'lead') {
+            leadCentres.push({ centreId: d.id, name: centre.name });
           }
         }
       });
+      const leadCentres: Array<{ centreId: string; name: string }> = [];
       const leadCounts: Record<string, number> = {};
       leadsSnap.docs.forEach((d) => {
         const s = (d.data() as any).status || 'unknown';
@@ -1722,7 +1711,7 @@ export function registerExtendedRoutes(app: express.Express): void {
       res.json({
         centres: { ...counts, total: centresSnap.size },
         seats: { used: seatsUsed, cap: seatsCap },
-        trialsEndingSoon,
+        leadCentres,
         leads: { ...leadCounts, total: leadsSnap.size },
         recentAudit: auditSnap.docs.map((d) => ({ id: d.id, ...d.data() })),
       });
@@ -1864,6 +1853,8 @@ export function registerExtendedRoutes(app: express.Express): void {
             ownerName: centre.ownerName || '',
             centreStatus: centre.status,
             billingStatus: billing ? effectiveStatus(centre, billing, config) : centre.status,
+            tier: facilityTier(billing),
+            upgradedAt: billing?.upgradedAt || null,
             planId: billing?.planId || null,
             seatsUsed: activeSeatsByCentre.get(d.id) ?? (billing?.activeStudentCount ?? 0),
             seatCap: billing ? seatCapFor(billing, plansById.get(String(billing.planId || '')) || null, effectiveStatus(centre, billing, config)) : null,
@@ -2025,27 +2016,6 @@ export function registerExtendedRoutes(app: express.Express): void {
         await auditChange('FREE_SEATS_OVERRIDE', { freeSeatsCustom: value });
         return res.json({ success: true, freeSeatsCustom: value });
       }
-      if (type === 'extend-trial') {
-        const days = Number(req.body?.days);
-        if (!Number.isInteger(days) || days < 1 || days > 365) return res.status(400).json({ error: 'Days must be between 1 and 365.' });
-        const billing = (bDoc.data() || {}) as any;
-        if (billing.skippedTrial) return res.status(400).json({ error: 'This facility skipped the trial; there is no trial to extend.' });
-        const current = billing.trialEndsAt ? new Date(billing.trialEndsAt).getTime() : Date.now();
-        const base = Math.max(current, Date.now());
-        const trialEndsAt = new Date(base + days * DAY_MS).toISOString();
-        await bRef.update({ trialEndsAt });
-        await auditChange('TRIAL_EXTENDED', { trialEndsAt, days });
-        return res.json({ success: true, trialEndsAt });
-      }
-      if (type === 'start-trial') {
-        const config = await getPlatformConfig();
-        const days = Math.floor(Number((config as any)?.trialDays ?? STARTING_CONFIG.trialDays));
-        if (!Number.isInteger(days) || days < 1) return res.status(400).json({ error: 'The trial length is not configured; set it under platform settings first.' });
-        const trialEndsAt = new Date(Date.now() + days * DAY_MS).toISOString();
-        await bRef.set({ trialEndsAt, skippedTrial: false }, { merge: true });
-        await auditChange('TRIAL_STARTED', { trialEndsAt, days });
-        return res.json({ success: true, trialEndsAt });
-      }
       if (type === 'regenerate-access-code') {
         const result = await regenerateAccessCode(req.params.id, caller.uid, 'tos');
         return res.json({ success: true, accessCode: result.accessCode });
@@ -2088,8 +2058,22 @@ export function registerExtendedRoutes(app: express.Express): void {
             return res.status(400).json({ error: seatResult.message || 'Choose a plan before creating seats.' });
           }
         }
+        // Batch 26: paying for the platform minimum of seats upgrades a lead
+        // into a facility. The tier flip is what turns the public landing
+        // page on and moves the facility into the TOS facility section.
+        let upgraded = false;
+        try {
+          const config = await getPlatformConfig();
+          const minimum = Math.max(0, Math.floor(Number((config as any)?.paidSeatMinimum ?? 5)));
+          const paidHeld = await countPaidSeatsForCentre(req.params.id);
+          if (paidHeld >= minimum && facilityTier(before) === 'lead') {
+            await bRef.update({ tier: 'facility', upgradedAt: new Date().toISOString() });
+            await auditChange('FACILITY_UPGRADED', { paidHeld, minimum });
+            upgraded = true;
+          }
+        } catch (e) { console.error('[tos/facilities] tier flip failed:', (e as Error).message); }
         await auditChange('PAYMENT_RECORDED', { amount, periodCoveredUntil: new Date(periodEnd).toISOString(), method, reference, seats, seatResult });
-        return res.json({ success: true, ...(seatResult ? { seats: seatResult } : {}) });
+        return res.json({ success: true, ...(upgraded ? { upgraded: true } : {}), ...(seatResult ? { seats: seatResult } : {}) });
       }
       if (type === 'suspend') {
         const reason = String(req.body?.reason || '').trim().slice(0, 300);
