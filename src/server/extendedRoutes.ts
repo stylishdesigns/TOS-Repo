@@ -5,11 +5,13 @@ import { adminAuth, adminDb } from './firebaseAdmin';
 import { runStaffPayReminderSweep } from './staffPayReminders';
 import {
   Caller,
+  countActiveStudents,
   effectiveStatus,
   getPlatformConfig,
   getPlatformPlan,
   httpError,
   requireMembership,
+  seatCapFor,
 } from './tenantService';
 import {
   buildStaffInviteEmail,
@@ -1693,6 +1695,26 @@ export function registerExtendedRoutes(app: express.Express): void {
       const statusFilter = String(req.query.status || '');
       const centresSnap = await adminDb.collection('centres').limit(200).get();
       const billingMap = await loadBillingMap(centresSnap.docs.map((d) => d.id));
+      // Live seat numbers per facility: active student memberships counted in
+      // one pass, and the same cap logic the facility's own panel uses (an
+      // explicit TOS-set cap wins even during trial).
+      const activeSeatsByCentre = new Map<string, number>();
+      try {
+        const activeSeatsSnap = await adminDb
+          .collection('memberships')
+          .where('role', '==', 'student')
+          .where('status', '==', 'active')
+          .select('centreId')
+          .get();
+        activeSeatsSnap.forEach((snap) => {
+          const cid = String((snap.data() as any)?.centreId || '');
+          if (cid) activeSeatsByCentre.set(cid, (activeSeatsByCentre.get(cid) || 0) + 1);
+        });
+      } catch { /* fall back to the stored counter below */ }
+      const plansById = new Map<string, any>();
+      for (const pid of Array.from(new Set(centresSnap.docs.map((d) => String((billingMap.get(d.id) as any)?.planId || '')).filter(Boolean)))) {
+        try { plansById.set(pid, await getPlatformPlan(pid)); } catch { /* plan missing: cap falls back to the stored number */ }
+      }
       // Leads vs facilities: a facility is onboarded once its owner set their
       // own password (ownerOnboardedAt, or the owner's staff record).
       const adminsSnap = await adminDb.collection('admins').limit(500).get();
@@ -1713,8 +1735,8 @@ export function registerExtendedRoutes(app: express.Express): void {
             centreStatus: centre.status,
             billingStatus: billing ? effectiveStatus(centre, billing, config) : centre.status,
             planId: billing?.planId || null,
-            seatsUsed: billing?.activeStudentCount ?? null,
-            seatCap: billing?.seatCap ?? null,
+            seatsUsed: activeSeatsByCentre.get(d.id) ?? (billing?.activeStudentCount ?? 0),
+            seatCap: billing ? seatCapFor(billing, plansById.get(String(billing.planId || '')) || null, effectiveStatus(centre, billing, config)) : null,
             trialEndsAt: billing?.trialEndsAt || null,
             credentialsNotDelivered: !!centre.credentialsNotDelivered,
             ownerOnboarded: !!centre.ownerOnboardedAt || (onboardedByCentre.get(d.id)?.changed === true),
@@ -1745,7 +1767,13 @@ export function registerExtendedRoutes(app: express.Express): void {
           }
         } catch { /* keep it as a lead when the lookup fails */ }
       }
-      res.json({ centres });
+      res.json({
+        centres,
+        seats: {
+          used: centres.reduce((n: number, c: any) => n + (Number(c.seatsUsed) || 0), 0),
+          cap: centres.reduce((n: number, c: any) => n + (Number(c.seatCap) || 0), 0),
+        },
+      });
     } catch (error: any) {
       console.error('[tos/facilities] failed:', error?.message || error);
       res.status(500).json({ error: 'Could not load facilities.' });
@@ -1783,11 +1811,24 @@ export function registerExtendedRoutes(app: express.Express): void {
       const cDoc = await adminDb.collection('centres').doc(req.params.id).get();
       if (!cDoc.exists) return res.status(404).json({ error: 'Facility not found.' });
       const bDoc = await adminDb.collection('centreBilling').doc(req.params.id).get();
+      // Same seat numbers the facility's own panel shows: the live active
+      // count and the effective cap (an explicit TOS-set cap wins even during
+      // trial).
+      const centre = cDoc.data() as any;
+      const billing = bDoc.exists ? (bDoc.data() as any) : null;
+      const config = await getPlatformConfig();
+      let plan: any = null;
+      if (billing?.planId) { try { plan = await getPlatformPlan(billing.planId); } catch { plan = null; } }
+      const status = billing ? effectiveStatus(centre, billing, config) : 'active';
+      let seatsUsed = billing?.activeStudentCount ?? 0;
+      try { seatsUsed = await countActiveStudents(req.params.id); } catch { /* keep the stored counter */ }
+      const seats = { used: seatsUsed, cap: billing ? seatCapFor(billing, plan, status) : 0 };
       const paymentsSnap = await adminDb.collection('billingPayments').where('centreId', '==', req.params.id).limit(100).get();
       const auditSnap = await adminDb.collection('auditLogs').where('centreId', '==', req.params.id).limit(50).get();
       res.json({
         centre: { id: cDoc.id, ...cDoc.data() },
         billing: bDoc.exists ? bDoc.data() : null,
+        seats,
         payments: paymentsSnap.docs
           .map((d) => ({ id: d.id, ...d.data() } as any))
           .sort((a: any, b: any) => String(b.at || '').localeCompare(String(a.at || ''))),
@@ -1960,7 +2001,7 @@ export function registerExtendedRoutes(app: express.Express): void {
 
       if (config) {
         const update: Record<string, any> = {};
-        ['trialDays', 'skipTrialDiscountPct', 'trialGraceDays', 'seatSwapLimitPerStudent', 'seatSwapWindowDays', 'aiRouteRateLimitPerHour', 'billedSeatsMinimum'].forEach((k) => {
+        ['trialDays', 'skipTrialDiscountPct', 'trialGraceDays', 'aiRouteRateLimitPerHour', 'billedSeatsMinimum'].forEach((k) => {
           if (config[k] !== undefined) {
             const n = Number(config[k]);
             if (!Number.isFinite(n) || n < 0) throw httpError(400, `${k} must be zero or more.`);

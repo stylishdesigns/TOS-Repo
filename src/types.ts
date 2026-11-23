@@ -590,8 +590,6 @@ export interface PlatformConfigGlobal {
   trialDays: number; // 30
   skipTrialDiscountPct: number; // e.g. 10
   trialGraceDays: number; // e.g. 7
-  seatSwapLimitPerStudent?: number; // default 2
-  seatSwapWindowDays?: number; // default 30
   aiRouteRateLimitPerHour?: number; // per-user hourly cap on the AI routes
 }
 
@@ -685,7 +683,6 @@ export interface CentreSeatsSummary {
   studentAccess?: Record<string, {
     status: MembershipStatus;
     lastToggledAt?: string;
-    reactivationsIn30d?: number;
   }>;
 }
 

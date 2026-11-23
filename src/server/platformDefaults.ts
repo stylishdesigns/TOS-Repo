@@ -44,8 +44,6 @@ export const STARTING_CONFIG = {
   trialDays: 14,
   skipTrialDiscountPct: 15, // set by TOS staff; the discount for skipping the trial
   trialGraceDays: 7,
-  seatSwapLimitPerStudent: 2,
-  seatSwapWindowDays: 30,
   aiRouteRateLimitPerHour: 60,
 };
 

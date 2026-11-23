@@ -186,8 +186,8 @@ export const CentreDetail: React.FC<{ centreId: string; onBack: () => void; onDa
             </button>
             {billing && (
               <div className="text-xs text-slate-400 space-y-1 pt-2 border-t border-white/5">
-                <p>Seats in use: <span className="text-white font-bold">{billing.activeStudentCount ?? 0}</span> of <span className="text-white font-bold">{billing.seatCap}</span></p>
-                <p>Billable seats this month: <span className="text-white font-bold">{Math.max(billing.billedSeatsMinimum || 0, billing.activeStudentCount || 0)}</span> × {money((plans.find((p) => p.id === billing.planId) || {}).price)}</p>
+                <p>Seats in use: <span className="text-white font-bold">{(data as any)?.seats?.used ?? billing.activeStudentCount ?? 0}</span> of <span className="text-white font-bold">{(data as any)?.seats?.cap ?? billing.seatCap ?? 0}</span></p>
+                <p>Billable seats this month: <span className="text-white font-bold">{Math.max(billing.billedSeatsMinimum || 0, (data as any)?.seats?.used ?? billing.activeStudentCount ?? 0)}</span> × {money((plans.find((p) => p.id === billing.planId) || {}).price)}</p>
               </div>
             )}
           </div>

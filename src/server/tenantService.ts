@@ -495,7 +495,7 @@ export async function getBillingDoc(centreId: string): Promise<CentreBilling | n
 
 /** Count active student memberships for a centre (used to seed the
  *  transactional seat counter when it has never been written). */
-async function countActiveStudents(centreId: string): Promise<number> {
+export async function countActiveStudents(centreId: string): Promise<number> {
   try {
     const snap = await adminDb
       .collection('memberships')
@@ -509,11 +509,17 @@ async function countActiveStudents(centreId: string): Promise<number> {
   }
 }
 
-function seatCapFor(
+export function seatCapFor(
   billing: CentreBilling | null,
   plan: PlatformPlan | null,
   status: EffectiveStatus
 ): number {
+  // A seat cap the TOS console set directly (it differs from the plan's own
+  // cap) is an explicit override and wins even during a trial, so the cap the
+  // console shows is the cap the facility enforces.
+  if (billing && Number(billing.seatCap) > 0 && (!plan || Number(billing.seatCap) !== Number(plan.seatCap))) {
+    return Number(billing.seatCap);
+  }
   if (status === 'trial' && plan?.trialSeatCap) return plan.trialSeatCap;
   return billing?.seatCap ?? plan?.seatCap ?? 0;
 }
@@ -1022,7 +1028,7 @@ export async function joinCentreService(params: {
 // ============================================================================
 
 /** Enable/reactivate a student membership transactionally, checking the seat
- *  cap and the per-student reactivation (swap) limit in the same transaction. */
+ *  cap in the same transaction. Seat swaps (disable/enable) are unlimited. */
 async function activateStudentTransactional(params: {
   caller: Caller;
   studentUid: string;
@@ -1057,9 +1063,7 @@ async function activateStudentTransactional(params: {
       throw httpError(403, 'This facility is currently suspended. Reactivate it before managing seats.');
     }
 
-    const current = memDoc.data() as CentreMembership & {
-      reactivationTimestamps?: string[];
-    };
+    const current = memDoc.data() as CentreMembership;
 
     // Already active: nothing to do.
     if (current.status === 'active') {
@@ -1240,7 +1244,7 @@ export async function getSeatsSummaryService(centreId: string): Promise<CentreSe
   let used = 0;
   const studentAccess: Record<
     string,
-    { status: MembershipStatus; lastToggledAt?: string; reactivationsIn30d?: number }
+    { status: MembershipStatus; lastToggledAt?: string }
   > = {};
 
   try {
@@ -1250,16 +1254,11 @@ export async function getSeatsSummaryService(centreId: string): Promise<CentreSe
       .where('role', '==', 'student')
       .get();
 
-    const now = Date.now();
-    const windowMs = Math.max(1, config.seatSwapWindowDays ?? 30) * 24 * 60 * 60 * 1000;
     mSnap.forEach((docSnap) => {
       const data = docSnap.data();
-      const stamps: string[] = data.reactivationTimestamps || [];
-      const recentCount = stamps.filter((ts) => now - new Date(ts).getTime() <= windowMs).length;
       studentAccess[data.uid] = {
         status: data.status,
         lastToggledAt: data.lastAccessToggledAt || data.updatedAt,
-        reactivationsIn30d: recentCount,
       };
       if (data.status === 'active') used++;
     });
