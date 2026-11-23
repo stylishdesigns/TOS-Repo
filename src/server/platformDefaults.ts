@@ -45,6 +45,17 @@ export const STARTING_CONFIG = {
   skipTrialDiscountPct: 15, // set by TOS staff; the discount for skipping the trial
   trialGraceDays: 7,
   aiRouteRateLimitPerHour: 60,
+  // Batch 22 seat policy. trialMaxSeats counts PAID seats a trial facility can
+  // create on top of its free grant (number only, never unlimited). paidMaxSeats
+  // caps everyone else unless paidSeatsUnlimited is true. freeSeatsGeneral is
+  // the platform-wide free-seat grant (a per-facility override on the billing
+  // doc wins). paidSeatMinimum is what unlocks the free grant and keeps the
+  // landing page live.
+  trialMaxSeats: 10,
+  paidMaxSeats: 50,
+  paidSeatsUnlimited: false,
+  freeSeatsGeneral: 5,
+  paidSeatMinimum: 5,
 };
 
 export interface SeedResult {

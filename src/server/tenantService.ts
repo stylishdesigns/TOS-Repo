@@ -19,7 +19,29 @@ import {
   drawFreeSeatForCentre,
   listSeats,
   seatUsage,
+  seatKind,
+  isOnTrial,
+  countPaidSeatsForCentre,
+  reconcileFreeSeats,
 } from './seatDays';
+
+/** The facility's free-seat allocation: a per-facility override wins, else
+ *  the platform-wide default. Batch 22. */
+function freeSeatAllocation(config: any, billing: any): number {
+  const custom = billing?.freeSeatsCustom;
+  if (custom !== null && custom !== undefined && String(custom).trim() !== '') {
+    return Math.max(0, Math.floor(Number(custom)));
+  }
+  return Math.max(0, Math.floor(Number((config as any)?.freeSeatsGeneral ?? 5)));
+}
+
+/** Free seats are always open on trial; off trial they unlock once the
+ *  facility has paid for at least the platform minimum. */
+async function freeSeatsUnlockedFor(centreId: string, billing: any, config: any): Promise<boolean> {
+  if (isOnTrial(billing)) return true;
+  const minimum = Math.max(0, Math.floor(Number((config as any)?.paidSeatMinimum ?? 5)));
+  return (await countPaidSeatsForCentre(centreId)) >= minimum;
+}
 
 // ============================================================================
 // SHARED HELPERS
@@ -1056,7 +1078,7 @@ async function activateStudentTransactional(params: {
   // Seat-days first: seed the pool on first use, lock seats whose days ran
   // out, then draw the free seat with the most days left for this student.
   try {
-    await ensureSeatsForCentre(centreId, { billing, trialSeatCap: Number((config as any)?.trialSeatCap || 10) });
+    await ensureSeatsForCentre(centreId, { billing, trialSeatCap: Number((config as any)?.trialSeatCap || 10), freeSeats: freeSeatAllocation(config, billing) });
   } catch {
     /* seeding retries on the next seats read */
   }
@@ -1065,7 +1087,8 @@ async function activateStudentTransactional(params: {
   } catch {
     /* the sweep also locks expired seats */
   }
-  const drawn = await drawFreeSeatForCentre(centreId);
+  const freeUnlocked = await freeSeatsUnlockedFor(centreId, billing, config);
+  const drawn = await drawFreeSeatForCentre(centreId, new Date(), { freeSeatsUnlocked: freeUnlocked });
   if (!drawn) {
     throw httpError(
       409,
@@ -1356,7 +1379,7 @@ export async function setSeatSwitchService(params: {
   const centre = await getCentreDoc(params.centreId);
   const config = await getPlatformConfig();
   try {
-    await ensureSeatsForCentre(params.centreId, { billing, trialSeatCap: Number((config as any)?.trialSeatCap || 10) });
+    await ensureSeatsForCentre(params.centreId, { billing, trialSeatCap: Number((config as any)?.trialSeatCap || 10), freeSeats: freeSeatAllocation(config, billing) });
   } catch {
     /* seeding retries on the next seats read */
   }
@@ -1384,6 +1407,12 @@ export async function setSeatSwitchService(params: {
       );
     }
     return { success: true, seatNo: Number(seat.seatNo || 0), status: 'locked', daysUsed, remaining: 0 };
+  }
+
+  // Batch 22: free seats have no switch. They stay on for as long as the
+  // facility holds them and can never be banked, locked or switched off.
+  if (seatKind(seat) === 'free') {
+    throw httpError(409, 'Free seats have no switch. They stay on for as long as the facility holds them.');
   }
 
   if (!params.active) {
@@ -1503,7 +1532,7 @@ export async function assignStudentToSeatService(params: {
   const centre = await getCentreDoc(params.centreId);
   const config = await getPlatformConfig();
   try {
-    await ensureSeatsForCentre(params.centreId, { billing, trialSeatCap: Number((config as any)?.trialSeatCap || 10) });
+    await ensureSeatsForCentre(params.centreId, { billing, trialSeatCap: Number((config as any)?.trialSeatCap || 10), freeSeats: freeSeatAllocation(config, billing) });
   } catch {
     /* seeding retries on the next seats read */
   }
@@ -1529,6 +1558,16 @@ export async function assignStudentToSeatService(params: {
     throw httpError(
       409,
       `Seat ${seat.seatNo} already has ${seat.studentName || 'a student'} on it. Switch that student off first.`
+    );
+  }
+
+  // Batch 22: the free-seat grant only unlocks once the facility has paid
+  // for at least the platform minimum (trial facilities are always open).
+  if (seatKind(seat) === 'free' && !(await freeSeatsUnlockedFor(params.centreId, billing, config))) {
+    const minimum = Math.max(0, Math.floor(Number((config as any)?.paidSeatMinimum ?? 5)));
+    throw httpError(
+      409,
+      `Free seats unlock once your facility has paid for at least ${minimum} seats. Record a payment first.`
     );
   }
 
@@ -1659,7 +1698,8 @@ export async function getSeatsSummaryService(centreId: string): Promise<CentreSe
   // then expose the whole pool for the control room.
   let seats: SeatSummary[] = [];
   try {
-    await ensureSeatsForCentre(centreId, { billing, trialSeatCap: Number((config as any)?.trialSeatCap || 10) });
+    await ensureSeatsForCentre(centreId, { billing, trialSeatCap: Number((config as any)?.trialSeatCap || 10), freeSeats: freeSeatAllocation(config, billing) });
+    try { await reconcileFreeSeats(centreId, freeSeatAllocation(config, billing)); } catch { /* tops up on the next read */ }
     await lockExpiredSeatsForCentre(centreId, { centreName: centre?.name || '' });
     const seatDocs = await listSeats(centreId);
     const now = new Date();
@@ -1671,6 +1711,7 @@ export async function getSeatsSummaryService(centreId: string): Promise<CentreSe
         id: d.id,
         seatNo: Number(s.seatNo || 0),
         status: (s.status || 'available') as SeatStatus,
+        kind: seatKind(s),
         daysTotal: Number(s.daysTotal || 30),
         daysUsed,
         remaining,
@@ -1684,6 +1725,13 @@ export async function getSeatsSummaryService(centreId: string): Promise<CentreSe
         seatByUid.set(summary.studentUid, { seatNo: summary.seatNo, remaining: summary.remaining });
       }
       return summary;
+    });
+    // Free seats render first, above a divider; paid seats follow.
+    seats.sort((a, b) => {
+      const ka = (a as any).kind === 'free' ? 0 : 1;
+      const kb = (b as any).kind === 'free' ? 0 : 1;
+      if (ka !== kb) return ka - kb;
+      return a.seatNo - b.seatNo;
     });
     for (const [uid, info] of seatByUid) {
       if (studentAccess[uid]) {
@@ -1709,6 +1757,11 @@ export async function getSeatsSummaryService(centreId: string): Promise<CentreSe
     trialDaysLeft = Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
   }
 
+  const paidSeatsHeld = seats.filter((s) => (s as any).kind !== 'free').length;
+  const paidSeatMinimum = Math.max(0, Math.floor(Number((config as any)?.paidSeatMinimum ?? 5)));
+  const freeSeatsAllocated = freeSeatAllocation(config, billing);
+  const freeSeatsUnlocked = isOnTrial(billing) || paidSeatsHeld >= paidSeatMinimum;
+
   return {
     used,
     cap: pool.total,
@@ -1718,6 +1771,10 @@ export async function getSeatsSummaryService(centreId: string): Promise<CentreSe
     studentAccess,
     seats,
     pool,
+    freeSeatsAllocated,
+    freeSeatsUnlocked,
+    paidSeatsHeld,
+    paidSeatMinimum,
   };
 }
 

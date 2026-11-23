@@ -384,6 +384,28 @@ const PlansTab: React.FC = () => {
         </Card>
       ))}
 
+      <Card title="Seat policy">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          <Field label="Max seats on free trial (paid seats)">
+            <input type="number" min="0" value={config.trialMaxSeats ?? ''} onChange={(e) => setConfig((c: any) => ({ ...c, trialMaxSeats: e.target.value }))} className={inputCls} />
+          </Field>
+          <Field label="Max seats, facilities not on trial">
+            <input type="number" min="0" value={config.paidMaxSeats ?? ''} disabled={config.paidSeatsUnlimited === true} onChange={(e) => setConfig((c: any) => ({ ...c, paidMaxSeats: e.target.value }))} className={inputCls} />
+          </Field>
+          <Field label="Free seats for every facility">
+            <input type="number" min="0" value={config.freeSeatsGeneral ?? ''} onChange={(e) => setConfig((c: any) => ({ ...c, freeSeatsGeneral: e.target.value }))} className={inputCls} />
+          </Field>
+          <Field label="Minimum paid seats to unlock free seats">
+            <input type="number" min="0" value={config.paidSeatMinimum ?? ''} onChange={(e) => setConfig((c: any) => ({ ...c, paidSeatMinimum: e.target.value }))} className={inputCls} />
+          </Field>
+        </div>
+        <label className="flex items-center gap-2 text-xs text-slate-300 mt-3">
+          <input type="checkbox" checked={config.paidSeatsUnlimited === true} onChange={(e) => setConfig((c: any) => ({ ...c, paidSeatsUnlimited: e.target.checked }))} className="accent-orange-500 w-4 h-4" />
+          Facilities not on trial can create unlimited seats
+        </label>
+        <p className="text-[11px] text-slate-500 mt-2">Free seats apply to trial and paid facilities alike; each facility can also carry its own override on its page. The trial cap counts paid seats only, on top of the free grant.</p>
+      </Card>
+
       <Card title="Platform settings">
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           {configFields.map(([key, label]) => (

@@ -32,7 +32,7 @@ export const CentreDetail: React.FC<{ centreId: string; onBack: () => void; onDa
   const [confirmStatus, setConfirmStatus] = useState<'' | 'suspend' | 'reactivate'>('');
   const [reason, setReason] = useState('');
   const [payment, setPayment] = useState({ amount: '', periodEnd: '', seats: '', method: '', reference: '', note: '' });
-  const [seatEdits, setSeatEdits] = useState({ seatCap: '', billedSeatsMinimum: '', planId: '', extendDays: '7' });
+  const [seatEdits, setSeatEdits] = useState({ seatCap: '', billedSeatsMinimum: '', planId: '', extendDays: '7', freeSeatsCustom: '' });
 
   const load = useCallback(async () => {
     setError('');
@@ -44,6 +44,7 @@ export const CentreDetail: React.FC<{ centreId: string; onBack: () => void; onDa
       setSeatEdits({
         seatCap: d.billing?.seatCap != null ? String(d.billing.seatCap) : '',
         billedSeatsMinimum: d.billing?.billedSeatsMinimum != null ? String(d.billing.billedSeatsMinimum) : '',
+        freeSeatsCustom: d.billing?.freeSeatsCustom != null ? String(d.billing.freeSeatsCustom) : '',
         planId: d.billing?.planId || 'centre_standard',
         extendDays: '7',
       });
@@ -172,6 +173,16 @@ export const CentreDetail: React.FC<{ centreId: string; onBack: () => void; onDa
             <Field label="Minimum billed seats">
               <input type="number" min="0" value={seatEdits.billedSeatsMinimum} onChange={(e) => setSeatEdits((s) => ({ ...s, billedSeatsMinimum: e.target.value }))} className={inputCls} />
             </Field>
+            <Field label="Free seats override (blank = platform default)">
+              <input type="number" min="0" value={seatEdits.freeSeatsCustom} onChange={(e) => setSeatEdits((s) => ({ ...s, freeSeatsCustom: e.target.value }))} className={inputCls} />
+            </Field>
+            <button
+              onClick={() => doAction('set-free-seats', { freeSeatsCustom: seatEdits.freeSeatsCustom === '' ? null : Number(seatEdits.freeSeatsCustom) })}
+              disabled={busy !== ''}
+              className={btnGhost}
+            >
+              {busy === 'set-free-seats' ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Save free seats
+            </button>
             <button
               onClick={() => doAction('set-plan', { planId: seatEdits.planId })}
               disabled={busy !== ''}
@@ -181,7 +192,7 @@ export const CentreDetail: React.FC<{ centreId: string; onBack: () => void; onDa
             </button>
             {billing && (
               <div className="text-xs text-slate-400 space-y-1 pt-2 border-t border-white/5">
-                <p>Seat pool: <span className="text-white font-bold">{(data as any)?.seatPool?.active ?? billing.activeStudentCount ?? 0}</span> active · <span className="text-white font-bold">{(data as any)?.seatPool?.available ?? 0}</span> available · <span className="text-white font-bold">{(data as any)?.seatPool?.locked ?? 0}</span> locked</p>
+                <p>Seat pool: <span className="text-white font-bold">{(data as any)?.seatPool?.active ?? billing.activeStudentCount ?? 0}</span> active · <span className="text-white font-bold">{(data as any)?.seatPool?.available ?? 0}</span> available · <span className="text-white font-bold">{(data as any)?.seatPool?.locked ?? 0}</span> locked · <span className="text-white font-bold">{(data as any)?.seatPool?.free ?? 0}</span> free</p>
                 <p>Banked days across free seats: <span className="text-white font-bold">{(data as any)?.seatPool?.bankedDays ?? 0}</span> · a seat runs 30 days once switched on</p>
                 <p>Billable seats this month: <span className="text-white font-bold">{Math.max(billing.billedSeatsMinimum || 0, (data as any)?.seatPool?.active ?? billing.activeStudentCount ?? 0)}</span> × {money((plans.find((p) => p.id === billing.planId) || {}).price)}</p>
               </div>
@@ -257,7 +268,7 @@ export const CentreDetail: React.FC<{ centreId: string; onBack: () => void; onDa
             <Field label="Seats this payment buys">
               <input type="number" min="0" value={payment.seats} onChange={(e) => setPayment((p) => ({ ...p, seats: e.target.value }))} className={inputCls} placeholder="e.g. 10" />
             </Field>
-            <p className="text-xs text-slate-400">A payment tops the facility's seat pool: locked seats reopen with a fresh 30 days first, then new seats join. Each seat runs 30 days from the day it is switched on, with or without a student.</p>
+            <p className="text-xs text-slate-400">A payment tops the facility's seat pool: locked seats reopen with a fresh 30 days first, then new seats join. A seat counts only while a student is on it, and free seats never expire.</p>
             <Field label="Note">
               <input value={payment.note} onChange={(e) => setPayment((p) => ({ ...p, note: e.target.value }))} className={inputCls} />
             </Field>

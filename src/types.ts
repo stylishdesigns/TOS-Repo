@@ -686,6 +686,7 @@ export interface SeatSummary {
   id: string;
   seatNo: number;
   status: SeatStatus;
+  kind?: 'free' | 'paid';
   daysTotal: number;
   daysUsed: number;
   remaining: number;
@@ -701,6 +702,7 @@ export interface SeatPool {
   available: number;
   locked: number;
   bankedDays: number;
+  free?: number;
 }
 export interface CentreSeatsSummary {
   used: number;
@@ -716,6 +718,10 @@ export interface CentreSeatsSummary {
   }>;
   seats?: SeatSummary[];
   pool?: SeatPool;
+  freeSeatsAllocated?: number;
+  freeSeatsUnlocked?: boolean;
+  paidSeatsHeld?: number;
+  paidSeatMinimum?: number;
 }
 
 export interface CentreUserRole {

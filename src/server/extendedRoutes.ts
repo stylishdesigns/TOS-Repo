@@ -1902,6 +1902,20 @@ export function registerExtendedRoutes(app: express.Express): void {
         await auditChange('BILLED_MINIMUM_CHANGED', { billedSeatsMinimum });
         return res.json({ success: true });
       }
+      if (type === 'set-free-seats') {
+        // Batch 22: this facility's custom free-seat grant. null clears the
+        // override so the platform-wide default applies again.
+        const raw = req.body?.freeSeatsCustom;
+        let value: number | null = null;
+        if (raw !== null && raw !== undefined) {
+          const n = Number(raw);
+          if (!Number.isInteger(n) || n < 0 || n > 100000) return res.status(400).json({ error: 'Free seats must be zero or more.' });
+          value = n;
+        }
+        await bRef.set({ freeSeatsCustom: value }, { merge: true });
+        await auditChange('FREE_SEATS_OVERRIDE', { freeSeatsCustom: value });
+        return res.json({ success: true, freeSeatsCustom: value });
+      }
       if (type === 'extend-trial') {
         const days = Number(req.body?.days);
         if (!Number.isInteger(days) || days < 1 || days > 365) return res.status(400).json({ error: 'Days must be between 1 and 365.' });
@@ -2033,13 +2047,14 @@ export function registerExtendedRoutes(app: express.Express): void {
 
       if (config) {
         const update: Record<string, any> = {};
-        ['trialDays', 'skipTrialDiscountPct', 'trialGraceDays', 'aiRouteRateLimitPerHour', 'billedSeatsMinimum'].forEach((k) => {
+        ['trialDays', 'skipTrialDiscountPct', 'trialGraceDays', 'aiRouteRateLimitPerHour', 'billedSeatsMinimum', 'trialMaxSeats', 'paidMaxSeats', 'freeSeatsGeneral', 'paidSeatMinimum'].forEach((k) => {
           if (config[k] !== undefined) {
             const n = Number(config[k]);
             if (!Number.isFinite(n) || n < 0) throw httpError(400, `${k} must be zero or more.`);
             update[k] = n;
           }
         });
+        if (config.paidSeatsUnlimited !== undefined) update.paidSeatsUnlimited = config.paidSeatsUnlimited === true;
         if (Object.keys(update).length) {
           await adminDb.collection('platformConfig').doc('global').update(update);
           await audit({ actorUid: caller.uid, action: 'CONFIG_UPDATED', after: update });

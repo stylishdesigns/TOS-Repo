@@ -1,14 +1,13 @@
 // ============================================================================
 // Seat-days (batch 19): seats carry days, not students.
 //
-// Each seat the facility pays for holds 30 calendar days (14 on trial). A seat
-// that is switched on burns one day every calendar day, whether or not a
-// student is attached, counting from the day it was switched on (Lagos
-// calendar). When its days run out the seat locks itself, the attached
-// student's access switches off, and reopening the seat takes a new payment.
-// Switching a student on draws the free seat with the most days left;
-// switching them off freezes the seat's used days and returns it to the
-// facility's pool.
+// Each seat the facility pays for holds 30 calendar days (14 on trial). A
+// seat counts only while a student is on it (batch 21): it is switched on by
+// adding a student, burns one Lagos calendar day for every day it runs, and
+// locks when its days run out, switching that student's access off.
+// Reopening the seat takes a new payment. Batch 22 adds free seats: a
+// platform-granted block that never expires, carries no switch and renders
+// first in the facility's pool.
 //
 // Everything here runs server-side only (admin SDK). The client never reads
 // the centreSeats collection directly; it sees seats through the seats
@@ -31,6 +30,7 @@ export interface SeatHistoryEntry {
 
 export interface SeatRead {
   status?: SeatStatus;
+  kind?: 'free' | 'paid';
   daysTotal?: number;
   daysUsedBase?: number;
   startedAt?: string | null;
@@ -54,11 +54,25 @@ function daysBetweenKeys(fromKey: string, toKey: string): number {
   return Math.round((b - a) / 86400000);
 }
 
+/** Paid seat or free grant. Seats written before batch 22 are paid. */
+export function seatKind(seat: SeatRead): 'free' | 'paid' {
+  return (seat as any).kind === 'free' ? 'free' : 'paid';
+}
+
+/** True while the facility sits inside its trial window. */
+export function isOnTrial(billing: any): boolean {
+  if (!billing || billing.skippedTrial) return false;
+  const t = billing.trialEndsAt ? new Date(billing.trialEndsAt).getTime() : 0;
+  return t > Date.now();
+}
+
 /** Days used and days left for one seat right now. */
 export function seatUsage(
   seat: SeatRead,
   now: Date = new Date()
 ): { daysUsed: number; remaining: number } {
+  // A free seat never burns: it has no day countdown at all.
+  if (seatKind(seat) === 'free') return { daysUsed: 0, remaining: 9999 };
   const total = Math.max(1, Number(seat.daysTotal || SEAT_DAYS_PAID));
   const base = Math.max(0, Number(seat.daysUsedBase || 0));
   if (seat.status === 'active' && seat.startedAt) {
@@ -90,6 +104,7 @@ async function hasSeats(centreId: string): Promise<boolean> {
 interface SeedContext {
   billing: any;
   trialSeatCap: number;
+  freeSeats: number;
 }
 
 /** First read seeds the pool from the facility's existing billing state.
@@ -129,6 +144,7 @@ export async function ensureSeatsForCentre(centreId: string, ctx: SeedContext): 
   type NewSeat = {
     seatNo: number;
     status: SeatStatus;
+    kind?: 'free' | 'paid';
     daysTotal: number;
     startedAt: string | null;
     studentUid: string;
@@ -196,6 +212,25 @@ export async function ensureSeatsForCentre(centreId: string, ctx: SeedContext): 
     }
   }
 
+  // Batch 22: the facility's free-seat grant joins the pool as kind 'free'.
+  // Free seats never expire and carry no switch; the panel renders them first.
+  const freeN = Math.max(0, Math.floor(Number(ctx.freeSeats || 0)));
+  const nextNo = seats.reduce((m, s) => Math.max(m, s.seatNo), 0);
+  for (let i = 1; i <= freeN; i++) {
+    seats.push({
+      seatNo: nextNo + i,
+      status: 'available',
+      kind: 'free',
+      daysTotal: 0,
+      startedAt: null,
+      studentUid: '',
+      studentName: '',
+      assignedAt: null,
+      history: [],
+      daysUsedBase: 0,
+    });
+  }
+
   if (!seats.length) return;
   const batch = adminDb.batch();
   for (const s of seats) {
@@ -254,6 +289,8 @@ export async function lockExpiredSeatsForCentre(
       });
       continue;
     }
+    // Free seats never expire.
+    if (seatKind(seat) === 'free') continue;
     const { remaining } = seatUsage(seat, now);
     if (remaining > 0) continue;
     const total = Math.max(1, Number(seat.daysTotal || SEAT_DAYS_PAID));
@@ -315,40 +352,40 @@ export async function lockExpiredSeatsForCentre(
   return locked;
 }
 
-/** Where a newly switched-on student goes. A seat already counting with
- *  nobody on it costs nothing to fill, so it wins first (lowest number);
- *  otherwise the banked seat with the most days left (lowest number on a
- *  tie). Null when the pool has nothing to give. */
+/** Where a newly switched-on student goes. Batch 22: an unlocked free seat
+ *  wins first (it never burns a day, lowest number on a tie), then the banked
+ *  paid seat with the most days left (lowest number on a tie). Null when the
+ *  pool has nothing to give. */
 export async function drawFreeSeatForCentre(
   centreId: string,
-  now: Date = new Date()
+  now: Date = new Date(),
+  opts: { freeSeatsUnlocked?: boolean } = {}
 ): Promise<{ id: string; seatNo: number; remaining: number } | null> {
   const snap = await adminDb
     .collection('centreSeats')
     .where('centreId', '==', centreId)
     .get();
   if (snap.empty) return null;
-  let emptyRunning: { id: string; seatNo: number; remaining: number } | null = null;
+  let bestFree: { id: string; seatNo: number; remaining: number } | null = null;
   let bestBanked: { id: string; seatNo: number; remaining: number } | null = null;
   for (const doc of snap.docs) {
     const data = doc.data() as SeatRead;
     const status = data.status;
     if (status !== 'active' && status !== 'available') continue;
-    const { remaining } = seatUsage(data, now);
+    if (status === 'active') continue; // occupied and running: not free
     const seatNo = Number(data.seatNo || 0);
-    if (remaining <= 0) continue;
-    if (status === 'active' && !data.studentUid) {
-      if (!emptyRunning || seatNo < emptyRunning.seatNo) {
-        emptyRunning = { id: doc.id, seatNo, remaining };
-      }
+    if (seatKind(data) === 'free') {
+      if (opts.freeSeatsUnlocked === false) continue;
+      if (!bestFree || seatNo < bestFree.seatNo) bestFree = { id: doc.id, seatNo, remaining: 9999 };
       continue;
     }
-    if (status === 'active') continue; // occupied and running: not free
+    const { remaining } = seatUsage(data, now);
+    if (remaining <= 0) continue;
     if (!bestBanked || remaining > bestBanked.remaining || (remaining === bestBanked.remaining && seatNo < bestBanked.seatNo)) {
       bestBanked = { id: doc.id, seatNo, remaining };
     }
   }
-  return emptyRunning || bestBanked;
+  return bestFree || bestBanked;
 }
 
 /** A payment tops the pool: locked seats reopen with a fresh 30 days first,
@@ -385,6 +422,7 @@ export async function provisionSeats(
       centreId,
       seatNo: nextNo + i,
       status: 'available' as SeatStatus,
+      kind: 'paid' as const,
       daysTotal: SEAT_DAYS_PAID,
       daysUsedBase: 0,
       startedAt: null,
@@ -407,6 +445,7 @@ export async function getSeatPool(centreId: string): Promise<{
   available: number;
   locked: number;
   bankedDays: number;
+  free: number;
 }> {
   const seats = await listSeats(centreId);
   const now = new Date();
@@ -414,8 +453,15 @@ export async function getSeatPool(centreId: string): Promise<{
   let available = 0;
   let locked = 0;
   let bankedDays = 0;
+  let free = 0;
   for (const d of seats) {
     const s = d.data() as SeatRead;
+    if (seatKind(s) === 'free') {
+      free += 1;
+      if (s.status === 'active') active += 1;
+      else available += 1;
+      continue; // free seats never add banked days: they never expire
+    }
     if (s.status === 'active') {
       active += 1;
       continue;
@@ -427,7 +473,46 @@ export async function getSeatPool(centreId: string): Promise<{
     }
     locked += 1;
   }
-  return { total: seats.length, active, available, locked, bankedDays };
+  return { total: seats.length, active, available, locked, bankedDays, free };
+}
+
+/** Paid seats the facility holds (any status): what unlocks the free grant
+ *  and what the landing-page minimum is judged on. */
+export async function countPaidSeatsForCentre(centreId: string): Promise<number> {
+  const seats = await listSeats(centreId);
+  return seats.filter((d) => seatKind(d.data() as SeatRead) === 'paid').length;
+}
+
+/** Batch 22: keep the facility's free-seat grant current. Tops the pool up to
+ *  the allocation with kind-'free' seats; never removes seats already there,
+ *  so lowering a grant only stops future top-ups. */
+export async function reconcileFreeSeats(centreId: string, allocation: number): Promise<number> {
+  const want = Math.max(0, Math.floor(Number(allocation || 0)));
+  const seats = await listSeats(centreId);
+  const held = seats.filter((d) => seatKind(d.data() as SeatRead) === 'free').length;
+  const missing = want - held;
+  if (missing <= 0) return 0;
+  const nextNo = seats.reduce((m, d) => Math.max(m, Number((d.data() as any).seatNo || 0)), 0);
+  const nowIso = new Date().toISOString();
+  const batch = adminDb.batch();
+  for (let i = 1; i <= missing; i++) {
+    batch.set(adminDb.collection('centreSeats').doc(`${centreId}__seat-${nextNo + i}`), {
+      centreId,
+      seatNo: nextNo + i,
+      status: 'available' as SeatStatus,
+      kind: 'free' as const,
+      daysTotal: 0,
+      startedAt: null,
+      studentUid: '',
+      studentName: '',
+      assignedAt: null,
+      history: [] as SeatHistoryEntry[],
+      daysUsedBase: 0,
+      grantedAt: nowIso,
+    });
+  }
+  await batch.commit();
+  return missing;
 }
 
 /** One in-app notification and one push per facility admin, guarded by a

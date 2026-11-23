@@ -283,9 +283,14 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-bold text-slate-900 dark:text-white">The pool</h3>
           <span className="text-[11px] text-slate-400">
-            {enrolled} enrolled · {used} holding a running seat
+            {enrolled} enrolled · {used} holding a running seat{seats.some((s) => (s as any).kind === 'free') ? ` · ${seats.filter((s) => (s as any).kind === 'free').length} free` : ''}
           </span>
         </div>
+        {seatsSummary?.freeSeatsUnlocked === false && seats.length > 0 && (
+          <p className="text-[11px] text-amber-600 dark:text-amber-400 mb-2">
+            Free seats unlock once the facility pays for at least {seatsSummary.paidSeatMinimum ?? 5} seats ({seatsSummary.paidSeatsHeld ?? 0} paid so far).
+          </p>
+        )}
         {seats.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 p-6 text-center text-xs text-slate-400">
             No seats in this facility&apos;s pool yet. Seats arrive when the trial starts or a payment is
@@ -305,12 +310,33 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                {seats.map((seat) => {
+                {seats.map((seat, idx) => {
                   const pct = Math.min(100, Math.round((seat.daysUsed / Math.max(1, seat.daysTotal)) * 100));
                   const low = seat.remaining <= 5 && seat.status === 'active';
                   const seatBusy = seatSwitchingId === seat.id;
+                  const isFree = (seat as any).kind === 'free';
+                  const freeLocked = isFree && seatsSummary?.freeSeatsUnlocked === false;
                   return (
-                    <tr key={seat.id} className="hover:bg-slate-50/50 dark:hover:brightness-110/30 transition-colors">
+                    <React.Fragment key={seat.id}>
+                      {isFree && idx === 0 && (
+                        <tr className="bg-emerald-500/5">
+                          <td colSpan={6} className="py-2 px-4">
+                            <div className="text-[10px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                              Free seats · granted by Tutorial OS · never paid · never expire
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                      {!isFree && (idx === 0 || (seats[idx - 1] as any)?.kind === 'free') && (
+                        <tr>
+                          <td colSpan={6} className="py-2 px-4">
+                            <div className="border-t border-dashed border-slate-300 dark:border-slate-600 pt-2 text-[10px] font-black uppercase tracking-wider text-slate-400">
+                              Paid seats
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                      <tr className="hover:bg-slate-50/50 dark:hover:brightness-110/30 transition-colors">
                       <td className="py-3 px-4">
                         <span className="text-xs font-black text-slate-900 dark:text-white">
                           Seat {seat.seatNo}
@@ -338,7 +364,9 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
                         </span>
                       </td>
                       <td className="py-3 px-4">
-                        {seat.status === 'locked' ? (
+                        {isFree ? (
+                          <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">No expiry</span>
+                        ) : seat.status === 'locked' ? (
                           <span className="text-[11px] text-rose-500 font-semibold">
                             Completed its {seat.daysTotal} days · needs payment
                           </span>
@@ -364,7 +392,14 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
                         )}
                       </td>
                       <td className="py-3 px-4 text-center">
-                        {seat.studentUid ? (
+                        {isFree ? (
+                          <span
+                            className="text-[10px] font-black text-emerald-600 dark:text-emerald-400"
+                            title="Free seats have no switch: they stay on for as long as the facility holds them"
+                          >
+                            Free
+                          </span>
+                        ) : seat.studentUid ? (
                           <button
                             type="button"
                             disabled={seatBusy}
@@ -396,12 +431,13 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
                           {!seat.studentUid && seat.status !== 'locked' && (
                             <button
                               type="button"
+                              disabled={freeLocked}
                               onClick={() => {
                                 setAssignSeat(seat);
                                 setAssignPick('');
                               }}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-bold text-white bg-[var(--brand,#0F172A)] hover:brightness-110 rounded-lg transition-all"
-                              title="Add a student to this seat"
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-bold text-white bg-[var(--brand,#0F172A)] hover:brightness-110 rounded-lg transition-all disabled:opacity-40"
+                              title={freeLocked ? `Free seats unlock once the facility has paid for at least ${seatsSummary?.paidSeatMinimum ?? 5} seats` : 'Add a student to this seat'}
                             >
                               <UserPlus className="w-3.5 h-3.5" />
                               Add student
@@ -419,6 +455,7 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
                         </div>
                       </td>
                     </tr>
+                    </React.Fragment>
                   );
                 })}
               </tbody>
