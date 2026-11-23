@@ -1155,6 +1155,13 @@ async function activateStudentTransactional(params: {
       { merge: true }
     );
     tx.set(billingRef, { activeStudentCount: used + 1 }, { merge: true });
+    // The student portal listens to its own profile doc live; this stamp is
+    // what clears the contact-admin banner the moment access returns.
+    tx.set(
+      adminDb.collection('students').doc(studentUid),
+      { accessStatus: 'active' },
+      { merge: true }
+    );
 
     const pool = await listSeats(centreId);
     return { used: used + 1, cap: pool.length, seatNo: drawn.seatNo, seatRemaining: drawn.remaining };
@@ -1238,6 +1245,13 @@ export async function toggleStudentAccessService(params: {
         const used = billingDoc.data()?.activeStudentCount ?? preSeedCount;
         tx.set(billingRef, { activeStudentCount: Math.max(0, used - 1) }, { merge: true });
       }
+      // Live stamp for the student portal's banner; the server-side gate on
+      // every student endpoint is requireMembership itself.
+      tx.set(
+        adminDb.collection('students').doc(studentUid),
+        { accessStatus: 'off' },
+        { merge: true }
+      );
       // Seat-days: switching a student off freezes their used days on the seat
       // and returns the seat, with its remaining days, to the facility's pool.
       if (wasActive && seatId) {
@@ -1305,6 +1319,282 @@ export async function toggleStudentAccessService(params: {
   }
 
   return { success: true, active: true, used: result.used, cap: result.cap };
+}
+
+
+// ============================================================================
+// SEAT SWITCHES AND SEAT ASSIGNMENT (batch 20: the pool is hands-on)
+// ============================================================================
+
+/** Switch one seat on or off from the control room. Off freezes its used days
+ *  and banks it; a student attached to it loses access and leaves the seat.
+ *  On starts (or resumes) the daily count, with or without a student. */
+export async function setSeatSwitchService(params: {
+  actorUid: string;
+  actorEmail: string;
+  centreId: string;
+  seatId: string;
+  active: boolean;
+  tos?: boolean;
+}): Promise<{
+  success: boolean;
+  seatNo: number;
+  status: string;
+  daysUsed: number;
+  remaining: number;
+  detachedStudent?: string;
+}> {
+  const caller: Caller = {
+    uid: params.actorUid,
+    email: params.actorEmail,
+    tos: Boolean(params.tos),
+    claims: {},
+  };
+  await verifyAdminOrOwner(caller, params.centreId);
+
+  const billing = await getBillingDoc(params.centreId);
+  const centre = await getCentreDoc(params.centreId);
+  const config = await getPlatformConfig();
+  try {
+    await ensureSeatsForCentre(params.centreId, { billing, trialSeatCap: Number((config as any)?.trialSeatCap || 10) });
+  } catch {
+    /* seeding retries on the next seats read */
+  }
+  try {
+    await lockExpiredSeatsForCentre(params.centreId, { centreName: centre?.name || '' });
+  } catch {
+    /* the sweep also locks expired seats */
+  }
+
+  const seatRef = adminDb.collection('centreSeats').doc(params.seatId);
+  const seatDoc = await seatRef.get();
+  if (!seatDoc.exists || (seatDoc.data() as any)?.centreId !== params.centreId) {
+    throw httpError(404, 'Seat not found in this facility.');
+  }
+  const seat = seatDoc.data() as any;
+  const now = new Date();
+  const nowIso = now.toISOString();
+
+  if (seat.status === 'locked') {
+    const { daysUsed } = seatUsage(seat, now);
+    if (params.active) {
+      throw httpError(
+        409,
+        `Seat ${seat.seatNo} completed its ${Number(seat.daysTotal || 30)} days and is locked. A new payment reopens it.`
+      );
+    }
+    return { success: true, seatNo: Number(seat.seatNo || 0), status: 'locked', daysUsed, remaining: 0 };
+  }
+
+  if (!params.active) {
+    const uid = String(seat.studentUid || '');
+    const name = String(seat.studentName || '');
+    const { daysUsed } = seatUsage(seat, now);
+    await adminDb.runTransaction(async (tx) => {
+      const history: any[] = Array.isArray(seat.history) ? seat.history.slice(-50) : [];
+      if (uid) {
+        history.push({
+          uid,
+          name,
+          from: seat.assignedAt || seat.startedAt || null,
+          to: nowIso,
+          reason: 'seat switched off',
+        });
+        tx.set(
+          adminDb.collection('memberships').doc(`${uid}__${params.centreId}`),
+          { status: 'disabled', seatId: '', seatNo: 0, lastAccessToggledAt: nowIso, updatedAt: nowIso },
+          { merge: true }
+        );
+        tx.set(
+          adminDb.collection('students').doc(uid),
+          { accessStatus: 'off' },
+          { merge: true }
+        );
+        const billingRef = adminDb.collection('centreBilling').doc(params.centreId);
+        const bDoc = await tx.get(billingRef);
+        const used = Number((bDoc.data() as any)?.activeStudentCount || 0);
+        tx.set(billingRef, { activeStudentCount: Math.max(0, used - 1) }, { merge: true });
+      }
+      tx.set(
+        seatRef,
+        {
+          status: 'available',
+          startedAt: null,
+          studentUid: '',
+          studentName: '',
+          assignedAt: null,
+          daysUsedBase: daysUsed,
+          history,
+          freedAt: nowIso,
+        },
+        { merge: true }
+      );
+    });
+    try {
+      await adminDb.collection('auditLogs').add({
+        actorUid: params.actorUid,
+        centreId: params.centreId,
+        action: 'SEAT_SWITCHED_OFF',
+        seatNo: Number(seat.seatNo || 0),
+        studentUid: uid || null,
+        at: nowIso,
+      });
+    } catch {
+      /* audit is best effort */
+    }
+    return {
+      success: true,
+      seatNo: Number(seat.seatNo || 0),
+      status: 'available',
+      daysUsed,
+      remaining: Math.max(0, Number(seat.daysTotal || 30) - daysUsed),
+      detachedStudent: uid ? name || uid : undefined,
+    };
+  }
+
+  // Switch on: the daily count starts (or resumes) now, student or not.
+  await seatRef.set({ status: 'active', startedAt: nowIso, switchedOnAt: nowIso }, { merge: true });
+  const fresh = (await seatRef.get()).data() as any;
+  const { daysUsed, remaining } = seatUsage(fresh, now);
+  try {
+    await adminDb.collection('auditLogs').add({
+      actorUid: params.actorUid,
+      centreId: params.centreId,
+      action: 'SEAT_SWITCHED_ON',
+      seatNo: Number(seat.seatNo || 0),
+      at: nowIso,
+    });
+  } catch {
+    /* audit is best effort */
+  }
+  return { success: true, seatNo: Number(seat.seatNo || 0), status: 'active', daysUsed, remaining };
+}
+
+/** Attach a student to one specific seat from the control room. A banked seat
+ *  starts counting the day it takes the student; a seat already counting
+ *  keeps its clock. The student must not already hold a running seat. */
+export async function assignStudentToSeatService(params: {
+  actorUid: string;
+  actorEmail: string;
+  centreId: string;
+  seatId: string;
+  studentUid: string;
+  tos?: boolean;
+}): Promise<{ success: boolean; seatNo: number; daysUsed: number; remaining: number }> {
+  const caller: Caller = {
+    uid: params.actorUid,
+    email: params.actorEmail,
+    tos: Boolean(params.tos),
+    claims: {},
+  };
+  await verifyAdminOrOwner(caller, params.centreId);
+
+  const billing = await getBillingDoc(params.centreId);
+  const centre = await getCentreDoc(params.centreId);
+  const config = await getPlatformConfig();
+  try {
+    await ensureSeatsForCentre(params.centreId, { billing, trialSeatCap: Number((config as any)?.trialSeatCap || 10) });
+  } catch {
+    /* seeding retries on the next seats read */
+  }
+  try {
+    await lockExpiredSeatsForCentre(params.centreId, { centreName: centre?.name || '' });
+  } catch {
+    /* the sweep also locks expired seats */
+  }
+
+  const seatRef = adminDb.collection('centreSeats').doc(params.seatId);
+  const seatDoc = await seatRef.get();
+  if (!seatDoc.exists || (seatDoc.data() as any)?.centreId !== params.centreId) {
+    throw httpError(404, 'Seat not found in this facility.');
+  }
+  const seat = seatDoc.data() as any;
+  if (seat.status === 'locked') {
+    throw httpError(
+      409,
+      `Seat ${seat.seatNo} completed its days and is locked. A new payment reopens it.`
+    );
+  }
+  if (String(seat.studentUid || '')) {
+    throw httpError(
+      409,
+      `Seat ${seat.seatNo} already has ${seat.studentName || 'a student'} on it. Switch that student off first.`
+    );
+  }
+
+  const holding = await adminDb
+    .collection('centreSeats')
+    .where('centreId', '==', params.centreId)
+    .where('studentUid', '==', params.studentUid)
+    .where('status', '==', 'active')
+    .get();
+  if (!holding.empty) {
+    const heldNo = Number((holding.docs[0].data() as any).seatNo || 0);
+    throw httpError(409, `This student already holds Seat ${heldNo}. Switch them off there first.`);
+  }
+
+  let studentName = '';
+  try {
+    const stuDoc = await adminDb.collection('students').doc(params.studentUid).get();
+    studentName = String((stuDoc.data() as any)?.name || '');
+  } catch {
+    /* the seat still shows its number */
+  }
+
+  const nowIso = new Date().toISOString();
+  const preSeedCount = await countActiveStudents(params.centreId);
+  const wasAvailable = seat.status !== 'active';
+
+  await adminDb.runTransaction(async (tx) => {
+    const memRef = adminDb.collection('memberships').doc(`${params.studentUid}__${params.centreId}`);
+    const billingRef = adminDb.collection('centreBilling').doc(params.centreId);
+    const [memDoc, billingDoc] = await Promise.all([tx.get(memRef), tx.get(billingRef)]);
+    if (!memDoc.exists) throw httpError(404, 'Student membership not found.');
+
+    tx.set(
+      memRef,
+      { status: 'active', seatId: seatRef.id, seatNo: Number(seat.seatNo || 0), lastAccessToggledAt: nowIso, updatedAt: nowIso },
+      { merge: true }
+    );
+    tx.set(
+      seatRef,
+      {
+        status: 'active',
+        studentUid: params.studentUid,
+        studentName,
+        assignedAt: nowIso,
+        ...(wasAvailable ? { startedAt: nowIso } : {}),
+      },
+      { merge: true }
+    );
+    tx.set(
+      adminDb.collection('students').doc(params.studentUid),
+      { accessStatus: 'active' },
+      { merge: true }
+    );
+    const used = Math.min(
+      Number((billingDoc.data() as any)?.activeStudentCount ?? preSeedCount),
+      preSeedCount
+    );
+    tx.set(billingRef, { activeStudentCount: used + 1 }, { merge: true });
+  });
+
+  try {
+    await adminDb.collection('auditLogs').add({
+      actorUid: params.actorUid,
+      centreId: params.centreId,
+      action: 'STUDENT_SEAT_ASSIGNED',
+      studentUid: params.studentUid,
+      seatNo: Number(seat.seatNo || 0),
+      at: nowIso,
+    });
+  } catch {
+    /* audit is best effort */
+  }
+
+  const fresh = (await seatRef.get()).data() as any;
+  const { daysUsed, remaining } = seatUsage(fresh, new Date());
+  return { success: true, seatNo: Number(seat.seatNo || 0), daysUsed, remaining };
 }
 
 // ============================================================================

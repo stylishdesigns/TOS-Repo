@@ -3,10 +3,11 @@ import {
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
   signInWithPopup, 
+  signOut,
   GoogleAuthProvider 
 } from 'firebase/auth';
 import { auth } from '../../firebase';
-import { Mail, Lock, LogIn, UserPlus, Globe, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, LogIn, UserPlus, Globe, Eye, EyeOff, ShieldAlert } from 'lucide-react';
 
 interface StudentLoginProps {
   onSuccess: () => void;
@@ -19,6 +20,32 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onSuccess }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [accessNotice, setAccessNotice] = useState('');
+
+  // Server-side gate: every student endpoint already refuses a switched-off
+  // membership; this check turns that state into a clear banner at the door.
+  const checkAccessGate = async () => {
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) return true;
+      const res = await fetch('/api/centre/my-access', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return true;
+      const data = await res.json();
+      const memberships: Array<{ centreId: string; status: string; centreName: string }> =
+        data.memberships || [];
+      if (memberships.length > 0 && !memberships.some((m) => m.status === 'active')) {
+        const withName = memberships.find((m) => m.centreName);
+        await signOut(auth);
+        setAccessNotice(withName?.centreName || 'your facility');
+        return false;
+      }
+      return true;
+    } catch {
+      return true;
+    }
+  };
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,10 +54,13 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onSuccess }) => {
     try {
       if (isSignUp) {
         await createUserWithEmailAndPassword(auth, email, password);
+        onSuccess();
       } else {
         await signInWithEmailAndPassword(auth, email, password);
+        const allowed = await checkAccessGate();
+        if (!allowed) return;
+        onSuccess();
       }
-      onSuccess();
     } catch (err: any) {
       setError(err.message || 'Authentication failed');
     } finally {
@@ -43,6 +73,8 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onSuccess }) => {
     const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth, provider);
+      const allowed = await checkAccessGate();
+      if (!allowed) return;
       onSuccess();
     } catch (err: any) {
       setError(err.message || 'Google login failed');
@@ -109,6 +141,19 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onSuccess }) => {
           {error && (
             <div className="bg-red-50 border border-red-100 text-red-600 text-[11px] font-bold p-3 rounded-xl">
               {error}
+            </div>
+          )}
+
+          {accessNotice && (
+            <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-xl">
+              <p className="text-xs font-black flex items-center gap-1.5">
+                <ShieldAlert className="w-4 h-4 shrink-0" />
+                Access switched off
+              </p>
+              <p className="text-[11px] font-medium mt-1 leading-relaxed">
+                Your access to {accessNotice} is currently switched off. Please contact your facility
+                admin to restore it.
+              </p>
             </div>
           )}
 

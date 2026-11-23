@@ -340,6 +340,8 @@ interface AppContextType {
   switchCentre: (centreId: string) => Promise<void>;
   refreshSeatsSummary: () => Promise<void>;
   toggleStudentAccess: (studentUid: string, active: boolean) => Promise<void>;
+  setSeatSwitch: (seatId: string, active: boolean) => Promise<void>;
+  assignStudentToSeat: (seatId: string, studentUid: string) => Promise<void>;
   activateStudentMembership: (studentUid: string) => Promise<{ success: boolean; used: number; cap: number }>;
 }
 
@@ -1679,6 +1681,50 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return s;
       })
     );
+  };
+
+  const setSeatSwitch = async (seatId: string, active: boolean) => {
+    if (!user) throw new Error('You must be signed in.');
+    const token = await user.getIdToken();
+    if (!activeCentreId) throw new Error('Select your facility first.');
+    const cId = activeCentreId;
+    const res = await fetch('/api/centre/seats/seat-switch', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ centreId: cId, seatId, active }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.message || data.error || 'Failed to switch the seat.');
+    }
+
+    await refreshSeatsSummary(cId);
+  };
+
+  const assignStudentToSeat = async (seatId: string, studentUid: string) => {
+    if (!user) throw new Error('You must be signed in.');
+    const token = await user.getIdToken();
+    if (!activeCentreId) throw new Error('Select your facility first.');
+    const cId = activeCentreId;
+    const res = await fetch('/api/centre/seats/assign', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ centreId: cId, seatId, studentUid }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.message || data.error || 'Failed to assign the student to the seat.');
+    }
+
+    await refreshSeatsSummary(cId);
   };
 
   const activateStudentMembership = async (studentUid: string) => {
@@ -3708,6 +3754,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         switchCentre,
         refreshSeatsSummary,
         toggleStudentAccess,
+        setSeatSwitch,
+        assignStudentToSeat,
         activateStudentMembership
       }}
 

@@ -35,6 +35,7 @@ import {
   ChevronLeft,
   MessageCircle,
   X,
+  ShieldAlert,
 } from 'lucide-react';
 
 import { orbBadgeLabel, totalUnread } from './tabs/chatNav';
@@ -73,6 +74,7 @@ export const StudentPortal: React.FC = () => {
   const { user, loading: authLoading } = useFirebase();
   const [profileLoading, setProfileLoading] = useState(true);
   const [hasProfile, setHasProfile] = useState(false);
+  const [accessOff, setAccessOff] = useState(false);
   const [, setOnboardingComplete] = useState(false);
   const [portalMode, setPortalMode] = useState<'student' | 'parent'>('student');
   const [desktopViewMode] = useState<'mobile_frame' | 'expanded'>('mobile_frame');
@@ -107,6 +109,12 @@ export const StudentPortal: React.FC = () => {
             const profiled = docSnap.exists() && (docSnap.data() as any)?.skeleton !== true;
             saveLastGoodFlag(`hasProfile:${user.uid}`, profiled);
             setHasProfile(profiled);
+            // Live access gate: the server stamps this field when the facility
+            // admin switches the student off, so the banner appears at once
+            // (and clears itself when access returns) without a reload.
+            setAccessOff(
+              profiled && String((docSnap.data() as any)?.accessStatus || 'active') === 'off'
+            );
             setProfileLoading(false);
           },
           (error) => {
@@ -572,6 +580,22 @@ export const StudentPortal: React.FC = () => {
 
   return (
     <div className={`h-[100dvh] overflow-hidden ${bgTheme === 'dark' ? 'tos-canvas-dark bg-[#0B1220]' : 'bg-slate-50'} flex flex-col justify-between selection:bg-orange-500 selection:text-white sm:h-auto sm:min-h-screen sm:overflow-visible`}>
+      {/* Access gate: server-stamped live banner replaces the app while the
+          facility admin has this student switched off */}
+      {!isAdmin && accessOff && (
+        <div className="fixed inset-0 z-[100] bg-slate-950 flex items-center justify-center p-6">
+          <div className="max-w-sm w-full bg-slate-900 border border-slate-800 rounded-3xl p-8 text-center shadow-2xl">
+            <div className="w-14 h-14 rounded-2xl bg-rose-500/10 flex items-center justify-center mx-auto mb-4">
+              <ShieldAlert className="w-7 h-7 text-rose-400" />
+            </div>
+            <h2 className="text-xl font-black text-white">Access switched off</h2>
+            <p className="text-sm text-slate-400 mt-2 leading-relaxed">
+              Your access to {centreName || 'your facility'} is currently switched off. Please
+              contact your facility admin to restore it.
+            </p>
+          </div>
+        </div>
+      )}
       {/* 1. Top Desktop Control Bar */}
       <header className="bg-slate-950 text-white px-4 py-3 z-40 sticky top-0 overflow-hidden shadow-md border-b border-slate-800">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-3 relative">

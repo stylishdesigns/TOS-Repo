@@ -277,6 +277,9 @@ export async function lockExpiredSeatsForCentre(
         const bDoc = await bRef.get();
         const cur = Number((bDoc.data() as any)?.activeStudentCount || 0);
         await bRef.set({ activeStudentCount: Math.max(0, cur - 1) }, { merge: true });
+        // The student portal listens to its own profile doc live; this stamp
+        // is what turns their app into the contact-admin banner at once.
+        await adminDb.collection('students').doc(uid).set({ accessStatus: 'off' }, { merge: true });
       } catch {
         /* the sweep retries this seat on its next pass */
       }
@@ -297,7 +300,10 @@ export async function lockExpiredSeatsForCentre(
   return locked;
 }
 
-/** The free seat with the most days left (lowest number on a tie), or null. */
+/** Where a newly switched-on student goes. A seat already counting with
+ *  nobody on it costs nothing to fill, so it wins first (lowest number);
+ *  otherwise the banked seat with the most days left (lowest number on a
+ *  tie). Null when the pool has nothing to give. */
 export async function drawFreeSeatForCentre(
   centreId: string,
   now: Date = new Date()
@@ -305,20 +311,29 @@ export async function drawFreeSeatForCentre(
   const snap = await adminDb
     .collection('centreSeats')
     .where('centreId', '==', centreId)
-    .where('status', '==', 'available')
     .get();
   if (snap.empty) return null;
-  let best: { id: string; seatNo: number; remaining: number } | null = null;
+  let emptyRunning: { id: string; seatNo: number; remaining: number } | null = null;
+  let bestBanked: { id: string; seatNo: number; remaining: number } | null = null;
   for (const doc of snap.docs) {
     const data = doc.data() as SeatRead;
+    const status = data.status;
+    if (status !== 'active' && status !== 'available') continue;
     const { remaining } = seatUsage(data, now);
     const seatNo = Number(data.seatNo || 0);
     if (remaining <= 0) continue;
-    if (!best || remaining > best.remaining || (remaining === best.remaining && seatNo < best.seatNo)) {
-      best = { id: doc.id, seatNo, remaining };
+    if (status === 'active' && !data.studentUid) {
+      if (!emptyRunning || seatNo < emptyRunning.seatNo) {
+        emptyRunning = { id: doc.id, seatNo, remaining };
+      }
+      continue;
+    }
+    if (status === 'active') continue; // occupied and running: not free
+    if (!bestBanked || remaining > bestBanked.remaining || (remaining === bestBanked.remaining && seatNo < bestBanked.seatNo)) {
+      bestBanked = { id: doc.id, seatNo, remaining };
     }
   }
-  return best;
+  return emptyRunning || bestBanked;
 }
 
 /** A payment tops the pool: locked seats reopen with a fresh 30 days first,

@@ -8,6 +8,7 @@ import {
   Power,
   Info,
   History,
+  UserPlus,
   X,
   Lock,
   CircleDot,
@@ -44,6 +45,8 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
     seatsSummary,
     refreshSeatsSummary,
     toggleStudentAccess,
+    setSeatSwitch,
+    assignStudentToSeat,
     addToast,
   } = useApp();
 
@@ -52,6 +55,10 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
   const [filterMode, setFilterMode] = useState<'all' | 'active' | 'disabled'>('all');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [detailSeat, setDetailSeat] = useState<SeatSummary | null>(null);
+  const [seatSwitchingId, setSeatSwitchingId] = useState<string | null>(null);
+  const [assignSeat, setAssignSeat] = useState<SeatSummary | null>(null);
+  const [assignPick, setAssignPick] = useState('');
+  const [assigning, setAssigning] = useState(false);
 
   useEffect(() => {
     refreshSeatsSummary();
@@ -101,6 +108,60 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
       });
     } finally {
       setTogglingStudentId(null);
+    }
+  };
+
+  const handleSeatSwitch = async (seat: SeatSummary, active: boolean) => {
+    setSeatSwitchingId(seat.id);
+    setErrorMessage(null);
+    try {
+      await setSeatSwitch(seat.id, active);
+      await refreshSeatsSummary();
+      addToast({
+        type: 'success',
+        title: active ? `Seat ${seat.seatNo} switched on` : `Seat ${seat.seatNo} switched off`,
+        description: active
+          ? `Seat ${seat.seatNo}'s day count is running now, with or without a student on it.`
+          : seat.studentName
+          ? `${seat.studentName} left Seat ${seat.seatNo}; their access is off and their app now shows the contact-admin banner. The seat is banked with its remaining days.`
+          : `Seat ${seat.seatNo} is banked; its days stop counting and its remaining days are safe.`,
+      });
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Failed to switch the seat.');
+      addToast({
+        type: 'error',
+        title: 'Action Denied',
+        description: err.message || 'Could not switch the seat.',
+      });
+    } finally {
+      setSeatSwitchingId(null);
+    }
+  };
+
+  const handleAssign = async () => {
+    if (!assignSeat || !assignPick) return;
+    const student = students.find((s) => (s.uid || s.id) === assignPick);
+    setAssigning(true);
+    setErrorMessage(null);
+    try {
+      await assignStudentToSeat(assignSeat.id, assignPick);
+      await refreshSeatsSummary();
+      addToast({
+        type: 'success',
+        title: `Added to Seat ${assignSeat.seatNo}`,
+        description: `${student?.name || 'The student'} now holds Seat ${assignSeat.seatNo}; their access is on and they can sign in.`,
+      });
+      setAssignSeat(null);
+      setAssignPick('');
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Failed to add the student to the seat.');
+      addToast({
+        type: 'error',
+        title: 'Action Denied',
+        description: err.message || 'Could not add the student to the seat.',
+      });
+    } finally {
+      setAssigning(false);
     }
   };
 
@@ -216,7 +277,7 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
         </div>
       )}
 
-      {/* Seat cards */}
+      {/* Seat pool: a table with a live switch on every seat */}
       <div className="mt-6">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-bold text-slate-900 dark:text-white">The pool</h3>
@@ -226,74 +287,140 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
         </div>
         {seats.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 p-6 text-center text-xs text-slate-400">
-            No seats in this facility's pool yet. Seats arrive when the trial starts or a payment is
+            No seats in this facility&apos;s pool yet. Seats arrive when the trial starts or a payment is
             recorded on the TOS console.
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {seats.map((seat) => {
-              const pct = Math.min(100, Math.round((seat.daysUsed / Math.max(1, seat.daysTotal)) * 100));
-              const low = seat.remaining <= 5 && seat.status === 'active';
-              return (
-                <div
-                  key={seat.id}
-                  className="rounded-2xl border border-slate-200 dark:border-slate-700/60 p-4 flex flex-col gap-2 bg-white dark:bg-slate-800/40"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-black text-slate-900 dark:text-white">
-                      Seat {seat.seatNo}
-                    </span>
-                    <span
-                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${statusChip(seat.status)}`}
-                    >
-                      {seat.status === 'locked' ? (
-                        <Lock className="w-3 h-3" />
-                      ) : seat.status === 'active' ? (
-                        <CircleDot className="w-3 h-3" />
-                      ) : (
-                        <CheckCircle2 className="w-3 h-3" />
-                      )}
-                      {statusLabel(seat.status)}
-                    </span>
-                  </div>
-                  <div className="text-xs text-slate-600 dark:text-slate-300 font-medium truncate">
-                    {seat.studentName || 'No student attached'}
-                  </div>
-                  {seat.status === 'locked' ? (
-                    <div className="text-[11px] text-rose-500 font-semibold">
-                      Completed its {seat.daysTotal} days · needs a payment to reopen
-                    </div>
-                  ) : (
-                    <div>
-                      <div className="flex items-center justify-between text-[11px] mb-1">
-                        <span className="text-slate-400">
-                          Day {seat.daysUsed} of {seat.daysTotal}
+          <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-700/60">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 text-slate-400 font-semibold uppercase tracking-wider text-[10px]">
+                  <th className="py-3 px-4">Seat</th>
+                  <th className="py-3 px-4">Student</th>
+                  <th className="py-3 px-4">Status</th>
+                  <th className="py-3 px-4">Days</th>
+                  <th className="py-3 px-4 text-center">Switch</th>
+                  <th className="py-3 px-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                {seats.map((seat) => {
+                  const pct = Math.min(100, Math.round((seat.daysUsed / Math.max(1, seat.daysTotal)) * 100));
+                  const low = seat.remaining <= 5 && seat.status === 'active';
+                  const seatBusy = seatSwitchingId === seat.id;
+                  return (
+                    <tr key={seat.id} className="hover:bg-slate-50/50 dark:hover:brightness-110/30 transition-colors">
+                      <td className="py-3 px-4">
+                        <span className="text-xs font-black text-slate-900 dark:text-white">
+                          Seat {seat.seatNo}
                         </span>
+                      </td>
+                      <td className="py-3 px-4">
+                        {seat.studentName ? (
+                          <span className="font-bold text-slate-900 dark:text-white">{seat.studentName}</span>
+                        ) : (
+                          <span className="italic text-slate-400">No student</span>
+                        )}
+                      </td>
+                      <td className="py-3 px-4">
                         <span
-                          className={`font-bold ${low ? 'text-rose-500' : 'text-slate-600 dark:text-slate-300'}`}
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${statusChip(seat.status)}`}
                         >
-                          {seat.remaining} day{seat.remaining === 1 ? '' : 's'} left
+                          {seat.status === 'locked' ? (
+                            <Lock className="w-3 h-3" />
+                          ) : seat.status === 'active' ? (
+                            <CircleDot className="w-3 h-3" />
+                          ) : (
+                            <CheckCircle2 className="w-3 h-3" />
+                          )}
+                          {statusLabel(seat.status)}
                         </span>
-                      </div>
-                      <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all duration-500 ${
-                            low ? 'bg-rose-500' : 'bg-[var(--brand,#0F172A)]'
-                          }`}
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                    </div>
-                  )}
-                  <button
-                    onClick={() => setDetailSeat(seat)}
-                    className="mt-auto inline-flex items-center gap-1.5 text-[11px] font-semibold text-[var(--brand,#0F172A)] dark:text-[var(--brand-tint,#93c5fd)] hover:underline self-start"
-                  >
-                    <History className="w-3.5 h-3.5" /> View details
-                  </button>
-                </div>
-              );
-            })}
+                      </td>
+                      <td className="py-3 px-4">
+                        {seat.status === 'locked' ? (
+                          <span className="text-[11px] text-rose-500 font-semibold">
+                            Completed its {seat.daysTotal} days · needs payment
+                          </span>
+                        ) : (
+                          <div>
+                            <div className="flex items-baseline gap-2">
+                              <span className="text-[10px] text-slate-400">
+                                Day {seat.daysUsed} of {seat.daysTotal}
+                              </span>
+                              <span
+                                className={`text-[11px] font-black ${low ? 'text-rose-500' : 'text-slate-700 dark:text-slate-200'}`}
+                              >
+                                {seat.remaining} left
+                              </span>
+                            </div>
+                            <div className="h-1.5 w-24 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden mt-1">
+                              <div
+                                className={`h-full rounded-full transition-all duration-500 ${low ? 'bg-rose-500' : 'bg-[var(--brand,#0F172A)]'}`}
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <button
+                          type="button"
+                          disabled={seat.status === 'locked' || seatBusy}
+                          onClick={() => handleSeatSwitch(seat, seat.status !== 'active')}
+                          title={
+                            seat.status === 'locked'
+                              ? 'Locked: a new payment reopens it'
+                              : seat.status === 'active'
+                              ? 'Switch off: the count stops and the seat is banked'
+                              : 'Switch on: the count starts now, with or without a student'
+                          }
+                          className={`relative inline-flex h-7 w-14 shrink-0 items-center rounded-full border transition-colors duration-200 ${
+                            seat.status === 'locked'
+                              ? 'bg-slate-200 dark:bg-slate-700 border-slate-300 dark:border-slate-600 opacity-50 cursor-not-allowed'
+                              : seat.status === 'active'
+                              ? 'bg-emerald-500 border-emerald-500'
+                              : 'bg-slate-200 dark:bg-slate-700 border-slate-300 dark:border-slate-600'
+                          } ${seatBusy ? 'opacity-60 cursor-wait' : ''}`}
+                        >
+                          <span
+                            className={`inline-block h-6 w-6 transform rounded-full bg-white shadow transition-transform duration-200 ${
+                              seat.status === 'active' ? 'translate-x-7' : 'translate-x-0.5'
+                            }`}
+                          />
+                        </button>
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          {!seat.studentUid && seat.status !== 'locked' && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAssignSeat(seat);
+                                setAssignPick('');
+                              }}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-bold text-white bg-[var(--brand,#0F172A)] hover:brightness-110 rounded-lg transition-all"
+                              title="Add a student to this seat"
+                            >
+                              <UserPlus className="w-3.5 h-3.5" />
+                              Add student
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setDetailSeat(seat)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:brightness-110 rounded-lg transition-colors"
+                            title="View this seat's history and details"
+                          >
+                            <History className="w-3.5 h-3.5" />
+                            Details
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
@@ -435,8 +562,10 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
                         type="button"
                         disabled={isBusy}
                         onClick={() => handleToggle(student, isCurrentlyActive)}
-                        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                          isCurrentlyActive ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700'
+                        className={`relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border transition-colors duration-200 ${
+                          isCurrentlyActive
+                            ? 'bg-emerald-500 border-emerald-500'
+                            : 'bg-slate-200 dark:bg-slate-700 border-slate-300 dark:border-slate-600'
                         } ${isBusy ? 'opacity-50 cursor-wait' : ''}`}
                         title={
                           isCurrentlyActive
@@ -445,8 +574,8 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
                         }
                       >
                         <span
-                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                            isCurrentlyActive ? 'translate-x-5' : 'translate-x-0'
+                          className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ${
+                            isCurrentlyActive ? 'translate-x-7' : 'translate-x-0.5'
                           }`}
                         />
                       </button>
@@ -462,8 +591,8 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
       <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-400 flex items-center gap-1.5">
         <Info className="w-3.5 h-3.5 text-slate-400 shrink-0" />
         <span>
-          Switching a student off banks their seat with its remaining days. A new student takes the
-          free seat with the most days left.
+          Switching a student off banks their seat with its remaining days. A new student draws a seat
+          that is already counting first, then the banked seat with the most days left.
         </span>
       </div>
 

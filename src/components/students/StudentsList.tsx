@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { resolveStudentFee } from '../../lib/fees';
 import { Student } from '../../types';
@@ -20,13 +20,13 @@ import {
   Mail,
   UserCheck,
   Eye,
-  UserX,
-  ShieldAlert,
 } from 'lucide-react';
 import { SeatsManagementPanel } from './SeatsManagementPanel';
 
 export const StudentsList: React.FC = () => {
-  const { students, programmes, branches, subjects, addStudent, toggleStudentSuspend, setSelectedStudent, addToast } = useApp();
+  const { students, programmes, branches, subjects, addStudent, toggleStudentAccess, seatsSummary, refreshSeatsSummary, activeCentreId, setSelectedStudent, addToast } = useApp();
+
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
   const [activeViewTab, setActiveViewTab] = useState<'directory' | 'seats'>('directory');
   const [programmeFilter, setProgrammeFilter] = useState('All Programmes');
@@ -54,6 +54,12 @@ export const StudentsList: React.FC = () => {
     subjects: [] as string[],
   });
 
+  // The access switch reflects the live seat pool, so refresh it on entry.
+  useEffect(() => {
+    refreshSeatsSummary();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeCentreId]);
+
   const filteredStudents = (students || []).filter((s) => {
     const matchesProgramme = programmeFilter === 'All Programmes' || s.programmeName === programmeFilter;
     const matchesStatus = statusFilter === 'All Status' || s.status === statusFilter;
@@ -80,6 +86,37 @@ export const StudentsList: React.FC = () => {
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
+
+  // Access state comes from the live seat pool when it is loaded; the legacy
+  // student status is the fallback.
+  const isAccessOn = (st: Student) => {
+    const accessUid = st.uid || st.id;
+    const accessData = seatsSummary?.studentAccess?.[accessUid];
+    return accessData ? accessData.status === 'active' : st.status !== 'Suspended';
+  };
+
+  const handleToggleAccess = async (st: Student, currentOn: boolean) => {
+    const accessUid = st.uid || st.id;
+    setTogglingId(accessUid);
+    try {
+      await toggleStudentAccess(accessUid, !currentOn);
+      addToast({
+        type: 'success',
+        title: !currentOn ? 'Access ON' : 'Access OFF',
+        description: !currentOn
+          ? `${st.name} can sign in again.`
+          : `${st.name}'s app now shows the contact-admin banner and their seat is banked with its remaining days.`,
+      });
+    } catch (err: any) {
+      addToast({
+        type: 'error',
+        title: 'Action Denied',
+        description: err.message || 'Could not toggle access.',
+      });
+    } finally {
+      setTogglingId(null);
+    }
+  };
 
   const handleAddStudentSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -133,8 +170,8 @@ export const StudentsList: React.FC = () => {
       {/* Header Row */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative">
         <div>
-          <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Students</h2>
-          <p className="text-xs text-slate-500 mt-1">
+          <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Students</h2>
+          <p className="text-xs text-slate-600 dark:text-white mt-1">
             Complete student directory with parent contacts, assigned cohort, attendance and fee balances.
           </p>
         </div>
@@ -292,8 +329,8 @@ export const StudentsList: React.FC = () => {
       ) : (
         <>
       {/* Students Data Table (matches video 00:23 - 00:26) */}
-      <div className="bg-white rounded-xl border border-slate-200/90 shadow-xs overflow-hidden">
-        <div className="overflow-x-auto">
+      <div className="bg-white rounded-xl border border-slate-200/90 shadow-xs">
+        <div className="overflow-x-auto rounded-t-xl">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50/50 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
@@ -407,31 +444,46 @@ export const StudentsList: React.FC = () => {
                       )}
                     </td>
 
-                    {/* Action Column with View Details and Suspend Button */}
-                    <td className="py-3.5 px-5 text-right" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center justify-end space-x-2">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedStudent(st)}
-                          className="px-2.5 py-1 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors inline-flex items-center space-x-1"
-                          title="View student profile details"
-                        >
-                          <Eye className="w-3 h-3 text-slate-500" />
-                          <span>View Details</span>
-                        </button>
+                    {/* Action column: the access switch sits on the left, details on the right */}
+                    <td className="py-3.5 px-5" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-between gap-3 min-w-[240px]">
+                        <div className="flex items-center gap-2.5">
+                          <button
+                            type="button"
+                            disabled={togglingId === (st.uid || st.id)}
+                            onClick={() => handleToggleAccess(st, isAccessOn(st))}
+                            className={`relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border transition-colors duration-200 ${
+                              isAccessOn(st)
+                                ? 'bg-emerald-500 border-emerald-500'
+                                : 'bg-slate-200 dark:bg-slate-700 border-slate-300 dark:border-slate-600'
+                            } ${togglingId === (st.uid || st.id) ? 'opacity-50 cursor-wait' : ''}`}
+                            title={
+                              isAccessOn(st)
+                                ? 'Switch off: their app shows the contact-admin banner and their seat is banked'
+                                : 'Switch on: they draw a seat and can sign in again'
+                            }
+                          >
+                            <span
+                              className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md transition duration-200 ${
+                                isAccessOn(st) ? 'translate-x-7' : 'translate-x-0.5'
+                              }`}
+                            />
+                          </button>
+                          <span
+                            className={`text-[11px] font-black ${isAccessOn(st) ? 'text-emerald-600' : 'text-rose-500'}`}
+                          >
+                            {isAccessOn(st) ? 'Access ON' : 'Access OFF'}
+                          </span>
+                        </div>
 
                         <button
                           type="button"
-                          onClick={() => toggleStudentSuspend(st.id)}
-                          className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition-colors inline-flex items-center space-x-1 ${
-                            st.status === 'Suspended'
-                              ? 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200'
-                              : 'text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200'
-                          }`}
-                          title={st.status === 'Suspended' ? 'Reactivate student' : 'Suspend student'}
+                          onClick={() => setSelectedStudent(st)}
+                          className="px-3 py-1.5 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors inline-flex items-center space-x-1.5"
+                          title="View student profile details"
                         >
-                          <UserX className="w-3 h-3" />
-                          <span>{st.status === 'Suspended' ? 'Reactivate' : 'Suspend'}</span>
+                          <Eye className="w-3.5 h-3.5 text-slate-500" />
+                          <span>View Details</span>
                         </button>
                       </div>
                     </td>
@@ -442,8 +494,8 @@ export const StudentsList: React.FC = () => {
           </table>
         </div>
 
-        {/* Pagination controls */}
-        <div className="p-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-500">
+        {/* Pagination controls (outside the clipping wrappers so the dropdown shows fully) */}
+        <div className="p-4 border-t border-slate-100 rounded-b-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-500">
           <div>
             Page {currentPage} of {totalPages} ({filteredStudents.length} total students)
           </div>

@@ -11,6 +11,8 @@ import {
   joinCentreService,
   activateStudentService,
   toggleStudentAccessService,
+  setSeatSwitchService,
+  assignStudentToSeatService,
   getCentreEntitlements,
   getSeatsSummaryService,
   isTosUser,
@@ -657,6 +659,101 @@ async function startServer() {
     } catch (error: any) {
       console.warn("toggle-access error:", error.message || error);
       res.status(400).json({ error: error.message || "Failed to toggle student access" });
+    }
+  });
+
+  // 6b-2. Seat switches and seat assignment (batch 20). The seat pool is
+  // hands-on from the control room: every seat carries its own on/off
+  // switch, and the admin can attach a student to a specific seat.
+  //
+  //   POST /api/centre/seats/seat-switch { centreId, seatId, active }
+  //     - admin/owner only. Off freezes the seat's used days and banks it; a
+  //       student attached to it loses access and leaves the seat. On starts
+  //       (or resumes) the daily count, with or without a student.
+  //   POST /api/centre/seats/assign { centreId, seatId, studentUid }
+  //     - admin/owner only. Attaches one student to one specific seat. The
+  //       student must not already hold a running seat.
+  //   GET /api/centre/my-access
+  //     - the signed-in student's own memberships and statuses, for the
+  //       contact-admin banner on the login screen. Server-side enforcement
+  //       itself stays in requireMembership on every student endpoint.
+  app.post("/api/centre/seats/seat-switch", async (req, res) => {
+    try {
+      const caller = await getCaller(req);
+      const { centreId, seatId, active } = req.body;
+      if (!centreId || !seatId || typeof active !== "boolean") {
+        return res.status(400).json({ error: "Missing centreId, seatId, or active flag" });
+      }
+      const result = await setSeatSwitchService({
+        actorUid: caller.uid,
+        actorEmail: caller.email,
+        centreId,
+        seatId,
+        active,
+        tos: caller.tos,
+      });
+      res.json(result);
+    } catch (error: any) {
+      console.warn("seat-switch error:", error.message || error);
+      res.status(error?.status || 400).json({ error: error.message || "Failed to switch the seat" });
+    }
+  });
+
+  app.post("/api/centre/seats/assign", async (req, res) => {
+    try {
+      const caller = await getCaller(req);
+      const { centreId, seatId, studentUid } = req.body;
+      if (!centreId || !seatId || !studentUid) {
+        return res.status(400).json({ error: "Missing centreId, seatId, or studentUid" });
+      }
+      const result = await assignStudentToSeatService({
+        actorUid: caller.uid,
+        actorEmail: caller.email,
+        centreId,
+        seatId,
+        studentUid,
+        tos: caller.tos,
+      });
+      res.json(result);
+    } catch (error: any) {
+      console.warn("seat-assign error:", error.message || error);
+      res.status(error?.status || 400).json({ error: error.message || "Failed to assign the student to the seat" });
+    }
+  });
+
+  app.get("/api/centre/my-access", async (req, res) => {
+    try {
+      const caller = await getCaller(req);
+      const mSnap = await adminDb
+        .collection("memberships")
+        .where("uid", "==", caller.uid)
+        .where("role", "==", "student")
+        .get();
+      const memberships: Array<{ centreId: string; status: string; centreName: string }> = [];
+      const centreIds = new Set<string>();
+      mSnap.forEach((d) => {
+        const v = d.data() as any;
+        const cid = String(v.centreId || "");
+        memberships.push({ centreId: cid, status: String(v.status || ""), centreName: "" });
+        if (cid) centreIds.add(cid);
+      });
+      await Promise.all(
+        [...centreIds].map(async (cid) => {
+          try {
+            const cDoc = await adminDb.collection("centres").doc(cid).get();
+            const name = String((cDoc.data() as any)?.name || "");
+            memberships.forEach((m) => {
+              if (m.centreId === cid) m.centreName = name;
+            });
+          } catch {
+            /* the banner falls back to a generic line */
+          }
+        })
+      );
+      res.json({ memberships });
+    } catch (error: any) {
+      console.warn("my-access error:", error.message || error);
+      res.status(400).json({ error: error.message || "Failed to check access" });
     }
   });
 
