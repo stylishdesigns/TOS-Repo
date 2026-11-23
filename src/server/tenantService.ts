@@ -1,5 +1,6 @@
 import { adminDb, adminAuth } from './firebaseAdmin';
 import { reconcileSeatOrder, migrateToLeadTier } from './seatDays';
+import { ensurePlansV2 } from './seatUpgrades';
 import {
   Centre,
   CentreBilling,
@@ -128,8 +129,8 @@ export async function getPlatformPlan(planId: string): Promise<PlatformPlan> {
   // Some older centre billing documents carry an empty planId. Firestore
   // rejects an empty document path, which used to surface as a generic
   // "server error" (for example when re-enabling a student's access).
-  // Fall back to the standard plan whenever the id is empty.
-  const effectivePlanId = String(planId ?? '').trim() || 'centre_standard';
+  // Fall back to the Free plan whenever the id is empty (batch 27: every
+  const effectivePlanId = String(planId ?? '').trim() || 'centre_free';
   try {
     const doc = await adminDb.collection('platformPlans').doc(effectivePlanId).get();
     if (!doc.exists) {
@@ -1666,7 +1667,7 @@ export async function assignStudentToSeatService(params: {
 
 export async function getCentreEntitlements(centreId: string): Promise<CentreEntitlements> {
   const billing = await getBillingDoc(centreId);
-  const planId = billing?.planId || 'centre_standard';
+  const planId = billing?.planId || 'centre_free';
   const plan = await getPlatformPlan(planId);
 
   return {
@@ -1684,6 +1685,9 @@ export async function getSeatsSummaryService(centreId: string): Promise<CentreSe
   // Batch 26: the one-time lead-tier migration rides the same read; guarded
   // in seatDays so it only ever runs once.
   try { await migrateToLeadTier(); } catch { /* retried on the next seats read */ }
+  // Batch 27: the Free/Standard/Premium plan model: seeds the Free plan,
+  // renames Plus to Premium and puts every lead on Free. One-time, guarded.
+  try { await ensurePlansV2(); } catch { /* retried on the next seats read */ }
   const billing = await getBillingDoc(centreId);
   const centre = await getCentreDoc(centreId);
   const config = await getPlatformConfig();

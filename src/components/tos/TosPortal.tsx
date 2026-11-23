@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, Building2, Wallet, ScrollText, UserPlus, Loader2,
   RefreshCw, Send, Ban, CheckCircle2, PlayCircle, Check, Plus, ShieldCheck,
   ArrowUpRight, UserRound, BookOpen, CalendarDays, Copy, HelpCircle, Sparkles,
-  AlertTriangle, X, ChevronRight, MessageSquare, Globe, Trash2, Settings,
+  AlertTriangle, X, ChevronRight, MessageSquare, Globe, Trash2, Settings, FileText,
 } from 'lucide-react';
 import {
   api, fmtDate, fmtDateTime, LEAD_STATUS_LABELS, STATUS_STYLES, Json,
@@ -470,6 +470,27 @@ const SettingsTab: React.FC = () => {
         </p>
       </Card>
 
+      <Card title="Payment account">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <Field label="Account name">
+            <input value={config.payAccountName ?? ''} onChange={(e) => setConfig((c: any) => ({ ...c, payAccountName: e.target.value }))} className={inputCls} placeholder="Michael Ogunnaike" />
+          </Field>
+          <Field label="Account number">
+            <input value={config.payAccountNumber ?? ''} onChange={(e) => setConfig((c: any) => ({ ...c, payAccountNumber: e.target.value }))} className={inputCls} placeholder="5070133907" />
+          </Field>
+          <Field label="Bank">
+            <input value={config.payBank ?? ''} onChange={(e) => setConfig((c: any) => ({ ...c, payBank: e.target.value }))} className={inputCls} placeholder="Moniepoint" />
+          </Field>
+          <Field label="WhatsApp number for payment confirmations">
+            <input value={config.tosWhatsappNumber ?? ''} onChange={(e) => setConfig((c: any) => ({ ...c, tosWhatsappNumber: e.target.value }))} className={inputCls} placeholder="09030064109" />
+          </Field>
+        </div>
+        <p className="text-[11px] text-slate-500 mt-3">
+          Facilities see these details on the payment step of the upgrade flow, and the WhatsApp button opens this number.
+          Leave a field empty to keep its current value.
+        </p>
+      </Card>
+
       <Card title="Platform settings">
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           {platformFields.map(([key, label]) => (
@@ -896,11 +917,179 @@ const AccountTab: React.FC = () => {
 // (mlabel is the short label the bar shows on phones).
 const GROUPS = ['Business', 'Content', 'System'] as const;
 
+// ---------------------------------------------------------------------------
+// BATCH 27: UPGRADE REQUESTS
+// Facilities that paid for seats and are waiting on the platform's word. A
+// facility picks Standard or Premium, pays by bank transfer, uploads its
+// receipt and contacts the admin on WhatsApp; approving here creates exactly
+// the seats paid for (they auto-populate on the facility's dashboard), moves
+// the billing to the chosen plan, raises the tier and sends the two
+// confirmation emails. Declining tells the facility why.
+// ---------------------------------------------------------------------------
+const UpgradeRequestsTab: React.FC = () => {
+  const [requests, setRequests] = useState<any[]>(() => loadLastGood<any[]>('tos:upgrades') || []);
+  const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState('');
+  const [declineId, setDeclineId] = useState('');
+  const [declineReason, setDeclineReason] = useState('');
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const d = await api('/api/tos/upgrade-requests');
+      setRequests(d.requests || []);
+      saveLastGood('tos:upgrades', d.requests || []);
+      setError('');
+    } catch (e: any) {
+      setError(e.message);
+    }
+    setLoading(false);
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const decide = async (requestId: string, action: 'approve' | 'decline', reason = '') => {
+    setBusyId(requestId);
+    setError('');
+    setMessage('');
+    try {
+      const d = await api('/api/tos/upgrade-requests/decide', {
+        method: 'POST',
+        body: { requestId, action, declineReason: reason },
+      });
+      setMessage(
+        action === 'approve'
+          ? `Approved: ${Array.isArray(d?.seatsCreated) ? d.seatsCreated.length : '?'} seat(s) created on the facility's dashboard and the two confirmation emails sent.`
+          : 'Request declined and the facility was told.'
+      );
+      setDeclineId('');
+      setDeclineReason('');
+      await load();
+    } catch (e: any) {
+      setError(e.message);
+    }
+    setBusyId('');
+  };
+
+  const chip = (status: string) => {
+    if (status === 'approved') return 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
+    if (status === 'declined') return 'bg-rose-500/10 text-rose-400 border border-rose-500/20';
+    return 'bg-amber-500/10 text-amber-400 border border-amber-500/20';
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <button onClick={load} className={btnGhost}><RefreshCw className="w-4 h-4" /> Refresh</button>
+      </div>
+      {message && <p className="text-xs text-emerald-400 mb-3">{message}</p>}
+      {error && <p className="text-xs text-rose-400 mb-3">{error}</p>}
+      {loading && requests.length === 0 ? (
+        <p className="text-sm text-slate-400"><Loader2 className="w-4 h-4 inline animate-spin" /> Loading requests...</p>
+      ) : requests.length === 0 ? (
+        <p className="text-sm text-slate-400">No upgrade requests yet. Facilities file one from the Add seat flow: they pick a plan, pay by bank transfer and upload their receipt here.</p>
+      ) : (
+        <div className="overflow-x-auto rounded-2xl border border-white/5">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-white/5 bg-white/5 text-slate-400 font-semibold uppercase tracking-wider text-[10px]">
+                <th className="py-3 px-4">Facility</th>
+                <th className="py-3 px-4">Plan</th>
+                <th className="py-3 px-4">Seats</th>
+                <th className="py-3 px-4">Total</th>
+                <th className="py-3 px-4">Receipt</th>
+                <th className="py-3 px-4">Requested</th>
+                <th className="py-3 px-4">Status</th>
+                <th className="py-3 px-4 text-right">Decision</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {requests.map((r: any) => {
+                const pending = String(r.status || '') === 'pending';
+                const busy = busyId === r.id;
+                return (
+                  <React.Fragment key={r.id}>
+                    <tr className="hover:bg-white/5 transition-colors">
+                      <td className="py-3 px-4 font-bold text-white">{r.centreName || r.centreId}</td>
+                      <td className="py-3 px-4 text-slate-300">{r.planName || r.planId}</td>
+                      <td className="py-3 px-4 text-slate-300">{r.seats}</td>
+                      <td className="py-3 px-4 font-bold text-white">\u20A6{Number(r.total || 0).toLocaleString()}</td>
+                      <td className="py-3 px-4">
+                        {r.receiptUrl ? (
+                          <a href={r.receiptUrl} target="_blank" rel="noopener noreferrer" className="text-orange-400 hover:text-orange-300 underline">View receipt</a>
+                        ) : (
+                          <span className="text-slate-500">Awaiting receipt</span>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 text-slate-400 text-xs">{fmtDateTime(String(r.createdAt || ''))}</td>
+                      <td className="py-3 px-4">
+                        <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold capitalize ${chip(String(r.status || ''))}`}>{r.status}</span>
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        {pending ? (
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => decide(r.id, 'approve')}
+                              disabled={busy}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-bold"
+                              title="Creates the seats on the facility's dashboard, moves them to the plan and sends the two confirmation emails"
+                            >
+                              {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                              Approve
+                            </button>
+                            <button
+                              onClick={() => { setDeclineId(declineId === r.id ? '' : r.id); setDeclineReason(''); }}
+                              disabled={busy}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-white/10 hover:bg-white/5 disabled:opacity-50 text-slate-300 text-xs font-bold"
+                            >
+                              Decline
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-slate-500 text-xs">Handled</span>
+                        )}
+                      </td>
+                    </tr>
+                    {declineId === r.id && (
+                      <tr>
+                        <td colSpan={8} className="py-3 px-4 bg-white/5">
+                          <div className="flex items-center gap-2">
+                            <input
+                              value={declineReason}
+                              onChange={(e) => setDeclineReason(e.target.value)}
+                              placeholder="Why it is declined (the facility sees this)"
+                              className="flex-1 bg-slate-950/60 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder:text-slate-500 outline-none focus:border-orange-500/60"
+                            />
+                            <button
+                              onClick={() => decide(r.id, 'decline', declineReason)}
+                              disabled={busy}
+                              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white text-xs font-bold"
+                            >
+                              {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Ban className="w-3.5 h-3.5" />}
+                              Confirm decline
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const TABS = [
   { id: 'overview', label: 'Overview', mlabel: 'Home', icon: LayoutDashboard, group: 'Business' },
   { id: 'leads', label: 'Leads', mlabel: 'Leads', icon: UserPlus, group: 'Business' },
   { id: 'centres', label: 'Facilities', mlabel: 'Facilities', icon: Building2, group: 'Business' },
   { id: 'plans', label: 'Plans', mlabel: 'Plans', icon: Wallet, group: 'Business' },
+  { id: 'upgrades', label: 'Upgrade Requests', mlabel: 'Upgrades', icon: FileText, group: 'Business' },
   { id: 'settings', label: 'Settings', mlabel: 'Settings', icon: Settings, group: 'Business' },
   { id: 'questions', label: 'Question Bank', mlabel: 'Bank', icon: BookOpen, group: 'Content' },
   { id: 'mocks', label: 'Mocks', mlabel: 'Mocks', icon: CalendarDays, group: 'Content' },
@@ -1235,6 +1424,7 @@ export const TosPortal: React.FC = () => {
             {tab === 'leads' && 'Trial owners who have not yet signed in and set their own password.'}
             {tab === 'centres' && 'Facilities whose owners have set their own password. Plan, seats, billing and access code.'}
             {tab === 'plans' && 'Pricing and feature flags. All stored as data. Seat settings live under Settings.'}
+            {tab === 'upgrades' && 'Facilities that paid for seats and are waiting on your word. Approving creates their seats and emails them.'}
             {tab === 'settings' && 'Seat policy and platform settings. Saved values are enforced live and checked on the server.'}
             {tab === 'questions' && 'Two separate banks: Practice and Mock. Pick one on the hub to work in.'}
             {tab === 'mocks' && "One mock a day for every facility's students. Create, freeze and manage them from here."}
@@ -1255,6 +1445,7 @@ export const TosPortal: React.FC = () => {
         {tab === 'chat' && <TosChat refreshKey={refreshKey} />}
         {tab === 'website' && <WebsiteTab refreshKey={refreshKey} />}
         {tab === 'plans' && <PlansTab />}
+        {tab === 'upgrades' && <UpgradeRequestsTab />}
         {tab === 'settings' && <SettingsTab />}
         {tab === 'audit' && <AuditTab />}
         {tab === 'team' && <TeamTab />}

@@ -11,8 +11,22 @@ import { reconcileFirstTenant } from './firstTenant';
  */
 export const STARTING_PLANS = [
   {
+    id: 'centre_free',
+    name: 'Free',
+    price: 0, // every lead and facility starts here: free seats only
+    priceType: 'per_seat',
+    seatCap: 0,
+    trialSeatCap: 0,
+    trialDays: 0,
+    studentChat: true,
+    whatsappNotifications: false,
+    aiEssayMarking: false, // internal only, never shown to customers
+    aiQuestionGen: false,
+    aiPerformanceAnalysis: false,
+  },
+  {
     id: 'centre_standard',
-    name: 'Facility Standard',
+    name: 'Standard',
     price: 2000, // ₦ per student per month
     priceType: 'per_seat',
     seatCap: 100,
@@ -26,7 +40,7 @@ export const STARTING_PLANS = [
   },
   {
     id: 'centre_plus',
-    name: 'Facility Plus',
+    name: 'Premium',
     price: 3500, // ₦ per student per month
     priceType: 'per_seat',
     seatCap: 100,

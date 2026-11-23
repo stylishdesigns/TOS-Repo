@@ -5,6 +5,7 @@ import { adminAuth, adminDb } from './firebaseAdmin';
 import { runStaffPayReminderSweep } from './staffPayReminders';
 import { provisionSeats, getSeatPool, facilityTier, countPaidSeatsForCentre, addSeatsForCentre, enforceSeatConfigAcrossFacilities } from './seatDays';
 import { runSeatPolicySweep } from './seatSweep';
+import { payAccount, paidSeatStats, createUpgradeRequest, attachReceiptToUpgradeRequest, listUpgradeRequests, decideUpgradeRequest } from './seatUpgrades';
 import {
   Caller,
   countActiveStudents,
@@ -311,7 +312,24 @@ export function registerExtendedRoutes(app: express.Express): void {
       const plans = plansSnap.docs
         .map((d) => ({ id: d.id, name: String((d.data() as any).name || d.id), price: Number((d.data() as any).price || 0) }))
         .sort((a, b) => a.price - b.price);
-      return res.json({ planId: String(billing.planId || ''), plans });
+      // Batch 27: everything the upgrade flow needs in one read: the paid-seat
+      // minimum and how many active paid seats the facility holds (so the
+      // student-count dropdown can start at the smallest valid purchase), the
+      // cap, and the account facilities pay into.
+      const cfg = await getPlatformConfig();
+      const stats = await paidSeatStats(centreId);
+      const account = await payAccount();
+      const cap = (cfg as any).paidSeatsUnlimited === true ? null : Math.max(1, Math.floor(Number((cfg as any).paidMaxSeats ?? 50)));
+      return res.json({
+        planId: String(billing.planId || ''),
+        plans,
+        paidSeatMinimum: Math.max(0, Math.floor(Number((cfg as any).paidSeatMinimum ?? 5))),
+        activePaidSeats: stats.active,
+        paidSeatsHeld: stats.total,
+        paidMaxSeats: cap,
+        payAccount: { name: account.name, number: account.number, bank: account.bank },
+        whatsappNumber: account.whatsappNumber,
+      });
     } catch (error: any) {
       const status = Number(error?.status || 500);
       res.status(status).json({ error: error.message || 'Could not load plans.' });
@@ -364,6 +382,109 @@ export function registerExtendedRoutes(app: express.Express): void {
     } catch (error: any) {
       const status = Number(error?.status || 500);
       res.status(status).json({ error: error.message || 'Could not create the seats.' });
+    }
+  });
+
+  // ==========================================================================
+  // Batch 27: the upgrade flow. A facility on Free buys seats by picking a
+  // plan, choosing how many students, paying by bank transfer and uploading
+  // its receipt; a TOS admin confirms and the seats auto-populate. The
+  // paid-seat minimum and cap are checked here and again on approval.
+  // ==========================================================================
+  app.post('/api/centre/seats/upgrade-request', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const centreId = String(req.body?.centreId || '').trim().slice(0, 120);
+      if (!centreId) throw httpError(400, 'centreId is required.');
+      await requireMembership(caller, centreId, ['owner', 'admin']);
+      const centreDoc = await adminDb.collection('centres').doc(centreId).get();
+      const centreName = String((centreDoc.data() as any)?.name || '');
+      const result = await createUpgradeRequest({
+        centreId,
+        centreName,
+        planId: String(req.body?.planId || ''),
+        seats: Number(req.body?.seats || 0),
+        requestedByUid: caller.uid,
+      });
+      if (!result.ok) {
+        return res.status(409).json({ error: result.error, needed: result.needed, minimum: result.minimum, active: result.active });
+      }
+      return res.json({ success: true, request: result.request });
+    } catch (error: any) {
+      const status = Number(error?.status || 500);
+      res.status(status).json({ error: error.message || 'Could not file the upgrade request.' });
+    }
+  });
+
+  // The payment receipt: a PNG/JPG/WebP image or a PDF, up to 4 MB. It uploads
+  // straight into the request and lands on the TOS admin console.
+  app.post('/api/centre/seats/upgrade-request/receipt', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const centreId = String(req.body?.centreId || '').trim().slice(0, 120);
+      const requestId = String(req.body?.requestId || '').trim().slice(0, 120);
+      if (!centreId || !requestId) throw httpError(400, 'A facility and a request are required.');
+      await requireMembership(caller, centreId, ['owner', 'admin']);
+      const rSnap = await adminDb.collection('centreUpgradeRequests').doc(requestId).get();
+      if (!rSnap.exists) throw httpError(404, 'That upgrade request no longer exists.');
+      const reqDoc = (rSnap.data() || {}) as any;
+      if (String(reqDoc.centreId || '') !== centreId) throw httpError(403, 'That request belongs to another facility.');
+      if (String(reqDoc.status || '') !== 'pending') throw httpError(409, 'That request was already handled.');
+      const dataUrl = String(req.body?.data || '');
+      const m = /^data:(image\/(?:png|jpe?g|webp)|application\/pdf);base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl);
+      if (!m) return res.status(400).json({ error: 'Upload the receipt as a PNG, JPG or WebP image, or a PDF.' });
+      const bytes = Math.floor((m[2].length * 3) / 4);
+      if (bytes > 4 * 1024 * 1024) return res.status(413).json({ error: 'The receipt can be up to 4 MB.' });
+      const cloud = String(process.env.CLOUDINARY_CLOUD_NAME || '');
+      const preset = String(process.env.CLOUDINARY_UPLOAD_PRESET || '');
+      if (!cloud || !preset) return res.status(500).json({ error: 'Receipt hosting is not configured on this deployment.' });
+      const endpoint = m[1] === 'application/pdf' ? 'raw' : 'image';
+      const form = new FormData();
+      form.append('upload_preset', preset);
+      form.append('folder', 'tos/receipts');
+      form.append('file', dataUrl);
+      const resp = await fetch(`https://api.cloudinary.com/v1_1/${cloud}/${endpoint}/upload`, { method: 'POST', body: form });
+      const data: any = await resp.json().catch(() => null);
+      const url = data && typeof data.secure_url === 'string' ? data.secure_url : '';
+      if (!resp.ok || !url) return res.status(502).json({ error: 'The receipt could not be uploaded. Please try again.' });
+      await attachReceiptToUpgradeRequest(requestId, url, caller.uid);
+      return res.json({ ok: true, url });
+    } catch (error: any) {
+      const status = Number(error?.status || 500);
+      res.status(status).json({ error: error?.message || 'The receipt could not be uploaded.' });
+    }
+  });
+
+  app.get('/api/tos/upgrade-requests', async (req, res) => {
+    try {
+      requireTos(req);
+      const requests = await listUpgradeRequests();
+      return res.json({ requests });
+    } catch (error: any) {
+      const status = Number(error?.status || 500);
+      res.status(status).json({ error: error.message || 'Could not load the upgrade requests.' });
+    }
+  });
+
+  app.post('/api/tos/upgrade-requests/decide', async (req, res) => {
+    try {
+      const caller = requireTos(req);
+      const requestId = String(req.body?.requestId || '').trim().slice(0, 120);
+      if (!requestId) throw httpError(400, 'requestId is required.');
+      const action = String(req.body?.action || '') === 'approve' ? 'approve' : 'decline';
+      const result = await decideUpgradeRequest({
+        requestId,
+        action,
+        actorUid: caller.uid,
+        declineReason: String(req.body?.declineReason || ''),
+      });
+      return res.json({ success: true, ...result });
+    } catch (error: any) {
+      if (error?.message && !/server error/i.test(error.message)) {
+        return res.status(409).json({ error: error.message });
+      }
+      const status = Number(error?.status || 500);
+      res.status(status).json({ error: error.message || 'Could not record the decision.' });
     }
   });
 
@@ -2155,6 +2276,11 @@ export function registerExtendedRoutes(app: express.Express): void {
           }
         });
         if (config.paidSeatsUnlimited !== undefined) update.paidSeatsUnlimited = config.paidSeatsUnlimited === true;
+        // Batch 27: the account facilities pay into and the admin WhatsApp
+        // number are platform settings too.
+        ['payAccountName', 'payAccountNumber', 'payBank', 'tosWhatsappNumber'].forEach((k) => {
+          if (config[k] !== undefined) update[k] = String(config[k]).trim().slice(0, 120);
+        });
         if (Object.keys(update).length) {
           await adminDb.collection('platformConfig').doc('global').update(update);
           // Batch 25: the saved numbers reach every facility NOW. The sweep

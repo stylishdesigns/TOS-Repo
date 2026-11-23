@@ -10,6 +10,9 @@ import {
   Lock,
   CircleDot,
   CheckCircle2,
+  Copy,
+  Upload,
+  MessageCircle,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { api } from '../tos/tosShared';
@@ -52,11 +55,18 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
   const [assignSeat, setAssignSeat] = useState<SeatSummary | null>(null);
   const [assignPick, setAssignPick] = useState('');
   const [assigning, setAssigning] = useState(false);
-  const [planState, setPlanState] = useState<{ planId: string; plans: { id: string; name: string; price: number }[] } | null>(null);
-  const [planSaving, setPlanSaving] = useState(false);
-  const [addingSeat, setAddingSeat] = useState(false);
-  const [addSeatOpen, setAddSeatOpen] = useState(false);
-  const [seatCountPick, setSeatCountPick] = useState('1');
+  // Batch 27: the full plan read carries everything the upgrade flow needs:
+  // the plans, the paid-seat minimum, how many active paid seats the facility
+  // holds, the cap, the pay account and the admin WhatsApp number.
+  const [planState, setPlanState] = useState<any>(null);
+  const [flowOpen, setFlowOpen] = useState(false);
+  const [flowStep, setFlowStep] = useState<'plan' | 'students' | 'account' | 'receipt'>('plan');
+  const [chosenPlan, setChosenPlan] = useState<{ id: string; name: string; price: number } | null>(null);
+  const [seatCountPick, setSeatCountPick] = useState('5');
+  const [requestCreating, setRequestCreating] = useState(false);
+  const [requestId, setRequestId] = useState('');
+  const [receiptUploading, setReceiptUploading] = useState(false);
+  const [receiptDone, setReceiptDone] = useState(false);
 
   useEffect(() => {
     refreshSeatsSummary();
@@ -68,24 +78,10 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
     if (!activeCentreId) return;
     let alive = true;
     api(`/api/centre/seats/plan?centreId=${encodeURIComponent(activeCentreId)}`)
-      .then((d: any) => { if (alive) setPlanState({ planId: String(d.planId || ''), plans: d.plans || [] }); })
+      .then((d: any) => { if (alive) setPlanState(d); })
       .catch(() => { /* the card hides when the plan lookup fails */ });
     return () => { alive = false; };
   }, [activeCentreId]);
-
-  const savePlan = async (planId: string) => {
-    if (!activeCentreId || !planId) return;
-    setPlanSaving(true);
-    try {
-      await api('/api/centre/seats/plan', { method: 'POST', body: { centreId: activeCentreId, planId } });
-      setPlanState((s) => (s ? { ...s, planId } : s));
-      addToast({ type: 'success', title: 'Plan saved', description: 'This plan now bills every seat you create.' });
-    } catch (err: any) {
-      addToast({ type: 'error', title: 'Could not save plan', description: err.message || 'Try again.' });
-    } finally {
-      setPlanSaving(false);
-    }
-  };
 
   const seats = seatsSummary?.seats ?? [];
   const pool = seatsSummary?.pool ?? {
@@ -162,36 +158,93 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
   };
 
 
-  // Batch 24: Add seat opens a pop-up to pick how many paid seats to create;
-  // the platform minimum (paid seats only) and the cap are checked on the
-  // server before anything is written.
-  const openAddSeatModal = () => {
-    const held = Number(seatsSummary?.paidSeatsHeld ?? 0);
-    const minimum = Number(seatsSummary?.paidSeatMinimum ?? 5);
-    const needed = held < minimum ? minimum - held : 0;
-    setSeatCountPick(String(Math.max(1, needed || 1)));
-    setAddSeatOpen(true);
+  // Batch 27: Add seat opens the upgrade flow: pick a plan, pick how many
+  // students, pay by bank transfer, upload the receipt. The seats land by
+  // themselves once the Tutorial OS admin confirms the payment.
+  const openUpgradeFlow = () => {
+    const minimum = Number(planState?.paidSeatMinimum ?? 5);
+    const activePaid = Number(planState?.activePaidSeats ?? 0);
+    const start = activePaid >= 1 ? Math.max(1, minimum - activePaid) : Math.max(1, minimum);
+    setSeatCountPick(String(start));
+    setFlowStep('plan');
+    setChosenPlan(null);
+    setRequestId('');
+    setReceiptDone(false);
+    setFlowOpen(true);
   };
 
-  const handleCreateSeats = async () => {
-    if (!activeCentreId) return;
-    const n = Math.max(1, Math.floor(Number(seatCountPick || 1)));
-    setAddingSeat(true);
+  // The smallest purchase the platform accepts right now: active paid seats
+  // plus this purchase may never land below the minimum. The dropdown only
+  // ever shows counts from here up, so an under-minimum pick is impossible.
+  const minSeats = (() => {
+    const minimum = Number(planState?.paidSeatMinimum ?? 5);
+    const activePaid = Number(planState?.activePaidSeats ?? 0);
+    return activePaid >= 1 ? Math.max(1, minimum - activePaid) : Math.max(1, minimum);
+  })();
+  const maxSeats = (() => {
+    const held = Number(planState?.paidSeatsHeld ?? 0);
+    const cap = Number(planState?.paidMaxSeats ?? 0);
+    return Math.min(200, Math.max(minSeats, cap > 0 ? cap - held : 50));
+  })();
+  const pickedSeats = Math.max(minSeats, Math.min(maxSeats, Number(seatCountPick) || minSeats));
+  const seatTotal = chosenPlan ? pickedSeats * Number(chosenPlan.price || 0) : 0;
+  const nairaFmt = (n: number) => `\u20A6${Number(n || 0).toLocaleString()}`;
+
+  const handleCreateRequest = async () => {
+    if (!activeCentreId || !chosenPlan) return;
+    setRequestCreating(true);
     setErrorMessage(null);
     try {
-      const d: any = await api('/api/centre/seats/add', { method: 'POST', body: { centreId: activeCentreId, count: n } });
-      await refreshSeatsSummary();
-      setAddSeatOpen(false);
-      addToast({
-        type: 'success',
-        title: `${n} paid seat${n === 1 ? '' : 's'} created`,
-        description: `Seat${n === 1 ? '' : 's'} ${(d.created || []).join(', ')} joined the pool, paused until you add a student to one.`,
+      const d: any = await api('/api/centre/seats/upgrade-request', {
+        method: 'POST',
+        body: { centreId: activeCentreId, planId: chosenPlan.id, seats: pickedSeats },
       });
+      setRequestId(String(d?.request?.id || ''));
+      setReceiptDone(false);
+      setFlowStep('receipt');
     } catch (err: any) {
-      addToast({ type: 'error', title: 'Could not create seats', description: err.message || 'Try again.' });
+      addToast({ type: 'error', title: 'Could not file the upgrade', description: err.message || 'Try again.' });
     } finally {
-      setAddingSeat(false);
+      setRequestCreating(false);
     }
+  };
+
+  const handleReceiptUpload = async (file: File) => {
+    if (!activeCentreId || !requestId || !file) return;
+    if (file.size > 4 * 1024 * 1024) {
+      addToast({ type: 'error', title: 'Too large', description: 'The receipt can be up to 4 MB.' });
+      return;
+    }
+    setReceiptUploading(true);
+    setErrorMessage(null);
+    try {
+      const data: string = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ''));
+        reader.onerror = () => reject(new Error('Could not read that file.'));
+        reader.readAsDataURL(file);
+      });
+      await api('/api/centre/seats/upgrade-request/receipt', {
+        method: 'POST',
+        body: { centreId: activeCentreId, requestId, data },
+      });
+      setReceiptDone(true);
+      addToast({ type: 'success', title: 'Receipt uploaded', description: 'It is with the Tutorial OS admin now.' });
+    } catch (err: any) {
+      addToast({ type: 'error', title: 'Could not upload the receipt', description: err.message || 'Try again.' });
+    } finally {
+      setReceiptUploading(false);
+    }
+  };
+
+  const openWhatsApp = () => {
+    const raw = String(planState?.whatsappNumber || '09030064109').replace(/\D/g, '');
+    const intl = raw.startsWith('0') ? `234${raw.slice(1)}` : raw;
+    const centreName = String(activeCentre?.name || 'Our facility');
+    const text = encodeURIComponent(
+      `Hello Tutorial OS, ${centreName} has paid ${nairaFmt(seatTotal)} for ${pickedSeats} seats on the ${chosenPlan?.name || ''} plan. The receipt is uploaded. Please confirm our payment and activate our seats.`
+    );
+    window.open(`https://wa.me/${intl}?text=${text}`, '_blank', 'noopener');
   };
 
   return (
@@ -225,13 +278,12 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
 
         <div className="flex items-center gap-2 self-start md:self-auto">
           <button
-            onClick={openAddSeatModal}
-            disabled={addingSeat}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-white bg-[var(--brand,#0F172A)] hover:brightness-110 rounded-xl transition-all disabled:opacity-50"
-            title="Choose how many paid seats to create; the platform minimum is checked before they are created"
+            onClick={openUpgradeFlow}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-white bg-[var(--brand,#0F172A)] hover:brightness-110 rounded-xl transition-all"
+            title="Pick a plan, pay and upload your receipt; your seats land once the Tutorial OS admin confirms"
           >
             <UserPlus className="w-4 h-4" />
-            {addingSeat ? 'Creating...' : 'Add seat'}
+            Add seat
           </button>
           <button
             onClick={() => refreshSeatsSummary()}
@@ -306,16 +358,21 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
             <p className="text-[11px] text-slate-400 mt-0.5">The chosen plan bills every seat you create, per student per month.</p>
           </div>
           <div className="flex items-center gap-2">
-            <select
-              value={planState.planId}
-              onChange={(e) => savePlan(e.target.value)}
-              disabled={planSaving}
-              className="text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-slate-900 dark:text-white outline-none focus:border-[var(--brand,#0F172A)]"
+            <span className="text-xs font-black text-slate-900 dark:text-white">
+              {(() => {
+                const current = (planState.plans || []).find((p: any) => p.id === planState.planId);
+                return current
+                  ? `${current.name}${Number(current.price) > 0 ? ` · \u20A6${Number(current.price).toLocaleString()}/seat/month` : ' · free seats only'}`
+                  : 'Free · free seats only';
+              })()}
+            </span>
+            <button
+              onClick={openUpgradeFlow}
+              className="text-xs font-bold text-white bg-[var(--brand,#0F172A)] hover:brightness-110 rounded-xl px-3 py-2 transition-all"
+              title="Move to a new plan: pick one, pay and upload your receipt"
             >
-              {planState.plans.map((p) => (
-                <option key={p.id} value={p.id}>{p.name} · ₦{Number(p.price || 0).toLocaleString()}/seat/month</option>
-              ))}
-            </select>
+              Upgrade
+            </button>
           </div>
         </div>
       )}
@@ -335,9 +392,9 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
         )}
         {seats.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 p-6 text-center text-xs text-slate-400">
-            No seats in this facility&apos;s pool yet. Free seats appear here automatically, and the
-            Add seat opens a pop-up to choose how many paid seats to create; the platform
-            minimum gates the first batch.
+            No seats in this facility&apos;s pool yet. Free seats appear here automatically, and
+            Add seat opens the upgrade flow: pick a plan, pay, and your seats land once the
+            Tutorial OS admin confirms.
           </div>
         ) : (
           <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-700/60">
@@ -471,6 +528,17 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
                       </td>
                       <td className="py-3 px-4 text-right">
                         <div className="flex items-center justify-end gap-2">
+                          {!isFree && seat.status === 'locked' && (
+                            <button
+                              type="button"
+                              onClick={openUpgradeFlow}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-bold text-white bg-[var(--brand,#0F172A)] hover:brightness-110 rounded-lg transition-all"
+                              title="This seat finished its days. Buy new seats to bring it back."
+                            >
+                              <Sparkles className="w-3.5 h-3.5" />
+                              Add new seat
+                            </button>
+                          )}
                           {!seat.studentUid && seat.status !== 'locked' && (
                             <button
                               type="button"
@@ -591,43 +659,218 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
       )}
 
       {/* Seat details + history modal */}
-      {/* Add seat pop-up (batch 24): pick how many paid seats to create. The
-          platform minimum (paid seats only) and the cap are checked on the
-          server before anything is written. */}
-      {addSeatOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" onClick={() => !addingSeat && setAddSeatOpen(false)}>
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 max-w-sm w-full shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-base font-black text-slate-900 dark:text-white">Add paid seats</h3>
-            <p className="text-xs text-slate-500 mt-1">
-              You hold {seatsSummary?.paidSeatsHeld ?? 0} paid seats. The platform minimum is {seatsSummary?.paidSeatMinimum ?? 5} paid seats; free seats never count toward it.
-            </p>
-            {(seatsSummary?.paidSeatsHeld ?? 0) < (seatsSummary?.paidSeatMinimum ?? 5) && (
-              <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-2">
-                You need {Math.max(0, (seatsSummary?.paidSeatMinimum ?? 5) - (seatsSummary?.paidSeatsHeld ?? 0))} more paid seats to reach the minimum, so pick at least that many; they are created together.
-              </p>
+      {/* Batch 27: the upgrade flow. Step 1 picks a plan, step 2 how many
+          students (never below the minimum), step 3 the account details,
+          step 4 the receipt upload with the WhatsApp contact. The seats land
+          by themselves once the Tutorial OS admin confirms the payment. */}
+      {flowOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"
+          onClick={() => !requestCreating && !receiptUploading && setFlowOpen(false)}
+        >
+          <div
+            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-3xl p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {flowStep === 'plan' && (
+              <>
+                <div className="flex items-start justify-between mb-1">
+                  <h3 className="text-lg font-black text-slate-900 dark:text-white">Choose a plan</h3>
+                  <button onClick={() => setFlowOpen(false)} className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-white rounded-lg">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
+                  Pick the plan you want to move into. You pay per student seat, per month.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {(planState?.plans || []).map((p: any) => {
+                    const isFreePlan = p.id === 'centre_free';
+                    const current = planState?.planId === p.id;
+                    return (
+                      <div key={p.id} className={`rounded-2xl border p-4 flex flex-col ${current ? 'border-[var(--brand,#0F172A)] border-2' : 'border-slate-200 dark:border-slate-700'}`}>
+                        <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">{p.name}</p>
+                        <p className="text-xl font-black text-slate-900 dark:text-white mt-1">
+                          {Number(p.price) > 0 ? `\u20A6${Number(p.price).toLocaleString()}` : '\u20A60'}
+                        </p>
+                        <p className="text-[10px] text-slate-400">{Number(p.price) > 0 ? 'per seat / month' : 'free seats only'}</p>
+                        {current && (
+                          <span className="mt-2 inline-flex self-start px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-300">
+                            Current plan
+                          </span>
+                        )}
+                        {!isFreePlan && !current && (
+                          <button
+                            type="button"
+                            onClick={() => { setChosenPlan(p); setFlowStep('students'); }}
+                            className="mt-3 w-full py-2 text-xs font-bold text-white bg-[var(--brand,#0F172A)] hover:brightness-110 rounded-xl transition-all"
+                          >
+                            Select
+                          </button>
+                        )}
+                        {isFreePlan && !current && (
+                          <p className="mt-3 text-[10px] text-slate-400">Your free seats stay free on any plan.</p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                {!(planState?.plans || []).length && (
+                  <p className="text-xs text-slate-400">Plans could not be loaded. Refresh and try again.</p>
+                )}
+              </>
             )}
-            <label className="block text-[11px] font-bold text-slate-500 mt-4 mb-1">How many seats</label>
-            <select
-              value={seatCountPick}
-              onChange={(e) => setSeatCountPick(e.target.value)}
-              className="w-full px-3 py-2.5 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-            >
-              {Array.from({ length: 50 }, (_, i) => String(i + 1)).map((v) => (
-                <option key={v} value={v}>{v}</option>
-              ))}
-            </select>
-            <p className="text-[11px] text-slate-400 mt-2">
-              Below the minimum the whole batch must reach it in one go; once your facility holds the minimum, any number goes.
-            </p>
-            <div className="flex justify-end gap-2 mt-4">
-              <button type="button" onClick={() => setAddSeatOpen(false)} disabled={addingSeat} className="px-3.5 py-2 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all">
-                Cancel
-              </button>
-              <button type="button" onClick={handleCreateSeats} disabled={addingSeat} className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-white bg-[var(--brand,#0F172A)] hover:brightness-110 rounded-xl transition-all disabled:opacity-50">
-                <UserPlus className="w-4 h-4" />
-                {addingSeat ? 'Creating...' : `Create ${Math.max(1, Math.floor(Number(seatCountPick || 1)))} seat${Math.max(1, Math.floor(Number(seatCountPick || 1))) === 1 ? '' : 's'}`}
-              </button>
-            </div>
+
+            {flowStep === 'students' && chosenPlan && (
+              <>
+                <div className="flex items-start justify-between mb-1">
+                  <h3 className="text-lg font-black text-slate-900 dark:text-white">Upgrade to {chosenPlan.name}</h3>
+                  <button onClick={() => setFlowStep('plan')} className="text-xs font-semibold text-slate-400 hover:text-slate-600 dark:hover:text-white">Back</button>
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">How many students are you enrolling?</p>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Number of students</label>
+                <select
+                  value={seatCountPick}
+                  onChange={(e) => setSeatCountPick(e.target.value)}
+                  className="w-full px-3 py-3 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
+                >
+                  {Array.from({ length: Math.max(1, maxSeats - minSeats + 1) }, (_, i) => String(minSeats + i)).map((v) => (
+                    <option key={v} value={v}>{v} student{v === '1' ? '' : 's'}</option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-slate-400 mt-2">
+                  {Number(planState?.activePaidSeats ?? 0) >= 1
+                    ? `You hold ${planState.activePaidSeats} active paid seat${planState.activePaidSeats === 1 ? '' : 's'}, so this purchase must take the total to at least ${planState?.paidSeatMinimum ?? 5}.`
+                    : `The platform minimum is ${planState?.paidSeatMinimum ?? 5} students on the first purchase.`}
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-3">
+                  {nairaFmt(Number(chosenPlan.price))} per student per month
+                </p>
+                <div className="mt-2 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700/60 px-4 py-3">
+                  <p className="text-sm font-black text-slate-900 dark:text-white">
+                    {pickedSeats} student{pickedSeats === 1 ? '' : 's'} \u00D7 {nairaFmt(Number(chosenPlan.price))} = {nairaFmt(seatTotal)}
+                  </p>
+                </div>
+                <div className="flex items-center justify-end gap-2 mt-5">
+                  <button
+                    type="button"
+                    onClick={() => setFlowStep('plan')}
+                    className="px-3.5 py-2 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all"
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFlowStep('account')}
+                    className="px-4 py-2 text-xs font-bold text-white bg-[var(--brand,#0F172A)] hover:brightness-110 rounded-xl transition-all"
+                  >
+                    Continue to payment
+                  </button>
+                </div>
+              </>
+            )}
+
+            {flowStep === 'account' && chosenPlan && (() => {
+              const acct = planState?.payAccount || { name: 'Michael Ogunnaike', number: '5070133907', bank: 'Moniepoint' };
+              const copy = (v: string) => {
+                try {
+                  navigator.clipboard.writeText(v);
+                  addToast({ type: 'success', title: 'Copied', description: v });
+                } catch { /* clipboard unavailable */ }
+              };
+              return (
+                <>
+                  <div className="flex items-start justify-between mb-1">
+                    <h3 className="text-lg font-black text-slate-900 dark:text-white">Payment details</h3>
+                    <button onClick={() => setFlowStep('students')} className="text-xs font-semibold text-slate-400 hover:text-slate-600 dark:hover:text-white">Back</button>
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
+                    Pay {nairaFmt(seatTotal)} by bank transfer for {pickedSeats} student{pickedSeats === 1 ? '' : 's'} on the {chosenPlan.name} plan.
+                  </p>
+                  <div className="rounded-2xl border border-slate-200 dark:border-slate-700 divide-y divide-slate-100 dark:divide-slate-800">
+                    {([['Bank', acct.bank], ['Account name', acct.name], ['Account number', acct.number]] as [string, string][]).map(([label, value]) => (
+                      <div key={label} className="flex items-center justify-between px-4 py-3">
+                        <div>
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</p>
+                          <p className="text-sm font-bold text-slate-900 dark:text-white">{value}</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => copy(value)}
+                          className="p-2 text-slate-400 hover:text-[var(--brand,#0F172A)] rounded-lg"
+                          title={`Copy the ${label.toLowerCase()}`}
+                        >
+                          <Copy className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-2">Use this account only for this payment.</p>
+                  <button
+                    type="button"
+                    disabled={requestCreating}
+                    onClick={handleCreateRequest}
+                    className="mt-5 w-full py-3 text-xs font-bold text-white bg-[var(--brand,#0F172A)] hover:brightness-110 rounded-xl transition-all disabled:opacity-50"
+                  >
+                    {requestCreating ? 'Filing your request...' : 'I have made the payment'}
+                  </button>
+                </>
+              );
+            })()}
+
+            {flowStep === 'receipt' && chosenPlan && (
+              <>
+                <h3 className="text-lg font-black text-slate-900 dark:text-white mb-1">Confirm your payment</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">Upload the receipt of your bank transfer.</p>
+                <label className="block cursor-pointer">
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,application/pdf"
+                    className="hidden"
+                    disabled={receiptUploading}
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) handleReceiptUpload(f);
+                      e.currentTarget.value = '';
+                    }}
+                  />
+                  <div className="rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-700 p-8 text-center hover:border-[var(--brand,#0F172A)] transition-colors">
+                    <Upload className="w-6 h-6 mx-auto text-slate-400" />
+                    <p className="text-xs font-bold text-slate-700 dark:text-slate-200 mt-2">
+                      {receiptUploading ? 'Uploading...' : receiptDone ? 'Receipt uploaded' : 'Upload receipt (image or PDF)'}
+                    </p>
+                  </div>
+                </label>
+                <p className="text-[11px] text-slate-400 mt-2">Your receipt goes straight to the Tutorial OS admin team.</p>
+                <button
+                  type="button"
+                  disabled={!receiptDone}
+                  onClick={openWhatsApp}
+                  className={`mt-4 w-full py-3 text-xs font-bold rounded-xl transition-all inline-flex items-center justify-center gap-2 text-white ${receiptDone ? 'bg-emerald-500 hover:brightness-110' : 'bg-emerald-500/40 cursor-not-allowed'}`}
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  Contact admin on WhatsApp
+                </button>
+                <p className="text-[10px] text-slate-400 mt-1.5 text-center">
+                  {receiptDone ? 'Ask the admin to confirm your payment and activate your seats.' : 'This unlocks once your receipt is uploaded.'}
+                </p>
+                <div className="mt-5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700/60 px-4 py-3">
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Once the Tutorial OS admin confirms your payment, the {chosenPlan.name} seats you paid for appear on this
+                    dashboard by themselves, on top of your free seats. Nothing else to do.
+                  </p>
+                </div>
+                <div className="flex justify-end mt-4">
+                  <button
+                    type="button"
+                    onClick={() => { setFlowOpen(false); refreshSeatsSummary(); }}
+                    className="px-3.5 py-2 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all"
+                  >
+                    Done
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
