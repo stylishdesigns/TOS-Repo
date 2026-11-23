@@ -210,6 +210,9 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
   const clockOutLabel = clockedOutAt ? fmtClock(clockedOutAt) : '';
 
   const isClosingTime = currentMinutes >= closingMinutes;
+  // Check-in is locked until the facility's sign-in (resumption) time arrives:
+  // the button reads closed, not open, before that moment.
+  const beforeResumption = !clockedInAt && currentMinutes < resumptionMinutes;
   // The chip on the line shows hour and minutes only; once the student has
   // checked out it freezes at that moment instead of ticking on.
   const chipTime = (clockedOutAt || currentTime).toLocaleTimeString('en-GB', { hour12: false, hour: '2-digit', minute: '2-digit' });
@@ -343,9 +346,9 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
           <div className="flex flex-col items-center gap-1 shrink-0 w-[64px]">
             <button
               onClick={handleClockInAction}
-              disabled={!!clockedInAt}
+              disabled={!!clockedInAt || beforeResumption}
               aria-label="Check In"
-              className={`w-14 h-14 rounded-full flex items-center justify-center text-white shadow-md transition-all ${clockedInAt ? 'bg-emerald-600 opacity-60 cursor-not-allowed' : `bg-emerald-600 hover:brightness-110 active:scale-95 ${isRunningLate ? 'checkin-breathe' : ''}`}`}
+              className={`w-14 h-14 rounded-full flex items-center justify-center text-white shadow-md transition-all ${clockedInAt ? 'bg-emerald-600 opacity-60 cursor-not-allowed' : beforeResumption ? 'bg-emerald-600 opacity-40 cursor-not-allowed' : `bg-emerald-600 hover:brightness-110 active:scale-95 ${isRunningLate ? 'checkin-breathe' : ''}`}`}
             >
               <LogIn className="w-6 h-6" />
             </button>
@@ -391,7 +394,9 @@ export const HomeTab: React.FC<HomeTabProps> = ({ student, onNavigateTab }) => {
         </div>
         <p className="text-center text-[10px] font-semibold text-slate-400 mt-2">
           {!clockedInAt
-            ? `Tap Check In when you arrive • Resumption ${attendanceSettings.resumptionTime} • Late after ${attendanceSettings.lateArrivalTime}`
+            ? beforeResumption
+              ? `Check-in opens at ${attendanceSettings.resumptionTime} • Late after ${attendanceSettings.lateArrivalTime}`
+              : `Tap Check In when you arrive • Resumption ${attendanceSettings.resumptionTime} • Late after ${attendanceSettings.lateArrivalTime}`
             : clockedOutAt
             ? `Checked in ${clockInLabel} • Checked out ${clockOutLabel}`
             : isClosingTime

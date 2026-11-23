@@ -39,6 +39,7 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
   }, [activeCentreId]);
 
   const used = seatsSummary?.used ?? students.filter(s => s.status !== 'Suspended').length;
+  const enrolled = students.filter(s => s.status !== 'Suspended').length;
   const cap = seatsSummary?.cap ?? 10;
   const isTrial = seatsSummary?.isTrial ?? (activeCentre?.status === 'trial');
   const trialDaysLeft = seatsSummary?.trialDaysLeft ?? 30;
@@ -108,7 +109,7 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
                 )}
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Live seat allocation and individual student access controls.
+                Enrolled students keep their place here; only students with access switched ON hold an active seat.
               </p>
             </div>
           </div>
@@ -117,6 +118,20 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
         {/* Live Seat Metric Widget */}
         <div className="flex items-center gap-6 bg-slate-50 dark:bg-slate-800/60 p-4 rounded-2xl border border-slate-100 dark:border-slate-700/60">
           <div className="text-left">
+            <span className="text-xs text-slate-400 dark:text-slate-400 font-medium block">
+              Enrolled Students
+            </span>
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-2xl font-black text-slate-900 dark:text-white">
+                {enrolled}
+              </span>
+              <span className="text-sm font-semibold text-slate-400">
+                in your facility
+              </span>
+            </div>
+          </div>
+
+          <div className="text-left border-l border-slate-200 dark:border-slate-700 pl-6">
             <span className="text-xs text-slate-400 dark:text-slate-400 font-medium block">
               Active Seats
             </span>
