@@ -949,3 +949,60 @@ export async function notifySeat(
   }
   return true;
 }
+
+// ============================================================================
+// Batch 26: lead-tier migration. Runs once: every facility's billing doc
+// drops its trial fields (trialStartsAt / trialEndsAt / skippedTrial /
+// discountPct) and the old grace fields, gains tier ('facility' when the
+// facility ever paid through, 'lead' otherwise), and leads have their paid
+// seats stripped (trimPaidSeatsForCap to 0 handles vacant and occupied
+// seats the same way a manual trim does). Free seats are re-reconciled.
+// Guarded by leadTierMigrationDoneAt on the platform config so it only ever
+// runs once; every later run is a single read.
+// ============================================================================
+export async function migrateToLeadTier(config?: any): Promise<{ done: boolean; facilities: number; seatsRemoved: number }> {
+  const cfgRef = adminDb.collection('platformConfig').doc('global');
+  const cfgSnap = await cfgRef.get();
+  if (cfgSnap.exists && (cfgSnap.data() as any)?.leadTierMigrationDoneAt) {
+    return { done: false, facilities: 0, seatsRemoved: 0 };
+  }
+  if (!config) config = await readSeatConfig();
+  const snap = await adminDb.collection('centreBilling').get();
+  let facilities = 0;
+  let seatsRemoved = 0;
+  for (const d of snap.docs) {
+    const billing = d.data() as any;
+    const tier = billing.paidThrough ? 'facility' : 'lead';
+    await d.ref.set({
+      tier,
+      trialStartsAt: null,
+      trialEndsAt: null,
+      skippedTrial: false,
+      discountPct: 0,
+      landingGraceUntil: null,
+      landingLockedNotifiedAt: null,
+    }, { merge: true });
+    facilities += 1;
+    if (tier === 'lead') {
+      // A lead is free-seats-only: paid seats go, occupied or not.
+      try {
+        const r = await trimPaidSeatsForCap(d.id, 0);
+        seatsRemoved += r.removed;
+      } catch (e) {
+        console.error('[lead-migration] trim failed', d.id, (e as Error).message);
+      }
+      try {
+        await reconcileFreeSeats(d.id, effectiveFreeSeats(billing, config));
+      } catch { /* tops up on the next seats read */ }
+    }
+  }
+  await cfgRef.set({ leadTierMigrationDoneAt: new Date().toISOString() }, { merge: true });
+  await adminDb.collection('auditLogs').add({
+    actorUid: 'system',
+    action: 'LEAD_TIER_MIGRATION',
+    after: { facilities, seatsRemoved },
+    at: new Date().toISOString(),
+  });
+  console.log('[lead-migration] done', JSON.stringify({ facilities, seatsRemoved }));
+  return { done: true, facilities, seatsRemoved };
+}

@@ -3,7 +3,7 @@ import { getAuth, signOut, updateProfile, updatePassword, reauthenticateWithCred
 import {
   LayoutDashboard, Users, Building2, Wallet, ScrollText, UserPlus, Loader2,
   RefreshCw, Send, Ban, CheckCircle2, PlayCircle, Check, Plus, ShieldCheck,
-  ArrowUpRight, UserRound, BookOpen, CalendarDays, Copy, HelpCircle,
+  ArrowUpRight, UserRound, BookOpen, CalendarDays, Copy, HelpCircle, Sparkles,
   AlertTriangle, X, ChevronRight, MessageSquare, Globe, Trash2, Settings,
 } from 'lucide-react';
 import {

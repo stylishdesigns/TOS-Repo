@@ -810,8 +810,8 @@ export function registerTutorAiRoutes(app: express.Express) {
 
       const centreId = await resolveCentreId(caller, String(body.centreId || '').slice(0, 128));
 
-      const status = await getCentreSubscriptionStatus(centreId);
-      if (status !== 'active' && status !== 'trial' && status !== 'lead') {
+      const status = await getCentreSubscriptionStatus(centreId) as string;
+      if (status !== 'active' && status !== 'lead') {
         throw httpError(403, 'Tutor AI is unavailable while the facility\'s subscription is not active.');
       }
 

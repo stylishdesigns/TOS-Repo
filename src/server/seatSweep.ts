@@ -14,7 +14,7 @@
 //
 import { adminDb } from './firebaseAdmin';
 import { getPlatformConfig } from './tenantService';
-import { listSeats, seatKind, facilityTier, trimPaidSeatsForCap, reconcileFreeSeats, effectiveFreeSeats, seatUsage } from './seatDays';
+import { listSeats, seatKind, facilityTier, trimPaidSeatsForCap, reconcileFreeSeats, effectiveFreeSeats, seatUsage, migrateToLeadTier } from './seatDays';
 import { sendEmail, emailProviderConfigured, OutgoingEmail } from './email';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -60,63 +60,6 @@ async function sendToAll(recipients: string[], mail: Omit<OutgoingEmail, 'to'>):
     } catch { /* keep going */ }
   }
   return delivered;
-}
-
-// ============================================================================
-// Batch 26: lead-tier migration. Runs once: every facility's billing doc
-// drops its trial fields (trialStartsAt / trialEndsAt / skippedTrial /
-// discountPct) and the old grace fields, gains tier ('facility' when the
-// facility ever paid through, 'lead' otherwise), and leads have their paid
-// seats stripped (trimPaidSeatsForCap to 0 handles vacant and occupied
-// seats the same way a manual trim does). Free seats are re-reconciled.
-// Guarded by leadTierMigrationDoneAt on the platform config so it only ever
-// runs once; every later run is a single read.
-// ============================================================================
-export async function migrateToLeadTier(): Promise<{ done: boolean; facilities: number; seatsRemoved: number }> {
-  const cfgRef = adminDb.collection('platformConfig').doc('global');
-  const cfgSnap = await cfgRef.get();
-  if (cfgSnap.exists && (cfgSnap.data() as any)?.leadTierMigrationDoneAt) {
-    return { done: false, facilities: 0, seatsRemoved: 0 };
-  }
-  const config = await getPlatformConfig();
-  const snap = await adminDb.collection('centreBilling').get();
-  let facilities = 0;
-  let seatsRemoved = 0;
-  for (const d of snap.docs) {
-    const billing = d.data() as any;
-    const tier = billing.paidThrough ? 'facility' : 'lead';
-    await d.ref.set({
-      tier,
-      trialStartsAt: null,
-      trialEndsAt: null,
-      skippedTrial: false,
-      discountPct: 0,
-      landingGraceUntil: null,
-      landingLockedNotifiedAt: null,
-    }, { merge: true });
-    facilities += 1;
-    if (tier === 'lead') {
-      // A lead is free-seats-only: paid seats go, occupied or not.
-      try {
-        const r = await trimPaidSeatsForCap(d.id, 0);
-        seatsRemoved += r.removed;
-      } catch (e) {
-        console.error('[lead-migration] trim failed', d.id, (e as Error).message);
-      }
-      try {
-        await reconcileFreeSeats(d.id, effectiveFreeSeats(billing, config));
-      } catch { /* tops up on the next seats read */ }
-    }
-  }
-  await cfgRef.set({ leadTierMigrationDoneAt: new Date().toISOString() }, { merge: true });
-  await adminDb.collection('auditLogs').add({
-    actorUid: 'system',
-    action: 'LEAD_TIER_MIGRATION',
-    after: { facilities, seatsRemoved },
-    at: new Date().toISOString(),
-  });
-  console.log('[lead-migration] done', JSON.stringify({ facilities, seatsRemoved }));
-  return { done: true, facilities, seatsRemoved };
 }
 
 export async function runSeatPolicySweep(opts: { centreId?: string } = {}): Promise<SeatSweepResult> {
@@ -193,9 +136,10 @@ export async function runSeatPolicySweep(opts: { centreId?: string } = {}): Prom
       marked += 1;
     }
     if (marked) await batch.commit();
-    if (finishing.length && recipients.length) {
+    const digestRecipients = finishing.length ? await centreRecipients(centreId, centre.ownerEmail) : [];
+    if (finishing.length && digestRecipients.length) {
       const lines = finishing.map((f) => `Seat ${f.seatNo} (${f.student}): ${f.days} day${f.days === 1 ? '' : 's'} left`);
-      const delivered = await sendToAll(recipients, {
+      const delivered = await sendToAll(digestRecipients, {
         subject: `${centreName}: ${finishing.length} seat${finishing.length === 1 ? '' : 's'} finish this week`,
         html: `<p>${finishing.length} seat${finishing.length === 1 ? '' : 's'} at ${centreName} finish within the next 5 days:</p><p>${lines.map((l) => l.replace(/&/g, '&amp;').replace(/</g, '&lt;')).join('<br/>')}</p><p>When a seat finishes it locks and the student on it loses access until a payment reopens the pool. Record a payment in the facility app, or let your Tutorial OS contact know.</p>`,
         text: `${finishing.length} seat(s) at ${centreName} finish within the next 5 days:\n\n${lines.join('\n')}\n\nWhen a seat finishes it locks and the student on it loses access until a payment reopens the pool. Record a payment in the facility app, or let your Tutorial OS contact know.`,

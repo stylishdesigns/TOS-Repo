@@ -1,5 +1,5 @@
 import { adminDb, adminAuth } from './firebaseAdmin';
-import { reconcileSeatOrder } from './seatDays';
+import { reconcileSeatOrder, migrateToLeadTier } from './seatDays';
 import {
   Centre,
   CentreBilling,
@@ -1681,6 +1681,9 @@ export async function getSeatsSummaryService(centreId: string): Promise<CentreSe
   // One-time pool tidy-up (free seats first, no default paid seats): runs on
   // the seats summary read the facility panel makes, guarded in seatDays.
   try { await reconcileSeatOrder(centreId); } catch { /* retried on the next seats read */ }
+  // Batch 26: the one-time lead-tier migration rides the same read; guarded
+  // in seatDays so it only ever runs once.
+  try { await migrateToLeadTier(); } catch { /* retried on the next seats read */ }
   const billing = await getBillingDoc(centreId);
   const centre = await getCentreDoc(centreId);
   const config = await getPlatformConfig();
