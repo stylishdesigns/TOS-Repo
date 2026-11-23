@@ -416,7 +416,7 @@ export async function drawFreeSeatForCentre(
 export async function provisionSeats(
   centreId: string,
   count: number
-): Promise<{ reopened: number; added: number; total: number; requested: number; capped: boolean; cap: number }> {
+): Promise<{ reopened: number; added: number; total: number; requested: number; capped: boolean; cap: number; planRequired?: boolean; message?: string }> {
   const n = Math.max(0, Math.floor(Number(count || 0)));
   const seats = await listSeats(centreId);
   if (!n) return { reopened: 0, added: 0, total: seats.length, requested: 0, capped: false, cap: 0 };
@@ -426,6 +426,10 @@ export async function provisionSeats(
   // locked seats adds no seats, so it is never capped.
   const billing = (await adminDb.collection('centreBilling').doc(centreId).get()).data() || {};
   const config = await readSeatConfig();
+  // Batch 22: a facility chooses its plan before creating seats off trial.
+  if (!isOnTrial(billing) && !String(billing.planId || '')) {
+    return { reopened: 0, added: 0, total: seats.length, requested: n, capped: false, cap: 0, planRequired: true, message: 'Choose a plan before creating seats.' };
+  }
   const cap = isOnTrial(billing)
     ? Math.max(1, Math.floor(Number((config as any)?.trialMaxSeats ?? 10)))
     : (config as any)?.paidSeatsUnlimited === true
@@ -449,6 +453,7 @@ export async function provisionSeats(
       studentName: '',
       assignedAt: null,
       reopenedAt: nowIso,
+      expiryNoticeSentAt: null,
     });
     reopened += 1;
   }

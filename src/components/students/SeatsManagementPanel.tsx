@@ -16,6 +16,7 @@ import {
   Clock3,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { api } from '../tos/tosShared';
 import { Student, SeatSummary } from '../../types';
 
 interface SeatsManagementPanelProps {
@@ -59,10 +60,37 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
   const [assignSeat, setAssignSeat] = useState<SeatSummary | null>(null);
   const [assignPick, setAssignPick] = useState('');
   const [assigning, setAssigning] = useState(false);
+  const [planState, setPlanState] = useState<{ planId: string; plans: { id: string; name: string; price: number }[] } | null>(null);
+  const [planSaving, setPlanSaving] = useState(false);
 
   useEffect(() => {
     refreshSeatsSummary();
   }, [activeCentreId]);
+
+  // Batch 22: the facility's chosen plan, shown above the pool. The chosen
+  // plan bills every seat the facility creates, per student per month.
+  useEffect(() => {
+    if (!activeCentreId) return;
+    let alive = true;
+    api(`/api/centre/seats/plan?centreId=${encodeURIComponent(activeCentreId)}`)
+      .then((d: any) => { if (alive) setPlanState({ planId: String(d.planId || ''), plans: d.plans || [] }); })
+      .catch(() => { /* the card hides when the plan lookup fails */ });
+    return () => { alive = false; };
+  }, [activeCentreId]);
+
+  const savePlan = async (planId: string) => {
+    if (!activeCentreId || !planId) return;
+    setPlanSaving(true);
+    try {
+      await api('/api/centre/seats/plan', { method: 'POST', body: { centreId: activeCentreId, planId } });
+      setPlanState((s) => (s ? { ...s, planId } : s));
+      addToast({ type: 'success', title: 'Plan saved', description: 'This plan now bills every seat you create.' });
+    } catch (err: any) {
+      addToast({ type: 'error', title: 'Could not save plan', description: err.message || 'Try again.' });
+    } finally {
+      setPlanSaving(false);
+    }
+  };
 
   const seats = seatsSummary?.seats ?? [];
   const pool = seatsSummary?.pool ?? {
@@ -275,6 +303,27 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
           >
             Dismiss
           </button>
+        </div>
+      )}
+
+      {planState && planState.plans.length > 0 && (
+        <div className="mt-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-slate-200 dark:border-slate-700/60 bg-slate-50 dark:bg-slate-800/40 p-4">
+          <div>
+            <p className="text-xs font-bold text-slate-900 dark:text-white">Plan</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">The chosen plan bills every seat you create, per student per month.</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <select
+              value={planState.planId}
+              onChange={(e) => savePlan(e.target.value)}
+              disabled={planSaving}
+              className="text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-slate-900 dark:text-white outline-none focus:border-[var(--brand,#0F172A)]"
+            >
+              {planState.plans.map((p) => (
+                <option key={p.id} value={p.id}>{p.name} · ₦{Number(p.price || 0).toLocaleString()}/seat/month</option>
+              ))}
+            </select>
+          </div>
         </div>
       )}
 

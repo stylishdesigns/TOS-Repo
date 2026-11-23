@@ -4,6 +4,7 @@ import { STARTING_CONFIG } from './platformDefaults';
 import { adminAuth, adminDb } from './firebaseAdmin';
 import { runStaffPayReminderSweep } from './staffPayReminders';
 import { provisionSeats, getSeatPool, isOnTrial, countPaidSeatsForCentre } from './seatDays';
+import { runSeatPolicySweep } from './seatSweep';
 import {
   Caller,
   countActiveStudents,
@@ -279,10 +280,15 @@ export function registerExtendedRoutes(app: express.Express): void {
         const minimum = Math.max(0, Math.floor(Number((config as any)?.paidSeatMinimum ?? 5)));
         const paidHeld = await countPaidSeatsForCentre(doc.id);
         if (paidHeld < minimum) {
-          return res.json({
-            locked: true,
-            message: `It unlocks once the facility pays for at least ${minimum} seats. It currently holds ${paidHeld}.`,
-          });
+          // The page pauses only after the 7-day grace that starts the day
+          // the warning email lands (seatSweep sets landingGraceUntil).
+          const graceUntil = billing.landingGraceUntil ? new Date(billing.landingGraceUntil).getTime() : 0;
+          if (graceUntil && graceUntil <= Date.now()) {
+            return res.json({
+              locked: true,
+              message: 'This facility page is not available right now. Please contact the facility admin directly.',
+            });
+          }
         }
       }
       const rawAccent = String(data.accentColor || '').trim();
@@ -295,6 +301,70 @@ export function registerExtendedRoutes(app: express.Express): void {
     } catch (error: any) {
       console.error('[centre-by-slug] failed:', error?.message || error);
       res.status(500).json({ error: 'Could not look up that facility. Please try again.' });
+    }
+  });
+
+  // ==========================================================================
+  // Batch 22: seat policy for the facility itself. Plan choice (the chosen
+  // plan bills every seat the facility creates) and an on-demand run of the
+  // seat-policy sweep, for testing and for a "run now" button later.
+  // ==========================================================================
+  app.get('/api/centre/seats/plan', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const centreId = String(req.query.centreId || '').trim().slice(0, 120);
+      if (!centreId) throw httpError(400, 'centreId is required.');
+      await requireMembership(caller, centreId, ['owner', 'admin']);
+      const bDoc = await adminDb.collection('centreBilling').doc(centreId).get();
+      const billing = (bDoc.data() || {}) as any;
+      const plansSnap = await adminDb.collection('platformPlans').get();
+      const plans = plansSnap.docs
+        .map((d) => ({ id: d.id, name: String((d.data() as any).name || d.id), price: Number((d.data() as any).price || 0) }))
+        .sort((a, b) => a.price - b.price);
+      return res.json({ planId: String(billing.planId || ''), plans });
+    } catch (error: any) {
+      const status = Number(error?.status || 500);
+      res.status(status).json({ error: error.message || 'Could not load plans.' });
+    }
+  });
+
+  app.post('/api/centre/seats/plan', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const centreId = String(req.body?.centreId || '').trim().slice(0, 120);
+      if (!centreId) throw httpError(400, 'centreId is required.');
+      await requireMembership(caller, centreId, ['owner', 'admin']);
+      const planId = String(req.body?.planId || '');
+      await getPlatformPlan(planId); // validates the plan exists
+      await adminDb.collection('centreBilling').doc(centreId).set(
+        { planId, planChosenAt: new Date().toISOString() },
+        { merge: true }
+      );
+      await adminDb.collection('auditLogs').add({
+        actorUid: caller.uid,
+        centreId,
+        action: 'PLAN_CHOSEN',
+        after: { planId },
+        at: new Date().toISOString(),
+      });
+      return res.json({ success: true, planId });
+    } catch (error: any) {
+      const status = Number(error?.status || 500);
+      res.status(status).json({ error: error.message || 'Could not save the plan.' });
+    }
+  });
+
+  app.post('/api/centre/seats/sweep', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const centreId = String(req.body?.centreId || '').trim().slice(0, 120);
+      if (!centreId) throw httpError(400, 'centreId is required.');
+      await requireMembership(caller, centreId, ['owner', 'admin']);
+      const result = await runSeatPolicySweep({ centreId });
+      return res.json({ success: true, result });
+    } catch (error: any) {
+      const status = Number(error?.status || 500);
+      res.status(status).json({ error: error.message || 'Could not run the seat sweep.' });
     }
   });
 
@@ -1990,6 +2060,9 @@ export function registerExtendedRoutes(app: express.Express): void {
           try { seatResult = await provisionSeats(req.params.id, seats); } catch (e) { console.error('[tos/facilities] seat provisioning failed:', (e as Error).message); }
           if (seatResult && seatResult.capped) {
             seatResult.message = `Only ${seatResult.added} of ${seatResult.requested} seat(s) could be added: this facility can hold up to ${seatResult.cap} paid seats.`;
+          }
+          if (seatResult && seatResult.planRequired) {
+            return res.status(400).json({ error: seatResult.message || 'Choose a plan before creating seats.' });
           }
         }
         await auditChange('PAYMENT_RECORDED', { amount, periodCoveredUntil: new Date(periodEnd).toISOString(), method, reference, seats, seatResult });
