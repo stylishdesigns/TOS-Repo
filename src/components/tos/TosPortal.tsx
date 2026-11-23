@@ -1017,7 +1017,7 @@ const UpgradeRequestsTab: React.FC = () => {
                       <td className="py-3 px-4 font-bold text-white">{r.centreName || r.centreId}</td>
                       <td className="py-3 px-4 text-slate-300">{r.planName || r.planId}</td>
                       <td className="py-3 px-4 text-slate-300">{r.seats}</td>
-                      <td className="py-3 px-4 font-bold text-white">\u20A6{Number(r.total || 0).toLocaleString()}</td>
+                      <td className="py-3 px-4 font-bold text-white">{`₦${Number(r.total || 0).toLocaleString()}`}</td>
                       <td className="py-3 px-4">
                         {r.receiptUrl ? (
                           <button onClick={() => setReceiptView(r)} className="text-orange-400 hover:text-orange-300 underline">View receipt</button>
@@ -1090,7 +1090,7 @@ const UpgradeRequestsTab: React.FC = () => {
               <div>
                 <p className="text-sm font-bold text-white">{receiptView.centreName || receiptView.centreId}</p>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  {receiptView.planName} · {receiptView.seats} seat{Number(receiptView.seats) === 1 ? '' : 's'} · \u20A6{Number(receiptView.total || 0).toLocaleString()}
+                  {receiptView.planName} · {receiptView.seats} seat{Number(receiptView.seats) === 1 ? '' : 's'} · {`₦${Number(receiptView.total || 0).toLocaleString()}`}
                 </p>
               </div>
               <button onClick={() => setReceiptView(null)} className="p-2 text-slate-400 hover:text-white rounded-lg"><X className="w-4 h-4" /></button>

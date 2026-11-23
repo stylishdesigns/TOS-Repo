@@ -760,15 +760,27 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
                 </div>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">How many students are you enrolling?</p>
                 <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Number of students</label>
-                <select
-                  value={seatCountPick}
-                  onChange={(e) => setSeatCountPick(e.target.value)}
-                  className="w-full px-3 py-3 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
-                >
-                  {Array.from({ length: Math.max(1, maxSeats - minSeats + 1) }, (_, i) => String(minSeats + i)).map((v) => (
-                    <option key={v} value={v}>{v} student{v === '1' ? '' : 's'}</option>
-                  ))}
-                </select>
+                <div className="flex items-center justify-between rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-2 py-2">
+                  <button
+                    type="button"
+                    onClick={() => setSeatCountPick(String(pickedSeats - 1))}
+                    disabled={pickedSeats <= minSeats}
+                    className="w-11 h-11 text-xl font-black text-slate-600 dark:text-slate-200 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    −
+                  </button>
+                  <p className="text-sm font-black text-slate-900 dark:text-white">
+                    {`${pickedSeats} student${pickedSeats === 1 ? '' : 's'}`}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setSeatCountPick(String(pickedSeats + 1))}
+                    disabled={pickedSeats >= maxSeats}
+                    className="w-11 h-11 text-xl font-black text-slate-600 dark:text-slate-200 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    +
+                  </button>
+                </div>
                 <p className="text-[11px] text-slate-400 mt-2">
                   {Number(planState?.activePaidSeats ?? 0) >= 1
                     ? `You hold ${planState.activePaidSeats} active paid seat${planState.activePaidSeats === 1 ? '' : 's'}, so this purchase must take the total to at least ${planState?.paidSeatMinimum ?? 5}.`
@@ -779,7 +791,7 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
                 </p>
                 <div className="mt-2 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700/60 px-4 py-3">
                   <p className="text-sm font-black text-slate-900 dark:text-white">
-                    {pickedSeats} student{pickedSeats === 1 ? '' : 's'} \u00D7 {nairaFmt(Number(chosenPlan.price))} = {nairaFmt(seatTotal)}
+                    {`${pickedSeats} student${pickedSeats === 1 ? '' : 's'} × ${nairaFmt(Number(chosenPlan.price))} = ${nairaFmt(seatTotal)}`}
                   </p>
                 </div>
                 <div className="flex items-center justify-end gap-2 mt-5">
