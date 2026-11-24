@@ -7,6 +7,7 @@ import {
   AlertCircle,
   BookOpen,
   Calendar,
+  PanelLeft,
   Check,
   X,
   UserCheck,
@@ -57,6 +58,11 @@ export const DashboardOverview: React.FC = () => {
   // Calendar planner: the same facility master timetable and day planner the
   // timetable page uses, opened straight from the greeting card.
   const [showPlanner, setShowPlanner] = React.useState(false);
+  // Mobile sections rail: on phones the dashboard's sections open from a
+  // collapsible left panel instead of piling at the bottom of the scroll.
+  const [sectionsOpen, setSectionsOpen] = React.useState(false);
+  const [secCollapsed, setSecCollapsed] = React.useState<Record<string, boolean>>({});
+  const flipSec = (k: string) => setSecCollapsed((sc) => ({ ...sc, [k]: !sc[k] }));
 
   const pendingAdmissions = admissions.filter((a) => a.status === 'Pending');
   const activeStudents = students.filter((s) => s.status === 'Active');
@@ -166,6 +172,46 @@ export const DashboardOverview: React.FC = () => {
 
   return (
     <div id="dashboard-overview-page" className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
+      {/* Mobile sections rail: on phones the dashboard's sections open from a
+          collapsible left panel instead of piling at the bottom of the scroll. */}
+      <button
+        onClick={() => setSectionsOpen(true)}
+        className="lg:hidden fixed left-2 top-1/2 -translate-y-1/2 z-40 w-11 h-11 rounded-full bg-white border border-slate-200 shadow-lg grid place-items-center text-slate-600 active:scale-95 transition-transform"
+        title="Dashboard sections"
+        aria-label="Open dashboard sections"
+      >
+        <PanelLeft className="w-5 h-5" />
+      </button>
+      {sectionsOpen && (
+        <>
+          <div className="lg:hidden fixed inset-0 bg-black/50 z-50" onClick={() => setSectionsOpen(false)} />
+          <div className="lg:hidden fixed left-0 top-0 bottom-0 z-50 w-60 bg-white border-r border-slate-200 shadow-2xl p-4 overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-2">
+              <p className="text-sm font-black text-slate-900">Sections</p>
+              <button onClick={() => setSectionsOpen(false)} className="w-8 h-8 rounded-lg grid place-items-center text-slate-400 hover:bg-slate-100" aria-label="Close sections"><X className="w-4 h-4" /></button>
+            </div>
+            {([
+              { k: 'classes', label: "Today's Classes", icon: CalendarDays },
+              { k: 'activities', label: 'Recent Activities', icon: Inbox },
+              { k: 'performers', label: 'Top Performers', icon: Trophy },
+              { k: 'programmes', label: 'Programme Capacities', icon: BookOpen },
+            ]).map(({ k, label, icon: Icon }) => (
+              <button
+                key={k}
+                onClick={() => {
+                  setSectionsOpen(false);
+                  window.setTimeout(() => document.getElementById(`dash-sec-${k}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+                }}
+                className="w-full flex items-center space-x-2.5 px-3 py-2.5 rounded-xl text-sm font-bold text-slate-700 hover:bg-slate-100 transition-colors text-left"
+              >
+                <Icon className="w-4 h-4 text-orange-600" />
+                <span>{label}</span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
       {/* 1. Greeting card */}
       <div
         id="admin-greeting-card"
@@ -212,7 +258,7 @@ export const DashboardOverview: React.FC = () => {
                   <Calendar className="w-3.5 h-3.5" />
                   <span>{now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</span>
                 </p>
-                <p className="text-sm font-medium text-slate-600 mt-2 leading-relaxed">
+                <p className="text-[15px] font-bold text-slate-700 mt-2 leading-relaxed">
                   A live snapshot of students, tutors, classes and money in {centreName}.
                 </p>
 
@@ -313,7 +359,7 @@ export const DashboardOverview: React.FC = () => {
                       <div key={p.id} className="p-3 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between gap-2">
                         <div className="min-w-0">
                           <p className="text-xs font-black text-slate-900">₦{Number(p.amount).toLocaleString('en-NG')}</p>
-                          <p className="text-[10px] text-slate-400 font-bold">{formatDateLong(p.datePaid)} · {p.mode}</p>
+                          <p className="text-xs font-semibold text-slate-500 font-bold">{formatDateLong(p.datePaid)} · {p.mode}</p>
                           {p.note && <p className="text-[10px] text-slate-500 mt-0.5 truncate">{p.note}</p>}
                         </div>
                         {p.evidenceUrl ? (
@@ -345,7 +391,7 @@ export const DashboardOverview: React.FC = () => {
             {students.length.toLocaleString()}
           </div>
           {activeStudents.length !== students.length && (
-            <p className="text-[11px] font-semibold text-slate-400 mt-1">{activeStudents.length} active</p>
+            <p className="text-xs font-bold text-slate-600 mt-1">{activeStudents.length} active</p>
           )}
         </div>
 
@@ -439,10 +485,13 @@ export const DashboardOverview: React.FC = () => {
       {/* Middle Row: Today's Scheduled Classes (left) & Recent Activities (right) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Left: Today's Scheduled Classes Panel */}
-        <div className="bg-white rounded-xl border border-slate-200/90 shadow-xs p-5 md:p-6 flex flex-col justify-between">
+        <div id="dash-sec-classes" className="bg-white rounded-xl border border-slate-200/90 shadow-xs p-5 md:p-6 flex flex-col justify-between scroll-mt-24">
           <div>
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <div className="flex items-center space-x-2">
+                <button onClick={() => flipSec('classes')} className="lg:hidden w-7 h-7 shrink-0 rounded-lg border border-slate-200 bg-white text-slate-500 grid place-items-center" aria-label="Collapse Today's Classes" title="Collapse or expand this section">
+                  <ChevronDown className={`w-4 h-4 transition-transform ${secCollapsed.classes ? '-rotate-90' : ''}`} />
+                </button>
                 <h3 className="text-base font-bold text-slate-900">Today's Classes</h3>
                 <span className="px-2 py-0.5 text-[10px] font-bold bg-orange-100 text-orange-600 rounded-md">
                   {todayName}
@@ -456,12 +505,12 @@ export const DashboardOverview: React.FC = () => {
               </button>
             </div>
 
-            <div className="mt-4 space-y-3">
+            <div className={`mt-4 space-y-3 ${secCollapsed.classes ? 'hidden' : ''}`}>
               {todaySlots.length === 0 ? (
                 <div className="p-5 rounded-xl border border-dashed border-slate-200 text-center">
                   <CalendarDays className="w-6 h-6 text-slate-300 mx-auto" />
-                  <p className="text-xs font-semibold text-slate-500 mt-2">No classes scheduled for today</p>
-                  <p className="text-[11px] text-slate-400 mt-0.5">Slots added to the timetable will appear here.</p>
+                  <p className="text-sm font-bold text-slate-700 mt-2">No classes scheduled for today</p>
+                  <p className="text-xs font-semibold text-slate-600 mt-0.5">Slots added to the timetable will appear here.</p>
                 </div>
               ) : (
                 todaySlots.slice(0, 5).map((slot) => (
@@ -477,7 +526,7 @@ export const DashboardOverview: React.FC = () => {
                         <p className="text-xs md:text-sm font-bold text-slate-900 truncate">
                           {slot.subject}
                         </p>
-                        <p className="text-[11px] text-slate-500 truncate">
+                        <p className="text-xs font-semibold text-slate-600 truncate">
                           {slot.tutorName}{slot.room ? ` • ${slot.room}` : ''}
                         </p>
                       </div>
@@ -493,7 +542,7 @@ export const DashboardOverview: React.FC = () => {
             </div>
           </div>
 
-          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
+          <div className={`mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-semibold text-slate-500 ${secCollapsed.classes ? 'hidden' : ''}`}>
             <span>Live from the facility timetable</span>
             <span className="font-semibold text-slate-600">
               {todaySlots.length > 5 ? `+${todaySlots.length - 5} more` : 'On-track'}
@@ -502,18 +551,21 @@ export const DashboardOverview: React.FC = () => {
         </div>
 
         {/* Right: Recent Activities Panel */}
-        <div className="bg-white rounded-xl border border-slate-200/90 shadow-xs p-5 md:p-6 flex flex-col justify-between">
+        <div id="dash-sec-activities" className="bg-white rounded-xl border border-slate-200/90 shadow-xs p-5 md:p-6 flex flex-col justify-between scroll-mt-24">
           <div>
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-              <h3 className="text-base font-bold text-slate-900">Recent Facility Activities</h3>
+                            <button onClick={() => flipSec('activities')} className="lg:hidden w-7 h-7 shrink-0 rounded-lg border border-slate-200 bg-white text-slate-500 grid place-items-center" aria-label="Collapse Recent activities" title="Collapse or expand this section">
+                <ChevronDown className={`w-4 h-4 transition-transform ${secCollapsed.activities ? '-rotate-90' : ''}`} />
+              </button>
+<h3 className="text-base font-bold text-slate-900">Recent Facility Activities</h3>
             </div>
 
-            <div className="mt-4 space-y-3">
+            <div className={`mt-4 space-y-3 ${secCollapsed.activities ? 'hidden' : ''}`}>
               {activities.length === 0 ? (
                 <div className="p-5 rounded-xl border border-dashed border-slate-200 text-center">
                   <Inbox className="w-6 h-6 text-slate-300 mx-auto" />
-                  <p className="text-xs font-semibold text-slate-500 mt-2">No activity recorded yet</p>
-                  <p className="text-[11px] text-slate-400 mt-0.5">Approvals, payments and updates will show here.</p>
+                  <p className="text-sm font-bold text-slate-700 mt-2">No activity recorded yet</p>
+                  <p className="text-xs font-semibold text-slate-600 mt-0.5">Approvals, payments and updates will show here.</p>
                 </div>
               ) : (
                 activities.slice(0, 5).map((act) => {
@@ -534,13 +586,13 @@ export const DashboardOverview: React.FC = () => {
                       </div>
 
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium text-slate-900 leading-snug truncate">
+                        <p className="text-sm font-bold text-slate-900 leading-snug truncate">
                           {act.title}
                         </p>
                         <div className="flex items-center space-x-1.5 mt-0.5">
-                          <span className="text-[10px] text-slate-400">{act.actorName ? `${act.actorName} · ${act.subtitle || 'Facility record'}` : (act.subtitle || 'Facility record')}</span>
+                          <span className="text-xs font-semibold text-slate-500">{act.actorName ? `${act.actorName} · ${act.subtitle || 'Facility record'}` : (act.subtitle || 'Facility record')}</span>
                           <span className="text-[10px] text-slate-300">•</span>
-                          <span className="text-[10px] text-slate-400">{formatActivityTime(act.createdAt) || 'Earlier'}</span>
+                          <span className="text-xs font-semibold text-slate-500">{formatActivityTime(act.createdAt) || 'Earlier'}</span>
                         </div>
                       </div>
                     </div>
@@ -550,8 +602,8 @@ export const DashboardOverview: React.FC = () => {
             </div>
           </div>
 
-          <div className="mt-4 pt-3 border-t border-slate-100 text-right">
-            <span className="text-[11px] text-slate-400">Showing last 5 activity logs</span>
+          <div className={`mt-4 pt-3 border-t border-slate-100 text-right ${secCollapsed.activities ? 'hidden' : ''}`}>
+            <span className="text-xs font-semibold text-slate-500">Showing last 5 activity logs</span>
           </div>
         </div>
       </div>
@@ -559,9 +611,12 @@ export const DashboardOverview: React.FC = () => {
       {/* Bottom Row: Top Performers (left) & Programme Capacities (right) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Left: Top Performers from recorded results */}
-        <div className="bg-white rounded-xl border border-slate-200/90 shadow-xs p-5 md:p-6">
+        <div id="dash-sec-performers" className="bg-white rounded-xl border border-slate-200/90 shadow-xs p-5 md:p-6 scroll-mt-24">
           <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-            <h3 className="text-base font-bold text-slate-900">Top Academic Performers</h3>
+                        <button onClick={() => flipSec('performers')} className="lg:hidden w-7 h-7 shrink-0 rounded-lg border border-slate-200 bg-white text-slate-500 grid place-items-center" aria-label="Collapse Top performers" title="Collapse or expand this section">
+              <ChevronDown className={`w-4 h-4 transition-transform ${secCollapsed.performers ? '-rotate-90' : ''}`} />
+            </button>
+<h3 className="text-base font-bold text-slate-900">Top Academic Performers</h3>
             <button
               onClick={() => setAdminSection('results')}
               className="text-xs font-semibold text-orange-600 hover:underline"
@@ -570,12 +625,12 @@ export const DashboardOverview: React.FC = () => {
             </button>
           </div>
 
-          <div className="mt-4 space-y-3">
+          <div className={`mt-4 space-y-3 ${secCollapsed.performers ? 'hidden' : ''}`}>
             {topPerformers.length === 0 ? (
               <div className="p-5 rounded-xl border border-dashed border-slate-200 text-center">
                 <Trophy className="w-6 h-6 text-slate-300 mx-auto" />
-                <p className="text-xs font-semibold text-slate-500 mt-2">No results recorded yet</p>
-                <p className="text-[11px] text-slate-400 mt-0.5">Top scorers appear once results are uploaded.</p>
+                <p className="text-sm font-bold text-slate-700 mt-2">No results recorded yet</p>
+                <p className="text-xs font-semibold text-slate-600 mt-0.5">Top scorers appear once results are uploaded.</p>
               </div>
             ) : (
               topPerformers.map((r, idx) => {
@@ -593,7 +648,7 @@ export const DashboardOverview: React.FC = () => {
                         <p className="text-xs font-bold text-slate-900 truncate">
                           {r.studentName}
                         </p>
-                        <p className="text-[11px] text-slate-400 truncate">
+                        <p className="text-xs font-semibold text-slate-500 truncate">
                           {r.examTitle || r.programmeName}
                         </p>
                       </div>
@@ -615,9 +670,12 @@ export const DashboardOverview: React.FC = () => {
         </div>
 
         {/* Right: Programme fill rates from live enrolment */}
-        <div className="bg-white rounded-xl border border-slate-200/90 shadow-xs p-5 md:p-6">
+        <div id="dash-sec-programmes" className="bg-white rounded-xl border border-slate-200/90 shadow-xs p-5 md:p-6 scroll-mt-24">
           <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-            <h3 className="text-base font-bold text-slate-900">Programme Capacities</h3>
+                        <button onClick={() => flipSec('programmes')} className="lg:hidden w-7 h-7 shrink-0 rounded-lg border border-slate-200 bg-white text-slate-500 grid place-items-center" aria-label="Collapse Programme capacities" title="Collapse or expand this section">
+              <ChevronDown className={`w-4 h-4 transition-transform ${secCollapsed.programmes ? '-rotate-90' : ''}`} />
+            </button>
+<h3 className="text-base font-bold text-slate-900">Programme Capacities</h3>
             <button
               onClick={() => setAdminSection('programmes')}
               className="text-xs font-semibold text-orange-600 hover:underline"
@@ -626,12 +684,12 @@ export const DashboardOverview: React.FC = () => {
             </button>
           </div>
 
-          <div className="mt-4 space-y-4">
+          <div className={`mt-4 space-y-4 ${secCollapsed.programmes ? 'hidden' : ''}`}>
             {programmeCapacity.length === 0 ? (
               <div className="p-5 rounded-xl border border-dashed border-slate-200 text-center">
                 <BookOpen className="w-6 h-6 text-slate-300 mx-auto" />
-                <p className="text-xs font-semibold text-slate-500 mt-2">No exam programmes yet</p>
-                <p className="text-[11px] text-slate-400 mt-0.5">Add an exam programme and registrations will count here live.</p>
+                <p className="text-sm font-bold text-slate-700 mt-2">No exam programmes yet</p>
+                <p className="text-xs font-semibold text-slate-600 mt-0.5">Add an exam programme and registrations will count here live.</p>
               </div>
             ) : (
               programmeCapacity.map(({ prog: p, enrolled }) => (

@@ -939,8 +939,8 @@ export const FinanceManager: React.FC = () => {
                     <span className="block text-[13px] font-bold text-slate-900">Automatic reminders</span>
                     <span className="block text-[11px] text-slate-500 mt-0.5">Remind every student who owes, on the schedule below.</span>
                   </span>
-                  <span className={`relative w-10 h-[22px] rounded-full transition-colors shrink-0 ${remEnabled ? 'bg-[var(--brand,#EA580C)]' : 'bg-slate-300'}`}>
-                    <span className={`absolute top-[3px] w-4 h-4 rounded-full bg-white shadow-sm transition-all ${remEnabled ? 'left-[21px]' : 'left-[3px]'}`} />
+                  <span className={`relative w-12 h-7 rounded-full transition-colors shrink-0 ${remEnabled ? 'bg-[var(--brand,#EA580C)]' : 'bg-slate-300'}`}>
+                    <span className={`absolute top-[3px] w-5 h-5 rounded-full bg-white shadow-sm transition-all ${remEnabled ? 'left-[26px]' : 'left-[3px]'}`} />
                   </span>
                 </button>
 

@@ -143,9 +143,9 @@ function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boolean) =
     >
       <span className="text-xs font-bold text-slate-700 text-left">{label}</span>
       <span
-        className={`w-10 h-6 rounded-full p-0.5 transition ${on ? 'bg-orange-600' : 'bg-slate-300'}`}
+        className={`w-12 h-7 rounded-full p-1 transition ${on ? 'bg-orange-600' : 'bg-slate-300'}`}
       >
-        <span className={`block w-5 h-5 rounded-full bg-white shadow transition-transform ${on ? 'translate-x-4' : ''}`} />
+        <span className={`block w-5 h-5 rounded-full bg-white shadow transition-transform ${on ? 'translate-x-5' : ''}`} />
       </span>
     </button>
   );

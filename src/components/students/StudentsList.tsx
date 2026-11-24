@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { resolveStudentFee } from '../../lib/fees';
 import { Student } from '../../types';
 import { ModernSelect } from '../ui/ModernSelect';
+import { COURSES, NIGERIAN_STATES, UNIVERSITIES } from '../../data/academicLists';
 import {
   Users,
   Search,
@@ -37,22 +38,50 @@ export const StudentsList: React.FC = () => {
   const [showAddModal, setShowAddModal] = useState(false);
 
 
-  // Form states for new student
+  // Form states for new student. The fields mirror the facility's public
+  // sign-up form one for one, so an admin-enrolled record carries exactly
+  // what a self-enrolled record carries (same field names, same rules).
   const [formData, setFormData] = useState({
-    name: '',
+    firstName: '',
+    lastName: '',
+    username: '',
+    dob: '',
+    gender: 'Male' as 'Male' | 'Female',
+    state: '',
     phone: '',
     email: '',
-    gender: 'Male' as 'Male' | 'Female',
-    dateOfBirth: '2008-05-14',
-    department: 'Science' as 'Science' | 'Commercial' | 'Arts',
+    address: '',
     parentName: '',
     parentWhatsApp: '',
-    parentEmail: '',
-    address: 'Lagos, Nigeria',
     programmeId: programmes[0]?.id || '',
     branchId: branches[0]?.id || 'branch-1',
+    department: 'Science' as 'Science' | 'Commercial' | 'Arts',
     subjects: [] as string[],
+    courseOfStudy: '',
+    universityChoice: '',
   });
+
+  // Username mirrors the sign-up form: suggested from the student's name,
+  // editable, and checked live against the same availability endpoint.
+  const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'ok' | 'taken'>('idle');
+  const [usernameTouched, setUsernameTouched] = useState(false);
+  const suggestUsername = (first: string, last: string) =>
+    `${first}${last}`.toLowerCase().replace(/[^a-z0-9_]/g, '');
+  useEffect(() => {
+    const u = formData.username.trim().toLowerCase();
+    if (u.length < 3) { setUsernameStatus('idle'); return; }
+    let dead = false;
+    setUsernameStatus('checking');
+    const t = setTimeout(async () => {
+      try {
+        const r = await fetch(`/api/public/username-check?u=${encodeURIComponent(u)}`);
+        const d = await r.json().catch(() => ({}));
+        if (!dead) setUsernameStatus(d && d.available === false ? 'taken' : 'ok');
+      } catch { if (!dead) setUsernameStatus('idle'); }
+    }, 500);
+    return () => { dead = true; clearTimeout(t); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.username]);
 
   // The access switch reflects the live seat pool, so refresh it on entry.
   useEffect(() => {
@@ -72,10 +101,19 @@ export const StudentsList: React.FC = () => {
   const avgAttendance = (students || []).length
     ? Math.round((students || []).reduce((sum, s) => sum + (s.attendancePercent || 0), 0) / (students || []).length)
     : 0;
-  const subjectOptions = Array.from(new Set([
-    ...(subjects || []).map((s: any) => String(s?.name || '')).filter(Boolean),
-    ...(programmes || []).flatMap((p: any) => p.subjects || []).map(String),
-  ]));
+  // The subject list mirrors the sign-up form: only the facility's own
+  // registered subjects, filtered to the chosen department (General subjects
+  // always show). Falls back to programme subjects when none are recorded.
+  const subjectsFor = (dept: string) =>
+    (subjects || [])
+      .filter((s: any) => s?.department === 'General' || (!!dept && s?.department === dept))
+      .map((s: any) => String(s?.name || ''))
+      .filter(Boolean)
+      .sort();
+  const selectableSubjects = subjectsFor(formData.department);
+  const subjectOptions = selectableSubjects.length > 0
+    ? selectableSubjects
+    : Array.from(new Set((programmes || []).flatMap((p: any) => p.subjects || []).map(String))).sort();
   const toggleSubject = (sub: string) =>
     setFormData((f) => ({
       ...f,
@@ -97,48 +135,75 @@ export const StudentsList: React.FC = () => {
 
   const handleAddStudentSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name.trim()) return;
+    const fail = (description: string) => addToast({ type: 'error', title: 'Missing details', description });
+    if (!formData.firstName.trim() || !formData.lastName.trim()) { fail("Enter the student's first and last name."); return; }
+    if (usernameStatus === 'taken') { fail('That username is already taken. Choose another one.'); return; }
+    if (usernameStatus === 'checking') { fail('Still checking that username. Try again in a second.'); return; }
+    if (!formData.dob) { fail("Enter the student's date of birth."); return; }
+    if (!formData.state) { fail("Choose the student's state."); return; }
+    if (formData.phone.replace(/\D/g, '').length !== 11) { fail('The phone number must be exactly 11 digits.'); return; }
+    if (!formData.parentName.trim()) { fail('Enter the parent or guardian name.'); return; }
+    if (formData.parentWhatsApp.replace(/\D/g, '').length !== 11) { fail("The parent's WhatsApp number must be exactly 11 digits."); return; }
+    if (!formData.programmeId) { fail('Choose the exam programme.'); return; }
+    if (formData.subjects.length === 0) { fail('Pick at least one subject to register.'); return; }
+    if (!formData.courseOfStudy) { fail('Choose the intended course.'); return; }
 
     const prog = programmes.find((p) => p.id === formData.programmeId) || programmes[0];
     const branch = branches.find((b) => b.id === formData.branchId) || branches[0];
-    const subjects = formData.subjects.length > 0 ? formData.subjects : (prog?.subjects || []);
 
+    // Same field names the sign-up flow's saveRecord writes, so the two
+    // enrollment paths produce identical records in the students collection.
     addStudent({
       ...formData,
-      department: formData.department,
+      name: `${formData.firstName.trim()} ${formData.lastName.trim()}`.trim(),
+      firstName: formData.firstName.trim(),
+      lastName: formData.lastName.trim(),
+      username: formData.username.trim().toLowerCase(),
+      dob: formData.dob,
+      state: formData.state,
+      email: formData.email.trim(),
+      parentEmail: formData.email.trim(),
       programmeName: prog?.name || 'JAMB Intensive',
-      branchName: branch?.name || 'Main Education facility',
-      subjects: subjects.length > 0 ? subjects : (prog?.subjects || []),
-      attendancePercent: 100,
+      examToRegister: prog?.name || '',
+      branchName: branch?.name || 'Main Campus',
+      studentId: `STU-${Math.floor(1000 + Math.random() * 9000)}`,
+      emailVerified: false,
+      avatar: '',
+      attendancePercent: 0,
       totalFee: prog?.fee || 50000,
       amountPaid: 0,
       outstandingBalance: prog?.fee || 50000,
       paymentStatus: 'Pending',
       status: 'Active',
-      parentWhatsApp: formData.parentWhatsApp,
     });
 
     setShowAddModal(false);
     setFormData({
-      name: '',
+      firstName: '',
+      lastName: '',
+      username: '',
+      dob: '',
+      gender: 'Male',
+      state: '',
       phone: '',
       email: '',
-      gender: 'Male',
-      dateOfBirth: '2008-05-14',
-      department: 'Science',
+      address: '',
       parentName: '',
       parentWhatsApp: '',
-      parentEmail: '',
-      address: 'Lagos, Nigeria',
       programmeId: programmes[0]?.id || '',
       branchId: branches[0]?.id || 'branch-1',
+      department: 'Science',
       subjects: [] as string[],
+      courseOfStudy: '',
+      universityChoice: '',
     });
+    setUsernameTouched(false);
+    setUsernameStatus('idle');
 
     addToast({
       type: 'success',
       title: 'Student Enrolled',
-      description: `${formData.name} successfully registered.`,
+      description: `${formData.firstName.trim()} ${formData.lastName.trim()}`.trim() + ' successfully registered.',
     });
   };
 
@@ -533,26 +598,97 @@ export const StudentsList: React.FC = () => {
             </div>
 
             <form onSubmit={handleAddStudentSubmit} className="mt-4 space-y-3.5 text-xs">
+              {/* Field-for-field match of the facility sign-up form, so the two
+                  enrollment paths collect and save exactly the same details. */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">First Name *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Oluwaseun"
+                    value={formData.firstName}
+                    onChange={(e) => { const v = e.target.value; setFormData((f) => ({ ...f, firstName: v, username: usernameTouched ? f.username : suggestUsername(v, f.lastName) })); }}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-900 focus:bg-white focus:border-orange-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Last Name *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Adeleke"
+                    value={formData.lastName}
+                    onChange={(e) => { const v = e.target.value; setFormData((f) => ({ ...f, lastName: v, username: usernameTouched ? f.username : suggestUsername(f.firstName, v) })); }}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-900 focus:bg-white focus:border-orange-500 outline-none"
+                  />
+                </div>
+              </div>
+
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">Full Name *</label>
+                <label className="block font-semibold text-slate-700 mb-1">Username * (their sign-in name, like the online form)</label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Oluwaseun Adeleke"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="e.g. oluwaseunadeleke"
+                  value={formData.username}
+                  onChange={(e) => { setUsernameTouched(true); setFormData({ ...formData, username: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '') }); }}
                   className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-900 focus:bg-white focus:border-orange-500 outline-none"
                 />
+                {usernameStatus === 'checking' && <p className="text-[10px] text-slate-400 mt-1">Checking that username.</p>}
+                {usernameStatus === 'ok' && <p className="text-[10px] text-emerald-600 font-semibold mt-1">That username is free.</p>}
+                {usernameStatus === 'taken' && <p className="text-[10px] text-rose-600 font-semibold mt-1">That username is taken. Choose another.</p>}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Phone Number</label>
+                  <label className="block font-semibold text-slate-700 mb-1">Date of Birth *</label>
+                  <input
+                    type="date"
+                    required
+                    value={formData.dob}
+                    onChange={(e) => setFormData({ ...formData, dob: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-900 focus:bg-white focus:border-orange-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Gender *</label>
+                  <select
+                    required
+                    value={formData.gender}
+                    onChange={(e) => setFormData({ ...formData, gender: e.target.value as 'Male' | 'Female' })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-900 focus:bg-white focus:border-orange-500 outline-none"
+                  >
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">State *</label>
+                <select
+                  required
+                  value={formData.state}
+                  onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-900 focus:bg-white focus:border-orange-500 outline-none"
+                >
+                  <option value="">Select state</option>
+                  {NIGERIAN_STATES.map((st) => (
+                    <option key={st} value={st}>{st}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Phone Number (11 digits)</label>
                   <input
                     type="tel"
-                    placeholder="0803 000 1122"
+                    maxLength={11}
+                    placeholder="08030001122"
                     value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/\D/g, '') })}
                     className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-900 focus:bg-white focus:border-orange-500 outline-none"
                   />
                 </div>
@@ -568,26 +704,16 @@ export const StudentsList: React.FC = () => {
                 </div>
               </div>
 
-              <ModernSelect
-                label="Target Exam Programme *"
-                value={formData.programmeId}
-                onChange={(val) => setFormData((f) => ({ ...f, programmeId: val, subjects: programmes.find((p) => p.id === val)?.subjects || f.subjects }))}
-                options={programmes.map(p => ({
-                  value: p.id,
-                  label: `${p.name} (₦${(p.fee || 0).toLocaleString()})`
-                }))}
-              />
-
-              <ModernSelect
-                label="Department *"
-                value={formData.department}
-                onChange={(val) => setFormData({ ...formData, department: val })}
-                options={[
-                  { value: 'Science', label: 'Science' },
-                  { value: 'Commercial', label: 'Commercial' },
-                  { value: 'Arts', label: 'Arts' }
-                ]}
-              />
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Residential Address</label>
+                <input
+                  type="text"
+                  placeholder="Street, area, city"
+                  value={formData.address}
+                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-900 focus:bg-white focus:border-orange-500 outline-none"
+                />
+              </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -602,30 +728,42 @@ export const StudentsList: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Parent WhatsApp Number *</label>
+                  <label className="block font-semibold text-slate-700 mb-1">Parent WhatsApp (11 digits) *</label>
                   <input
                     type="tel"
                     required
-                    placeholder="0802 345 6789"
+                    maxLength={11}
+                    placeholder="08023456789"
                     value={formData.parentWhatsApp}
-                    onChange={(e) => setFormData({ ...formData, parentWhatsApp: e.target.value })}
+                    onChange={(e) => setFormData({ ...formData, parentWhatsApp: e.target.value.replace(/\D/g, '') })}
                     className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-900 focus:bg-white focus:border-orange-500 outline-none"
                   />
                 </div>
               </div>
 
               <ModernSelect
-                label="Preferred Campus / Branch *"
-                value={formData.branchId}
-                onChange={(val) => setFormData({ ...formData, branchId: val })}
-                options={branches.map(b => ({
-                  value: b.id,
-                  label: `${b.name} (${b.city})`
+                label="Target Exam Programme *"
+                value={formData.programmeId}
+                onChange={(val) => setFormData((f) => ({ ...f, programmeId: val }))}
+                options={programmes.map(p => ({
+                  value: p.id,
+                  label: `${p.name} (\u20A6${(p.fee || 0).toLocaleString()})`
                 }))}
               />
 
+              <ModernSelect
+                label="Department *"
+                value={formData.department}
+                onChange={(val) => setFormData((f) => ({ ...f, department: val as 'Science' | 'Commercial' | 'Arts', subjects: f.subjects.filter((sub) => subjectsFor(val).includes(sub)) }))}
+                options={[
+                  { value: 'Science', label: 'Science' },
+                  { value: 'Commercial', label: 'Commercial' },
+                  { value: 'Arts', label: 'Arts' }
+                ]}
+              />
+
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">Exam Subjects *</label>
+                <label className="block font-semibold text-slate-700 mb-1">Subjects to Register *</label>
                 <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 max-h-40 overflow-y-auto space-y-2">
                   {subjectOptions.map((sub) => (
                     <label key={sub} className="flex items-center space-x-2 cursor-pointer group">
@@ -644,6 +782,30 @@ export const StudentsList: React.FC = () => {
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-3">
+                <ModernSelect
+                  label="Intended Course *"
+                  value={formData.courseOfStudy}
+                  onChange={(val) => setFormData((f) => ({ ...f, courseOfStudy: val }))}
+                  options={COURSES.map((c) => ({ value: c, label: c }))}
+                />
+                <ModernSelect
+                  label="Target University (optional)"
+                  value={formData.universityChoice}
+                  onChange={(val) => setFormData((f) => ({ ...f, universityChoice: val }))}
+                  options={[{ value: '', label: 'Not decided yet' }, ...UNIVERSITIES.map((u) => ({ value: u, label: u }))]}
+                />
+              </div>
+
+              <ModernSelect
+                label="Preferred Campus / Branch *"
+                value={formData.branchId}
+                onChange={(val) => setFormData((f) => ({ ...f, branchId: val }))}
+                options={branches.map(b => ({
+                  value: b.id,
+                  label: `${b.name} (${b.city})`
+                }))}
+              />
 
               <div className="flex items-center justify-end space-x-2 pt-3 border-t border-slate-100">
                 <button

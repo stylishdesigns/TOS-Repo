@@ -33,6 +33,9 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
   const { settings, updateSettings, addToast, authMethod, activeUser, activeCentre, updateAdmin, uploadCentreImage, getCentreSessions, revokeCentreSession, getCentreLogo, saveCentreLogo, getCentreWelcomeImage, saveCentreWelcomeImage, activeCentreId } = useApp();
 
   const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'sessions'>('profile');
+  // Facility mode shows two panels: the facility's identity settings and
+  // the website landing page editor, picked with a toggle up top.
+  const [facilityView, setFacilityView] = useState<'facility' | 'landing'>('facility');
 
   // Sync active tab if security is forbidden
   React.useEffect(() => {
@@ -785,10 +788,26 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
         <div>
           <h2 className="text-xl font-bold text-slate-900">Facility Settings</h2>
           <p className="text-xs text-slate-500 mt-0.5">Facility parameters, branding and your website landing page.</p>
+          {/* Two-way toggle: the facility's own settings or the landing page
+              editor, both reachable from the top. */}
+          <div className="mt-4 inline-flex p-1 rounded-xl bg-slate-100 border border-slate-200 gap-1">
+            <button
+              onClick={() => setFacilityView('facility')}
+              className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${facilityView === 'facility' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              Facility settings
+            </button>
+            <button
+              onClick={() => setFacilityView('landing')}
+              className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${facilityView === 'landing' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              Website landing page
+            </button>
+          </div>
         </div>
       )}
 
-      {mode === 'facility' && (
+      {mode === 'facility' && facilityView === 'facility' && (
         <div className="space-y-6">
           {/* Accent colour: one colour for the whole facility, saved to the
               account and the website landing page together. */}
@@ -1081,7 +1100,7 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
       )}
 
       {/* Facility mode, section two: the website landing page editor. */}
-      {mode === 'facility' && (
+      {mode === 'facility' && facilityView === 'landing' && (
         <div className="space-y-3">
           <div>
             <h3 className="text-base font-bold text-slate-900">Website Landing Page</h3>

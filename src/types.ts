@@ -117,6 +117,17 @@ export interface Student {
   branchName: string;
   subjects: string[];
   notes?: string;
+  // Sign-up form fields the admin add-student form now collects too, so
+  // admin-enrolled and self-enrolled records carry the same information.
+  firstName?: string;
+  lastName?: string;
+  username?: string;
+  state?: string;
+  courseOfStudy?: string;
+  universityChoice?: string;
+  examToRegister?: string;
+  studentId?: string;
+  emailVerified?: boolean;
   registrationDate: string;
   status: 'Active' | 'Idle' | 'Suspended' | 'Completed';
   attendancePercent: number;

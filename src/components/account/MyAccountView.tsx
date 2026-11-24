@@ -345,13 +345,13 @@ export const MyAccountView: React.FC = () => {
                   description: twoFactorEnabled ? 'Two-factor auth disabled.' : 'Two-factor auth enabled.',
                 });
               }}
-              className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors ${
+              className={`w-14 h-8 flex items-center rounded-full p-1 transition-colors ${
                 twoFactorEnabled ? 'bg-orange-600' : 'bg-slate-200'
               }`}
             >
               <div
-                className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${
-                  twoFactorEnabled ? 'translate-x-5' : 'translate-x-0'
+                className={`bg-white w-6 h-6 rounded-full shadow-md transform transition-transform ${
+                  twoFactorEnabled ? 'translate-x-6' : 'translate-x-0'
                 }`}
               />
             </button>

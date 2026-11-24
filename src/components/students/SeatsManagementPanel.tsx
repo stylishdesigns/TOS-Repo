@@ -524,14 +524,14 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
                             disabled={seatBusy}
                             onClick={() => handleSeatSwitch(seat, false)}
                             title="Switch off: the student leaves, their access suspends and the seat is vacant"
-                            className={`relative inline-flex h-7 w-14 shrink-0 items-center rounded-full border transition-colors duration-200 ${
+                            className={`relative inline-flex h-9 w-16 shrink-0 items-center rounded-full border transition-colors duration-200 ${
                               seat.status === 'active'
                                 ? 'bg-emerald-500 border-emerald-500'
                                 : 'bg-slate-200 dark:bg-slate-700 border-slate-300 dark:border-slate-600'
                             } ${seatBusy ? 'opacity-60 cursor-wait' : ''}`}
                           >
                             <span
-                              className={`inline-block h-6 w-6 transform rounded-full bg-white shadow transition-transform duration-200 ${
+                              className={`inline-block h-8 w-8 transform rounded-full bg-white shadow transition-transform duration-200 ${
                                 seat.status === 'active' ? 'translate-x-7' : 'translate-x-0.5'
                               }`}
                             />

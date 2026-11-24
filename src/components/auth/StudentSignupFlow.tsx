@@ -6,7 +6,7 @@ import {
 import { auth, db } from '../../firebase';
 import { createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signOut, signInWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
-import { COURSES, UNIVERSITIES } from '../../data/academicLists';
+import { COURSES, UNIVERSITIES, NIGERIAN_STATES } from '../../data/academicLists';
 import { ModernSelect } from '../ui/ModernSelect';
 import { BrandDatePicker } from '../ui/BrandDatePicker';
 
@@ -32,14 +32,6 @@ const GoogleIcon = () => (
     <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
   </svg>
 );
-
-const NIGERIAN_STATES = [
-  'Abia', 'Adamawa', 'Akwa Ibom', 'Anambra', 'Bauchi', 'Bayelsa', 'Benue', 'Borno',
-  'Cross River', 'Delta', 'Ebonyi', 'Edo', 'Ekiti', 'Enugu', 'FCT - Abuja', 'Gombe',
-  'Imo', 'Jigawa', 'Kaduna', 'Kano', 'Katsina', 'Kebbi', 'Kogi', 'Kwara', 'Lagos',
-  'Nasarawa', 'Niger', 'Ogun', 'Ondo', 'Osun', 'Oyo', 'Plateau', 'Rivers', 'Sokoto',
-  'Taraba', 'Yobe', 'Zamfara',
-];
 
 const USERNAME_RE = /^[a-z][a-z0-9_]{2,19}$/;
 
