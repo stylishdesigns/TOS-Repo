@@ -27,7 +27,7 @@ export const STARTING_PLANS = [
   {
     id: 'centre_standard',
     name: 'Standard',
-    price: 2000, // ₦ per student per month
+    price: 2000, // ₦ per seat per month
     priceType: 'per_seat',
     seatCap: 100,
     trialSeatCap: 10,
@@ -41,7 +41,7 @@ export const STARTING_PLANS = [
   {
     id: 'centre_plus',
     name: 'Premium',
-    price: 3500, // ₦ per student per month
+    price: 3500, // ₦ per seat per month
     priceType: 'per_seat',
     seatCap: 100,
     trialSeatCap: 10,

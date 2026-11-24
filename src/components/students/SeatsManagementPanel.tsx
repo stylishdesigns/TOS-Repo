@@ -75,7 +75,7 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
   }, [activeCentreId]);
 
   // Batch 22: the facility's chosen plan, shown above the pool. The chosen
-  // plan bills every seat the facility creates, per student per month.
+  // plan bills every seat the facility creates, per seat per month.
   useEffect(() => {
     if (!activeCentreId) return;
     let alive = true;
@@ -256,6 +256,15 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
 
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 shadow-sm transition-all mb-8">
+      {/* Batch 30: the plan tag sits front and centre with a soft pulse */}
+      <div className="flex flex-col items-center gap-1.5 pb-5">
+        <span className="relative inline-flex items-center px-6 py-2.5 rounded-2xl text-base sm:text-xl font-black tracking-wide bg-[var(--brand,#0F172A)] text-white shadow-lg">
+          <span aria-hidden="true" className="absolute inset-0 rounded-2xl bg-[var(--brand,#0F172A)] blur-md opacity-40 animate-pulse" />
+          <span className="relative">{planTagLabel}</span>
+        </span>
+        <span className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Current plan</span>
+      </div>
+
       {/* Top header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-slate-100 dark:border-slate-800">
         <div>
@@ -266,15 +275,9 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
             <div>
               <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 <span>Seat Control Room</span>
-                <span
-                  className="inline-flex items-center px-3 py-1.5 rounded-xl text-[11px] sm:text-sm font-black bg-[var(--brand,#0F172A)] text-white"
-                  title="The plan this facility's seats are billed on"
-                >
-                  {planTagLabel}
-                </span>
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400 max-w-xl">
-                You pay for seats, not students. A seat only counts while a student is on it:
+                You pay for seats. A seat only counts while a student is on it:
                 adding a student switches the seat on and starts its count, and switching them off
                 pauses it with its remaining days. When a seat's days run out it locks until a new
                 payment reopens it.
@@ -293,7 +296,7 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
                 Awaiting confirmation from Tutorial OS
               </p>
               <p className="text-[11px] text-amber-700/90 dark:text-amber-300/80 mt-0.5">
-                {planState.pendingUpgrade.planName || 'Your'} upgrade, {planState.pendingUpgrade.seats} seat{Number(planState.pendingUpgrade.seats) === 1 ? '' : 's'} ({nairaFmt(planState.pendingUpgrade.total || 0)}), is awaiting confirmation from Tutorial OS. Once it is confirmed, the seats appear here by themselves. Nothing else to do.
+                {planState.pendingUpgrade.planName || 'Your'} upgrade, {planState.pendingUpgrade.seats} seat{Number(planState.pendingUpgrade.seats) === 1 ? '' : 's'} ({nairaFmt(planState.pendingUpgrade.total || 0)}), is awaiting confirmation from Tutorial OS. Once it is confirmed, the seats appear here. Nothing else to do.
               </p>
             </div>
           </div>
@@ -371,7 +374,7 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
         <div className="mt-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-slate-200 dark:border-slate-700/60 bg-slate-50 dark:bg-slate-800/40 p-4">
           <div>
             <p className="text-xs font-bold text-slate-900 dark:text-white">Plan</p>
-            <p className="text-[11px] text-slate-400 mt-0.5">The chosen plan bills every seat you create, per student per month.</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">The chosen plan bills every seat you create, per seat per month.</p>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs font-black text-slate-900 dark:text-white">
@@ -697,7 +700,7 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
                   </button>
                 </div>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
-                  Pick the plan you want to move into. You pay per student seat, per month.
+                  Pick the plan you want to move into. You pay per seat, per month.
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   {(planState?.plans || []).map((p: any) => {
@@ -772,7 +775,7 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
                     : `The platform minimum is ${planState?.paidSeatMinimum ?? 5} students on the first purchase.`}
                 </p>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-3">
-                  {nairaFmt(Number(chosenPlan.price))} per student per month
+                  {nairaFmt(Number(chosenPlan.price))} per seat per month
                 </p>
                 <div className="mt-2 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700/60 px-4 py-3">
                   <p className="text-sm font-black text-slate-900 dark:text-white">
@@ -899,7 +902,7 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
                 <div className="mt-5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700/60 px-4 py-3">
                   <p className="text-[11px] text-slate-500 dark:text-slate-400">
                     Once Tutorial OS confirms your payment, the {chosenPlan.name} seats you paid for appear on this
-                    dashboard by themselves, on top of your free seats. Nothing else to do.
+                    dashboard, on top of your free seats. Nothing else to do.
                   </p>
                 </div>
                 <div className="flex justify-end mt-4">

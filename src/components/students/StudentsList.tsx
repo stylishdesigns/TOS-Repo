@@ -252,7 +252,7 @@ export const StudentsList: React.FC = () => {
             options={[
               { value: 'All Status', label: 'All Status' },
               { value: 'Active', label: 'Active' },
-              { value: 'Suspended', label: 'Suspended' },
+              { value: 'Suspended', label: 'Inactive' },
               { value: 'Idle', label: 'Idle' },
               { value: 'Graduated', label: 'Graduated' }
             ]}
@@ -282,7 +282,7 @@ export const StudentsList: React.FC = () => {
           role="tab"
           aria-selected={activeViewTab === 'directory'}
           onClick={() => setActiveViewTab('directory')}
-          className={`relative z-10 px-2 py-2 rounded-xl text-[11px] sm:text-xs font-bold text-center transition-colors cursor-pointer ${
+          className={`relative z-10 px-3 py-2.5 rounded-xl text-base sm:text-lg font-bold text-center transition-colors cursor-pointer ${
             activeViewTab === 'directory'
               ? 'text-slate-900 dark:text-white'
               : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
@@ -295,7 +295,7 @@ export const StudentsList: React.FC = () => {
           role="tab"
           aria-selected={activeViewTab === 'seats'}
           onClick={() => setActiveViewTab('seats')}
-          className={`relative z-10 px-2 py-2 rounded-xl text-[11px] sm:text-xs font-bold text-center transition-colors flex items-center justify-center gap-1.5 cursor-pointer ${
+          className={`relative z-10 px-3 py-2.5 rounded-xl text-base sm:text-lg font-bold text-center transition-colors flex items-center justify-center gap-1.5 cursor-pointer ${
             activeViewTab === 'seats'
               ? 'text-orange-600 dark:text-orange-400'
               : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
@@ -309,7 +309,7 @@ export const StudentsList: React.FC = () => {
           role="tab"
           aria-selected={activeViewTab === 'payments'}
           onClick={() => setActiveViewTab('payments')}
-          className={`relative z-10 px-2 py-2 rounded-xl text-[11px] sm:text-xs font-bold text-center transition-colors cursor-pointer ${
+          className={`relative z-10 px-3 py-2.5 rounded-xl text-base sm:text-lg font-bold text-center transition-colors cursor-pointer ${
             activeViewTab === 'payments'
               ? 'text-orange-600 dark:text-orange-400'
               : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
@@ -423,20 +423,18 @@ export const StudentsList: React.FC = () => {
 
                     {/* Status */}
                     <td className="py-3.5 px-5">
+                      {/* Batch 30: the directory status is seat-based. A student
+                          holding a seat reads Active; a student without one reads
+                          Inactive, never "Suspended", which read as a punishment. */}
                       {!isAccessOn(st) ? (
-                        <span className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
-                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                          <span>Suspended</span>
+                        <span className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                          <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                          <span>Inactive</span>
                         </span>
-                      ) : st.status === 'Active' ? (
+                      ) : (
                         <span className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                           <span>Active</span>
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center space-x-1.5 text-xs font-medium text-slate-500">
-                          <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
-                          <span>{st.status || 'Idle'}</span>
                         </span>
                       )}
                     </td>
