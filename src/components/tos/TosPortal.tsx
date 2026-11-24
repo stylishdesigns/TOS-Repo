@@ -5,6 +5,7 @@ import {
   RefreshCw, Send, Ban, CheckCircle2, PlayCircle, Check, Plus, ShieldCheck,
   ArrowUpRight, UserRound, BookOpen, CalendarDays, Copy, HelpCircle, Sparkles,
   AlertTriangle, X, ChevronRight, MessageSquare, Globe, Trash2, Settings, FileText,
+  PanelLeftClose, PanelLeftOpen,
 } from 'lucide-react';
 import {
   api, fmtDate, fmtDateTime, LEAD_STATUS_LABELS, STATUS_STYLES, Json,
@@ -912,9 +913,11 @@ const AccountTab: React.FC = () => {
   );
 };
 
-// N2: the sidebar groups its items into Business / Content / System. One
-// nav array still drives both the desktop sidebar and the mobile bottom bar
-// (mlabel is the short label the bar shows on phones).
+// N2: the sidebar groups its items into Business / Content / System. The
+// same nav array and groups drive the desktop sidebar and the phone panel:
+// on phones the sections sit by the side exactly as arranged on the desktop,
+// with a collapse button that closes the panel and a round button that
+// brings it back.
 const GROUPS = ['Business', 'Content', 'System'] as const;
 
 // ---------------------------------------------------------------------------
@@ -1371,6 +1374,18 @@ export const TosPortal: React.FC = () => {
   };
   const [mocksCreateKey, setMocksCreateKey] = useState(0);
 
+  // Mobile sections panel: on phones the sections sit by the side, exactly as
+  // arranged on the desktop. The button on the panel collapses it; the round
+  // button brings it back. The choice survives a refresh.
+  const TOS_NAV_KEY = 'tos:navOpen';
+  const [mobileNavOpen, setMobileNavOpenState] = useState<boolean>(() => {
+    try { return localStorage.getItem(TOS_NAV_KEY) !== '0'; } catch { return true; }
+  });
+  const setMobileNavOpen = (open: boolean) => {
+    setMobileNavOpenState(open);
+    try { localStorage.setItem(TOS_NAV_KEY, open ? '1' : '0'); } catch { /* storage unavailable */ }
+  };
+
   useEffect(() => {
     const handler = (e: Event) => {
       const id = (e as CustomEvent).detail;
@@ -1394,9 +1409,44 @@ export const TosPortal: React.FC = () => {
   // confirm or a scroll position can never be wiped by a timer, and idle
   // screens cost zero reads.
 
+  // One nav body drives the desktop sidebar and the phone panel, so phones
+  // show the exact same sections, in the same groups, in the same order.
+  const navBody = (
+    <>
+      <nav className="space-y-5 flex-1 min-h-0 overflow-y-auto">
+        {GROUPS.map((g) => (
+          <div key={g}>
+            <p className="text-[9px] font-black uppercase tracking-[0.25em] text-slate-600 px-3.5 mb-1.5">{g}</p>
+            <div className="space-y-1">
+              {TABS.filter((t) => t.group === g).map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => { setTab(t.id); }}
+                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-colors ${tab === t.id ? 'bg-orange-500/15 text-orange-300 border border-orange-500/30' : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent'}`}
+                >
+                  <t.icon className="w-4 h-4" /> {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </nav>
+      <div className="mt-auto pt-4 border-t border-white/5">
+        <button
+          onClick={() => { window.location.hash = '#landing'; }}
+          className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition-colors"
+          title="Open the Tutorial OS landing page. You stay signed in: three quick taps on the Tutorial OS logo bring you straight back here."
+        >
+          <Globe className="w-4 h-4" />
+          Landing page
+        </button>
+      </div>
+    </>
+  );
+
   return (
     <div className="min-h-screen w-full bg-slate-950 flex">
-      {/* Sidebar */}
+      {/* Sidebar (desktop) */}
       <aside className="hidden md:flex flex-col w-60 shrink-0 border-r border-white/5 bg-slate-950 p-5 sticky top-0 h-screen overflow-hidden">
         <div className="flex items-center gap-2.5 mb-8">
           <div className="w-9 h-9 rounded-xl bg-orange-500/15 border border-orange-500/30 flex items-center justify-center">
@@ -1407,49 +1457,50 @@ export const TosPortal: React.FC = () => {
             <p className="text-sm font-black text-white">Platform</p>
           </div>
         </div>
-        <nav className="space-y-5 flex-1 min-h-0 overflow-y-auto">
-          {GROUPS.map((g) => (
-            <div key={g}>
-              <p className="text-[9px] font-black uppercase tracking-[0.25em] text-slate-600 px-3.5 mb-1.5">{g}</p>
-              <div className="space-y-1">
-                {TABS.filter((t) => t.group === g).map((t) => (
-                  <button
-                    key={t.id}
-                    onClick={() => { setTab(t.id); }}
-                    className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-colors ${tab === t.id ? 'bg-orange-500/15 text-orange-300 border border-orange-500/30' : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent'}`}
-                  >
-                    <t.icon className="w-4 h-4" /> {t.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ))}
-        </nav>
-        <div className="mt-auto pt-4 border-t border-white/5">
-          <button
-            onClick={() => { window.location.hash = '#landing'; }}
-            className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition-colors"
-            title="Open the Tutorial OS landing page. You stay signed in: three quick taps on the Tutorial OS logo bring you straight back here."
-          >
-            <Globe className="w-4 h-4" />
-            Landing page
-          </button>
-        </div>
+        {navBody}
       </aside>
 
-      {/* Mobile tab bar: steps aside while the channel chat is open */}
-      {tab !== 'channel' && (
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 backdrop-blur border-t border-white/10 flex overflow-x-auto">
-        {TABS.map((t) => (
-          <button key={t.id} onClick={() => setTab(t.id)} className={`flex-1 min-w-[64px] min-h-[44px] flex flex-col items-center justify-center gap-1 py-2 text-[10px] font-bold ${tab === t.id ? 'text-orange-300' : 'text-slate-500'}`}>
-            <t.icon className="w-4 h-4" /> {t.mlabel}
+      {/* Mobile: the same sections by the side, collapsible. Open by default;
+          the button on the panel collapses it, the round button brings it back. */}
+      <aside
+        className={`md:hidden fixed top-0 left-0 bottom-0 z-50 w-60 bg-slate-950 border-r border-white/5 p-5 flex flex-col overflow-hidden transition-transform duration-300 ease-in-out ${mobileNavOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'}`}
+      >
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-orange-500/15 border border-orange-500/30 flex items-center justify-center">
+              <ShieldCheck className="w-5 h-5 text-orange-400" />
+            </div>
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-[0.35em] text-orange-400">Tutorial OS</p>
+              <p className="text-sm font-black text-white">Platform</p>
+            </div>
+          </div>
+          <button
+            onClick={() => setMobileNavOpen(false)}
+            title="Collapse sections"
+            aria-label="Collapse sections"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
+          >
+            <PanelLeftClose className="w-5 h-5" />
           </button>
-        ))}
-      </div>
+        </div>
+        {navBody}
+      </aside>
+
+      {/* Brings the sections back after collapsing */}
+      {!mobileNavOpen && (
+        <button
+          onClick={() => setMobileNavOpen(true)}
+          title="Show sections"
+          aria-label="Show sections"
+          className="md:hidden fixed left-3 top-1/2 -translate-y-1/2 z-40 w-11 h-11 rounded-full bg-slate-900 border border-white/10 text-slate-300 grid place-items-center shadow-lg active:scale-95 transition-transform"
+        >
+          <PanelLeftOpen className="w-5 h-5" />
+        </button>
       )}
 
       {/* Main */}
-      <main className="flex-1 min-w-0 p-5 md:p-8 pb-24 md:pb-8">
+      <main className="flex-1 min-w-0 p-5 md:p-8">
         <header className="mb-6">
           <h1 className="text-2xl font-black text-white tracking-tight capitalize">{TABS.find((t) => t.id === tab)?.label}</h1>
           <p className="text-slate-400 text-xs mt-1">
