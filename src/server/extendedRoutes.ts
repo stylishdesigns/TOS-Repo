@@ -1863,6 +1863,7 @@ export function registerExtendedRoutes(app: express.Express): void {
       let seatsUsed = 0;
       let seatsCap = 0;
       const weekAhead = Date.now() + 7 * DAY_MS;
+      const leadCentres: Array<{ centreId: string; name: string }> = [];
       centresSnap.docs.forEach((d) => {
         const centre = { id: d.id, ...(d.data() as any) };
         const billing = billingMap.get(d.id) || null;
@@ -1882,7 +1883,6 @@ export function registerExtendedRoutes(app: express.Express): void {
           }
         }
       });
-      const leadCentres: Array<{ centreId: string; name: string }> = [];
       const leadCounts: Record<string, number> = {};
       leadsSnap.docs.forEach((d) => {
         const s = (d.data() as any).status || 'unknown';

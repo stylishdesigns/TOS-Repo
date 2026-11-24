@@ -40,7 +40,7 @@ export const EmailTestTrigger: React.FC = () => {
   const disabled = busy || !email.trim();
 
   return (
-    <section id="email-test" aria-label="Email delivery test" style={{ maxWidth: '1160px', margin: '0 auto', padding: '0 20px 28px' }}>
+    <section id="email-test" aria-label="Email delivery test" style={{ maxWidth: '1120px', margin: '0 auto', padding: '0 24px 72px' }}>
       <div style={{ maxWidth: '640px', marginLeft: 'auto', marginRight: 'auto', border: '1px solid #334155', borderRadius: '14px', padding: '18px', background: '#0F172A' }}>
         <p style={{ font: '700 14px Inter,sans-serif', color: '#E2E8F0' }}>Email delivery test</p>
         <p style={{ font: '400 13px Inter,sans-serif', color: '#94A3B8', marginTop: '4px' }}>

@@ -1421,7 +1421,7 @@ export const TosPortal: React.FC = () => {
               {TABS.filter((t) => t.group === g).map((t) => (
                 <button
                   key={t.id}
-                  onClick={() => { setTab(t.id); }}
+                  onClick={() => { setTab(t.id); if (typeof window !== 'undefined' && window.innerWidth < 768) setMobileNavOpen(false); }}
                   className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-colors ${tab === t.id ? 'bg-orange-500/15 text-orange-300 border border-orange-500/30' : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent'}`}
                 >
                   <t.icon className="w-4 h-4" /> {t.label}
