@@ -12,7 +12,7 @@ import { reconcileFirstTenant } from './firstTenant';
 export const STARTING_PLANS = [
   {
     id: 'centre_free',
-    name: 'Free',
+    name: 'Free Facility',
     price: 0, // every lead and facility starts here: free seats only
     priceType: 'per_seat',
     seatCap: 0,
@@ -23,10 +23,15 @@ export const STARTING_PLANS = [
     aiEssayMarking: false, // internal only, never shown to customers
     aiQuestionGen: false,
     aiPerformanceAnalysis: false,
+    // Batch 31: per-plan feature fields (TOS console will make the caps editable).
+    aiCreditsPerSeat: 50,
+    storageGb: 1,
+    questionBankCap: 1000, // 0 = unlimited
+    notificationChannels: ['email'],
   },
   {
     id: 'centre_standard',
-    name: 'Standard',
+    name: 'Standard Facility',
     price: 2000, // ₦ per seat per month
     priceType: 'per_seat',
     seatCap: 100,
@@ -35,12 +40,17 @@ export const STARTING_PLANS = [
     studentChat: true,
     whatsappNotifications: false,
     aiEssayMarking: true, // internal only, never shown to customers
-    aiQuestionGen: false,
-    aiPerformanceAnalysis: false,
+    aiQuestionGen: true,
+    aiPerformanceAnalysis: true,
+    // Batch 31: per-plan feature fields (TOS console will make the caps editable).
+    aiCreditsPerSeat: 200,
+    storageGb: 10,
+    questionBankCap: 0, // 0 = unlimited
+    notificationChannels: ['email', 'push'],
   },
   {
     id: 'centre_plus',
-    name: 'Premium',
+    name: 'Premium Facility',
     price: 3500, // ₦ per seat per month
     priceType: 'per_seat',
     seatCap: 100,
@@ -51,6 +61,11 @@ export const STARTING_PLANS = [
     aiEssayMarking: true, // internal only, never shown to customers
     aiQuestionGen: true,
     aiPerformanceAnalysis: true,
+    // Batch 31: per-plan feature fields (TOS console will make the caps editable).
+    aiCreditsPerSeat: 500,
+    storageGb: 25,
+    questionBankCap: 0, // 0 = unlimited
+    notificationChannels: ['email', 'push', 'whatsapp'],
   },
 ];
 

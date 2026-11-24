@@ -153,7 +153,7 @@ export async function provisionCentre(
   if (!centreId) throw httpError(500, 'Could not allocate a facility id. Please try again.');
 
   const config = await getPlatformConfig();
-  const planId = params.planId || 'centre_standard';
+  const planId = params.planId || 'centre_free'; // Batch 31: no trial; new facilities start on Free Facility
   const plan = await getPlatformPlan(planId);
   const now = new Date();
   const billedSeatsMinimum = (plan as any).billedSeatsMinimum ?? (config as any).billedSeatsMinimum ?? 10; // mirrors the seeded value

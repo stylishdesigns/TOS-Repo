@@ -1460,7 +1460,7 @@ export function registerExtendedRoutes(app: express.Express): void {
       await requireMembership(caller, centreId, ['owner', 'admin']);
       const bDoc = await adminDb.collection('centreBilling').doc(centreId).get();
       const billing = (bDoc.exists ? bDoc.data() : null) as any;
-      const planId = String(billing?.planId || '') || 'centre_standard';
+      const planId = String(billing?.planId || '') || 'centre_free';
       let planName = '';
       let whatsappNotifications = false;
       try {

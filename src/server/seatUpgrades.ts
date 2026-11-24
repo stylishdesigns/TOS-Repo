@@ -54,6 +54,60 @@ export async function payAccount(): Promise<{
  * lead (and any facility with no plan on file) onto the Free plan. Rides the
  * seats read like the batch 26 migration so no terminal or script is needed.
  */
+/**
+ * One-time plan-feature migration, guarded by plansV3DoneAt on
+ * platformConfig/global: renames the plan display names to the Facility
+ * suffix (Free Facility, Standard Facility, Premium Facility), stamps the
+ * per-plan feature fields (AI credits per seat, storage GB, question-bank
+ * cap, notification channels) and moves AI question generation and AI
+ * performance analysis onto Standard Facility. Rides the seats read like the
+ * earlier migrations so no terminal or script is needed.
+ */
+export async function ensurePlansV3(): Promise<void> {
+  const cfgRef = adminDb.collection('platformConfig').doc('global');
+  const cfgSnap = await cfgRef.get();
+  const cfg = (cfgSnap.data() || {}) as any;
+  if (cfg.plansV3DoneAt) return;
+
+  const planFields: Record<string, Record<string, unknown>> = {
+    centre_free: {
+      name: 'Free Facility',
+      aiQuestionGen: false,
+      aiPerformanceAnalysis: false,
+      aiCreditsPerSeat: 50,
+      storageGb: 1,
+      questionBankCap: 1000, // 0 = unlimited
+      notificationChannels: ['email'],
+    },
+    centre_standard: {
+      name: 'Standard Facility',
+      aiQuestionGen: true,
+      aiPerformanceAnalysis: true,
+      aiCreditsPerSeat: 200,
+      storageGb: 10,
+      questionBankCap: 0, // 0 = unlimited
+      notificationChannels: ['email', 'push'],
+    },
+    centre_plus: {
+      name: 'Premium Facility',
+      aiQuestionGen: true,
+      aiPerformanceAnalysis: true,
+      aiCreditsPerSeat: 500,
+      storageGb: 25,
+      questionBankCap: 0, // 0 = unlimited
+      notificationChannels: ['email', 'push', 'whatsapp'],
+    },
+  };
+  for (const [id, fields] of Object.entries(planFields)) {
+    const ref = adminDb.collection('platformPlans').doc(id);
+    const snap = await ref.get();
+    if (snap.exists) await ref.set(fields, { merge: true });
+  }
+
+  await cfgRef.set({ plansV3DoneAt: new Date().toISOString() }, { merge: true });
+  console.warn('[plansV3] plan names renamed to the Facility suffix and feature fields stamped');
+}
+
 export async function ensurePlansV2(): Promise<void> {
   const cfgRef = adminDb.collection('platformConfig').doc('global');
   const cfgSnap = await cfgRef.get();

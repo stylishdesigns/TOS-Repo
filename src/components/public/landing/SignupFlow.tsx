@@ -210,7 +210,7 @@ const BuildOverlay: React.FC<{
         )}
         {finished && failed && (
           <>
-            <p role="alert" style={{ font: '600 14px Inter, sans-serif', color: '#DC2626', margin: '16px 0 0' }}>{error || 'Could not start your trial. Please try again.'}</p>
+            <p role="alert" style={{ font: '600 14px Inter, sans-serif', color: '#DC2626', margin: '16px 0 0' }}>{error || 'Could not register your centre. Please try again.'}</p>
             <button type="button" onClick={onClose} style={{ ...CTA, marginTop: '14px' }}>Close</button>
           </>
         )}
@@ -394,7 +394,7 @@ export const SignupStartPage: React.FC = () => {
         }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Could not start your trial. Please try again.');
+      if (!res.ok) throw new Error(data.error || 'Could not register your centre. Please try again.');
       try {
         sessionStorage.setItem(RESULT_KEY, JSON.stringify({ startedAt: Date.now(), domain: nameState.domain || `tutorialos.com/${slugForName(name)}` }));
         sessionStorage.setItem(LOCKED_KEY, '1');
@@ -402,7 +402,7 @@ export const SignupStartPage: React.FC = () => {
       setPostState('ok');
     } catch (err: unknown) {
       setPostState('failed');
-      setFormError((err as Error)?.message || 'Could not start your trial. Please try again.');
+      setFormError((err as Error)?.message || 'Could not register your centre. Please try again.');
     }
   };
 
@@ -719,7 +719,7 @@ export const SignupConfirmPage: React.FC = () => {
           <h2 style={h2Style}>Your plan</h2>
           <span className="pill" style={{ marginBottom: '12px' }}>Free seats included · upgrade any time</span>
           <p style={{ font: '500 15px/1.6 Inter, sans-serif', color: '#334155', margin: '10px 0 0' }}>
-            Your facility starts with its <b>free seats</b> on the Standard plan. Upgrade any time: pay for seats (from <b>₦2,000 per seat per month</b>) to add more students and unlock your facility's own public landing page.
+            Your facility starts on the <b>Free Facility</b> plan: up to 5 students, free forever. Upgrade any time: pay for seats (from <b>₦2,000 per seat per month</b>) to add more students and unlock your facility's own public landing page.
           </p>
         </div>
 

@@ -51,7 +51,7 @@ console.log('✓ no sign-in or sign-up buttons');
 // The trial form fields: the landing form keeps the owner's details only
 // (facility details moved to the /start page) and a Login button opens the
 // centre access-code gate. No discount request and no city anywhere.
-has('Full name', 'Email', 'Phone', 'State', 'Start my free trial', 'Login');
+has('Full name', 'Email', 'Phone', 'State', 'Start free. No card needed.', 'Login');
 assert.ok(!html.includes('Request a 20% discount'), 'discount request checkbox must stay removed');
 assert.ok(!html.includes('City'), 'city must stay off the forms');
 console.log('✓ trial form fields');
