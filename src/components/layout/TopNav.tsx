@@ -216,7 +216,7 @@ export const TopNav: React.FC<TopNavProps> = ({ onToggleMobileMenu }) => {
         <button
           id="mobile-menu-toggle-btn"
           onClick={onToggleMobileMenu}
-          className="lg:hidden p-2 rounded-lg text-slate-700 hover:bg-slate-100 transition-colors"
+          className="lg:hidden p-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50 active:scale-95 transition-all"
           aria-label="Toggle Navigation"
         >
           <Menu className="w-5 h-5" />

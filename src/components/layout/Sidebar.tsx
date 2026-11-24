@@ -21,6 +21,7 @@ import {
   Sparkles,
   MessageSquare,
   Wallet,
+  X,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -109,7 +110,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
       <aside
         id="app-main-sidebar"
         className={`fixed lg:static top-0 left-0 bottom-0 z-50 w-60 bg-[#070F1E] border-r border-[#15233C] flex flex-col transition-transform duration-300 ease-in-out ${
-          mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+          mobileOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full lg:translate-x-0'
         }`}
       >
         {/* Brand Header */}
@@ -135,13 +136,23 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
             </div>
           </div>
 
-          <button
-            onClick={() => setViewMode('website')}
-            title="Open Public Website"
-            className="p-1.5 rounded-md text-slate-400 hover:text-white hover:brightness-110 transition-colors"
-          >
-            <ExternalLink className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setViewMode('website')}
+              title="Open Public Website"
+              className="p-1.5 rounded-md text-slate-400 hover:text-white hover:brightness-110 transition-colors"
+            >
+              <ExternalLink className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setMobileOpen(false)}
+              title="Close menu"
+              aria-label="Close menu"
+              className="lg:hidden p-1.5 rounded-md text-slate-400 hover:text-white transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Navigation Sections */}
