@@ -90,7 +90,7 @@ export const LandingEnquiries: React.FC = () => {
       <div className="flex items-center justify-between gap-3 flex-wrap mb-5">
         <div>
           <h1 className="text-xl sm:text-2xl font-black text-white">Website Enquiries</h1>
-          <p className="text-sm text-slate-400 mt-1">
+          <p className="text-sm sm:text-[15px] font-bold text-slate-100 mt-1">
             Messages parents and students send through your facility's landing page.
             {leads && newCount > 0 ? ` ${newCount} new.` : ''}
           </p>

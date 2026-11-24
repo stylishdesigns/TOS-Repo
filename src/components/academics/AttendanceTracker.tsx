@@ -160,7 +160,7 @@ export const AttendanceTracker: React.FC = () => {
           <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
             Attendance
           </h2>
-          <p className="text-[12px] text-slate-500 font-medium mt-0.5">
+          <p className="text-sm sm:text-[15px] font-bold text-slate-900 mt-0.5">
             Who is in, late or away for the selected day.
           </p>
         </div>

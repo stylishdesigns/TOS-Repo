@@ -433,7 +433,7 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
                 {activeUser?.role || 'Administrator'}
               </span>
             </div>
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 mt-1">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm font-bold text-slate-900 mt-1">
               <span className="flex items-center space-x-1">
                 <Mail className="w-3.5 h-3.5 text-slate-400" />
                 <span>{activeUser?.email || ''}</span>
@@ -787,22 +787,24 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
       {mode === 'facility' && (
         <div>
           <h2 className="text-xl font-bold text-slate-900">Facility Settings</h2>
-          <p className="text-xs text-slate-500 mt-0.5">Facility parameters, branding and your website landing page.</p>
+          <p className="text-sm sm:text-[15px] font-bold text-slate-900 mt-0.5">Facility parameters, branding and your website landing page.</p>
           {/* Two-way toggle: the facility's own settings or the landing page
               editor, both reachable from the top. */}
-          <div className="mt-4 inline-flex p-1 rounded-xl bg-slate-100 border border-slate-200 gap-1">
+          <div className="mt-4 flex justify-center">
+          <div className="inline-flex p-1.5 rounded-xl bg-slate-100 border border-slate-200 gap-1">
             <button
               onClick={() => setFacilityView('facility')}
-              className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${facilityView === 'facility' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-colors ${facilityView === 'facility' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
             >
               Facility settings
             </button>
             <button
               onClick={() => setFacilityView('landing')}
-              className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${facilityView === 'landing' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-colors ${facilityView === 'landing' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
             >
               Website landing page
             </button>
+          </div>
           </div>
         </div>
       )}

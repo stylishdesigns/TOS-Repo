@@ -214,7 +214,7 @@ export const StaffRolesManager: React.FC = () => {
               Role-Based Access
             </span>
           </div>
-          <p className="text-xs text-slate-500 mt-1">
+          <p className="text-sm sm:text-[15px] font-bold text-slate-900 mt-1">
             Configure staff members and permissions across Tutor, Manager, Secretary, and Super Admin roles.
           </p>
         </div>

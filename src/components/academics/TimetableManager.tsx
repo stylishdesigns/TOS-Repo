@@ -368,7 +368,7 @@ export const TimetableManager: React.FC = () => {
           <h2 className="text-2xl font-bold text-slate-900 tracking-tight uppercase">
             Timetable
           </h2>
-          <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest mt-1">
+          <p className="text-xs sm:text-sm font-bold text-slate-900 uppercase tracking-widest mt-1">
             Today: {currentDate}
           </p>
         </div>
@@ -422,7 +422,7 @@ export const TimetableManager: React.FC = () => {
               <button
                 key={status.id}
                 onClick={() => setSelectedStatus(status.id)}
-                className={`px-2 py-2 text-[8px] font-black uppercase tracking-tighter rounded-lg border-2 transition-all whitespace-nowrap ${
+                className={`px-3.5 py-2.5 text-xs font-black uppercase tracking-wide rounded-lg border-2 transition-all whitespace-nowrap ${
                   selectedStatus === status.id
                     ? 'bg-slate-900 border-slate-900 text-white shadow-sm'
                     : 'bg-white border-slate-100 text-slate-400 hover:border-slate-200'

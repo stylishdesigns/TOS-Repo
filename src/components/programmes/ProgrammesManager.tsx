@@ -243,7 +243,7 @@ export const ProgrammesManager: React.FC = () => {
       </div>
 
       {/* Subsections Navigation Tabs */}
-      <div className="flex items-center space-x-2 bg-slate-100/80 p-1.5 rounded-xl border border-slate-200/80 overflow-x-auto scrollbar-none">
+      <div className="flex items-center space-x-2 bg-slate-100/80 p-1.5 rounded-xl border border-slate-200/80 w-fit max-w-full mx-auto overflow-x-auto scrollbar-none">
         {(
           [
             { id: 'Exam Programmes', label: 'Exam Programmes', icon: BookOpen },
@@ -256,7 +256,7 @@ export const ProgrammesManager: React.FC = () => {
             <button
               key={sub.id}
               onClick={() => setActiveSubsection(sub.id)}
-              className={`px-3.5 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap flex items-center space-x-2 ${
+              className={`px-5 py-2.5 text-sm font-bold rounded-lg transition-all whitespace-nowrap flex items-center space-x-2 ${
                 isActive
                   ? 'bg-orange-600 text-white shadow-xs'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-white/70'

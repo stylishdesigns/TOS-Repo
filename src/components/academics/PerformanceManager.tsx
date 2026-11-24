@@ -153,7 +153,7 @@ export const PerformanceManager: React.FC = () => {
           <h2 className="text-2xl font-bold text-slate-900 tracking-tight">
             Performance Analytics
           </h2>
-          <p className="text-xs text-slate-500 mt-1">In-depth student performance & class leaderboards</p>
+          <p className="text-sm sm:text-[15px] font-bold text-slate-900 mt-1">In-depth student performance & class leaderboards</p>
         </div>
       </div>
 
@@ -236,12 +236,12 @@ export const PerformanceManager: React.FC = () => {
       </div>
 
       {/* View Mode Toggle */}
-      <div className="flex items-center space-x-1 bg-slate-100 p-1 rounded-xl w-fit">
+      <div className="flex items-center space-x-1 bg-slate-100 p-1 rounded-xl w-fit mx-auto">
         {(['General', 'Mock'] as const).map((mode) => (
           <button
             key={mode}
             onClick={() => setActiveToggle(mode)}
-            className={`px-8 py-2.5 text-xs font-black rounded-lg transition-all ${
+            className={`px-8 py-3 text-sm font-black rounded-lg transition-all ${
               activeToggle === mode
                 ? 'bg-white text-orange-600 shadow-md scale-105'
                 : 'text-slate-500 hover:text-slate-700'

@@ -408,7 +408,7 @@ export const StaffPayManager: React.FC = () => {
             <Wallet className="w-6 h-6 text-orange-600" />
             <span>Staff Pay</span>
           </h1>
-          <p className="text-xs text-slate-500 mt-1 max-w-xl">
+          <p className="text-sm sm:text-[15px] font-bold text-slate-900 mt-1 max-w-xl">
             Pay your tutors and admins, keep the record, and attach the screenshot as evidence.
           </p>
         </div>

@@ -97,7 +97,7 @@ export const CmsManager: React.FC = () => {
           <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight mt-1">
             Website Content & Template Studio
           </h2>
-          <p className="text-xs md:text-sm text-slate-500 mt-0.5">
+          <p className="text-sm sm:text-[15px] font-bold text-slate-900 mt-0.5">
             Customize branding, banners, hero text, announcements, and bank payment info without coding
           </p>
         </div>

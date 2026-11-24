@@ -219,7 +219,7 @@ export const SubjectsManager: React.FC = () => {
               Subjects
             </h2>
           </div>
-          <p className="text-xs text-slate-500 mt-1">
+          <p className="text-sm sm:text-[15px] font-bold text-slate-900 mt-1">
             Master catalog of academic disciplines taught across all tutorial tracks.
           </p>
         </div>

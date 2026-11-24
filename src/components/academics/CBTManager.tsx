@@ -855,7 +855,7 @@ export const CBTManager: React.FC = () => {
             <h2 className="text-2xl font-bold text-slate-900 tracking-tight">
               Tutors Assessment
             </h2>
-            <p className="text-xs text-slate-500 mt-1">Configure automated assessments & simulations</p>
+            <p className="text-sm sm:text-[15px] font-bold text-slate-900 mt-1">Configure automated assessments & simulations</p>
           </div>
         </div>
 
@@ -987,7 +987,7 @@ export const CBTManager: React.FC = () => {
             <button
               key={freq}
               onClick={() => setActiveFrequency(freq)}
-              className={`px-8 py-2.5 text-[11px] font-black rounded-xl transition-all ${
+              className={`px-8 py-3 text-sm font-black rounded-xl transition-all ${
                 activeFrequency === freq
                   ? 'bg-white text-orange-600 shadow-md scale-105 ring-1 ring-slate-200'
                   : 'text-slate-500 hover:text-slate-700'

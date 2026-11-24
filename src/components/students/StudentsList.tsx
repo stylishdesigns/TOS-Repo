@@ -213,7 +213,7 @@ export const StudentsList: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative">
         <div>
           <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Students</h2>
-          <p className="text-xs text-slate-600 dark:text-white mt-1">
+          <p className="text-sm sm:text-[15px] font-bold text-slate-900 mt-1">
             Complete student directory with parent contacts, assigned cohort, attendance and fee balances.
           </p>
         </div>

@@ -45,7 +45,7 @@ export const WebsiteLanding: React.FC = () => {
     <div className="w-full">
       <div className="p-4 sm:p-6 pb-0 max-w-5xl mx-auto w-full">
         <h1 className="text-xl sm:text-2xl font-black text-white">Website (Landing page)</h1>
-        <p className="text-sm text-slate-400 mt-1">
+        <p className="text-sm sm:text-[15px] font-bold text-slate-100 mt-1">
           Design your facility's landing page, publish it, and read the enquiries it brings in.
         </p>
         <div className="flex gap-2 mt-4 flex-wrap" role="tablist" aria-label="Website sections">

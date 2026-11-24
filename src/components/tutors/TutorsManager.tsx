@@ -184,7 +184,7 @@ export const TutorsManager: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Tutors</h2>
-          <p className="text-xs text-slate-500 mt-1">
+          <p className="text-sm sm:text-[15px] font-bold text-slate-900 mt-1">
             Manage subject specialists, performance ratings, and portal access across academic departments.
           </p>
         </div>
@@ -236,7 +236,7 @@ export const TutorsManager: React.FC = () => {
             <button
               key={tab}
               onClick={() => setActiveFilter(tab)}
-              className={`px-3 py-1 text-xs font-semibold rounded-md transition-all whitespace-nowrap ${
+              className={`px-4 py-2.5 text-sm font-bold rounded-lg transition-all whitespace-nowrap ${
                 activeFilter === tab
                   ? 'bg-white text-slate-900 shadow-2xs border border-slate-200/60'
                   : 'text-slate-500 hover:text-slate-900'

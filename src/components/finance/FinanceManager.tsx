@@ -373,7 +373,7 @@ export const FinanceManager: React.FC = () => {
           <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">
             Fees & Payments
           </h2>
-          <p className="text-xs md:text-sm text-slate-500 mt-1">
+          <p className="text-sm sm:text-[15px] font-bold text-slate-900 mt-1">
             Track tuition fee collections, outstanding student balances, and official receipts
           </p>
           <div className="mt-3">
