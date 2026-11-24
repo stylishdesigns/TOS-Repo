@@ -1487,13 +1487,14 @@ export const TosPortal: React.FC = () => {
         {navBody}
       </aside>
 
-      {/* Brings the sections back after collapsing */}
+      {/* Brings the sections back after collapsing: sits at the top, where the
+          collapse button it mirrors lives */}
       {!mobileNavOpen && (
         <button
           onClick={() => setMobileNavOpen(true)}
           title="Show sections"
           aria-label="Show sections"
-          className="md:hidden fixed left-3 top-1/2 -translate-y-1/2 z-40 w-11 h-11 rounded-full bg-slate-900 border border-white/10 text-slate-300 grid place-items-center shadow-lg active:scale-95 transition-transform"
+          className="md:hidden fixed top-3 left-3 z-40 w-11 h-11 rounded-full bg-slate-900 border border-white/10 text-slate-300 grid place-items-center shadow-lg active:scale-95 transition-transform"
         >
           <PanelLeftOpen className="w-5 h-5" />
         </button>
@@ -1501,7 +1502,7 @@ export const TosPortal: React.FC = () => {
 
       {/* Main */}
       <main className="flex-1 min-w-0 p-5 md:p-8">
-        <header className="mb-6">
+        <header className={`mb-6 ${!mobileNavOpen ? 'pl-12 md:pl-0' : ''}`}>
           <h1 className="text-2xl font-black text-white tracking-tight capitalize">{TABS.find((t) => t.id === tab)?.label}</h1>
           <p className="text-slate-400 text-xs mt-1">
             {tab === 'overview' && 'Everything happening across the platform right now.'}
