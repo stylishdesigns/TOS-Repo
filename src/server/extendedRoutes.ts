@@ -315,6 +315,9 @@ export function registerExtendedRoutes(app: express.Express): void {
         centreName: String(data.name || '').slice(0, 60),
         accent: /^#[0-9a-fA-F]{6}$/.test(rawAccent) ? rawAccent : '',
         logoUrl: String(data.logoUrl || ''),
+        // Batch 44: a facility that switched its access code off tells the
+        // app here, so the gate never shows and sign-in follows the splash.
+        accessCodeRequired: data.accessCodeRequired !== false,
       });
     } catch (error: any) {
       console.error('[centre-by-slug] failed:', error?.message || error);
@@ -946,18 +949,32 @@ export function registerExtendedRoutes(app: express.Express): void {
       // exam tags (added before batch 42) and callers without an exam on
       // their profile (tutors, admins) see the whole library.
       let examStrings: string[] = [];
+      let callerCentreId = '';
       try {
         const stu = await adminDb.collection('students').where('uid', '==', caller.uid).limit(20).get();
         for (const d of stu.docs) {
           const row = d.data() as Record<string, any>;
+          if (!callerCentreId && row.centreId) callerCentreId = String(row.centreId);
           for (const key of ['examToRegister', 'programmeName']) {
             const v = String(row?.[key] || '').trim().toUpperCase();
             if (v && !examStrings.includes(v)) examStrings.push(v);
           }
         }
       } catch { examStrings = []; }
+      // Batch 44: every facility decides whether its students ever see the
+      // TOS video class library. The switch is read on this very request
+      // from the centre's document, so it lands the moment the admin flips
+      // it. A facility's own uploaded materials are a separate list and are
+      // never touched by this switch.
+      let videoClassesOff = false;
+      if (callerCentreId) {
+        try {
+          const cs = await adminDb.collection('centres').doc(callerCentreId).get();
+          videoClassesOff = cs.exists && (cs.data() as any)?.videoClassesEnabled === false;
+        } catch { videoClassesOff = false; }
+      }
       let hidden = 0;
-      const videos = all.filter((v) => {
+      const videos = videoClassesOff ? [] : all.filter((v) => {
         const tags: string[] = Array.isArray(v.examTypes)
           ? (v.examTypes as any[]).map((x) => String(x).trim().toUpperCase()).filter(Boolean)
           : [];
@@ -1692,7 +1709,7 @@ export function registerExtendedRoutes(app: express.Express): void {
         const regenerated = await regenerateAccessCode(centreId, caller.uid, 'owner');
         accessCode = regenerated.accessCode;
       }
-      res.json({ success: true, accessCode });
+      res.json({ success: true, accessCode, accessCodeRequired: (cDoc.data() as any)?.accessCodeRequired !== false });
     } catch (error: any) {
       if (error?.status) return res.status(error.status).json({ error: error.message });
       console.error('[access-code] read failed:', error?.message || error);
@@ -1712,6 +1729,66 @@ export function registerExtendedRoutes(app: express.Express): void {
       if (error?.status) return res.status(error.status).json({ error: error.message });
       console.error('[access-code] regenerate failed:', error?.message || error);
       res.status(500).json({ error: 'Could not regenerate the access code.' });
+    }
+  });
+
+  // CENTRE (batch 44): the facility decides whether anyone is asked for the
+  // access code at all. It is ON by default; a facility that switches it off
+  // lets its students and staff go straight from the splash screen to
+  // signing in. The code itself stays valid for anyone who still has it.
+  app.post('/api/centre/access-code/require', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const centreId = String(req.body?.centreId || '');
+      if (!centreId) return res.status(400).json({ error: 'centreId is required.' });
+      await requireMembership(caller, centreId, ['owner', 'admin']);
+      const required = req.body?.required !== false;
+      await adminDb.collection('centres').doc(centreId).set(
+        { accessCodeRequired: required, accessCodeRequiredUpdatedAt: new Date().toISOString() },
+        { merge: true },
+      );
+      res.json({ success: true, accessCodeRequired: required });
+    } catch (error: any) {
+      if (error?.status) return res.status(error.status).json({ error: error.message });
+      console.error('[access-code] require toggle failed:', error?.message || error);
+      res.status(500).json({ error: 'Could not save the access-code setting.' });
+    }
+  });
+
+  // CENTRE (batch 44): whether the facility's students see the Tutorial OS
+  // video class library at all. The flag lives on the centre's document and
+  // is read on every student video fetch, so the switch lands instantly.
+  app.get('/api/centre/video-classes', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const centreId = String(req.query.centreId || '');
+      if (!centreId) return res.status(400).json({ error: 'centreId is required.' });
+      await requireMembership(caller, centreId, ['owner', 'admin']);
+      const cDoc = await adminDb.collection('centres').doc(centreId).get();
+      res.json({ success: true, enabled: cDoc.exists ? (cDoc.data() as any)?.videoClassesEnabled !== false : true });
+    } catch (error: any) {
+      if (error?.status) return res.status(error.status).json({ error: error.message });
+      console.error('[video-classes] read failed:', error?.message || error);
+      res.status(500).json({ error: 'Could not read the video-classes setting.' });
+    }
+  });
+
+  app.post('/api/centre/video-classes', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const centreId = String(req.body?.centreId || '');
+      if (!centreId) return res.status(400).json({ error: 'centreId is required.' });
+      await requireMembership(caller, centreId, ['owner', 'admin']);
+      const enabled = req.body?.enabled !== false;
+      await adminDb.collection('centres').doc(centreId).set(
+        { videoClassesEnabled: enabled, videoClassesUpdatedAt: new Date().toISOString() },
+        { merge: true },
+      );
+      res.json({ success: true, enabled });
+    } catch (error: any) {
+      if (error?.status) return res.status(error.status).json({ error: error.message });
+      console.error('[video-classes] toggle failed:', error?.message || error);
+      res.status(500).json({ error: 'Could not save the video-classes setting.' });
     }
   });
 

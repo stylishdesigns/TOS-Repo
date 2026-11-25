@@ -128,7 +128,7 @@ const MainLayout: React.FC = () => {
   // always enter THIS facility, and signs out an account that does not
   // belong to it. undefined while the lookup runs, null when the visit
   // carries no ?centre= (a plain browser visit keeps today's behaviour).
-  const [appFacility, setAppFacility] = useState<{ centreId: string; centreName: string; accent: string; logoUrl: string } | null | undefined>(undefined);
+  const [appFacility, setAppFacility] = useState<{ centreId: string; centreName: string; accent: string; logoUrl: string; accessCodeRequired?: boolean } | null | undefined>(undefined);
   // Batch 22: a facility under the paid-seat minimum has no public landing
   // page; the lookup returns locked and the visitor sees this screen only.
   const [landingLocked, setLandingLocked] = useState<{ message: string } | null>(null);
@@ -148,13 +148,20 @@ const MainLayout: React.FC = () => {
         }
         setLandingLocked(null);
         if (d && d.centreId) {
-          const facility = { centreId: String(d.centreId), centreName: String(d.centreName || ''), accent: String(d.accent || ''), logoUrl: String(d.logoUrl || '') };
+          const facility = { centreId: String(d.centreId), centreName: String(d.centreName || ''), accent: String(d.accent || ''), logoUrl: String(d.logoUrl || ''), accessCodeRequired: d.accessCodeRequired !== false };
           // The gate state is prepared in the same update as the facility
           // itself, so the access-code gate is the very first screen that
           // paints: the TOS landing never flashes through the gap in between.
           setShowWelcome(false);
           setCentreGateRequested(true);
           setAppWelcomeCentre({ centreId: facility.centreId, centreName: facility.centreName, accent: facility.accent, logoUrl: facility.logoUrl, welcomeImageUrl: '' });
+          // Batch 44: a facility that switched its access code off skips the
+          // code gate and the welcome screen entirely: splash, then straight
+          // to signing in. The centre is already known, so no code is needed.
+          if (facility.accessCodeRequired === false) {
+            setPendingCentre({ code: '', centreName: facility.centreName, centreId: facility.centreId, accent: facility.accent });
+            setAppWelcomeMode('login');
+          }
           setAppFacility(facility);
         } else {
           setAppFacility(null);
@@ -1109,6 +1116,7 @@ const MainLayout: React.FC = () => {
             {adminSection === 'tutors' && <TutorsManager />}
             {adminSection === 'programmes' && <ProgrammesManager />}
             {adminSection === 'cbt' && <CBTManager />}
+            {adminSection === 'resources' && <ResourcesManager />}
             {adminSection === 'timetable' && <TimetableManager />}
             {adminSection === 'attendance' && <AttendanceTracker />}
             {adminSection === 'results' && <PerformanceManager />}
@@ -1156,6 +1164,7 @@ const PerformanceManager = lazy(() => import('./components/academics/Performance
 const CBTManager = lazy(() => import('./components/academics/CBTManager').then((m) => ({ default: m.CBTManager })));
 const TimetableManager = lazy(() => import('./components/academics/TimetableManager').then((m) => ({ default: m.TimetableManager })));
 const AttendanceTracker = lazy(() => import('./components/academics/AttendanceTracker').then((m) => ({ default: m.AttendanceTracker })));
+const ResourcesManager = lazy(() => import('./components/academics/ResourcesManager').then((m) => ({ default: m.ResourcesManager })));
 const AnnouncementsManager = lazy(() => import('./components/communications/AnnouncementsManager').then((m) => ({ default: m.AnnouncementsManager })));
 const ChatManager = lazy(() => import('./components/communications/ChatManager').then((m) => ({ default: m.ChatManager })));
 const AdminChatEntry = lazy(() => import('./components/communications/AdminChatEntry').then((m) => ({ default: m.AdminChatEntry })));

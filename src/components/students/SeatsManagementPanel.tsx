@@ -18,6 +18,31 @@ import { useApp } from '../../context/AppContext';
 import { api } from '../tos/tosShared';
 import { Student, SeatSummary } from '../../types';
 
+// Batch 44: the plan cards in the payment flow show what each plan actually
+// covers, word for word like the pricing cards on the landing page and the
+// proposal, so an admin choosing a plan can see the difference at a glance.
+const PLAN_FEATURES: Record<string, string[]> = {
+  centre_free: [
+    'Up to 5 students',
+    'Your own branded landing page',
+    'Student, tutor and admin portals',
+    'Email notifications',
+    '50 AI credits per seat',
+  ],
+  centre_standard: [
+    'Everything in Free',
+    'Unlimited students',
+    'Email and push notifications',
+    '200 AI credits per seat',
+    'AI question generation and performance analysis',
+  ],
+  centre_premium: [
+    'Everything in Standard',
+    'WhatsApp notifications for parents',
+    '500 AI credits per seat',
+  ],
+};
+
 interface SeatsManagementPanelProps {
   students: Student[];
 }
@@ -713,6 +738,16 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
                           {Number(p.price) > 0 ? `\u20A6${Number(p.price).toLocaleString()}` : '\u20A60'}
                         </p>
                         <p className="text-[10px] text-slate-400">{Number(p.price) > 0 ? 'per seat / month' : 'free seats only'}</p>
+                        {Array.isArray(PLAN_FEATURES[p.id]) && (
+                          <ul className="mt-2 space-y-1">
+                            {PLAN_FEATURES[p.id].map((f: string) => (
+                              <li key={f} className="flex items-start gap-1.5 text-[10.5px] leading-snug text-slate-600 dark:text-slate-300">
+                                <CheckCircle2 className="w-3 h-3 mt-[2px] shrink-0 text-[var(--brand,#0F172A)]" />
+                                <span>{f}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
                         {current && (
                           <span className="mt-2 inline-flex self-start px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-300">
                             Current plan

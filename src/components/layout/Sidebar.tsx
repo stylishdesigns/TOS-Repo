@@ -22,6 +22,7 @@ import {
   MessageSquare,
   Wallet,
   X,
+  FolderOpen,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -76,6 +77,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
         { id: 'attendance', label: 'Attendance', icon: UserCheck },
         { id: 'results', label: 'Performance', icon: BarChart3 },
         { id: 'cbt', label: 'Tutors Assessment', icon: Laptop },
+        { id: 'resources', label: 'Resources', icon: FolderOpen },
       ],
     },
     {

@@ -145,6 +145,7 @@ export type AdminSection =
   | 'attendance'
   | 'results'
   | 'cbt'
+  | 'resources'
   | 'payments'
   | 'announcements'
   | 'chat'

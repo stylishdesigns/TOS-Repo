@@ -93,6 +93,7 @@ p.body{color:#475569;font-size:16px;margin-bottom:12px}
 .covers h4{font-size:15.5px;font-weight:800;margin-bottom:10px}
 .covers li{list-style:none;color:#475569;font-size:15px;padding:5px 0 5px 24px;position:relative}
 .covers li:before{content:'✓';position:absolute;left:0;top:5px;color:var(--orange-d);font-weight:800}
+.dear{font-size:16.5px;font-weight:800;color:#0F172A;margin-bottom:8px}
 .paybox{margin-top:16px;background:#FFF7ED;border:1px solid #FED7AA;border-radius:14px;padding:18px 20px}
 .paybox>b{display:block;font-size:15.5px;margin-bottom:6px}
 .paybox li{list-style:none;color:#7C2D12;font-size:15px;padding:5px 0 5px 24px;position:relative}
@@ -147,7 +148,7 @@ export function buildProposalPage(displayName: string, origin: string, slug: str
   <div class="wrap">
     <div class="brand"><span class="mark"><img src="/tos-brand-icon.png" alt="Tutorial OS" /></span><b>Tutorial OS</b></div>
     <span class="eyebrow">Partnership proposal</span>
-    <h1>Run your whole learning facility on one system.</h1>
+    <h1>Run your whole learning facility on one software system.</h1>
     <div class="forline">Prepared for <b>${name}</b><span aria-hidden="true">·</span><span>${esc(dateStr)}</span></div>
   </div>
 </header>
@@ -156,8 +157,9 @@ export function buildProposalPage(displayName: string, origin: string, slug: str
 
 <section>
   <div class="sh"><span class="num">01</span><h2>One platform for learning facilities of every kind</h2></div>
-  <p class="lead">Tutorial OS is one system that runs a learning facility end to end: the owner's console, portals for tutors and students, a student phone app, and a branded public landing page for enrolment. Everything carries the facility's own name, logo and colours, so students and parents see the facility, never us.</p>
-  <p class="body">It is built for learning facilities of every kind: tutorial and lesson centres preparing students for JAMB, WAEC and NECO, bridge programmes like IJMB and JUPEB, satellite campuses, distance-learning programmes, professional-course providers, online tutorial programmes and their students, undergraduate study groups, and schools that want the same structure. It runs in the browser on any phone or laptop, with nothing to install.</p>
+  <p class="dear">To the owner and admins of ${name},</p>
+  <p class="lead">Tutorial OS is one software system that runs a learning facility end to end: your console, portals for tutors and students, a student phone app, and a branded landing page for enrolment. Everything carries your name, logo and colours, so students and parents see the facility, never us.</p>
+  <p class="body">It is built for tutorial and lesson centres, bridge programmes like IJMB and JUPEB, satellite campuses, distance-learning and online programmes, study groups, and schools that want the same structure. It runs in the browser on any phone or laptop, with nothing to install.</p>
   <dl class="facts">
     <div><dt>Built for</dt><dd>Learning facilities of every kind</dd></div>
     <div><dt>Exams</dt><dd>JAMB, WAEC, NECO, IJMB and JUPEB, plus your own custom exams</dd></div>
@@ -199,7 +201,7 @@ export function buildProposalPage(displayName: string, origin: string, slug: str
 </section>
 
 <section>
-  <div class="sh"><span class="num">05</span><h2>Money and parents, handled</h2></div>
+  <div class="sh"><span class="num">05</span><h2>Fee management for students and parents</h2></div>
   <div class="duo">
     <div class="card"><span class="chip">FEES</span><div class="big">Without running after anyone</div><p>No more chasing students for money. The facility plugs in its own payment and bank details, and students pay straight into it. Each student can see exactly what they owe and when it is due, and admins see who has paid and who has not. Reminders go out on their own: daily notifications to the admin for every student who has not paid or whose due date is about to expire, and a notice to the student when their own payment is due. Every confirmed payment gets a receipt.</p></div>
     <div class="card"><span class="chip">PARENTS</span><div class="big">In the loop, on time</div><p>Parents who see progress renew and refer. Your branded landing page brings enrolment enquiries straight to you, day and night. Results and mock scores give parents proof their child is moving, not just attending, and notices by email and WhatsApp keep them updated on their child's performance and fees without anyone chasing them one by one.</p></div>
@@ -241,7 +243,7 @@ export function buildProposalPage(displayName: string, origin: string, slug: str
 
 </div>
 </main>
-<div class="foot"><div class="wrap"><b>Tutorial OS</b> · One system for learning facilities of every kind. This proposal was prepared for ${name}.</div></div>
+<div class="foot"><div class="wrap"><b>Tutorial OS</b> · One software system for learning facilities of every kind. This proposal was prepared for ${name}.</div></div>
 <script type="module">
 const fileName = 'TutorialOS-Proposal-${esc(displayName).replace(/[^A-Za-z0-9]+/g, '-')}.pdf';
 let pdfBusy = false;
