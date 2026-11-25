@@ -1084,7 +1084,7 @@ const MainLayout: React.FC = () => {
 
   // Admin Portal Dashboard matching video layout and Geometric Balance theme
   return (
-    <AppOnlyGate>
+    <AppOnlyGate desktopOk>
     <div style={brandVars(brandAccent)}>
     <div
       id="app-root-layout"

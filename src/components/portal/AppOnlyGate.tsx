@@ -2,17 +2,27 @@ import React, { useEffect, useState } from 'react';
 import { readLaunchBranding } from '../student-portal/LaunchSplash';
 
 /**
- * App-only gate. When the platform's app-only setting is ON, the three
- * portals open only inside the installed app (standalone display mode): in
- * any browser, phone or desktop, this screen replaces the portal with an
- * install call-to-action. The TOS console, the TOS landing and facility
- * landing pages are never gated.
+ * App-only gate. When the platform's app-only setting is ON, the student
+ * and tutor portals open only inside the installed app (standalone display
+ * mode): in any browser, phone or desktop, this screen replaces the portal
+ * with an install call-to-action. The admin portal is the one exception the
+ * facility asked for: it also opens in a desktop browser (a wide screen with
+ * a real pointer), never on a phone or tablet. The TOS console, the TOS
+ * landing and facility landing pages are never gated.
  */
 // True when this page is running inside the installed app rather than a
 // browser tab: the installed app is the only place app-only portals open.
 export const isStandaloneDisplay = (): boolean =>
   window.matchMedia('(display-mode: standalone)').matches ||
   (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
+
+// Desktop, for the admin portal's web exemption: a wide screen driven by a
+// fine pointer (mouse or trackpad). Phones and tablets never match, so the
+// app-only rule still keeps them on the installed app.
+export const isDesktopBrowser = (): boolean =>
+  typeof window !== 'undefined' &&
+  window.matchMedia('(min-width: 1024px)').matches &&
+  window.matchMedia('(pointer: fine)').matches;
 
 // Reads the app-only switch fresh on every page load: no session storage, so
 // a refresh catches an on/off toggle right away. The tiny in-memory cache
@@ -89,30 +99,48 @@ const GateSplash: React.FC = () => {
   );
 };
 
-export const AppOnlyGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [state, setState] = useState<'loading' | 'open' | 'blocked'>(() => {
-    if (typeof window !== 'undefined' && isStandaloneDisplay()) return 'open';
-    const stored = readStoredAppOnly();
-    if (stored === null) return 'loading';
-    return stored ? 'blocked' : 'open';
+export const AppOnlyGate: React.FC<{ children: React.ReactNode; desktopOk?: boolean }> = ({ children, desktopOk = false }) => {
+  // appOnlyOn === null means the setting is still being checked (loading).
+  // The device's remembered answer opens the first paint; the live check
+  // follows and corrects it if the toggle changed since.
+  const [appOnlyOn, setAppOnlyOn] = useState<boolean | null>(() => {
+    if (typeof window !== 'undefined' && isStandaloneDisplay()) return false;
+    return readStoredAppOnly();
   });
+  const [desktop, setDesktop] = useState(() => isDesktopBrowser());
 
   useEffect(() => {
     let alive = true;
     if (isStandaloneDisplay()) {
-      setState('open');
+      setAppOnlyOn(false);
       return;
     }
     isAppOnlyOn().then((on) => {
       if (!alive) return;
-      setState(on ? 'blocked' : 'open');
+      setAppOnlyOn(on);
       try { localStorage.setItem('tos:app-only', on ? 'blocked' : 'open'); } catch { /* private mode */ }
     });
     return () => { alive = false; };
   }, []);
 
-  if (state === 'open') return <>{children}</>;
-  if (state === 'loading') {
+  // The desktop exemption follows the window live: shrink a desktop browser
+  // window narrow (or detach it to a tablet-sized split) and it counts as
+  // mobile again, growing back reopens the portal without a reload.
+  useEffect(() => {
+    if (!desktopOk) return;
+    const update = () => setDesktop(isDesktopBrowser());
+    window.addEventListener('resize', update);
+    const m = window.matchMedia('(pointer: fine)');
+    m.addEventListener?.('change', update);
+    return () => {
+      window.removeEventListener('resize', update);
+      m.removeEventListener?.('change', update);
+    };
+  }, [desktopOk]);
+
+  const blocked = !!appOnlyOn && !(desktopOk && desktop);
+  if (!blocked) return <>{children}</>;
+  if (appOnlyOn === null) {
     return <GateSplash />;
   }
   return (
