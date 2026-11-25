@@ -36,9 +36,15 @@ export async function uploadStudyMaterialFile(
     throw new Error('The file could not be uploaded. Please try again.');
   }
   const bytes = Number(data.bytes || 0);
+  // Cloudinary's original_filename arrives WITHOUT its extension, and the
+  // material's type chip reads the extension from the stored name. Keep it:
+  // the Cloudinary format ("jpg", "pdf") or the original file's own
+  // extension is appended back on.
+  const base = String(data.original_filename || String(file.name || '').replace(/\.[^.]+$/, '') || 'material');
+  const ext = String(data.format || (String(file.name || '').match(/\.([A-Za-z0-9]{1,5})$/)?.[1]) || '').toLowerCase();
   return {
     url: String(data.secure_url),
-    name: String(data.original_filename || file.name),
+    name: ext ? `${base}.${ext}` : base,
     sizeLabel: bytes > 0 ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : undefined,
   };
 }

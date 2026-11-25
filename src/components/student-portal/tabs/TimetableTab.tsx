@@ -39,10 +39,7 @@ const DAYS: ('Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Satur
 export const TimetableTab: React.FC<TimetableTabProps> = ({ student }) => {
   const { timetable, classRatings, bgTheme } = useApp();
   const dark = bgTheme === 'dark';
-  const [activeSection, setActiveSection] = useState<'timetable' | 'materials'>('timetable');
-  // Learning Resources sub-toggle: study materials (the existing shelf) or
-  // video classes (the platform video library, batch 41).
-  const [learningView, setLearningView] = useState<'materials' | 'videos'>('materials');
+  const [activeSection, setActiveSection] = useState<'timetable' | 'materials' | 'videos'>('timetable');
 
   // Batch 43: ONE subject dropdown for the whole of Learning Resources. The
   // value lives here so Study materials and Video classes always show the
@@ -239,12 +236,14 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({ student }) => {
 
   return (
     <div className="space-y-4 px-4 py-3 max-w-lg mx-auto animate-in fade-in duration-300">
-      {/* 1. Switch at top: "Timetable | Study Materials" */}
-      <div className={`${dark ? 'bg-slate-800/90 p-1 border border-slate-700 shadow-2xs grid grid-cols-2 gap-1' : 'bg-white rounded-[14px] p-1 border border-[#E2E8F0] shadow-2xs grid grid-cols-2 gap-1'}`}>
+      {/* 1. Switch at top (batch 45): one toggle for the three views.
+          Timetable | Study materials | Video classes. The old second toggle
+          and the Study Materials title are gone. */}
+      <div className={`${dark ? 'bg-slate-800/90 p-1 border border-slate-700 shadow-2xs grid grid-cols-3 gap-1' : 'bg-white rounded-[14px] p-1 border border-[#E2E8F0] shadow-2xs grid grid-cols-3 gap-1'}`}>
         <button
           type="button"
           onClick={() => setActiveSection('timetable')}
-          className={`h-10 rounded-[10px] text-xs font-extrabold transition-all flex items-center justify-center cursor-pointer ${
+          className={`h-10 rounded-[10px] text-[11px] font-extrabold transition-all flex items-center justify-center cursor-pointer ${
             activeSection === 'timetable'
               ? 'bg-[var(--brand,#0F172A)] text-[var(--on-brand,#fff)] shadow-xs'
               : dark ? 'text-slate-300' : 'text-[#64748B] hover:text-[#0F172A]'
@@ -256,66 +255,45 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({ student }) => {
         <button
           type="button"
           onClick={() => setActiveSection('materials')}
-          className={`h-10 rounded-[10px] text-xs font-extrabold transition-all flex items-center justify-center cursor-pointer ${
+          className={`h-10 rounded-[10px] text-[11px] font-extrabold transition-all flex items-center justify-center cursor-pointer ${
             activeSection === 'materials'
               ? 'bg-[var(--brand,#0F172A)] text-[var(--on-brand,#fff)] shadow-xs'
               : dark ? 'text-slate-300' : 'text-[#64748B] hover:text-[#0F172A]'
           }`}
         >
-          Learning Resources
+          Study materials
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveSection('videos')}
+          className={`h-10 rounded-[10px] text-[11px] font-extrabold transition-all flex items-center justify-center cursor-pointer ${
+            activeSection === 'videos'
+              ? 'bg-[var(--brand,#0F172A)] text-[var(--on-brand,#fff)] shadow-xs'
+              : dark ? 'text-slate-300' : 'text-[#64748B] hover:text-[#0F172A]'
+          }`}
+        >
+          Video classes
         </button>
       </div>
 
-      {activeSection === 'materials' ? (
-        <div className="space-y-3">
-          {/* Learning Resources toggle: two views, one tap each. Study
-              materials is the existing shelf; Video classes is the platform
-              video library the TOS console maintains. */}
-          <div className={`${dark ? 'bg-slate-800/90 p-1 border border-slate-700 shadow-2xs grid grid-cols-2 gap-1' : 'bg-white rounded-[14px] p-1 border border-[#E2E8F0] shadow-2xs grid grid-cols-2 gap-1'}`}>
-            <button
-              type="button"
-              onClick={() => setLearningView('materials')}
-              className={`h-9 rounded-[10px] text-[11px] font-extrabold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                learningView === 'materials'
-                  ? 'bg-[var(--brand,#0F172A)] text-[var(--on-brand,#fff)] shadow-xs'
-                  : dark ? 'text-slate-300' : 'text-[#64748B] hover:text-[#0F172A]'
-              }`}
-            >
-              <BookOpen className="w-3.5 h-3.5" />
-              Study materials
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setLearningView('videos')}
-              className={`h-9 rounded-[10px] text-[11px] font-extrabold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                learningView === 'videos'
-                  ? 'bg-[var(--brand,#0F172A)] text-[var(--on-brand,#fff)] shadow-xs'
-                  : dark ? 'text-slate-300' : 'text-[#64748B] hover:text-[#0F172A]'
-              }`}
-            >
-              <MonitorPlay className="w-3.5 h-3.5" />
-              Video classes
-            </button>
-          </div>
-
-          {learningView === 'videos' ? (
-            <VideoClassesSection
-              dark={dark}
-              subject={learningSubject}
-              onSubjectChange={setLearningSubject}
-              registeredSubjects={registeredSubjects}
-            />
-          ) : (
-            <StudyMaterialsSection
-              student={student}
-              onSwitchToTimetable={() => setActiveSection('timetable')}
-              subject={learningSubject}
-              onSubjectChange={setLearningSubject}
-              registeredSubjects={registeredSubjects}
-            />
-          )}
-        </div>
+      {activeSection !== 'timetable' ? (
+        activeSection === 'videos' ? (
+          <VideoClassesSection
+            dark={dark}
+            subject={learningSubject}
+            onSubjectChange={setLearningSubject}
+            registeredSubjects={registeredSubjects}
+          />
+        ) : (
+          <StudyMaterialsSection
+            student={student}
+            onSwitchToTimetable={() => setActiveSection('timetable')}
+            subject={learningSubject}
+            onSubjectChange={setLearningSubject}
+            registeredSubjects={registeredSubjects}
+          />
+        )
       ) : (
         <>
           {/* 2. Week Strip: 7 days Mon - Sun */}

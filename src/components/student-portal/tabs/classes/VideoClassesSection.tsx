@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getAuth } from 'firebase/auth';
 import {
   Search, Play, X, MonitorPlay, RefreshCw, GraduationCap, BookOpen, WifiOff,
-  ChevronUp, ChevronDown, RotateCcw,
+  ChevronUp, ChevronDown, RotateCcw, Maximize, Minimize,
 } from 'lucide-react';
 import type { VideoResource } from '../../../../types';
 import { SubjectDropdown } from './SubjectDropdown';
@@ -53,8 +53,12 @@ const playerUrl = (id: string) =>
 // Module-level cache: opening the Video classes toggle renders the last list
 // instantly while a quiet refresh runs underneath, instead of a skeleton
 // every single time.
-let cache: VideoResource[] | null = null;
-let cacheHidden = 0;
+/** One cached page: the videos the server sent for one subject at one
+ *  page number, plus whether a next page exists. Pagination is decided on
+ *  the server (batch 45); the browser only shows the page it was given. */
+interface VideoCache { page: number; subject: string; videos: VideoResource[]; hidden: number; hasMore: boolean; }
+let cache: VideoCache | null = null;
+const PAGE_SIZE = 10;
 
 /** The shield over the YouTube player (batch 43 geometry, from the user's
  *  own phone screenshot): TWO plain see-through bands, not pinpoint boxes.
@@ -66,10 +70,21 @@ let cacheHidden = 0;
  *  stop responding, while the band never touches the timeline itself. The
  *  uncovered middle strip keeps play/pause, the timeline, double-tap 10
  *  second skip and the fullscreen button fully live. */
-const ShieldPatches: React.FC<{ ended: boolean; onReplay: () => void }> = ({ ended, onReplay }) => (
+const ShieldPatches: React.FC<{ ended: boolean; onReplay: () => void; onToggleFullscreen?: () => void; isFullscreen?: boolean }> = ({ ended, onReplay, onToggleFullscreen, isFullscreen }) => (
   <>
     <span aria-hidden className="absolute left-0 top-0 w-full" style={{ height: '46%', pointerEvents: 'auto' }} />
     <span aria-hidden className="absolute left-0 bottom-0 w-full" style={{ height: '25%', pointerEvents: 'auto' }} />
+    {onToggleFullscreen && (
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); onToggleFullscreen(); }}
+        aria-label={isFullscreen ? 'Exit full screen' : 'Open full screen'}
+        className="absolute grid place-items-center rounded-lg bg-black/45 text-white/85 hover:text-white transition-colors"
+        style={{ right: '1.5%', bottom: '25.8%', width: '12%', height: '11.5%', pointerEvents: 'auto', minWidth: 34, minHeight: 34 }}
+      >
+        {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+      </button>
+    )}
     {ended && (
       <div
         className="absolute inset-0 z-10 grid place-items-center"
@@ -94,6 +109,28 @@ const ShieldPatches: React.FC<{ ended: boolean; onReplay: () => void }> = ({ end
 const VideoPlayerModal: React.FC<{ video: VideoResource; dark: boolean; onClose: () => void }> = ({ video, dark, onClose }) => {
   const [ended, setEnded] = useState(false);
   const frameRef = useRef<HTMLIFrameElement | null>(null);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const [isFs, setIsFs] = useState(false);
+
+  // Full screen (batch 45): YouTube's own button pulls ONLY the video out of
+  // the page, which leaves the shield behind. So that button is covered and
+  // this one opens full screen on the whole player box (video + shield
+  // together), keeping the overlay working in full view. Where the browser
+  // cannot fullscreen a plain box (older iPhones), the YouTube button stays
+  // uncovered as a fallback.
+  const fullscreenSupported = typeof document !== 'undefined' && document.fullscreenEnabled !== false;
+  const toggleFullscreen = () => {
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    } else {
+      wrapRef.current?.requestFullscreen?.().catch(() => {});
+    }
+  };
+  useEffect(() => {
+    const onFs = () => setIsFs(document.fullscreenElement === wrapRef.current);
+    document.addEventListener('fullscreenchange', onFs);
+    return () => document.removeEventListener('fullscreenchange', onFs);
+  }, []);
 
   useEffect(() => {
     const onMessage = (ev: MessageEvent) => {
@@ -120,7 +157,7 @@ const VideoPlayerModal: React.FC<{ video: VideoResource; dark: boolean; onClose:
   };
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !document.fullscreenElement) onClose(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
@@ -145,7 +182,7 @@ const VideoPlayerModal: React.FC<{ video: VideoResource; dark: boolean; onClose:
             <X className="w-4.5 h-4.5" style={{ width: 18, height: 18 }} />
           </button>
         </div>
-        <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-black shadow-2xl">
+        <div ref={wrapRef} className="relative w-full aspect-video rounded-2xl overflow-hidden bg-black shadow-2xl">
           <iframe
             ref={frameRef}
             key={video.videoId}
@@ -155,7 +192,7 @@ const VideoPlayerModal: React.FC<{ video: VideoResource; dark: boolean; onClose:
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
             allowFullScreen
           />
-          <ShieldPatches ended={ended} onReplay={replay} />
+          <ShieldPatches ended={ended} onReplay={replay} onToggleFullscreen={fullscreenSupported ? toggleFullscreen : undefined} isFullscreen={isFs} />
         </div>
         {video.description && (
           <p className={`px-1 pt-2 text-[11px] leading-relaxed ${subTone}`}>{video.description}</p>
@@ -178,46 +215,74 @@ interface VideoClassesSectionProps {
 }
 
 export const VideoClassesSection: React.FC<VideoClassesSectionProps> = ({ dark, subject, onSubjectChange, registeredSubjects }) => {
-  const [videos, setVideos] = useState<VideoResource[]>(cache || []);
-  const [hiddenCount, setHiddenCount] = useState<number>(cacheHidden);
-  const [loading, setLoading] = useState(!cache);
-  const [err, setErr] = useState('');
   const [query, setQuery] = useState('');
   const [internalSubject, setInternalSubject] = useState('All');
   const subjectFilter = subject !== undefined ? subject : internalSubject;
+  const seed = cache && cache.subject === subjectFilter ? cache : null;
+  const [videos, setVideos] = useState<VideoResource[]>(seed?.videos || []);
+  const [hiddenCount, setHiddenCount] = useState<number>(seed?.hidden || 0);
+  const [page, setPage] = useState<number>(seed?.page || 1);
+  const [hasMore, setHasMore] = useState<boolean>(!!seed?.hasMore);
+  const [loading, setLoading] = useState(!seed);
+  const [paging, setPaging] = useState(false);
+  const [err, setErr] = useState('');
   const setSubjectFilter = (next: string) =>
     onSubjectChange ? onSubjectChange(next) : setInternalSubject(next);
   const [watching, setWatching] = useState<VideoResource | null>(null);
   const [openIds, setOpenIds] = useState<Set<string>>(new Set());
 
-  const load = useCallback(async (silent = false) => {
-    if (!silent) {
-      setLoading(true);
-      setErr('');
+  const fetchPage = useCallback(async (nextPage: number, nextSubject: string, mode: 'full' | 'silent' | 'page') => {
+    const user = getAuth().currentUser;
+    if (!user) {
+      if (mode !== 'silent') setErr('You are signed out. Sign in again to continue.');
+      if (mode === 'full') setLoading(false);
+      if (mode === 'page') setPaging(false);
+      return;
     }
+    if (mode === 'full') { setLoading(true); setErr(''); }
+    if (mode === 'page') { setPaging(true); setErr(''); }
     try {
-      const user = getAuth().currentUser;
-      if (!user) throw new Error('You are signed out. Sign in again to continue.');
       const token = await user.getIdToken();
-      const res = await fetch('/api/student/video-resources', {
+      const qs = new URLSearchParams({ page: String(nextPage), limit: String(PAGE_SIZE) });
+      if (nextSubject && nextSubject !== 'All') qs.set('subject', nextSubject);
+      const res = await fetch(`/api/student/video-resources?${qs.toString()}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error('Could not load the video classes. Pull down to retry.');
       const data: any = await res.json().catch(() => null);
       const list = Array.isArray(data?.videos) ? data.videos : [];
-      cache = list;
-      cacheHidden = Number(data?.hidden || 0);
+      const hasMoreNext = !!data?.hasMore;
+      cache = { page: nextPage, subject: nextSubject, videos: list, hidden: Number(data?.hidden || 0), hasMore: hasMoreNext };
       setVideos(list);
-      setHiddenCount(cacheHidden);
+      setHiddenCount(cache.hidden);
+      setPage(nextPage);
+      setHasMore(hasMoreNext);
       setErr('');
     } catch (e: any) {
-      if (!silent) setErr(e?.message || 'Could not load the video classes. Pull down to retry.');
+      if (mode !== 'silent') setErr(e?.message || 'Could not load the video classes. Pull down to retry.');
     } finally {
-      if (!silent) setLoading(false);
+      if (mode === 'full') setLoading(false);
+      if (mode === 'page') setPaging(false);
     }
   }, []);
 
-  useEffect(() => { if (cache) load(true); else load(false); }, [load]);
+  // First open: render the cached page instantly when it matches the current
+  // subject, otherwise fetch. Any subject change re-queries from page 1.
+  const firstRun = useRef(true);
+  useEffect(() => {
+    if (firstRun.current) {
+      firstRun.current = false;
+      if (cache && cache.subject === subjectFilter) void fetchPage(cache.page, subjectFilter, 'silent');
+      else void fetchPage(1, subjectFilter, 'full');
+      return;
+    }
+    void fetchPage(1, subjectFilter, cache && cache.subject === subjectFilter ? 'silent' : 'full');
+  }, [subjectFilter, fetchPage]);
+
+  const gotoPage = (next: number) => {
+    if (next < 1 || paging) return;
+    void fetchPage(next, subjectFilter, 'page');
+  };
 
   const subjects = useMemo(
     () => Array.from(new Set<string>(videos.map((v) => v.subject).filter(Boolean))).sort((a: string, b: string) => a.localeCompare(b)),
@@ -297,7 +362,7 @@ export const VideoClassesSection: React.FC<VideoClassesSectionProps> = ({ dark, 
           <WifiOff className={`w-5 h-5 mx-auto mb-2 ${textSub}`} />
           <p className={`text-xs font-bold ${textMain}`}>{err}</p>
           <button
-            onClick={() => load(false)}
+            onClick={() => fetchPage(page, subjectFilter, 'page')}
             className="mt-3 inline-flex items-center gap-1.5 h-9 px-4 rounded-xl bg-[var(--brand,#0F172A)] text-[var(--on-brand,#fff)] text-xs font-extrabold"
           >
             <RefreshCw className="w-3.5 h-3.5" /> Try again
@@ -359,9 +424,21 @@ export const VideoClassesSection: React.FC<VideoClassesSectionProps> = ({ dark, 
                     <BookOpen className="w-3 h-3" /> {v.subject}
                   </span>
                 </button>
-                {/* The small arrow under the thumbnail: up by default, and
-                    it only opens the description. The topic and the exam
-                    badges show without it. */}
+                {/* The topic and the exam badges always show; the small
+                    arrow sits UNDER them (batch 45) so it reads as "there is
+                    more here", and it opens only the description below. */}
+                <div className="px-1 pt-1">
+                  <h4 className={`text-xs font-extrabold leading-snug ${textMain}`}>{v.topic}</h4>
+                  {(v.examTypes || []).length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1.5">
+                      {(v.examTypes || []).map((t) => (
+                        <span key={t} className="inline-flex items-center gap-1 h-5 px-2 rounded-full text-[10px] font-extrabold" style={{ background: 'var(--brand-soft, rgba(100,116,139,0.12))', color: 'var(--brand,#0F172A)' }}>
+                          <GraduationCap className="w-3 h-3" /> {t}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <button
                   type="button"
                   onClick={() => toggleDetails(v.id)}
@@ -373,24 +450,36 @@ export const VideoClassesSection: React.FC<VideoClassesSectionProps> = ({ dark, 
                     ? <ChevronDown className="w-4 h-4" />
                     : <ChevronUp className="w-4 h-4" />}
                 </button>
-                <div className="px-1 pb-1">
-                  <h4 className={`text-xs font-extrabold leading-snug ${textMain}`}>{v.topic}</h4>
-                  {(v.examTypes || []).length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-1.5">
-                      {(v.examTypes || []).map((t) => (
-                        <span key={t} className="inline-flex items-center gap-1 h-5 px-2 rounded-full text-[10px] font-extrabold" style={{ background: 'var(--brand-soft, rgba(100,116,139,0.12))', color: 'var(--brand,#0F172A)' }}>
-                          <GraduationCap className="w-3 h-3" /> {t}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  {open && v.description && (
-                    <p className={`text-[11px] mt-1.5 leading-relaxed ${textSub}`}>{v.description}</p>
-                  )}
-                </div>
+                {open && v.description && (
+                  <p className={`px-1 pb-1 text-[11px] leading-relaxed ${textSub}`}>{v.description}</p>
+                )}
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Pager (batch 45): the server sends one page at a time and decides
+          whether a next page exists; the buttons only ask for it. */}
+      {!err && videos.length > 0 && (hasMore || page > 1) && (
+        <div className="flex items-center justify-center gap-2 pt-1">
+          <button
+            type="button"
+            onClick={() => gotoPage(page - 1)}
+            disabled={page <= 1 || paging}
+            className={`h-9 px-3.5 rounded-xl border text-[11px] font-extrabold transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${cardBg} ${textMain}`}
+          >
+            Previous
+          </button>
+          <span className={`text-[11px] font-extrabold px-1 ${textSub}`}>{paging ? 'Loading' : `Page ${page}`}</span>
+          <button
+            type="button"
+            onClick={() => gotoPage(page + 1)}
+            disabled={!hasMore || paging}
+            className={`h-9 px-3.5 rounded-xl border text-[11px] font-extrabold transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${cardBg} ${textMain}`}
+          >
+            Next page
+          </button>
         </div>
       )}
 

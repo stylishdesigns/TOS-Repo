@@ -696,6 +696,39 @@ export function registerExtendedRoutes(app: express.Express): void {
   // Study-material create runs on the server (Admin SDK) so an upload reaches
   // every student of the centre even when the deployed Firestore rules release
   // is older than the app. The browser keeps its local copy either way.
+  // ==========================================================================
+  // AUTHENTICATED: student study-material list. Batch 45: served by the
+  // server with pagination enforced HERE (10 per page, ?page= query), never
+  // by slicing a full list in the browser. requireMembership checks the
+  // caller really belongs to the centre they ask about, so one centre can
+  // never read another centre's materials. The subject filter is applied
+  // before the page is cut, so a filtered page is still a full page.
+  // ==========================================================================
+  app.get('/api/student/study-materials', async (req, res) => {
+    try {
+      const caller = getCaller(req);
+      const centreId = String(req.query.centreId || '').trim().slice(0, 120);
+      if (!centreId) throw httpError(400, 'centreId is required.');
+      await requireMembership(caller, centreId);
+      const page = Math.max(1, Number.parseInt(String(req.query.page || '1'), 10) || 1);
+      const limit = Math.min(50, Math.max(1, Number.parseInt(String(req.query.limit || '10'), 10) || 10));
+      const subjectQ = String(req.query.subject || '').trim().toLowerCase();
+      const snap = await adminDb.collection('studyMaterials').where('centreId', '==', centreId).limit(400).get();
+      const all = snap.docs
+        .map((d) => ({ id: d.id, ...(d.data() as Record<string, any>) } as Record<string, any>))
+        .sort((a, b) => String(b.uploadedAt || '').localeCompare(String(a.uploadedAt || '')));
+      const rows = subjectQ && subjectQ !== 'all'
+        ? all.filter((m) => String(m.subject || '').trim().toLowerCase() === subjectQ)
+        : all;
+      const total = rows.length;
+      const paged = rows.slice((page - 1) * limit, page * limit);
+      res.json({ ok: true, materials: paged, page, limit, hasMore: page * limit < total, total });
+    } catch (error: any) {
+      const status = Number(error?.status || 500);
+      res.status(status).json({ error: error?.message || 'Study-material list failed.' });
+    }
+  });
+
   app.post('/api/centre/study-materials', async (req, res) => {
     try {
       const caller = getCaller(req);
@@ -934,7 +967,20 @@ export function registerExtendedRoutes(app: express.Express): void {
         if (!hit) hidden += 1;
         return hit;
       }).slice(0, 300);
-      res.json({ ok: true, videos, hidden });
+      // Batch 45: pagination is enforced HERE, on the server, never by
+      // slicing in the browser. 10 lessons per page by default; the student
+      // app asks for the next page when it needs it. The subject filter is
+      // applied before the page is cut, so a filtered page is still a full
+      // page of that subject.
+      const page = Math.max(1, Number.parseInt(String(req.query.page || '1'), 10) || 1);
+      const limit = Math.min(50, Math.max(1, Number.parseInt(String(req.query.limit || '10'), 10) || 10));
+      const subjectQ = String(req.query.subject || '').trim().toLowerCase();
+      const rows = subjectQ && subjectQ !== 'all'
+        ? videos.filter((v) => String(v.subject || '').trim().toLowerCase() === subjectQ)
+        : videos;
+      const total = rows.length;
+      const paged = rows.slice((page - 1) * limit, page * limit);
+      res.json({ ok: true, videos: paged, hidden, page, limit, hasMore: page * limit < total, total });
     } catch (error: any) {
       const status = Number(error?.status || 500);
       res.status(status).json({ error: error?.message || 'Video list failed.' });

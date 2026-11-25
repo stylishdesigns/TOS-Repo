@@ -649,7 +649,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
                       value={currentPassword}
                       onChange={(e) => setCurrentPassword(e.target.value)}
                       placeholder="Enter current password to continue"
-                      className="w-full pl-10 pr-12 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-4 focus:ring-slate-100 focus:border-slate-900 outline-none transition-all font-medium"
+                      className="w-full pl-10 pr-12 py-3 bg-[#f8fafc] text-[#0f172a] placeholder:text-[#94a3b8] border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-4 focus:ring-slate-100 focus:border-slate-900 outline-none transition-all font-medium"
                     />
                     <button
                       type="button"
@@ -677,7 +677,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
                         value={newPassword}
                         onChange={(e) => setNewPassword(e.target.value)}
                         placeholder="Min 8 chars, A-z, 0-9, symbol"
-                        className="w-full pl-10 pr-12 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-4 focus:ring-slate-100 focus:border-slate-900 outline-none transition-all font-medium"
+                        className="w-full pl-10 pr-12 py-3 bg-[#f8fafc] text-[#0f172a] placeholder:text-[#94a3b8] border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-4 focus:ring-slate-100 focus:border-slate-900 outline-none transition-all font-medium"
                       />
                       <button
                         type="button"
@@ -701,7 +701,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
                         placeholder="Repeat new password"
-                        className="w-full pl-10 pr-12 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-4 focus:ring-slate-100 focus:border-slate-900 outline-none transition-all font-medium"
+                        className="w-full pl-10 pr-12 py-3 bg-[#f8fafc] text-[#0f172a] placeholder:text-[#94a3b8] border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-4 focus:ring-slate-100 focus:border-slate-900 outline-none transition-all font-medium"
                       />
                       <button
                         type="button"
@@ -776,7 +776,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
                       value={email}
                       onChange={(e) => onEmailChange(e.target.value)}
                       placeholder="e.g. name@yourfacility.com"
-                      className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-4 focus:ring-slate-100 focus:border-slate-900 outline-none transition-all font-medium"
+                      className="w-full pl-10 pr-4 py-3 bg-[#f8fafc] text-[#0f172a] placeholder:text-[#94a3b8] border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-4 focus:ring-slate-100 focus:border-slate-900 outline-none transition-all font-medium"
                     />
                   </div>
                 </div>
@@ -805,7 +805,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
                         value={password}
                         onChange={(e) => onPasswordChange(e.target.value)}
                         placeholder="••••••••"
-                        className="w-full pl-10 pr-12 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-4 focus:ring-slate-100 focus:border-slate-900 outline-none transition-all font-medium"
+                        className="w-full pl-10 pr-12 py-3 bg-[#f8fafc] text-[#0f172a] placeholder:text-[#94a3b8] border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-4 focus:ring-slate-100 focus:border-slate-900 outline-none transition-all font-medium"
                       />
                       <button
                         type="button"

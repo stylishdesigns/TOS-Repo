@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { BookOpen, Check, ChevronDown } from 'lucide-react';
+import { Check, ChevronDown } from 'lucide-react';
 
 /**
  * The learning-resources subject dropdown (batch 43): a custom, app-branded
@@ -56,12 +56,8 @@ export const SubjectDropdown: React.FC<SubjectDropdownProps> = ({ dark, subjects
           dark ? 'shadow-none' : 'shadow-2xs'
         }`}
       >
-        <span className="flex items-center gap-2 min-w-0">
-          <BookOpen className={`w-4 h-4 shrink-0 ${textSub}`} />
-          <span className={`text-[10px] font-black uppercase tracking-widest ${textSub}`}>Subject</span>
-          <span className={`text-xs font-extrabold truncate ${textMain}`}>
-            {value === 'All' ? 'All subjects' : value}
-          </span>
+        <span className={`text-xs font-extrabold truncate ${textMain}`}>
+          {value === 'All' ? 'All subjects' : value}
         </span>
         <ChevronDown className={`w-4 h-4 shrink-0 transition-transform ${textSub} ${open ? 'rotate-180' : ''}`} />
       </button>
