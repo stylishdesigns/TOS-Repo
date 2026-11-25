@@ -48,57 +48,60 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica N
 .brand{display:flex;align-items:center;gap:12px;margin-bottom:34px}
 .mark{width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#F97316,#EA580C);color:#fff;font-weight:800;font-size:17px;display:flex;align-items:center;justify-content:center;letter-spacing:.5px;box-shadow:0 8px 24px rgba(249,115,22,.35)}
 .brand b{font-size:19px;letter-spacing:-.2px}
-.eyebrow{display:inline-block;margin-bottom:16px;font-size:11px;font-weight:800;letter-spacing:.18em;color:#FDBA74;text-transform:uppercase}
+.eyebrow{display:inline-block;margin-bottom:16px;font-size:12px;font-weight:800;letter-spacing:.18em;color:#FDBA74;text-transform:uppercase}
 .hero h1{font-size:clamp(30px,6vw,46px);line-height:1.12;font-weight:800;letter-spacing:-.02em;max-width:15em}
-.forline{margin-top:22px;display:inline-flex;flex-wrap:wrap;gap:8px 14px;align-items:center;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);border-radius:999px;padding:10px 20px;font-size:14px;color:#CBD5E1}
+.forline{margin-top:22px;display:inline-flex;flex-wrap:wrap;gap:8px 14px;align-items:center;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);border-radius:999px;padding:10px 20px;font-size:15px;color:#CBD5E1}
 .forline b{color:#fff}
 .forline span{color:#94A3B8}
 main{padding:20px 0 8px}
 section{margin-bottom:14px;background:#fff;border:1px solid var(--line);border-radius:20px;padding:38px 36px;box-shadow:0 1px 2px rgba(15,23,42,.04)}
 .sh{display:flex;gap:16px;align-items:baseline;margin-bottom:6px}
 .num{font-size:13px;font-weight:800;color:var(--orange);letter-spacing:.08em}
-section h2{font-size:24px;font-weight:800;letter-spacing:-.02em;margin-bottom:14px}
-p.lead{color:#334155;font-size:15.5px;margin-bottom:12px}
-p.body{color:#475569;font-size:14.5px;margin-bottom:12px}
+section h2{font-size:26px;font-weight:800;letter-spacing:-.02em;margin-bottom:14px}
+p.lead{color:#334155;font-size:17px;margin-bottom:12px}
+p.body{color:#475569;font-size:16px;margin-bottom:12px}
 .facts{display:grid;grid-template-columns:1fr 1fr;gap:14px 26px;margin-top:18px;background:#F8FAFC;border:1px solid var(--line);border-radius:14px;padding:18px 20px}
-.facts div{display:flex;gap:8px;font-size:13.5px}
+.facts div{display:flex;gap:8px;font-size:15px}
 .facts dt{color:var(--muted);min-width:110px;font-weight:600}
 .facts dd{color:var(--ink);font-weight:600}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px}
 .card{border:1px solid var(--line);border-radius:14px;padding:18px 18px 16px;background:#FCFCFD}
-.card h4{font-size:14.5px;font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:8px}
+.card h4{font-size:16px;font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:8px}
 .card h4:before{content:'';width:8px;height:8px;border-radius:3px;background:var(--orange);flex:none}
-.card p{color:#64748B;font-size:13.5px}
+.card p{color:#64748B;font-size:15px}
 .steps{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-top:16px}
 .step{background:var(--cream);border:1px solid #FED7AA;border-radius:14px;padding:18px}
-.step .n{font-size:11px;font-weight:800;color:var(--orange-d);letter-spacing:.1em;display:block;margin-bottom:8px}
-.step h4{font-size:14.5px;font-weight:700;margin-bottom:5px}
-.step p{color:#9A3412;font-size:13px}
+.step .n{font-size:12px;font-weight:800;color:var(--orange-d);letter-spacing:.1em;display:block;margin-bottom:8px}
+.step h4{font-size:16px;font-weight:700;margin-bottom:5px}
+.step p{color:#9A3412;font-size:14.5px}
 .duo{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px}
 .duo .card{border-radius:16px}
-.duo .chip{display:inline-block;font-size:10.5px;font-weight:800;letter-spacing:.12em;color:var(--orange-d);background:var(--cream);border:1px solid #FED7AA;border-radius:999px;padding:4px 10px;margin-bottom:10px}
-.duo .big{color:var(--ink);font-weight:700;font-size:15px;margin-bottom:6px}
+.duo .chip{display:inline-block;font-size:11.5px;font-weight:800;letter-spacing:.12em;color:var(--orange-d);background:var(--cream);border:1px solid #FED7AA;border-radius:999px;padding:4px 10px;margin-bottom:10px}
+.duo .big{color:var(--ink);font-weight:700;font-size:16.5px;margin-bottom:6px}
 .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
-.tbl{width:100%;border-collapse:collapse;margin-top:16px;font-size:13.5px}
-.tbl caption{caption-side:top;text-align:left;color:var(--muted);font-size:12.5px;padding-bottom:10px}
-.tbl th,.tbl td{text-align:left;padding:12px 14px;border-bottom:1px solid var(--line);vertical-align:top}
-.tbl thead th{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border-bottom:2px solid var(--line)}
+.tbl{width:100%;border-collapse:collapse;margin-top:16px;font-size:15px}
+.tbl caption{caption-side:top;text-align:left;color:var(--muted);font-size:13.5px;padding-bottom:10px}
+.tbl th,.tbl td{text-align:left;padding:14px 16px;border-bottom:1px solid var(--line);vertical-align:top}
+.tbl thead th{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border-bottom:2px solid var(--line)}
 .tbl tbody th{font-weight:700;color:var(--ink);white-space:nowrap}
 .tbl td .price{font-weight:800;color:var(--orange-d);white-space:nowrap}
-.tbl td:nth-child(2){white-space:nowrap}
+.covers{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-top:14px}
+.covers>div{background:#FCFCFD;border:1px solid var(--line);border-radius:14px;padding:16px 18px}
+.covers h4{font-size:15.5px;font-weight:800;margin-bottom:10px}
+.covers li{list-style:none;color:#475569;font-size:15px;padding:5px 0 5px 24px;position:relative}
+.covers li:before{content:'✓';position:absolute;left:0;top:5px;color:var(--orange-d);font-weight:800}
+.paybox{margin-top:16px;background:#FFF7ED;border:1px solid #FED7AA;border-radius:14px;padding:18px 20px}
+.paybox>b{display:block;font-size:15.5px;margin-bottom:6px}
+.paybox li{list-style:none;color:#7C2D12;font-size:15px;padding:5px 0 5px 24px;position:relative}
+.paybox li:before{content:'✓';position:absolute;left:0;top:5px;color:#C2410C;font-weight:800}
 .cta{margin-top:16px;background:linear-gradient(135deg,#0F172A,#1E293B);border-radius:18px;padding:34px;color:#F8FAFC;text-align:center}
 .cta h3{font-size:22px;font-weight:800;margin-bottom:8px;letter-spacing:-.02em}
-.cta p{color:#94A3B8;font-size:14px;margin-bottom:18px}
-.btn{display:inline-block;background:linear-gradient(135deg,#F97316,#EA580C);color:#fff;font-weight:700;font-size:14.5px;padding:13px 28px;border-radius:999px;text-decoration:none;box-shadow:0 10px 26px rgba(249,115,22,.4)}
-.foot{color:var(--muted);font-size:12.5px;text-align:center;padding:26px 0 90px}
+.cta p{color:#94A3B8;font-size:15.5px;margin-bottom:18px}
+.btn{display:inline-block;background:linear-gradient(135deg,#F97316,#EA580C);color:#fff;font-weight:700;font-size:16px;padding:13px 28px;border-radius:999px;text-decoration:none;box-shadow:0 10px 26px rgba(249,115,22,.4)}
+.foot{color:var(--muted);font-size:13.5px;text-align:center;padding:26px 0 40px}
 .foot b{color:var(--ink)}
-.toolbar{position:fixed;right:18px;bottom:18px;display:flex;gap:10px;z-index:50}
-.toolbar button{border:0;cursor:pointer;font:inherit;font-size:13px;font-weight:700;padding:12px 18px;border-radius:999px;box-shadow:0 10px 26px rgba(15,23,42,.25)}
-.tb-copy{background:#fff;color:var(--ink);border:1.5px solid #CBD5E1!important;box-shadow:0 10px 26px rgba(15,23,42,.12)!important}
-.tb-pdf{background:linear-gradient(135deg,#F97316,#EA580C);color:#fff}
-@media(max-width:720px){section{padding:26px 20px;border-radius:16px}.grid,.duo,.facts{grid-template-columns:1fr}.steps{grid-template-columns:1fr}.hero{padding:48px 0 44px}body{padding-bottom:84px}.toolbar{left:0;right:0;bottom:0;gap:12px;padding:10px 16px calc(10px + env(safe-area-inset-bottom));background:rgba(255,255,255,.94);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-top:1px solid var(--line);box-shadow:0 -6px 20px rgba(15,23,42,.08);border-radius:0}.toolbar button{flex:1;padding:13px 10px;font-size:14px}}
+@media(max-width:720px){section{padding:26px 20px;border-radius:16px}.grid,.duo,.facts,.covers{grid-template-columns:1fr}.steps{grid-template-columns:1fr}.hero{padding:48px 0 44px}}
 @media print{
- .toolbar{display:none}
  body{background:#fff}
  section{box-shadow:none;border:none;padding:18px 0;break-inside:avoid}
  .hero{background:#0F172A!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;border-radius:0 0 18px 18px;margin-bottom:10px}
@@ -195,19 +198,33 @@ export function buildProposalPage(displayName: string, origin: string, slug: str
     <div class="card"><span class="chip">FEES</span><div class="big">Without running after anyone</div><p>No more chasing students for money. The facility plugs in its own payment and bank details, and students pay straight into it. Each student can see exactly what they owe and when it is due, and admins see who has paid and who has not. Reminders go out on their own: daily notifications to the admin for every student who has not paid or whose due date is about to expire, and a notice to the student when their own payment is due. Every confirmed payment gets a receipt.</p></div>
     <div class="card"><span class="chip">PARENTS</span><div class="big">In the loop, on time</div><p>Parents who see progress renew and refer. Your branded landing page brings enrolment enquiries straight to you, day and night. Results and mock scores give parents proof their child is moving, not just attending, and notices by email and WhatsApp keep them updated on their child's performance and fees without anyone chasing them one by one.</p></div>
   </div>
+  <div class="paybox">
+    <b>How facilities pay for the platform itself</b>
+    <ul>
+      <li>You pay for seats, per seat per month, and a seat only starts costing the day a student takes it. An empty seat never costs anything.</li>
+      <li>Payment is a simple bank transfer, confirmed on the console. No card on file, nothing auto-charged, no setup fee, no contract.</li>
+      <li>The console warns you at 7, 3 and 1 days before a seat's days run out, so nothing stops mid-lesson.</li>
+      <li>One payment reopens every locked seat with a fresh 30 days first, and a student's work stays safe while a seat is locked.</li>
+    </ul>
+  </div>
 </section>
 
 <section>
   <div class="sh"><span class="num">06</span><h2>Pricing and getting started</h2></div>
   <div class="tbl-wrap"><table class="tbl">
     <caption>Every facility starts free and upgrades when it grows.</caption>
-    <thead><tr><th>Plan</th><th>Price</th><th>What it covers</th></tr></thead>
+    <thead><tr><th>Plan</th><th>Price</th></tr></thead>
     <tbody>
-      <tr><th>Free Facility</th><td><span class="price">NGN 0</span><br /><small style="color:#64748B">free forever</small></td><td>Up to 5 students, white-label landing page, portals, email notifications, 50 AI credits per seat</td></tr>
-      <tr><th>Standard Facility</th><td><span class="price">NGN 1,000</span><br /><small style="color:#64748B">/ seat / month</small></td><td>Unlimited students, email and push notifications, 200 AI credits per seat, AI question generation and performance analysis</td></tr>
-      <tr><th>Premium Facility</th><td><span class="price">NGN 2,500</span><br /><small style="color:#64748B">/ seat / month</small></td><td>Everything in Standard plus WhatsApp notifications for parents, 500 AI credits per seat</td></tr>
+      <tr><th>Free Facility</th><td><span class="price">NGN 0</span> <small style="color:#64748B">free forever</small></td></tr>
+      <tr><th>Standard Facility</th><td><span class="price">NGN 1,000</span> <small style="color:#64748B">/ seat / month</small></td></tr>
+      <tr><th>Premium Facility</th><td><span class="price">NGN 2,500</span> <small style="color:#64748B">/ seat / month</small></td></tr>
     </tbody>
   </table></div>
+  <div class="covers">
+    <div><h4>Free Facility</h4><ul><li>Up to 5 students</li><li>Your own branded landing page</li><li>Student, tutor and admin portals</li><li>Email notifications</li><li>50 AI credits per seat</li></ul></div>
+    <div><h4>Standard Facility</h4><ul><li>Everything in Free</li><li>Unlimited students</li><li>Email and push notifications</li><li>200 AI credits per seat</li><li>AI question generation and performance analysis</li></ul></div>
+    <div><h4>Premium Facility</h4><ul><li>Everything in Standard</li><li>WhatsApp notifications for parents</li><li>500 AI credits per seat</li></ul></div>
+  </div>
   <p class="body" style="margin-top:14px">A seat is one student's place on the platform. Facilities can start on Free and move up any time; no setup fee, no contract, no card needed to begin. Starting takes three steps: sign up free on the landing page, check your email for the access code and login details, then brand the facility, add students and tutors with the facility code, and you are running.</p>
   <div class="cta">
     <h3>Ready to see it live?</h3>
@@ -219,27 +236,12 @@ export function buildProposalPage(displayName: string, origin: string, slug: str
 </div>
 </main>
 <div class="foot"><div class="wrap"><b>Tutorial OS</b> · One system for learning facilities of every kind. This proposal was prepared for ${name}.</div></div>
-<div class="toolbar">
-  <button type="button" class="tb-copy" id="copyBtn">Copy link</button>
-  <button type="button" class="tb-pdf" id="pdfBtn">Download PDF</button>
-</div>
 <script type="module">
-const copyBtn = document.getElementById('copyBtn');
-const pdfBtn = document.getElementById('pdfBtn');
 const fileName = 'TutorialOS-Proposal-${esc(displayName).replace(/[^A-Za-z0-9]+/g, '-')}.pdf';
-copyBtn.addEventListener('click', async () => {
-  try {
-    await navigator.clipboard.writeText(window.location.href);
-    copyBtn.textContent = 'Copied!';
-  } catch (e) {
-    copyBtn.textContent = window.location.href.slice(0, 40);
-  }
-  setTimeout(() => { copyBtn.textContent = 'Copy link'; }, 2000);
-});
+let pdfBusy = false;
 async function downloadPdf() {
-  const label = pdfBtn.textContent;
-  pdfBtn.textContent = 'Preparing PDF...';
-  pdfBtn.disabled = true;
+  if (pdfBusy) return;
+  pdfBusy = true;
   try {
     const [{ default: jsPDF }, { default: html2canvas }] = await Promise.all([
       import('https://esm.sh/jspdf@2.5.2'),
@@ -268,10 +270,8 @@ async function downloadPdf() {
   } catch (e) {
     window.print();
   }
-  pdfBtn.textContent = 'Download PDF';
-  pdfBtn.disabled = false;
+  pdfBusy = false;
 }
-pdfBtn.addEventListener('click', downloadPdf);
 try {
   if (new URLSearchParams(window.location.search).get('pdf') === '1') {
     setTimeout(downloadPdf, 600);

@@ -6,7 +6,7 @@ import { Card, Field, inputCls, btnPrimary, btnGhost } from './tosShared';
  * Batch 38: Proposals tab in the TOS console.
  * Generates a per-facility partnership-proposal link that opens a fully
  * designed proposal page addressed to that facility, with social preview
- * tags (WhatsApp, Facebook) and a direct PDF download on the page itself.
+ * tags (WhatsApp, Facebook); the PDF builds from the same design via the pdf=1 flag.
  */
 
 /** Facility name -> URL slug: "Bright Minds Tutorial!" -> "bright-minds-tutorial". */
@@ -53,8 +53,8 @@ const ProposalsTab: React.FC = () => {
         <p className="text-xs text-slate-400 mb-4">
           Type a facility's name and copy its proposal link. The link opens a fully designed proposal page
           addressed to that facility, and when it is shared on WhatsApp or Facebook it shows a branded preview
-          card with the facility's name in the title. The page carries its own Download PDF button, so the same
-          design downloads as a PDF too. Prices are the same for every facility.
+          card with the facility's name in the title. Opened with pdf=1, the same design builds and downloads
+          as a PDF on its own. Prices are the same for every facility.
         </p>
         <Field label="Facility name">
           <input
@@ -97,7 +97,7 @@ const ProposalsTab: React.FC = () => {
           </p>
           <p className="flex gap-2">
             <Download className="w-4 h-4 text-orange-400 flex-none mt-0.5" />
-            <span>The Download PDF button on the page saves a copy of the exact same design, ready to print or attach to a WhatsApp message.</span>
+            <span>Download PDF opens the proposal link and saves a copy of the exact same design, ready to print or attach to a WhatsApp message.</span>
           </p>
         </div>
       </Card>

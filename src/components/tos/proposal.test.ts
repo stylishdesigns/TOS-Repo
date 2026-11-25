@@ -21,7 +21,7 @@ expect(page.includes('og:title') && page.includes('og:image') && page.includes('
 expect(page.includes('twitter:card') && page.includes('summary_large_image'), 'proposal page carries the Twitter large-card tag');
 expect(page.includes("content=\"${esc(origin)}/og-proposal.jpg\""), 'OG image points at the branded banner');
 expect(page.includes('Prepared for'), 'proposal addresses the facility by name');
-expect(page.includes('Download PDF') && page.includes('Copy link'), 'proposal page has Copy link and Download PDF actions');
+expect(!page.includes('class="toolbar"') && !page.includes('tb-copy'), 'proposal page has NO floating toolbar for visitors (console holds the actions)');
 expect(page.includes('esm.sh/jspdf') && page.includes('html2canvas'), 'PDF builds client-side from the page design');
 expect(page.includes('NGN 1,000') && page.includes('NGN 2,500') && page.includes('/ seat / month'), 'proposal prices read NGN 1,000 and NGN 2,500 per seat');
 expect(page.includes('Over 100,000 practice questions'), 'question bank count is quoted');
