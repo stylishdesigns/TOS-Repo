@@ -63,7 +63,7 @@ export function AppInstallPage() {
   const [waiting, setWaiting] = useState(false);
   const [cancelled, setCancelled] = useState(false);
   const [retryHint] = useState(() => consumeInstallRetryFlag());
-  const [appOnly, setAppOnly] = useState(false);
+  const [appOnly, setAppOnly] = useState<boolean | null>(null);
 
   useEffect(() => {
     isAppOnlyOn().then(setAppOnly).catch(() => undefined);
@@ -283,12 +283,20 @@ export function AppInstallPage() {
       ) : (
         <div style={card}>
           <h2 style={{ fontSize: 19, fontWeight: 800, margin: '0 0 6px' }}>On a computer?</h2>
-          <p style={{ fontSize: 14.5, color: '#94A3B8', margin: '0 0 18px', lineHeight: 1.55 }}>
-            {centre.name} runs right in your browser, and you can install it from the address bar too. On your phone it is even better.
-          </p>
-          <a href="/" style={{ ...primaryBtn, display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none', minWidth: 220 }}>
-            Open {centre.name}
-          </a>
+          {appOnly === false ? (
+            <>
+              <p style={{ fontSize: 14.5, color: '#94A3B8', margin: '0 0 18px', lineHeight: 1.55 }}>
+                {centre.name} runs right in your browser, and you can install it from the address bar too. On your phone it is even better.
+              </p>
+              <a href={`/?centre=${encodeURIComponent(centre.slug)}`} style={{ ...primaryBtn, display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none', minWidth: 220 }}>
+                Open {centre.name}
+              </a>
+            </>
+          ) : (
+            <p style={{ fontSize: 14.5, color: '#94A3B8', margin: 0, lineHeight: 1.55 }}>
+              {centre.name} opens in the installed app. Install it straight from your browser&apos;s address bar (the install icon appears there on this page), then sign in inside the app itself.
+            </p>
+          )}
         </div>
       )}
     </>
