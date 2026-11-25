@@ -809,18 +809,25 @@ export function registerExtendedRoutes(app: express.Express): void {
       const caller = requireTos(req);
       const videoId = parseYoutubeId(String(req.body?.youtubeUrl || req.body?.link || ''));
       if (!videoId) throw httpError(400, 'That link is not a YouTube video link. Paste a link like https://www.youtube.com/watch?v=...');
-      const title = String(req.body?.title || '').trim().slice(0, 200);
+      // Batch 42: the title field is gone. A video carries the exam types it
+      // prepares students for (from the TOS exam registry), a subject and the
+      // topic students see, which is now required.
       const subject = String(req.body?.subject || '').trim().slice(0, 120);
-      if (!title || !subject) throw httpError(400, 'Title and subject are required.');
+      if (!subject) throw httpError(400, 'Subject is required.');
+      const examTypes = Array.isArray(req.body?.examTypes)
+        ? Array.from(new Set((req.body.examTypes as any[]).map((x) => String(x).trim().toUpperCase().slice(0, 40)).filter(Boolean)))
+        : [];
+      if (!examTypes.length) throw httpError(400, 'Pick at least one exam type for this video.');
       const topic = String(req.body?.topic || '').trim().slice(0, 160);
-      const description = String(req.body?.description || '').trim().slice(0, 500);
+      if (!topic) throw httpError(400, 'Topic is required. It is the name students see on the video.');
+      const description = String(req.body?.description || '').trim().slice(0, 280);
       // One copy of each video: a repeat link is refused with a clear message.
       const dup = await adminDb.collection('videoResources').where('videoId', '==', videoId).limit(1).get();
       if (!dup.empty) throw httpError(409, 'This video is already in the library. Find it in the list and edit it instead of adding it again.');
       const id = 'vid-' + crypto.randomBytes(6).toString('hex');
       const now = new Date().toISOString();
       const payload: Record<string, any> = {
-        id, title, subject, topic, description, videoId,
+        id, subject, topic, description, examTypes, videoId,
         youtubeUrl: `https://www.youtube.com/watch?v=${videoId}`,
         addedAt: now,
         addedBy: String(caller.email || caller.uid || ''),
@@ -849,18 +856,24 @@ export function registerExtendedRoutes(app: express.Express): void {
         patch.videoId = videoId;
         patch.youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
       }
-      if (req.body?.title !== undefined) {
-        const title = String(req.body.title).trim().slice(0, 200);
-        if (!title) throw httpError(400, 'Title cannot be empty.');
-        patch.title = title;
+      if (req.body?.examTypes !== undefined) {
+        const examTypes = Array.isArray(req.body.examTypes)
+          ? Array.from(new Set((req.body.examTypes as any[]).map((x) => String(x).trim().toUpperCase().slice(0, 40)).filter(Boolean)))
+          : [];
+        if (!examTypes.length) throw httpError(400, 'Pick at least one exam type for this video.');
+        patch.examTypes = examTypes;
       }
       if (req.body?.subject !== undefined) {
         const subject = String(req.body.subject).trim().slice(0, 120);
         if (!subject) throw httpError(400, 'Subject cannot be empty.');
         patch.subject = subject;
       }
-      if (req.body?.topic !== undefined) patch.topic = String(req.body.topic).trim().slice(0, 160);
-      if (req.body?.description !== undefined) patch.description = String(req.body.description).trim().slice(0, 500);
+      if (req.body?.topic !== undefined) {
+        const topic = String(req.body.topic).trim().slice(0, 160);
+        if (!topic) throw httpError(400, 'Topic cannot be empty. It is the name students see on the video.');
+        patch.topic = topic;
+      }
+      if (req.body?.description !== undefined) patch.description = String(req.body.description).trim().slice(0, 280);
       patch.updatedAt = new Date().toISOString();
       await ref.set(patch, { merge: true });
       res.json({ ok: true });
@@ -887,16 +900,106 @@ export function registerExtendedRoutes(app: express.Express): void {
   // gets the same platform library, newest first, capped at 300.
   app.get('/api/student/video-resources', async (req, res) => {
     try {
-      getCaller(req);
+      const caller = getCaller(req);
       const snap = await adminDb.collection('videoResources').get();
-      const videos = snap.docs
+      const all = snap.docs
         .map((d) => ({ id: d.id, ...(d.data() as Record<string, any>) } as Record<string, any>))
-        .sort((a, b) => String(b.addedAt || '').localeCompare(String(a.addedAt || '')))
-        .slice(0, 300);
-      res.json({ ok: true, videos });
+        .sort((a, b) => String(b.addedAt || '').localeCompare(String(a.addedAt || '')));
+      // Batch 42 exam filter: a student sees the videos tagged with the exam
+      // THEY are registered for. Their exam comes from the student record's
+      // programme (examToRegister / programmeName, e.g. "JAMB UTME 2026"), so
+      // the match is by keyword: a video tagged JAMB and WAEC shows for both,
+      // a WAEC-only video stays hidden from a JAMB student. Videos without
+      // exam tags (added before batch 42) and callers without an exam on
+      // their profile (tutors, admins) see the whole library.
+      let examStrings: string[] = [];
+      try {
+        const stu = await adminDb.collection('students').where('uid', '==', caller.uid).limit(20).get();
+        for (const d of stu.docs) {
+          const row = d.data() as Record<string, any>;
+          for (const key of ['examToRegister', 'programmeName']) {
+            const v = String(row?.[key] || '').trim().toUpperCase();
+            if (v && !examStrings.includes(v)) examStrings.push(v);
+          }
+        }
+      } catch { examStrings = []; }
+      let hidden = 0;
+      const videos = all.filter((v) => {
+        const tags: string[] = Array.isArray(v.examTypes)
+          ? (v.examTypes as any[]).map((x) => String(x).trim().toUpperCase()).filter(Boolean)
+          : [];
+        if (!tags.length) return true;
+        if (!examStrings.length) return true;
+        const hit = examStrings.some((s) => tags.some((t) => s.includes(t) || t.includes(s)));
+        if (!hit) hidden += 1;
+        return hit;
+      }).slice(0, 300);
+      res.json({ ok: true, videos, hidden });
     } catch (error: any) {
       const status = Number(error?.status || 500);
       res.status(status).json({ error: error?.message || 'Video list failed.' });
+    }
+  });
+
+  // EXAM REGISTRY (batch 42): the examinations TOS registers learning
+  // resources for. Platform staff manage the list from the Learning
+  // Resources tab; the first read seeds the standard Nigerian exams so the
+  // picker is never empty. Students never read this list directly - their
+  // programme matches against it on the student video route above.
+  app.get('/api/tos/exam-types', async (req, res) => {
+    try {
+      requireTos(req);
+      const ref = adminDb.collection('examTypes');
+      let snap = await ref.get();
+      if (snap.empty) {
+        const now = new Date().toISOString();
+        const batch = adminDb.batch();
+        for (const name of ['JAMB', 'WAEC', 'NECO', 'IJMB', 'JUPEB']) {
+          const id = 'exam-' + name.toLowerCase();
+          batch.set(ref.doc(id), { id, name, addedAt: now });
+        }
+        await batch.commit();
+        snap = await ref.get();
+      }
+      const exams = snap.docs
+        .map((d) => ({ id: d.id, ...(d.data() as Record<string, any>) } as Record<string, any>))
+        .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+      res.json({ ok: true, exams });
+    } catch (error: any) {
+      const status = Number(error?.status || 500);
+      res.status(status).json({ error: error?.message || 'Exam list failed.' });
+    }
+  });
+
+  app.post('/api/tos/exam-types', async (req, res) => {
+    try {
+      const caller = requireTos(req);
+      const name = String(req.body?.name || '').trim().slice(0, 24);
+      if (!name) throw httpError(400, 'Type the exam name to register.');
+      const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+      const id = slug ? 'exam-' + slug : 'exam-' + crypto.randomBytes(4).toString('hex');
+      const dup = await adminDb.collection('examTypes').doc(id).get();
+      if (dup.exists) throw httpError(409, 'That exam is already registered.');
+      const now = new Date().toISOString();
+      const payload = { id, name, addedAt: now, addedBy: String(caller.email || caller.uid || '') };
+      await adminDb.collection('examTypes').doc(id).set(payload);
+      res.json({ ok: true, exam: payload });
+    } catch (error: any) {
+      const status = Number(error?.status || 500);
+      res.status(status).json({ error: error?.message || 'Registering the exam failed.' });
+    }
+  });
+
+  app.delete('/api/tos/exam-types/:id', async (req, res) => {
+    try {
+      requireTos(req);
+      const id = String(req.params?.id || '').trim();
+      if (!/^[a-zA-Z0-9_-]{1,64}$/.test(id)) throw httpError(400, 'A valid exam id is required.');
+      await adminDb.collection('examTypes').doc(id).delete();
+      res.json({ ok: true });
+    } catch (error: any) {
+      const status = Number(error?.status || 500);
+      res.status(status).json({ error: error?.message || 'Removing the exam failed.' });
     }
   });
 

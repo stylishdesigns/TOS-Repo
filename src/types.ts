@@ -281,15 +281,29 @@ export interface StudyMaterial {
 // platform library under Learning Resources > Video classes).
 export interface VideoResource {
   id: string;
-  title: string;
+  // Batch 42: the title field is gone. A video is identified by its exam
+  // types (from the TOS exam registry), subject and topic; the topic is the
+  // name students see. examTypes must come from the TOS exam registry
+  // (JAMB, WAEC, NECO, IJMB, JUPEB, or whatever the platform admin adds).
   subject: string;
-  topic?: string;
+  topic: string;
   description?: string;
+  examTypes: string[];
   youtubeUrl: string;
   videoId: string;
   addedAt: string;
   addedBy?: string;
   updatedAt?: string;
+}
+
+// The examinations TOS registers learning resources for, managed by the
+// platform admin from the Learning Resources tab (batch 42). Students never
+// edit this list; they only match against it through their programme.
+export interface TosExamType {
+  id: string;
+  name: string;
+  addedAt?: string;
+  addedBy?: string;
 }
 
 export interface ClassRating {

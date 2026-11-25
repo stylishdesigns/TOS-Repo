@@ -1122,7 +1122,7 @@ const TABS = [
   { id: 'settings', label: 'Settings', mlabel: 'Settings', icon: Settings, group: 'Business' },
   { id: 'questions', label: 'Question Bank', mlabel: 'Bank', icon: BookOpen, group: 'Content' },
   { id: 'mocks', label: 'Mocks', mlabel: 'Mocks', icon: CalendarDays, group: 'Content' },
-  { id: 'videos', label: 'Video Resources', mlabel: 'Videos', icon: MonitorPlay, group: 'Content' },
+  { id: 'videos', label: 'Learning Resources', mlabel: 'Learning', icon: MonitorPlay, group: 'Content' },
   { id: 'chat', label: 'Chat', mlabel: 'Chat', icon: MessageSquare, group: 'Content' },
   { id: 'website', label: 'Website', mlabel: 'Website', icon: Globe, group: 'Content' },
   { id: 'audit', label: 'Audit log', mlabel: 'Audit', icon: ScrollText, group: 'System' },
