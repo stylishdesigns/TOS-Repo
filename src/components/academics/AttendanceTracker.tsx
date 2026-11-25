@@ -24,7 +24,7 @@ interface AttendanceRecord {
   studentName: string;
   programmeName: string;
   parentPhone: string;
-  status: 'Present' | 'Absent' | 'Late' | 'No clock out';
+  status: 'Present' | 'Absent' | 'Late' | 'No clock out' | 'Pending';
   checkInTime?: string;
   checkOutTime?: string;
   parentNotified?: boolean;
@@ -55,6 +55,20 @@ export const AttendanceTracker: React.FC = () => {
       : ALL_DAYS,
   });
 
+  // A student with no check-in yet is only Absent once the facility's closing
+  // time has passed; until then the day is still open for them to check in.
+  const parseAmPmToMinutes = (timeStr?: string) => {
+    if (!timeStr) return 23 * 60 + 30;
+    const m = /^\s*(\d{1,2}):(\d{2})\s*(AM|PM)\s*$/i.exec(timeStr);
+    if (!m) return 23 * 60 + 30;
+    let h = parseInt(m[1], 10) % 12;
+    if (m[3].toUpperCase() === 'PM') h += 12;
+    return h * 60 + parseInt(m[2], 10);
+  };
+  const isTodaySelected = selectedDate === new Date().toISOString().split('T')[0];
+  const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+  const closingPassed = nowMin >= parseAmPmToMinutes(attendanceSettings?.closingTime);
+
   // Map attendance logs to records
   const attendanceList: AttendanceRecord[] = (students || []).map((s) => {
     const log = attendanceLogs.find(l => l.studentId === s.id && l.date === selectedDate);
@@ -64,7 +78,7 @@ export const AttendanceTracker: React.FC = () => {
       studentName: s.name,
       programmeName: s.programmeName,
       parentPhone: s.parentPhone,
-      status: log?.status || 'Absent',
+      status: log?.status || (isTodaySelected && !closingPassed ? 'Pending' : 'Absent'),
       checkInTime: log?.clockInAt ? new Date(log.clockInAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : undefined,
       checkOutTime: log?.clockOutAt ? new Date(log.clockOutAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : undefined,
       parentNotified: false,
@@ -90,8 +104,11 @@ export const AttendanceTracker: React.FC = () => {
   const presentPercent = Math.round((presentCount / total) * 100);
   const latePercent = Math.round((lateCount / total) * 100);
   const absentPercent = Math.round((absentCount / total) * 100);
+  // The rate reads only days that are settled: pending students (closing
+  // time not yet reached) are not counted against it.
+  const resolvedTotal = attendanceList.filter((r) => r.status !== 'Pending').length || 1;
   const attendanceRate = Math.round(
-    ((presentCount + lateCount) / total) * 100
+    ((presentCount + lateCount) / resolvedTotal) * 100
   );
 
   const handleUpdateStatus = (
@@ -358,6 +375,8 @@ export const AttendanceTracker: React.FC = () => {
                           ? 'bg-amber-50 text-amber-700 border-amber-200'
                           : rec.status === 'No clock out'
                           ? 'bg-slate-50 text-slate-700 border-slate-200'
+                          : rec.status === 'Pending'
+                          ? 'bg-blue-50 text-blue-700 border-blue-200'
                           : 'bg-rose-50 text-rose-700 border-rose-200'
                       }`}
                     >
@@ -368,6 +387,8 @@ export const AttendanceTracker: React.FC = () => {
                           ? 'bg-amber-500'
                           : rec.status === 'No clock out'
                           ? 'bg-slate-400'
+                          : rec.status === 'Pending'
+                          ? 'bg-blue-400'
                           : 'bg-rose-500'
                       }`} />
                       {rec.status}
@@ -395,7 +416,9 @@ export const AttendanceTracker: React.FC = () => {
                         <span>{rec.parentNotified ? 'SMS Dispatched' : 'Alert Parent'}</span>
                       </button>
                     ) : (
-                      <span className="text-slate-300 text-[11px] font-medium">Normal</span>
+                      <span className="text-slate-300 text-[11px] font-medium">
+                        {rec.status === 'Pending' ? 'Waiting' : 'Normal'}
+                      </span>
                     )}
                   </td>
                 </tr>

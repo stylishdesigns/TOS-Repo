@@ -86,9 +86,9 @@ export function LaunchSplash({ tos }: { tos?: boolean } = {}) {
   if (tos) {
     return (
       <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-white" role="status" aria-label="Loading">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
           <span className="text-3xl font-black tracking-tight text-slate-900" style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', sans-serif" }}>Tutorial</span>
-          <img src="/tos-brand-icon.png" alt="Tutorial OS" className="w-14 h-14 rounded-2xl" style={{ animation: 'boot-pop 1.6s ease-in-out infinite' }} />
+          <img src="/tos-brand-icon.png" alt="Tutorial OS" className="w-9 h-9 rounded-xl" style={{ animation: 'boot-pop 1.6s ease-in-out infinite' }} />
           <span className="text-3xl font-black tracking-tight text-slate-900" style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', sans-serif" }}>OS</span>
         </div>
         <div className="mt-6 flex items-center gap-2">

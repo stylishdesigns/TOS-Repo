@@ -598,16 +598,17 @@ export const StudentPortal: React.FC = () => {
       )}
       {/* 1. Top Desktop Control Bar */}
       <header className="bg-slate-950 text-white px-4 py-3 z-40 sticky top-0 overflow-hidden shadow-md border-b border-slate-800">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-3 relative">
-          {/* Facility name, dead centre of the header menu, always shown in full */}
-          <div className="flex-1 min-w-0 text-center">
-            <span className="block w-full break-words leading-tight font-black text-sm uppercase tracking-[0.2em] pointer-events-none">
-              {centreName}
-            </span>
-          </div>
+        <div className="max-w-7xl mx-auto grid grid-cols-[1fr_auto_1fr] items-center gap-3 relative">
+          {/* Facility name, dead centre of the header menu, always shown in full.
+              The 1fr side columns are equal, so the middle column — the name —
+              sits on the true centre of the header whatever the buttons weigh. */}
+          <div className="min-w-0" />
+          <span className="block text-center break-words leading-tight font-black text-sm uppercase tracking-[0.2em] pointer-events-none min-w-0 max-w-full">
+            {centreName}
+          </span>
 
           {/* Right side: notifications (work continues) + install */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center justify-end gap-2 min-w-0">
             <NotificationsBell onOpenChange={setBellOpen} />
             <RetryButton dark />
             <PWAInstallButton
