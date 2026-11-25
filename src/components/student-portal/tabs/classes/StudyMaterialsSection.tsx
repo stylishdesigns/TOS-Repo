@@ -1,8 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import {
-  FileText,
   Search,
-  Download,
   BookOpen,
   Calendar,
   User,
@@ -12,9 +10,33 @@ import {
   FileDown,
   Layers,
   PlayCircle,
-  Image as ImageIcon,
 } from 'lucide-react';
 import { Student, StudyMaterial } from '../../../../types';
+import { SubjectDropdown } from './SubjectDropdown';
+
+/** One small type label per file on a material (batch 43). The type is read
+ *  from each saved file's extension when the material carries files, and
+ *  from the material's own type otherwise. */
+const FILE_TYPES: Record<string, string> = {
+  pdf: 'PDF', doc: 'DOCX', docx: 'DOCX', ppt: 'Slides', pptx: 'Slides',
+  jpg: 'Image', jpeg: 'Image', png: 'Image', webp: 'Image', gif: 'Image',
+  mp4: 'Video', webm: 'Video', mov: 'Video', mkv: 'Video', avi: 'Video',
+};
+
+const typeOfFileName = (name: string, fallback: string): string => {
+  const ext = (String(name || '').split('.').pop() || '').toLowerCase();
+  return FILE_TYPES[ext] || fallback;
+};
+
+const materialTypes = (m: StudyMaterial): string[] => {
+  const out = new Set<string>();
+  if (Array.isArray(m.files) && m.files.length) {
+    m.files.forEach((f) => out.add(typeOfFileName(f.name, m.fileType || 'File')));
+  } else if (m.type === 'video') out.add('Video link');
+  else if (m.type === 'image') out.add('Image');
+  else out.add(m.fileType || 'PDF');
+  return Array.from(out);
+};
 import { useApp } from '../../../../context/AppContext';
 import { MaterialViewer } from '../../../common/MaterialViewer';
 
@@ -22,6 +44,14 @@ interface StudyMaterialsSectionProps {
   student: Student;
   initialSubject?: string | null;
   onSwitchToTimetable?: () => void;
+  /** Batch 43: one subject dropdown shared with Video classes. When the
+   *  parent passes subject/onSubjectChange the two views stay in lockstep:
+   *  a pick in either is the pick in both. */
+  subject?: string;
+  onSubjectChange?: (next: string) => void;
+  /** The subjects the student is registered for; falls back to the subjects
+   *  present on the materials. */
+  registeredSubjects?: string[];
 }
 
 const SUBJECT_COLORS: Record<string, { bg: string; text: string; border: string }> = {
@@ -38,9 +68,15 @@ export const StudyMaterialsSection: React.FC<StudyMaterialsSectionProps> = ({
   student,
   initialSubject,
   onSwitchToTimetable,
+  subject,
+  onSubjectChange,
+  registeredSubjects,
 }) => {
   const { studyMaterials = [], addToast } = useApp();
-  const [selectedSubject, setSelectedSubject] = useState<string>(initialSubject || 'All');
+  const [internalSubject, setInternalSubject] = useState<string>(initialSubject || 'All');
+  const selectedSubject = subject !== undefined ? subject : internalSubject;
+  const setSelectedSubject = (next: string) =>
+    onSubjectChange ? onSubjectChange(next) : setInternalSubject(next);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [readingMaterial, setReadingMaterial] = useState<StudyMaterial | null>(null);
   const [viewing, setViewing] = useState<StudyMaterial | null>(null);
@@ -55,6 +91,13 @@ export const StudyMaterialsSection: React.FC<StudyMaterialsSectionProps> = ({
     });
     return Array.from(list);
   }, [studyMaterials]);
+
+  // Dropdown options: the student's registered subjects when the parent
+  // supplies them, otherwise the subjects on the materials themselves.
+  const dropdownSubjects = useMemo(
+    () => (registeredSubjects && registeredSubjects.length ? registeredSubjects : Array.from(availableSubjects)),
+    [registeredSubjects, availableSubjects],
+  );
 
   // Filtered materials
   const filteredMaterials = useMemo(() => {
@@ -98,14 +141,11 @@ export const StudyMaterialsSection: React.FC<StudyMaterialsSectionProps> = ({
 
   return (
     <div className="space-y-4 animate-in fade-in duration-200">
-      {/* Header Banner */}
+      {/* Header: the title alone (batch 43). */}
       <div className="pt-1">
         <h2 className="text-xl font-black text-slate-900 tracking-tight">
-          Study Materials & Handouts
+          Study Materials
         </h2>
-        <p className="text-xs text-slate-500 font-medium mt-0.5">
-          Revision notes, lecture handouts, and syllabus guides uploaded by your specialist tutors.
-        </p>
       </div>
 
       {/* Search Bar */}
@@ -129,38 +169,9 @@ export const StudyMaterialsSection: React.FC<StudyMaterialsSectionProps> = ({
         )}
       </div>
 
-      {/* Subject Filter Pills */}
-      <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 -mx-1 px-1 no-scrollbar">
-        <button
-          type="button"
-          onClick={() => setSelectedSubject('All')}
-          className={`px-3 py-1.5 rounded-full text-xs font-extrabold transition-all shrink-0 cursor-pointer ${
-            selectedSubject === 'All'
-              ? 'bg-[var(--brand,#0F172A)] text-[var(--on-brand,#fff)] shadow-xs'
-              : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-          }`}
-        >
-          All Subjects ({studyMaterials.length})
-        </button>
-        {availableSubjects.map((sub) => {
-          const count = studyMaterials.filter((m) => m.subject.toLowerCase() === sub.toLowerCase()).length;
-          const isSelected = selectedSubject.toLowerCase() === sub.toLowerCase();
-          return (
-            <button
-              key={sub}
-              type="button"
-              onClick={() => setSelectedSubject(sub)}
-              className={`px-3 py-1.5 rounded-full text-xs font-extrabold transition-all shrink-0 cursor-pointer ${
-                isSelected
-                  ? 'bg-orange-600 text-white shadow-xs'
-                  : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-              }`}
-            >
-              {sub} ({count})
-            </button>
-          );
-        })}
-      </div>
+      {/* Subject dropdown (batch 43): the shared, app-branded filter that
+          Study materials and Video classes keep in lockstep. */}
+      <SubjectDropdown dark={false} subjects={dropdownSubjects} value={selectedSubject} onChange={setSelectedSubject} />
 
       {/* Materials List */}
       <div className="space-y-3">
@@ -207,16 +218,15 @@ export const StudyMaterialsSection: React.FC<StudyMaterialsSectionProps> = ({
                     {material.subject}
                   </span>
 
-                  <span className="text-[11px] font-mono font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded-md border border-slate-200/60 flex items-center gap-1">
-                    {material.type === 'video' ? (
-                      <PlayCircle className="w-3 h-3 text-slate-400" />
-                    ) : material.type === 'image' ? (
-                      <ImageIcon className="w-3 h-3 text-slate-400" />
-                    ) : (
-                      <FileText className="w-3 h-3 text-slate-400" />
-                    )}
-                    <span>{material.type === 'video' ? 'VIDEO' : material.type === 'image' ? 'IMAGE' : (material.fileType || 'PDF')}</span>
-                    {material.fileSize && <span>· {material.fileSize}</span>}
+                  {/* Type chips only (batch 43): one small chip per type on
+                      the material - PDF, image, video link - and the file
+                      size is gone. */}
+                  <span className="flex flex-wrap gap-1 justify-end shrink-0">
+                    {materialTypes(material).map((t) => (
+                      <span key={t} className="text-[10px] font-black uppercase tracking-wider text-slate-500 bg-slate-50 px-2 py-0.5 rounded-md border border-slate-200/60">
+                        {t}
+                      </span>
+                    ))}
                   </span>
                 </div>
 
@@ -248,27 +258,15 @@ export const StudyMaterialsSection: React.FC<StudyMaterialsSectionProps> = ({
                     </span>
                   </div>
 
-                  <div className="flex items-center space-x-2 shrink-0">
+                  <div className="flex items-center shrink-0">
+                    {/* One plain Open button (batch 43): the Read button and
+                        the download-style arrow icon are gone. */}
                     <button
                       type="button"
                       onClick={(e) => handleDownload(material, e)}
-                      className="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-[11px] flex items-center space-x-1 cursor-pointer transition-colors active:scale-95"
-                      title={material.type === 'video' ? 'Watch video' : material.type === 'image' ? 'View image' : 'Open file'}
+                      className="px-3 py-1.5 rounded-lg bg-orange-700 hover:bg-orange-600 text-white font-extrabold text-[11px] shadow-2xs cursor-pointer transition-all active:scale-95"
                     >
-                      {material.type === 'video' ? (
-                        <PlayCircle className="w-3 h-3 text-slate-500" />
-                      ) : (
-                        <Download className="w-3 h-3 text-slate-500" />
-                      )}
-                      <span>{material.type === 'video' ? 'Watch' : material.type === 'image' ? 'View' : 'Open'}</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setReadingMaterial(material)}
-                      className="px-3 py-1.5 rounded-lg bg-orange-700 hover:bg-orange-600 text-white font-extrabold text-[11px] flex items-center space-x-1 shadow-2xs cursor-pointer transition-all active:scale-95"
-                    >
-                      <span>Read</span>
+                      <span>Open</span>
                     </button>
                   </div>
                 </div>
@@ -301,7 +299,7 @@ export const StudyMaterialsSection: React.FC<StudyMaterialsSectionProps> = ({
                   {readingMaterial.title}
                 </h3>
                 <p className="text-[11px] text-slate-500 font-medium mt-0.5">
-                  Uploaded by {readingMaterial.tutorName}{readingMaterial.fileSize ? ` · ${readingMaterial.fileSize}` : ''}{readingMaterial.pages ? ` · ${readingMaterial.pages} pages` : ''}
+                  Uploaded by {readingMaterial.tutorName}{readingMaterial.pages ? ` · ${readingMaterial.pages} pages` : ''}
                 </p>
               </div>
 

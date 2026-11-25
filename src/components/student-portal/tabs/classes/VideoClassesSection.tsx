@@ -5,6 +5,7 @@ import {
   ChevronUp, ChevronDown, RotateCcw,
 } from 'lucide-react';
 import type { VideoResource } from '../../../../types';
+import { SubjectDropdown } from './SubjectDropdown';
 
 /**
  * Video classes (batch 42): the student side of the platform video library.
@@ -55,19 +56,20 @@ const playerUrl = (id: string) =>
 let cache: VideoResource[] | null = null;
 let cacheHidden = 0;
 
-/** The see-through shield over the YouTube player. It blocks the touches
- *  that would lead students out of the app (the title bar with the share and
- *  copy-link buttons, the volume and settings buttons, the YouTube watermark
- *  and the subscribe row, and the suggested-video end screen) while leaving
- *  the taps that should work: play/pause, the timeline, double-tap to skip
- *  10 seconds, and fullscreen. */
+/** The shield over the YouTube player (batch 43 geometry, from the user's
+ *  own phone screenshot): TWO plain see-through bands, not pinpoint boxes.
+ *  The top band runs from the top edge of the player down to just above the
+ *  middle, so the title, channel row, volume, CC and settings buttons on the
+ *  phone player sit under it and stop responding. The bottom band runs from
+ *  the bottom edge up to just below the timeline row, so the copy-link
+ *  button, the suggested-video card and the YouTube logo sit under it and
+ *  stop responding, while the band never touches the timeline itself. The
+ *  uncovered middle strip keeps play/pause, the timeline, double-tap 10
+ *  second skip and the fullscreen button fully live. */
 const ShieldPatches: React.FC<{ ended: boolean; onReplay: () => void }> = ({ ended, onReplay }) => (
   <>
-    <span aria-hidden className="absolute left-0 top-0 w-full" style={{ height: '13%', pointerEvents: 'auto' }} />
-    <span aria-hidden className="absolute right-0" style={{ bottom: '13.5%', height: '10%', width: '18%', pointerEvents: 'auto' }} />
-    <span aria-hidden className="absolute left-0" style={{ bottom: '13.5%', height: '12%', width: '46%', pointerEvents: 'auto' }} />
-    <span aria-hidden className="absolute bottom-0" style={{ left: '13%', width: '12%', height: '13.5%', pointerEvents: 'auto' }} />
-    <span aria-hidden className="absolute bottom-0" style={{ left: '78%', width: '12%', height: '13.5%', pointerEvents: 'auto' }} />
+    <span aria-hidden className="absolute left-0 top-0 w-full" style={{ height: '46%', pointerEvents: 'auto' }} />
+    <span aria-hidden className="absolute left-0 bottom-0 w-full" style={{ height: '25%', pointerEvents: 'auto' }} />
     {ended && (
       <div
         className="absolute inset-0 z-10 grid place-items-center"
@@ -165,15 +167,26 @@ const VideoPlayerModal: React.FC<{ video: VideoResource; dark: boolean; onClose:
 
 interface VideoClassesSectionProps {
   dark: boolean;
+  /** Batch 43: the subject filter is one dropdown shared with Study
+   *  materials. When the parent passes subject/onSubjectChange the two views
+   *  stay in lockstep: a pick in either is the pick in both. */
+  subject?: string;
+  onSubjectChange?: (next: string) => void;
+  /** The subjects the student is registered for; falls back to the subjects
+   *  present on the videos when the parent supplies none. */
+  registeredSubjects?: string[];
 }
 
-export const VideoClassesSection: React.FC<VideoClassesSectionProps> = ({ dark }) => {
+export const VideoClassesSection: React.FC<VideoClassesSectionProps> = ({ dark, subject, onSubjectChange, registeredSubjects }) => {
   const [videos, setVideos] = useState<VideoResource[]>(cache || []);
   const [hiddenCount, setHiddenCount] = useState<number>(cacheHidden);
   const [loading, setLoading] = useState(!cache);
   const [err, setErr] = useState('');
   const [query, setQuery] = useState('');
-  const [subjectFilter, setSubjectFilter] = useState('All');
+  const [internalSubject, setInternalSubject] = useState('All');
+  const subjectFilter = subject !== undefined ? subject : internalSubject;
+  const setSubjectFilter = (next: string) =>
+    onSubjectChange ? onSubjectChange(next) : setInternalSubject(next);
   const [watching, setWatching] = useState<VideoResource | null>(null);
   const [openIds, setOpenIds] = useState<Set<string>>(new Set());
 
@@ -211,6 +224,13 @@ export const VideoClassesSection: React.FC<VideoClassesSectionProps> = ({ dark }
     [videos],
   );
 
+  // Dropdown options: the student's registered subjects when the parent
+  // supplies them, otherwise the subjects on the videos themselves.
+  const dropdownSubjects = useMemo(
+    () => (registeredSubjects && registeredSubjects.length ? registeredSubjects : subjects),
+    [registeredSubjects, subjects],
+  );
+
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
     return videos.filter((v) => {
@@ -232,7 +252,6 @@ export const VideoClassesSection: React.FC<VideoClassesSectionProps> = ({ dark }
   const cardBg = dark ? 'bg-slate-800/70 border-slate-700' : 'bg-white border-[#E2E8F0]';
   const textMain = dark ? 'text-white' : 'text-[#0F172A]';
   const textSub = dark ? 'text-slate-400' : 'text-[#64748B]';
-  const chipIdle = dark ? 'text-slate-300 border-slate-600 bg-slate-800/60' : 'text-[#64748B] border-[#E2E8F0] bg-white';
 
   // Branded skeleton: straight blocks in the facility colour family, never a
   // circular spinner. Only shown the very first time; afterwards the cached
@@ -255,23 +274,9 @@ export const VideoClassesSection: React.FC<VideoClassesSectionProps> = ({ dark }
 
   return (
     <div className="space-y-3">
-      {/* Subject chips + search */}
-      <div className="flex gap-1.5 flex-wrap">
-        {['All', ...subjects].map((s) => (
-          <button
-            key={s}
-            type="button"
-            onClick={() => setSubjectFilter(s)}
-            className={`h-8 px-3.5 rounded-full text-[11px] font-extrabold transition-all border ${
-              subjectFilter === s
-                ? 'bg-[var(--brand,#0F172A)] text-[var(--on-brand,#fff)] border-transparent shadow-xs'
-                : chipIdle
-            }`}
-          >
-            {s}
-          </button>
-        ))}
-      </div>
+      {/* Subject dropdown (batch 43): the shared, app-branded filter that
+          Study materials and Video classes keep in lockstep. */}
+      <SubjectDropdown dark={dark} subjects={dropdownSubjects} value={subjectFilter} onChange={setSubjectFilter} />
       <div className="relative">
         <Search className={`w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 ${textSub}`} />
         <input
@@ -354,34 +359,35 @@ export const VideoClassesSection: React.FC<VideoClassesSectionProps> = ({ dark }
                     <BookOpen className="w-3 h-3" /> {v.subject}
                   </span>
                 </button>
+                {/* The small arrow under the thumbnail: up by default, and
+                    it only opens the description. The topic and the exam
+                    badges show without it. */}
                 <button
                   type="button"
                   onClick={() => toggleDetails(v.id)}
                   className={`w-full flex items-center justify-center gap-1 py-1.5 ${textSub}`}
-                  aria-label={open ? 'Hide the video details' : 'Show the video details'}
+                  aria-label={open ? 'Hide the video description' : 'Show the video description'}
                   aria-expanded={open}
                 >
                   {open
                     ? <ChevronDown className="w-4 h-4" />
                     : <ChevronUp className="w-4 h-4" />}
                 </button>
-                {open && (
-                  <div className="px-1 pb-1">
-                    <h4 className={`text-xs font-extrabold leading-snug ${textMain}`}>{v.topic}</h4>
-                    {(v.examTypes || []).length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-1.5">
-                        {(v.examTypes || []).map((t) => (
-                          <span key={t} className="inline-flex items-center gap-1 h-5 px-2 rounded-full text-[10px] font-extrabold" style={{ background: 'var(--brand-soft, rgba(100,116,139,0.12))', color: 'var(--brand,#0F172A)' }}>
-                            <GraduationCap className="w-3 h-3" /> {t}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                    {v.description && (
-                      <p className={`text-[11px] mt-1.5 leading-relaxed ${textSub}`}>{v.description}</p>
-                    )}
-                  </div>
-                )}
+                <div className="px-1 pb-1">
+                  <h4 className={`text-xs font-extrabold leading-snug ${textMain}`}>{v.topic}</h4>
+                  {(v.examTypes || []).length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1.5">
+                      {(v.examTypes || []).map((t) => (
+                        <span key={t} className="inline-flex items-center gap-1 h-5 px-2 rounded-full text-[10px] font-extrabold" style={{ background: 'var(--brand-soft, rgba(100,116,139,0.12))', color: 'var(--brand,#0F172A)' }}>
+                          <GraduationCap className="w-3 h-3" /> {t}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {open && v.description && (
+                    <p className={`text-[11px] mt-1.5 leading-relaxed ${textSub}`}>{v.description}</p>
+                  )}
+                </div>
               </div>
             );
           })}

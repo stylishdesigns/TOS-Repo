@@ -44,6 +44,21 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({ student }) => {
   // video classes (the platform video library, batch 41).
   const [learningView, setLearningView] = useState<'materials' | 'videos'>('materials');
 
+  // Batch 43: ONE subject dropdown for the whole of Learning Resources. The
+  // value lives here so Study materials and Video classes always show the
+  // same subject: a pick in either is the pick in both, and both start on
+  // All. Options come from the subjects the student is registered for.
+  const [learningSubject, setLearningSubject] = useState<string>('All');
+
+  const registeredSubjects = useMemo(() => {
+    const set = new Set<string>();
+    (timetable || []).forEach((slot) => {
+      const sub = String(slot.subject || '').trim();
+      if (sub) set.add(sub);
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [timetable]);
+
   const [viewingSession, setViewingSession] = useState<TimetableSlot | null>(null);
   const [ratingSlot, setRatingSlot] = useState<TimetableSlot | null>(null);
 
@@ -285,11 +300,19 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({ student }) => {
           </div>
 
           {learningView === 'videos' ? (
-            <VideoClassesSection dark={dark} />
+            <VideoClassesSection
+              dark={dark}
+              subject={learningSubject}
+              onSubjectChange={setLearningSubject}
+              registeredSubjects={registeredSubjects}
+            />
           ) : (
             <StudyMaterialsSection
               student={student}
               onSwitchToTimetable={() => setActiveSection('timetable')}
+              subject={learningSubject}
+              onSubjectChange={setLearningSubject}
+              registeredSubjects={registeredSubjects}
             />
           )}
         </div>

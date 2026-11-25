@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  MonitorPlay, Plus, RefreshCw, Search, Play, Pencil, Trash2, X,
+  MonitorPlay, Plus, Search, Play, Pencil, Trash2, X,
   CheckCircle2, Film, GraduationCap, BookOpen, ListPlus, Check, Loader2,
 } from 'lucide-react';
 import { api, fmtDate, inputCls } from './tosShared';
@@ -76,6 +76,9 @@ export const TosVideos: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
 
   // Batch 42: the learning-resources toggle and the exam registry.
   const [view, setView] = useState<'videos' | 'materials'>('videos');
+  // Batch 43: exam-type filter for the video list (All + every registered
+  // exam).
+  const [examFilter, setExamFilter] = useState<string>('All');
   const [exams, setExams] = useState<TosExamType[]>([]);
   const [examsOpen, setExamsOpen] = useState(false);
   const [examName, setExamName] = useState('');
@@ -109,10 +112,11 @@ export const TosVideos: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
     const q = query.trim().toLowerCase();
     return videos.filter((v) => {
       if (subjectFilter !== 'All' && v.subject !== subjectFilter) return false;
+      if (examFilter !== 'All' && !(v.examTypes || []).includes(examFilter)) return false;
       if (!q) return true;
       return `${v.topic || ''} ${v.subject} ${(v.examTypes || []).join(' ')} ${v.description || ''}`.toLowerCase().includes(q);
     });
-  }, [videos, query, subjectFilter]);
+  }, [videos, query, subjectFilter, examFilter]);
 
   const parsedLink = parseYoutubeId(form.link);
 
@@ -221,14 +225,6 @@ export const TosVideos: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
           top-right corner of the section. */}
       <div className="flex flex-wrap items-center gap-3">
         <button
-          onClick={load}
-          disabled={loading}
-          className="inline-flex items-center gap-2 h-10 px-4 rounded-xl border border-white/10 bg-white/5 text-sm font-semibold text-slate-200 hover:bg-white/10 transition-colors disabled:opacity-50"
-          title="Reload the library"
-        >
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
-        </button>
-        <button
           onClick={openAdd}
           className="inline-flex items-center gap-2 h-10 px-4 rounded-xl bg-orange-500 text-sm font-extrabold text-white hover:bg-orange-400 transition-colors shadow-sm"
         >
@@ -246,9 +242,10 @@ export const TosVideos: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
         </button>
       </div>
 
-      {/* Learning resources toggle: platform videos here, platform study
+      {/* Learning resources toggle (batch 43): stretched across the full
+          width of the section. Platform videos here, platform study
           materials arriving in the next batch. */}
-      <div className="inline-flex rounded-xl border border-white/10 bg-white/5 p-1">
+      <div className="grid grid-cols-2 rounded-xl border border-white/10 bg-white/5 p-1">
         {([
           ['videos', 'Video resources'],
           ['materials', 'Study materials'],
@@ -256,7 +253,7 @@ export const TosVideos: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
           <button
             key={key}
             onClick={() => setView(key)}
-            className={`h-8 px-4 rounded-lg text-xs font-extrabold transition-colors ${
+            className={`h-10 rounded-lg text-xs font-extrabold transition-colors ${
               view === key ? 'bg-orange-500 text-white' : 'text-slate-400 hover:text-white'
             }`}
           >
@@ -287,9 +284,28 @@ export const TosVideos: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
         </div>
       ) : (
         <>
-          {/* Filters: subject chips + search */}
+          {/* Filters: exam-type chips (from the registry) + subject chips +
+              search */}
           {!loading && !err && videos.length > 0 && (
             <div className="space-y-3">
+              {exams.length > 0 && (
+                <div className="flex gap-1.5 flex-wrap">
+                  {['All', ...exams.map((e) => e.name)].map((name) => (
+                    <button
+                      key={name}
+                      onClick={() => setExamFilter(name)}
+                      className={`inline-flex items-center gap-1 h-8 px-3.5 rounded-full text-xs font-bold transition-colors border ${
+                        examFilter === name
+                          ? 'bg-orange-500 text-white border-transparent'
+                          : 'text-slate-300 border-white/10 bg-white/5 hover:bg-white/10 hover:text-white'
+                      }`}
+                    >
+                      <GraduationCap className={`w-3.5 h-3.5 ${examFilter === name ? 'text-white' : 'text-orange-400'}`} />
+                      {name}
+                    </button>
+                  ))}
+                </div>
+              )}
               <div className="flex gap-1.5 flex-wrap">
                 {['All', ...subjects].map((s) => (
                   <button
