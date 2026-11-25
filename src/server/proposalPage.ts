@@ -52,6 +52,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica N
 .hero h1{font-size:clamp(30px,6vw,46px);line-height:1.12;font-weight:800;letter-spacing:-.02em;max-width:15em}
 .forline{margin-top:22px;display:inline-flex;flex-wrap:wrap;gap:8px 14px;align-items:center;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);border-radius:999px;padding:10px 20px;font-size:14px;color:#CBD5E1}
 .forline b{color:#fff}
+.forline span{color:#94A3B8}
 main{padding:20px 0 8px}
 section{margin-bottom:14px;background:#fff;border:1px solid var(--line);border-radius:20px;padding:38px 36px;box-shadow:0 1px 2px rgba(15,23,42,.04)}
 .sh{display:flex;gap:16px;align-items:baseline;margin-bottom:6px}
@@ -59,9 +60,9 @@ section{margin-bottom:14px;background:#fff;border:1px solid var(--line);border-r
 section h2{font-size:24px;font-weight:800;letter-spacing:-.02em;margin-bottom:14px}
 p.lead{color:#334155;font-size:15.5px;margin-bottom:12px}
 p.body{color:#475569;font-size:14.5px;margin-bottom:12px}
-.facts{display:grid;grid-template-columns:1fr 1fr;gap:10px 18px;margin-top:18px;background:#F8FAFC;border:1px solid var(--line);border-radius:14px;padding:18px 20px}
+.facts{display:grid;grid-template-columns:1fr 1fr;gap:14px 26px;margin-top:18px;background:#F8FAFC;border:1px solid var(--line);border-radius:14px;padding:18px 20px}
 .facts div{display:flex;gap:8px;font-size:13.5px}
-.facts dt{color:var(--muted);min-width:96px;font-weight:600}
+.facts dt{color:var(--muted);min-width:110px;font-weight:600}
 .facts dd{color:var(--ink);font-weight:600}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px}
 .card{border:1px solid var(--line);border-radius:14px;padding:18px 18px 16px;background:#FCFCFD}
@@ -83,6 +84,7 @@ p.body{color:#475569;font-size:14.5px;margin-bottom:12px}
 .tbl thead th{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border-bottom:2px solid var(--line)}
 .tbl tbody th{font-weight:700;color:var(--ink);white-space:nowrap}
 .tbl td .price{font-weight:800;color:var(--orange-d);white-space:nowrap}
+.tbl td:nth-child(2){white-space:nowrap}
 .cta{margin-top:16px;background:linear-gradient(135deg,#0F172A,#1E293B);border-radius:18px;padding:34px;color:#F8FAFC;text-align:center}
 .cta h3{font-size:22px;font-weight:800;margin-bottom:8px;letter-spacing:-.02em}
 .cta p{color:#94A3B8;font-size:14px;margin-bottom:18px}
@@ -201,8 +203,8 @@ export function buildProposalPage(displayName: string, origin: string, slug: str
     <thead><tr><th>Plan</th><th>Price</th><th>What it covers</th></tr></thead>
     <tbody>
       <tr><th>Free Facility</th><td><span class="price">NGN 0</span><br /><small style="color:#64748B">free forever</small></td><td>Up to 5 students, white-label landing page, portals, email notifications, 50 AI credits per seat</td></tr>
-      <tr><th>Standard Facility</th><td><span class="price">NGN 1,000</span><br /><small style="color:#64748B">per seat per month</small></td><td>Unlimited students, email and push notifications, 200 AI credits per seat, AI question generation and performance analysis</td></tr>
-      <tr><th>Premium Facility</th><td><span class="price">NGN 2,500</span><br /><small style="color:#64748B">per seat per month</small></td><td>Everything in Standard plus WhatsApp notifications for parents, 500 AI credits per seat</td></tr>
+      <tr><th>Standard Facility</th><td><span class="price">NGN 1,000</span><br /><small style="color:#64748B">/ seat / month</small></td><td>Unlimited students, email and push notifications, 200 AI credits per seat, AI question generation and performance analysis</td></tr>
+      <tr><th>Premium Facility</th><td><span class="price">NGN 2,500</span><br /><small style="color:#64748B">/ seat / month</small></td><td>Everything in Standard plus WhatsApp notifications for parents, 500 AI credits per seat</td></tr>
     </tbody>
   </table>
   <p class="body" style="margin-top:14px">A seat is one student's place on the platform. Facilities can start on Free and move up any time; no setup fee, no contract, no card needed to begin. Starting takes three steps: sign up free on the landing page, check your email for the access code and login details, then brand the facility, add students and tutors with the facility code, and you are running.</p>
