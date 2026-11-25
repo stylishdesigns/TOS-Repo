@@ -23,7 +23,7 @@ expect(page.includes("content=\"${esc(origin)}/og-proposal.jpg\""), 'OG image po
 expect(page.includes('Prepared for'), 'proposal addresses the facility by name');
 expect(page.includes('Download PDF') && page.includes('Copy link'), 'proposal page has Copy link and Download PDF actions');
 expect(page.includes('esm.sh/jspdf') && page.includes('html2canvas'), 'PDF builds client-side from the page design');
-expect(page.includes('NGN 1,000') && page.includes('NGN 2,500') && page.includes('per seat per month'), 'proposal prices read NGN 1,000 and NGN 2,500 per seat');
+expect(page.includes('NGN 1,000') && page.includes('NGN 2,500') && page.includes('/ seat / month'), 'proposal prices read NGN 1,000 and NGN 2,500 per seat');
 expect(page.includes('Over 100,000 practice questions'), 'question bank count is quoted');
 expect(page.includes('IJMB and JUPEB') && page.includes('custom exams'), 'bridge programmes and custom exams are named');
 expect(page.includes('Results are what fill your classes'), 'results section is present');
