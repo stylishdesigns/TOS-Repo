@@ -172,6 +172,7 @@ export function buildProposalPage(displayName: string, origin: string, slug: str
     <div class="card"><h4>Admissions and records</h4><p>Take applications online, approve students, and give every facility a join code so students and tutors land in the right place.</p></div>
     <div class="card"><h4>Fees and payments</h4><p>Set programme fees and let students pay straight into the facility's own bank details, with a receipt for every confirmed payment.</p></div>
     <div class="card"><h4>Exam preparation</h4><p>Timed CBT practice and scheduled mock exams for JAMB, WAEC and NECO, bridge programmes like IJMB and JUPEB, plus your own custom exams for any other programme you run.</p></div>
+    <div class="card"><h4>Video classes</h4><p>Recorded video lessons for core subjects, arranged topic by topic, so students can learn and revise any time. It is optional: every facility decides whether to offer it, and it is ready the moment you want it.</p></div>
     <div class="card"><h4>Question bank</h4><p>Over 100,000 practice questions across subjects and topics, banked per year, so practice never runs dry.</p></div>
     <div class="card"><h4>Performance analytics</h4><p>Every student's scores, trends and weak topics in one place. Facility admins see at a glance who is doing well and who needs help.</p></div>
     <div class="card"><h4>Chat for the whole facility</h4><p>Admins, tutors and students in one chat, with a group for every class. Announcements reach everyone at once.</p></div>

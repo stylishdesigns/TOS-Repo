@@ -21,9 +21,9 @@ for (const f of ['favicon-32.png', 'tos-brand-icon.png', 'tos-splash-icon.png', 
 }
 const index = read('index.html');
 expect(index.includes('/favicon-32.png') && index.includes('/pwa-192x192.png'), 'index.html uses the new favicon PNGs');
-expect(index.includes("/tos-splash-icon.png"), 'boot splash uses the cap-over-book icon');
+expect(index.includes('class="wm"') && index.includes('/tos-brand-icon.png'), 'boot splash uses the Tutorial logo OS wordmark (batch 42 superseded the icon splash)');
 expect(index.includes('boot-pop'), 'boot splash icon has a pulse animation');
-expect(read('src/components/student-portal/LaunchSplash.tsx').includes('/tos-splash-icon.png'), 'LaunchSplash fallback uses the new icon');
+expect(read('src/components/student-portal/LaunchSplash.tsx').includes('/tos-brand-icon.png'), 'LaunchSplash TOS fallback uses the wordmark mark (batch 42)');
 expect(read('src/server/proposalPage.ts').includes('/tos-brand-icon.png'), 'proposal page brand mark uses the monogram');
 
 // Sidebar: collapsed by default.

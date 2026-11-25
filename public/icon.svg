@@ -1,16 +1,18 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Tutorial OS">
   <defs>
     <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#F97316"/>
-      <stop offset="1" stop-color="#EA580C"/>
+      <stop offset="0" stop-color="#F89B3C"/>
+      <stop offset="1" stop-color="#E9660F"/>
     </linearGradient>
   </defs>
   <rect width="512" height="512" rx="115" fill="url(#g)"/>
-  <g fill="none" stroke="#ffffff" stroke-width="16" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M256 96 L392 148 L256 200 L120 148 Z"/>
-    <path d="M330 176 v54 c0 20 -34 36 -74 36 s-74 -16 -74 -36 v-54"/>
-    <path d="M392 148 v96"/>
+  <!-- mortarboard perched on the O -->
+  <g fill="#ffffff">
+    <rect x="228" y="256" width="62" height="28" rx="12"/>
+    <polygon points="142,262 252,218 362,262 252,306"/>
+    <line x1="252" y1="260" x2="155" y2="260" stroke="#ffffff" stroke-width="6"/>
+    <line x1="155" y1="260" x2="155" y2="292" stroke="#ffffff" stroke-width="6"/>
+    <circle cx="155" cy="297" r="9"/>
   </g>
-  <circle cx="392" cy="256" r="10" fill="#ffffff"/>
-  <text x="256" y="420" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="800" font-size="170" fill="#ffffff" letter-spacing="4">TOS</text>
+  <text x="256" y="404" font-family="Arial, Helvetica, sans-serif" font-size="120" font-weight="800" fill="#ffffff" text-anchor="middle" letter-spacing="2">TOS</text>
 </svg>
