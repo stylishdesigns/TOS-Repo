@@ -54,6 +54,31 @@ import { registerProposalApiRoutes } from './proposalRoutes';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+/** Pulls the 11-character video id out of any normal YouTube URL shape
+ *  (watch?v=, youtu.be/, shorts/, embed/, live/). Returns null for anything
+ *  that is not a single YouTube video, so a playlist or channel link is
+ *  refused with a clear message instead of embedded broken. */
+function parseYoutubeId(raw: string): string | null {
+  const url = String(raw || '').trim();
+  if (!url) return null;
+  let u: URL;
+  try { u = new URL(url); } catch { return null; }
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
+  const host = u.hostname.replace(/^(www|m|music)\./, '');
+  const idOk = (v: string) => /^[A-Za-z0-9_-]{11}$/.test(v);
+  if (host === 'youtu.be') {
+    const id = u.pathname.slice(1).split('/')[0];
+    return idOk(id) ? id : null;
+  }
+  if (host === 'youtube.com' || host === 'youtube-nocookie.com') {
+    const v = u.searchParams.get('v');
+    if (v && idOk(v)) return v;
+    const m = u.pathname.match(/\/(?:shorts|embed|live|v)\/([A-Za-z0-9_-]{11})(?:[/?#]|$)/);
+    if (m) return m[1];
+  }
+  return null;
+}
+
 /** Short-lived in-memory cache for the public question-bank pointer. */
 const qbPointerCache = new Map<string, { at: number; value: unknown }>();
 const QB_POINTER_TTL_MS = 60 * 1000;
@@ -756,6 +781,122 @@ export function registerExtendedRoutes(app: express.Express): void {
     } catch (error: any) {
       const status = Number(error?.status || 500);
       res.status(status).json({ error: error?.message || 'Material delete failed.' });
+    }
+  });
+
+  // VIDEO RESOURCES (batch 41): platform-level YouTube lesson videos. The
+  // videoResources collection is written ONLY here, by TOS staff routes, and
+  // read through the student route below with the Admin SDK, so no Firestore
+  // rules release is needed for any of this to work. One video the platform
+  // admin adds once; every facility's students see the same library under
+  // Learning Resources > Video classes.
+  app.get('/api/tos/video-resources', async (req, res) => {
+    try {
+      requireTos(req);
+      const snap = await adminDb.collection('videoResources').get();
+      const videos = snap.docs
+        .map((d) => ({ id: d.id, ...(d.data() as Record<string, any>) } as Record<string, any>))
+        .sort((a, b) => String(b.addedAt || '').localeCompare(String(a.addedAt || '')));
+      res.json({ ok: true, videos });
+    } catch (error: any) {
+      const status = Number(error?.status || 500);
+      res.status(status).json({ error: error?.message || 'Video list failed.' });
+    }
+  });
+
+  app.post('/api/tos/video-resources', async (req, res) => {
+    try {
+      const caller = requireTos(req);
+      const videoId = parseYoutubeId(String(req.body?.youtubeUrl || req.body?.link || ''));
+      if (!videoId) throw httpError(400, 'That link is not a YouTube video link. Paste a link like https://www.youtube.com/watch?v=...');
+      const title = String(req.body?.title || '').trim().slice(0, 200);
+      const subject = String(req.body?.subject || '').trim().slice(0, 120);
+      if (!title || !subject) throw httpError(400, 'Title and subject are required.');
+      const topic = String(req.body?.topic || '').trim().slice(0, 160);
+      const description = String(req.body?.description || '').trim().slice(0, 500);
+      // One copy of each video: a repeat link is refused with a clear message.
+      const dup = await adminDb.collection('videoResources').where('videoId', '==', videoId).limit(1).get();
+      if (!dup.empty) throw httpError(409, 'This video is already in the library. Find it in the list and edit it instead of adding it again.');
+      const id = 'vid-' + crypto.randomBytes(6).toString('hex');
+      const now = new Date().toISOString();
+      const payload: Record<string, any> = {
+        id, title, subject, topic, description, videoId,
+        youtubeUrl: `https://www.youtube.com/watch?v=${videoId}`,
+        addedAt: now,
+        addedBy: String(caller.email || caller.uid || ''),
+        updatedAt: now,
+      };
+      await adminDb.collection('videoResources').doc(id).set(JSON.parse(JSON.stringify(payload)));
+      res.json({ ok: true, id, video: payload });
+    } catch (error: any) {
+      const status = Number(error?.status || 500);
+      res.status(status).json({ error: error?.message || 'Adding the video failed.' });
+    }
+  });
+
+  app.patch('/api/tos/video-resources/:id', async (req, res) => {
+    try {
+      requireTos(req);
+      const id = String(req.params?.id || '').trim();
+      if (!/^[a-zA-Z0-9_-]{1,128}$/.test(id)) throw httpError(400, 'A valid video id is required.');
+      const ref = adminDb.collection('videoResources').doc(id);
+      const snap = await ref.get();
+      if (!snap.exists) throw httpError(404, 'This video no longer exists.');
+      const patch: Record<string, any> = {};
+      if (req.body?.youtubeUrl !== undefined) {
+        const videoId = parseYoutubeId(String(req.body.youtubeUrl));
+        if (!videoId) throw httpError(400, 'That link is not a YouTube video link.');
+        patch.videoId = videoId;
+        patch.youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
+      }
+      if (req.body?.title !== undefined) {
+        const title = String(req.body.title).trim().slice(0, 200);
+        if (!title) throw httpError(400, 'Title cannot be empty.');
+        patch.title = title;
+      }
+      if (req.body?.subject !== undefined) {
+        const subject = String(req.body.subject).trim().slice(0, 120);
+        if (!subject) throw httpError(400, 'Subject cannot be empty.');
+        patch.subject = subject;
+      }
+      if (req.body?.topic !== undefined) patch.topic = String(req.body.topic).trim().slice(0, 160);
+      if (req.body?.description !== undefined) patch.description = String(req.body.description).trim().slice(0, 500);
+      patch.updatedAt = new Date().toISOString();
+      await ref.set(patch, { merge: true });
+      res.json({ ok: true });
+    } catch (error: any) {
+      const status = Number(error?.status || 500);
+      res.status(status).json({ error: error?.message || 'Video update failed.' });
+    }
+  });
+
+  app.delete('/api/tos/video-resources/:id', async (req, res) => {
+    try {
+      requireTos(req);
+      const id = String(req.params?.id || '').trim();
+      if (!/^[a-zA-Z0-9_-]{1,128}$/.test(id)) throw httpError(400, 'A valid video id is required.');
+      await adminDb.collection('videoResources').doc(id).delete();
+      res.json({ ok: true });
+    } catch (error: any) {
+      const status = Number(error?.status || 500);
+      res.status(status).json({ error: error?.message || 'Video delete failed.' });
+    }
+  });
+
+  // Student-side read: any verified caller (student, tutor or centre admin)
+  // gets the same platform library, newest first, capped at 300.
+  app.get('/api/student/video-resources', async (req, res) => {
+    try {
+      getCaller(req);
+      const snap = await adminDb.collection('videoResources').get();
+      const videos = snap.docs
+        .map((d) => ({ id: d.id, ...(d.data() as Record<string, any>) } as Record<string, any>))
+        .sort((a, b) => String(b.addedAt || '').localeCompare(String(a.addedAt || '')))
+        .slice(0, 300);
+      res.json({ ok: true, videos });
+    } catch (error: any) {
+      const status = Number(error?.status || 500);
+      res.status(status).json({ error: error?.message || 'Video list failed.' });
     }
   });
 

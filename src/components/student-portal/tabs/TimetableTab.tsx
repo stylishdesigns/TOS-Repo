@@ -11,10 +11,12 @@ import {
   Sparkles,
   ArrowRight,
   BookOpen,
+  MonitorPlay,
   Zap,
   ChevronRight,
 } from 'lucide-react';
 import { StudyMaterialsSection } from './classes/StudyMaterialsSection';
+import { VideoClassesSection } from './classes/VideoClassesSection';
 import { ClassRatingSheet } from './classes/ClassRatingSheet';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../../firebase';
@@ -38,6 +40,9 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({ student }) => {
   const { timetable, classRatings, bgTheme } = useApp();
   const dark = bgTheme === 'dark';
   const [activeSection, setActiveSection] = useState<'timetable' | 'materials'>('timetable');
+  // Learning Resources sub-toggle: study materials (the existing shelf) or
+  // video classes (the platform video library, batch 41).
+  const [learningView, setLearningView] = useState<'materials' | 'videos'>('materials');
 
   const [viewingSession, setViewingSession] = useState<TimetableSlot | null>(null);
   const [ratingSlot, setRatingSlot] = useState<TimetableSlot | null>(null);
@@ -242,15 +247,52 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({ student }) => {
               : dark ? 'text-slate-300' : 'text-[#64748B] hover:text-[#0F172A]'
           }`}
         >
-          Study Materials
+          Learning Resources
         </button>
       </div>
 
       {activeSection === 'materials' ? (
-        <StudyMaterialsSection
-          student={student}
-          onSwitchToTimetable={() => setActiveSection('timetable')}
-        />
+        <div className="space-y-3">
+          {/* Learning Resources toggle: two views, one tap each. Study
+              materials is the existing shelf; Video classes is the platform
+              video library the TOS console maintains. */}
+          <div className={`${dark ? 'bg-slate-800/90 p-1 border border-slate-700 shadow-2xs grid grid-cols-2 gap-1' : 'bg-white rounded-[14px] p-1 border border-[#E2E8F0] shadow-2xs grid grid-cols-2 gap-1'}`}>
+            <button
+              type="button"
+              onClick={() => setLearningView('materials')}
+              className={`h-9 rounded-[10px] text-[11px] font-extrabold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                learningView === 'materials'
+                  ? 'bg-[var(--brand,#0F172A)] text-[var(--on-brand,#fff)] shadow-xs'
+                  : dark ? 'text-slate-300' : 'text-[#64748B] hover:text-[#0F172A]'
+              }`}
+            >
+              <BookOpen className="w-3.5 h-3.5" />
+              Study materials
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setLearningView('videos')}
+              className={`h-9 rounded-[10px] text-[11px] font-extrabold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                learningView === 'videos'
+                  ? 'bg-[var(--brand,#0F172A)] text-[var(--on-brand,#fff)] shadow-xs'
+                  : dark ? 'text-slate-300' : 'text-[#64748B] hover:text-[#0F172A]'
+              }`}
+            >
+              <MonitorPlay className="w-3.5 h-3.5" />
+              Video classes
+            </button>
+          </div>
+
+          {learningView === 'videos' ? (
+            <VideoClassesSection dark={dark} />
+          ) : (
+            <StudyMaterialsSection
+              student={student}
+              onSwitchToTimetable={() => setActiveSection('timetable')}
+            />
+          )}
+        </div>
       ) : (
         <>
           {/* 2. Week Strip: 7 days Mon - Sun */}

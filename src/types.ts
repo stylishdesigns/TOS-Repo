@@ -276,6 +276,22 @@ export interface StudyMaterial {
   updatedAt?: number;
 }
 
+// VIDEO RESOURCES (batch 41): platform-level YouTube lesson videos. Written
+// only by the TOS server routes; read everywhere (students see the same
+// platform library under Learning Resources > Video classes).
+export interface VideoResource {
+  id: string;
+  title: string;
+  subject: string;
+  topic?: string;
+  description?: string;
+  youtubeUrl: string;
+  videoId: string;
+  addedAt: string;
+  addedBy?: string;
+  updatedAt?: string;
+}
+
 export interface ClassRating {
   id?: string;
   centreId?: string;
