@@ -87,7 +87,7 @@ export function LaunchSplash({ tos }: { tos?: boolean } = {}) {
     return (
       <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-white" role="status" aria-label="Loading">
         <div className="w-28 h-28 rounded-3xl bg-white shadow-lg flex items-center justify-center overflow-hidden border border-slate-100">
-          <img src="/icon.svg" alt="Tutorial OS" className="w-16 h-16" />
+          <img src="/tos-splash-icon.png" alt="Tutorial OS" className="w-16 h-16" />
         </div>
         <p
           className="mt-6 text-3xl font-black tracking-tight px-6 text-center leading-tight text-slate-900"

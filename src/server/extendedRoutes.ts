@@ -35,6 +35,7 @@ import { deleteCentreCascade, loadBillingMap, registerTosRoutes2 } from './tosRo
 import { registerChatRoutes } from './chatRoutes';
 import { registerQuestionBankRoutes } from './questionBankRoutes';
 import { registerProposalRoutes } from './proposalPage';
+import { registerProposalApiRoutes } from './proposalRoutes';
 
 /**
  * Prompt C routes: public lead capture and verification, the TOS platform
@@ -2413,6 +2414,7 @@ export function registerExtendedRoutes(app: express.Express): void {
   // Batch 38: the public partnership-proposal page (per-facility link with
   // social preview tags + client-side PDF). Unauthenticated by design.
   registerProposalRoutes(app);
+  registerProposalApiRoutes(app);
 
   registerTosRoutes2(app);
   registerChatRoutes(app);

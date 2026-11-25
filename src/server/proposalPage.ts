@@ -11,6 +11,8 @@
  * Public by design: anyone holding the link opens it, no sign-in.
  */
 import express from 'express';
+import { adminDb } from './firebaseAdmin';
+import { sendEmail } from './email';
 
 /** Escape a value for safe interpolation into HTML text and attribute slots. */
 function esc(value: string): string {
@@ -47,6 +49,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica N
 .hero .wrap{position:relative;z-index:1}
 .brand{display:flex;align-items:center;gap:12px;margin-bottom:34px}
 .mark{width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#F97316,#EA580C);color:#fff;font-weight:800;font-size:17px;display:flex;align-items:center;justify-content:center;letter-spacing:.5px;box-shadow:0 8px 24px rgba(249,115,22,.35)}
+.mark img{width:100%;height:100%;object-fit:cover;border-radius:12px;display:block}
 .brand b{font-size:19px;letter-spacing:-.2px}
 .eyebrow{display:inline-block;margin-bottom:16px;font-size:12px;font-weight:800;letter-spacing:.18em;color:#FDBA74;text-transform:uppercase}
 .hero h1{font-size:clamp(30px,6vw,46px);line-height:1.12;font-weight:800;letter-spacing:-.02em;max-width:15em}
@@ -131,6 +134,8 @@ export function buildProposalPage(displayName: string, origin: string, slug: str
 <meta property="og:image" content="${esc(origin)}/og-proposal.jpg" />
 <meta property="og:image:width" content="1200" />
 <meta property="og:image:height" content="630" />
+<meta property="og:site_name" content="Tutorial OS" />
+<meta property="og:image:alt" content="Partnership proposal from Tutorial OS" />
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content="${esc(title)}" />
 <meta name="twitter:description" content="${esc(desc)}" />
@@ -140,7 +145,7 @@ export function buildProposalPage(displayName: string, origin: string, slug: str
 <body>
 <header class="hero">
   <div class="wrap">
-    <div class="brand"><span class="mark">T</span><b>Tutorial OS</b></div>
+    <div class="brand"><span class="mark"><img src="/tos-brand-icon.png" alt="Tutorial OS" /></span><b>Tutorial OS</b></div>
     <span class="eyebrow">Partnership proposal</span>
     <h1>Run your whole learning facility on one system.</h1>
     <div class="forline">Prepared for <b>${name}</b><span aria-hidden="true">·</span><span>${esc(dateStr)}</span></div>
@@ -290,13 +295,53 @@ try {
  *   is unauthenticated by design).
  */
 export function registerProposalRoutes(app: express.Express): void {
-  const serve = (req: express.Request, res: express.Response) => {
+  const OWNER_EMAIL = 'stylishdesigns484@gmail.com';
+  const trackOpen = async (slug: string, displayName: string, origin: string, req: express.Request) => {
+    // Count real human opens only: the console's own preview (preview=1), the
+    // PDF auto-download (pdf=1) and social-media crawlers fetching the page
+    // for a preview card are not a lead reading the proposal.
+    const qv = (k: string) => (typeof (req.query as any)[k] === 'string' ? String((req.query as any)[k]) : '');
+    if (qv('pdf') === '1' || qv('preview') === '1') return;
+    const ua = String(req.headers['user-agent'] || '');
+    if (/whatsapp|facebookexternalhit|twitterbot|slackbot|telegrambot|discordbot|bot|crawl|spider|slurp|preview/i.test(ua)) return;
+    const ref = adminDb.collection('proposalShares').doc(slug);
+    const snap = await ref.get();
+    const now = Date.now();
+    const prev = (snap.exists ? snap.data() : {}) as any;
+    const opens = Number(prev.opens || 0) + 1;
+    const firstOpen = opens === 1;
+    const lastNotified = Number(prev.lastNotifiedAt || 0);
+    const shouldNotify = firstOpen || now - lastNotified > 12 * 60 * 60 * 1000;
+    await ref.set({
+      slug,
+      name: displayName,
+      url: `${origin}/proposal/${slug}?n=${encodeURIComponent(displayName)}`,
+      opens,
+      lastOpenedAt: now,
+      firstOpenedAt: Number(prev.firstOpenedAt || 0) || now,
+      lastNotifiedAt: shouldNotify ? now : lastNotified,
+      createdAt: Number(prev.createdAt || 0) || now,
+    }, { merge: true });
+    if (shouldNotify) {
+      try {
+        const when = new Date(now).toLocaleString('en-NG', { timeZone: 'Africa/Lagos', weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
+        await sendEmail({
+          to: OWNER_EMAIL,
+          subject: `${displayName} opened your Tutorial OS proposal`,
+          text: `Your proposal for ${displayName} was opened ${when} (Lagos time). That is open number ${opens}. Link: ${origin}/proposal/${slug}?n=${encodeURIComponent(displayName)}. A good moment to follow up while it is fresh in their mind.`,
+          html: `<p>Your proposal for <b>${displayName}</b> was opened <b>${when}</b> (Lagos time). That is open number ${opens}.</p><p>A good moment to follow up while it is fresh in their mind. Link: ${origin}/proposal/${slug}?n=${encodeURIComponent(displayName)}</p>`,
+        });
+      } catch { /* the notification must never break the page */ }
+    }
+  };
+  const serve = async (req: express.Request, res: express.Response) => {
     const rawName = typeof req.query.n === 'string' ? req.query.n.trim() : '';
     const slug = String(req.params.slug || '').toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '') || 'your-facility';
     const displayName = rawName ? rawName.slice(0, 120) : nameFromSlug(slug);
     const proto = String(req.headers['x-forwarded-proto'] || 'https').split(',')[0].trim() || 'https';
     const host = String(req.headers['x-forwarded-host'] || req.headers.host || 'tutorialos.com').split(',')[0].trim();
     const origin = `${proto}://${host}`;
+    try { await trackOpen(slug, displayName, origin, req); } catch { /* tracking must never break the page */ }
     res.set('Cache-Control', 'public, max-age=300');
     res.type('html').send(buildProposalPage(displayName, origin, slug));
   };

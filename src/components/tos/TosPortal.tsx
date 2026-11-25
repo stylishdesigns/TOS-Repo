@@ -1378,10 +1378,12 @@ export const TosPortal: React.FC = () => {
 
   // Mobile sections panel: on phones the sections sit by the side, exactly as
   // arranged on the desktop. The button on the panel collapses it; the round
-  // button brings it back. The choice survives a refresh.
+  // button brings it back. The choice survives a refresh. Defaults collapsed:
+  // a fresh visitor (or one coming from the landing page) opens the console
+  // with the nav tucked away, never covering the content.
   const TOS_NAV_KEY = 'tos:navOpen';
   const [mobileNavOpen, setMobileNavOpenState] = useState<boolean>(() => {
-    try { return localStorage.getItem(TOS_NAV_KEY) !== '0'; } catch { return true; }
+    try { return localStorage.getItem(TOS_NAV_KEY) === '1'; } catch { return false; }
   });
   const setMobileNavOpen = (open: boolean) => {
     setMobileNavOpenState(open);
