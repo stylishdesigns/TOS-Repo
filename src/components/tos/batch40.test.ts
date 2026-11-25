@@ -37,7 +37,7 @@ expect(ext.includes("registerProposalApiRoutes(app)"), 'extended routes wire the
 const page = read('src/server/proposalPage.ts');
 expect(page.includes("adminDb.collection('proposalShares')"), 'proposal page records opens in proposalShares');
 expect(page.includes('sendEmail'), 'first open sends the owner an email');
-expect(page.includes('12 * 60 * 60 * 1000'), 'open notifications are throttled to 12h');
+expect(page.includes('60 * 60 * 1000'), 'open notifications throttle same-hour reopens only');
 expect(/whatsapp\|facebookexternalhit/i.test(page), 'social-media crawlers are not counted as opens');
 const tab = read('src/components/tos/TosProposals.tsx');
 expect(tab.includes("api('/api/tos/proposals'"), 'console saves and lists proposals');

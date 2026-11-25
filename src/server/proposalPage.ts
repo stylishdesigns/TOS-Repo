@@ -310,8 +310,8 @@ export function registerProposalRoutes(app: express.Express): void {
     const prev = (snap.exists ? snap.data() : {}) as any;
     const opens = Number(prev.opens || 0) + 1;
     const firstOpen = opens === 1;
-    const lastNotified = Number(prev.lastNotifiedAt || 0);
-    const shouldNotify = firstOpen || now - lastNotified > 12 * 60 * 60 * 1000;
+    const lastNotified = Number(prev.lastNotifiedAt || 0); // notify on every open, but fold reopens within the same hour
+    const shouldNotify = firstOpen || now - lastNotified > 60 * 60 * 1000;
     await ref.set({
       slug,
       name: displayName,
