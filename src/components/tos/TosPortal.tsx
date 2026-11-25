@@ -5,7 +5,7 @@ import {
   RefreshCw, Send, Ban, CheckCircle2, PlayCircle, Check, Plus, ShieldCheck,
   ArrowUpRight, UserRound, BookOpen, CalendarDays, Copy, HelpCircle, Sparkles,
   AlertTriangle, X, ChevronRight, MessageSquare, Globe, Trash2, Settings, FileText,
-  PanelLeftClose, PanelLeftOpen,
+  PanelLeftClose, PanelLeftOpen, Share2,
 } from 'lucide-react';
 import {
   api, fmtDate, fmtDateTime, LEAD_STATUS_LABELS, STATUS_STYLES, Json,
@@ -20,6 +20,7 @@ import { QuestionBankHub, MockPapersTab } from './TosQuestionHub';
 import { MocksTab } from './TosMocks';
 import { TosChat } from './TosChat';
 import { WebsiteTab } from './TosWebsite';
+import ProposalsTab from './TosProposals';
 
 /**
  * TOS platform console (Prompt C Part D).
@@ -1116,6 +1117,7 @@ const TABS = [
   { id: 'centres', label: 'Facilities', mlabel: 'Facilities', icon: Building2, group: 'Business' },
   { id: 'plans', label: 'Plans', mlabel: 'Plans', icon: Wallet, group: 'Business' },
   { id: 'upgrades', label: 'Upgrade Requests', mlabel: 'Upgrades', icon: FileText, group: 'Business' },
+  { id: 'proposals', label: 'Proposals', mlabel: 'Proposals', icon: Share2, group: 'Business' },
   { id: 'settings', label: 'Settings', mlabel: 'Settings', icon: Settings, group: 'Business' },
   { id: 'questions', label: 'Question Bank', mlabel: 'Bank', icon: BookOpen, group: 'Content' },
   { id: 'mocks', label: 'Mocks', mlabel: 'Mocks', icon: CalendarDays, group: 'Content' },
@@ -1510,6 +1512,7 @@ export const TosPortal: React.FC = () => {
             {tab === 'centres' && 'Facilities whose owners have set their own password. Plan, seats, billing and access code.'}
             {tab === 'plans' && 'Pricing and feature flags. All stored as data. Seat settings live under Settings.'}
             {tab === 'upgrades' && 'Facilities that paid for seats and are waiting on your word. Approving creates their seats and emails them.'}
+            {tab === 'proposals' && 'Generate a partnership proposal link or PDF for any facility, addressed to them by name.'}
             {tab === 'settings' && 'Seat policy and platform settings. Saved values are enforced live and checked on the server.'}
             {tab === 'questions' && 'Two separate banks: Practice and Mock. Pick one on the hub to work in.'}
             {tab === 'mocks' && "One mock a day for every facility's students. Create, freeze and manage them from here."}
@@ -1531,6 +1534,7 @@ export const TosPortal: React.FC = () => {
         {tab === 'website' && <WebsiteTab refreshKey={refreshKey} />}
         {tab === 'plans' && <PlansTab />}
         {tab === 'upgrades' && <UpgradeRequestsTab />}
+        {tab === 'proposals' && <ProposalsTab />}
         {tab === 'settings' && <SettingsTab />}
         {tab === 'audit' && <AuditTab />}
         {tab === 'team' && <TeamTab />}

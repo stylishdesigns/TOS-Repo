@@ -34,6 +34,7 @@ import {
 import { deleteCentreCascade, loadBillingMap, registerTosRoutes2 } from './tosRoutes2';
 import { registerChatRoutes } from './chatRoutes';
 import { registerQuestionBankRoutes } from './questionBankRoutes';
+import { registerProposalRoutes } from './proposalPage';
 
 /**
  * Prompt C routes: public lead capture and verification, the TOS platform
@@ -2409,6 +2410,10 @@ export function registerExtendedRoutes(app: express.Express): void {
   // Routes split into tosRoutes2.ts (manual centre creation, access-code
   // setting, team, directory views) register here so they stay behind the
   // same /api/tos guard and ahead of the static/SPA fallback.
+  // Batch 38: the public partnership-proposal page (per-facility link with
+  // social preview tags + client-side PDF). Unauthenticated by design.
+  registerProposalRoutes(app);
+
   registerTosRoutes2(app);
   registerChatRoutes(app);
 
