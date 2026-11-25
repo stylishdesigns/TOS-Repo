@@ -78,6 +78,7 @@ p.body{color:#475569;font-size:14.5px;margin-bottom:12px}
 .duo .card{border-radius:16px}
 .duo .chip{display:inline-block;font-size:10.5px;font-weight:800;letter-spacing:.12em;color:var(--orange-d);background:var(--cream);border:1px solid #FED7AA;border-radius:999px;padding:4px 10px;margin-bottom:10px}
 .duo .big{color:var(--ink);font-weight:700;font-size:15px;margin-bottom:6px}
+.tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
 .tbl{width:100%;border-collapse:collapse;margin-top:16px;font-size:13.5px}
 .tbl caption{caption-side:top;text-align:left;color:var(--muted);font-size:12.5px;padding-bottom:10px}
 .tbl th,.tbl td{text-align:left;padding:12px 14px;border-bottom:1px solid var(--line);vertical-align:top}
@@ -93,9 +94,9 @@ p.body{color:#475569;font-size:14.5px;margin-bottom:12px}
 .foot b{color:var(--ink)}
 .toolbar{position:fixed;right:18px;bottom:18px;display:flex;gap:10px;z-index:50}
 .toolbar button{border:0;cursor:pointer;font:inherit;font-size:13px;font-weight:700;padding:12px 18px;border-radius:999px;box-shadow:0 10px 26px rgba(15,23,42,.25)}
-.tb-copy{background:#fff;color:var(--ink);border:1px solid var(--line)!important;box-shadow:0 10px 26px rgba(15,23,42,.12)!important}
+.tb-copy{background:#fff;color:var(--ink);border:1.5px solid #CBD5E1!important;box-shadow:0 10px 26px rgba(15,23,42,.12)!important}
 .tb-pdf{background:linear-gradient(135deg,#F97316,#EA580C);color:#fff}
-@media(max-width:720px){section{padding:26px 20px;border-radius:16px}.grid,.duo,.facts{grid-template-columns:1fr}.steps{grid-template-columns:1fr}.hero{padding:48px 0 44px}}
+@media(max-width:720px){section{padding:26px 20px;border-radius:16px}.grid,.duo,.facts{grid-template-columns:1fr}.steps{grid-template-columns:1fr}.hero{padding:48px 0 44px}body{padding-bottom:84px}.toolbar{left:0;right:0;bottom:0;gap:12px;padding:10px 16px calc(10px + env(safe-area-inset-bottom));background:rgba(255,255,255,.94);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-top:1px solid var(--line);box-shadow:0 -6px 20px rgba(15,23,42,.08);border-radius:0}.toolbar button{flex:1;padding:13px 10px;font-size:14px}}
 @media print{
  .toolbar{display:none}
  body{background:#fff}
@@ -198,7 +199,7 @@ export function buildProposalPage(displayName: string, origin: string, slug: str
 
 <section>
   <div class="sh"><span class="num">06</span><h2>Pricing and getting started</h2></div>
-  <table class="tbl">
+  <div class="tbl-wrap"><table class="tbl">
     <caption>Every facility starts free and upgrades when it grows.</caption>
     <thead><tr><th>Plan</th><th>Price</th><th>What it covers</th></tr></thead>
     <tbody>
@@ -206,7 +207,7 @@ export function buildProposalPage(displayName: string, origin: string, slug: str
       <tr><th>Standard Facility</th><td><span class="price">NGN 1,000</span><br /><small style="color:#64748B">/ seat / month</small></td><td>Unlimited students, email and push notifications, 200 AI credits per seat, AI question generation and performance analysis</td></tr>
       <tr><th>Premium Facility</th><td><span class="price">NGN 2,500</span><br /><small style="color:#64748B">/ seat / month</small></td><td>Everything in Standard plus WhatsApp notifications for parents, 500 AI credits per seat</td></tr>
     </tbody>
-  </table>
+  </table></div>
   <p class="body" style="margin-top:14px">A seat is one student's place on the platform. Facilities can start on Free and move up any time; no setup fee, no contract, no card needed to begin. Starting takes three steps: sign up free on the landing page, check your email for the access code and login details, then brand the facility, add students and tutors with the facility code, and you are running.</p>
   <div class="cta">
     <h3>Ready to see it live?</h3>
