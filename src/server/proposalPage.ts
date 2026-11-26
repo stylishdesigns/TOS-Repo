@@ -303,46 +303,50 @@ const COMPACT_CSS = `
 :root{--ink:#0F172A;--muted:#64748B;--line:#E2E8F0;--orange:#F97316;--orange-d:#EA580C;--cream:#FFF7ED}
 *{box-sizing:border-box;margin:0;padding:0}
 html{-webkit-text-size-adjust:100%}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;color:var(--ink);background:#fff;line-height:1.45}
-.cwrap{max-width:1120px;margin:0 auto;padding:0 26px}
-.c-hero{background:linear-gradient(160deg,#0F172A 0%,#1E293B 70%,#273449 100%);color:#F8FAFC;padding:26px 0 24px;position:relative;overflow:hidden;border-radius:0 0 16px 16px}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;color:var(--ink);background:#fff;line-height:1.5}
+.cwrap{max-width:1080px;margin:0 auto;padding:0 30px}
+.c-hero{background:linear-gradient(160deg,#0F172A 0%,#1E293B 70%,#273449 100%);color:#F8FAFC;padding:30px 0 28px;position:relative;overflow:hidden;border-radius:0 0 16px 16px}
 .c-hero:before{content:'';position:absolute;right:-120px;top:-160px;width:420px;height:420px;border-radius:50%;background:radial-gradient(circle,rgba(249,115,22,.4),rgba(249,115,22,0) 70%)}
 .c-hero .cwrap{position:relative;z-index:1}
-.brand{display:flex;align-items:center;gap:10px;margin-bottom:10px}
-.mark{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#F97316,#EA580C);color:#fff;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 18px rgba(249,115,22,.35)}
+.brand{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.mark{width:36px;height:36px;border-radius:9px;background:linear-gradient(135deg,#F97316,#EA580C);color:#fff;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 18px rgba(249,115,22,.35)}
 .mark img{width:100%;height:100%;object-fit:cover;border-radius:9px;display:block}
-.brand b{font-size:15px;letter-spacing:-.2px}
-.c-hero h1{font-size:26px;line-height:1.15;font-weight:800;letter-spacing:-.02em;max-width:24em}
-.c-hero .forline{margin-top:9px;display:inline-flex;flex-wrap:wrap;gap:6px 12px;align-items:center;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);border-radius:999px;padding:7px 15px;font-size:12px;color:#CBD5E1}
+.brand b{font-size:16px;letter-spacing:-.2px}
+.c-hero h1{font-size:29px;line-height:1.15;font-weight:800;letter-spacing:-.02em;max-width:24em}
+.c-hero .forline{margin-top:11px;display:inline-flex;flex-wrap:wrap;gap:7px 13px;align-items:center;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);border-radius:999px;padding:8px 16px;font-size:13px;color:#CBD5E1}
 .c-hero .forline b{color:#fff}
-.cs{margin-top:11px;border:1px solid var(--line);border-radius:12px;padding:13px 18px;background:#fff}
-.cs h2{font-size:15px;font-weight:800;letter-spacing:-.01em;margin-bottom:5px}
-.cs h2 .num{color:var(--orange);font-size:11px;font-weight:800;letter-spacing:.08em;margin-right:7px}
-.cbody{color:#475569;font-size:12.5px}
-.clist{margin-top:3px;columns:2;column-gap:28px}
-.clist li{list-style:none;color:#475569;font-size:12.5px;padding:2.5px 0 2.5px 17px;position:relative;break-inside:avoid}
+.cs{margin-top:16px;border:1px solid var(--line);border-radius:14px;padding:18px 22px;background:#fff}
+.cs h2{font-size:17px;font-weight:800;letter-spacing:-.01em;margin-bottom:8px}
+.cbody{color:#475569;font-size:13.5px}
+.clist{margin-top:4px;columns:2;column-gap:34px}
+.clist li{list-style:none;color:#475569;font-size:13.5px;padding:4px 0 4px 18px;position:relative;break-inside:avoid}
 .clist li b{color:var(--ink)}
-.clist li:before{content:'\\2713';position:absolute;left:0;top:3px;color:var(--orange-d);font-weight:800}
-.cpay{margin-top:9px;background:#FFF7ED;border:1px solid #FED7AA;border-radius:10px;padding:10px 14px;color:#7C2D12;font-size:12px}
-.cpay b{display:block;margin-bottom:3px;font-size:12.5px;color:#9A3412}
-.ctbl{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:3px}
-.ctbl th,.ctbl td{text-align:left;padding:5px 10px;border-bottom:1px solid var(--line);vertical-align:top}
-.ctbl thead th{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border-bottom:2px solid var(--line)}
+.clist li:before{content:'\\2713';position:absolute;left:0;top:5px;color:var(--orange-d);font-weight:800}
+.ctbl{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:4px}
+.ctbl th,.ctbl td{text-align:left;padding:7px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+.ctbl thead th{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border-bottom:2px solid var(--line)}
 .ctbl tbody th{font-weight:700;color:var(--ink);white-space:nowrap}
 .ctbl .price{font-weight:800;color:var(--orange-d);white-space:nowrap}
 .ctbl small{color:#64748B}
-.cplan{margin-top:8px;color:#475569;font-size:12px}
+.cplan{margin-top:10px;color:#475569;font-size:13px}
 .cplan b{color:var(--ink)}
-.ccta{margin-top:11px;background:linear-gradient(135deg,#0F172A,#1E293B);border-radius:12px;padding:14px 18px;color:#F8FAFC;font-size:12.5px}
-.ccta b{display:block;font-size:14px;font-weight:800;margin-bottom:3px;letter-spacing:-.01em}
+.ccta{margin-top:16px;background:linear-gradient(135deg,#0F172A,#1E293B);border-radius:14px;padding:18px 22px;color:#F8FAFC;font-size:13.5px}
+.ccta b{display:block;font-size:15.5px;font-weight:800;margin-bottom:4px;letter-spacing:-.01em}
 .ccta a{color:#FDBA74;font-weight:700;text-decoration:none}
-.cfoot{color:var(--muted);font-size:11px;text-align:center;padding:11px 0 16px}
+.cfoot{color:var(--muted);font-size:11.5px;text-align:center;padding:14px 0 20px}
 .cfoot b{color:var(--ink)}
-@media(max-width:720px){.clist{columns:1}.cwrap{padding:0 16px}}
+@media(max-width:720px){.clist{columns:1}.cwrap{padding:0 18px}}
 @media print{body{background:#fff}.c-hero,.ccta{-webkit-print-color-adjust:exact;print-color-adjust:exact}.cs{break-inside:avoid}}
 `;
 
-/** The compressed single-page proposal document. */
+/**
+ * Batch 49: the one-page proposal is a BRIEF, not a compression.
+ * The user said the batch-48 version carried every point of the full
+ * proposal and read stuffy, so this picks only the important points and
+ * leaves generous whitespace: what the facility gets, the results engine,
+ * pricing and how to start. Still exactly one A4 page by the same fit
+ * math; still served at the same link with ?short=1.
+ */
 export function buildCompactProposalPage(displayName: string, origin: string, slug: string): string {
   const name = esc(displayName);
   const title = `Tutorial OS x ${displayName} - One-page proposal`;
@@ -376,38 +380,23 @@ export function buildCompactProposalPage(displayName: string, origin: string, sl
 </header>
 <div class="cwrap">
   <section class="cs">
-    <h2><span class="num">01</span>One platform, your brand on everything</h2>
-    <p class="cbody">To the owner and admins of ${name}: Tutorial OS is one software system that runs a learning facility end to end: your console, portals for tutors and students, a student phone app and a branded landing page for enrolment. Everything carries your name, logo and colours, so students and parents see the facility, never us. Built for tutorial and lesson centres, bridge programmes like IJMB and JUPEB, satellite campuses, distance-learning and online programmes, and study groups. You will not have the usual difficulty of downloading a separate app for Android and iPhone users: the same app works on both phones, and it is even accessible on the web from any phone or laptop. JAMB, WAEC, NECO, IJMB and JUPEB plus your own custom exams, backed by over 100,000 practice questions.</p>
-  </section>
-  <section class="cs">
-    <h2><span class="num">02</span>What your facility gets</h2>
+    <h2>What Tutorial OS gives your facility</h2>
     <ul class="clist">
       <li><b>Admissions and records:</b> online applications, approvals, join codes for students and tutors.</li>
-      <li><b>Fees and payments:</b> students pay straight into the facility's own bank details, a receipt for every confirmed payment.</li>
-      <li><b>Exam preparation:</b> timed CBT practice and scheduled mock exams for JAMB, WAEC, NECO, IJMB and JUPEB, plus custom exams.</li>
-      <li><b>Question bank:</b> over 100,000 practice questions across subjects and topics, banked per year.</li>
-      <li><b>Video classes:</b> recorded lessons arranged topic by topic, optional, ready when you want them.</li>
-      <li><b>Performance analytics:</b> scores, trends and weak topics for every student at a glance.</li>
-      <li><b>Chat:</b> admins, tutors and students in one chat, a group per class, announcements to everyone at once.</li>
-      <li><b>AI built in:</b> an AI study coach for students, question generation and performance analysis for tutors.</li>
-      <li><b>Your brand everywhere:</b> portals, app and landing page under your name and colours; Tutorial OS stays in the background.</li>
+      <li><b>Fee management:</b> students pay straight into your own bank details, a receipt for every confirmed payment, reminders go out on their own.</li>
+      <li><b>Exam preparation:</b> timed CBT practice and mock exams for JAMB, WAEC, NECO, IJMB and JUPEB, plus your own custom exams.</li>
+      <li><b>Over 100,000 practice questions</b> across subjects and topics, banked per year.</li>
+      <li><b>Chat for the whole facility:</b> admins, tutors and students in one place, a group per class, announcements to everyone at once.</li>
+      <li><b>AI built in:</b> a study coach for students, question generation and performance analysis for tutors.</li>
+      <li><b>Your brand everywhere:</b> your name, logo and colours on the portals, the student app and a branded landing page. Works on Android, iPhone and the web.</li>
     </ul>
   </section>
   <section class="cs">
-    <h2><span class="num">03</span>Even without a tutor, no student sits idle</h2>
-    <p class="cbody">When a tutor is away, the CBT engine keeps every class on timed practice, the leaderboard keeps students competing, and the AI study coach answers questions in simple terms until the tutor is back. When tutors are present they get more done: AI drafts questions in minutes, reviews how each class performed and flags students falling behind, so one tutor covers more ground with less preparation.</p>
+    <h2>Built to produce results</h2>
+    <p class="cbody">When a tutor is away, the CBT engine keeps every class practising, the leaderboard keeps students competing and the AI study coach fills the gap. And results are what fill your classes: a student who scores 300 and above in JAMB, or brings home A1 to B3 across nine subjects, becomes the story parents tell one another. Daily practice and mock exams that surface gaps long before the real day make those results repeatable.</p>
   </section>
   <section class="cs">
-    <h2><span class="num">04</span>Results are what fill your classes</h2>
-    <p class="cbody">A student who scores 300 and above in JAMB, or brings home A1 to B3 across nine subjects, becomes the story parents tell one another, and the enquiries follow. Daily practice, mock exams that surface gaps long before the real day, and AI that closes those gaps make those results repeatable rather than lucky: better scores, term after term, are the one marketing a facility cannot buy.</p>
-  </section>
-  <section class="cs">
-    <h2><span class="num">05</span>Fee management for students and parents</h2>
-    <p class="cbody">Students and parents pay programme fees straight into the facility's own bank details, so nobody runs after anyone. Each student sees exactly what they owe and when it is due, and admins see who has paid and who has not. Reminders go out on their own: daily notifications to the admin for every student who has not paid or whose due date is about to expire, a notice to the student when their own payment is due, and a receipt for every confirmed payment. Results and mock scores give parents proof their child is moving, and notices by email and WhatsApp keep them updated without anyone chasing them one by one, so parents renew and refer.</p>
-    <div class="cpay"><b>How facilities pay for the platform itself</b>You pay for seats, per seat per month, and a seat only starts costing the day a student takes it: an empty seat never costs anything. Payment is a simple bank transfer confirmed on the console, no card on file, nothing auto-charged, no setup fee, no contract. The console warns you at 7, 3 and 1 days before a seat's days run out, and one payment reopens every locked seat with a fresh 30 days.</div>
-  </section>
-  <section class="cs">
-    <h2><span class="num">06</span>Pricing and getting started</h2>
+    <h2>Pricing</h2>
     <table class="ctbl">
       <thead><tr><th>Plan</th><th>Price</th></tr></thead>
       <tbody>
@@ -416,9 +405,9 @@ export function buildCompactProposalPage(displayName: string, origin: string, sl
         <tr><th>Premium Facility</th><td><span class="price">NGN 2,500</span> <small>/ seat / month</small></td></tr>
       </tbody>
     </table>
-    <p class="cplan"><b>Free</b> up to 5 students, your branded landing page, all portals, email notifications, 50 AI credits per seat. <b>Standard</b> everything in Free, unlimited students, email and push notifications, 200 AI credits per seat, AI question generation and performance analysis. <b>Premium</b> everything in Standard, WhatsApp notifications for parents, 500 AI credits per seat.</p>
-    <div class="ccta"><b>Ready to see it live?</b>Sign up free on the landing page, check your email for the access code and login details, then brand the facility, add students and tutors with the facility code, and you are running. No card, no payment, setup in minutes. <a href="/">tutorialos.com</a></div>
+    <p class="cplan">A seat is one student's place on the platform, and a seat only starts costing the day a student takes it: an empty seat never costs anything. Every facility starts on Free and moves up any time; no setup fee, no contract, no card to begin.</p>
   </section>
+  <div class="ccta"><b>Ready to see it live?</b>Start free today: sign up on the landing page, check your email for the access code and login details, brand the facility, add students and tutors, and you are running. No card, no payment, setup in minutes. <a href="/">tutorialos.com</a></div>
 </div>
 <div class="cfoot"><b>Tutorial OS</b> &middot; One software system for learning facilities of every kind &middot; Prepared for ${name}</div>
 </div>
