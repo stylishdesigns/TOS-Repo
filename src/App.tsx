@@ -695,7 +695,17 @@ const MainLayout: React.FC = () => {
           setAppWelcomeCentre({ centreId: centreId || appFacility.centreId, centreName, accent: accent || '', logoUrl: logoUrl || appFacility.logoUrl, welcomeImageUrl: '' });
           setAppWelcomeMode('welcome');
         }}
-        onBack={() => { setShowPortals(false); setShowWelcome(true); setCentreGateRequested(false); }}
+        onBack={() => {
+          // This gate sits inside the facility-app context (?centre= in the
+          // address), and no state change can leave that context: clearing
+          // the gate flags only makes the same branch render the gate again,
+          // and the bound-facility belt below holds the loading screen. The
+          // back button therefore navigates for real: /#landing is a fresh
+          // load with no ?centre=, so the public Tutorial OS landing shows.
+          // Inside the installed app the control is hidden (data-gate-back +
+          // the standalone CSS rule), so this navigation never fires there.
+          window.location.href = '/#landing';
+        }}
       />
     );
   }
