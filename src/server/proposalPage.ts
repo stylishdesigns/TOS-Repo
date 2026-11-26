@@ -159,7 +159,7 @@ export function buildProposalPage(displayName: string, origin: string, slug: str
   <div class="sh"><span class="num">01</span><h2>One platform for learning facilities of every kind</h2></div>
   <p class="dear">To the owner and admins of ${name},</p>
   <p class="lead">Tutorial OS is one software system that runs a learning facility end to end: your console, portals for tutors and students, a student phone app, and a branded landing page for enrolment. Everything carries your name, logo and colours, so students and parents see the facility, never us.</p>
-  <p class="body">It is built for tutorial and lesson centres, bridge programmes like IJMB and JUPEB, satellite campuses, distance-learning and online programmes, study groups, and schools that want the same structure. It runs in the browser on any phone or laptop, with nothing to install.</p>
+  <p class="body">It is built for tutorial and lesson centres, bridge programmes like IJMB and JUPEB, satellite campuses, distance-learning and online programmes, study groups, and schools that want the same structure. You will not have the usual difficulty of downloading a separate app for Android and iPhone users: the same app works on both phones, and it is even accessible on the web from any phone or laptop.</p>
   <dl class="facts">
     <div><dt>Built for</dt><dd>Learning facilities of every kind</dd></div>
     <div><dt>Exams</dt><dd>JAMB, WAEC, NECO, IJMB and JUPEB, plus your own custom exams</dd></div>
