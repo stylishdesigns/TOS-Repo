@@ -87,6 +87,8 @@ const ProposalsTab: React.FC = () => {
 
   const openPreview = (p: Proposal) => window.open(`${linkOf(p)}&preview=1`, '_blank', 'noopener');
   const downloadPdf = (p: Proposal) => window.open(`${linkOf(p)}&pdf=1`, '_blank', 'noopener');
+  // Batch 48: the one-page PDF, a compressed single-sheet version of the same proposal.
+  const downloadOnePagePdf = (p: Proposal) => window.open(`${linkOf(p)}&short=1&pdf=1`, '_blank', 'noopener');
   const remove = async (p: Proposal) => {
     if (!window.confirm(`Delete the saved proposal for ${p.name}?`)) return;
     try {
@@ -160,6 +162,9 @@ const ProposalsTab: React.FC = () => {
                   </button>
                   <button onClick={() => downloadPdf(p)} className={btnGhost}>
                     <Download className="w-4 h-4" /> Download PDF
+                  </button>
+                  <button onClick={() => downloadOnePagePdf(p)} className={btnGhost} title="A compressed version that prints on a single page">
+                    <FileText className="w-4 h-4" /> One-page PDF
                   </button>
                   <button onClick={() => remove(p)} className="text-xs text-rose-300/80 hover:text-rose-300 flex items-center gap-1 px-3 py-2">
                     <Trash2 className="w-4 h-4" /> Delete
