@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../../context/AppContext';
 import { 
   Calendar, 
@@ -9,27 +9,26 @@ import {
   ChevronRight,
   ChevronDown,
   Info,
-  LayoutGrid,
   X,
   User,
   GraduationCap,
   Bell,
-  History
+  BookOpen,
 } from 'lucide-react';
-import { CalendarView } from '../../common/CalendarView';
 import { ModernSelect } from '../../ui/ModernSelect';
-import { TimetableSlot, Tutor, Student } from '../../../types';
+import { TimetableSlot, Tutor } from '../../../types';
 import { useScrollLock } from '../../../hooks/useScrollLock';
-import { TutorHistoryView } from './TutorHistoryView';
+import { TutorMaterialsSection } from './TutorMaterialsSection';
+import { dayNameFromDate } from '../../../lib/planner';
 
 interface ScheduleTabProps {
   tutor: Tutor;
+  initialSection?: string | null;
 }
 
-export const ScheduleTab: React.FC<ScheduleTabProps> = ({ tutor }) => {
-  const { timetable, programmes, settings, consentToTimetableSlot, updateTimetableSlot, students } = useApp();
-  const [showCalendar, setShowCalendar] = useState(false);
-  const [showPastClasses, setShowPastClasses] = useState(false);
+export const ScheduleTab: React.FC<ScheduleTabProps> = ({ tutor, initialSection }) => {
+  const { timetable, programmes, settings, consentToTimetableSlot, updateTimetableSlot, studyMaterials, currentUser, students, plannerReminders, addPlannerReminder, removePlannerReminder, updatePlannerReminder } = useApp();
+  const [activeSection, setActiveSection] = useState<'classes' | 'materials'>(initialSection === 'materials' ? 'materials' : 'classes');
   const [selectedDay, setSelectedDay] = useState<'All' | string>('All');
   const [selectedStatus, setSelectedStatus] = useState<string>('All');
   
@@ -38,8 +37,35 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({ tutor }) => {
   const [tutorTopic, setTutorTopic] = useState('');
   const [actionReason, setActionReason] = useState('');
   const [actionType, setActionType] = useState<'none' | 'postpone'>('none');
+  useScrollLock(!!viewingSession);
 
-  useScrollLock(!!viewingSession || showCalendar);
+  // Materials this tutor has already uploaded. Attaching a material to a
+  // class only picks from these; uploads happen in Study Materials.
+  const myMaterials = studyMaterials.filter((m) =>
+    (m.tutorId && (m.tutorId === tutor.id || m.tutorId === currentUser?.uid)) ||
+    (!m.tutorId && !!m.tutorName && m.tutorName.toLowerCase() === (tutor.name || '').toLowerCase())
+  );
+  const attachedIds = new Set((viewingSession?.materials || []).map((m) => m.id));
+  const availableMaterials = myMaterials.filter((m) => !attachedIds.has(m.id));
+  const canAttach = viewingSession?.status === 'pending_tutor_consent';
+  const [attachOpen, setAttachOpen] = useState(false);
+  useEffect(() => { setAttachOpen(false); }, [viewingSession?.id]);
+
+  const handleAttachMaterial = async (materialId: string) => {
+    if (!materialId || !viewingSession) return;
+    const mat = myMaterials.find((m) => m.id === materialId);
+    if (!mat || attachedIds.has(mat.id)) return;
+    const next = [...(viewingSession.materials || []), { id: mat.id, title: mat.title }];
+    setViewingSession({ ...viewingSession, materials: next });
+    await updateTimetableSlot(viewingSession.id, { materials: next });
+  };
+
+  const handleDetachMaterial = async (materialId: string) => {
+    if (!viewingSession) return;
+    const next = (viewingSession.materials || []).filter((m) => m.id !== materialId);
+    setViewingSession({ ...viewingSession, materials: next });
+    await updateTimetableSlot(viewingSession.id, { materials: next });
+  };
 
   // Current week range (Monday to Sunday)
   const currentWeekRange = React.useMemo(() => {
@@ -88,12 +114,22 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({ tutor }) => {
 
   // Apply Status & Day Filters
   if (selectedStatus !== 'All') myClasses = myClasses.filter(s => s.status === selectedStatus || (!s.status && selectedStatus === 'active'));
-  if (selectedDay !== 'All') myClasses = myClasses.filter(s => s.day === selectedDay);
+  if (selectedDay !== 'All') myClasses = myClasses.filter(s => s.date ? dayNameFromDate(s.date) === selectedDay : s.day === selectedDay);
 
   const pendingClasses = myClasses.filter(c => c.status === 'pending_tutor_consent');
   const activeClasses = myClasses.filter(c => c.status === 'active' || !c.status || c.status === 'postponed');
 
   const daysList = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+  const tutorSubjects = React.useMemo(() => {
+    const set = new Set<string>(tutor.subjects || []);
+    (timetable || []).forEach(slot => {
+      if (slot.tutorId === tutor.id || (slot.tutorName && slot.tutorName.toLowerCase() === tutor.name.toLowerCase())) {
+        set.add(slot.subject);
+      }
+    });
+    return Array.from(set);
+  }, [timetable, tutor.id, tutor.name, tutor.subjects]);
 
   const formatTimeAMPM = (time: string) => {
     if (!time) return '';
@@ -185,45 +221,47 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({ tutor }) => {
     }
   };
 
-  if (showPastClasses) {
-    return <TutorHistoryView tutor={tutor} onBack={() => setShowPastClasses(false)} />;
-  }
-
   return (
     <div className="p-5 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex items-center space-x-3">
-        <div className="w-12 h-12 rounded-2xl bg-orange-500 text-white flex items-center justify-center shadow-lg shadow-orange-200 shrink-0">
-          <Calendar className="w-6 h-6" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <h2 className="text-2xl font-black text-slate-900 tracking-tight truncate">My Classes</h2>
-          <p className="text-[11px] text-slate-500 font-bold uppercase tracking-wider">{settings.academicSession} Schedule</p>
-        </div>
-        
-        {/* Past Classes Button (Upper right corner) */}
+      {/* 1. Switch at top: "My Classes | Study Materials" */}
+      <div className="bg-white rounded-[14px] p-1 border border-slate-200 shadow-xs grid grid-cols-2 gap-1">
         <button
           type="button"
-          onClick={() => setShowPastClasses(true)}
-          className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs rounded-xl flex items-center space-x-1.5 shadow-sm active:scale-95 transition-all cursor-pointer shrink-0"
-          title="View Past Classes and Ratings History"
+          onClick={() => setActiveSection('classes')}
+          className={`h-10 rounded-[10px] text-xs font-extrabold transition-all flex items-center justify-center cursor-pointer ${
+            activeSection === 'classes'
+              ? 'bg-[var(--brand,#0F172A)] text-[var(--on-brand,#fff)] shadow-xs'
+              : 'text-slate-500 hover:text-slate-900'
+          }`}
         >
-          <History className="w-4 h-4 text-[#F97316]" />
-          <span>Past Classes</span>
+          My Classes
         </button>
 
-        <button 
-          onClick={() => setShowCalendar(true)} 
-          className="w-10 h-10 bg-white border border-slate-200 rounded-xl flex items-center justify-center text-slate-400 hover:text-orange-500 transition-all shadow-xs cursor-pointer shrink-0"
-          aria-label="View Calendar Schedule"
+        <button
+          type="button"
+          onClick={() => setActiveSection('materials')}
+          className={`h-10 rounded-[10px] text-xs font-extrabold transition-all flex items-center justify-center cursor-pointer ${
+            activeSection === 'materials'
+              ? 'bg-[var(--brand,#0F172A)] text-[var(--on-brand,#fff)] shadow-xs'
+              : 'text-slate-500 hover:text-slate-900'
+          }`}
         >
-          <LayoutGrid className="w-5 h-5" />
+          Study Materials
         </button>
       </div>
+
+      {activeSection === 'materials' ? (
+        <TutorMaterialsSection
+          tutor={tutor}
+          subjects={tutorSubjects}
+        />
+      ) : (
+        <>
 
       {/* Status Filter Pills (All Exam filter removed per user instructions) */}
       <div className="bg-white p-1.5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between overflow-hidden">
         <div className="flex flex-nowrap overflow-x-auto gap-1 scrollbar-none w-full">
-          {[{ id: 'All', label: 'All Classes' }, { id: 'active', label: 'Approved' }, { id: 'pending_tutor_consent', label: 'Pending Consent' }, { id: 'postponed', label: 'Postponed' }].map((status) => (
+          {[{ id: 'All', label: 'All Classes' }, { id: 'active', label: 'Approved' }, { id: 'pending_tutor_consent', label: 'Pending' }, { id: 'postponed', label: 'Postponed' }].map((status) => (
             <button
               key={status.id}
               onClick={() => setSelectedStatus(status.id)}
@@ -256,7 +294,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({ tutor }) => {
             </span>
           </button>
           {daysList.map((day) => {
-            const daySessionsCount = activeClasses.filter(s => s.day === day).length;
+            const daySessionsCount = activeClasses.filter(s => s.date ? dayNameFromDate(s.date) === day : s.day === day).length;
             const dateNum = getWeekDateForDay(day);
             const isSelected = selectedDay === day;
 
@@ -285,7 +323,6 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({ tutor }) => {
         </div>
       </div>
 
-      <CalendarView isOpen={showCalendar} onClose={() => setShowCalendar(false)} slots={myClasses} title="My Teaching Schedule" />
 
       {pendingClasses.length > 0 && (
         <div className="space-y-3">
@@ -312,7 +349,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({ tutor }) => {
                        </div>
                     </div>
                     <div className="w-8 h-8 rounded-full bg-white border border-amber-200 flex items-center justify-center text-amber-500 group-hover:bg-amber-500 group-hover:text-white transition-all">
-                       <ChevronRight className="w-5 h-5" />
+                       <ChevronRight strokeWidth={2.75} className="w-5 h-5" />
                     </div>
                  </div>
               </div>
@@ -332,7 +369,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({ tutor }) => {
       ) : (
         <div className="space-y-6">
           {daysList.filter((day) => selectedDay === 'All' || selectedDay === day).map((day) => {
-            const daySessions = activeClasses.filter(s => s.day === day);
+            const daySessions = activeClasses.filter(s => s.date ? dayNameFromDate(s.date) === day : s.day === day);
             if (daySessions.length === 0) return null;
             return (
               <div key={day} className="space-y-3">
@@ -414,8 +451,16 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({ tutor }) => {
                               </div>
                             </div>
                           </div>
-                          <div className="pt-4 border-t border-slate-100 flex items-center justify-end">
-                            <button className="px-6 py-2 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-orange-600 transition-colors">View Details</button>
+                          <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-2">
+                            {cls.status === 'pending_tutor_consent' && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setViewingSession(cls); setTutorTopic(cls.topic || ''); setActionType('none'); setHasConsented(false); }}
+                                className="px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl text-[10px] font-black uppercase tracking-widest hover:border-slate-300 transition-colors"
+                              >
+                                Add Material
+                              </button>
+                            )}
+                            <button className="px-6 py-2 bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-orange-600 transition-colors">View Details</button>
                           </div>
                         </div>
                       </div>
@@ -427,6 +472,9 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({ tutor }) => {
             );
           })}
         </div>
+      )}
+
+        </>
       )}
 
       {viewingSession && (() => {
@@ -484,7 +532,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({ tutor }) => {
                   <div className="space-y-4">
                      <div className="pt-4 border-t border-slate-100">
                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Schedule Status</span>
-                         <div className={`p-3 rounded-xl border-2 flex items-center justify-between shadow-sm ${
+                         <div className={`inline-flex w-fit items-center gap-2 px-3.5 py-2 rounded-full border-2 shadow-sm ${
                             inSession ? 'bg-emerald-600 border-emerald-500 text-white' : 
                             finished ? 'bg-slate-400 border-slate-300 text-white' : 
                             isNextUp(viewingSession.time, viewingSession.date) ? 'bg-blue-600 border-blue-500 text-white' : 
@@ -506,6 +554,56 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({ tutor }) => {
                          </div>
                      </div>
 
+                     <div className="pt-4 border-t border-slate-100">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Class Materials</span>
+                        {canAttach && (
+                           <div className="relative">
+                              <button
+                                 type="button"
+                                 onClick={() => setAttachOpen((o) => !o)}
+                                 className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-left text-slate-700 focus:outline-none focus:border-orange-500 flex items-center justify-between"
+                              >
+                                 <span className={availableMaterials.length === 0 ? 'text-slate-400' : ''}>
+                                    {availableMaterials.length === 0 ? 'No unattached materials yet' : 'Attach a material…'}
+                                 </span>
+                                 <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${attachOpen ? 'rotate-180' : ''}`} />
+                              </button>
+                              {attachOpen && availableMaterials.length > 0 && (
+                                 <div className="absolute left-0 right-0 top-full mt-1 z-30 max-h-48 overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-xl">
+                                    {availableMaterials.map((m) => (
+                                       <button
+                                          key={m.id}
+                                          type="button"
+                                          onClick={() => { setAttachOpen(false); handleAttachMaterial(m.id); }}
+                                          className="w-full text-left px-3 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 border-b border-slate-100 last:border-0"
+                                       >
+                                          {m.title}
+                                       </button>
+                                    ))}
+                                 </div>
+                              )}
+                           </div>
+                        )}
+                        {canAttach && myMaterials.length === 0 && (
+                           <p className="text-[10px] text-slate-400 mt-1.5">Upload a material in Study Materials first, then attach it here.</p>
+                        )}
+                        {(viewingSession.materials || []).length > 0 && (
+                           <div className="flex flex-wrap gap-1.5 mt-2.5">
+                              {(viewingSession.materials || []).map((mat) => (
+                                 <span key={mat.id} className="inline-flex items-center gap-1.5 bg-white border border-slate-200 rounded-lg pl-2.5 pr-1.5 py-1">
+                                    <BookOpen className="w-3 h-3 text-orange-500 shrink-0" />
+                                    <span className="text-[10px] font-bold text-slate-700">{mat.title}</span>
+                                    {canAttach && (
+                                       <button type="button" onClick={() => handleDetachMaterial(mat.id)} className="text-slate-300 hover:text-rose-500 transition-colors" aria-label={`Remove ${mat.title}`}>
+                                          <X className="w-3 h-3" />
+                                       </button>
+                                    )}
+                                 </span>
+                              ))}
+                           </div>
+                        )}
+                     </div>
+
                      {!isFinished(viewingSession.time, viewingSession.date) && actionType === 'none' && (
                         <div className="space-y-4">
                            {viewingSession.status === 'pending_tutor_consent' && (
@@ -516,12 +614,12 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({ tutor }) => {
                            )}
                            
                            {hasConsented && viewingSession.status === 'pending_tutor_consent' ? (
-                              <button disabled={isProcessing || (!viewingSession.topic && !tutorTopic.trim())} onClick={handleConsent} className="w-full py-4 bg-[#EA580C] text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-lg shadow-orange-200 disabled:opacity-50">
+                              <button disabled={isProcessing || (!viewingSession.topic && !tutorTopic.trim())} onClick={handleConsent} className="w-full py-4 bg-orange-600 text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-lg shadow-orange-200 disabled:opacity-50">
                                 {isProcessing ? 'Processing...' : 'Approve Class'}
                               </button>
-                           ) : (
+                           ) : !inSession ? (
                               <button disabled={isProcessing} onClick={() => setActionType('postpone')} className="w-full py-3 bg-amber-50 border border-amber-200 text-amber-700 font-black text-[10px] uppercase tracking-widest rounded-xl hover:bg-amber-100 transition-all">Request for a postponement</button>
-                           )}
+                           ) : null}
                         </div>
                      )}
                      {actionType !== 'none' && (

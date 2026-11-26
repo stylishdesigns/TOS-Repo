@@ -43,7 +43,7 @@ export const AdmissionsManager: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Admissions Registry</h2>
-          <p className="text-xs text-slate-500 mt-1">
+          <p className="text-sm sm:text-[15px] font-bold text-slate-900 mt-1">
             Review and process incoming applications for various academic programmes.
           </p>
         </div>
@@ -51,7 +51,7 @@ export const AdmissionsManager: React.FC = () => {
         <div className="flex items-center space-x-4">
           <div className="text-right hidden md:block">
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block leading-none">Academic Session</span>
-            <span className="text-sm font-black text-[#EA580C]">{settings.academicSession}</span>
+            <span className="text-sm font-black text-orange-600">{settings.academicSession}</span>
           </div>
         </div>
       </div>
@@ -64,7 +64,7 @@ export const AdmissionsManager: React.FC = () => {
             onClick={() => setActiveTab(tab)}
             className={`px-4 py-1.5 text-xs font-semibold rounded-lg transition-all ${
               activeTab === tab
-                ? 'bg-[#EA580C] text-white shadow-sm'
+                ? 'bg-orange-600 text-white shadow-sm'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200'
             }`}
           >
@@ -111,7 +111,7 @@ export const AdmissionsManager: React.FC = () => {
                   <tr key={app.id} className="hover:bg-slate-50/60 transition-colors">
                     <td className="py-3.5 px-5">
                       <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 rounded-lg bg-orange-50 text-[#EA580C] font-bold text-xs flex items-center justify-center shrink-0">
+                        <div className="w-8 h-8 rounded-lg bg-orange-50 text-orange-600 font-bold text-xs flex items-center justify-center shrink-0">
                           {app.applicantName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
                         </div>
                         <div>

@@ -90,7 +90,7 @@ export const LandingEnquiries: React.FC = () => {
       <div className="flex items-center justify-between gap-3 flex-wrap mb-5">
         <div>
           <h1 className="text-xl sm:text-2xl font-black text-white">Website Enquiries</h1>
-          <p className="text-sm text-slate-400 mt-1">
+          <p className="text-sm sm:text-[15px] font-bold text-slate-100 mt-1">
             Messages parents and students send through your facility's landing page.
             {leads && newCount > 0 ? ` ${newCount} new.` : ''}
           </p>
@@ -125,14 +125,14 @@ export const LandingEnquiries: React.FC = () => {
         {(leads || []).map((l) => (
           <div
             key={l.id}
-            className={`rounded-2xl border px-4 py-4 sm:px-5 ${l.status === 'new' ? 'border-[#EA580C]/50 bg-[#0F1B2E]' : 'border-slate-800 bg-[#0F1B2E]/50'}`}
+            className={`rounded-2xl border px-4 py-4 sm:px-5 ${l.status === 'new' ? 'border-orange-600/50 bg-[#0F1B2E]' : 'border-slate-800 bg-[#0F1B2E]/50'}`}
           >
             <div className="flex items-start justify-between gap-3 flex-wrap">
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-white font-bold text-[15px]">{l.name}</span>
                   {l.status === 'new' ? (
-                    <span className="text-[10px] font-extrabold uppercase tracking-wide bg-[#EA580C] text-white px-2 py-0.5 rounded-full">New</span>
+                    <span className="text-[10px] font-extrabold uppercase tracking-wide bg-orange-600 text-white px-2 py-0.5 rounded-full">New</span>
                   ) : null}
                 </div>
                 <div className="text-xs text-slate-500 mt-0.5">{dayLabel(l.createdAt)}</div>

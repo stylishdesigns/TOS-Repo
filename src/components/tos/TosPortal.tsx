@@ -3,8 +3,9 @@ import { getAuth, signOut, updateProfile, updatePassword, reauthenticateWithCred
 import {
   LayoutDashboard, Users, Building2, Wallet, ScrollText, UserPlus, Loader2,
   RefreshCw, Send, Ban, CheckCircle2, PlayCircle, Check, Plus, ShieldCheck,
-  Clock, ArrowUpRight, UserRound, BookOpen, CalendarDays, Copy, HelpCircle,
-  AlertTriangle, X, ChevronRight, MessageSquare, Globe, Trash2,
+  ArrowUpRight, UserRound, BookOpen, CalendarDays, Copy, HelpCircle, Sparkles,
+  AlertTriangle, X, ChevronRight, MessageSquare, Globe, Trash2, Settings, FileText,
+  PanelLeftClose, PanelLeftOpen, Share2, MonitorPlay,
 } from 'lucide-react';
 import {
   api, fmtDate, fmtDateTime, LEAD_STATUS_LABELS, STATUS_STYLES, Json,
@@ -18,7 +19,9 @@ import { QuestionLibraryTab } from './TosQuestionLibrary';
 import { QuestionBankHub, MockPapersTab } from './TosQuestionHub';
 import { MocksTab } from './TosMocks';
 import { TosChat } from './TosChat';
+import { TosVideos } from './TosVideos';
 import { WebsiteTab } from './TosWebsite';
+import ProposalsTab from './TosProposals';
 
 /**
  * TOS platform console (Prompt C Part D).
@@ -131,13 +134,13 @@ const OverviewTab: React.FC<{ onOpenCentre: (id: string) => void; refreshKey: nu
         </div>
       </div>
 
-      {(data.trialsEndingSoon || []).length > 0 && (
-        <Card title="Trials ending within 7 days">
+      {(data.leadCentres || []).length > 0 && (
+        <Card title="Leads not yet upgraded">
           <div className="space-y-2">
-            {data.trialsEndingSoon.map((t: any) => (
+            {data.leadCentres.map((t: any) => (
               <button key={t.centreId} onClick={() => onOpenCentre(t.centreId)} className="w-full flex items-center justify-between bg-slate-950/50 border border-white/5 rounded-xl px-4 py-2.5 hover:border-orange-500/40 transition-colors text-left">
                 <span className="text-sm text-white font-semibold">{t.name}</span>
-                <span className="text-xs text-amber-300 flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" /> ends {fmtDate(t.endsAt)}</span>
+                <span className="text-xs text-amber-300 flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5" /> lead · free seats</span>
               </button>
             ))}
           </div>
@@ -260,7 +263,7 @@ const LeadsTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
                     <p className="text-xs text-slate-500">{c.ownerName || '—'} · {c.ownerEmail || 'no owner email'}</p>
                   </td>
                   <td className="px-4 py-3"><StatusPill status={c.billingStatus} /></td>
-                  <td className="px-4 py-3 text-xs text-slate-300">{c.trialEndsAt && c.billingStatus === 'trial' ? fmtDate(c.trialEndsAt) : '—'}</td>
+                  <td className="px-4 py-3 text-xs text-slate-300">{c.tier === 'lead' ? <span className="text-amber-300 font-semibold">Lead · free seats</span> : <span className="text-emerald-300">Facility</span>}</td>
                   <td className="px-4 py-3 text-xs text-slate-500">{c.createdAt ? fmtDate(c.createdAt) : '—'}</td>
                 </tr>
               ))}
@@ -304,7 +307,6 @@ const LeadsTab: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
 // ---------------------------------------------------------------------------
 const PlansTab: React.FC = () => {
   const [plans, setPlans] = useState<any[]>(() => loadLastGood<any[]>('tos:plans') || []);
-  const [config, setConfig] = useState<any>(() => loadLastGood<any>('tos:plansConfig') || {});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
@@ -315,9 +317,7 @@ const PlansTab: React.FC = () => {
     try {
       const d = await api('/api/tos/plans');
       setPlans(d.plans || []);
-      setConfig(d.config || {});
       saveLastGood('tos:plans', d.plans || []);
-      saveLastGood('tos:plansConfig', d.config || {});
       setError('');
     } catch (e: any) {
       setError(e.message);
@@ -333,7 +333,7 @@ const PlansTab: React.FC = () => {
     setMessage('');
     setError('');
     try {
-      await api('/api/tos/plans', { method: 'POST', body: { plans, config } });
+      await api('/api/tos/plans', { method: 'POST', body: { plans } });
       setMessage('Saved. Changes apply to new calculations only, never to payments already recorded.');
       await load();
     } catch (e: any) {
@@ -347,14 +347,6 @@ const PlansTab: React.FC = () => {
     setPlans((ps) => ps.map((p) => (p.id === id ? { ...p, [key]: value } : p)));
 
   if (loading && plans.length === 0) return <div className="flex items-center gap-2 text-slate-400 text-sm py-10 justify-center"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</div>;
-
-  const configFields: [string, string][] = [
-    ['trialDays', 'Trial length (days)'],
-    ['skipTrialDiscountPct', 'Skip-trial discount (%)'],
-    ['trialGraceDays', 'Grace days after expiry'],
-    ['seatSwapWindowDays', 'Seat swap window (days)'],
-    ['aiRouteRateLimitPerHour', 'AI requests per user per hour'],
-  ];
 
   return (
     <div className="space-y-5">
@@ -371,7 +363,6 @@ const PlansTab: React.FC = () => {
               <input type="number" min="0" value={p.trialSeatCap ?? ''} onChange={(e) => setPlan(p.id, 'trialSeatCap', e.target.value)} className={inputCls} />
             </Field>
             <Field label="Trial days">
-              <input type="number" min="0" value={p.trialDays ?? ''} onChange={(e) => setPlan(p.id, 'trialDays', e.target.value)} className={inputCls} />
             </Field>
           </div>
           <div className="flex flex-wrap gap-4 mt-4">
@@ -385,9 +376,127 @@ const PlansTab: React.FC = () => {
         </Card>
       ))}
 
+      <div className="flex items-center gap-3">
+        <button onClick={save} disabled={saving} className={btnPrimary}>
+          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} Save plans
+        </button>
+        {message && <p className="text-xs text-emerald-300">{message}</p>}
+        {error && <p className="text-xs text-rose-300">{error}</p>}
+      </div>
+      <p className="text-[11px] text-slate-500">AI essay marking runs on every plan and is never shown to customers, so it has no switch here. Every change is recorded in the audit log with what it was before.</p>
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// SETTINGS (batch 24): seat policy and platform settings, out of the Plans
+// tab so the pricing page stays pricing. Dropdowns for fixed choices, fields
+// for numbers. Every value is checked on the server and read fresh on each
+// seat action, so nothing here can be worked around with a stale copy.
+// ---------------------------------------------------------------------------
+const SettingsTab: React.FC = () => {
+  const [config, setConfig] = useState<any>(() => loadLastGood<any>('tos:plansConfig') || {});
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+
+  const load = useCallback(async () => {
+    try {
+      const d = await api('/api/tos/plans');
+      setConfig(d.config || {});
+      saveLastGood('tos:plansConfig', d.config || {});
+      setError('');
+    } catch (e: any) {
+      setError(e.message);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const save = async () => {
+    setSaving(true);
+    setMessage('');
+    setError('');
+    try {
+      const d = await api('/api/tos/plans', { method: 'POST', body: { plans: [], config } });
+      const a = d?.applied;
+      if (a) {
+        const parts: string[] = [];
+        if (a.freeSeatsRemoved > 0) parts.push(`${a.freeSeatsRemoved} free seat${a.freeSeatsRemoved === 1 ? '' : 's'} removed`);
+        if (a.freeSeatsAdded > 0) parts.push(`${a.freeSeatsAdded} free seat${a.freeSeatsAdded === 1 ? '' : 's'} added`);
+        if (a.trialSeatsRemoved > 0) parts.push(`${a.trialSeatsRemoved} trial seat${a.trialSeatsRemoved === 1 ? '' : 's'} removed`);
+        if (a.studentsDetached > 0) parts.push(`${a.studentsDetached} student${a.studentsDetached === 1 ? '' : 's'} detached`);
+        setMessage(`Saved. Applied across ${a.facilities} facilit${a.facilities === 1 ? 'y' : 'ies'}${parts.length ? `: ${parts.join(', ')}.` : ', nothing to change.'}`);
+      } else {
+        setMessage('Saved. The platform reads these values fresh on every seat action and checks them on the server.');
+      }
+      await load();
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const platformFields: [string, string][] = [
+    ['aiRouteRateLimitPerHour', 'AI requests per user per hour'],
+  ];
+
+  const unlimited = config.paidSeatsUnlimited === true;
+
+  return (
+    <div className="space-y-5">
+      <Card title="Seat policy">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <Field label="Paid seats for facilities not on trial">
+            <select
+              value={unlimited ? 'unlimited' : 'limited'}
+              onChange={(e) => setConfig((c: any) => ({ ...c, paidSeatsUnlimited: e.target.value === 'unlimited' }))}
+              className={inputCls}
+            >
+              <option value="limited">A set limit</option>
+              <option value="unlimited">Unlimited</option>
+            </select>
+          </Field>
+          <Field label="Max paid seats, facilities not on trial">
+            <input type="number" min="0" value={config.paidMaxSeats ?? ''} disabled={unlimited} onChange={(e) => setConfig((c: any) => ({ ...c, paidMaxSeats: e.target.value }))} className={inputCls} />
+          </Field>
+          <Field label="Free seats for every facility">
+            <input type="number" min="0" value={config.freeSeatsGeneral ?? ''} onChange={(e) => setConfig((c: any) => ({ ...c, freeSeatsGeneral: e.target.value }))} className={inputCls} />
+          </Field>
+          <Field label="Minimum paid seats">
+            <input type="number" min="0" value={config.paidSeatMinimum ?? ''} onChange={(e) => setConfig((c: any) => ({ ...c, paidSeatMinimum: e.target.value }))} className={inputCls} />
+          </Field>
+        </div>
+        <p className="text-[11px] text-slate-500 mt-3">
+          Saving applies these numbers to every facility right away: lowering a number trims the extra seats live and moves students off removed seats (their access switches off), raising it adds seats. The minimum is judged on paid seats only; free seats never count toward it. A lead below the minimum cannot create paid seats at all: it upgrades by paying for the minimum in one go. Every facility runs on its free-seat grant, and each facility can carry its own override on its page.
+        </p>
+      </Card>
+
+      <Card title="Payment account">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <Field label="Account name">
+            <input value={config.payAccountName ?? ''} onChange={(e) => setConfig((c: any) => ({ ...c, payAccountName: e.target.value }))} className={inputCls} placeholder="Michael Ogunnaike" />
+          </Field>
+          <Field label="Account number">
+            <input value={config.payAccountNumber ?? ''} onChange={(e) => setConfig((c: any) => ({ ...c, payAccountNumber: e.target.value }))} className={inputCls} placeholder="5070133907" />
+          </Field>
+          <Field label="Bank">
+            <input value={config.payBank ?? ''} onChange={(e) => setConfig((c: any) => ({ ...c, payBank: e.target.value }))} className={inputCls} placeholder="Moniepoint" />
+          </Field>
+          <Field label="WhatsApp number for payment confirmations">
+            <input value={config.tosWhatsappNumber ?? ''} onChange={(e) => setConfig((c: any) => ({ ...c, tosWhatsappNumber: e.target.value }))} className={inputCls} placeholder="09030064109" />
+          </Field>
+        </div>
+        <p className="text-[11px] text-slate-500 mt-3">
+          Facilities see these details on the payment step of the upgrade flow, and the WhatsApp button opens this number.
+          Leave a field empty to keep its current value.
+        </p>
+      </Card>
+
       <Card title="Platform settings">
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-          {configFields.map(([key, label]) => (
+          {platformFields.map(([key, label]) => (
             <Field key={key} label={label}>
               <input type="number" min="0" value={config[key] ?? ''} onChange={(e) => setConfig((c: any) => ({ ...c, [key]: e.target.value }))} className={inputCls} />
             </Field>
@@ -397,12 +506,11 @@ const PlansTab: React.FC = () => {
 
       <div className="flex items-center gap-3">
         <button onClick={save} disabled={saving} className={btnPrimary}>
-          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} Save plans and settings
+          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} Save settings
         </button>
         {message && <p className="text-xs text-emerald-300">{message}</p>}
         {error && <p className="text-xs text-rose-300">{error}</p>}
       </div>
-      <p className="text-[11px] text-slate-500">AI essay marking runs on every plan and is never shown to customers, so it has no switch here. Every change is recorded in the audit log with what it was before.</p>
     </div>
   );
 };
@@ -717,7 +825,9 @@ const AccountTab: React.FC = () => {
   };
 
   const signOutEverywhere = async () => {
-    window.location.hash = '';
+    // Signing out of the TOS console returns to the TOS staff sign-in door,
+    // never the landing page or a facility's access-code gate.
+    window.location.hash = '#tos-admin';
     try { await signOut(getAuth()); } catch (e) { console.error(e); }
   };
 
@@ -805,18 +915,214 @@ const AccountTab: React.FC = () => {
   );
 };
 
-// N2: the sidebar groups its items into Business / Content / System. One
-// nav array still drives both the desktop sidebar and the mobile bottom bar
-// (mlabel is the short label the bar shows on phones).
+// N2: the sidebar groups its items into Business / Content / System. The
+// same nav array and groups drive the desktop sidebar and the phone panel:
+// on phones the sections sit by the side exactly as arranged on the desktop,
+// with a collapse button that closes the panel and a round button that
+// brings it back.
 const GROUPS = ['Business', 'Content', 'System'] as const;
+
+// ---------------------------------------------------------------------------
+// BATCH 27: UPGRADE REQUESTS
+// Facilities that paid for seats and are waiting on the platform's word. A
+// facility picks Standard or Premium, pays by bank transfer, uploads its
+// receipt and contacts the admin on WhatsApp; approving here creates exactly
+// the seats paid for (they auto-populate on the facility's dashboard), moves
+// the billing to the chosen plan, raises the tier and sends the two
+// confirmation emails. Declining tells the facility why.
+// ---------------------------------------------------------------------------
+const UpgradeRequestsTab: React.FC = () => {
+  const [requests, setRequests] = useState<any[]>(() => loadLastGood<any[]>('tos:upgrades') || []);
+  const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState('');
+  const [declineId, setDeclineId] = useState('');
+  const [declineReason, setDeclineReason] = useState('');
+  // Batch 27: receipts are viewed on the dashboard, never bounced out to the
+  // image host: the receipt opens in a modal here.
+  const [receiptView, setReceiptView] = useState<any>(null);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const d = await api('/api/tos/upgrade-requests');
+      setRequests(d.requests || []);
+      saveLastGood('tos:upgrades', d.requests || []);
+      setError('');
+    } catch (e: any) {
+      setError(e.message);
+    }
+    setLoading(false);
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const decide = async (requestId: string, action: 'approve' | 'decline', reason = '') => {
+    setBusyId(requestId);
+    setError('');
+    setMessage('');
+    try {
+      const d = await api('/api/tos/upgrade-requests/decide', {
+        method: 'POST',
+        body: { requestId, action, declineReason: reason },
+      });
+      setMessage(
+        action === 'approve'
+          ? `Approved: ${Array.isArray(d?.seatsCreated) ? d.seatsCreated.length : '?'} seat(s) created on the facility's dashboard and the two confirmation emails sent.`
+          : 'Request declined and the facility was told.'
+      );
+      setDeclineId('');
+      setDeclineReason('');
+      await load();
+    } catch (e: any) {
+      setError(e.message);
+    }
+    setBusyId('');
+  };
+
+  const chip = (status: string) => {
+    if (status === 'approved') return 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
+    if (status === 'declined') return 'bg-rose-500/10 text-rose-400 border border-rose-500/20';
+    return 'bg-amber-500/10 text-amber-400 border border-amber-500/20';
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <button onClick={load} className={btnGhost}><RefreshCw className="w-4 h-4" /> Refresh</button>
+      </div>
+      {message && <p className="text-xs text-emerald-400 mb-3">{message}</p>}
+      {error && <p className="text-xs text-rose-400 mb-3">{error}</p>}
+      {loading && requests.length === 0 ? (
+        <p className="text-sm text-slate-400"><Loader2 className="w-4 h-4 inline animate-spin" /> Loading requests...</p>
+      ) : requests.length === 0 ? (
+        <p className="text-sm text-slate-400">No upgrade requests yet. Facilities file one from the Add seat flow: they pick a plan, pay by bank transfer and upload their receipt here.</p>
+      ) : (
+        <div className="overflow-x-auto rounded-2xl border border-white/5">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-white/5 bg-white/5 text-slate-400 font-semibold uppercase tracking-wider text-[10px]">
+                <th className="py-3 px-4">Facility</th>
+                <th className="py-3 px-4">Plan</th>
+                <th className="py-3 px-4">Seats</th>
+                <th className="py-3 px-4">Total</th>
+                <th className="py-3 px-4">Receipt</th>
+                <th className="py-3 px-4">Requested</th>
+                <th className="py-3 px-4">Status</th>
+                <th className="py-3 px-4 text-right">Decision</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {requests.map((r: any) => {
+                const pending = String(r.status || '') === 'pending';
+                const busy = busyId === r.id;
+                return (
+                  <React.Fragment key={r.id}>
+                    <tr className="hover:bg-white/5 transition-colors">
+                      <td className="py-3 px-4 font-bold text-white">{r.centreName || r.centreId}</td>
+                      <td className="py-3 px-4 text-slate-300">{r.planName || r.planId}</td>
+                      <td className="py-3 px-4 text-slate-300">{r.seats}</td>
+                      <td className="py-3 px-4 font-bold text-white">{`₦${Number(r.total || 0).toLocaleString()}`}</td>
+                      <td className="py-3 px-4">
+                        {r.receiptUrl ? (
+                          <button onClick={() => setReceiptView(r)} className="text-orange-400 hover:text-orange-300 underline">View receipt</button>
+                        ) : (
+                          <span className="text-slate-500">Awaiting receipt</span>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 text-slate-400 text-xs">{fmtDateTime(String(r.createdAt || ''))}</td>
+                      <td className="py-3 px-4">
+                        <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold capitalize ${chip(String(r.status || ''))}`}>{r.status}</span>
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        {pending ? (
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => decide(r.id, 'approve')}
+                              disabled={busy}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-bold"
+                              title="Creates the seats on the facility's dashboard, moves them to the plan and sends the two confirmation emails"
+                            >
+                              {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                              Approve
+                            </button>
+                            <button
+                              onClick={() => { setDeclineId(declineId === r.id ? '' : r.id); setDeclineReason(''); }}
+                              disabled={busy}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-white/10 hover:bg-white/5 disabled:opacity-50 text-slate-300 text-xs font-bold"
+                            >
+                              Decline
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-slate-500 text-xs">Handled</span>
+                        )}
+                      </td>
+                    </tr>
+                    {declineId === r.id && (
+                      <tr>
+                        <td colSpan={8} className="py-3 px-4 bg-white/5">
+                          <div className="flex items-center gap-2">
+                            <input
+                              value={declineReason}
+                              onChange={(e) => setDeclineReason(e.target.value)}
+                              placeholder="Why it is declined (the facility sees this)"
+                              className="flex-1 bg-slate-950/60 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder:text-slate-500 outline-none focus:border-orange-500/60"
+                            />
+                            <button
+                              onClick={() => decide(r.id, 'decline', declineReason)}
+                              disabled={busy}
+                              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white text-xs font-bold"
+                            >
+                              {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Ban className="w-3.5 h-3.5" />}
+                              Confirm decline
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {receiptView && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setReceiptView(null)}>
+          <div className="bg-slate-950 border border-white/10 rounded-3xl max-w-2xl w-full max-h-[92vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/5 shrink-0">
+              <div>
+                <p className="text-sm font-bold text-white">{receiptView.centreName || receiptView.centreId}</p>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {receiptView.planName} · {receiptView.seats} seat{Number(receiptView.seats) === 1 ? '' : 's'} · {`₦${Number(receiptView.total || 0).toLocaleString()}`}
+                </p>
+              </div>
+              <button onClick={() => setReceiptView(null)} className="p-2 text-slate-400 hover:text-white rounded-lg"><X className="w-4 h-4" /></button>
+            </div>
+            <div className="flex-1 overflow-auto bg-slate-900 min-h-[320px] flex items-center justify-center p-4">
+              {/\.pdf($|\?)/i.test(String(receiptView.receiptUrl || ''))
+                ? <iframe src={String(receiptView.receiptUrl)} className="w-full h-[68vh] rounded-xl bg-white" title="Payment receipt" />
+                : <img src={String(receiptView.receiptUrl)} alt="Payment receipt" className="max-w-full max-h-[68vh] object-contain rounded-xl" />}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const TABS = [
   { id: 'overview', label: 'Overview', mlabel: 'Home', icon: LayoutDashboard, group: 'Business' },
   { id: 'leads', label: 'Leads', mlabel: 'Leads', icon: UserPlus, group: 'Business' },
   { id: 'centres', label: 'Facilities', mlabel: 'Facilities', icon: Building2, group: 'Business' },
   { id: 'plans', label: 'Plans', mlabel: 'Plans', icon: Wallet, group: 'Business' },
+  { id: 'upgrades', label: 'Upgrade Requests', mlabel: 'Upgrades', icon: FileText, group: 'Business' },
+  { id: 'proposals', label: 'Proposals', mlabel: 'Proposals', icon: Share2, group: 'Business' },
+  { id: 'settings', label: 'Settings', mlabel: 'Settings', icon: Settings, group: 'Business' },
   { id: 'questions', label: 'Question Bank', mlabel: 'Bank', icon: BookOpen, group: 'Content' },
   { id: 'mocks', label: 'Mocks', mlabel: 'Mocks', icon: CalendarDays, group: 'Content' },
+  { id: 'videos', label: 'Learning Resources', mlabel: 'Learning', icon: MonitorPlay, group: 'Content' },
   { id: 'chat', label: 'Chat', mlabel: 'Chat', icon: MessageSquare, group: 'Content' },
   { id: 'website', label: 'Website', mlabel: 'Website', icon: Globe, group: 'Content' },
   { id: 'audit', label: 'Audit log', mlabel: 'Audit', icon: ScrollText, group: 'System' },
@@ -1072,6 +1378,20 @@ export const TosPortal: React.FC = () => {
   };
   const [mocksCreateKey, setMocksCreateKey] = useState(0);
 
+  // Mobile sections panel: on phones the sections sit by the side, exactly as
+  // arranged on the desktop. The button on the panel collapses it; the round
+  // button brings it back. The choice survives a refresh. Defaults collapsed:
+  // a fresh visitor (or one coming from the landing page) opens the console
+  // with the nav tucked away, never covering the content.
+  const TOS_NAV_KEY = 'tos:navOpen';
+  const [mobileNavOpen, setMobileNavOpenState] = useState<boolean>(() => {
+    try { return localStorage.getItem(TOS_NAV_KEY) === '1'; } catch { return false; }
+  });
+  const setMobileNavOpen = (open: boolean) => {
+    setMobileNavOpenState(open);
+    try { localStorage.setItem(TOS_NAV_KEY, open ? '1' : '0'); } catch { /* storage unavailable */ }
+  };
+
   useEffect(() => {
     const handler = (e: Event) => {
       const id = (e as CustomEvent).detail;
@@ -1095,9 +1415,44 @@ export const TosPortal: React.FC = () => {
   // confirm or a scroll position can never be wiped by a timer, and idle
   // screens cost zero reads.
 
+  // One nav body drives the desktop sidebar and the phone panel, so phones
+  // show the exact same sections, in the same groups, in the same order.
+  const navBody = (
+    <>
+      <nav className="space-y-5 flex-1 min-h-0 overflow-y-auto">
+        {GROUPS.map((g) => (
+          <div key={g}>
+            <p className="text-[9px] font-black uppercase tracking-[0.25em] text-slate-600 px-3.5 mb-1.5">{g}</p>
+            <div className="space-y-1">
+              {TABS.filter((t) => t.group === g).map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => { setTab(t.id); if (typeof window !== 'undefined' && window.innerWidth < 768) setMobileNavOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-colors ${tab === t.id ? 'bg-orange-500/15 text-orange-300 border border-orange-500/30' : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent'}`}
+                >
+                  <t.icon className="w-4 h-4" /> {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </nav>
+      <div className="mt-auto pt-4 border-t border-white/5">
+        <button
+          onClick={() => { window.location.hash = '#landing'; }}
+          className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition-colors"
+          title="Open the Tutorial OS landing page. You stay signed in: three quick taps on the Tutorial OS logo bring you straight back here."
+        >
+          <Globe className="w-4 h-4" />
+          Landing page
+        </button>
+      </div>
+    </>
+  );
+
   return (
     <div className="min-h-screen w-full bg-slate-950 flex">
-      {/* Sidebar */}
+      {/* Sidebar (desktop) */}
       <aside className="hidden md:flex flex-col w-60 shrink-0 border-r border-white/5 bg-slate-950 p-5 sticky top-0 h-screen overflow-hidden">
         <div className="flex items-center gap-2.5 mb-8">
           <div className="w-9 h-9 rounded-xl bg-orange-500/15 border border-orange-500/30 flex items-center justify-center">
@@ -1108,48 +1463,64 @@ export const TosPortal: React.FC = () => {
             <p className="text-sm font-black text-white">Platform</p>
           </div>
         </div>
-        <nav className="space-y-5 flex-1 min-h-0 overflow-y-auto">
-          {GROUPS.map((g) => (
-            <div key={g}>
-              <p className="text-[9px] font-black uppercase tracking-[0.25em] text-slate-600 px-3.5 mb-1.5">{g}</p>
-              <div className="space-y-1">
-                {TABS.filter((t) => t.group === g).map((t) => (
-                  <button
-                    key={t.id}
-                    onClick={() => { setTab(t.id); }}
-                    className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-colors ${tab === t.id ? 'bg-orange-500/15 text-orange-300 border border-orange-500/30' : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent'}`}
-                  >
-                    <t.icon className="w-4 h-4" /> {t.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ))}
-        </nav>
+        {navBody}
       </aside>
 
-      {/* Mobile tab bar: steps aside while the channel chat is open */}
-      {tab !== 'channel' && (
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 backdrop-blur border-t border-white/10 flex overflow-x-auto">
-        {TABS.map((t) => (
-          <button key={t.id} onClick={() => setTab(t.id)} className={`flex-1 min-w-[64px] min-h-[44px] flex flex-col items-center justify-center gap-1 py-2 text-[10px] font-bold ${tab === t.id ? 'text-orange-300' : 'text-slate-500'}`}>
-            <t.icon className="w-4 h-4" /> {t.mlabel}
+      {/* Mobile: the same sections by the side, collapsible. Open by default;
+          the button on the panel collapses it, the round button brings it back. */}
+      <aside
+        className={`md:hidden fixed top-0 left-0 bottom-0 z-50 w-60 bg-slate-950 border-r border-white/5 p-5 flex flex-col overflow-hidden transition-transform duration-300 ease-in-out ${mobileNavOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'}`}
+      >
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-orange-500/15 border border-orange-500/30 flex items-center justify-center">
+              <ShieldCheck className="w-5 h-5 text-orange-400" />
+            </div>
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-[0.35em] text-orange-400">Tutorial OS</p>
+              <p className="text-sm font-black text-white">Platform</p>
+            </div>
+          </div>
+          <button
+            onClick={() => setMobileNavOpen(false)}
+            title="Collapse sections"
+            aria-label="Collapse sections"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
+          >
+            <PanelLeftClose className="w-5 h-5" />
           </button>
-        ))}
-      </div>
+        </div>
+        {navBody}
+      </aside>
+
+      {/* Brings the sections back after collapsing: sits at the top, where the
+          collapse button it mirrors lives */}
+      {!mobileNavOpen && (
+        <button
+          onClick={() => setMobileNavOpen(true)}
+          title="Show sections"
+          aria-label="Show sections"
+          className="md:hidden fixed top-3 left-3 z-40 w-11 h-11 rounded-full bg-slate-900 border border-white/10 text-slate-300 grid place-items-center shadow-lg active:scale-95 transition-transform"
+        >
+          <PanelLeftOpen className="w-5 h-5" />
+        </button>
       )}
 
       {/* Main */}
-      <main className="flex-1 min-w-0 p-5 md:p-8 pb-24 md:pb-8">
-        <header className="mb-6">
+      <main className="flex-1 min-w-0 p-5 md:p-8">
+        <header className={`mb-6 ${!mobileNavOpen ? 'pl-12 md:pl-0' : ''}`}>
           <h1 className="text-2xl font-black text-white tracking-tight capitalize">{TABS.find((t) => t.id === tab)?.label}</h1>
           <p className="text-slate-400 text-xs mt-1">
             {tab === 'overview' && 'Everything happening across the platform right now.'}
             {tab === 'leads' && 'Trial owners who have not yet signed in and set their own password.'}
             {tab === 'centres' && 'Facilities whose owners have set their own password. Plan, seats, billing and access code.'}
-            {tab === 'plans' && 'Pricing, caps and feature flags. All stored as data.'}
+            {tab === 'plans' && 'Pricing and feature flags. All stored as data. Seat settings live under Settings.'}
+            {tab === 'upgrades' && 'Facilities that paid for seats and are waiting on your word. Approving creates their seats and emails them.'}
+            {tab === 'proposals' && 'Generate a partnership proposal link or PDF for any facility, addressed to them by name.'}
+            {tab === 'settings' && 'Seat policy and platform settings. Saved values are enforced live and checked on the server.'}
             {tab === 'questions' && 'Two separate banks: Practice and Mock. Pick one on the hub to work in.'}
             {tab === 'mocks' && "One mock a day for every facility's students. Create, freeze and manage them from here."}
+            {tab === 'videos' && 'YouTube lesson videos for students. Add a link, preview and watch it here, and every facility\'s Learning Resources shows it.'}
             {tab === 'chat' && 'The platform channel, chat settings and escalated reports.'}
             {tab === 'website' && 'Each facility\'s public landing page: template, content and publish.'}
             {tab === 'audit' && 'Every privileged action, recorded.'}
@@ -1164,9 +1535,13 @@ export const TosPortal: React.FC = () => {
         {tab === 'questions' && <QuestionBankShell refreshKey={refreshKey} onNewMock={() => { setTab('mocks'); setMocksCreateKey((k) => k + 1); }} />}
         {tab === 'library' && <QuestionLibraryTab refreshKey={refreshKey} />}
         {tab === 'mocks' && <MocksTab refreshKey={refreshKey} openCreateSignal={mocksCreateKey} />}
+        {tab === 'videos' && <TosVideos refreshKey={refreshKey} />}
         {tab === 'chat' && <TosChat refreshKey={refreshKey} />}
         {tab === 'website' && <WebsiteTab refreshKey={refreshKey} />}
         {tab === 'plans' && <PlansTab />}
+        {tab === 'upgrades' && <UpgradeRequestsTab />}
+        {tab === 'proposals' && <ProposalsTab />}
+        {tab === 'settings' && <SettingsTab />}
         {tab === 'audit' && <AuditTab />}
         {tab === 'team' && <TeamTab />}
         {tab === 'account' && <AccountTab />}

@@ -13,7 +13,7 @@
  * - APP_URL: the public URL of this deployment (optional, used for links).
  */
 import serverless from 'serverless-http';
-// NOTE: bundled fresh on every deploy; bump this comment when server-side files change (v46)
+// NOTE: bundled fresh on every deploy; bump this comment when server-side files change (v48: proposal paths)
 // so the function bundler cache cannot serve a stale bundle.
 // (the Firestore proxy routes in server.ts + src/server/foDbProxy.ts ride the same bundle).
 
@@ -35,6 +35,11 @@ async function getHandler() {
 
 /** Normalize the incoming path to what the Express app expects (/api/...). */
 function normalizePath(pathname: string): string {
+  // Batch 38: /proposal/* is its own function path (pretty proposal links).
+  // Serve it through the unauthenticated /api/public/proposal route.
+  if (pathname.startsWith('/proposal/')) {
+    return '/api/public' + pathname;
+  }
   if (pathname.startsWith('/.netlify/functions/api')) {
     const rest = pathname.slice('/.netlify/functions/api'.length) || '/';
     return '/api' + (rest.startsWith('/') ? rest : '/' + rest);
@@ -109,4 +114,4 @@ export default async function handler(req: Request, context: any): Promise<Respo
   return new Response(body, { status: res.statusCode, headers });
 }
 
-export const config = { path: '/api/*' };
+export const config = { path: ['/api/*', '/proposal/*'] };

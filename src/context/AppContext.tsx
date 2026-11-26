@@ -1,4 +1,6 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { initialsAvatar } from '../lib/avatar';
+import { api } from '../components/tos/tosShared';
 import {
   TenantSettings,
   Branch,
@@ -28,6 +30,7 @@ import {
   CentreEntitlements,
   CentreSeatsSummary,
   CentreUserRole,
+  PlannerActivity,
 } from '../types';
 
 export const SWITCH_REQUIRES_CODE = false;
@@ -46,11 +49,9 @@ import {
   INITIAL_PAYMENTS,
   INITIAL_ANNOUNCEMENTS,
   INITIAL_ADMINS,
-  INITIAL_ACTIVITIES,
   INITIAL_CLASSROOMS,
   INITIAL_ATTENDANCE_SETTINGS,
   INITIAL_SUBJECTS,
-  INITIAL_STUDY_MATERIALS,
 } from '../initialData';
 
 import { 
@@ -65,7 +66,9 @@ import {
   query,
   where,
   addDoc,
-  getDocFromServer
+  getDocFromServer,
+  arrayUnion,
+  arrayRemove
 } from 'firebase/firestore';
 import { initializeApp, deleteApp } from 'firebase/app';
 import { 
@@ -142,6 +145,7 @@ export type AdminSection =
   | 'attendance'
   | 'results'
   | 'cbt'
+  | 'resources'
   | 'payments'
   | 'announcements'
   | 'chat'
@@ -151,6 +155,7 @@ export type AdminSection =
   | 'settings'
   | 'account'
   | 'staff-roles'
+  | 'staff-pay'
   | 'parent-portal'
   | 'student-portal'
   | 'tutor-portal';
@@ -170,7 +175,7 @@ interface ToastMessage {
 
 interface AppContextType {
   settings: TenantSettings;
-  updateSettings: (newSettings: Partial<TenantSettings>) => void;
+  updateSettings: (newSettings: Partial<TenantSettings>, opts?: { silent?: boolean }) => void;
   resetToDefaults: () => void;
 
   branches: Branch[];
@@ -225,12 +230,18 @@ interface AppContextType {
 
   studyMaterials: StudyMaterial[];
   addStudyMaterial: (material: Omit<StudyMaterial, 'id' | 'uploadedAt'>) => Promise<void>;
+  updateStudyMaterial: (id: string, patch: Partial<StudyMaterial>) => Promise<void>;
+  deleteStudyMaterial: (id: string) => Promise<void>;
 
   attendanceSettings: AttendanceSettings;
   updateAttendanceSettings: (settings: Partial<AttendanceSettings>) => void;
 
   attendanceLogs: AttendanceLog[];
   clockIn: (studentId: string) => Promise<void>;
+  plannerReminders: PlannerActivity[];
+  addPlannerReminder: (input: { date: string; time: string; title: string; kind: 'practice' | 'mock' | 'custom' }) => Promise<boolean>;
+  removePlannerReminder: (id: string) => Promise<boolean>;
+  updatePlannerReminder: (id: string, input: { date: string; time: string; title: string; kind: 'practice' | 'mock' | 'custom' }) => Promise<boolean>;
   clockOut: (studentId: string) => Promise<void>;
 
   results: StudentResult[];
@@ -240,8 +251,11 @@ interface AppContextType {
   addCBTQuestion: (question: Omit<CBTQuestion, 'id'>) => void;
 
   payments: PaymentRecord[];
-  recordPayment: (payment: { studentId: string; amountPaid: number; method?: 'Card' | 'Bank Transfer' | 'Cash'; note?: string; evidenceUrl?: string; evidenceName?: string }) => Promise<RecordPaymentResult | void>;
-  confirmPayment: (paymentId: string, action: 'confirm' | 'reject', reason?: string) => Promise<boolean>;
+  recordPayment: (payment: { studentId: string; amountPaid: number; method?: 'Card' | 'Bank Transfer' | 'Cash'; note?: string; evidenceUrl?: string; evidenceName?: string; effectiveFrom?: string; expiresAt?: string }) => Promise<RecordPaymentResult | void>;
+  setStudentTotalFee: (input: { studentId: string; totalFee: number }) => Promise<{ totalFee: number; outstandingBalance: number; paymentStatus: string } | void>;
+  confirmPayment: (paymentId: string, action: 'confirm' | 'reject', reason?: string, dates?: { effectiveFrom?: string; expiresAt?: string }) => Promise<boolean>;
+  /** Admin-only: run the automated payment reminder sweep for this facility right now. */
+  runPaymentReminders: () => Promise<{ ok: boolean; emailed?: number; pushed?: number; chatted?: number; pushReason?: string; error?: string }>;
 
   announcements: Announcement[];
   addAnnouncement: (announcement: Omit<Announcement, 'id' | 'date'>) => void;
@@ -315,7 +329,10 @@ interface AppContextType {
   userCentres: CentreUserRole[];
   entitlements: CentreEntitlements;
   seatsSummary: CentreSeatsSummary | null;
+  planCaps: { planId: string; planName: string; whatsappNotifications: boolean } | null;
   hasCheckedActiveCentre: boolean;
+  passwordChangePending: boolean;
+  setPasswordChangePending: (v: boolean) => void;
   enterCentreByCode: (code: string, centreId?: string) => Promise<{ success: boolean; centreId?: string; error?: string }>;
   resumeCentreSession: (centreId: string) => Promise<void>;
   enterSoleCentre: () => Promise<{ entered: boolean; count: number; error?: string; whatsapp?: string }>;
@@ -324,6 +341,8 @@ interface AppContextType {
   switchCentre: (centreId: string) => Promise<void>;
   refreshSeatsSummary: () => Promise<void>;
   toggleStudentAccess: (studentUid: string, active: boolean) => Promise<void>;
+  setSeatSwitch: (seatId: string, active: boolean) => Promise<void>;
+  assignStudentToSeat: (seatId: string, studentUid: string) => Promise<void>;
   activateStudentMembership: (studentUid: string) => Promise<{ success: boolean; used: number; cap: number }>;
 }
 
@@ -386,14 +405,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const saved = localStorage.getItem(scopedKey('students'));
       if (saved) {
         const parsed: Student[] = JSON.parse(saved);
-        // Ensure student avatars use authentic Nigerian student pictures
-        const MALE_NIGERIAN =
-          'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=500&q=80';
-        const FEMALE_NIGERIAN =
-          'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?auto=format&fit=crop&w=500&q=80';
+        // No profile picture uploaded: the student's own initials, never a
+        // stock-photo placeholder.
         return parsed.map((s) => {
           if (!s.avatar || s.avatar.includes('photo-1534528741775') || s.avatar.includes('photo-1517841905240')) {
-            return { ...s, avatar: s.gender === 'Female' ? FEMALE_NIGERIAN : MALE_NIGERIAN };
+            return { ...s, avatar: initialsAvatar(s.name) };
           }
           return s;
         });
@@ -447,7 +463,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [attendanceSettings, setAttendanceSettings] = useState<AttendanceSettings>(() => {
     try {
       const saved = localStorage.getItem(scopedKey('attendanceSettings'));
-      return saved ? JSON.parse(saved) : INITIAL_ATTENDANCE_SETTINGS;
+      return saved ? { ...INITIAL_ATTENDANCE_SETTINGS, ...JSON.parse(saved) } : INITIAL_ATTENDANCE_SETTINGS;
     } catch {
       return INITIAL_ATTENDANCE_SETTINGS;
     }
@@ -456,9 +472,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [programmes, setProgrammes] = useState<Programme[]>(() => {
     try {
       const saved = localStorage.getItem(scopedKey('programmes'));
-      return saved ? JSON.parse(saved) : INITIAL_PROGRAMMES;
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return INITIAL_PROGRAMMES;
+      return [];
     }
   });
 
@@ -525,14 +541,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   });
 
-  const [activities, setActivities] = useState<ActivityLog[]>(() => {
-    try {
-      const saved = localStorage.getItem(scopedKey('activities'));
-      return saved ? JSON.parse(saved) : INITIAL_ACTIVITIES;
-    } catch {
-      return INITIAL_ACTIVITIES;
-    }
-  });
+  // Recent activities come only from the live Firestore stream; no sample
+  // data and no local cache, so the panel never shows invented logs.
+  const [activities, setActivities] = useState<ActivityLog[]>([]);
 
   const [attendanceLogs, setAttendanceLogs] = useState<AttendanceLog[]>([]);
   const [exams, setExams] = useState<CBTExam[]>([]);
@@ -540,11 +551,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [studyMaterials, setStudyMaterials] = useState<StudyMaterial[]>(() => {
     try {
       const saved = localStorage.getItem(scopedKey('studyMaterials'));
-      return saved ? JSON.parse(saved) : INITIAL_STUDY_MATERIALS;
+      if (!saved) return [];
+      const parsed: StudyMaterial[] = JSON.parse(saved);
+      // Drop the old demo placeholder materials (mat-1..mat-6) cached from earlier builds.
+      return parsed.filter((m) => !/^mat-\d{1,6}$/.test(m.id));
     } catch {
-      return INITIAL_STUDY_MATERIALS;
+      return [];
     }
   });
+
+  // Materials the user just deleted on the server, id -> delete time (ms).
+  // A reconnecting Firestore snapshot can re-deliver a just-deleted doc from
+  // its cache; these are hidden until the stream itself drops them.
+  const recentlyDeletedMaterialsRef = useRef<Map<string, number>>(new Map());
 
   useEffect(() => {
     try {
@@ -578,7 +597,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     aiPerformanceAnalysis: true,
   });
   const [seatsSummary, setSeatsSummary] = useState<CentreSeatsSummary | null>(null);
+  // Plan capabilities for the active facility (WhatsApp reminders are Facility Plus only).
+  const [planCaps, setPlanCaps] = useState<{ planId: string; planName: string; whatsappNotifications: boolean } | null>(null);
   const [hasCheckedActiveCentre, setHasCheckedActiveCentre] = useState(false);
+  // True while a staff or tutor account is mid-way through its first-login
+  // password change: the whole app holds on that one screen until it is done.
+  const [passwordChangePending, setPasswordChangePending] = useState(false);
 
 
   const addStudyMaterial = async (materialData: Omit<StudyMaterial, 'id' | 'uploadedAt'>) => {
@@ -588,11 +612,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ...materialData,
         id: newId,
         uploadedAt: new Date().toISOString(),
+        updatedAt: Date.now(),
       };
       setStudyMaterials((prev) => [newMaterial, ...prev]);
 
       try {
-        await setDoc(doc(db, 'studyMaterials', newId), tenantWrite(newMaterial));
+        // The server route writes through the Admin SDK, so the upload reaches
+        // every student of the centre even when the deployed Firestore rules
+        // release is older than the app. The direct write stays as fallback.
+        let saved = false;
+        try {
+          await api(`/api/centre/study-materials?centreId=${encodeURIComponent(activeCentreId || '')}`, {
+            method: 'POST',
+            body: { centreId: activeCentreId, material: newMaterial },
+          });
+          saved = true;
+        } catch (serverErr: any) {
+          console.warn('Study material server save failed, trying direct write:', serverErr?.message || serverErr);
+        }
+        if (!saved) {
+          // Firestore rejects `undefined` values (an unset topic/description on
+          // general materials): strip them so the save writes only real fields.
+          const payload = JSON.parse(JSON.stringify(tenantWrite(newMaterial)));
+          await setDoc(doc(db, 'studyMaterials', newId), payload);
+        }
+        // Students taking this subject get a notification about the upload.
+        const typeLabel = newMaterial.type === 'video' ? 'Video link' : newMaterial.type === 'image' ? 'Image' : (newMaterial.fileType || 'PDF');
+        void api('/api/notifications/push', { method: 'POST', body: {
+          centreId: (newMaterial as any).centreId || activeCentreId,
+          type: 'material',
+          title: 'New study material',
+          body: `${newMaterial.title} (${newMaterial.subject}, ${typeLabel})`,
+          subjects: [newMaterial.subject],
+        } }).catch(() => {});
       } catch (err) {
         console.warn('Firestore studyMaterial save (using local):', err);
       }
@@ -604,6 +656,82 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
     } catch (e) {
       console.error('Error adding study material:', e);
+    }
+  };
+
+  // Edit an existing study material: update the local list at once, then
+  // replace the Firestore document with the merged copy (undefined fields
+  // stripped, same as the add path).
+  const updateStudyMaterial = async (id: string, patch: Partial<StudyMaterial>) => {
+    try {
+      const current = studyMaterials.find((m) => m.id === id);
+      if (!current) return;
+      // The server rejects undefined field values, and a general material's
+      // edit patch used to carry one (topic: undefined), which silently
+      // failed the whole save. Drop undefined keys before anything leaves.
+      const editStamp = Date.now();
+      const cleanPatch = JSON.parse(JSON.stringify({ ...patch, updatedAt: editStamp })) as Partial<StudyMaterial>;
+      const merged: StudyMaterial = { ...current, ...cleanPatch };
+      setStudyMaterials((prev) => prev.map((m) => (m.id === id ? merged : m)));
+      let saved = false;
+      try {
+        await api(`/api/centre/study-materials/${encodeURIComponent(id)}?centreId=${encodeURIComponent(activeCentreId || '')}`, {
+          method: 'PATCH',
+          body: { centreId: activeCentreId, patch: cleanPatch },
+        });
+        saved = true;
+      } catch (serverErr: any) {
+        console.warn('Study material server update failed, trying direct write:', serverErr?.message || serverErr);
+      }
+      try {
+        if (!saved) {
+          const payload = JSON.parse(JSON.stringify(tenantWrite(merged)));
+          await setDoc(doc(db, 'studyMaterials', id), payload);
+        }
+        addToast({
+          type: 'success',
+          title: 'Material Updated',
+          description: `"${merged.title}" was saved.`,
+        });
+      } catch (err) {
+        console.warn('Firestore studyMaterial update (local only):', err);
+        addToast({
+          type: 'error',
+          title: 'Not Saved',
+          description: 'The change could not be saved. Please try again.',
+        });
+      }
+    } catch (e) {
+      console.error('Error updating study material:', e);
+    }
+  };
+
+  // Delete runs on the server (ownership + centre isolation checked there, via
+  // the Admin SDK) so it cannot be blocked by a stale rules release. The local
+  // list updates first; on failure the material is put back.
+  const deleteStudyMaterial = async (id: string) => {
+    try {
+      const removed = studyMaterials.find((m) => m.id === id);
+      setStudyMaterials((prev) => prev.filter((m) => m.id !== id));
+      try {
+        await api(`/api/centre/study-materials/${encodeURIComponent(id)}?centreId=${encodeURIComponent(activeCentreId || '')}`, { method: 'DELETE' });
+        recentlyDeletedMaterialsRef.current.set(id, Date.now());
+        addToast({
+          type: 'success',
+          title: 'Material Deleted',
+          description: removed ? `"${removed.title}" was removed.` : 'The material was removed.',
+        });
+      } catch (err: any) {
+        console.warn('Study material delete failed:', err);
+        if (removed) setStudyMaterials((prev) => [removed, ...prev]);
+        addToast({
+          type: 'error',
+          title: 'Not Deleted',
+          description: err?.message || 'The material could not be deleted. Please try again.',
+        });
+      }
+    } catch (e) {
+      console.error('Error deleting study material:', e);
     }
   };
 
@@ -949,15 +1077,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isAdmin, setIsAdmin] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
 
-  // Safety timeout for auth loading to prevent stuck loading screen in case of connectivity issues
+  // Safety timeout for auth loading to prevent stuck loading screen in case of connectivity issues.
+  // A saved facility session on this device means an account is signed in here:
+  // its restore is local and normally instant, so a slow start must wait for it
+  // instead of treating the account as signed out and showing the access-code
+  // gate and login again. Without a saved session the 6-second guard still applies.
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (isAuthLoading) {
-        console.warn("Auth initialization timed out, proceeding with default state.");
-        setIsAuthLoading(false);
+    if (!isAuthLoading) return;
+    const deviceHasSavedSession = () => {
+      try { return Object.keys(localStorage).some((k) => k.startsWith('tos_tenant:')); } catch { return false; }
+    };
+    const proceedAsSignedOut = () => {
+      console.warn("Auth initialization timed out, proceeding with default state.");
+      setIsAuthLoading(false);
+    };
+    let lateTimer: ReturnType<typeof setTimeout> | undefined;
+    const earlyTimer = setTimeout(() => {
+      if (deviceHasSavedSession()) {
+        lateTimer = setTimeout(proceedAsSignedOut, 30000);
+      } else {
+        proceedAsSignedOut();
       }
-    }, 6000); // 6 seconds safety window
-    return () => clearTimeout(timer);
+    }, 6000);
+    return () => { clearTimeout(earlyTimer); if (lateTimer) clearTimeout(lateTimer); };
   }, [isAuthLoading]);
 
   // Auth State Listener & Admin Verification
@@ -1121,6 +1263,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => unsub();
   }, []);
 
+  // The uid the facility session state belongs to: a different account
+  // signing in never inherits the previous account's facility.
+  const lastAuthUidRef = useRef<string | null>(null);
+
   // -------------------------------------------------------------------------
   // MULTI-TENANT INITIALIZATION & REFRESH (Prompt 3)
   // -------------------------------------------------------------------------
@@ -1129,6 +1275,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setHasCheckedActiveCentre(true);
       return;
     }
+
+    // A different account signing in must never inherit the previous
+    // account's facility session, not even for the moment before its own
+    // validation comes back: clear the previous facility first.
+    if (lastAuthUidRef.current && lastAuthUidRef.current !== user.uid) {
+      setActiveCentreId(null);
+      setActiveCentre(null);
+      setUserCentres([]);
+      setSeatsSummary(null);
+      try {
+        sessionStorage.removeItem('tos_activeCentreId');
+        sessionStorage.removeItem('tos_activeCentreOwner');
+      } catch { /* storage unavailable */ }
+    }
+    lastAuthUidRef.current = user.uid;
 
     const initTenantSession = async () => {
       try {
@@ -1157,7 +1318,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         // 3. Check & Validate activeCentreId from sessionStorage (Part A, point 4)
         const savedCentreId = sessionStorage.getItem('tos_activeCentreId');
-        if (savedCentreId) {
+        const savedCentreOwner = sessionStorage.getItem('tos_activeCentreOwner');
+        if (savedCentreId && savedCentreOwner && savedCentreOwner !== user.uid) {
+          // The saved facility session belongs to a different account: drop
+          // it before anything else, so no other user's facility can leak
+          // into this one.
+          sessionStorage.removeItem('tos_activeCentreId');
+          sessionStorage.removeItem('tos_activeCentreOwner');
+        } else if (savedCentreId) {
           const valRes = await fetch('/api/auth/validate-active-centre', {
             method: 'POST',
             headers: {
@@ -1182,6 +1350,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 if (sData.success && sData.summary) setSeatsSummary(sData.summary);
               })
               .catch((e) => console.warn('seats summary error:', e));
+            fetchPlanCaps(savedCentreId);
           } else {
             sessionStorage.removeItem('tos_activeCentreId');
             setActiveCentreId(null);
@@ -1223,6 +1392,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setActiveCentre(data.centre);
     if (data.entitlements) setEntitlements(data.entitlements);
     sessionStorage.setItem('tos_activeCentreId', centreId);
+    try { sessionStorage.setItem('tos_activeCentreOwner', firebaseAuth.currentUser?.uid || ''); } catch { /* storage unavailable */ }
     try { localStorage.setItem(`tos_tenant:${centreId}`, centreId); } catch { /* storage unavailable */ }
     fetch(`/api/centre/seats-summary?centreId=${centreId}`, {
       headers: { Authorization: `Bearer ${token}` },
@@ -1232,6 +1402,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (sData.success && sData.summary) setSeatsSummary(sData.summary);
       })
       .catch((e) => console.warn('seats summary error:', e));
+    fetchPlanCaps(centreId);
     fetch('/api/session/sync', {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
@@ -1264,6 +1435,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setActiveCentre(data.centre);
     if (data.entitlements) setEntitlements(data.entitlements);
     sessionStorage.setItem('tos_activeCentreId', data.centreId);
+    try { sessionStorage.setItem('tos_activeCentreOwner', firebaseAuth.currentUser?.uid || ''); } catch { /* storage unavailable */ }
     // Keep the tenant on this device per facility, so a facility app (and a
     // page refresh or relaunch) restores its own dashboard without asking for
     // anything. The value is always re-validated with the server before use.
@@ -1289,12 +1461,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } else {
       setViewMode('portal');
     }
-
-    addToast({
-      type: 'success',
-      title: 'Welcome to ' + data.centre.name,
-      description: `Access code verified successfully. Role: ${data.role}`,
-    });
 
     return { success: true, centreId: data.centreId };
   };
@@ -1322,6 +1488,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (data.status === 'active') {
       setActiveCentreId(data.centreId);
       sessionStorage.setItem('tos_activeCentreId', data.centreId);
+      try { sessionStorage.setItem('tos_activeCentreOwner', firebaseAuth.currentUser?.uid || ''); } catch { /* storage unavailable */ }
       setViewMode('student');
       addToast({
         type: 'success',
@@ -1365,6 +1532,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setActiveCentre(data.centre);
       if (data.entitlements) setEntitlements(data.entitlements);
       sessionStorage.setItem('tos_activeCentreId', targetCentreId);
+      try { sessionStorage.setItem('tos_activeCentreOwner', firebaseAuth.currentUser?.uid || ''); } catch { /* storage unavailable */ }
       addToast({
         type: 'success',
         title: 'Switched Facility',
@@ -1438,6 +1606,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setActiveCentre(valData.centre);
       if (valData.entitlements) setEntitlements(valData.entitlements);
       sessionStorage.setItem('tos_activeCentreId', target.centreId);
+      try { sessionStorage.setItem('tos_activeCentreOwner', firebaseAuth.currentUser?.uid || ''); } catch { /* storage unavailable */ }
       refreshSeatsSummary(target.centreId);
       if (valData.role === 'student') setViewMode('student');
       else if (valData.role === 'tutor') setViewMode('tutor');
@@ -1448,10 +1617,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  // Plan capabilities gate notification methods: WhatsApp reminders are a
+  // Facility Plus feature; Standard facilities never see WhatsApp options.
+  const fetchPlanCaps = async (cId?: string) => {
+    const centre = cId || activeCentreId;
+    if (!centre || !user) return;
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/centre/plan?centreId=${encodeURIComponent(centre)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (data?.ok) setPlanCaps({ planId: data.planId, planName: data.planName, whatsappNotifications: data.whatsappNotifications === true });
+      else setPlanCaps(null); // unknown plan: fail closed (no WhatsApp)
+    } catch {
+      setPlanCaps(null); // unknown plan: fail closed (no WhatsApp)
+    }
+  };
+
   const refreshSeatsSummary = async (targetId?: string) => {
     const cId = targetId || activeCentreId;
     if (!cId || !user) return;
     try {
+      fetchPlanCaps(cId);
       const token = await user.getIdToken();
       const res = await fetch(`/api/centre/seats-summary?centreId=${cId}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -1496,6 +1684,50 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
   };
 
+  const setSeatSwitch = async (seatId: string, active: boolean) => {
+    if (!user) throw new Error('You must be signed in.');
+    const token = await user.getIdToken();
+    if (!activeCentreId) throw new Error('Select your facility first.');
+    const cId = activeCentreId;
+    const res = await fetch('/api/centre/seats/seat-switch', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ centreId: cId, seatId, active }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.message || data.error || 'Failed to switch the seat.');
+    }
+
+    await refreshSeatsSummary(cId);
+  };
+
+  const assignStudentToSeat = async (seatId: string, studentUid: string) => {
+    if (!user) throw new Error('You must be signed in.');
+    const token = await user.getIdToken();
+    if (!activeCentreId) throw new Error('Select your facility first.');
+    const cId = activeCentreId;
+    const res = await fetch('/api/centre/seats/assign', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ centreId: cId, seatId, studentUid }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.message || data.error || 'Failed to assign the student to the seat.');
+    }
+
+    await refreshSeatsSummary(cId);
+  };
+
   const activateStudentMembership = async (studentUid: string) => {
     if (!user) throw new Error('You must be signed in.');
     const token = await user.getIdToken();
@@ -1524,9 +1756,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [bgTheme, setBgThemeState] = useState<'light' | 'dark'>(() => {
     try {
       const saved = localStorage.getItem(`${STORAGE_KEY}_bgTheme`);
-      return saved === 'light' ? 'light' : 'dark';
+      return saved === 'dark' ? 'dark' : 'light';
     } catch {
-      return 'dark';
+      return 'light';
     }
   });
 
@@ -1566,7 +1798,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       localStorage.setItem(scopedKey('announcements'), JSON.stringify(announcements));
       localStorage.setItem(scopedKey('admins'), JSON.stringify(admins));
       localStorage.setItem(`${STORAGE_KEY}_testimonials`, JSON.stringify(testimonials));
-      localStorage.setItem(scopedKey('activities'), JSON.stringify(activities));
     } catch {
       // ignore storage quota errors in private browsing
     }
@@ -1592,16 +1823,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const addToast = (toast: Omit<ToastMessage, 'id'>) => {
     const id = `toast-${Date.now()}-${Math.random()}`;
     setToasts((prev) => [...prev, { ...toast, id }]);
+    const dwell = toast.type === 'error' ? 6000 : 4200;
     setTimeout(() => {
       removeToast(id);
-    }, 1200);
+    }, dwell);
   };
 
   const removeToast = (id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
-  const updateSettings = async (newSettings: Partial<TenantSettings>) => {
+  const updateSettings = async (newSettings: Partial<TenantSettings>, opts?: { silent?: boolean }) => {
     try {
       const updated = { ...settings, ...newSettings };
       if (newSettings.whatsappNumber && !newSettings.whatsapp) {
@@ -1613,14 +1845,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (!activeCentreId) throw new Error('Select your facility before saving settings.');
       await setDoc(doc(db, 'centreSettings', `${activeCentreId}__global`), updated);
       setSettingsState(updated);
-      addToast({
-        type: 'success',
-        title: 'Settings Updated',
-        description: 'Education facility configuration updated successfully.',
-      });
+      // Name exactly what changed, never a generic "settings were updated".
+      const changedSettings = (Object.keys(updated) as (keyof typeof updated)[])
+        .filter((k) => {
+          const before = (settings as any)[k];
+          const after = (updated as any)[k];
+          if (typeof before === 'object' || typeof after === 'object') {
+            return JSON.stringify(before) !== JSON.stringify(after);
+          }
+          return before !== after;
+        })
+        .slice(0, 4)
+        .map((k) => {
+          const before = (settings as any)[k];
+          const after = (updated as any)[k];
+          const short = (v: any) => {
+            const str = String(v ?? 'empty');
+            return str.length > 40 ? `${str.slice(0, 40)}…` : str;
+          };
+          return `${String(k)}: ${short(before)} → ${short(after)}`;
+        });
+      // Screens with their own tailored message pass { silent: true } so the
+      // action still shows exactly one toast.
+      if (!opts?.silent) {
+        addToast({
+          type: 'success',
+          title: 'Settings Updated',
+          description: 'Education facility configuration updated successfully.',
+        });
+      }
       logActivity({
-        title: 'Facility Configuration Modified',
-        subtitle: `Updated by ${activeUser?.name || 'Admin'}`,
+        title: changedSettings.length > 0
+          ? `Settings Changed: ${changedSettings[0].split(':')[0]}`
+          : 'Facility Settings Opened & Saved',
+        subtitle: changedSettings.length > 0 ? changedSettings.join(' · ') : 'No field values changed',
+        details: changedSettings.join('; '),
         category: 'CMS',
         type: 'info',
       });
@@ -1643,7 +1902,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setPayments(INITIAL_PAYMENTS);
     setAnnouncements(INITIAL_ANNOUNCEMENTS);
     setAdmins(INITIAL_ADMINS);
-    setActivities(INITIAL_ACTIVITIES);
+    setActivities([]);
     setClassrooms(INITIAL_CLASSROOMS);
     setAttendanceSettings(INITIAL_ATTENDANCE_SETTINGS);
     setActiveTutor(INITIAL_TUTORS[0] || null);
@@ -1661,14 +1920,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (!activeCentreId) throw new Error('Select your facility before saving website content.');
       await setDoc(doc(db, 'centreSettings', `${activeCentreId}__cms`), updated);
       setCmsState(updated);
+      const changedCms = (Object.keys(newCms) as (keyof CMSContent)[])
+        .filter((k) => JSON.stringify((cms as any)[k]) !== JSON.stringify((newCms as any)[k]))
+        .map((k) => String(k));
       addToast({
         type: 'success',
         title: 'Website CMS Saved',
         description: 'Changes are now live on your public education facility website.',
       });
       logActivity({
-        title: 'Live Website Content Published',
-        subtitle: 'CMS sections synchronized',
+        title: changedCms.length > 0
+          ? `Website Content Published: ${changedCms.slice(0, 3).join(', ')}`
+          : 'Website Content Saved',
+        subtitle: changedCms.length > 0 ? `Updated ${changedCms.length} section${changedCms.length === 1 ? '' : 's'}` : 'No sections changed',
+        details: changedCms.join(', '),
         category: 'CMS',
         type: 'success',
       });
@@ -2044,7 +2309,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Activities listener
     let qActivities = centreQuery('activities');
     const unsubActivities = isAdmin ? onSnapshot(qActivities, (snapshot) => {
-      const data = scopedDocs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as ActivityLog)));
+      // Newest first, and every record carries the real moment it happened.
+      // Older records hold the moment only inside their id (act-<ms>), so the
+      // id backfills the stamp before the feed sorts.
+      const data = scopedDocs(snapshot.docs.map(doc => {
+        const act: ActivityLog = { ...(doc.data() as ActivityLog), id: doc.id };
+        if (!act.createdAt) {
+          const ms = Number(String(act.id).replace(/^act-/, ''));
+          if (Number.isFinite(ms) && ms > 0) act.createdAt = ms;
+        }
+        return act;
+      }));
+      data.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
       setActivities(data);
     }, (error) => handleFirestoreError(error, OperationType.GET, 'activities')) : () => {};
 
@@ -2055,11 +2331,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }, (error) => console.warn('classRatings snapshot error:', error));
 
     // Study Materials listener
+    // While Firestore rules still deny studyMaterials reads/writes, an upload
+    // only reaches local state (the write fails, so the server stream never
+    // carries it) and an empty or reconnecting snapshot would wipe it, along
+    // with the copy hydrated from localStorage. Merge the server view with
+    // locally-added entries (mat- ids) until the server stream carries them;
+    // once rules allow the write, the doc arrives in the stream and dedupes.
     const unsubStudyMaterials = onSnapshot(centreQuery('studyMaterials'), (snapshot) => {
-      if (!snapshot.empty) {
-        const data = scopedDocs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as StudyMaterial)));
-        setStudyMaterials(data);
-      }
+      const data = scopedDocs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as StudyMaterial)));
+      setStudyMaterials((prev) => {
+        const serverIds = new Set(data.map(d => d.id));
+        const deleted = recentlyDeletedMaterialsRef.current;
+        for (const [k, t] of deleted) if (Date.now() - t > 120000) deleted.delete(k);
+        // A snapshot that reconnects mid-save (or replays the local cache) can
+        // carry a copy that predates the server write; a locally newer edit
+        // (stamped at save time, same stamp the server stores) must win until
+        // the stream itself carries the save.
+        const guarded = data
+          .filter((d) => {
+            const del = deleted.get(d.id);
+            return !(del && ((d as any).updatedAt || 0) <= del);
+          })
+          .map((d) => {
+            const local = prev.find((m) => m.id === d.id);
+            if (local && (((local as any).updatedAt || 0) > ((d as any).updatedAt || 0))) {
+              return { ...d, ...local } as StudyMaterial;
+            }
+            return d;
+          });
+        const localOnly = prev.filter(m => !serverIds.has(m.id) && typeof m.id === 'string' && m.id.startsWith('mat-'));
+        return [...localOnly, ...guarded];
+      });
     }, (error) => console.warn('studyMaterials snapshot error:', error));
 
     return () => {
@@ -2128,6 +2430,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         description: `${studentData.name} has been registered successfully.`,
       });
       refreshSeatsSummary(cId);
+      logActivity({
+        title: `Student Enrolled: ${studentData.name}`,
+        subtitle: `${studentData.programmeName || 'Programme'} • Registered by ${activeUser?.name || 'Admin'}`,
+        category: 'Students',
+        type: 'success',
+      });
     } catch (e: any) {
       console.error(e);
       addToast({ 
@@ -2139,18 +2447,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const updateStudent = async (id: string, studentData: Partial<Student>) => {
+  const updateStudent = async (id: string, studentData: Partial<Student>, opts?: { silent?: boolean }) => {
     try {
       await updateDoc(doc(db, 'students', id), studentData);
       // Refresh the in-app copy too: the menu header, tabs and chat read this
       // list, so a saved change (a new profile picture, for instance) shows
       // everywhere at once instead of only after a reload.
       setStudents((prev) => prev.map((st) => (st.id === id ? { ...st, ...studentData } : st)));
-      addToast({
-        type: 'success',
-        title: 'Student Record Updated',
-        description: 'Student profile details saved successfully.',
+      logActivity({
+        title: `Student Record Updated: ${studentData.name || 'a student'}`,
+        subtitle: `Changed ${(Object.keys(studentData) as string[]).slice(0, 3).join(', ') || 'profile details'} • By ${activeUser?.name || 'Admin'}`,
+        category: 'Students',
+        type: 'info',
       });
+      // Screens with their own tailored message pass { silent: true } so the
+      // action still shows exactly one toast.
+      if (!opts?.silent) {
+        addToast({
+          type: 'success',
+          title: 'Student Record Updated',
+          description: 'Student profile details saved successfully.',
+        });
+      }
     } catch (e) {
       console.error(e);
     }
@@ -2162,6 +2480,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       addToast({
         type: 'info',
         title: 'Student Removed',
+      });
+      logActivity({
+        title: 'Student Removed',
+        subtitle: `Student record deleted • By ${activeUser?.name || 'Admin'}`,
+        category: 'Students',
+        type: 'danger',
       });
     } catch (e) {
       console.error(e);
@@ -2248,7 +2572,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const newStudent: Student = {
         id: studentId,
         name: app.applicantName,
-        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+        avatar: initialsAvatar(app.applicantName),
         phone: app.phone,
         email: app.email,
         gender: app.gender,
@@ -2334,6 +2658,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         title: 'Tutor Added',
         description: `${tutorData.name} has been enrolled in the faculty team.`,
       });
+      logActivity({
+        title: `Tutor Added: ${tutorData.name}`,
+        subtitle: `${(tutorData.subjects || []).slice(0, 2).join(', ') || 'Faculty'} • Added by ${activeUser?.name || 'Admin'}`,
+        category: 'Schools',
+        type: 'success',
+      });
     } catch (e: any) {
       console.error(e);
       addToast({ 
@@ -2359,6 +2689,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         title: 'Tutor Profile Updated',
         description: 'Faculty details saved successfully.',
       });
+      logActivity({
+        title: `Tutor Record Updated: ${tutorData.name || 'a tutor'}`,
+        subtitle: `Changed ${(Object.keys(tutorData) as string[]).slice(0, 3).join(', ') || 'profile details'} • By ${activeUser?.name || 'Admin'}`,
+        category: 'Schools',
+        type: 'info',
+      });
     } catch (e: any) {
       console.error(e);
       addToast({ type: 'error', title: 'Update Failed', description: 'Could not sync with database.' });
@@ -2373,6 +2709,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         type: 'info',
         title: 'Tutor Removed',
         description: 'Tutor removed from faculty.',
+      });
+      logActivity({
+        title: 'Tutor Removed',
+        subtitle: `Tutor deleted from faculty • By ${activeUser?.name || 'Admin'}`,
+        category: 'Schools',
+        type: 'danger',
       });
     } catch (e) {
       console.error(e);
@@ -2493,11 +2835,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         enrolledStudents: 0,
       };
       await setDoc(doc(db, 'programmes', id), tenantWrite(newProg));
-      addToast({
+      logActivity({
+        title: `Programme Created: ${progData.name}`,
+        subtitle: `Fee ${progData.fee} • Created by ${activeUser?.name || 'Admin'}`,
+        category: 'Schools',
         type: 'success',
-        title: 'Programme Created',
-        description: `${progData.name} is now available on the website and registration form.`,
       });
+      // No toast here: every caller shows exactly one tailored toast for the
+      // programme it just created.
     } catch (e) {
       handleFirestoreError(e, OperationType.CREATE, 'programmes');
     }
@@ -2506,11 +2851,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateProgramme = async (id: string, progData: Partial<Programme>) => {
     try {
       await updateDoc(doc(db, 'programmes', id), progData);
-      addToast({
-        type: 'success',
-        title: 'Programme Updated',
-        description: 'Curriculum & fee changes saved.',
-      });
+      // Fee changed: pull every student registered on this exam programme to
+      // the programme's new fee. The server keeps each paid amount and
+      // recomputes the balance and payment status.
+      if (typeof progData.fee === 'number' && progData.fee > 0) {
+        {
+          try {
+            await api('/api/programme/sync-fee', { method: 'POST', body: { programmeId: id } });
+          } catch (syncErr) {
+            console.warn('Programme fee sync failed:', syncErr);
+            addToast({
+              type: 'error',
+              title: 'Fee sync failed',
+              description: 'The fee was saved, but student balances could not be updated. Open the exam programme and save the fee again.',
+            });
+          }
+        }
+      }
+      // No toast here: callers show exactly one tailored toast per action.
     } catch (e) {
       handleFirestoreError(e, OperationType.UPDATE, 'programmes');
     }
@@ -2529,10 +2887,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       Object.keys(newSlot).forEach(key => newSlot[key] === undefined && delete newSlot[key]);
 
       await setDoc(doc(db, 'timetable', id), tenantWrite(newSlot));
+      // Students taking this subject get a notification about the new class.
+      void api('/api/notifications/push', { method: 'POST', body: {
+        centreId: newSlot.centreId || activeCentreId,
+        type: 'class',
+        title: 'New class scheduled',
+        body: `${newSlot.subject}${newSlot.topic ? ': ' + newSlot.topic : ''} - ${newSlot.day} ${newSlot.time}`,
+        subjects: [newSlot.subject],
+      } }).catch(() => {});
       addToast({
         type: 'success',
         title: 'Timetable Slot Added',
         description: `${slotData.subject} on ${slotData.day} at ${slotData.time}`,
+      });
+      logActivity({
+        title: `Class Scheduled: ${slotData.subject}`,
+        subtitle: `${slotData.day} ${slotData.time} • Tutor: ${slotData.tutorName} • By ${activeUser?.name || 'Admin'}`,
+        category: 'Timetable',
+        type: 'success',
       });
     } catch (e) {
       handleFirestoreError(e, OperationType.CREATE, 'timetable');
@@ -2552,11 +2924,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         Object.keys(newSlot).forEach(key => newSlot[key] === undefined && delete newSlot[key]);
 
         await setDoc(doc(db, 'timetable', id), tenantWrite(newSlot));
+      // Students taking this subject get a notification about the new class.
+      void api('/api/notifications/push', { method: 'POST', body: {
+        centreId: newSlot.centreId || activeCentreId,
+        type: 'class',
+        title: 'New class scheduled',
+        body: `${newSlot.subject}${newSlot.topic ? ': ' + newSlot.topic : ''} - ${newSlot.day} ${newSlot.time}`,
+        subjects: [newSlot.subject],
+      } }).catch(() => {});
       }
       addToast({
         type: 'success',
         title: 'Multiple Classes Scheduled',
         description: `${slotsData.length} classes have been added to the timetable.`,
+      });
+      logActivity({
+        title: `${slotsData.length} Classes Scheduled`,
+        subtitle: `${slotsData[0]?.subject || 'Classes'} and more • By ${activeUser?.name || 'Admin'}`,
+        category: 'Timetable',
+        type: 'success',
       });
     } catch (e) {
       handleFirestoreError(e, OperationType.CREATE, 'timetable');
@@ -2587,6 +2973,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         title: 'Timetable Slot Removed',
         description: 'Schedule slot removed.',
       });
+      logActivity({
+        title: 'Scheduled Class Deleted',
+        subtitle: `Timetable slot removed • By ${activeUser?.name || 'Admin'}`,
+        category: 'Timetable',
+        type: 'danger',
+      });
     } catch (e) {
       handleFirestoreError(e, OperationType.DELETE, 'timetable');
     }
@@ -2614,6 +3006,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         type: 'success',
         title: 'Timetable Updated',
         description: 'Class schedule updated successfully.',
+      });
+      logActivity({
+        title: 'Class Schedule Modified',
+        subtitle: `Changed ${(Object.keys(slotData) as string[]).filter((k) => k !== 'status').slice(0, 3).join(', ') || 'schedule details'} • By ${activeUser?.name || 'Admin'}`,
+        category: 'Timetable',
+        type: 'info',
       });
     } catch (e) {
       handleFirestoreError(e, OperationType.UPDATE, 'timetable');
@@ -2816,6 +3214,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     note?: string;
     evidenceUrl?: string;
     evidenceName?: string;
+    effectiveFrom?: string;
+    expiresAt?: string;
   }): Promise<RecordPaymentResult | void> => {
     // Payments go through the server payment route only. A student's call
     // stores a 'Pending' claim and changes no balance; an admin's call is
@@ -2851,7 +3251,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
   // Admin-only: confirm or reject a student's pending payment claim. The server
   // applies the stored amount to the student's balance; the client sends no money.
-  const confirmPayment = async (paymentId: string, action: 'confirm' | 'reject', reason?: string): Promise<boolean> => {
+  const confirmPayment = async (paymentId: string, action: 'confirm' | 'reject', reason?: string, dates?: { effectiveFrom?: string; expiresAt?: string }): Promise<boolean> => {
     try {
       const token = await firebaseAuth.currentUser?.getIdToken();
       if (!token) throw new Error('You are signed out. Sign in and try again.');
@@ -2861,7 +3261,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ paymentId, action, reason }),
+        body: JSON.stringify({ paymentId, action, reason, ...(dates || {}) }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data?.success) {
@@ -2874,11 +3274,90 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           ? `Receipt ${data.receiptNumber} issued and the student's balance updated.`
           : 'The student has been shown the payment as rejected.',
       });
+      logActivity({
+        title: action === 'confirm' ? `Payment Confirmed: ${data.studentName || 'student payment'}` : 'Payment Claim Rejected',
+        subtitle: action === 'confirm'
+          ? `Receipt ${data.receiptNumber} issued${data.amount ? ` • ${settings.currencySymbol || '₦'}${Number(data.amount).toLocaleString()}` : ''} • By ${activeUser?.name || 'Admin'}`
+          : `Reason: ${reason || 'not stated'} • By ${activeUser?.name || 'Admin'}`,
+        category: 'Finance',
+        type: action === 'confirm' ? 'success' : 'danger',
+      });
       return true;
     } catch (e) {
       console.error(e);
       addToast({ type: 'error', title: 'Payment Not Updated', description: (e as Error)?.message || 'Could not update the payment.' });
       return false;
+    }
+  };
+
+  // Admin-only: run the automated payment reminder sweep for this facility
+  // right now (the "Run reminders now" button in Fees & Payments). The server
+  // decides who is due and sends the configured channels; the client sends
+  // nothing itself.
+  const runPaymentReminders = async (): Promise<{ ok: boolean; emailed?: number; pushed?: number; chatted?: number; pushReason?: string; error?: string }> => {
+    try {
+      const token = await firebaseAuth.currentUser?.getIdToken();
+      if (!token) throw new Error('You are signed out. Sign in and try again.');
+      const res = await fetch('/api/centre/reminders/run', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ centreId: activeCentreId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || 'The reminders could not run. Please try again.');
+      }
+      const r = data.reminders || {};
+      return {
+        ok: true,
+        emailed: Number(r.emailed) || 0,
+        pushed: Number(r.pushed) || 0,
+        chatted: Number(r.chatted) || 0,
+        pushReason: String(data.push?.reason || ''),
+      };
+    } catch (e) {
+      console.error(e);
+      return { ok: false, error: (e as Error)?.message || 'Could not run the reminders.' };
+    }
+  };
+
+  // Admin-only: set the student's total fee. The server recomputes the
+  // outstanding balance and payment status, so no device ever sends balance
+  // numbers; the client only reads back what the server wrote.
+  const setStudentTotalFee = async (input: { studentId: string; totalFee: number }): Promise<{ totalFee: number; outstandingBalance: number; paymentStatus: string } | void> => {
+    try {
+      const token = await firebaseAuth.currentUser?.getIdToken();
+      if (!token) throw new Error('You are signed out, so the fee cannot be set. Sign in and try again.');
+      const res = await fetch('/api/centre/students/set-fee', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(input),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || 'The fee could not be set. Please try again.');
+      }
+      const s = data.student || {};
+      addToast({
+        type: 'success',
+        title: 'Fee Updated',
+        description: `Total fee set to ${settings.currencySymbol}${Number(input.totalFee).toLocaleString()}. The balance now reflects it.`,
+      });
+      return {
+        totalFee: typeof s.totalFee === 'number' ? s.totalFee : input.totalFee,
+        outstandingBalance: typeof s.outstandingBalance === 'number' ? s.outstandingBalance : 0,
+        paymentStatus: typeof s.paymentStatus === 'string' ? s.paymentStatus : 'Pending',
+      };
+    } catch (e) {
+      console.error(e);
+      addToast({ type: 'error', title: 'Fee Not Updated', description: (e as Error)?.message || 'Could not set the fee.' });
+      return;
     }
   };
 
@@ -2891,6 +3370,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Prompt PF2: wipe every saved last-good copy before the session ends,
     // so nothing is left on the device after sign-out.
     clearAllLastGood();
+    // The active facility's remembered session goes with it too, so a signed-out
+    // account is signed out for good until the account holder signs in again.
+    // Other facility apps on this device keep their own remembered sessions.
+    if (activeCentreId) {
+      try { localStorage.removeItem(`tos_tenant:${activeCentreId}`); } catch { /* ignore */ }
+    }
+    try { sessionStorage.removeItem('tos_activeCentreId'); } catch { /* ignore */ }
+    try { sessionStorage.removeItem('tos_activeCentreOwner'); } catch { /* ignore */ }
+    setPasswordChangePending(false);
     await signOut(firebaseAuth);
   };
 
@@ -2904,6 +3392,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         date: new Date().toISOString().split('T')[0],
       };
       await setDoc(doc(db, 'announcements', id), tenantWrite(newAnn));
+      logActivity({
+        title: `Announcement Published: ${annData.title || 'Notice'}`,
+        subtitle: `To ${annData.target || 'the facility'} • By ${activeUser?.name || 'Admin'}`,
+        category: 'CMS',
+        type: 'success',
+      });
       addToast({
         type: 'success',
         title: 'Announcement Published',
@@ -3003,6 +3497,92 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  // ---- Academic planner reminders (Nov 19) -------------------------------
+  // Each member's own planner reminders live on their own portal record
+  // (students/tutors/admins document) under plannerReminders, so no new
+  // collection and no extra database reads: the records are already live
+  // here. The shared calendar carries timetable classes plus these.
+  const plannerUid = user?.uid || '';
+  const ownAdminRecord = admins.find((a: any) => a.id === plannerUid);
+  const ownTutorRecord = tutors.find((t: any) => t.uid === plannerUid || t.id === plannerUid);
+  const ownStudentRecord = students.find((st: any) => st.uid === plannerUid || st.id === plannerUid);
+  const plannerReminders = ((ownAdminRecord?.plannerReminders)
+    ?? (ownTutorRecord?.plannerReminders)
+    ?? (ownStudentRecord?.plannerReminders)
+    ?? []) as PlannerActivity[];
+
+  const plannerWriteTarget = (): { col: string; id: string } | null => {
+    if (ownAdminRecord) return { col: 'admins', id: ownAdminRecord.id };
+    // Tutors may only self-update the tutors document whose id is their uid.
+    if (ownTutorRecord && ownTutorRecord.id === plannerUid) return { col: 'tutors', id: plannerUid };
+    if (ownStudentRecord) return { col: 'students', id: ownStudentRecord.id };
+    return null;
+  };
+
+  const addPlannerReminder = async (input: { date: string; time: string; title: string; kind: 'practice' | 'mock' | 'custom' }): Promise<boolean> => {
+    const target = plannerWriteTarget();
+    if (!target || !input.date || !input.title.trim()) return false;
+    const item: PlannerActivity = {
+      id: `pr_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
+      date: input.date,
+      time: (input.time || '').trim(),
+      title: input.title.trim().slice(0, 80),
+      kind: input.kind,
+      createdAt: Date.now(),
+    };
+    try {
+      await updateDoc(doc(db, target.col, target.id), { plannerReminders: arrayUnion(item) });
+      // Queue the web-push job for this reminder (server-side; fire and forget,
+      // the reminder itself already saved so a queue miss is not fatal).
+      void api('/api/push/queue', { method: 'POST', body: { reminder: item } }).catch(() => {});
+      return true;
+    } catch (e) {
+      console.error('planner reminder save failed', e);
+      return false;
+    }
+  };
+
+  const removePlannerReminder = async (id: string): Promise<boolean> => {
+    const target = plannerWriteTarget();
+    const item = plannerReminders.find((r) => r.id === id);
+    if (!target || !item) return false;
+    try {
+      await updateDoc(doc(db, target.col, target.id), { plannerReminders: arrayRemove(item) });
+      // Drop the queued push job for this reminder, if one exists.
+      void api('/api/push/unqueue', { method: 'POST', body: { id } }).catch(() => {});
+      return true;
+    } catch (e) {
+      console.error('planner reminder removal failed', e);
+      return false;
+    }
+  };
+
+  // Editing a reminder keeps its id (and the queued push job id) and rewrites
+  // the fields, so the planner and push sender see one reminder that moved.
+  const updatePlannerReminder = async (id: string, input: { date: string; time: string; title: string; kind: 'practice' | 'mock' | 'custom' }): Promise<boolean> => {
+    const target = plannerWriteTarget();
+    const item = plannerReminders.find((r) => r.id === id);
+    if (!target || !item || !input.date || !input.title.trim()) return false;
+    const next: PlannerActivity = {
+      ...item,
+      date: input.date,
+      time: (input.time || '').trim(),
+      title: input.title.trim().slice(0, 80),
+      kind: input.kind,
+    };
+    try {
+      await updateDoc(doc(db, target.col, target.id), { plannerReminders: arrayRemove(item) });
+      await updateDoc(doc(db, target.col, target.id), { plannerReminders: arrayUnion(next) });
+      // Re-queue the push for the new time and drop the job for the old one.
+      void api('/api/push/unqueue', { method: 'POST', body: { id } }).catch(() => {});
+      void api('/api/push/queue', { method: 'POST', body: { reminder: next } }).catch(() => {});
+      return true;
+    } catch (e) {
+      console.error('planner reminder update failed', e);
+      return false;
+    }
+  };
+
   const toggleAdminSuspend = async (id: string) => {
     try {
       const admin = admins.find((a) => a.id === id);
@@ -3024,10 +3604,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const logActivity = async (activityData: Omit<ActivityLog, 'id' | 'timeAgo'>) => {
     try {
       const id = `act-${Date.now()}`;
+      // Admin actions carry who did them and the real moment, so the owner
+      // sees every admin's work with the exact time attached. Portal actions
+      // (students, tutors) stay out of the facility activity feed.
+      const isAdminAction = viewMode === 'portal';
       const newAct: ActivityLog = {
         ...activityData,
         id,
         timeAgo: 'Just now',
+        createdAt: Date.now(),
+        ...(isAdminAction && activeUser
+          ? { actorName: activeUser.name, actorRole: activeUser.role || 'admin' }
+          : {}),
       };
       await setDoc(doc(db, 'activities', id), tenantWrite(newAct));
     } catch (e) {
@@ -3083,10 +3671,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         getClassRatingStats,
         studyMaterials,
         addStudyMaterial,
+        updateStudyMaterial,
+        deleteStudyMaterial,
         attendanceSettings,
         updateAttendanceSettings,
         attendanceLogs,
         clockIn,
+        plannerReminders,
+        addPlannerReminder,
+        removePlannerReminder,
+        updatePlannerReminder,
         clockOut,
         results,
         addResult,
@@ -3094,7 +3688,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addCBTQuestion,
         payments,
         recordPayment,
+        setStudentTotalFee,
         confirmPayment,
+        runPaymentReminders,
         announcements,
         addAnnouncement,
         deleteAnnouncement,
@@ -3147,7 +3743,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         userCentres,
         entitlements,
         seatsSummary,
+        planCaps,
         hasCheckedActiveCentre,
+        passwordChangePending,
+        setPasswordChangePending,
         enterCentreByCode,
         enterSoleCentre,
         resumeCentreSession,
@@ -3156,6 +3755,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         switchCentre,
         refreshSeatsSummary,
         toggleStudentAccess,
+        setSeatSwitch,
+        assignStudentToSeat,
         activateStudentMembership
       }}
 

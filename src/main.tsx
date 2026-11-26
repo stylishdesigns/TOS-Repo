@@ -30,6 +30,18 @@ const updateSW = registerSW({
 // Attach the Firebase ID token to same-origin /api requests (Prompt A step 10).
 installServerApiFetch();
 
+// Keep the saved sign-in for good: mark the app's storage as persistent, so
+// the browser treats it as important data and never clears it on its own
+// (browsers otherwise evict site storage when the phone runs low on space,
+// which reads to the user as being signed out for no reason). Closing,
+// swiping the app away, refreshing or restarting the phone never clears
+// this storage; only the user's own sign-out or wiping the app's data does.
+try {
+  if (navigator.storage && navigator.storage.persist) {
+    navigator.storage.persist().catch(() => { /* not granted: the saved sign-in still holds */ });
+  }
+} catch { /* older browsers: the saved sign-in still holds */ }
+
 // Owner-branded app install: when this device is tied to a facility (a
 // welcome-email link ?centre=..., or a signup in progress on this device),
 // point the PWA manifest at that facility's own manifest, so the install

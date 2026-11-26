@@ -3,7 +3,7 @@ import {
   ExternalLink, Loader2, Plus, Trash2, Check, Image as ImageIcon,
 } from 'lucide-react';
 import { api, Card, Field, inputCls, btnPrimary, btnGhost } from '../tos/tosShared';
-import { LandingContent, LandingCard, LandingTestimonial, TEMPLATE_PRESETS, normalizeTemplateId } from '../../landing/landingContent';
+import { LandingContent, LandingCard, LandingTestimonial, TEMPLATE_PRESETS, normalizeTemplateId, ACCENTS } from '../../landing/landingContent';
 import { LandingBody, LandingFormApi } from '../../landing/LandingBody';
 
 /**
@@ -26,7 +26,6 @@ const ICON_OPTIONS = [
   { value: 'clock', label: 'Clock' },
 ];
 
-const ACCENTS = ['#EA580C', '#2563EB', '#059669', '#7C3AED', '#DB2777', '#B45309'];
 
 type LandingState = LandingContent;
 
@@ -215,7 +214,7 @@ export const LandingEditor: React.FC<{ apiPath: string; refreshKey?: number; sho
                     ) : (
                       <div className="h-16 w-24 rounded-lg bg-slate-800 border border-white/10 flex items-center justify-center text-slate-500"><ImageIcon className="w-5 h-5" /></div>
                     )}
-                    <label className="inline-flex items-center gap-2 text-xs font-bold px-3 py-2.5 rounded-lg bg-slate-800 border border-white/10 text-white hover:bg-slate-700 cursor-pointer min-h-[44px]">
+                    <label className="inline-flex items-center gap-2 text-xs font-bold px-3 py-2.5 rounded-lg bg-slate-800 border border-white/10 text-white hover:brightness-110 cursor-pointer min-h-[44px]">
                       {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImageIcon className="w-4 h-4" />}
                       {content.hero.photoUrl ? 'Replace photo' : 'Upload photo'}
                       <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadHero(f); e.currentTarget.value = ''; }} />
@@ -250,10 +249,18 @@ export const LandingEditor: React.FC<{ apiPath: string; refreshKey?: number; sho
                   </div>
                 </Field>
                 <Field label="Accent colour">
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 items-center">
                     {ACCENTS.map((a) => (
                       <button key={a} onClick={() => set({ accent: a })} aria-label={`Accent ${a}`} className={`w-9 h-9 rounded-full border-2 ${content.accent === a ? 'border-white' : 'border-transparent'}`} style={{ background: a }} />
                     ))}
+                    <input
+                      type="color"
+                      value={/^#[0-9a-fA-F]{6}$/i.test(content.accent) ? content.accent : '#F2A93B'}
+                      onChange={(e) => set({ accent: e.target.value.toUpperCase() })}
+                      aria-label="Custom accent colour"
+                      title="Pick any colour"
+                      className="w-9 h-9 rounded-full border-2 border-dashed border-slate-300 bg-transparent p-0 cursor-pointer"
+                    />
                   </div>
                 </Field>
               </div>

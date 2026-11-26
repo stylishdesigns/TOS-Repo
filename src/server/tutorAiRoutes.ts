@@ -547,6 +547,18 @@ async function studentContextFor(
           ? stu.subjects.split(",").map((v: string) => v.trim()).filter(Boolean)
           : [];
       if (subs.length) lines.push(`Subjects: ${subs.slice(0, 12).join(", ")}`);
+      const progs: string[] = Array.isArray(stu.programmeNames)
+        ? stu.programmeNames.map((v: any) => String(v)).filter(Boolean)
+        : stu.programmeName
+          ? [String(stu.programmeName)]
+          : [];
+      if (progs.length) lines.push(`Registered exam programme(s): ${progs.slice(0, 6).join(", ")}`);
+      if (subs.length || progs.length) {
+        const scope = [...subs, ...progs].slice(0, 14).join(", ");
+        lines.push(
+          `SCOPE (must follow): this student is registered only for: ${scope}. Answer only study questions about those subjects and programmes. If they ask about any other subject or examination programme, politely say you can only help with the subjects and exam programmes they are registered for, then offer to help with one of their own subjects instead.`
+        );
+      }
       // P5: the student's own fee record and the centre's tutors.
       const totalFee = Number(stu.totalFee) || 0;
       if (totalFee > 0 || Number(stu.paidAmount) > 0) {
@@ -798,8 +810,8 @@ export function registerTutorAiRoutes(app: express.Express) {
 
       const centreId = await resolveCentreId(caller, String(body.centreId || '').slice(0, 128));
 
-      const status = await getCentreSubscriptionStatus(centreId);
-      if (status !== 'active' && status !== 'trial') {
+      const status = await getCentreSubscriptionStatus(centreId) as string;
+      if (status !== 'active' && status !== 'lead') {
         throw httpError(403, 'Tutor AI is unavailable while the facility\'s subscription is not active.');
       }
 

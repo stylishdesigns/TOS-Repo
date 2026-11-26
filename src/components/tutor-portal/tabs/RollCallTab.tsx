@@ -128,7 +128,7 @@ export const RollCallTab: React.FC = () => {
       <div className="pt-4">
         <button 
           onClick={handleSave}
-          className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black text-sm shadow-xl shadow-slate-200 flex items-center justify-center space-x-2 active:scale-[0.98] transition-all"
+          className="w-full bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] py-4 rounded-2xl font-black text-sm shadow-xl shadow-slate-200 flex items-center justify-center space-x-2 active:scale-[0.98] transition-all"
         >
           <Save className="w-4 h-4 text-orange-400" />
           <span>Finalize Class Attendance</span>

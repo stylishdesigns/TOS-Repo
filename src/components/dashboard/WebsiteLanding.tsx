@@ -45,7 +45,7 @@ export const WebsiteLanding: React.FC = () => {
     <div className="w-full">
       <div className="p-4 sm:p-6 pb-0 max-w-5xl mx-auto w-full">
         <h1 className="text-xl sm:text-2xl font-black text-white">Website (Landing page)</h1>
-        <p className="text-sm text-slate-400 mt-1">
+        <p className="text-sm sm:text-[15px] font-bold text-slate-100 mt-1">
           Design your facility's landing page, publish it, and read the enquiries it brings in.
         </p>
         <div className="flex gap-2 mt-4 flex-wrap" role="tablist" aria-label="Website sections">
@@ -57,7 +57,7 @@ export const WebsiteLanding: React.FC = () => {
               onClick={() => setTab(id)}
               className={`flex items-center gap-2 px-4 h-11 rounded-xl text-sm font-bold border transition-colors ${
                 tab === id
-                  ? 'bg-[#EA580C] text-white border-[#EA580C]'
+                  ? 'bg-orange-600 text-white border-orange-600'
                   : 'bg-[#0F1B2E] text-slate-300 border-slate-800 hover:bg-[#15233C]'
               }`}
             >
@@ -70,7 +70,7 @@ export const WebsiteLanding: React.FC = () => {
               href={publicUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1.5 px-3 h-11 rounded-xl text-xs font-bold border border-[#EA580C] text-[#EA580C] bg-transparent hover:bg-[#FFF7ED] transition-colors"
+              className="flex items-center gap-1.5 px-3 h-11 rounded-xl text-xs font-bold border border-orange-600 text-orange-600 bg-transparent hover:bg-orange-50 transition-colors"
               title="Open this facility's public landing page in a new tab"
             >
               <ExternalLink className="w-3.5 h-3.5" />

@@ -147,9 +147,11 @@ async function readLanding(centreId: string) {
     db.collection('centreLandingPages').doc(centreId).get(),
   ]);
   const centreName = String((centreSnap.data() as any)?.name || '');
+  const centreAccent = String((centreSnap.data() as any)?.accentColor || '');
   if (!centreSnap.exists) return null;
   const stored = pageSnap.data() as any;
-  const content = isLandingContent(stored?.content) ? stored.content : defaultLandingContent(centreName);
+  let content = isLandingContent(stored?.content) ? stored.content : defaultLandingContent(centreName, centreAccent);
+  if (HEX_RE.test(centreAccent)) content = { ...content, accent: centreAccent.toUpperCase() };
   return {
     centreId,
     centreName,
@@ -167,12 +169,17 @@ async function saveLanding(callerUid: string, centreId: string, body: any) {
   const content = sanitizeLandingContent((body || {}).content);
   const published = (body || {}).published === true;
   const now = new Date().toISOString();
-  await db.collection('centreLandingPages').doc(centreId).set({
-    content,
-    published,
-    updatedAt: now,
-    updatedBy: callerUid,
-  }, { merge: true });
+  // One brand colour: the landing accent mirrors into the centre document so
+  // the install page, login gate and app theme always agree with the website.
+  await Promise.all([
+    db.collection('centreLandingPages').doc(centreId).set({
+      content,
+      published,
+      updatedAt: now,
+      updatedBy: callerUid,
+    }, { merge: true }),
+    db.collection('centres').doc(centreId).set({ accentColor: content.accent.toUpperCase() }, { merge: true }),
+  ]);
   return { success: true, published, updatedAt: now };
 }
 
@@ -276,6 +283,36 @@ export function registerLandingAdminRoutes(app: express.Express): void {
       console.error('[landing-admin] facility save failed:', error?.message || error);
       const status = statusFor(error);
       res.status(status).json({ error: status === 500 ? 'Could not save this facility\'s landing content.' : String(error?.message || 'Unauthorized') });
+    }
+  });
+
+  // One accent colour, saved once: writes the account accent AND the
+  // website landing page accent together, so every surface stays aligned.
+  app.put('/api/centre/branding-accent', async (req, res) => {
+    try {
+      const admin = await requireCentreAdmin(req);
+      const raw = String((req.body as any)?.accent || '').trim();
+      if (!HEX_RE.test(raw)) return res.status(400).json({ error: 'Choose a preset or a custom colour first.' });
+      const accent = raw.toUpperCase();
+      const db = adminDb;
+      const centreRef = db.collection('centres').doc(admin.centreId);
+      const pageRef = db.collection('centreLandingPages').doc(admin.centreId);
+      const [centreSnap, pageSnap] = await Promise.all([centreRef.get(), pageRef.get()]);
+      if (!centreSnap.exists) return res.status(404).json({ error: 'Facility not found.' });
+      const stored = pageSnap.data() as any;
+      const writes: Promise<unknown>[] = [centreRef.set({ accentColor: accent }, { merge: true })];
+      if (isLandingContent(stored?.content)) {
+        writes.push(pageRef.set({
+          content: { ...stored.content, accent },
+          updatedAt: new Date().toISOString(),
+        }, { merge: true }));
+      }
+      await Promise.all(writes);
+      res.json({ ok: true, accent });
+    } catch (error: any) {
+      console.error('[landing-admin] accent save failed:', error?.message || error);
+      const status = statusFor(error);
+      res.status(status).json({ error: status === 500 ? 'Could not save the accent colour.' : String(error?.message || 'Unauthorized') });
     }
   });
 

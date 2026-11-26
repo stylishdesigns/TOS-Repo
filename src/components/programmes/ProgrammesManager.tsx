@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { Programme } from '../../types';
+import { Programme, Student } from '../../types';
 import {
   BookOpen,
   GraduationCap,
@@ -37,11 +37,10 @@ type ProgrammeSubsection =
   | 'Archived Exam Programs';
 
 export const ProgrammesManager: React.FC = () => {
-  const { programmes, subjects: allSubjects, addProgramme, updateProgramme, students, settings, updateSettings, addToast } = useApp();
+  const { programmes, subjects: allSubjects, addProgramme, updateProgramme, students, settings, updateSettings, addToast, seatsSummary, refreshSeatsSummary } = useApp();
 
   const [activeSubsection, setActiveSubsection] = useState<ProgrammeSubsection>('Exam Programmes');
 
-  const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [selectedStatus, setSelectedStatus] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
@@ -57,37 +56,46 @@ export const ProgrammesManager: React.FC = () => {
     description: '',
     category: 'JAMB' as Programme['category'],
     fee: 45000,
-    duration: '4 Months (Jan - Apr)',
+    duration: '4 Months',
     startDate: '2027-01-10',
     endDate: '2027-05-02',
-    maxStudents: 100,
     status: 'Active' as Programme['status'],
     selectedSubjects: [] as string[],
   });
 
-  const categories: Programme['category'][] = [
-    'JAMB',
-    'WAEC',
-    'NECO',
-    'A-Levels',
-    'SAT / International',
-  ];
-
+  // Programme data still carries a legacy category field, but the UI no longer
+  // shows or asks for it: the exam name is the programme.
   // Filtered programmes
   const filteredProgrammes = (programmes || []).filter((p) => {
-    const matchesCat = selectedCategory === 'All' || p.category === selectedCategory;
     const matchesStatus = selectedStatus === 'All' || p.status === selectedStatus;
     const matchesSearch =
       p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       p.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
       p.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (p.subjects || []).some((s) => s.toLowerCase().includes(searchQuery.toLowerCase()));
-    return matchesCat && matchesStatus && matchesSearch;
+    return matchesStatus && matchesSearch;
   });
 
+  // Live cohort counts: the number on each exam programme is the real count
+  // of students registered on it, excluding suspended students and students
+  // whose seat access has been switched off. There is no capacity or limit.
+  React.useEffect(() => {
+    if (!seatsSummary) void refreshSeatsSummary();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const seatActiveOf = (s: Student) => {
+    const access = seatsSummary?.studentAccess?.[s.uid || s.id];
+    return access ? access.status === 'active' : s.status !== 'Suspended';
+  };
+  const matchesProgramme = (s: Student, prog: Programme) =>
+    s.programmeId
+      ? s.programmeId === prog.id
+      : String(s.programmeName || '').trim().toLowerCase() === String(prog.name || '').trim().toLowerCase();
+  const enrolledOf = (prog: Programme) =>
+    students.filter((s) => matchesProgramme(s, prog) && seatActiveOf(s)).length;
+
   // Calculate high-level KPIs
-  const totalEnrolled = (programmes || []).reduce((acc, p) => acc + (p.enrolledStudents || 0), 0);
-  const totalCapacity = (programmes || []).reduce((acc, p) => acc + (p.maxStudents || 1), 0);
+  const totalEnrolled = (programmes || []).reduce((acc, p) => acc + enrolledOf(p), 0);
   const activeCount = (programmes || []).filter((p) => p.status === 'Active').length;
 
   const handleOpenAdd = () => {
@@ -98,10 +106,9 @@ export const ProgrammesManager: React.FC = () => {
       description: '',
       category: 'JAMB',
       fee: 45000,
-      duration: '4 Months (Jan - Apr)',
+      duration: '4 Months',
       startDate: '2027-01-10',
       endDate: '2027-05-02',
-      maxStudents: 100,
       status: 'Active',
       selectedSubjects: [],
     });
@@ -116,10 +123,9 @@ export const ProgrammesManager: React.FC = () => {
       description: prog.description,
       category: prog.category,
       fee: prog.fee,
-      duration: prog.duration,
+      duration: normalizedDuration(prog.duration),
       startDate: prog.startDate,
       endDate: prog.endDate,
-      maxStudents: prog.maxStudents,
       status: prog.status,
       selectedSubjects: prog.subjects || [],
     });
@@ -135,24 +141,57 @@ export const ProgrammesManager: React.FC = () => {
     }));
   };
 
+  // The form no longer collects a programme code; derive a short readable one
+  // from the title so cards, search and the inspect modal still have one.
+  const deriveCode = (name: string) => {
+    const words = name.replace(/[^A-Za-z0-9 ]/g, ' ').trim().split(/\s+/).filter(Boolean);
+    const base = (words.map((w) => w[0]).join('') || 'EXAM').toUpperCase().slice(0, 5);
+    return `${base}-${Date.now().toString(36).toUpperCase().slice(-4)}`;
+  };
+
+  // Duration is stored as a plain "N Months" / "N Years" string. Older records
+  // carried attached date ranges like "4 Months (Jan - Apr)"; those are
+  // normalised away here so nothing re-attaches them.
+  const parseDuration = (d: string): { value: number; unit: 'Months' | 'Years' } => {
+    const m = String(d || '').match(/(\d+)\s*(month|year)/i);
+    if (m) {
+      const n = Math.max(1, parseInt(m[1], 10));
+      return /^year/i.test(m[2])
+        ? { value: Math.min(n, 5), unit: 'Years' }
+        : { value: Math.min(n, 60), unit: 'Months' };
+    }
+    return { value: 4, unit: 'Months' };
+  };
+  const durationLabel = (n: number, unit: 'Months' | 'Years') => {
+    if (unit === 'Years') return `${n} ${n === 1 ? 'Year' : 'Years'}`;
+    if (n < 12) return `${n} ${n === 1 ? 'Month' : 'Months'}`;
+    const y = Math.floor(n / 12);
+    const r = n % 12;
+    if (r === 0) return `${n} Months (${y} ${y === 1 ? 'Year' : 'Years'})`;
+    return `${n} Months (${y} yr ${r} mo)`;
+  };
+  const normalizedDuration = (d: string) => {
+    const p = parseDuration(d);
+    return `${p.value} ${p.unit}`;
+  };
+
   const handleSaveProgramme = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name.trim() || !formData.code.trim()) {
-      addToast({ type: 'error', title: 'Missing Information', description: 'Please provide programme name and code.' });
+    if (!formData.name.trim()) {
+      addToast({ type: 'error', title: 'Missing Information', description: 'Please provide the exam program title.' });
       return;
     }
 
     if (editingProg) {
       updateProgramme(editingProg.id, {
         name: formData.name,
-        code: formData.code.toUpperCase(),
+        code: (formData.code.trim() || deriveCode(formData.name)).toUpperCase(),
         description: formData.description,
         category: formData.category,
         fee: Number(formData.fee),
-        duration: formData.duration,
+        duration: normalizedDuration(formData.duration),
         startDate: formData.startDate,
         endDate: formData.endDate,
-        maxStudents: Number(formData.maxStudents),
         status: formData.status,
         subjects: formData.selectedSubjects,
       });
@@ -164,14 +203,13 @@ export const ProgrammesManager: React.FC = () => {
     } else {
       addProgramme({
         name: formData.name,
-        code: formData.code.toUpperCase(),
+        code: (formData.code.trim() || deriveCode(formData.name)).toUpperCase(),
         description: formData.description,
         category: formData.category,
         fee: Number(formData.fee),
-        duration: formData.duration,
+        duration: normalizedDuration(formData.duration),
         startDate: formData.startDate,
         endDate: formData.endDate,
-        maxStudents: Number(formData.maxStudents),
         status: formData.status,
         subjects: formData.selectedSubjects,
       });
@@ -185,54 +223,6 @@ export const ProgrammesManager: React.FC = () => {
     setShowAddModal(false);
   };
 
-  // Category Badge Colors
-  const getCategoryTheme = (category: Programme['category']) => {
-    switch (category) {
-      case 'JAMB':
-        return {
-          bg: 'bg-orange-50 text-orange-700 border-orange-200',
-          badge: 'bg-[#EA580C] text-white',
-          border: 'border-orange-500/40',
-          accent: 'text-[#EA580C]',
-        };
-      case 'WAEC':
-        return {
-          bg: 'bg-blue-50 text-blue-700 border-blue-200',
-          badge: 'bg-blue-600 text-white',
-          border: 'border-blue-500/40',
-          accent: 'text-blue-600',
-        };
-      case 'NECO':
-        return {
-          bg: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-          badge: 'bg-emerald-600 text-white',
-          border: 'border-emerald-500/40',
-          accent: 'text-emerald-600',
-        };
-      case 'A-Levels':
-        return {
-          bg: 'bg-purple-50 text-purple-700 border-purple-200',
-          badge: 'bg-purple-600 text-white',
-          border: 'border-purple-500/40',
-          accent: 'text-purple-600',
-        };
-      case 'SAT / International':
-        return {
-          bg: 'bg-sky-50 text-sky-700 border-sky-200',
-          badge: 'bg-sky-600 text-white',
-          border: 'border-sky-500/40',
-          accent: 'text-sky-600',
-        };
-      default:
-        return {
-          bg: 'bg-slate-50 text-slate-700 border-slate-200',
-          badge: 'bg-slate-700 text-white',
-          border: 'border-slate-300',
-          accent: 'text-slate-700',
-        };
-    }
-  };
-
   return (
     <div id="academic-programmes-page" className="p-4 sm:p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
       {/* Header Row */}
@@ -244,7 +234,7 @@ export const ProgrammesManager: React.FC = () => {
         <div className="flex items-center space-x-4">
           <button
             onClick={handleOpenAdd}
-            className="px-4 py-2 text-xs font-semibold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg shadow-sm transition-all flex items-center space-x-1.5 shadow-xs"
+            className="px-4 py-2 text-xs font-semibold text-white bg-orange-600 hover:bg-orange-700 rounded-lg shadow-sm transition-all flex items-center space-x-1.5 shadow-xs"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Add Exam Programs</span>
@@ -253,7 +243,7 @@ export const ProgrammesManager: React.FC = () => {
       </div>
 
       {/* Subsections Navigation Tabs */}
-      <div className="flex items-center space-x-2 bg-slate-100/80 p-1.5 rounded-xl border border-slate-200/80 overflow-x-auto scrollbar-none">
+      <div className="flex items-center space-x-2 bg-slate-100/80 p-1.5 rounded-xl border border-slate-200/80 w-fit max-w-full mx-auto overflow-x-auto scrollbar-none">
         {(
           [
             { id: 'Exam Programmes', label: 'Exam Programmes', icon: BookOpen },
@@ -266,9 +256,9 @@ export const ProgrammesManager: React.FC = () => {
             <button
               key={sub.id}
               onClick={() => setActiveSubsection(sub.id)}
-              className={`px-3.5 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap flex items-center space-x-2 ${
+              className={`px-5 py-2.5 text-sm font-bold rounded-lg transition-all whitespace-nowrap flex items-center space-x-2 ${
                 isActive
-                  ? 'bg-[#EA580C] text-white shadow-xs'
+                  ? 'bg-orange-600 text-white shadow-xs'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-white/70'
               }`}
             >
@@ -290,7 +280,7 @@ export const ProgrammesManager: React.FC = () => {
       <div className="grid grid-cols-2 gap-3 md:gap-4">
         <div className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200/90 shadow-xs">
           <div className="flex items-center space-x-2 text-slate-600">
-            <BookOpen className="w-4 h-4 text-[#EA580C]" />
+            <BookOpen className="w-4 h-4 text-orange-600" />
             <span className="text-xs font-semibold text-slate-600 truncate">Exam Tracks</span>
           </div>
           <p className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight mt-2">
@@ -317,36 +307,6 @@ export const ProgrammesManager: React.FC = () => {
 
       {/* Filter & Search Bar */}
       <div className="bg-white p-4 rounded-xl border border-slate-200/90 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
-        {/* Category Pills */}
-        <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
-          <button
-            onClick={() => setSelectedCategory('All')}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap ${
-              selectedCategory === 'All'
-                ? 'bg-[#EA580C] text-white shadow-2xs'
-                : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
-            }`}
-          >
-            All Programmes ({programmes.length})
-          </button>
-          {categories.map((cat) => {
-            const count = programmes.filter((p) => p.category === cat).length;
-            return (
-              <button
-                key={cat}
-                onClick={() => setSelectedCategory(cat)}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap ${
-                  selectedCategory === cat
-                    ? 'bg-[#EA580C] text-white shadow-2xs'
-                    : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
-                }`}
-              >
-                {cat} ({count})
-              </button>
-            );
-          })}
-        </div>
-
         {/* Search & Status Filter */}
         <div className="flex items-center space-x-2 w-full md:w-auto">
           <ModernSelect
@@ -377,7 +337,7 @@ export const ProgrammesManager: React.FC = () => {
       {/* Programme Cards Grid */}
       {filteredProgrammes.length === 0 ? (
         <div className="bg-white p-12 rounded-xl border border-slate-200/90 text-center space-y-3">
-          <div className="w-12 h-12 bg-orange-50 text-[#EA580C] rounded-full flex items-center justify-center mx-auto">
+          <div className="w-12 h-12 bg-orange-50 text-orange-600 rounded-full flex items-center justify-center mx-auto">
             <BookOpen className="w-6 h-6" />
           </div>
           <h3 className="font-bold text-slate-800 text-base">No Academic Programmes Found</h3>
@@ -386,7 +346,7 @@ export const ProgrammesManager: React.FC = () => {
           </p>
           <button
             onClick={handleOpenAdd}
-            className="px-4 py-2 text-xs font-semibold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg shadow-sm"
+            className="px-4 py-2 text-xs font-semibold text-white bg-orange-600 hover:bg-orange-700 rounded-lg shadow-sm"
           >
             Create Programme
           </button>
@@ -394,12 +354,6 @@ export const ProgrammesManager: React.FC = () => {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5">
           {filteredProgrammes.map((prog) => {
-            const theme = getCategoryTheme(prog.category);
-            const fillRate = Math.min(
-              100,
-              Math.round(((prog.enrolledStudents || 0) / (prog.maxStudents || 1)) * 100)
-            );
-
             return (
               <div
                 key={prog.id}
@@ -407,12 +361,7 @@ export const ProgrammesManager: React.FC = () => {
               >
                 {/* Top Banner with Exam Tag & Status */}
                 <div className="p-5 pb-4 space-y-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <span
-                      className={`px-2.5 py-1 rounded-md text-[11px] font-bold tracking-wide uppercase border ${theme.bg}`}
-                    >
-                      {prog.category} Programme
-                    </span>
+                  <div className="flex items-center justify-end gap-2">
                     <span
                       className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                         prog.status === 'Active'
@@ -427,7 +376,7 @@ export const ProgrammesManager: React.FC = () => {
                   </div>
 
                   <div>
-                    <h3 className="font-bold text-slate-900 text-base group-hover:text-[#EA580C] transition-colors leading-snug">
+                    <h3 className="font-bold text-slate-900 text-base group-hover:text-orange-600 transition-colors leading-snug">
                       {prog.name}
                     </h3>
                     <p className="text-[11px] font-mono font-semibold text-slate-400 mt-0.5">
@@ -439,26 +388,14 @@ export const ProgrammesManager: React.FC = () => {
                     {prog.description}
                   </p>
 
-                  {/* Enrollment Progress Bar */}
-                  <div className="pt-2 border-t border-slate-100 space-y-1.5">
+                  {/* Live cohort count */}
+                  <div className="pt-2 border-t border-slate-100">
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-slate-500 font-medium">Cohort Enrollment:</span>
                       <span className="font-bold text-slate-800">
-                        {prog.enrolledStudents || 0}{' '}
-                        <span className="font-normal text-slate-400">/ {prog.maxStudents} desks</span>
+                        {enrolledOf(prog)}{' '}
+                        <span className="font-normal text-slate-400">students</span>
                       </span>
-                    </div>
-                    <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all duration-500 ${
-                          fillRate >= 90
-                            ? 'bg-rose-500'
-                            : fillRate >= 70
-                            ? 'bg-[#EA580C]'
-                            : 'bg-emerald-500'
-                        }`}
-                        style={{ width: `${fillRate}%` }}
-                      />
                     </div>
                   </div>
 
@@ -504,9 +441,9 @@ export const ProgrammesManager: React.FC = () => {
                     </button>
                     <button
                       onClick={() => setInspectingProg(prog)}
-                      className="px-3 py-1.5 text-xs font-semibold text-[#EA580C] bg-orange-50 hover:bg-orange-100 rounded-lg border border-orange-200 shadow-2xs transition-colors flex items-center space-x-1"
+                      className="px-3 py-1.5 text-xs font-semibold text-orange-600 bg-orange-50 hover:bg-orange-100 rounded-lg border border-orange-200 shadow-2xs transition-colors flex items-center space-x-1"
                     >
-                      <span>Syllabus & Info</span>
+                      <span>Info</span>
                       <ChevronRight className="w-3 h-3" />
                     </button>
                   </div>
@@ -528,13 +465,6 @@ export const ProgrammesManager: React.FC = () => {
             <div className="flex items-start justify-between border-b border-slate-100 pb-4">
               <div>
                 <div className="flex items-center space-x-2">
-                  <span
-                    className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${
-                      getCategoryTheme(inspectingProg.category).bg
-                    }`}
-                  >
-                    {inspectingProg.category} Exam Track
-                  </span>
                   <span className="text-xs font-mono text-slate-400 font-semibold">
                     {inspectingProg.code}
                   </span>
@@ -562,20 +492,59 @@ export const ProgrammesManager: React.FC = () => {
               </div>
               <div>
                 <span className="text-[10px] text-slate-400 block font-medium">TUITION FEE</span>
-                <p className="font-bold text-[#EA580C]">₦{(inspectingProg.fee || 0).toLocaleString()}</p>
+                <p className="font-bold text-orange-600">₦{(inspectingProg.fee || 0).toLocaleString()}</p>
               </div>
               <div>
                 <span className="text-[10px] text-slate-400 block font-medium">ENROLLMENT</span>
                 <p className="font-bold text-slate-800">
-                  {inspectingProg.enrolledStudents || 0} / {inspectingProg.maxStudents}
+                  {enrolledOf(inspectingProg)} students
                 </p>
               </div>
+            </div>
+
+            {/* Registered Students (live) */}
+            <div className="space-y-3">
+              <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center space-x-1.5">
+                <Users className="w-4 h-4 text-orange-600" />
+                <span>Registered Students</span>
+              </h4>
+              {(() => {
+                const roster = students.filter((s) => matchesProgramme(s, inspectingProg));
+                if (roster.length === 0) {
+                  return (
+                    <p className="text-xs text-slate-500">No student has registered for this exam programme yet.</p>
+                  );
+                }
+                return (
+                  <div className="space-y-2">
+                    {roster.map((s) => {
+                      const seatOn = seatActiveOf(s);
+                      return (
+                        <div key={s.id} className="flex items-center justify-between gap-3 p-2.5 bg-slate-50/70 border border-slate-200/80 rounded-lg text-xs">
+                          <span className="font-semibold text-slate-800 truncate">{s.name}</span>
+                          <span className="flex items-center gap-1.5 shrink-0">
+                            {!seatOn && (
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-600">
+                                {s.status === 'Suspended' ? 'Suspended' : 'Seat off'}
+                              </span>
+                            )}
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${s.paymentStatus === 'Paid' ? 'bg-emerald-50 text-emerald-700' : s.paymentStatus === 'Partial' ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>
+                              {s.paymentStatus || 'Pending'}
+                            </span>
+                            <span className="font-bold text-slate-700">&#8358;{(s.outstandingBalance || 0).toLocaleString()}</span>
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Subjects & Syllabus Structure */}
             <div className="space-y-3">
               <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center space-x-1.5">
-                <BookMarked className="w-4 h-4 text-[#EA580C]" />
+                <BookMarked className="w-4 h-4 text-orange-600" />
                 <span>Curriculum Modules & Tested Subjects</span>
               </h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
@@ -594,9 +563,9 @@ export const ProgrammesManager: React.FC = () => {
             <div className="flex items-center justify-end pt-4 border-t border-slate-100">
               <button
                 onClick={() => setInspectingProg(null)}
-                className="px-4 py-2 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-lg shadow-sm"
+                className="px-4 py-2 text-xs font-semibold text-[var(--on-brand,#fff)] bg-[var(--brand,#0f172a)] hover:brightness-110 rounded-lg shadow-sm"
               >
-                Close Syllabus
+                Close
               </button>
             </div>
           </div>
@@ -628,13 +597,6 @@ export const ProgrammesManager: React.FC = () => {
             <form onSubmit={handleSaveProgramme} className="mt-4 space-y-3.5 text-xs">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <ModernSelect
-                  label="Exam Category *"
-                  value={formData.category}
-                  onChange={(val) => setFormData({ ...formData, category: val as any })}
-                  options={categories.map(c => ({ value: c, label: c }))}
-                />
-
-                <ModernSelect
                   label="Status"
                   value={formData.status}
                   onChange={(val) => setFormData({ ...formData, status: val as any })}
@@ -644,6 +606,20 @@ export const ProgrammesManager: React.FC = () => {
                     { value: 'Archived', label: 'Archived' }
                   ]}
                 />
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1.5">
+                    Tuition fee (&#8358;) *
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    min={0}
+                    step={500}
+                    value={formData.fee}
+                    onChange={(e) => setFormData({ ...formData, fee: Number(e.target.value) })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-900 focus:bg-white focus:border-orange-500 outline-none"
+                  />
+                </div>
               </div>
 
               <div>
@@ -693,23 +669,43 @@ export const ProgrammesManager: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <ModernSelect
-                    label="Duration (Months) *"
-                    value={formData.duration.split(' ')[0]}
-                    onChange={(val) => setFormData({ ...formData, duration: `${val} Months` })}
-                    options={[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(m => ({
-                      value: String(m),
-                      label: `${m} ${m === 1 ? 'Month' : 'Months'}`
-                    }))}
-                  />
-                </div>
-
-                <div className="pt-5">
-                   <span className="text-[10px] text-slate-400 italic">Duration determines cohort lifespan</span>
-                </div>
-              </div>
+              {(() => {
+                const dur = parseDuration(formData.duration);
+                return (
+                  <div className="space-y-1.5">
+                    <div className="grid grid-cols-2 gap-3">
+                      <ModernSelect
+                        label="Duration *"
+                        value={String(dur.value)}
+                        onChange={(val) => setFormData({ ...formData, duration: `${val} ${dur.unit}` })}
+                        options={
+                          dur.unit === 'Years'
+                            ? [1, 2, 3, 4, 5].map((y) => ({ value: String(y), label: durationLabel(y, 'Years') }))
+                            : Array.from({ length: 60 }, (_, i) => i + 1).map((m) => ({ value: String(m), label: durationLabel(m, 'Months') }))
+                        }
+                      />
+                      <ModernSelect
+                        label="Duration unit"
+                        value={dur.unit}
+                        onChange={(val) => {
+                          const unit = val as 'Months' | 'Years';
+                          const converted = unit === 'Years'
+                            ? Math.max(1, Math.round(dur.value / 12))
+                            : Math.min(60, dur.value * 12);
+                          setFormData({ ...formData, duration: `${converted} ${unit}` });
+                        }}
+                        options={[
+                          { value: 'Months', label: 'Months' },
+                          { value: 'Years', label: 'Years' },
+                        ]}
+                      />
+                    </div>
+                    <p className="text-[10px] text-slate-400 italic">
+                      Months or years, anything up to five years. Duration determines cohort lifespan.
+                    </p>
+                  </div>
+                );
+              })()}
 
               <div className="flex items-center justify-end space-x-2 pt-3 border-t border-slate-100">
                 <button
@@ -721,7 +717,7 @@ export const ProgrammesManager: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 font-semibold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg shadow-sm"
+                  className="px-4 py-2 font-semibold text-white bg-orange-600 hover:bg-orange-700 rounded-lg shadow-sm"
                 >
                   {editingProg ? 'Save Changes' : 'Create Exam Program'}
                 </button>

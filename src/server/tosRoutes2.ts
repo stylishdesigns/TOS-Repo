@@ -201,7 +201,7 @@ export function registerTosRoutes2(app: express.Express): void {
         centreId: result.centreId,
         action: 'CENTRE_CREATED_MANUALLY',
         at: new Date().toISOString(),
-        after: { ownerEmail: email, planId: planId || 'centre_standard', skipTrial, createdAuthUser: result.createdAuthUser },
+        after: { ownerEmail: email, planId: planId || 'centre_free', skipTrial, createdAuthUser: result.createdAuthUser },
       });
       return res.json({
         success: true,

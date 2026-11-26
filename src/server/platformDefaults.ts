@@ -11,9 +11,28 @@ import { reconcileFirstTenant } from './firstTenant';
  */
 export const STARTING_PLANS = [
   {
+    id: 'centre_free',
+    name: 'Free Facility',
+    price: 0, // every lead and facility starts here: free seats only
+    priceType: 'per_seat',
+    seatCap: 0,
+    trialSeatCap: 0,
+    trialDays: 0,
+    studentChat: true,
+    whatsappNotifications: false,
+    aiEssayMarking: false, // internal only, never shown to customers
+    aiQuestionGen: false,
+    aiPerformanceAnalysis: false,
+    // Batch 31: per-plan feature fields (TOS console will make the caps editable).
+    aiCreditsPerSeat: 50,
+    storageGb: 1,
+    questionBankCap: 1000, // 0 = unlimited
+    notificationChannels: ['email'],
+  },
+  {
     id: 'centre_standard',
-    name: 'Facility Standard',
-    price: 2000, // ₦ per student per month
+    name: 'Standard Facility',
+    price: 2000, // ₦ per seat per month
     priceType: 'per_seat',
     seatCap: 100,
     trialSeatCap: 10,
@@ -21,13 +40,18 @@ export const STARTING_PLANS = [
     studentChat: true,
     whatsappNotifications: false,
     aiEssayMarking: true, // internal only, never shown to customers
-    aiQuestionGen: false,
-    aiPerformanceAnalysis: false,
+    aiQuestionGen: true,
+    aiPerformanceAnalysis: true,
+    // Batch 31: per-plan feature fields (TOS console will make the caps editable).
+    aiCreditsPerSeat: 200,
+    storageGb: 10,
+    questionBankCap: 0, // 0 = unlimited
+    notificationChannels: ['email', 'push'],
   },
   {
     id: 'centre_plus',
-    name: 'Facility Plus',
-    price: 3500, // ₦ per student per month
+    name: 'Premium Facility',
+    price: 3500, // ₦ per seat per month
     priceType: 'per_seat',
     seatCap: 100,
     trialSeatCap: 10,
@@ -37,6 +61,11 @@ export const STARTING_PLANS = [
     aiEssayMarking: true, // internal only, never shown to customers
     aiQuestionGen: true,
     aiPerformanceAnalysis: true,
+    // Batch 31: per-plan feature fields (TOS console will make the caps editable).
+    aiCreditsPerSeat: 500,
+    storageGb: 25,
+    questionBankCap: 0, // 0 = unlimited
+    notificationChannels: ['email', 'push', 'whatsapp'],
   },
 ];
 
@@ -44,9 +73,18 @@ export const STARTING_CONFIG = {
   trialDays: 14,
   skipTrialDiscountPct: 15, // set by TOS staff; the discount for skipping the trial
   trialGraceDays: 7,
-  seatSwapLimitPerStudent: 2,
-  seatSwapWindowDays: 30,
   aiRouteRateLimitPerHour: 60,
+  // Batch 22 seat policy. trialMaxSeats counts PAID seats a trial facility can
+  // create on top of its free grant (number only, never unlimited). paidMaxSeats
+  // caps everyone else unless paidSeatsUnlimited is true. freeSeatsGeneral is
+  // the platform-wide free-seat grant (a per-facility override on the billing
+  // doc wins). paidSeatMinimum is what unlocks the free grant and keeps the
+  // landing page live.
+  trialMaxSeats: 10,
+  paidMaxSeats: 50,
+  paidSeatsUnlimited: false,
+  freeSeatsGeneral: 5,
+  paidSeatMinimum: 5,
 };
 
 export interface SeedResult {

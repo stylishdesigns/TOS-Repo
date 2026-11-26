@@ -143,9 +143,9 @@ function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boolean) =
     >
       <span className="text-xs font-bold text-slate-700 text-left">{label}</span>
       <span
-        className={`w-10 h-6 rounded-full p-0.5 transition ${on ? 'bg-[#EA580C]' : 'bg-slate-300'}`}
+        className={`w-12 h-7 rounded-full p-1 transition ${on ? 'bg-orange-600' : 'bg-slate-300'}`}
       >
-        <span className={`block w-5 h-5 rounded-full bg-white shadow transition-transform ${on ? 'translate-x-4' : ''}`} />
+        <span className={`block w-5 h-5 rounded-full bg-white shadow transition-transform ${on ? 'translate-x-5' : ''}`} />
       </span>
     </button>
   );
@@ -206,7 +206,7 @@ export const ChatManager: React.FC<{ onThreadOpenChange?: (open: boolean) => voi
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center p-8">
-        <Loader2 className="w-6 h-6 animate-spin text-[#EA580C]" />
+        <Loader2 className="w-6 h-6 animate-spin text-orange-600" />
       </div>
     );
   }
@@ -218,7 +218,7 @@ export const ChatManager: React.FC<{ onThreadOpenChange?: (open: boolean) => voi
           <ShieldAlert className="w-8 h-8 text-rose-500 mx-auto" />
           <p className="text-sm font-bold text-slate-800">Chat could not be loaded</p>
           <p className="text-xs text-slate-500 font-medium">{error}</p>
-          <button onClick={load} className="px-4 py-2 rounded-xl bg-[#EA580C] text-white text-xs font-black active:scale-95 transition">
+          <button onClick={load} className="px-4 py-2 rounded-xl bg-orange-600 text-white text-xs font-black active:scale-95 transition">
             Try again
           </button>
         </div>
@@ -240,12 +240,12 @@ export const ChatManager: React.FC<{ onThreadOpenChange?: (open: boolean) => voi
               key={t.id}
               onClick={() => setView(t.id)}
               className={`px-4 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition ${
-                view === t.id ? 'bg-[#EA580C] text-white shadow-sm shadow-orange-200' : 'bg-white text-slate-500 border border-slate-200'
+                view === t.id ? 'bg-orange-600 text-white shadow-sm shadow-orange-200' : 'bg-white text-slate-500 border border-slate-200'
               }`}
             >
               <t.icon className="w-3.5 h-3.5" /> {t.label}
               {!!t.badge && (
-                <span className={`min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-black flex items-center justify-center ${view === t.id ? 'bg-white text-[#EA580C]' : 'bg-rose-500 text-white'}`}>
+                <span className={`min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-black flex items-center justify-center ${view === t.id ? 'bg-white text-orange-600' : 'bg-rose-500 text-white'}`}>
                   {t.badge}
                 </span>
               )}
@@ -387,7 +387,7 @@ const GroupsSection: React.FC<SectionProps & { staffFilter: 'personal' | 'groups
             onClick={() => setCreating(!creating)}
             className="w-full px-4 py-3 flex items-center justify-between text-sm font-black text-slate-800"
           >
-            <span className="flex items-center gap-2"><Plus className="w-4 h-4 text-[#EA580C]" /> Create a group</span>
+            <span className="flex items-center gap-2"><Plus className="w-4 h-4 text-orange-600" /> Create a group</span>
             <span className="text-slate-400 text-lg leading-none">{creating ? '−' : '+'}</span>
           </button>
           {creating && (
@@ -452,7 +452,7 @@ const GroupsSection: React.FC<SectionProps & { staffFilter: 'personal' | 'groups
               <button
                 onClick={create}
                 disabled={!name.trim() || busy}
-                className="px-5 py-2.5 rounded-xl bg-[#EA580C] text-white text-xs font-black active:scale-95 transition disabled:opacity-50 flex items-center gap-2"
+                className="px-5 py-2.5 rounded-xl bg-orange-600 text-white text-xs font-black active:scale-95 transition disabled:opacity-50 flex items-center gap-2"
               >
                 {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />} Create group
               </button>
@@ -465,7 +465,7 @@ const GroupsSection: React.FC<SectionProps & { staffFilter: 'personal' | 'groups
         <button
           onClick={() => setPickerOpen(true)}
           className="fixed bottom-24 right-4 z-30 w-14 h-14 rounded-full text-white flex items-center justify-center shadow-xl active:scale-95 transition"
-          style={{ background: 'linear-gradient(145deg, #EA580C, #9A3412)' }}
+          style={{ background: 'linear-gradient(145deg, var(--brand, #EA580C), color-mix(in oklab, var(--brand, #EA580C) 55%, black))' }}
           aria-label="Start a new chat"
         >
           <UserPlus className="w-6 h-6" />
@@ -545,7 +545,7 @@ const GroupsSection: React.FC<SectionProps & { staffFilter: 'personal' | 'groups
                 <button
                   onClick={() => saveEdit(g)}
                   disabled={busy}
-                  className="flex-1 py-2.5 rounded-xl bg-[#EA580C] text-white text-xs font-black flex items-center justify-center gap-2 disabled:opacity-50"
+                  className="flex-1 py-2.5 rounded-xl bg-orange-600 text-white text-xs font-black flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />} Save
                 </button>
@@ -556,13 +556,13 @@ const GroupsSection: React.FC<SectionProps & { staffFilter: 'personal' | 'groups
               {g.kind === 'personal' ? (
                 <span
                   onClick={(e) => { e.stopPropagation(); if (g.peerAvatar) { setListImage(g.peerAvatar); } else { setListImageName(g.name); } }}
-                  className={`w-10 h-10 rounded-full bg-orange-50 border border-orange-100 text-[#EA580C] flex items-center justify-center text-xs font-black overflow-hidden shrink-0 ${g.peerAvatar ? 'cursor-pointer' : ''}`}
+                  className={`w-10 h-10 rounded-full bg-orange-50 border border-orange-100 text-orange-600 flex items-center justify-center text-xs font-black overflow-hidden shrink-0 ${g.peerAvatar ? 'cursor-pointer' : ''}`}
                 >
                   {g.peerAvatar ? <img src={g.peerAvatar} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" /> : (initialsOf(g.name) || <User className="w-5 h-5" />)}
                 </span>
               ) : (
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${
-                  g.kind === 'announcements' ? 'bg-amber-50 border-amber-100 text-amber-600' : 'bg-orange-50 border-orange-100 text-[#EA580C]'
+                  g.kind === 'announcements' ? 'bg-amber-50 border-amber-100 text-amber-600' : 'bg-orange-50 border-orange-100 text-orange-600'
                 }`}>
                   {g.kind === 'announcements' ? <Megaphone className="w-4 h-4" /> : <MessageSquare className="w-4 h-4" />}
                 </div>
@@ -607,7 +607,7 @@ const GroupsSection: React.FC<SectionProps & { staffFilter: 'personal' | 'groups
             <img src={listImage} alt="Profile photo" className="max-h-full max-w-full object-contain" />
           ) : (
             <div className="w-40 h-40 rounded-3xl bg-orange-50 border-2 border-orange-200 flex items-center justify-center">
-              <span className="text-5xl font-black text-[#EA580C]">{initialsOf(listImageName)}</span>
+              <span className="text-5xl font-black text-orange-600">{initialsOf(listImageName)}</span>
             </div>
           )}
         </div>
@@ -734,7 +734,7 @@ const SettingsSection: React.FC<SectionProps> = ({ data, isAdmin, reload, addToa
                 onClick={() => setDay(d, !s.muteDayOptions.includes(d))}
                 className={`px-3 py-2 rounded-xl text-xs font-black border transition ${
                   s.muteDayOptions.includes(d)
-                    ? 'bg-[#EA580C] text-white border-[#EA580C]'
+                    ? 'bg-orange-600 text-white border-orange-600'
                     : 'bg-white text-slate-500 border-slate-200'
                 }`}
               >
@@ -752,7 +752,7 @@ const SettingsSection: React.FC<SectionProps> = ({ data, isAdmin, reload, addToa
       <button
         onClick={save}
         disabled={busy}
-        className="w-full py-3 rounded-2xl bg-[#EA580C] text-white text-sm font-black shadow-sm shadow-orange-200 active:scale-[0.99] transition disabled:opacity-50 flex items-center justify-center gap-2"
+        className="w-full py-3 rounded-2xl bg-orange-600 text-white text-sm font-black shadow-sm shadow-orange-200 active:scale-[0.99] transition disabled:opacity-50 flex items-center justify-center gap-2"
       >
         {busy && <Loader2 className="w-4 h-4 animate-spin" />} Save settings
       </button>
@@ -798,13 +798,13 @@ const ReportsSection: React.FC<SectionProps> = ({ data, isAdmin, reload, addToas
       <div className="flex gap-2">
         <button
           onClick={() => setFilter('pending')}
-          className={`px-3.5 py-2 rounded-xl text-xs font-black transition ${filter === 'pending' ? 'bg-slate-900 text-white' : 'bg-white text-slate-500 border border-slate-200'}`}
+          className={`px-3.5 py-2 rounded-xl text-xs font-black transition ${filter === 'pending' ? 'bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)]' : 'bg-white text-slate-500 border border-slate-200'}`}
         >
           Pending
         </button>
         <button
           onClick={() => setFilter('all')}
-          className={`px-3.5 py-2 rounded-xl text-xs font-black transition ${filter === 'all' ? 'bg-slate-900 text-white' : 'bg-white text-slate-500 border border-slate-200'}`}
+          className={`px-3.5 py-2 rounded-xl text-xs font-black transition ${filter === 'all' ? 'bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)]' : 'bg-white text-slate-500 border border-slate-200'}`}
         >
           All
         </button>
@@ -964,7 +964,7 @@ function roleChip(role: string): string {
 
 function roleChipClass(role: string): string {
   if (role === 'tos') return 'bg-violet-100 text-violet-700';
-  if (role === 'admin') return 'bg-orange-100 text-[#EA580C]';
+  if (role === 'admin') return 'bg-orange-100 text-orange-600';
   if (role === 'tutor') return 'bg-amber-100 text-amber-700';
   return 'bg-slate-100 text-slate-500';
 }
@@ -1326,21 +1326,21 @@ const ThreadPanel: React.FC<{
   // composer both pinned, and only the messages scroll between them.
   return (
     <div className="fixed inset-y-0 right-0 left-0 lg:left-60 z-40 flex flex-col bg-[#FFF3E7]" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-      <div className="px-3 sm:px-5 py-2.5 flex items-center gap-2 bg-[#EA580C] shadow-sm shrink-0">
-        <button onClick={onBack} className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center text-white active:scale-95 transition shrink-0" aria-label="Back to groups">
+      <div className="px-3 sm:px-5 py-3.5 flex items-center gap-2 bg-orange-600 shadow-sm shrink-0">
+        <button onClick={onBack} className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center text-white active:scale-95 transition shrink-0" aria-label="Back to groups">
           <ChevronLeft className="w-4 h-4" />
         </button>
         <div className="flex-1 min-w-0 flex items-center gap-2.5">
           {group.kind === 'personal' && (
-            <span className="w-8 h-8 rounded-full bg-white/20 text-white flex items-center justify-center text-[11px] font-black overflow-hidden shrink-0">
+            <span className="w-9 h-9 rounded-full bg-white/20 text-white flex items-center justify-center text-[11px] font-black overflow-hidden shrink-0">
               {group.peerAvatar ? <img src={group.peerAvatar} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" /> : (initialsOf(group.name) || <User className="w-5 h-5" />)}
             </span>
           )}
-          <p className="text-sm font-black text-white truncate">{group.name}</p>
+          <p className="text-base font-black text-white truncate">{group.name}</p>
         </div>
         <button
           onClick={() => setInfoOpen(true)}
-          className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center text-white active:scale-95 transition shrink-0"
+          className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center text-white active:scale-95 transition shrink-0"
           aria-label="Group info"
         >
           <Info className="w-4 h-4" />
@@ -1355,7 +1355,7 @@ const ThreadPanel: React.FC<{
 
       <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
         {messages === null && (
-          <div className="flex items-center justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-[#EA580C]" /></div>
+          <div className="flex items-center justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-orange-600" /></div>
         )}
         {messages !== null && messages.length === 0 && (
           <p className="text-center text-xs text-slate-400 font-medium py-8">No messages yet. Send the first one.</p>
@@ -1454,11 +1454,11 @@ const ThreadPanel: React.FC<{
             )}
             <div
               {...press}
-              className={`max-w-[85%] select-none px-3.5 py-2 rounded-2xl text-xs leading-relaxed cursor-pointer ${m.mine && !emojiOnly ? 'bg-[#EA580C] text-white' : 'bg-white text-slate-800 border border-slate-200'}`}
+              className={`max-w-[85%] select-none px-3.5 py-2 rounded-2xl text-xs leading-relaxed cursor-pointer ${m.mine && !emojiOnly ? 'bg-orange-600 text-white' : 'bg-white text-slate-800 border border-slate-200'}`}
             >
               {m.replyTo && (
                 <div className={`mb-1 rounded-lg border-l-2 px-2 py-1 ${m.mine ? 'border-orange-200 bg-white/10' : 'border-orange-300 bg-orange-50/70'}`}>
-                  <p className={`text-[10px] font-black ${m.mine ? 'text-orange-100' : 'text-[#C2410C]'}`}>{m.replyTo.username}</p>
+                  <p className={`text-[10px] font-black ${m.mine ? 'text-orange-100' : 'text-orange-700'}`}>{m.replyTo.username}</p>
                   <p className={`text-[10px] truncate ${m.mine ? 'text-orange-100/80' : 'text-slate-500'}`}>{m.replyTo.excerpt}</p>
                 </div>
               )}
@@ -1489,7 +1489,7 @@ const ThreadPanel: React.FC<{
         {replyTo && (
           <div className="absolute bottom-full left-3 right-3 mb-1 flex items-start gap-2 rounded-xl bg-orange-50 border border-orange-100 px-3 py-2">
             <div className="min-w-0 flex-1">
-              <p className="text-[10px] font-black text-[#C2410C]">Replying to {replyTo.username}</p>
+              <p className="text-[10px] font-black text-orange-700">Replying to {replyTo.username}</p>
               <p className="text-[11px] text-slate-500 truncate">{replyTo.removed ? 'Message removed' : (replyTo.text || 'Photo')}</p>
             </div>
             <button onClick={() => setReplyTo(null)} className="rounded-full p-1 text-slate-400 hover:bg-orange-100" aria-label="Cancel reply">
@@ -1534,7 +1534,7 @@ const ThreadPanel: React.FC<{
         />
         <button
           onClick={() => send()}
-          className="px-4 py-2.5 rounded-xl bg-[#EA580C] text-white text-xs font-black active:scale-95 transition flex items-center gap-1.5"
+          className="px-4 py-2.5 rounded-xl bg-orange-600 text-white text-xs font-black active:scale-95 transition flex items-center gap-1.5"
         >
           <Send className="w-3.5 h-3.5" /> Send
         </button>
@@ -1568,7 +1568,7 @@ const ThreadPanel: React.FC<{
               onChange={(e) => setAttachCaption(e.target.value)}
               placeholder="Add a caption (optional)"
               aria-label="Caption for the attachment"
-              className="w-full bg-white/10 border border-white/20 rounded-full px-4 py-3 text-[13px] text-white placeholder:text-white/50 font-medium outline-none focus:border-[#EA580C]/60"
+              className="w-full bg-white/10 border border-white/20 rounded-full px-4 py-3 text-[13px] text-white placeholder:text-white/50 font-medium outline-none focus:border-orange-600/60"
             />
           </div>
           <div className="p-4 flex justify-end gap-3">
@@ -1581,7 +1581,7 @@ const ThreadPanel: React.FC<{
                 setAttachCaption('');
                 send({ preview: cur.dataUrl, file: cur.file, text: attachCaption.trim() });
               }}
-              className="px-5 py-3 rounded-2xl bg-[#EA580C] text-white text-xs font-black flex items-center gap-2 active:scale-95 transition"
+              className="px-5 py-3 rounded-2xl bg-orange-600 text-white text-xs font-black flex items-center gap-2 active:scale-95 transition"
             >
               <Send className="w-4 h-4" /> Send
             </button>
@@ -1600,7 +1600,7 @@ const ThreadPanel: React.FC<{
             </div>
             {photosAllowed && (
               <button onClick={() => fileRef.current?.click()} className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-left active:scale-[0.99] transition">
-                <span className="w-10 h-10 rounded-xl bg-orange-50 border border-orange-100 text-[#EA580C] flex items-center justify-center"><Info className="w-4 h-4" /></span>
+                <span className="w-10 h-10 rounded-xl bg-orange-50 border border-orange-100 text-orange-600 flex items-center justify-center"><Info className="w-4 h-4" /></span>
                 <span>
                   <span className="block text-sm font-black text-slate-900">Photo</span>
                   <span className="block text-[11px] text-slate-500 font-medium">Take or choose a photo</span>
@@ -1638,7 +1638,7 @@ const ThreadPanel: React.FC<{
               {group.kind === 'personal' ? (
                 <>
                   <div className="flex items-center gap-3">
-                    <span className="w-12 h-12 rounded-full bg-orange-50 border border-orange-100 text-[#EA580C] flex items-center justify-center text-sm font-black overflow-hidden shrink-0">
+                    <span className="w-12 h-12 rounded-full bg-orange-50 border border-orange-100 text-orange-600 flex items-center justify-center text-sm font-black overflow-hidden shrink-0">
                       {group.peerAvatar ? <img src={group.peerAvatar} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" /> : (initialsOf(group.name) || <User className="w-5 h-5" />)}
                     </span>
                     <div className="min-w-0">
@@ -1709,7 +1709,7 @@ const ThreadPanel: React.FC<{
                 setVvAt(t);
                 if (viewerVideoRef.current) viewerVideoRef.current.currentTime = t;
               }}
-              className="flex-1 h-1 accent-[#EA580C]"
+              className="flex-1 h-1 accent-orange-600"
               aria-label="Video timeline"
             />
             <span className="text-[10px] font-bold text-white/80 tabular-nums">{fmtVvTime(vvDur)}</span>
@@ -1765,7 +1765,7 @@ const ThreadPanel: React.FC<{
                   disabled={forwarding}
                   className="w-full flex items-center gap-3 bg-white border border-slate-200 rounded-2xl px-3.5 py-2.5 active:scale-[0.99] transition disabled:opacity-50 text-left"
                 >
-                  <span className="w-9 h-9 rounded-xl bg-orange-50 border border-orange-100 text-[#EA580C] flex items-center justify-center shrink-0">
+                  <span className="w-9 h-9 rounded-xl bg-orange-50 border border-orange-100 text-orange-600 flex items-center justify-center shrink-0">
                     {o.kind === 'personal' ? <User className="w-4 h-4" /> : <MessageSquare className="w-4 h-4" />}
                   </span>
                   <span className="min-w-0 flex-1">
@@ -1929,7 +1929,7 @@ const StaffNewChatSheet: React.FC<{
                   <div className="space-y-2">
                     {directory.students.filter((s) => matches(`${s.name || ''} ${s.username || ''}`)).map((s) => (
                       <div key={s.uid} className="flex items-center gap-3 bg-white border border-slate-200 rounded-2xl px-3.5 py-2.5">
-                        <span className="w-10 h-10 rounded-full bg-orange-50 border border-orange-100 text-[#EA580C] flex items-center justify-center text-xs font-black shrink-0 overflow-hidden">
+                        <span className="w-10 h-10 rounded-full bg-orange-50 border border-orange-100 text-orange-600 flex items-center justify-center text-xs font-black shrink-0 overflow-hidden">
                           {s.avatar
                             ? <img src={s.avatar} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                             : (initials(s.name || s.username || '') || <User className="w-5 h-5" />)}
@@ -1941,7 +1941,7 @@ const StaffNewChatSheet: React.FC<{
                         <button
                           onClick={() => openWith(s.uid)}
                           disabled={busyUid === s.uid}
-                          className="shrink-0 px-3.5 py-2 rounded-xl bg-[#EA580C] text-white text-[11px] font-black flex items-center gap-1.5 active:scale-95 transition disabled:opacity-50"
+                          className="shrink-0 px-3.5 py-2 rounded-xl bg-orange-600 text-white text-[11px] font-black flex items-center gap-1.5 active:scale-95 transition disabled:opacity-50"
                           aria-label={`Chat with ${s.name || s.username}`}
                         >
                           {busyUid === s.uid && <Loader2 className="w-3.5 h-3.5 animate-spin" />} Chat
@@ -1969,7 +1969,7 @@ const StaffNewChatSheet: React.FC<{
                         <button
                           onClick={() => openWith(st.uid)}
                           disabled={busyUid === st.uid}
-                          className="shrink-0 px-3.5 py-2 rounded-xl bg-[#EA580C] text-white text-[11px] font-black flex items-center gap-1.5 active:scale-95 transition disabled:opacity-50"
+                          className="shrink-0 px-3.5 py-2 rounded-xl bg-orange-600 text-white text-[11px] font-black flex items-center gap-1.5 active:scale-95 transition disabled:opacity-50"
                           aria-label={`Chat with ${st.name}`}
                         >
                           {busyUid === st.uid && <Loader2 className="w-3.5 h-3.5 animate-spin" />} Chat

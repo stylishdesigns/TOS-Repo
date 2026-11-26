@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../../../context/AppContext';
 import { Tutor, TimetableSlot } from '../../../types';
-import { ArrowLeft, Star, TrendingUp, Info } from 'lucide-react';
+import { X, Star, TrendingUp, Info } from 'lucide-react';
 import { ModernSelect } from '../../ui/ModernSelect';
 
 interface TutorHistoryViewProps {
@@ -117,24 +117,20 @@ export const TutorHistoryView: React.FC<TutorHistoryViewProps> = ({ tutor, onBac
 
   return (
     <div className="p-4 sm:p-5 max-w-lg mx-auto space-y-4 animate-in fade-in duration-200 pb-20">
-      {/* Header with Back Navigation */}
-      <div className="flex items-center justify-between">
+      {/* Header: a single X close, same behaviour as the greetings splash */}
+      <div className="flex items-center justify-end">
         <button
           type="button"
           onClick={onBack}
-          className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-white border border-[#E2E8F0] text-slate-700 hover:bg-slate-50 font-bold text-xs shadow-2xs transition-all cursor-pointer active:scale-95"
+          aria-label="Close"
+          className="w-9 h-9 rounded-full bg-white border border-[#E2E8F0] text-slate-600 hover:bg-slate-50 flex items-center justify-center shadow-2xs transition-all cursor-pointer active:scale-95"
         >
-          <ArrowLeft className="w-3.5 h-3.5" />
-          <span>Active Classes</span>
+          <X className="w-4 h-4" />
         </button>
-
-        <span className="text-[10px] font-black uppercase text-slate-400 font-mono">
-          Tutor Portal
-        </span>
       </div>
 
       <div>
-        <div className="text-[10px] font-extrabold uppercase tracking-wider text-[#C2410C]">
+        <div className="text-[10px] font-extrabold uppercase tracking-wider text-orange-700">
           {tutor.name} · {primarySubject}
         </div>
         <h1 className="text-2xl font-black text-[#0F172A] tracking-tight mt-0.5">
@@ -145,13 +141,9 @@ export const TutorHistoryView: React.FC<TutorHistoryViewProps> = ({ tutor, onBac
       {/* 1. Overall Student Rating Card (Matching TutorHistory.dc.html) */}
       <section
         aria-label="Overall rating"
-        style={{
-          background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 55%, #0B1224 100%)',
-          boxShadow: '0 8px 24px rgba(2, 6, 23, 0.18)',
-        }}
-        className="rounded-[20px] p-5 border border-[#334155] text-white"
+        className="rounded-[20px] p-5 border border-slate-200 bg-white text-slate-900 shadow-lg shadow-slate-200/50"
       >
-        <div className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#CBD5E1]">
+        <div className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-slate-500">
           Overall student rating
         </div>
 
@@ -160,52 +152,52 @@ export const TutorHistoryView: React.FC<TutorHistoryViewProps> = ({ tutor, onBac
             <span className="text-[56px] font-extrabold tracking-[-0.03em] font-mono tabular-nums">
               {stats.totalRatings > 0 ? stats.averageRating.toFixed(1) : '—'}
             </span>
-            <span className="text-xl font-extrabold text-[#FCD34D] ml-1">
+            <span className="text-xl font-extrabold text-amber-500 ml-1">
               / 5
             </span>
           </div>
 
           <div className="pb-2 flex flex-col gap-1.5">
-            <div className="flex gap-0.5 text-[#FBBF24]" aria-label={`${stats.averageRating} out of 5 stars`}>
+            <div className="flex gap-0.5 text-amber-400" aria-label={`${stats.averageRating} out of 5 stars`}>
               {[1, 2, 3, 4, 5].map((s) => (
                 <Star
                   key={s}
                   className={`w-4 h-4 ${
                     stats.totalRatings > 0 && s <= Math.round(stats.averageRating)
-                      ? 'fill-[#FBBF24] text-[#FBBF24]'
-                      : 'fill-[#475569] text-[#475569]'
+                      ? 'fill-amber-400 text-amber-400'
+                      : 'fill-slate-200 text-slate-200'
                   }`}
                 />
               ))}
             </div>
 
-            <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/18 text-[#6EE7B7] border border-emerald-500/30">
+            <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200">
               <TrendingUp className="w-3 h-3" />
               <span>{stats.changeVsLastMonth} vs last month</span>
             </span>
           </div>
         </div>
 
-        <div className="mt-1.5 text-[11px] font-semibold text-[#94A3B8]">
+        <div className="mt-1.5 text-[11px] font-semibold text-slate-500">
           {stats.totalRatings > 0
             ? `From ${stats.totalRatings} ${stats.totalRatings === 1 ? 'rating' : 'ratings'} across ${stats.totalClassesRated} ${stats.totalClassesRated === 1 ? 'class' : 'classes'}`
             : 'No student ratings submitted yet'}
         </div>
 
         {/* Rating Breakdown Bars (5 to 1) */}
-        <div className="flex flex-col gap-1.5 mt-3.5 pt-3 border-t border-white/10">
+        <div className="flex flex-col gap-1.5 mt-3.5 pt-3 border-t border-slate-100">
           {([5, 4, 3, 2, 1] as const).map((starNum) => {
             const row = stats.distribution[starNum];
             return (
-              <div key={starNum} className="flex items-center gap-2 text-[11px] font-bold text-[#CBD5E1]">
+              <div key={starNum} className="flex items-center gap-2 text-[11px] font-bold text-slate-600">
                 <span className="w-5 text-left">{starNum}</span>
-                <span className="flex-1 h-1.5 rounded-full bg-white/12 overflow-hidden">
+                <span className="flex-1 h-1.5 rounded-full bg-slate-100 overflow-hidden">
                   <span
-                    className="block h-full rounded-full bg-[#FBBF24] transition-all duration-300"
+                    className="block h-full rounded-full bg-amber-400 transition-all duration-300"
                     style={{ width: `${row?.percent || 0}%` }}
                   />
                 </span>
-                <span className="w-8 text-right font-mono tabular-nums text-slate-300">
+                <span className="w-8 text-right font-mono tabular-nums text-slate-500">
                   {row?.percent || 0}%
                 </span>
               </div>

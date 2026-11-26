@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { AccessCodeSettings } from './AccessCodeSettings';
 import { WebsiteLanding } from '../dashboard/WebsiteLanding';
+import { ACCENTS } from '../../landing/landingContent';
 import { ModernSelect } from '../ui/ModernSelect';
 import {
   User,
@@ -23,7 +24,6 @@ import {
   Plus,
   Calendar,
   X,
-  Camera,
   ImagePlus,
   Trash2,
   RefreshCw,
@@ -33,6 +33,9 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
   const { settings, updateSettings, addToast, authMethod, activeUser, activeCentre, updateAdmin, uploadCentreImage, getCentreSessions, revokeCentreSession, getCentreLogo, saveCentreLogo, getCentreWelcomeImage, saveCentreWelcomeImage, activeCentreId } = useApp();
 
   const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'sessions'>('profile');
+  // Facility mode shows two panels: the facility's identity settings and
+  // the website landing page editor, picked with a toggle up top.
+  const [facilityView, setFacilityView] = useState<'facility' | 'landing'>('facility');
 
   // Sync active tab if security is forbidden
   React.useEffect(() => {
@@ -86,6 +89,44 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
       addToast({ type: 'error', title: 'Remove Failed', description: err?.message || 'The logo could not be removed. Please try again.' });
     } finally {
       setLogoBusy(false);
+    }
+  };
+
+  // ---- Accent colour: one colour for the whole facility. Saving here moves
+  // the account accent AND the website landing page accent together, so the
+  // landing page, portals, login page, install page and app theme all agree.
+  const [accent, setAccent] = useState('');
+  const [accentDraft, setAccentDraft] = useState('');
+  const [accentBusy, setAccentBusy] = useState(false);
+  React.useEffect(() => {
+    if (mode !== 'facility' || !activeCentreId) return;
+    fetch('/api/centre/landing').then((r) => (r.ok ? r.json() : null)).then((d) => {
+      const a = String(d?.content?.accent || '');
+      if (/^#[0-9a-fA-F]{6}$/i.test(a)) {
+        setAccent(a.toUpperCase());
+        setAccentDraft(a.toUpperCase());
+      }
+    }).catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, activeCentreId]);
+  const handleAccentSave = async () => {
+    if (!/^#[0-9a-fA-F]{6}$/i.test(accentDraft)) {
+      addToast({ type: 'error', title: 'Pick a Colour', description: 'Choose a preset or a custom colour before saving.' });
+      return;
+    }
+    try {
+      setAccentBusy(true);
+      const r = await fetch('/api/centre/branding-accent', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ accent: accentDraft }) });
+      const d = await r.json().catch(() => null);
+      if (!r.ok || d?.error) throw new Error(d?.error || 'The colour could not be saved. Please try again.');
+      const saved = String(d.accent || accentDraft).toUpperCase();
+      setAccent(saved);
+      setAccentDraft(saved);
+      addToast({ type: 'success', title: 'Colour Is Live', description: 'The landing page, portals, login page and install pages now use this colour.' });
+    } catch (err: any) {
+      addToast({ type: 'error', title: 'Save Failed', description: err?.message || 'The colour could not be saved. Please try again.' });
+    } finally {
+      setAccentBusy(false);
     }
   };
 
@@ -180,9 +221,7 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
   const [newSessionName, setNewSessionName] = useState('');
 
   // ---- Profile photo: uploaded to Cloudinary through the server, saved on the admin record.
-  const photoInputRef = useRef<HTMLInputElement>(null);
   const [photoUrl, setPhotoUrl] = useState(activeUser?.photoUrl || '');
-  const [photoBusy, setPhotoBusy] = useState(false);
 
   const readFileAsDataUrl = (file: File): Promise<string> =>
     new Promise((resolve, reject) => {
@@ -191,33 +230,6 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
       reader.onerror = () => reject(reader.error);
       reader.readAsDataURL(file);
     });
-
-  const handlePhotoPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
-    if (!/^image\/(png|jpe?g|webp)$/i.test(file.type)) {
-      addToast({ type: 'error', title: 'Unsupported Image', description: 'Upload a PNG, JPG or WebP picture.' });
-      return;
-    }
-    if (file.size > 2 * 1024 * 1024) {
-      addToast({ type: 'error', title: 'Image Too Large', description: 'Your profile photo can be up to 2 MB.' });
-      return;
-    }
-    if (!activeUser) return;
-    setPhotoBusy(true);
-    try {
-      const dataUrl = await readFileAsDataUrl(file);
-      const url = await uploadCentreImage(dataUrl, 'profile');
-      setPhotoUrl(url);
-      await updateAdmin(activeUser.id, { photoUrl: url });
-      addToast({ type: 'success', title: 'Profile Photo Updated', description: 'Your new photo shows on the avatar and dropdown.' });
-    } catch (err: any) {
-      addToast({ type: 'error', title: 'Upload Failed', description: err?.message || 'The photo could not be uploaded. Please try again.' });
-    } finally {
-      setPhotoBusy(false);
-    }
-  };
 
   // ---- Session expiry: this account decides how long a login lasts.
   const [expiryDays, setExpiryDays] = useState<number>(activeUser?.sessionExpiryDays ?? 0);
@@ -371,7 +383,7 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
       whatsappNumber: centreForm.whatsapp,
       smsNotifications: centreForm.smsNotifications,
       emailNotifications: centreForm.emailNotifications,
-    });
+    }, { silent: true });
 
     addToast({
       type: 'success',
@@ -386,7 +398,7 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
     const currentSessions = settings.academicSessions || [];
     if (!currentSessions.includes(newSessionName.trim())) {
       const updated = [newSessionName.trim(), ...currentSessions];
-      updateSettings({ academicSessions: updated, academicSession: newSessionName.trim() });
+      updateSettings({ academicSessions: updated, academicSession: newSessionName.trim() }, { silent: true });
       setCentreForm(prev => ({ ...prev, academicSession: newSessionName.trim() }));
       addToast({
         type: 'success',
@@ -407,7 +419,7 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
           {photoUrl ? (
             <img src={photoUrl} alt={activeUser?.name || 'Administrator'} className="w-13 h-13 rounded-xl object-cover shrink-0 border border-orange-200" />
           ) : (
-            <div className="w-13 h-13 rounded-xl bg-orange-100 text-[#EA580C] font-black text-xl flex items-center justify-center shrink-0 border border-orange-200">
+            <div className="w-13 h-13 rounded-xl bg-orange-100 text-orange-600 font-black text-xl flex items-center justify-center shrink-0 border border-orange-200">
               {firstName[0]}
               {lastName[0]}
             </div>
@@ -421,7 +433,7 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
                 {activeUser?.role || 'Administrator'}
               </span>
             </div>
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 mt-1">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm font-bold text-slate-900 mt-1">
               <span className="flex items-center space-x-1">
                 <Mail className="w-3.5 h-3.5 text-slate-400" />
                 <span>{activeUser?.email || ''}</span>
@@ -451,7 +463,7 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
           onClick={() => setActiveTab('profile')}
           className={`px-3.5 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap flex items-center space-x-2 ${
             activeTab === 'profile'
-              ? 'bg-[#EA580C] text-white shadow-xs'
+              ? 'bg-orange-600 text-white shadow-xs'
               : 'text-slate-600 hover:text-slate-900 hover:bg-white/70'
           }`}
         >
@@ -464,7 +476,7 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
             onClick={() => setActiveTab('security')}
             className={`px-3.5 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap flex items-center space-x-2 ${
               activeTab === 'security'
-                ? 'bg-[#EA580C] text-white shadow-xs'
+                ? 'bg-orange-600 text-white shadow-xs'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-white/70'
             }`}
           >
@@ -477,7 +489,7 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
           onClick={() => setActiveTab('sessions')}
           className={`px-3.5 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap flex items-center space-x-2 ${
             activeTab === 'sessions'
-              ? 'bg-[#EA580C] text-white shadow-xs'
+              ? 'bg-orange-600 text-white shadow-xs'
               : 'text-slate-600 hover:text-slate-900 hover:bg-white/70'
           }`}
         >
@@ -502,25 +514,11 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
               {photoUrl ? (
                 <img src={photoUrl} alt="Profile" className="w-16 h-16 rounded-xl object-cover border border-slate-200" />
               ) : (
-                <div className="w-16 h-16 rounded-xl bg-orange-100 text-[#EA580C] font-black text-lg grid place-items-center border border-orange-200">
+                <div className="w-16 h-16 rounded-xl bg-orange-100 text-orange-600 font-black text-lg grid place-items-center border border-orange-200">
                   {firstName[0]}{lastName[0]}
                 </div>
               )}
-              <button
-                type="button"
-                onClick={() => photoInputRef.current?.click()}
-                disabled={photoBusy}
-                aria-label="Upload profile photo"
-                className="absolute -bottom-1.5 -right-1.5 w-7 h-7 rounded-full bg-[#EA580C] text-white shadow flex items-center justify-center hover:bg-[#C2410C] disabled:opacity-60 transition-colors"
-              >
-                {photoBusy ? <div className="w-3.5 h-3.5 rounded-full border-2 border-white border-t-transparent animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
-              </button>
             </div>
-            <div>
-              <p className="text-xs font-bold text-slate-800">Profile photo</p>
-              <p className="text-[11px] text-slate-500">PNG, JPG or WebP, up to 2 MB. Shows on your avatar and dropdown.</p>
-            </div>
-            <input ref={photoInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={handlePhotoPick} />
           </div>
 
           <form onSubmit={handleUpdateProfile} className="space-y-4 text-xs">
@@ -592,7 +590,7 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
             <div className="flex justify-end pt-3 border-t border-slate-100">
               <button
                 type="submit"
-                className="px-4 py-2 text-xs font-semibold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg shadow-sm flex items-center space-x-1.5"
+                className="px-4 py-2 text-xs font-semibold text-white bg-orange-600 hover:bg-orange-700 rounded-lg shadow-sm flex items-center space-x-1.5"
               >
                 <Save className="w-3.5 h-3.5" />
                 <span>Save Profile Changes</span>
@@ -664,7 +662,7 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
               <div className="pt-2">
                 <button
                   type="submit"
-                  className="px-4 py-2 text-xs font-semibold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg shadow-sm"
+                  className="px-4 py-2 text-xs font-semibold text-white bg-orange-600 hover:bg-orange-700 rounded-lg shadow-sm"
                 >
                   Update Password
                 </button>
@@ -789,12 +787,59 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
       {mode === 'facility' && (
         <div>
           <h2 className="text-xl font-bold text-slate-900">Facility Settings</h2>
-          <p className="text-xs text-slate-500 mt-0.5">Facility parameters, branding and your website landing page.</p>
+          <p className="text-sm sm:text-[15px] font-bold text-slate-900 mt-0.5">Facility parameters, branding and your website landing page.</p>
+          {/* Two-way toggle: the facility's own settings or the landing page
+              editor, both reachable from the top. */}
+          <div className="mt-4 flex justify-center">
+          <div className="inline-flex p-1.5 rounded-xl bg-slate-100 border border-slate-200 gap-1">
+            <button
+              onClick={() => setFacilityView('facility')}
+              className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-colors ${facilityView === 'facility' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              Facility settings
+            </button>
+            <button
+              onClick={() => setFacilityView('landing')}
+              className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-colors ${facilityView === 'landing' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              Website landing page
+            </button>
+          </div>
+          </div>
         </div>
       )}
 
-      {mode === 'facility' && (
+      {mode === 'facility' && facilityView === 'facility' && (
         <div className="space-y-6">
+          {/* Accent colour: one colour for the whole facility, saved to the
+              account and the website landing page together. */}
+          <div className="bg-white p-5 sm:p-6 rounded-xl border border-slate-200/90 shadow-xs space-y-4">
+            <div className="border-b border-slate-100 pb-3">
+              <h3 className="text-base font-bold text-slate-900">Accent colour</h3>
+              <p className="text-xs text-slate-500">
+                One colour for your facility: the website landing page, portals, login page and the app families install. Saving here updates them all together, no deploy needed.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {ACCENTS.map((a) => (
+                <button key={a} type="button" onClick={() => setAccentDraft(a)} aria-label={`Accent ${a}`} className={`w-9 h-9 rounded-full border-2 transition-transform ${accentDraft === a ? 'border-slate-900 scale-110' : 'border-transparent'}`} style={{ background: a }} />
+              ))}
+              <input
+                type="color"
+                value={/^#[0-9a-fA-F]{6}$/i.test(accentDraft) ? accentDraft : '#F2A93B'}
+                onChange={(e) => setAccentDraft(e.target.value.toUpperCase())}
+                aria-label="Custom colour"
+                title="Pick any colour"
+                className="w-9 h-9 rounded-full border-2 border-dashed border-slate-300 bg-transparent p-0 cursor-pointer"
+              />
+              <span className="text-xs text-slate-400">{accentDraft || 'Pick a colour'}</span>
+              <div className="flex-1" />
+              <button type="button" onClick={handleAccentSave} disabled={accentBusy || accentDraft === accent} className="px-4 py-2 rounded-lg text-sm font-semibold bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] hover:brightness-110 disabled:opacity-50 transition-colors">
+                {accentBusy ? 'Saving…' : 'Save colour'}
+              </button>
+            </div>
+          </div>
+
           {/* Access code (Prompt C Part C): owner-managed, server-verified. */}
           <AccessCodeSettings />
 
@@ -819,7 +864,7 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
                   type="button"
                   onClick={() => logoInputRef.current?.click()}
                   disabled={logoBusy}
-                  className="px-4 py-2 text-xs font-semibold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg shadow-sm disabled:opacity-60 w-fit"
+                  className="px-4 py-2 text-xs font-semibold text-white bg-orange-600 hover:bg-orange-700 rounded-lg shadow-sm disabled:opacity-60 w-fit"
                 >
                   {logoBusy ? 'Uploading…' : centreLogo ? 'Replace logo' : 'Upload logo'}
                 </button>
@@ -858,7 +903,7 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
                   type="button"
                   onClick={() => welcomeInputRef.current?.click()}
                   disabled={welcomeBusy}
-                  className="px-4 py-2 text-xs font-semibold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg shadow-sm disabled:opacity-60 w-fit"
+                  className="px-4 py-2 text-xs font-semibold text-white bg-orange-600 hover:bg-orange-700 rounded-lg shadow-sm disabled:opacity-60 w-fit"
                 >
                   {welcomeBusy ? 'Uploading…' : centreWelcome ? 'Replace image' : 'Upload your own image'}
                 </button>
@@ -1045,7 +1090,7 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
             <div className="flex justify-end pt-3 border-t border-slate-100">
               <button
                 type="submit"
-                className="px-4 py-2 text-xs font-semibold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg shadow-sm flex items-center space-x-1.5"
+                className="px-4 py-2 text-xs font-semibold text-white bg-orange-600 hover:bg-orange-700 rounded-lg shadow-sm flex items-center space-x-1.5"
               >
                 <Save className="w-3.5 h-3.5" />
                 <span>Save Facility Parameters</span>
@@ -1057,7 +1102,7 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
       )}
 
       {/* Facility mode, section two: the website landing page editor. */}
-      {mode === 'facility' && (
+      {mode === 'facility' && facilityView === 'landing' && (
         <div className="space-y-3">
           <div>
             <h3 className="text-base font-bold text-slate-900">Website Landing Page</h3>
@@ -1073,7 +1118,7 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
           <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center space-x-2">
-                <Calendar className="w-5 h-5 text-[#EA580C]" />
+                <Calendar className="w-5 h-5 text-orange-600" />
                 <h3 className="font-bold text-base text-slate-900">Add Academic Session</h3>
               </div>
               <button
@@ -1109,7 +1154,7 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 font-semibold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg shadow-sm"
+                  className="px-4 py-2 font-semibold text-white bg-orange-600 hover:bg-orange-700 rounded-lg shadow-sm"
                 >
                   Add Session
                 </button>

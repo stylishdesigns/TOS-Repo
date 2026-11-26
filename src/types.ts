@@ -34,6 +34,8 @@ export interface TenantSettings {
   bankAccountName?: string;
   cashPaymentGuide?: string;
   academicSessions?: string[];
+  /** Automated payment reminder settings (Fees & Payments). */
+  paymentReminders?: import('./lib/feeReminders').FeeReminderSettings | null;
 }
 
 export interface Branch {
@@ -83,6 +85,18 @@ export interface CMSContent {
   gallery: { id: string; title: string; category: string; imageUrl: string }[];
 }
 
+// One item on the academic schedule planner: a timetable class, or a
+// reminder a member added to a day (practice, mock or custom). CalendarView
+// renders every kind uniformly on the shared month grid.
+export interface PlannerActivity {
+  id: string;
+  date: string; // YYYY-MM-DD
+  time?: string; // display time, e.g. "09:00"
+  title: string;
+  kind: 'class' | 'mock' | 'practice' | 'custom';
+  createdAt?: number;
+}
+
 export interface Student {
   id: string;
   centreId?: string;
@@ -103,6 +117,17 @@ export interface Student {
   branchName: string;
   subjects: string[];
   notes?: string;
+  // Sign-up form fields the admin add-student form now collects too, so
+  // admin-enrolled and self-enrolled records carry the same information.
+  firstName?: string;
+  lastName?: string;
+  username?: string;
+  state?: string;
+  courseOfStudy?: string;
+  universityChoice?: string;
+  examToRegister?: string;
+  studentId?: string;
+  emailVerified?: boolean;
   registrationDate: string;
   status: 'Active' | 'Idle' | 'Suspended' | 'Completed';
   attendancePercent: number;
@@ -110,6 +135,7 @@ export interface Student {
   paidAmount: number;
   outstandingBalance: number;
   paymentStatus?: 'Pending' | 'Partial' | 'Paid';
+  feeOverride?: boolean;
   department?: 'Science' | 'Commercial' | 'Arts';
   totalAttendanceCount?: number;
 }
@@ -133,6 +159,7 @@ export interface AdmissionApplication {
 }
 
 export interface Tutor {
+  plannerReminders?: PlannerActivity[];
   id: string;
   centreId?: string;
   name: string;
@@ -150,6 +177,13 @@ export interface Tutor {
   ratePerHour?: number;
   totalClassesTaught?: number;
   programmeIds?: string[];
+  payFrequency?: 'daily' | 'weekly' | 'monthly';
+  payDay?: number;
+  ratePerPeriod?: number;
+  payAmount?: number;
+  bankName?: string;
+  bankAccountName?: string;
+  bankAccountNumber?: string;
   temporaryPassword?: string;
   hasChangedPassword?: boolean;
   photoUrl?: string;
@@ -178,7 +212,7 @@ export interface Programme {
   duration: string;
   startDate: string;
   endDate: string;
-  maxStudents: number;
+  maxStudents?: number;
   enrolledStudents: number;
   status: 'Active' | 'Upcoming' | 'Archived';
   category: 'JAMB' | 'WAEC' | 'NECO' | 'A-Levels' | 'SAT / International';
@@ -205,6 +239,7 @@ export interface TimetableSlot {
   changeRequestReason?: string;
   postponedNote?: string;
   cancellationReason?: string;
+  materials?: { id: string; title: string }[];
 }
 
 export interface StudyMaterial {
@@ -223,6 +258,52 @@ export interface StudyMaterial {
   description?: string;
   contentSummary?: string;
   downloadUrl?: string;
+  // Multi-file uploads: every file on one material lives here. downloadUrl
+  // keeps the first file so older viewers (and old records) keep working.
+  files?: Array<{ url: string; name: string; sizeLabel?: string }>;
+  // Where the material lives: 'general' materials float free of the timetable;
+  // 'topic' ones are attached to a scheduled class (topic + classId).
+  kind?: 'general' | 'topic';
+  // Real upload shape: pdf/image carry an uploaded file, video is link-only.
+  type?: 'pdf' | 'image' | 'video';
+  videoUrl?: string;
+  fileName?: string;
+  classId?: string;
+  classDate?: string;
+  classTime?: string;
+  // ms epoch stamped at every local save; lets listeners tell a stale replay
+  // from a fresh save.
+  updatedAt?: number;
+}
+
+// VIDEO RESOURCES (batch 41): platform-level YouTube lesson videos. Written
+// only by the TOS server routes; read everywhere (students see the same
+// platform library under Learning Resources > Video classes).
+export interface VideoResource {
+  id: string;
+  // Batch 42: the title field is gone. A video is identified by its exam
+  // types (from the TOS exam registry), subject and topic; the topic is the
+  // name students see. examTypes must come from the TOS exam registry
+  // (JAMB, WAEC, NECO, IJMB, JUPEB, or whatever the platform admin adds).
+  subject: string;
+  topic: string;
+  description?: string;
+  examTypes: string[];
+  youtubeUrl: string;
+  videoId: string;
+  addedAt: string;
+  addedBy?: string;
+  updatedAt?: string;
+}
+
+// The examinations TOS registers learning resources for, managed by the
+// platform admin from the Learning Resources tab (batch 42). Students never
+// edit this list; they only match against it through their programme.
+export interface TosExamType {
+  id: string;
+  name: string;
+  addedAt?: string;
+  addedBy?: string;
 }
 
 export interface ClassRating {
@@ -262,6 +343,7 @@ export interface AttendanceSettings {
   resumptionTime: string; // e.g. "08:00 AM"
   closingTime: string;    // e.g. "03:30 PM"
   lateArrivalTime: string; // e.g. "08:30 AM"
+  operatingDays?: string[]; // days the facility opens; check-in is required only on these
 }
 
 export interface AttendanceLog {
@@ -349,6 +431,9 @@ export interface PaymentRecord {
   status: 'Paid' | 'Partial' | 'Pending' | 'Rejected';
   method: 'Card' | 'Bank Transfer' | 'Cash';
   date: string;
+  // Payment window: when this payment starts covering the student and when it expires.
+  effectiveFrom?: string;
+  expiresAt?: string;
   evidenceUrl?: string;
   evidenceName?: string;
   note?: string;
@@ -380,6 +465,7 @@ export interface Announcement {
 }
 
 export interface AdminUser {
+  plannerReminders?: PlannerActivity[];
   id: string;
   centreId?: string;
   name: string;
@@ -389,6 +475,13 @@ export interface AdminUser {
   status: 'Active' | 'Invited' | 'Suspended';
   department: string;
   jobTitle: string;
+  payFrequency?: 'daily' | 'weekly' | 'monthly';
+  payDay?: number;
+  ratePerPeriod?: number;
+  payAmount?: number;
+  bankName?: string;
+  bankAccountName?: string;
+  bankAccountNumber?: string;
   temporaryPassword?: string;
   hasChangedPassword?: boolean;
 }
@@ -398,9 +491,15 @@ export interface ActivityLog {
   centreId?: string;
   title: string;
   subtitle: string;
-  category: 'Schools' | 'Students' | 'Finance' | 'CMS' | 'Admissions';
+  category: 'Schools' | 'Students' | 'Finance' | 'CMS' | 'Admissions' | 'Timetable' | 'Staff';
   timeAgo: string;
   type: 'success' | 'pending' | 'danger' | 'info';
+  // When it actually happened (ms epoch) and who did it, so the owner can see
+  // every admin's actions with the exact time attached.
+  createdAt?: number;
+  actorName?: string;
+  actorRole?: string;
+  details?: string;
 }
 
 export interface QuizQuestion {
@@ -532,8 +631,6 @@ export interface PlatformConfigGlobal {
   trialDays: number; // 30
   skipTrialDiscountPct: number; // e.g. 10
   trialGraceDays: number; // e.g. 7
-  seatSwapLimitPerStudent?: number; // default 2
-  seatSwapWindowDays?: number; // default 30
   aiRouteRateLimitPerHour?: number; // per-user hourly cap on the AI routes
 }
 
@@ -618,17 +715,54 @@ export interface CentreEntitlements {
   aiPerformanceAnalysis: boolean;
 }
 
+export type SeatStatus = 'available' | 'active' | 'locked';
+export interface SeatHistoryEntry {
+  uid: string;
+  name?: string;
+  from?: string | null;
+  to?: string | null;
+  reason?: string;
+}
+export interface SeatSummary {
+  id: string;
+  seatNo: number;
+  status: SeatStatus;
+  kind?: 'free' | 'paid';
+  daysTotal: number;
+  daysUsed: number;
+  remaining: number;
+  startedAt?: string | null;
+  studentUid?: string;
+  studentName?: string;
+  assignedAt?: string | null;
+  history: SeatHistoryEntry[];
+}
+export interface SeatPool {
+  total: number;
+  active: number;
+  available: number;
+  locked: number;
+  bankedDays: number;
+  free?: number;
+}
 export interface CentreSeatsSummary {
   used: number;
   cap: number;
-  isTrial: boolean;
-  trialDaysLeft?: number;
-  trialEndsAt?: string | null;
+  /** Batch 26: 'lead' (signed up, never upgraded) or 'facility' (upgraded by
+   *  paying for at least the platform minimum of seats). */
+  tier: 'lead' | 'facility';
   studentAccess?: Record<string, {
     status: MembershipStatus;
     lastToggledAt?: string;
-    reactivationsIn30d?: number;
+    seatNo?: number;
+    seatRemaining?: number;
   }>;
+  seats?: SeatSummary[];
+  pool?: SeatPool;
+  freeSeatsAllocated?: number;
+  freeSeatsUnlocked?: boolean;
+  paidSeatsHeld?: number;
+  paidSeatMinimum?: number;
 }
 
 export interface CentreUserRole {

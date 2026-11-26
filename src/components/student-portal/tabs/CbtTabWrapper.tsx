@@ -3,6 +3,7 @@ import { Student, StudentResult } from '../../../types';
 import { StudentPractice } from './StudentPractice';
 import { PracticeAnalytics } from './PracticeAnalytics';
 import { StudentMockTab } from './StudentMockTab';
+import { useApp } from '../../../context/AppContext';
 
 interface CbtTabWrapperProps {
   student: Student;
@@ -36,19 +37,21 @@ export const CbtTabWrapper: React.FC<CbtTabWrapperProps> = ({
   onExitReview,
   onGoToProfile,
 }) => {
+  const { bgTheme } = useApp();
+  const dark = bgTheme === 'dark';
   if (subPage === 'mock') {
     return (
       <div className="space-y-3">
         {/* Top Segmented Control: Mock | Leaderboard */}
         <div className="px-4 pt-3 max-w-lg mx-auto">
-          <div className="bg-white rounded-[14px] p-1 border border-[#E2E8F0] shadow-2xs grid grid-cols-2 gap-1">
+          <div className={`${dark ? 'bg-slate-800/90 p-1 border border-slate-700 shadow-2xs grid grid-cols-2 gap-1' : 'bg-white rounded-[14px] p-1 border border-[#E2E8F0] shadow-2xs grid grid-cols-2 gap-1'}`}>
             <button
               type="button"
               onClick={() => onMockViewChange('mock')}
               className={`h-10 rounded-[10px] text-xs font-extrabold transition-all flex items-center justify-center cursor-pointer ${
                 mockView === 'mock'
-                  ? 'bg-[#0F172A] text-white shadow-xs'
-                  : 'text-[#64748B] hover:text-[#0F172A]'
+                  ? 'bg-[var(--brand,#0F172A)] text-[var(--on-brand,#fff)] shadow-xs'
+                  : dark ? 'text-slate-300' : 'text-[#64748B] hover:text-[#0F172A]'
               }`}
             >
               Mock
@@ -58,8 +61,8 @@ export const CbtTabWrapper: React.FC<CbtTabWrapperProps> = ({
               onClick={() => onMockViewChange('leaderboard')}
               className={`h-10 rounded-[10px] text-xs font-extrabold transition-all flex items-center justify-center cursor-pointer ${
                 mockView === 'leaderboard'
-                  ? 'bg-[#0F172A] text-white shadow-xs'
-                  : 'text-[#64748B] hover:text-[#0F172A]'
+                  ? 'bg-[var(--brand,#0F172A)] text-[var(--on-brand,#fff)] shadow-xs'
+                  : dark ? 'text-slate-300' : 'text-[#64748B] hover:text-[#0F172A]'
               }`}
             >
               Leaderboard
@@ -86,14 +89,14 @@ export const CbtTabWrapper: React.FC<CbtTabWrapperProps> = ({
     <div className="space-y-3">
       {/* Top Segmented Control: Practice | Analytics */}
       <div className="px-4 pt-3 max-w-lg mx-auto">
-        <div className="bg-white rounded-[14px] p-1 border border-[#E2E8F0] shadow-2xs grid grid-cols-2 gap-1">
+        <div className={`${dark ? 'bg-slate-800/90 p-1 border border-slate-700 shadow-2xs grid grid-cols-2 gap-1' : 'bg-white rounded-[14px] p-1 border border-[#E2E8F0] shadow-2xs grid grid-cols-2 gap-1'}`}>
           <button
             type="button"
             onClick={() => onPracticeViewChange('practice')}
             className={`h-10 rounded-[10px] text-xs font-extrabold transition-all flex items-center justify-center cursor-pointer ${
               practiceView === 'practice'
-                ? 'bg-[#0F172A] text-white shadow-xs'
-                : 'text-[#64748B] hover:text-[#0F172A]'
+                ? 'bg-[var(--brand,#0F172A)] text-[var(--on-brand,#fff)] shadow-xs'
+                : dark ? 'text-slate-300' : 'text-[#64748B] hover:text-[#0F172A]'
             }`}
           >
             Practice
@@ -103,8 +106,8 @@ export const CbtTabWrapper: React.FC<CbtTabWrapperProps> = ({
             onClick={() => onPracticeViewChange('analytics')}
             className={`h-10 rounded-[10px] text-xs font-extrabold transition-all flex items-center justify-center cursor-pointer ${
               practiceView === 'analytics'
-                ? 'bg-[#0F172A] text-white shadow-xs'
-                : 'text-[#64748B] hover:text-[#0F172A]'
+                ? 'bg-[var(--brand,#0F172A)] text-[var(--on-brand,#fff)] shadow-xs'
+                : dark ? 'text-slate-300' : 'text-[#64748B] hover:text-[#0F172A]'
             }`}
           >
             Analytics

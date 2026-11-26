@@ -86,7 +86,7 @@ export const SubjectSheet: React.FC<SubjectSheetProps> = ({
         <div className="p-5 pb-3 border-b border-slate-100 flex items-start justify-between shrink-0">
           <div>
             <div className="flex items-center space-x-2">
-              <span className="text-[10px] font-extrabold uppercase text-[#EA580C] tracking-wider block">
+              <span className="text-[10px] font-extrabold uppercase text-orange-600 tracking-wider block">
                 Subject Deep Dive
               </span>
               {subject.isWeakest && (
@@ -261,7 +261,7 @@ export const SubjectSheet: React.FC<SubjectSheetProps> = ({
                   >
                     <div className="space-y-0.5 min-w-0 flex-1">
                       <span className="text-[10px] font-mono text-slate-400 block">{result.date}</span>
-                      <h4 className="text-xs font-bold text-slate-900 truncate group-hover:text-[#EA580C] transition-colors">
+                      <h4 className="text-xs font-bold text-slate-900 truncate group-hover:text-orange-600 transition-colors">
                         {result.examTitle}
                       </h4>
                     </div>

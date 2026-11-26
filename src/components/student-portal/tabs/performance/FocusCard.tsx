@@ -15,8 +15,8 @@ export const FocusCard: React.FC<FocusCardProps> = ({ data, onPractiseSubject })
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-2.5">
-          <div className="w-[32px] h-[32px] rounded-xl bg-orange-50 text-[#EA580C] flex items-center justify-center shrink-0 border border-orange-100">
-            <Target className="w-4 h-4 text-[#EA580C]" />
+          <div className="w-[32px] h-[32px] rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center shrink-0 border border-orange-100">
+            <Target className="w-4 h-4 text-orange-600" />
           </div>
           <h3 className="text-[12px] font-extrabold uppercase tracking-[0.08em] text-[#0F172A]">
             FOCUS AREA
@@ -32,7 +32,7 @@ export const FocusCard: React.FC<FocusCardProps> = ({ data, onPractiseSubject })
       <div className="space-y-1">
         <div className="text-[13px] font-bold text-[#0F172A] flex items-center gap-1.5">
           <span>Priority Subject:</span>
-          <span className="text-[#EA580C] font-black underline decoration-orange-300 underline-offset-2">
+          <span className="text-orange-600 font-black underline decoration-orange-300 underline-offset-2">
             {data.weakestSubject}
           </span>
         </div>
@@ -46,7 +46,7 @@ export const FocusCard: React.FC<FocusCardProps> = ({ data, onPractiseSubject })
         <button
           type="button"
           onClick={() => onPractiseSubject(data.weakestSubject)}
-          className="w-full min-h-[44px] px-4 py-2.5 rounded-2xl bg-[#EA580C] hover:bg-[#C2410C] active:scale-[0.99] text-white font-extrabold text-[12px] uppercase tracking-wider shadow-sm transition-all inline-flex items-center justify-center space-x-2 cursor-pointer"
+          className="w-full min-h-[44px] px-4 py-2.5 rounded-2xl bg-orange-600 hover:bg-orange-700 active:scale-[0.99] text-white font-extrabold text-[12px] uppercase tracking-wider shadow-sm transition-all inline-flex items-center justify-center space-x-2 cursor-pointer"
         >
           <span>Practise {data.weakestSubject} CBT</span>
           <ArrowRight className="w-4 h-4" />

@@ -11,6 +11,8 @@ import {
   assertPending,
   assertPendingCapacity,
   parseConfirmAction,
+  parseFee,
+  feeState,
 } from './paymentLogic';
 
 console.log('--- Running paymentLogic.ts Unit Tests ---');
@@ -98,5 +100,23 @@ for (const bad of ['', 'CONFIRM', 'approve', null, undefined, 1]) {
   throwsPayment(() => parseConfirmAction(bad), 400);
 }
 console.log('✓ parseConfirmAction passed');
+
+// parseFee (0 allowed: clears the fee; same ceiling as a payment)
+assert.equal(parseFee(0), 0);
+assert.equal(parseFee(50000), 50000);
+assert.equal(parseFee('2500.50'), 2500.5);
+for (const bad of [-1, NaN, Infinity, '', '  ', 'abc', null, undefined, {}, [], MAX_PAYMENT_AMOUNT + 1]) {
+  throwsPayment(() => parseFee(bad), 400);
+}
+assert.equal(parseFee(MAX_PAYMENT_AMOUNT), MAX_PAYMENT_AMOUNT);
+console.log('✓ parseFee passed');
+
+// feeState (status stays in the existing vocabulary; nothing-paid is 'Pending')
+assert.deepEqual(feeState({ totalFee: 0, paidAmount: 0 }, 0), { totalFee: 0, paidAmount: 0, outstandingBalance: 0, paymentStatus: 'Pending' });
+assert.deepEqual(feeState({ totalFee: 0, paidAmount: 0 }, 100000), { totalFee: 100000, paidAmount: 0, outstandingBalance: 100000, paymentStatus: 'Pending' });
+assert.deepEqual(feeState({ totalFee: 0, paidAmount: 30000 }, 100000), { totalFee: 100000, paidAmount: 30000, outstandingBalance: 70000, paymentStatus: 'Partial' });
+assert.deepEqual(feeState({ totalFee: 100000, paidAmount: 100000 }, 100000), { totalFee: 100000, paidAmount: 100000, outstandingBalance: 0, paymentStatus: 'Paid' });
+assert.deepEqual(feeState({ totalFee: 80000, paidAmount: 90000 }, 80000), { totalFee: 80000, paidAmount: 90000, outstandingBalance: 0, paymentStatus: 'Paid' });
+console.log('✓ feeState passed');
 
 console.log('--- ALL PAYMENT LOGIC TESTS PASSED SUCCESSFULLY ---');

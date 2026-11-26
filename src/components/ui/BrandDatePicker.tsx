@@ -4,9 +4,10 @@ import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 /**
  * The platform's own calendar date picker, used instead of the browser's date
  * picker: day, month and year are shown in the facility's brand colour with no
- * native controls, so the user always sees what they are picking. The panel
- * opens upward, like every dropdown on the platform, so it never runs off the
- * bottom of a phone screen.
+ * native controls, so the user always sees what they are picking. The panel is
+ * position-aware: it opens downward when there is room below the trigger (a
+ * picker near the top of the page) and upward only when the trigger sits near
+ * the bottom of the screen, so it never runs off a phone screen either way.
  */
 
 interface BrandDatePickerProps {
@@ -31,6 +32,7 @@ export const BrandDatePicker: React.FC<BrandDatePickerProps> = ({
   value, onChange, accent = '#EA580C', maxDate, placeholder = 'Select date', ariaLabel = 'Date picker',
 }) => {
   const [open, setOpen] = useState(false);
+  const [dropUp, setDropUp] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
   const parsed = useMemo(() => {
     if (!value) return null;
@@ -102,7 +104,17 @@ export const BrandDatePicker: React.FC<BrandDatePickerProps> = ({
       <button
         type="button"
         aria-label={ariaLabel}
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => {
+          if (!open && boxRef.current) {
+            // Position-aware: open downward when there is room below the
+            // trigger, upward only when the trigger sits near the screen bottom.
+            const rect = boxRef.current.getBoundingClientRect();
+            const spaceBelow = window.innerHeight - rect.bottom;
+            const spaceAbove = rect.top;
+            setDropUp(spaceBelow < 380 && spaceAbove > spaceBelow);
+          }
+          setOpen((o) => !o);
+        }}
         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-left text-sm outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all flex items-center justify-between"
         style={{ color: parsed ? '#0F172A' : '#94A3B8', fontWeight: 600 }}
       >
@@ -114,7 +126,7 @@ export const BrandDatePicker: React.FC<BrandDatePickerProps> = ({
         <div
           role="dialog"
           aria-label="Calendar"
-          className="absolute z-[110] bottom-full mb-2 left-0 bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200"
+          className={`absolute z-[110] left-0 ${dropUp ? 'bottom-full mb-2 animate-in fade-in slide-in-from-bottom-2' : 'top-full mt-2 animate-in fade-in slide-in-from-top-2'} bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden duration-200`}
           style={{ width: 'max(100%, 272px)', maxWidth: 'calc(100vw - 32px)', padding: 12 }}
         >
           <div className="flex items-center justify-between mb-2">

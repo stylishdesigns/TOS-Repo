@@ -40,6 +40,7 @@ export function registerLandingRoutes(app: express.Express): void {
       let centrePhone = "";
       let logoUrl = "";
       let welcomeImageUrl = "";
+      let accentColor = "";
       try {
         const centreSnap = await adminDb.collection("centres").doc(resolvedId).get();
         if (centreSnap.exists) {
@@ -50,6 +51,7 @@ export function registerLandingRoutes(app: express.Express): void {
           if (data && typeof data.phone === "string") centrePhone = data.phone;
           if (data && typeof data.logoUrl === "string") logoUrl = data.logoUrl;
           if (data && typeof data.welcomeImageUrl === "string") welcomeImageUrl = data.welcomeImageUrl;
+          if (data && typeof data.accentColor === "string") accentColor = data.accentColor;
         }
       } catch {
         // Name lookup failure must not break the page; fall back to the default.
@@ -115,6 +117,13 @@ export function registerLandingRoutes(app: express.Express): void {
         }
       } catch {
         // No published page (or read failed): serve the starter content instead.
+      }
+
+      // One brand colour: the facility's picked accent wins over the stored
+      // page and the day-one starter alike, so the website, the portals and
+      // the install pages stay in step with one save, publish state aside.
+      if (/^#[0-9a-fA-F]{6}$/.test(accentColor)) {
+        content = { ...content, accent: accentColor.toUpperCase() };
       }
 
       res.set("Cache-Control", "public, max-age=60");

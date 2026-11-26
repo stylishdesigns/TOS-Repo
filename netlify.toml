@@ -29,6 +29,14 @@
   to = "/.netlify/functions/api/:splat"
   status = 200
 
+# Batch 38: the per-facility partnership-proposal page. Served by the Express
+# app (function) so its Open Graph tags render per facility for WhatsApp and
+# Facebook link previews. Must sit before the SPA fallback.
+[[redirects]]
+  from = "/proposal/*"
+  to = "/.netlify/functions/api/public/proposal/:splat"
+  status = 200
+
 # SPA fallback, always last.
 [[redirects]]
   from = "/*"

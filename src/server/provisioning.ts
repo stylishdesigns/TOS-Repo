@@ -153,16 +153,17 @@ export async function provisionCentre(
   if (!centreId) throw httpError(500, 'Could not allocate a facility id. Please try again.');
 
   const config = await getPlatformConfig();
-  const planId = params.planId || 'centre_standard';
+  const planId = params.planId || 'centre_free'; // Batch 31: no trial; new facilities start on Free Facility
   const plan = await getPlatformPlan(planId);
   const now = new Date();
-  const trialDays = (plan as any).trialDays ?? config.trialDays;
   const billedSeatsMinimum = (plan as any).billedSeatsMinimum ?? (config as any).billedSeatsMinimum ?? 10; // mirrors the seeded value
 
   const centreRef = adminDb.collection('centres').doc(centreId);
   await centreRef.set({
     name: businessName,
-    status: params.skipTrial ? 'pending_payment' : 'trial',
+    // Batch 26: no trial. A new signup is a LEAD until it upgrades by
+    // paying for at least the platform minimum of seats.
+    status: 'lead',
     ownerUid: uid,
     ownerEmail: email,
     ownerPhone: phone,
@@ -179,21 +180,25 @@ export async function provisionCentre(
     credentialsNotDelivered: false,
   });
 
+  // Every facility starts on the same default daily hours, stored in the
+  // database so each facility can change them in settings and the change
+  // takes effect everywhere at once (mirrors INITIAL_ATTENDANCE_SETTINGS).
+  await adminDb.collection('centreSettings').doc(`${centreId}__attendance`).set({
+    resumptionTime: '08:00 AM',
+    closingTime: '03:30 PM',
+    lateArrivalTime: '08:30 AM',
+  });
+
   await adminDb.collection('centreBilling').doc(centreId).set({
     centreId,
     planId,
-    // During the trial the cap is the plan's trial cap; after skip-trial the
-    // full plan cap applies (students still wait for the first payment).
-    seatCap: params.skipTrial ? plan.seatCap : (plan.trialSeatCap || plan.seatCap),
+    // Batch 26: the full plan cap applies from day one; the lead still
+    // creates no paid seats until it upgrades by paying for the minimum.
+    seatCap: plan.seatCap,
     billedSeatsMinimum,
-    trialStartsAt: params.skipTrial ? null : now.toISOString(),
-    trialEndsAt: params.skipTrial ? null : new Date(now.getTime() + trialDays * DAY_MS).toISOString(),
-    skippedTrial: params.skipTrial,
-    discountPct: params.skipTrial ? (config.skipTrialDiscountPct ?? 0) : 0,
+    tier: 'lead',
     paidThrough: null,
-    notes: params.skipTrial
-      ? 'Skipped the trial; students cannot enter until the first payment is recorded.'
-      : 'Trial running on the standard feature set.',
+    notes: 'Lead tier: running on the platform free seats. Upgrading to a plan unlocks paid seats and the public landing page.',
   });
 
   await adminDb.collection('memberships').doc(`${uid}__${centreId}`).set({

@@ -20,6 +20,9 @@ import {
   Award,
   Sparkles,
   MessageSquare,
+  Wallet,
+  X,
+  FolderOpen,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -39,6 +42,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
     activeUser,
     setViewMode,
     centreName,
+    activeCentre,
   } = useApp();
 
   const pendingAdmissionsCount = admissions.filter((a) => a.status === 'Pending').length;
@@ -73,12 +77,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
         { id: 'attendance', label: 'Attendance', icon: UserCheck },
         { id: 'results', label: 'Performance', icon: BarChart3 },
         { id: 'cbt', label: 'Tutors Assessment', icon: Laptop },
+        { id: 'resources', label: 'Resources', icon: FolderOpen },
       ],
     },
     {
       title: 'FINANCE & ANNOUNCEMENTS',
       items: [
         { id: 'payments', label: 'Fees & Payments', icon: CreditCard },
+        { id: 'staff-pay', label: 'Staff Pay', icon: Wallet },
         { id: 'announcements', label: 'Announcements', icon: Bell },
         { id: 'chat', label: 'Chat', icon: MessageSquare },
       ],
@@ -106,7 +112,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
       <aside
         id="app-main-sidebar"
         className={`fixed lg:static top-0 left-0 bottom-0 z-50 w-60 bg-[#070F1E] border-r border-[#15233C] flex flex-col transition-transform duration-300 ease-in-out ${
-          mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+          mobileOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full lg:translate-x-0'
         }`}
       >
         {/* Brand Header */}
@@ -115,26 +121,40 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
             onClick={() => setAdminSection('dashboard')}
             className="flex items-center space-x-2.5 cursor-pointer group"
           >
-            <div className="w-8 h-8 rounded-lg bg-[#EA580C] flex items-center justify-center text-white font-extrabold text-sm shadow-md shadow-orange-950/40">
-              <GraduationCap className="w-4 h-4 text-white" />
-            </div>
+            {activeCentre?.logoUrl ? (
+              <img src={activeCentre.logoUrl} alt={centreName} className="w-8 h-8 rounded-lg object-cover shadow-md" />
+            ) : (
+              <div className="w-8 h-8 rounded-lg bg-orange-600 flex items-center justify-center text-white font-extrabold text-sm shadow-md shadow-orange-950/40">
+                <GraduationCap className="w-4 h-4 text-white" />
+              </div>
+            )}
             <div>
               <div className="flex items-baseline space-x-1 leading-none">
                 <span className="text-white font-black text-sm tracking-tight truncate max-w-[9.5rem]">{(centreName.split(/\s+/)[0] || 'TUTORIAL').toUpperCase()}</span>
               </div>
-              <span className="text-[#EA580C] font-black text-[10px] tracking-wider leading-none block mt-0.5 uppercase truncate max-w-[9.5rem]">
+              <span className="text-orange-600 font-black text-[10px] tracking-wider leading-none block mt-0.5 uppercase truncate max-w-[9.5rem]">
                 {centreName.split(/\s+/).slice(1).join(' ') || 'EDUCATION FACILITY'}
               </span>
             </div>
           </div>
 
-          <button
-            onClick={() => setViewMode('website')}
-            title="Open Public Website"
-            className="p-1.5 rounded-md text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-          >
-            <ExternalLink className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setViewMode('website')}
+              title="Open Public Website"
+              className="p-1.5 rounded-md text-slate-400 hover:text-white hover:brightness-110 transition-colors"
+            >
+              <ExternalLink className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setMobileOpen(false)}
+              title="Close menu"
+              aria-label="Close menu"
+              className="lg:hidden p-1.5 rounded-md text-slate-400 hover:text-white transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Navigation Sections */}
@@ -165,7 +185,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
                     <div className="flex items-center space-x-3 truncate">
                       <Icon
                         className={`w-4 h-4 shrink-0 transition-colors ${
-                          isActive ? 'text-[#EA580C]' : 'text-slate-400'
+                          isActive ? 'text-orange-600' : 'text-slate-400'
                         }`}
                       />
                       <span className="truncate">{item.label}</span>
@@ -175,7 +195,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
                       <span
                         className={`px-2 py-0.5 text-[10px] font-bold rounded-full ${
                           isActive
-                            ? 'bg-[#EA580C] text-white'
+                            ? 'bg-orange-600 text-white'
                             : 'bg-slate-800 text-slate-300'
                         }`}
                       >

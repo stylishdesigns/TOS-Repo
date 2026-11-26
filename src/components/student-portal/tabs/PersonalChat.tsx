@@ -77,7 +77,7 @@ export const PersonalNewChatSheet: React.FC<{
               )}
               {directory.students.map((s) => (
                 <div key={s.uid} className="flex items-center gap-3 bg-white border border-slate-200 rounded-2xl px-3.5 py-2.5">
-                  <span className="w-10 h-10 rounded-full bg-orange-50 border border-orange-100 text-[#EA580C] flex items-center justify-center text-xs font-black shrink-0 overflow-hidden">
+                  <span className="w-10 h-10 rounded-full bg-orange-50 border border-orange-100 text-orange-600 flex items-center justify-center text-xs font-black shrink-0 overflow-hidden">
                     {s.avatar
                       ? <img src={s.avatar} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                       : ((s.name || '').trim().split(/\s+/).slice(0, 2).map((w) => (w[0] || '').toUpperCase()).join('') || <User className="w-5 h-5" />)}
@@ -89,7 +89,7 @@ export const PersonalNewChatSheet: React.FC<{
                   <button
                     onClick={() => openWith(s.uid)}
                     disabled={busyUid === s.uid}
-                    className="shrink-0 px-3.5 py-2 rounded-xl bg-[#EA580C] text-white text-[11px] font-black flex items-center gap-1.5 active:scale-95 transition disabled:opacity-50"
+                    className="shrink-0 px-3.5 py-2 rounded-xl bg-orange-600 text-white text-[11px] font-black flex items-center gap-1.5 active:scale-95 transition disabled:opacity-50"
                     aria-label={`Chat with ${s.name}`}
                   >
                     {busyUid === s.uid ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <MessageCircle className="w-3.5 h-3.5" />} Chat
@@ -98,7 +98,7 @@ export const PersonalNewChatSheet: React.FC<{
               ))}
               {directory.staff.map((s) => (
                 <div key={s.uid} className="flex items-center gap-3 bg-white border border-slate-200 rounded-2xl px-3.5 py-2.5">
-                  <span className="w-10 h-10 rounded-full bg-violet-50 border border-violet-100 text-violet-600 flex items-center justify-center text-xs font-black shrink-0 overflow-hidden">
+                  <span className="w-10 h-10 rounded-full bg-orange-50 border border-orange-100 text-orange-600 flex items-center justify-center text-xs font-black shrink-0 overflow-hidden">
                     {s.avatar
                       ? <img src={s.avatar} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                       : ((s.name || '').trim().split(/\s+/).slice(0, 2).map((w) => (w[0] || '').toUpperCase()).join('') || <User className="w-5 h-5" />)}
@@ -110,7 +110,7 @@ export const PersonalNewChatSheet: React.FC<{
                         <span className="ml-1.5 align-middle text-[9px] font-black uppercase tracking-wider text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-full">Admin</span>
                       )}
                       {s.role === 'tutor' && (
-                        <span className="ml-1.5 align-middle text-[9px] font-black uppercase tracking-wider text-violet-700 bg-violet-50 px-1.5 py-0.5 rounded-full">Tutor</span>
+                        <span className="ml-1.5 align-middle text-[9px] font-black uppercase tracking-wider text-orange-700 bg-orange-50 px-1.5 py-0.5 rounded-full">Tutor</span>
                       )}
                     </p>
                     <p className="text-[10px] text-slate-400 font-medium">{s.role === 'admin' ? 'Admin' : 'Tutor'}</p>
@@ -118,7 +118,7 @@ export const PersonalNewChatSheet: React.FC<{
                   <button
                     onClick={() => openWith(s.uid)}
                     disabled={busyUid === s.uid}
-                    className="shrink-0 px-3.5 py-2 rounded-xl bg-[#EA580C] text-white text-[11px] font-black flex items-center gap-1.5 active:scale-95 transition disabled:opacity-50"
+                    className="shrink-0 px-3.5 py-2 rounded-xl bg-orange-600 text-white text-[11px] font-black flex items-center gap-1.5 active:scale-95 transition disabled:opacity-50"
                     aria-label={`Chat with ${s.name}`}
                   >
                     {busyUid === s.uid ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <MessageCircle className="w-3.5 h-3.5" />} Chat

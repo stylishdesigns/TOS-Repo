@@ -10,7 +10,8 @@ import { adminApp, adminAuth, projectId, databaseId } from "./firebaseAdmin";
  * every call is logged with [fo-fb-door].
  *
  * Doors:
- *   1. rules   (READ-ONLY: the live rulesets; publishing stays in the console)
+ *   1. rules   (the live rulesets; publishing happens only through the
+ *               publish door, gated by confirm === "PUBLISH-RULES")
  *   2. backup  (export is safe; import requires confirm === "IMPORT")
  *   3. auth    (list + lookup are reads; disable/enable, claims and reset link
  *               are reversible; DELETE requires confirm === "DELETE <uid>")
@@ -54,7 +55,7 @@ async function bearerToken(): Promise<string> {
 
 async function googleApi(
   url: string,
-  method: "GET" | "POST",
+  method: "GET" | "POST" | "PATCH",
   body?: unknown,
 ): Promise<{ status: number; json: any }> {
   const token = await bearerToken();
@@ -153,6 +154,49 @@ export function registerFoAccessDoors(app: express.Express): void {
     } catch (err: any) {
       console.error(`${TAG} rules failed:`, err?.message || err);
       reject(res, 500, `The rules read failed on the server: ${String(err?.message || err).slice(0, 300)}`);
+    }
+  });
+
+  // ------------------------------------------------------------------
+  // Door 1b: publish Firestore rules. Creates a ruleset from the supplied
+  // source (the API validates syntax), then repoints THIS app's database
+  // release. Guardrails: x-fo-key gate plus confirm === "PUBLISH-RULES";
+  // only the database this server is configured for is ever touched.
+  // ------------------------------------------------------------------
+  app.post("/api/internal/fs/fb/rules/publish", async (req, res) => {
+    const body = (req.body || {}) as Body;
+    if (str(body, "confirm", 64) !== "PUBLISH-RULES") {
+      return reject(res, 400, 'Send confirm: "PUBLISH-RULES" to publish.');
+    }
+    const rules = typeof body.rules === "string" ? body.rules : "";
+    if (!rules.trim()) return reject(res, 400, "The rules source is required.");
+    if (rules.length > 120000) return reject(res, 400, "The rules source is too large.");
+    const head = rules.trim().slice(0, 40);
+    if (!/^rules_version/.test(head) || rules.indexOf("service cloud.firestore") === -1) {
+      return reject(res, 400, "The rules source does not look like Firestore rules.");
+    }
+    const dbId = databaseId || "(default)";
+    try {
+      const base = `https://firebaserules.googleapis.com/v1/projects/${projectId}`;
+      const created = await googleApi(`${base}/rulesets`, "POST", {
+        source: { files: [{ name: "firestore.rules", content: rules }] },
+      });
+      if (created.status !== 200) {
+        return upstreamFail(res, "Creating the ruleset failed", created);
+      }
+      const rulesetName = String(created.json?.name || "");
+      if (!rulesetName) return reject(res, 502, "The rules API returned no ruleset name.");
+      const releaseName = `${base}/releases/cloud.firestore${dbId === "(default)" ? "" : "/" + dbId}`;
+      const relName = releaseName.replace("https://firebaserules.googleapis.com/v1/", "");
+      const updated = await googleApi(releaseName, "PATCH", { release: { name: relName, rulesetName }, updateMask: "rulesetName" });
+      if (updated.status !== 200) {
+        return upstreamFail(res, "Updating the rules release failed", updated);
+      }
+      console.log(`${TAG} rules publish: ${releaseName} -> ${rulesetName}`);
+      res.json({ ok: true, release: releaseName, ruleset: rulesetName });
+    } catch (err: any) {
+      console.error(`${TAG} rules publish failed:`, err?.message || err);
+      reject(res, 500, `The rules publish failed on the server: ${String(err?.message || err).slice(0, 300)}`);
     }
   });
 

@@ -31,8 +31,8 @@ export const CentreDetail: React.FC<{ centreId: string; onBack: () => void; onDa
   const [deleteReason, setDeleteReason] = useState('');
   const [confirmStatus, setConfirmStatus] = useState<'' | 'suspend' | 'reactivate'>('');
   const [reason, setReason] = useState('');
-  const [payment, setPayment] = useState({ amount: '', periodEnd: '', method: '', reference: '', note: '' });
-  const [seatEdits, setSeatEdits] = useState({ seatCap: '', billedSeatsMinimum: '', planId: '', extendDays: '7' });
+  const [payment, setPayment] = useState({ amount: '', periodEnd: '', seats: '', method: '', reference: '', note: '' });
+  const [seatEdits, setSeatEdits] = useState({ seatCap: '', billedSeatsMinimum: '', planId: '', freeSeatsCustom: '' });
 
   const load = useCallback(async () => {
     setError('');
@@ -44,8 +44,8 @@ export const CentreDetail: React.FC<{ centreId: string; onBack: () => void; onDa
       setSeatEdits({
         seatCap: d.billing?.seatCap != null ? String(d.billing.seatCap) : '',
         billedSeatsMinimum: d.billing?.billedSeatsMinimum != null ? String(d.billing.billedSeatsMinimum) : '',
+        freeSeatsCustom: d.billing?.freeSeatsCustom != null ? String(d.billing.freeSeatsCustom) : '',
         planId: d.billing?.planId || 'centre_standard',
-        extendDays: '7',
       });
     } catch (e: any) {
       setError(e.message);
@@ -169,48 +169,44 @@ export const CentreDetail: React.FC<{ centreId: string; onBack: () => void; onDa
                 {plans.map((p) => <option key={p.id} value={p.id}>{p.name} · {money(p.price)}/seat/month</option>)}
               </select>
             </Field>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Seat cap">
-                <input type="number" min="1" value={seatEdits.seatCap} onChange={(e) => setSeatEdits((s) => ({ ...s, seatCap: e.target.value }))} className={inputCls} />
-              </Field>
-              <Field label="Minimum billed seats">
-                <input type="number" min="0" value={seatEdits.billedSeatsMinimum} onChange={(e) => setSeatEdits((s) => ({ ...s, billedSeatsMinimum: e.target.value }))} className={inputCls} />
-              </Field>
-            </div>
+            <Field label="Minimum billed seats">
+              <input type="number" min="0" value={seatEdits.billedSeatsMinimum} onChange={(e) => setSeatEdits((s) => ({ ...s, billedSeatsMinimum: e.target.value }))} className={inputCls} />
+            </Field>
+            <Field label="Free seats override (blank = platform default)">
+              <input type="number" min="0" value={seatEdits.freeSeatsCustom} onChange={(e) => setSeatEdits((s) => ({ ...s, freeSeatsCustom: e.target.value }))} className={inputCls} />
+            </Field>
             <button
-              onClick={() => doAction('set-plan', { planId: seatEdits.planId }, () => doAction('set-seat-cap', { seatCap: Number(seatEdits.seatCap) }))}
+              onClick={() => doAction('set-free-seats', { freeSeatsCustom: seatEdits.freeSeatsCustom === '' ? null : Number(seatEdits.freeSeatsCustom) })}
+              disabled={busy !== ''}
+              className={btnGhost}
+            >
+              {busy === 'set-free-seats' ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Save free seats
+            </button>
+            <button
+              onClick={() => doAction('set-plan', { planId: seatEdits.planId })}
               disabled={busy !== ''}
               className={btnPrimary}
             >
-              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Save plan and seats
+              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Save plan
             </button>
             {billing && (
               <div className="text-xs text-slate-400 space-y-1 pt-2 border-t border-white/5">
-                <p>Seats in use: <span className="text-white font-bold">{billing.activeStudentCount ?? 0}</span> of <span className="text-white font-bold">{billing.seatCap}</span></p>
-                <p>Billable seats this month: <span className="text-white font-bold">{Math.max(billing.billedSeatsMinimum || 0, billing.activeStudentCount || 0)}</span> × {money((plans.find((p) => p.id === billing.planId) || {}).price)}</p>
+                <p>Seat pool: <span className="text-white font-bold">{(data as any)?.seatPool?.active ?? billing.activeStudentCount ?? 0}</span> active · <span className="text-white font-bold">{(data as any)?.seatPool?.available ?? 0}</span> available · <span className="text-white font-bold">{(data as any)?.seatPool?.locked ?? 0}</span> locked · <span className="text-white font-bold">{(data as any)?.seatPool?.free ?? 0}</span> free</p>
+                <p>Banked days across free seats: <span className="text-white font-bold">{(data as any)?.seatPool?.bankedDays ?? 0}</span> · a seat runs 30 days once switched on</p>
+                <p>Billable seats this month: <span className="text-white font-bold">{Math.max(billing.billedSeatsMinimum || 0, (data as any)?.seatPool?.active ?? billing.activeStudentCount ?? 0)}</span> × {money((plans.find((p) => p.id === billing.planId) || {}).price)}</p>
               </div>
             )}
           </div>
         </Card>
 
-        <Card title="Trial and status">
+        <Card title="Status and tier">
           <div className="space-y-4">
             <div className="text-xs text-slate-400 space-y-1">
-              {billing?.trialEndsAt && !billing.skippedTrial && <p>Trial ends <span className="text-white font-bold">{fmtDate(billing.trialEndsAt)}</span></p>}
+              <p>Tier <span className="text-white font-bold">{billing?.tier === 'facility' ? 'Facility (upgraded)' : 'Lead'}</span></p>
+              {billing?.tier === 'lead' && <p className="text-amber-300">Lead: running on the platform free seats. Paying for the minimum seats upgrades this facility.</p>}
               <p>Paid through <span className="text-white font-bold">{fmtDate(billing?.paidThrough)}</span></p>
-              {billing?.discountPct ? <p>Skip-trial discount: <span className="text-white font-bold">{billing.discountPct}%</span></p> : null}
-              {billing?.skippedTrial && <p className="text-rose-300">Trial skipped; first payment records the start of billing.</p>}
+              {billing?.upgradedAt && <p>Upgraded <span className="text-white font-bold">{fmtDate(billing.upgradedAt)}</span></p>}
             </div>
-            {!billing?.skippedTrial ? (
-              <div className="flex items-end gap-2">
-                <Field label="Extend trial (days)">
-                  <input type="number" min="1" max="365" value={seatEdits.extendDays} onChange={(e) => setSeatEdits((s) => ({ ...s, extendDays: e.target.value }))} className={`${inputCls} w-28`} />
-                </Field>
-                <button onClick={() => doAction('extend-trial', { days: Number(seatEdits.extendDays) })} disabled={busy !== ''} className={btnGhost}>Extend</button>
-              </div>
-            ) : (
-              <button onClick={() => doAction('start-trial')} disabled={busy !== ''} className={btnPrimary}>Start trial</button>
-            )}
             <div className="pt-2 border-t border-white/5 flex flex-wrap gap-2">
               {status === 'suspended' ? (
                 <button onClick={() => { setConfirmStatus('reactivate'); setReason(''); }} className={btnPrimary}>
@@ -258,11 +254,18 @@ export const CentreDetail: React.FC<{ centreId: string; onBack: () => void; onDa
                 <input value={payment.reference} onChange={(e) => setPayment((p) => ({ ...p, reference: e.target.value }))} className={inputCls} placeholder="Bank reference" />
               </Field>
             </div>
+            <Field label="Seats this payment buys">
+              <input type="number" min="0" value={payment.seats} onChange={(e) => setPayment((p) => ({ ...p, seats: e.target.value }))} className={inputCls} placeholder="e.g. 10" />
+            </Field>
+            <p className="text-xs text-slate-400">A payment tops the facility's seat pool: locked seats reopen with a fresh 30 days first, then new seats join. A seat counts only while a student is on it, and free seats never expire.</p>
             <Field label="Note">
               <input value={payment.note} onChange={(e) => setPayment((p) => ({ ...p, note: e.target.value }))} className={inputCls} />
             </Field>
             <button
-              onClick={() => doAction('record-payment', { amount: Number(payment.amount), periodEnd: payment.periodEnd, method: payment.method, reference: payment.reference, note: payment.note }, () => setPayment({ amount: '', periodEnd: '', method: '', reference: '', note: '' }))}
+              onClick={() => doAction('record-payment', { amount: Number(payment.amount), periodEnd: payment.periodEnd, seats: Number(payment.seats) || 0, method: payment.method, reference: payment.reference, note: payment.note }, (r: any) => {
+                setPayment({ amount: '', periodEnd: '', seats: '', method: '', reference: '', note: '' });
+                if (r?.seats?.capped) setOwnerNote(r.seats.message || 'Only some seats could be added: the facility is at its seat cap.');
+              })}
               disabled={busy !== '' || !payment.amount || !payment.periodEnd}
               className={btnPrimary}
             >
@@ -528,7 +531,7 @@ export const CentresTab: React.FC<{ refreshKey: number; openCentreId: string; on
                     {c.credentialsNotDelivered && <span className="inline-flex items-center gap-1 text-[11px] text-amber-300 mt-0.5"><AlertTriangle className="w-3 h-3" /> credentials undelivered</span>}
                   </td>
                   <td className="px-4 py-3"><StatusPill status={c.billingStatus} /></td>
-                  <td className="px-4 py-3 text-xs text-slate-300">{c.planId ? c.planId.replace('centre_', 'Facility ').replace('_', ' ') : 'no plan'}{c.trialEndsAt && c.billingStatus === 'trial' ? <span className="block text-slate-500">trial ends {fmtDate(c.trialEndsAt)}</span> : null}</td>
+                  <td className="px-4 py-3 text-xs text-slate-300">{c.planId ? c.planId.replace('centre_', 'Facility ').replace('_', ' ') : (c.tier === 'lead' ? 'not upgraded' : 'no plan')}{c.tier === 'lead' ? <span className="block text-amber-300 font-semibold">Lead · free seats</span> : null}</td>
                   <td className="px-4 py-3 text-xs text-slate-300">{c.seatsUsed ?? 0} / {c.seatCap ?? '—'}</td>
                   <td className="px-4 py-3 text-xs text-slate-500">{c.createdAt ? fmtDate(c.createdAt) : '—'}</td>
                   <td className="px-4 py-3 text-right"><span className="text-[11px] font-bold text-orange-300">Open →</span></td>

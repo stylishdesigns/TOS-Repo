@@ -101,7 +101,7 @@ export const BranchesManager: React.FC = () => {
 
         <button
           onClick={() => setShowAddModal(true)}
-          className="px-4 py-2 text-xs font-semibold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg shadow-sm transition-all flex items-center space-x-1.5 self-start sm:self-auto"
+          className="px-4 py-2 text-xs font-semibold text-white bg-orange-600 hover:bg-orange-700 rounded-lg shadow-sm transition-all flex items-center space-x-1.5 self-start sm:self-auto"
         >
           <Plus className="w-4 h-4" />
           <span>Add Branch Campus</span>
@@ -112,7 +112,7 @@ export const BranchesManager: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-white p-5 rounded-xl border border-slate-200/90 shadow-xs">
           <div className="flex items-center space-x-2 text-slate-600">
-            <Building2 className="w-4 h-4 text-[#EA580C]" />
+            <Building2 className="w-4 h-4 text-orange-600" />
             <span className="text-xs font-semibold text-slate-600">Registered Campuses</span>
           </div>
           <p className="text-3xl font-extrabold text-slate-900 tracking-tight mt-2">
@@ -225,7 +225,7 @@ export const BranchesManager: React.FC = () => {
                     {/* Campus Name & Code */}
                     <td className="py-3.5 px-5">
                       <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 rounded-lg bg-orange-100 text-[#EA580C] font-bold text-xs flex items-center justify-center shrink-0">
+                        <div className="w-8 h-8 rounded-lg bg-orange-100 text-orange-600 font-bold text-xs flex items-center justify-center shrink-0">
                           <Building2 className="w-4 h-4" />
                         </div>
                         <div>
@@ -258,7 +258,7 @@ export const BranchesManager: React.FC = () => {
                         </div>
                         <div className="w-28 h-1.5 bg-slate-100 rounded-full overflow-hidden">
                           <div
-                            className="h-full bg-[#EA580C] rounded-full"
+                            className="h-full bg-orange-600 rounded-full"
                             style={{ width: `${capacityPct > 0 ? capacityPct : 70}%` }}
                           />
                         </div>
@@ -310,7 +310,7 @@ export const BranchesManager: React.FC = () => {
                 onClick={() => setCurrentPage(page)}
                 className={`w-7 h-7 rounded-md text-xs font-bold transition-colors ${
                   currentPage === page
-                    ? 'bg-[#EA580C] text-white shadow-xs'
+                    ? 'bg-orange-600 text-white shadow-xs'
                     : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
                 }`}
               >
@@ -424,7 +424,7 @@ export const BranchesManager: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 font-semibold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg shadow-sm"
+                  className="px-4 py-2 font-semibold text-white bg-orange-600 hover:bg-orange-700 rounded-lg shadow-sm"
                 >
                   Create Campus
                 </button>
@@ -447,7 +447,7 @@ export const BranchesManager: React.FC = () => {
 
             <div className="py-4 space-y-3 text-xs">
               <div className="flex items-center space-x-3.5 pb-3 border-b border-slate-100">
-                <div className="w-12 h-12 rounded-xl bg-orange-100 text-[#EA580C] font-extrabold flex items-center justify-center">
+                <div className="w-12 h-12 rounded-xl bg-orange-100 text-orange-600 font-extrabold flex items-center justify-center">
                   <Building2 className="w-6 h-6" />
                 </div>
                 <div>
@@ -479,7 +479,7 @@ export const BranchesManager: React.FC = () => {
             <div className="flex items-center justify-end pt-3 border-t border-slate-100">
               <button
                 onClick={() => setSelectedBranch(null)}
-                className="px-4 py-2 text-xs font-semibold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg"
+                className="px-4 py-2 text-xs font-semibold text-white bg-orange-600 hover:bg-orange-700 rounded-lg"
               >
                 Done
               </button>

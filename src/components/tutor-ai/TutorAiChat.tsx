@@ -213,6 +213,7 @@ const PALETTES = {
     backBtn: 'text-slate-500 hover:text-orange-600 hover:bg-orange-50',
     ghostBtn: 'text-slate-500 hover:text-orange-600 hover:bg-orange-50',
     aiBubble: 'bg-slate-100 text-slate-800',
+    aiText: 'text-slate-800 font-medium',
     aiTime: 'text-slate-400',
     imgBorder: 'border-slate-200',
     dayChip: 'text-slate-500 bg-slate-100',
@@ -237,14 +238,15 @@ const PALETTES = {
     captionInput: 'bg-slate-100 border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-orange-500/50',
   },
   dark: {
-    shell: 'bg-slate-950 text-white',
+    shell: 'bg-[#0B1220] text-white',
     embedded: 'border-slate-800',
     header: 'bg-slate-950/95 border-slate-800',
     headerTitle: 'text-white',
     headerSub: 'text-slate-400',
     backBtn: 'text-slate-400 hover:text-orange-400 hover:bg-orange-500/10',
     ghostBtn: 'text-slate-400 hover:text-orange-400 hover:bg-orange-500/10',
-    aiBubble: 'bg-slate-800/90 text-slate-100',
+    aiBubble: 'bg-slate-800/90 text-white',
+    aiText: 'text-white font-semibold',
     aiTime: 'text-slate-500',
     imgBorder: 'border-slate-700/60',
     dayChip: 'text-slate-500 bg-slate-800/60',
@@ -259,11 +261,11 @@ const PALETTES = {
     sendOff: 'bg-slate-800 text-slate-500',
     overlay: 'bg-slate-950/85 backdrop-blur-sm',
     overlayPanel: 'bg-slate-900 border-slate-700',
-    cancelBtn: 'bg-slate-800 text-slate-300 hover:bg-slate-700',
+    cancelBtn: 'bg-slate-800 text-slate-300 hover:brightness-110',
     drawer: 'bg-slate-900 border-slate-800',
     drawerText: 'text-white',
     drawerSub: 'text-slate-500',
-    drawerItem: 'hover:bg-slate-800 text-slate-200',
+    drawerItem: 'hover:brightness-110 text-slate-200',
     drawerItemActive: 'bg-orange-500/15 text-orange-300',
     drawerNew: 'text-orange-400 hover:bg-orange-500/10',
     captionInput: 'bg-slate-800/70 border-slate-700 text-slate-100 placeholder:text-slate-500 focus:border-orange-500/50',
@@ -459,7 +461,7 @@ const TutorAiChat: React.FC<Props> = ({
           />
         )}
         {m.role === 'ai' ? (
-          <div className="text-[15px] leading-relaxed">{renderRichText(typewriter ?? m.text)}</div>
+          <div className={`text-[15px] leading-relaxed ${th.aiText}`}>{renderRichText(typewriter ?? m.text)}</div>
         ) : (
           <p className="text-[15px] leading-relaxed whitespace-pre-wrap break-words font-medium text-white">{m.text}</p>
         )}

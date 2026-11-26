@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
+import { initialsAvatar } from '../../../lib/avatar';
 import { useApp } from '../../../context/AppContext';
+import { resolveStudentFee } from '../../../lib/fees';
 import { Student } from '../../../types';
 import studentHeroAvatar from '../../../assets/images/regenerated_image_1789369642757.jpg';
 import { ModernSelect } from '../../ui/ModernSelect';
@@ -8,7 +10,6 @@ import {
   CreditCard,
   CheckCircle2,
   Clock,
-  MessageSquare,
   Phone,
   MapPin,
   QrCode,
@@ -24,20 +25,19 @@ interface ProfileTabProps {
 }
 
 export const ProfileTab: React.FC<ProfileTabProps> = ({ student, onSelectStudent }) => {
-  const { students, settings, payments, recordPayment, addToast, centreName } = useApp();
+  const { students, settings, payments, recordPayment, addToast, centreName, programmes } = useApp();
+
+  // Fee read live from the student's programme, so an admin fee change lands here at once.
+  const liveFee = resolveStudentFee(student, programmes);
+  const liveBalance = Math.max(0, liveFee - Number(student.paidAmount || 0));
 
   const [showPayModal, setShowPayModal] = useState(false);
   const [payAmount, setPayAmount] = useState<number>(
-    student.outstandingBalance > 0 ? student.outstandingBalance : 10000
+    liveBalance > 0 ? liveBalance : 10000
   );
 
   // Student payments
   const studentPayments = payments.filter((p) => p.studentId === student.id);
-
-  const MALE_NIGERIAN_AVATAR =
-    'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=500&q=80';
-  const FEMALE_NIGERIAN_AVATAR =
-    'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?auto=format&fit=crop&w=500&q=80';
 
   const resolvedAvatar =
     studentHeroAvatar ||
@@ -45,9 +45,7 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({ student, onSelectStudent
     !student.avatar.includes('photo-1534528741775') &&
     !student.avatar.includes('photo-1517841905240')
       ? student.avatar
-      : student.gender === 'Female'
-      ? FEMALE_NIGERIAN_AVATAR
-      : MALE_NIGERIAN_AVATAR);
+      : initialsAvatar(student.name));
 
   // Simulate payment
   const handleCompletePayment = async (e: React.FormEvent) => {
@@ -76,7 +74,7 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({ student, onSelectStudent
       {/* Header with Switcher */}
       <div className="flex items-center justify-between">
         <div>
-          <span className="text-[10px] font-extrabold uppercase text-[#EA580C] tracking-wider">
+          <span className="text-[10px] font-extrabold uppercase text-orange-600 tracking-wider">
             Student Identification
           </span>
           <h2 className="text-lg font-black text-slate-900 tracking-tight">
@@ -106,7 +104,7 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({ student, onSelectStudent
         {/* Card Header */}
         <div className="flex items-center justify-between border-b border-slate-800 pb-3 relative z-10">
           <div className="flex items-center space-x-2">
-            <div className="w-7 h-7 rounded-lg bg-[#EA580C] text-white flex items-center justify-center font-black text-xs">
+            <div className="w-7 h-7 rounded-lg bg-orange-600 text-white flex items-center justify-center font-black text-xs">
               EX
             </div>
             <div>
@@ -187,19 +185,19 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({ student, onSelectStudent
       <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
-            <CreditCard className="w-4 h-4 text-[#EA580C]" />
+            <CreditCard className="w-4 h-4 text-orange-600" />
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
               Tuition & Programme Fees
             </h3>
           </div>
           <span
             className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
-              student.outstandingBalance > 0
+              liveBalance > 0
                 ? 'bg-amber-100 text-amber-800'
                 : 'bg-emerald-100 text-emerald-800'
             }`}
           >
-            {student.outstandingBalance > 0 ? 'Balance Due' : 'Fully Cleared'}
+            {liveBalance > 0 ? 'Balance Due' : 'Fully Cleared'}
           </span>
         </div>
 
@@ -209,7 +207,7 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({ student, onSelectStudent
             <span className="text-[10px] text-slate-400 uppercase font-semibold block">Total Tuition</span>
             <span className="text-xs font-bold text-slate-900">
               {settings.currencySymbol}
-              {(student.totalFee || 0).toLocaleString()}
+              {liveFee.toLocaleString()}
             </span>
           </div>
           <div>
@@ -223,21 +221,21 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({ student, onSelectStudent
             <span className="text-[10px] text-slate-400 uppercase font-semibold block">Outstanding</span>
             <span className="text-xs font-bold text-rose-700">
               {settings.currencySymbol}
-              {(student.outstandingBalance || 0).toLocaleString()}
+              {(liveBalance || 0).toLocaleString()}
             </span>
           </div>
         </div>
 
         {/* Pay Button if balance exists */}
-        {student.outstandingBalance > 0 ? (
+        {liveBalance > 0 ? (
           <button
             onClick={() => setShowPayModal(true)}
-            className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#EA580C] to-amber-600 hover:from-[#C2410C] hover:to-amber-700 text-white font-bold text-xs shadow-xs active:scale-98 transition-all flex items-center justify-center space-x-2"
+            className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white font-bold text-xs shadow-xs active:scale-98 transition-all flex items-center justify-center space-x-2"
           >
             <CreditCard className="w-4 h-4" />
             <span>
               Pay Outstanding Balance ({settings.currencySymbol}
-              {(student.outstandingBalance || 0).toLocaleString()})
+              {(liveBalance || 0).toLocaleString()})
             </span>
           </button>
         ) : (
@@ -319,7 +317,7 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({ student, onSelectStudent
 
         <div className="space-y-2 text-xs text-slate-600">
           <div className="flex items-center space-x-2">
-            <MapPin className="w-4 h-4 text-[#EA580C] shrink-0" />
+            <MapPin className="w-4 h-4 text-orange-600 shrink-0" />
             <span>{settings.address}</span>
           </div>
           <div className="flex items-center space-x-2">
@@ -328,15 +326,6 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({ student, onSelectStudent
           </div>
         </div>
 
-        <a
-          href={`https://wa.me/${(settings.whatsappNumber || settings.whatsapp || settings.phone).replace(/\D/g, '')}`}
-          target="_blank"
-          rel="noreferrer"
-          className="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center space-x-2 transition-all shadow-xs"
-        >
-          <MessageSquare className="w-4 h-4" />
-          <span>Chat with Ikeja Coordinator on WhatsApp</span>
-        </a>
       </div>
 
       {/* Payment Gateway Modal (Simulation) */}
@@ -345,7 +334,7 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({ student, onSelectStudent
           <div className="bg-white rounded-3xl p-5 max-w-sm w-full shadow-2xl border border-slate-200 space-y-4">
             <div className="flex items-center justify-between pb-2 border-b border-slate-100">
               <div className="flex items-center space-x-2">
-                <span className="text-xs font-extrabold uppercase text-[#EA580C]">
+                <span className="text-xs font-extrabold uppercase text-orange-600">
                   Direct Payment Gateway
                 </span>
               </div>
@@ -365,14 +354,14 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({ student, onSelectStudent
                 <input
                   type="number"
                   min="1000"
-                  max={student.outstandingBalance}
+                  max={liveBalance}
                   value={payAmount}
                   onChange={(e) => setPayAmount(Number(e.target.value))}
                   className="w-full p-2.5 rounded-xl border border-slate-300 font-mono font-bold text-sm outline-none focus:border-orange-500"
                 />
                 <span className="text-[10px] text-slate-400 mt-1 block">
                   Outstanding balance: {settings.currencySymbol}
-                  {(student.outstandingBalance || 0).toLocaleString()}
+                  {(liveBalance || 0).toLocaleString()}
                 </span>
               </div>
 

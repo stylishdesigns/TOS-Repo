@@ -1,4 +1,6 @@
+import { initialsAvatar } from '../../lib/avatar';
 import { loadLastGood, loadLastGoodFlag, saveLastGoodFlag } from '../../lib/lastGood';
+import { LaunchSplash } from './LaunchSplash';
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useFirebase } from '../../context/FirebaseContext';
@@ -16,8 +18,11 @@ import { MoreTab } from './tabs/MoreTab';
 import { ActionSheetModal, ActionSheetItem } from './tabs/ActionSheetModal';
 import { StudentResult } from '../../types';
 import { PWAInstallButton } from '../pwa/PWAInstallButton';
-import regeneratedStudentAvatar from '../../assets/images/regenerated_image_1789369642757.jpg';
+import { NotificationsBell } from './NotificationsBell';
+import { PushPrompt } from './PushPrompt';
+import { RetryButton } from '../common/RetryButton';
 import {
+  Bell,
   Home,
   Calendar,
   Laptop,
@@ -26,9 +31,11 @@ import {
   MessageSquare,
   FileText,
   Sparkles,
+  Monitor,
   ChevronLeft,
   MessageCircle,
   X,
+  ShieldAlert,
 } from 'lucide-react';
 
 import { orbBadgeLabel, totalUnread } from './tabs/chatNav';
@@ -54,15 +61,25 @@ const ChatOrbIcon: React.FC<{ className?: string }> = ({ className }) => (
 export type TabType = 'home' | 'classes' | 'chat' | 'cbt' | 'results' | 'more';
 
 export const StudentPortal: React.FC = () => {
-  const { students, settings, isAdmin, attendanceSettings, attendanceLogs, entitlements, centreName, bgTheme } = useApp();
+  const { students, settings, isAdmin, attendanceSettings, attendanceLogs, entitlements, centreName, bgTheme, activeCentre, brandAccent } = useApp();
+
+  // The facility's own accent drives the orb and fan menu; orange only where
+  // the facility has saved no brand color of its own.
+  const orbAccent = /^#[0-9a-fA-F]{6}$/.test(String(brandAccent || ''))
+    ? String(brandAccent)
+    : '#EA580C';
+  const orbGradient = `linear-gradient(145deg, ${orbAccent}, color-mix(in oklab, ${orbAccent} 60%, black))`;
+  const orbShadowClosed = `0 0 0 5px color-mix(in srgb, ${orbAccent} 22%, transparent), 0 10px 24px color-mix(in srgb, ${orbAccent} 50%, transparent), inset 0 2px 0 rgba(255,255,255,.35)`;
 
   const { user, loading: authLoading } = useFirebase();
   const [profileLoading, setProfileLoading] = useState(true);
   const [hasProfile, setHasProfile] = useState(false);
+  const [accessOff, setAccessOff] = useState(false);
   const [, setOnboardingComplete] = useState(false);
   const [portalMode, setPortalMode] = useState<'student' | 'parent'>('student');
   const [desktopViewMode] = useState<'mobile_frame' | 'expanded'>('mobile_frame');
   const [hideBottomNav, setHideBottomNav] = useState(false);
+  const [bellOpen, setBellOpen] = useState(false);
   // Orb badge: seeded from the chat overview's last good copy (no new reads);
   // ChatTab reports each fresh total through onUnreadTotal after its loads.
   const [orbUnread, setOrbUnread] = useState(0);
@@ -92,6 +109,12 @@ export const StudentPortal: React.FC = () => {
             const profiled = docSnap.exists() && (docSnap.data() as any)?.skeleton !== true;
             saveLastGoodFlag(`hasProfile:${user.uid}`, profiled);
             setHasProfile(profiled);
+            // Live access gate: the server stamps this field when the facility
+            // admin switches the student off, so the banner appears at once
+            // (and clears itself when access returns) without a reload.
+            setAccessOff(
+              profiled && String((docSnap.data() as any)?.accessStatus || 'active') === 'off'
+            );
             setProfileLoading(false);
           },
           (error) => {
@@ -400,7 +423,7 @@ export const StudentPortal: React.FC = () => {
       title: 'Timetable',
       subtitle: 'Your classes for the week',
       badge: 'Schedule',
-      icon: <Calendar className="w-5 h-5 text-[#C2410C]" />,
+      icon: <Calendar className="w-5 h-5 text-orange-700" />,
       iconBg: 'bg-orange-50 border border-orange-100',
       onClick: () => {
         setClassesSubPage('timetable');
@@ -415,7 +438,7 @@ export const StudentPortal: React.FC = () => {
       title: 'Assessment',
       subtitle: 'Tests set by your tutors & performance',
       badge: 'Tests & Scores',
-      icon: <FileText className="w-5 h-5 text-[#C2410C]" />,
+      icon: <FileText className="w-5 h-5 text-orange-700" />,
       iconBg: 'bg-orange-50 border border-orange-100',
       onClick: () => {
         setClassesSubPage('assessment');
@@ -435,7 +458,7 @@ export const StudentPortal: React.FC = () => {
       title: 'CBT Practice',
       subtitle: 'Untimed practice, no pressure',
       badge: 'Self-Paced',
-      icon: <Sparkles className="w-5 h-5 text-[#C2410C]" />,
+      icon: <Monitor className="w-5 h-5 text-orange-700" />,
       iconBg: 'bg-orange-50 border border-orange-100',
       onClick: () => {
         setCbtSubPage('practice');
@@ -450,7 +473,7 @@ export const StudentPortal: React.FC = () => {
       title: 'CBT Mock',
       subtitle: 'Timed mock exams under real conditions',
       badge: 'Timed Exam',
-      icon: <Laptop className="w-5 h-5 text-[#C2410C]" />,
+      icon: <Laptop className="w-5 h-5 text-orange-700" />,
       iconBg: 'bg-orange-50 border border-orange-100',
       onClick: () => {
         setCbtSubPage('mock');
@@ -462,14 +485,10 @@ export const StudentPortal: React.FC = () => {
     },
   ];
 
-  const MALE_NIGERIAN_AVATAR =
-    regeneratedStudentAvatar ||
-    'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=500&q=80';
-  const FEMALE_NIGERIAN_AVATAR =
-    'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?auto=format&fit=crop&w=500&q=80';
-
+  // Only the signed-in student's own record; never another student's row, and
+  // no sample record. Payment figures come from the server-written fields only.
   const rawStudent = user
-    ? students.find((s) => s.uid === user.uid || s.email === user.email) || students[0]
+    ? students.find((s) => s.uid === user.uid || s.email === user.email)
     : students[0];
   const activeStudent = rawStudent
     ? {
@@ -479,19 +498,17 @@ export const StudentPortal: React.FC = () => {
           !rawStudent.avatar.includes('photo-1534528741775') &&
           !rawStudent.avatar.includes('photo-1517841905240')
             ? rawStudent.avatar
-            : rawStudent.gender === 'Female'
-            ? FEMALE_NIGERIAN_AVATAR
-            : MALE_NIGERIAN_AVATAR,
+            : initialsAvatar(rawStudent.name),
       }
     : {
-        id: 'stu-1',
-        regNumber: 'EXC-2026-00421',
-        name: 'John Ade',
-        avatar: MALE_NIGERIAN_AVATAR,
-        programmeName: 'JAMB / UTME 2027 Intensive',
-        attendancePercent: 92,
-        totalFee: 50000,
-        paidAmount: 50000,
+        id: 'self',
+        regNumber: '',
+        name: (user && (user.displayName || user.email?.split('@')[0])) || 'Student',
+        avatar: initialsAvatar(user && (user.displayName || user.email?.split('@')[0]) || 'Student'),
+        programmeName: '',
+        attendancePercent: 0,
+        totalFee: 0,
+        paidAmount: 0,
         outstandingBalance: 0,
       };
 
@@ -532,20 +549,22 @@ export const StudentPortal: React.FC = () => {
 
   // Appearance: the student's Light / Dark pick in More. The screens stay as
   // written; a scoped stylesheet flips their light surfaces while the body
-  // carries the marker class. Chat and status portals attach to the body
-  // too, so they follow along.
-  React.useEffect(() => {
-    if (bgTheme === 'dark') document.body.classList.add('tos-student-dark');
-    else document.body.classList.remove('tos-student-dark');
-    return () => document.body.classList.remove('tos-student-dark');
-  }, [bgTheme]);
+  let splashShownThisLoad = false;
 
-  if (!isAdmin && (authLoading || profileLoading)) {
-    return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <div className="w-12 h-12 border-4 border-orange-500/30 border-t-orange-500 rounded-full animate-spin" />
-      </div>
-    );
+  // Dark mode (Nov 21) is canvas-only: the page background goes dark while
+  // every card and component keeps its light-mode look, so nothing travels on
+  // document.body any more.
+
+  const [splashHold, setSplashHold] = useState(!splashShownThisLoad);
+  useEffect(() => {
+    if (!splashHold) return;
+    splashShownThisLoad = true;
+    const t = setTimeout(() => setSplashHold(false), 1500);
+    return () => clearTimeout(t);
+  }, []);
+
+  if (!isAdmin && (authLoading || profileLoading || splashHold)) {
+    return <LaunchSplash />;
   }
 
   if (!isAdmin && !user) {
@@ -559,38 +578,39 @@ export const StudentPortal: React.FC = () => {
 
   const orbBadgeText = orbBadgeLabel(orbUnread);
 
-  const lateMinutesThreshold = parseTime(attendanceSettings.lateArrivalTime || '08:30 AM');
-  const currentMinutes = currentTime.getHours() * 60 + currentTime.getMinutes();
-  const isRunningLate = !todayLog?.clockInAt && currentMinutes > lateMinutesThreshold;
-
   return (
-    <div className="h-[100dvh] overflow-hidden bg-slate-50 flex flex-col justify-between selection:bg-orange-500 selection:text-white sm:h-auto sm:min-h-screen sm:overflow-visible">
-      {/* 1. Top Desktop Control Bar */}
-      <header className="bg-slate-950 text-white px-4 py-3 z-40 sticky top-0 overflow-hidden shadow-md">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-3 relative">
-          {/* Brand / Tutorial App Name */}
-          <div className="flex items-center space-x-2.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-orange-500 animate-pulse shrink-0 shadow-sm shadow-orange-500" />
-            <span className="font-black text-sm uppercase tracking-[0.2em]">
-              {centreName}
-            </span>
-          </div>
-
-          {/* Late Notification Animation */}
-          {isRunningLate && (
-            <div
-              onClick={() => { setChatFanOpen(false); setTitoOpen(false); setStatusScreenOpen(false); setActiveTab('home'); }}
-              className="absolute left-1/2 -translate-x-1/2 top-full bg-rose-600 px-4 py-2 rounded-b-2xl shadow-xl border border-white/10 animate-in slide-in-from-top-full duration-700 cursor-pointer flex items-center space-x-2 group active:scale-95"
-            >
-              <div className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
-              <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap">
-                You are Running Late! Clock In Now
-              </span>
+    <div className={`h-[100dvh] overflow-hidden ${bgTheme === 'dark' ? 'tos-canvas-dark bg-[#0B1220]' : 'bg-slate-50'} flex flex-col justify-between selection:bg-orange-500 selection:text-white sm:h-auto sm:min-h-screen sm:overflow-visible`}>
+      {/* Access gate: server-stamped live banner replaces the app while the
+          facility admin has this student switched off */}
+      {!isAdmin && accessOff && (
+        <div className="fixed inset-0 z-[100] bg-slate-950 flex items-center justify-center p-6">
+          <div className="max-w-sm w-full bg-slate-900 border border-slate-800 rounded-3xl p-8 text-center shadow-2xl">
+            <div className="w-14 h-14 rounded-2xl bg-rose-500/10 flex items-center justify-center mx-auto mb-4">
+              <ShieldAlert className="w-7 h-7 text-rose-400" />
             </div>
-          )}
+            <h2 className="text-xl font-black text-white">Access switched off</h2>
+            <p className="text-sm text-slate-400 mt-2 leading-relaxed">
+              Your access to {centreName || 'your facility'} is currently switched off. Please
+              contact your facility admin to restore it.
+            </p>
+          </div>
+        </div>
+      )}
+      {/* 1. Top Desktop Control Bar */}
+      <header className="bg-slate-950 text-white px-4 py-3 z-40 sticky top-0 overflow-hidden shadow-md border-b border-slate-800">
+        <div className="max-w-7xl mx-auto grid grid-cols-[1fr_auto_1fr] items-center gap-3 relative">
+          {/* Facility name, dead centre of the header menu, always shown in full.
+              The 1fr side columns are equal, so the middle column — the name —
+              sits on the true centre of the header whatever the buttons weigh. */}
+          <div className="min-w-0" />
+          <span className="block text-center break-words leading-tight font-black text-sm uppercase tracking-[0.2em] pointer-events-none min-w-0 max-w-full">
+            {centreName}
+          </span>
 
-          {/* PWA Icon Button beside banner */}
-          <div className="flex items-center">
+          {/* Right side: notifications (work continues) + install */}
+          <div className="flex items-center justify-end gap-2 min-w-0">
+            <NotificationsBell onOpenChange={setBellOpen} />
+            <RetryButton dark />
             <PWAInstallButton
               variant="icon"
               className="!bg-white/10 !border-white/10 hover:!bg-white/20"
@@ -599,6 +619,8 @@ export const StudentPortal: React.FC = () => {
         </div>
       </header>
 
+      <PushPrompt />
+
       {/* 2. Main Body: Phone Shell Container */}
       <main className="flex-1 min-h-0 flex items-center justify-center p-0 sm:py-6 sm:px-4">
         <div
@@ -606,7 +628,7 @@ export const StudentPortal: React.FC = () => {
             desktopViewMode === 'mobile_frame'
               ? 'max-w-md mx-auto sm:rounded-[36px] sm:shadow-2xl sm:border-[6px] sm:border-slate-800'
               : 'max-w-4xl mx-auto sm:rounded-3xl sm:border sm:border-slate-800'
-          } bg-slate-50 h-full sm:h-[100svh] flex flex-col relative overflow-hidden`}
+          } ${bgTheme === 'dark' ? 'bg-[#0B1220]' : 'bg-slate-50'} h-full sm:h-[100svh] flex flex-col relative overflow-hidden`}
         >
           {/* Parent Mode Indicator Notification if active */}
           {portalMode === 'parent' && (
@@ -697,7 +719,6 @@ export const StudentPortal: React.FC = () => {
             {activeTab === 'chat' && (
               <ChatTab
                 student={activeStudent}
-                onGoToProfile={() => setActiveTab('more')}
                 onGoToPractice={() => setActiveTab('cbt')}
                 onHideBottomNav={setHideBottomNav}
                 onUnreadTotal={setOrbUnread}
@@ -769,7 +790,7 @@ export const StudentPortal: React.FC = () => {
               allow-status flag and status limits. No back control: the chat
               orb is the way back to the fan. */}
           {statusScreenOpen && !hideBottomNav && (
-            <div className="fixed inset-0 z-40 bg-slate-50 overflow-y-auto animate-in fade-in duration-200">
+            <div className={`fixed inset-0 z-40 ${bgTheme === 'dark' ? 'bg-[#0B1220]' : 'bg-slate-50'} overflow-y-auto animate-in fade-in duration-200`}>
               <div className="p-4 sm:p-5 max-w-lg mx-auto pt-6 pb-24">
                 <StatusScreen student={activeStudent} />
               </div>
@@ -804,7 +825,7 @@ export const StudentPortal: React.FC = () => {
 
           {/* 3. Persistent Mobile Bottom Navigation Bar (5 Items: Home · Classes · Chat · CBT · More).
               Hidden while the Tutor AI thread is open, like a chat room. */}
-          {!hideBottomNav && (!titoOpen || chatFanOpen) && (
+          {!hideBottomNav && !bellOpen && (!titoOpen || chatFanOpen) && (
             <nav
               aria-label="Student Mobile Navigation"
               className="relative z-40 shrink-0 bg-slate-950/95 backdrop-blur-md border-t border-slate-800 py-1.5 px-2 shadow-2xl"
@@ -912,14 +933,14 @@ export const StudentPortal: React.FC = () => {
                           height: 62,
                           background: '#FFFFFF',
                           border: '4px solid #020617',
-                          boxShadow: '0 0 0 5px rgba(234,88,12,.18), 0 10px 24px rgba(15,23,42,.35)',
+                          boxShadow: `0 0 0 5px color-mix(in srgb, ${orbAccent} 18%, transparent), 0 10px 24px rgba(15,23,42,.35)`,
                         }
                       : {
                           width: 62,
                           height: 62,
-                          background: 'linear-gradient(145deg, #EA580C, #9A3412)',
+                          background: orbGradient,
                           border: '4px solid #020617',
-                          boxShadow: '0 0 0 5px rgba(234,88,12,.22), 0 10px 24px rgba(234,88,12,.5), inset 0 2px 0 rgba(255,255,255,.35)',
+                          boxShadow: orbShadowClosed,
                         }
                   }
                 >
@@ -929,7 +950,7 @@ export const StudentPortal: React.FC = () => {
                     <ChatOrbIcon className="w-8 h-8 text-white" />
                   )}
                   {orbBadgeText && !chatFanOpen && (
-                    <span className="absolute -top-0.5 -right-0.5 min-w-[22px] h-[22px] px-1 rounded-full bg-white text-[#EA580C] text-[11px] font-black flex items-center justify-center border border-orange-200 shadow-sm">
+                    <span className="absolute -top-0.5 -right-0.5 min-w-[22px] h-[22px] px-1 rounded-full bg-white text-orange-600 text-[11px] font-black flex items-center justify-center border border-orange-200 shadow-sm">
                       {orbBadgeText}
                     </span>
                   )}
@@ -947,7 +968,7 @@ export const StudentPortal: React.FC = () => {
                     role="menuitem"
                     onClick={fanWing(openStatusScreen)}
                     aria-label="Status"
-                    className={`absolute w-12 h-12 rounded-full bg-white text-[#EA580C] flex items-center justify-center shadow-lg cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 ${prefersReducedMotion ? '' : 'animate-in fade-in zoom-in-95 duration-200'}`}
+                    className={`absolute w-12 h-12 rounded-full bg-white text-orange-600 flex items-center justify-center shadow-lg cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 ${prefersReducedMotion ? '' : 'animate-in fade-in zoom-in-95 duration-200'}`}
                     style={{ left: -72, top: -42, transform: 'translate(-50%, -50%)' }}
                   >
                     <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden="true">
@@ -966,7 +987,7 @@ export const StudentPortal: React.FC = () => {
                     onClick={fanWing(() => openChatSection('chats'))}
                     aria-label="Chats"
                     className={`absolute w-14 h-14 rounded-full text-white flex items-center justify-center shadow-xl cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-200 ${prefersReducedMotion ? '' : 'animate-in fade-in zoom-in-95 duration-200'}`}
-                    style={{ left: 0, top: -84, transform: 'translate(-50%, -50%)', background: 'linear-gradient(145deg, #EA580C, #9A3412)' }}
+                    style={{ left: 0, top: -84, transform: 'translate(-50%, -50%)', background: orbGradient }}
                   >
                     <MessageCircle className="w-7 h-7" />
                     <span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 whitespace-nowrap text-[11px] font-bold text-white pointer-events-none">
@@ -979,7 +1000,7 @@ export const StudentPortal: React.FC = () => {
                     role="menuitem"
                     onClick={fanWing(openTito)}
                     aria-label="Tutor AI"
-                    className={`absolute w-12 h-12 rounded-full bg-white text-[#EA580C] flex items-center justify-center shadow-lg cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 ${prefersReducedMotion ? '' : 'animate-in fade-in zoom-in-95 duration-200'}`}
+                    className={`absolute w-12 h-12 rounded-full bg-white text-orange-600 flex items-center justify-center shadow-lg cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 ${prefersReducedMotion ? '' : 'animate-in fade-in zoom-in-95 duration-200'}`}
                     style={{ left: 72, top: -42, transform: 'translate(-50%, -50%)' }}
                   >
                     <Sparkles className="w-6 h-6" />

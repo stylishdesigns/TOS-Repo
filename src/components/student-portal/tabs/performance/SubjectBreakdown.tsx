@@ -52,7 +52,7 @@ export const SubjectBreakdown: React.FC<SubjectBreakdownProps> = ({
               {/* Top line of row: Name, Needs Focus, Percent, Grade */}
               <div className="flex items-center justify-between mb-1.5">
                 <div className="flex items-center space-x-2 min-w-0">
-                  <span className="text-[13px] font-bold text-[#0F172A] group-hover:text-[#C2410C] transition-colors truncate">
+                  <span className="text-[13px] font-bold text-[#0F172A] group-hover:text-orange-700 transition-colors truncate">
                     {item.subject}
                   </span>
 

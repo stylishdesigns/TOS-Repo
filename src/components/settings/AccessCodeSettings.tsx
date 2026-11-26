@@ -18,6 +18,11 @@ export const AccessCodeSettings: React.FC = () => {
   const [confirming, setConfirming] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState('');
+  // Batch 44: the facility can switch the access-code gate off entirely.
+  // It is ON by default; switching it off lets students and staff go
+  // straight from the splash screen to signing in.
+  const [required, setRequired] = useState<boolean | null>(null);
+  const [savingReq, setSavingReq] = useState(false);
 
   const load = useCallback(async () => {
     if (!activeCentreId) return;
@@ -30,6 +35,7 @@ export const AccessCodeSettings: React.FC = () => {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Could not load the access code.');
       setCode(data.accessCode || '');
+      setRequired(data.accessCodeRequired !== false);
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -38,6 +44,26 @@ export const AccessCodeSettings: React.FC = () => {
   }, [activeCentreId]);
 
   useEffect(() => { load(); }, [load]);
+
+  const saveRequired = async (next: boolean) => {
+    setSavingReq(true);
+    setError('');
+    try {
+      const token = (await getAuth().currentUser?.getIdToken()) || '';
+      const res = await fetch('/api/centre/access-code/require', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ centreId: activeCentreId, required: next }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Could not save the setting.');
+      setRequired(data.accessCodeRequired !== false);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setSavingReq(false);
+    }
+  };
 
   const regenerate = async () => {
     setRegenerating(true);
@@ -78,6 +104,31 @@ export const AccessCodeSettings: React.FC = () => {
           <h3 className="text-sm font-black text-slate-800">Access code</h3>
           <p className="text-[11px] text-slate-500">Staff and students join your facility with this 6-digit code.</p>
         </div>
+      </div>
+
+      {/* Batch 44: whether anyone is asked for this code at all. */}
+      <div className="flex items-start justify-between gap-3 mb-3 pb-3 border-b border-slate-200/70">
+        <div>
+          <p className="text-xs font-black text-slate-800">Access code required</p>
+          <p className="text-[11px] text-slate-500 leading-snug mt-0.5">
+            {required === false
+              ? 'Off: students and staff skip the code and sign in straight away.'
+              : 'On: students and staff enter this code before they can sign in.'}
+          </p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={required !== false}
+          aria-label="Access code required"
+          disabled={required === null || savingReq}
+          onClick={() => saveRequired(!(required !== false))}
+          className={`relative w-11 h-6 rounded-full transition-colors shrink-0 mt-0.5 ${required !== false ? '' : 'bg-slate-300'}`}
+          style={required !== false ? { background: 'var(--brand, #F97316)' } : undefined}
+        >
+          <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${required !== false ? 'translate-x-5' : ''}`} />
+          {savingReq && <Loader2 className="w-3 h-3 text-white animate-spin absolute inset-0 m-auto" />}
+        </button>
       </div>
 
       {loading ? (

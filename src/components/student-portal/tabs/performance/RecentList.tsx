@@ -53,7 +53,7 @@ export const RecentList: React.FC<RecentListProps> = ({
 
               {/* Middle: Title & Subtitle */}
               <div className="flex-1 min-w-0 pr-1">
-                <h4 className="text-[14px] font-extrabold text-[#0F172A] truncate group-hover:text-[#C2410C] transition-colors">
+                <h4 className="text-[14px] font-extrabold text-[#0F172A] truncate group-hover:text-orange-700 transition-colors">
                   {item.title}
                 </h4>
                 <p className="text-[11px] text-[#64748B] font-medium mt-0.5 truncate">

@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Payment reminder from {{facility_name}}</title></head>
+<body style="margin:0;padding:0;background:#F1F5F9;font-family:Arial,Helvetica,sans-serif;color:#0F172A;">
+  <div style="max-width:560px;margin:0 auto;padding:24px 16px;">
+    <div style="background:#0F172A;border-radius:16px 16px 0 0;padding:20px 24px;">
+      <span style="font-size:18px;font-weight:bold;color:#FFFFFF;">{{facility_name}}</span>
+      <span style="float:right;font-size:11px;letter-spacing:2px;color:#94A3B8;">PAYMENT REMINDER</span>
+    </div>
+    <div style="background:#FFFFFF;border-radius:0 0 16px 16px;padding:28px 24px;">
+      <p style="margin:0 0 14px;font-size:15px;line-height:1.6;">Hi {{student_name}},</p>
+      <p style="margin:0 0 14px;font-size:15px;line-height:1.6;">This is a friendly reminder from <strong>{{facility_name}}</strong> about your fees. Your record shows an outstanding balance, and your next payment is due on <strong>{{next_payment_due}}</strong>.</p>
+
+      <div style="border:1px solid #E2E8F0;border-radius:12px;padding:14px 16px;margin:0 0 18px;">
+        <p style="margin:0 0 10px;font-size:14px;"><strong>Outstanding balance:</strong> {{outstanding_balance}}</p>
+        <p style="margin:0;font-size:14px;"><strong>Next payment due:</strong> {{next_payment_due}}</p>
+      </div>
+
+      <p style="margin:0 0 14px;font-size:15px;line-height:1.6;">You can settle your balance by bank transfer or in cash at the centre. When you pay, submit it in the app so the centre can confirm it and update your record.</p>
+
+      <p style="margin:0 0 22px;text-align:center;">
+        <a href="{{app_url}}" style="display:inline-block;background:#0F172A;color:#FFFFFF;font-size:15px;font-weight:bold;text-decoration:none;padding:14px 28px;border-radius:12px;">Open the app</a>
+      </p>
+
+      <p style="margin:0 0 4px;font-size:13px;color:#475569;">If you have already paid, please disregard this reminder or reach out to us at the centre.</p>
+    </div>
+    <p style="margin:14px 4px 0;font-size:11px;color:#94A3B8;">You are receiving this email because you are enrolled at {{facility_name}}.</p>
+  </div>
+</body>
+</html>

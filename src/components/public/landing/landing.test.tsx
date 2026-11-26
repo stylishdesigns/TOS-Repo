@@ -25,8 +25,9 @@ has(
   'Your name on everything.',
   'Live in three steps.',
   'Simple pricing, in naira.',
-  'Free for 14 days',
-  'Questions, answered.',
+  'Everything you want to ask, answered.',
+  'Unlimited students',
+  'Start for free',
   'Ready to run your facility on one system?',
   '\u20A62,000',
   '\u20A63,500',
@@ -51,7 +52,7 @@ console.log('✓ no sign-in or sign-up buttons');
 // The trial form fields: the landing form keeps the owner's details only
 // (facility details moved to the /start page) and a Login button opens the
 // centre access-code gate. No discount request and no city anywhere.
-has('Full name', 'Email', 'Phone', 'State', 'Start my free trial', 'Login');
+has('Full name', 'Email', 'Phone', 'State', 'Start free. No card needed.', 'Login');
 assert.ok(!html.includes('Request a 20% discount'), 'discount request checkbox must stay removed');
 assert.ok(!html.includes('City'), 'city must stay off the forms');
 console.log('✓ trial form fields');

@@ -11,6 +11,8 @@ import {
   joinCentreService,
   activateStudentService,
   toggleStudentAccessService,
+  setSeatSwitchService,
+  assignStudentToSeatService,
   getCentreEntitlements,
   getSeatsSummaryService,
   isTosUser,
@@ -30,10 +32,14 @@ import { registerLandingRoutes } from "./src/server/landingRoutes";
 import { registerLandingAdminRoutes } from "./src/server/landingAdminRoutes";
 import { registerLandingLeadRoutes } from "./src/server/landingLeadRoutes";
 import { registerMockRoutes } from "./src/server/mockRoutes";
-import { PaymentError, parseAmount, parseConfirmAction } from "./src/server/paymentLogic";
-import { loadPaymentActor, submitPayment, decidePayment } from "./src/server/paymentService";
+import { PaymentError, feeState, parseAmount, parseConfirmAction, parseFee } from "./src/server/paymentLogic";
+import { loadPaymentActor, submitPayment, decidePayment, setStudentFee, syncProgrammeFee } from "./src/server/paymentService";
+import { runFeeReminderSweep } from "./src/server/feeReminders";
+import { runPushSweep } from "./src/server/pushSender";
 import { registerStudentMockRoutes } from "./src/server/studentMockRoutes";
+import { registerNotificationRoutes } from "./src/server/notificationRoutes";
 import { registerTutorAiRoutes } from "./src/server/tutorAiRoutes";
+import { registerAnnouncementRoutes } from "./src/server/announcementRoutes";
 
 
 // Source file is ESM, but compiled to CJS for production.
@@ -656,6 +662,101 @@ async function startServer() {
     }
   });
 
+  // 6b-2. Seat switches and seat assignment (batch 20). The seat pool is
+  // hands-on from the control room: every seat carries its own on/off
+  // switch, and the admin can attach a student to a specific seat.
+  //
+  //   POST /api/centre/seats/seat-switch { centreId, seatId, active }
+  //     - admin/owner only. Off freezes the seat's used days and banks it; a
+  //       student attached to it loses access and leaves the seat. On starts
+  //       (or resumes) the daily count, with or without a student.
+  //   POST /api/centre/seats/assign { centreId, seatId, studentUid }
+  //     - admin/owner only. Attaches one student to one specific seat. The
+  //       student must not already hold a running seat.
+  //   GET /api/centre/my-access
+  //     - the signed-in student's own memberships and statuses, for the
+  //       contact-admin banner on the login screen. Server-side enforcement
+  //       itself stays in requireMembership on every student endpoint.
+  app.post("/api/centre/seats/seat-switch", async (req, res) => {
+    try {
+      const caller = await getCaller(req);
+      const { centreId, seatId, active } = req.body;
+      if (!centreId || !seatId || typeof active !== "boolean") {
+        return res.status(400).json({ error: "Missing centreId, seatId, or active flag" });
+      }
+      const result = await setSeatSwitchService({
+        actorUid: caller.uid,
+        actorEmail: caller.email,
+        centreId,
+        seatId,
+        active,
+        tos: caller.tos,
+      });
+      res.json(result);
+    } catch (error: any) {
+      console.warn("seat-switch error:", error.message || error);
+      res.status(error?.status || 400).json({ error: error.message || "Failed to switch the seat" });
+    }
+  });
+
+  app.post("/api/centre/seats/assign", async (req, res) => {
+    try {
+      const caller = await getCaller(req);
+      const { centreId, seatId, studentUid } = req.body;
+      if (!centreId || !seatId || !studentUid) {
+        return res.status(400).json({ error: "Missing centreId, seatId, or studentUid" });
+      }
+      const result = await assignStudentToSeatService({
+        actorUid: caller.uid,
+        actorEmail: caller.email,
+        centreId,
+        seatId,
+        studentUid,
+        tos: caller.tos,
+      });
+      res.json(result);
+    } catch (error: any) {
+      console.warn("seat-assign error:", error.message || error);
+      res.status(error?.status || 400).json({ error: error.message || "Failed to assign the student to the seat" });
+    }
+  });
+
+  app.get("/api/centre/my-access", async (req, res) => {
+    try {
+      const caller = await getCaller(req);
+      const mSnap = await adminDb
+        .collection("memberships")
+        .where("uid", "==", caller.uid)
+        .where("role", "==", "student")
+        .get();
+      const memberships: Array<{ centreId: string; status: string; centreName: string }> = [];
+      const centreIds = new Set<string>();
+      mSnap.forEach((d) => {
+        const v = d.data() as any;
+        const cid = String(v.centreId || "");
+        memberships.push({ centreId: cid, status: String(v.status || ""), centreName: "" });
+        if (cid) centreIds.add(cid);
+      });
+      await Promise.all(
+        [...centreIds].map(async (cid) => {
+          try {
+            const cDoc = await adminDb.collection("centres").doc(cid).get();
+            const name = String((cDoc.data() as any)?.name || "");
+            memberships.forEach((m) => {
+              if (m.centreId === cid) m.centreName = name;
+            });
+          } catch {
+            /* the banner falls back to a generic line */
+          }
+        })
+      );
+      res.json({ memberships });
+    } catch (error: any) {
+      console.warn("my-access error:", error.message || error);
+      res.status(400).json({ error: error.message || "Failed to check access" });
+    }
+  });
+
   // 6c. Payments (Part C, point 3). Fees move through these routes only, and
   // only the server ever writes paidAmount / outstandingBalance / paymentStatus.
   // The transactions live in src/server/paymentService.ts (rules in
@@ -668,6 +769,10 @@ async function startServer() {
   //       the desk, confirmed transfer) and applies it in one transaction.
   //   POST /api/centre/payments/confirm
   //     - admin only: confirms or rejects a pending claim, once.
+  //   POST /api/centre/students/set-fee
+  //     - admin only: sets the student's total fee. The server recomputes
+  //       outstandingBalance / paymentStatus from it, so no client ever sends
+  //       balance numbers.
   //
   // Both refuse overpayment and enforce centre isolation (fail closed when a
   // record has no centre). Every action leaves an audit record.
@@ -682,15 +787,37 @@ async function startServer() {
     return res.status(500).json({ error: "Failed to process the payment" });
   };
 
+  //   GET /api/centre/payments/upload-config
+  //     - centre admin only: media-host details for attaching proof of
+  //       payment (a receipt screenshot or photo) when recording a payment
+  //       manually. The host details come from this deployment's own
+  //       environment, never from the client.
+  app.get("/api/centre/payments/upload-config", async (req, res) => {
+    try {
+      const caller = await getCaller(req);
+      await loadPaymentActor(adminDb, caller);
+      const cloud = String(process.env.CLOUDINARY_CLOUD_NAME || "");
+      const preset = String(process.env.CLOUDINARY_UPLOAD_PRESET || "");
+      if (!cloud || !preset) {
+        return res.status(503).json({ error: "File hosting is not configured on this deployment yet." });
+      }
+      res.json({ ok: true, cloud, preset, folder: "tos/payments" });
+    } catch (error) {
+      sendPaymentError(res, error, "payments upload-config");
+    }
+  });
+
   app.post("/api/centre/students/payment", async (req, res) => {
     try {
       const caller = await getCaller(req);
-      const { studentId, amountPaid, method, note, evidenceUrl, evidenceName } = req.body || {};
+      const { studentId, amountPaid, method, note, evidenceUrl, evidenceName, effectiveFrom, expiresAt } = req.body || {};
       if (typeof studentId !== "string" || !/^[a-zA-Z0-9_\-]{1,128}$/.test(studentId)) {
         return res.status(400).json({ error: "Invalid studentId" });
       }
       const amount = parseAmount(amountPaid);
-      const payMethod = method === "Bank Transfer" || method === "Cash" ? method : "Card";
+      // Only Bank Transfer and Cash are offered anywhere now; legacy 'Card'
+      // records stay readable but nothing new mints them.
+      const payMethod = method === "Cash" ? "Cash" : "Bank Transfer";
       if (typeof evidenceUrl === "string" && evidenceUrl.length > 900000) {
         return res.status(400).json({ error: "Payment evidence is too large. Please attach a smaller image." });
       }
@@ -703,6 +830,8 @@ async function startServer() {
         note,
         evidenceUrl,
         evidenceName,
+        effectiveFrom,
+        expiresAt,
       });
       res.json({ success: true, ...result });
     } catch (error: any) {
@@ -713,17 +842,175 @@ async function startServer() {
   app.post("/api/centre/payments/confirm", async (req, res) => {
     try {
       const caller = await getCaller(req);
-      const { paymentId, action, reason } = req.body || {};
+      const { paymentId, action, reason, effectiveFrom, expiresAt } = req.body || {};
       if (typeof paymentId !== "string" || !/^[a-zA-Z0-9_\-]{1,128}$/.test(paymentId)) {
         return res.status(400).json({ error: "Invalid paymentId" });
       }
       const act = parseConfirmAction(action);
 
       const actor = await loadPaymentActor(adminDb, caller);
-      const result = await decidePayment(adminDb, caller, actor, { paymentId, action: act, reason });
+      const result = await decidePayment(adminDb, caller, actor, { paymentId, action: act, reason, effectiveFrom, expiresAt });
       res.json({ success: true, ...result });
     } catch (error: any) {
       sendPaymentError(res, error, "confirm-payment");
+    }
+  });
+
+  app.post("/api/centre/students/set-fee", async (req, res) => {
+    try {
+      const caller = await getCaller(req);
+      const { studentId, totalFee } = req.body || {};
+      if (typeof studentId !== "string" || !/^[a-zA-Z0-9_\-]{1,128}$/.test(studentId)) {
+        return res.status(400).json({ error: "Invalid studentId" });
+      }
+      const fee = parseFee(totalFee);
+      const actor = await loadPaymentActor(adminDb, caller);
+      const result = await setStudentFee(adminDb, caller, actor, { studentId, totalFee: fee });
+      res.json({ success: true, ...result });
+    } catch (error: any) {
+      sendPaymentError(res, error, "set-fee");
+    }
+  });
+
+  //   POST /api/programme/sync-fee
+  //     - admin only: pulls every student registered on an exam programme to
+  //       the programme's current fee. Paid amounts are preserved and
+  //       balance and payment status are recomputed, the same rule as
+  //       set-fee. Runs when an admin changes a programme's fee so every
+  //       registered student owes the programme's current amount.
+  app.post("/api/programme/sync-fee", async (req, res) => {
+    try {
+      const caller = await getCaller(req);
+      const { programmeId } = req.body || {};
+      const actor = await loadPaymentActor(adminDb, caller);
+      const result = await syncProgrammeFee(adminDb, caller, actor, { programmeId });
+      res.json({ success: true, ...result });
+    } catch (error: any) {
+      sendPaymentError(res, error, "programme-fee-sync");
+    }
+  });
+
+  //   POST /api/student/programme-fee
+  //     - student only: saves the department and programme track the student
+  //       picked in their own Academic details, and when the track is one of
+  //       the facility's programmes, that programme's approved fee becomes
+  //       the student's fee. Only the server writes totalFee /
+  //       outstandingBalance / paymentStatus, the same rule as set-fee: the
+  //       paid amount is preserved, balance and status are recomputed from
+  //       the new fee, and every fee switch lands in the audit log.
+  app.post("/api/student/programme-fee", async (req, res) => {
+    try {
+      const caller = await getCaller(req);
+      const department = String(req.body?.department || "").trim();
+      const programmeName = String(req.body?.programmeName || "").trim();
+      if (department && !["Science", "Commercial", "Arts"].includes(department)) {
+        throw new PaymentError(400, "Pick Science, Commercial or Arts as the department");
+      }
+      if (programmeName.length > 120) {
+        throw new PaymentError(400, "That programme name is too long");
+      }
+      const stuSnap = await adminDb.collection("students").where("uid", "==", caller.uid).limit(1).get();
+      if (stuSnap.empty) {
+        throw new PaymentError(403, "Only a student can change their academic details");
+      }
+      const stuDoc = stuSnap.docs[0];
+      const s = stuDoc.data() as Record<string, any>;
+      const centreId = typeof s.centreId === "string" ? s.centreId : "";
+      if (!centreId) {
+        throw new PaymentError(400, "Your facility could not be resolved");
+      }
+
+      let programme: Record<string, any> | null = null;
+      if (programmeName) {
+        const progSnap = await adminDb.collection("programmes").where("centreId", "==", centreId).get();
+        programme =
+          progSnap.docs
+            .map((d) => d.data() as Record<string, any>)
+            .find((p) => String(p.name || "").trim().toLowerCase() === programmeName.toLowerCase()) || null;
+        if (!programme) {
+          throw new PaymentError(400, "That programme is not one of your facility's programmes");
+        }
+      }
+
+      const updates: Record<string, any> = {};
+      if (department && department !== String(s.department || "")) {
+        updates.department = department;
+      }
+      const canonicalName = programme ? String(programme.name || "").trim() : programmeName;
+      if (canonicalName !== String(s.programmeName || "")) {
+        updates.programmeName = canonicalName;
+      }
+
+      const rawFee = programme ? Number(programme.fee) : 0;
+      const fee = Number.isFinite(rawFee) && rawFee > 0 ? Math.round(rawFee) : 0;
+      let fees: ReturnType<typeof feeState> | null = null;
+      if (fee > 0 && fee !== Number(s.totalFee || 0)) {
+        const currentTotal = Number(s.totalFee || 0);
+        const paidAmount = Math.max(currentTotal - Number(s.outstandingBalance || 0), 0);
+        fees = feeState({ totalFee: currentTotal, paidAmount } as any, fee);
+        updates.totalFee = fees.totalFee;
+        updates.outstandingBalance = fees.outstandingBalance;
+        updates.paymentStatus = fees.paymentStatus;
+      }
+
+      if (Object.keys(updates).length > 0) {
+        await stuDoc.ref.update(updates);
+        if (fees) {
+          await adminDb.collection("auditLogs").doc().set({
+            action: "fee.set",
+            actorUid: caller.uid,
+            actorEmail: caller.email,
+            centreId,
+            studentId: stuDoc.id,
+            totalFee: fees.totalFee,
+            previousFee: Number(s.totalFee || 0),
+            paidAmount: fees.paidAmount,
+            reason: "programme-track-change",
+            at: new Date().toISOString(),
+          });
+        }
+      }
+
+      res.json({
+        success: true,
+        department: updates.department !== undefined ? updates.department : String(s.department || ""),
+        programmeName: updates.programmeName !== undefined ? updates.programmeName : String(s.programmeName || ""),
+        feeApplied: !!fees,
+        totalFee: fees ? fees.totalFee : Number(s.totalFee || 0),
+        outstandingBalance: fees ? fees.outstandingBalance : Number(s.outstandingBalance || 0),
+        paymentStatus: fees ? fees.paymentStatus : String(s.paymentStatus || "Pending"),
+      });
+    } catch (error: any) {
+      sendPaymentError(res, error, "student programme change");
+    }
+  });
+
+  // 6d. Automated payment reminders. The facility's reminder settings live in
+  // centreSettings/{centreId}__global (paymentReminders); this route runs the
+  // sweep for the caller's own facility right now (the "Run reminders now"
+  // button). The daily schedule runs the same sweep for every facility.
+  app.post("/api/centre/reminders/run", async (req, res) => {
+    try {
+      const caller = await getCaller(req);
+      const centreId = String(req.body?.centreId || req.headers["x-centre-id"] || "");
+      if (!/^[a-zA-Z0-9_\-]{1,160}$/.test(centreId)) {
+        return res.status(400).json({ error: "Missing or invalid centreId" });
+      }
+      const actor = await loadPaymentActor(adminDb, caller);
+      if (!actor.isAdminCaller) {
+        return res.status(403).json({ error: "Only the facility admin can run reminders." });
+      }
+      if (actor.callerCentreId && actor.callerCentreId !== centreId) {
+        return res.status(403).json({ error: "You can only run reminders for your own facility." });
+      }
+      const reminders = await runFeeReminderSweep({ centreId });
+      // Deliver any pushes the sweep just queued without waiting for the
+      // next scheduled push pass.
+      const push = reminders.pushed > 0 ? await runPushSweep({ limit: 50 }) : undefined;
+      res.json({ success: true, reminders, push });
+    } catch (error: any) {
+      console.warn("reminders/run error:", error.message || error);
+      res.status(500).json({ error: error.message || "Could not run the reminders." });
     }
   });
 
@@ -1235,6 +1522,8 @@ RULES:
   registerLandingLeadRoutes(app);
   registerLandingAdminRoutes(app);
   registerMockRoutes(app);
+  registerNotificationRoutes(app);
+  registerAnnouncementRoutes(app);
   registerStudentMockRoutes(app);
 
   // Tutor AI (T1): general study-assistant chat for centre members. Separate

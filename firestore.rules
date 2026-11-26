@@ -494,6 +494,24 @@ service cloud.firestore {
     }
 
     // -------------------------------------------------------------------------
+    // STUDY MATERIALS. Uploaded by tutors and centre admins of the centre; read
+    // by anyone signed in on that centre's app. PDFs and images are uploaded
+    // files, videos are pasted links, so no binary storage is policed here.
+    // -------------------------------------------------------------------------
+    match /studyMaterials/{matId} {
+      allow read: if isVerified();
+      allow create: if isTutorOfCentre(incoming().get('centreId', ''))
+                    || isAdminOfCentre(incoming().get('centreId', ''));
+      allow update: if ((isAdminOfCentre(existing().get('centreId', ''))
+                          || (isTutorOfCentre(existing().get('centreId', ''))
+                              && existing().get('tutorId', '') == request.auth.uid))
+                        && centreTagUnchanged());
+      allow delete: if isAdminOfCentre(existing().get('centreId', ''))
+                    || (isTutorOfCentre(existing().get('centreId', ''))
+                        && existing().get('tutorId', '') == request.auth.uid);
+    }
+
+    // -------------------------------------------------------------------------
     // TOS MOCKS (Prompt M). Mocks are owned entirely by Tutorial OS: centres,
     // admins and tutors cannot create, edit, see inside or use them. Every
     // mock collection below is read and written ONLY by the server through

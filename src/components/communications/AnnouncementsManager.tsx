@@ -42,6 +42,7 @@ export const AnnouncementsManager: React.FC = () => {
   const [busy, setBusy] = useState(false);
 
   const [announcements, setAnnouncements] = useState<AnnouncementItem[]>([]);
+  const [historyTick, setHistoryTick] = useState(0);
 
   // The centre's own chat groups, pulled live so the Student Group channel
   // can target any group the centre has created.
@@ -62,6 +63,35 @@ export const AnnouncementsManager: React.FC = () => {
     })();
     return () => { dead = true; };
   }, [activeCentreId]);
+
+  // Broadcast history comes from the server (the `announcements` collection):
+  // every saved broadcast, delivered or scheduled, across reloads.
+  useEffect(() => {
+    if (!activeCentreId || activeCentreId === 'none') return;
+    let dead = false;
+    (async () => {
+      try {
+        const res: any = await api(`/api/centre/announcements?centreId=${encodeURIComponent(activeCentreId)}`);
+        if (dead) return;
+        const items: AnnouncementItem[] = (res?.items || []).map((v: any) => ({
+          id: String(v.id),
+          title: String(v.title || ''),
+          body: String(v.body || ''),
+          audience: String(v.audience || 'All Programs'),
+          channels: Array.isArray(v.channels) ? v.channels : [],
+          dateSent: v.status === 'Scheduled' && v.scheduledAt
+            ? new Date(Number(v.scheduledAt)).toLocaleString()
+            : new Date(Number(v.deliveredAt || v.createdAt || Date.now())).toLocaleString(),
+          status: v.status === 'Scheduled' ? 'Scheduled' : 'Delivered',
+          imageUrl: String(v.imageUrl || ''),
+          targetGroups: Array.isArray(v.targetGroups) && v.targetGroups.length ? v.targetGroups : ['Student'],
+          groupName: v.groupName || undefined,
+        }));
+        setAnnouncements(items);
+      } catch { /* the page stays usable when history cannot load */ }
+    })();
+    return () => { dead = true; };
+  }, [activeCentreId, historyTick]);
 
   const [showComposeModal, setShowComposeModal] = useState(false);
   const [formData, setFormData] = useState({
@@ -129,36 +159,87 @@ export const AnnouncementsManager: React.FC = () => {
       setBusy(false);
     }
 
-    const newAnn: AnnouncementItem = {
-      id: `ann-${Date.now()}`,
-      title: formData.title,
-      body: formData.body,
-      audience: formData.audience,
-      channels: formData.channels,
-      dateSent: formData.sendMode === 'now' ? 'Just now' : new Date(formData.scheduleTime).toLocaleString(),
-      status: formData.sendMode === 'now' ? 'Delivered' : 'Scheduled',
-      imageUrl: formData.imageUrl,
-      targetGroups: [target],
-      groupName: groupName || undefined,
-    };
-
-    setAnnouncements([newAnn, ...announcements]);
-    setShowComposeModal(false);
-    setFormData({
-      title: '',
-      body: '',
-      audience: 'All Programs',
-      channels: ['In-App', 'Student Group'],
-      sendMode: 'now',
-      scheduleTime: '',
-      imageUrl: '',
-    });
-
-    addToast({
-      type: 'success',
-      title: 'Broadcast Dispatched!',
-      description: `Announcement pushed to ${target}s for ${formData.audience} via ${formData.channels.join(', ')}.`,
-    });
+    const wantsInApp = formData.channels.includes('In-App');
+    const wantsEmail = formData.channels.includes('Email');
+    if (busy) return;
+    setBusy(true);
+    try {
+      const res: any = await api(`/api/centre/announcements/broadcast?centreId=${encodeURIComponent(activeCentreId || '')}`, {
+        method: 'POST',
+        body: {
+          centreId: activeCentreId,
+          title: formData.title.trim(),
+          body: formData.body.trim(),
+          audience: formData.audience,
+          channels: formData.channels,
+          target,
+          imageUrl: formData.imageUrl,
+          groupId: wantsGroup ? selectedGroupId : '',
+          groupName: groupName || '',
+          sendMode: formData.sendMode,
+          scheduleTime: formData.scheduleTime,
+        },
+      });
+      if (res?.status === 'Scheduled') {
+        setShowComposeModal(false);
+        setFormData({
+          title: '',
+          body: '',
+          audience: 'All Programs',
+          channels: ['In-App', 'Student Group'],
+          sendMode: 'now',
+          scheduleTime: '',
+          imageUrl: '',
+        });
+        setHistoryTick((n) => n + 1);
+        setBusy(false);
+        addToast({
+          type: 'success',
+          title: 'Broadcast Scheduled',
+          description: `It goes out automatically at the time you picked.`,
+        });
+        return;
+      }
+      const r = res?.results || {};
+      const parts: string[] = [];
+      if (wantsInApp) {
+        const pushInfo = r.push?.sent !== undefined
+          ? `${r.push.sent} phone notification${r.push.sent === 1 ? '' : 's'}${r.push.failed ? `, ${r.push.failed} failed` : ''}`
+          : r.push?.queued ? `${r.push.queued} phone notifications` : '';
+        const pushed = pushInfo ? `${r.inApp?.delivered || 0} in the bell, ${pushInfo}` : `${r.inApp?.delivered || 0} in the bell`;
+        parts.push(`In-app: ${pushed}`);
+      }
+      if (wantsEmail) {
+        const note = r.email?.skipped ? ` (${r.email.skipped})` : r.email?.noAddress ? `, ${r.email.noAddress} without an email address` : '';
+        parts.push(`Email: ${r.email?.sent || 0} sent${note}`);
+      }
+      if (wantsGroup) parts.push(`Group: ${groupName || 'sent'}`);
+      setShowComposeModal(false);
+      setFormData({
+        title: '',
+        body: '',
+        audience: 'All Programs',
+        channels: ['In-App', 'Student Group'],
+        sendMode: 'now',
+        scheduleTime: '',
+        imageUrl: '',
+      });
+      setHistoryTick((n) => n + 1);
+      addToast({
+        type: 'success',
+        title: 'Broadcast Dispatched!',
+        description: parts.join(' · ') || `Announcement sent to ${target}s for ${formData.audience}.`,
+      });
+    } catch (e: any) {
+      setBusy(false);
+      addToast({
+        type: 'error',
+        title: 'Not Delivered',
+        description: String(e?.message || 'The broadcast could not be sent. Check the attached channels and try again.'),
+      });
+      return;
+    }
+    setBusy(false);
   };
 
   return (
@@ -169,14 +250,14 @@ export const AnnouncementsManager: React.FC = () => {
           <h2 className="text-2xl font-bold text-slate-900 tracking-tight text-[22px] sm:text-[26px]">
             Announcements
           </h2>
-          <p className="text-[11px] text-slate-500 mt-1 uppercase font-black tracking-widest">
-            Broadcast announcements to your facility's student groups, in-app, WhatsApp and email.
+          <p className="text-xs sm:text-sm font-black text-slate-900 mt-1 uppercase tracking-widest">
+            Broadcast announcements to your facility's student groups, in-app and email.
           </p>
         </div>
 
         <button
           onClick={() => setShowComposeModal(true)}
-          className="px-6 py-3 text-[11px] font-black uppercase tracking-[0.15em] text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-xl shadow-lg shadow-orange-500/20 transition-all flex items-center space-x-2 self-start sm:self-auto active:scale-95"
+          className="px-6 py-3 text-[11px] font-black uppercase tracking-[0.15em] text-white bg-orange-600 hover:bg-orange-700 rounded-xl shadow-lg shadow-orange-500/20 transition-all flex items-center space-x-2 self-start sm:self-auto active:scale-95"
         >
           <Send className="w-4 h-4" />
           <span>Broadcast Announcement</span>
@@ -187,7 +268,7 @@ export const AnnouncementsManager: React.FC = () => {
       <div className="grid grid-cols-2 gap-3 sm:gap-4">
         <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-sm">
           <div className="flex items-center space-x-2 text-slate-600">
-            <Bell className="w-3.5 h-3.5 text-[#EA580C]" />
+            <Bell className="w-3.5 h-3.5 text-orange-600" />
             <span className="text-[9px] sm:text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Broadcasts</span>
           </div>
           <p className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight mt-1.5">
@@ -211,7 +292,7 @@ export const AnnouncementsManager: React.FC = () => {
       {/* Broadcast History List */}
       <div className="space-y-4">
         <div className="flex items-center space-x-2">
-           <div className="h-5 w-1.5 bg-[#EA580C] rounded-full" />
+           <div className="h-5 w-1.5 bg-orange-600 rounded-full" />
            <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Broadcast History</h3>
         </div>
 
@@ -231,7 +312,7 @@ export const AnnouncementsManager: React.FC = () => {
                   <span className="px-3 py-1 rounded-lg text-[9px] font-black bg-slate-50 text-slate-600 border border-slate-200 uppercase tracking-widest">
                     {ann.audience}
                   </span>
-                  <h4 className="font-black text-slate-900 text-base group-hover:text-[#EA580C] transition-colors">{ann.title}</h4>
+                  <h4 className="font-black text-slate-900 text-base group-hover:text-orange-600 transition-colors">{ann.title}</h4>
                 </div>
 
                 <div className="flex items-center space-x-3 text-[10px] text-slate-400 font-bold self-start sm:self-auto uppercase tracking-tighter">
@@ -269,12 +350,12 @@ export const AnnouncementsManager: React.FC = () => {
                 </div>
                 <div className="flex items-center space-x-2">
                   {ann.targetGroups.map(g => (
-                    <span key={g} className="px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest bg-orange-50 text-[#EA580C] border border-orange-100 shadow-sm">
+                    <span key={g} className="px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest bg-orange-50 text-orange-600 border border-orange-100 shadow-sm">
                       To {g}
                     </span>
                   ))}
                   {ann.groupName && (
-                    <span className="px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest bg-slate-900 text-white shadow-sm">
+                    <span className="px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest bg-[var(--brand,#0f172a)] text-[var(--on-brand,#fff)] shadow-sm">
                       {ann.groupName}
                     </span>
                   )}
@@ -292,7 +373,7 @@ export const AnnouncementsManager: React.FC = () => {
             <div className="flex items-center justify-between pb-5 border-b border-slate-100">
               <div className="flex items-center space-x-3">
                  <div className="w-10 h-10 rounded-2xl bg-orange-50 flex items-center justify-center">
-                    <Send className="w-5 h-5 text-[#EA580C]" />
+                    <Send className="w-5 h-5 text-orange-600" />
                  </div>
                  <h3 className="font-black text-slate-900 uppercase tracking-widest text-[14px]">New Broadcast</h3>
               </div>
@@ -310,7 +391,7 @@ export const AnnouncementsManager: React.FC = () => {
                   placeholder="e.g. Schedule for 2026 UTME Mock Series"
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3.5 text-slate-900 font-bold focus:bg-white focus:border-[#EA580C] outline-none transition-all placeholder:text-slate-300"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3.5 text-slate-900 font-bold focus:bg-white focus:border-orange-600 outline-none transition-all placeholder:text-slate-300"
                 />
               </div>
 
@@ -329,19 +410,19 @@ export const AnnouncementsManager: React.FC = () => {
 
                 <div>
                   <label className="block font-black text-slate-700 mb-2 uppercase tracking-widest text-[10px]">Delivery Time</label>
-                  <div className="flex bg-slate-100 p-1.5 rounded-2xl mb-2">
+                  <div className="flex bg-slate-100 p-1.5 rounded-2xl mb-2 w-fit mx-auto">
                     <button
                       onClick={() => setFormData({ ...formData, sendMode: 'now' })}
-                      className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
-                        formData.sendMode === 'now' ? 'bg-white text-[#EA580C] shadow-sm scale-[1.02]' : 'text-slate-400 hover:text-slate-600'
+                      className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+                        formData.sendMode === 'now' ? 'bg-white text-orange-600 shadow-sm scale-[1.02]' : 'text-slate-400 hover:text-slate-600'
                       }`}
                     >
                       Now
                     </button>
                     <button
                       onClick={() => setFormData({ ...formData, sendMode: 'schedule' })}
-                      className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
-                        formData.sendMode === 'schedule' ? 'bg-white text-[#EA580C] shadow-sm scale-[1.02]' : 'text-slate-400 hover:text-slate-600'
+                      className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+                        formData.sendMode === 'schedule' ? 'bg-white text-orange-600 shadow-sm scale-[1.02]' : 'text-slate-400 hover:text-slate-600'
                       }`}
                     >
                       Schedule
@@ -354,7 +435,7 @@ export const AnnouncementsManager: React.FC = () => {
                         type="datetime-local"
                         value={formData.scheduleTime}
                         onChange={(e) => setFormData({...formData, scheduleTime: e.target.value})}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 font-bold outline-none focus:bg-white focus:border-[#EA580C] transition-all text-[11px]"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 font-bold outline-none focus:bg-white focus:border-orange-600 transition-all text-[11px]"
                       />
                     </div>
                   )}
@@ -398,7 +479,7 @@ export const AnnouncementsManager: React.FC = () => {
                   placeholder="Type announcement message here..."
                   value={formData.body}
                   onChange={(e) => setFormData({ ...formData, body: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 text-slate-700 font-medium focus:bg-white focus:border-[#EA580C] outline-none transition-all placeholder:text-slate-300"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 text-slate-700 font-medium focus:bg-white focus:border-orange-600 outline-none transition-all placeholder:text-slate-300"
                 />
                 {formData.imageUrl && (
                   <div className="mt-3 space-y-3 animate-in slide-in-from-top-2">
@@ -424,7 +505,7 @@ export const AnnouncementsManager: React.FC = () => {
                   Delivery Channels
                 </label>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                  {(['In-App', 'Student Group', 'WhatsApp', 'Email'] as const).map((ch) => {
+                  {(['In-App', 'Student Group', 'Email'] as const).map((ch) => {
                     const active = formData.channels.includes(ch);
                     return (
                       <button
@@ -433,7 +514,7 @@ export const AnnouncementsManager: React.FC = () => {
                         onClick={() => handleToggleChannel(ch)}
                         className={`p-3 rounded-2xl border text-center font-black text-[9px] uppercase tracking-[0.2em] transition-all ${
                           active
-                            ? 'bg-orange-50 border-orange-200 text-[#EA580C] shadow-sm'
+                            ? 'bg-orange-50 border-orange-200 text-orange-600 shadow-sm'
                             : 'bg-slate-50 border-slate-100 text-slate-400 hover:bg-slate-100'
                         }`}
                       >
@@ -466,7 +547,7 @@ export const AnnouncementsManager: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => handleSend('Student')}
-                  className="flex-1 py-4 font-black text-white bg-slate-900 hover:bg-slate-800 rounded-[20px] shadow-xl shadow-slate-200 flex items-center justify-center space-x-2.5 uppercase tracking-[0.2em] text-[10px] transition-all group active:scale-95"
+                  className="flex-1 py-4 font-black text-[var(--on-brand,#fff)] bg-[var(--brand,#0f172a)] hover:brightness-110 rounded-[20px] shadow-xl shadow-slate-200 flex items-center justify-center space-x-2.5 uppercase tracking-[0.2em] text-[10px] transition-all group active:scale-95"
                 >
                   <Send className="w-4 h-4 text-orange-400 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
                   <span>Push to Student</span>
@@ -474,7 +555,7 @@ export const AnnouncementsManager: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => handleSend('Parents')}
-                  className="flex-1 py-4 font-black text-[#EA580C] bg-orange-50 hover:bg-orange-100 border border-orange-200 rounded-[20px] shadow-sm flex items-center justify-center space-x-2.5 uppercase tracking-[0.2em] text-[10px] transition-all active:scale-95"
+                  className="flex-1 py-4 font-black text-orange-600 bg-orange-50 hover:bg-orange-100 border border-orange-200 rounded-[20px] shadow-sm flex items-center justify-center space-x-2.5 uppercase tracking-[0.2em] text-[10px] transition-all active:scale-95"
                 >
                   <Users className="w-4 h-4" />
                   <span>Push to Parents</span>

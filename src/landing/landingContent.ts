@@ -193,11 +193,15 @@ export function textOnAccent(hex: string): string {
  * decent page at its address on day one, and the builder simply edits these
  * fields.
  */
-export function defaultLandingContent(centreName: string): LandingContent {
+/** The accent swatches shared by the landing editor and the Facility
+ * Settings accent card. Gold first: it is the day-one starter colour. */
+export const ACCENTS = ['#F2A93B', '#EA580C', '#2563EB', '#059669', '#7C3AED', '#DB2777', '#B45309'];
+
+export function defaultLandingContent(centreName: string, accent?: string): LandingContent {
   const name = centreName || 'Our education facility';
   return {
     templateId: 'scholar',
-    accent: '#F2A93B',
+    accent: accent || '#F2A93B',
     ribbon: 'Admissions open · 2026/27 session',
     hero: {
       headline: 'Learn. Excel. Succeed with us.',

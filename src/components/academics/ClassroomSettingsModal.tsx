@@ -121,7 +121,7 @@ export const ClassroomSettingsModal: React.FC<Props> = ({ isOpen, onClose }) => 
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 pb-4">
           <div className="flex items-center space-x-3">
-            <div className="p-2.5 bg-orange-50 text-[#EA580C] rounded-xl border border-orange-100">
+            <div className="p-2.5 bg-orange-50 text-orange-600 rounded-xl border border-orange-100">
               <Building2 className="w-5 h-5" />
             </div>
             <div>
@@ -158,7 +158,7 @@ export const ClassroomSettingsModal: React.FC<Props> = ({ isOpen, onClose }) => 
                 });
                 setShowAddForm(true);
               }}
-              className="px-3 py-1.5 text-xs font-semibold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg shadow-sm transition-all flex items-center space-x-1.5"
+              className="px-3 py-1.5 text-xs font-semibold text-white bg-orange-600 hover:bg-orange-700 rounded-lg shadow-sm transition-all flex items-center space-x-1.5"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Add New Room</span>
@@ -228,7 +228,7 @@ export const ClassroomSettingsModal: React.FC<Props> = ({ isOpen, onClose }) => 
             <div className="flex justify-end space-x-2 pt-2">
               <button
                 type="submit"
-                className="px-4 py-2 text-xs font-semibold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg shadow-sm"
+                className="px-4 py-2 text-xs font-semibold text-white bg-orange-600 hover:bg-orange-700 rounded-lg shadow-sm"
               >
                 {editingRoom ? 'Save Room Changes' : 'Create Room'}
               </button>

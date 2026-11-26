@@ -33,7 +33,7 @@ export default defineConfig(({mode}) => {
           short_name: 'TOS',
           description:
             'Multi-Tenant Tutorial Centre Management System, CBT Testing Engine & Student Mobile Portal.',
-          theme_color: '#EA580C',
+          theme_color: '#020617',
           background_color: '#0F172A',
           display: 'standalone',
           start_url: '/#access',
@@ -56,6 +56,9 @@ export default defineConfig(({mode}) => {
         },
         workbox: {
           maximumFileSizeToCacheInBytes: 10 * 1024 * 1024, // 10 MiB
+          // Web push handlers (Nov 19): the generated service worker imports
+          // public/push-handlers.js so pushes show notifications app-closed too.
+          importScripts: ['push-handlers.js'],
           // index.html is deliberately NOT precached: the app shell is fetched
           // network-first (see runtimeCaching below) so a new deploy can never
           // hide behind an offline copy. Hashed assets below stay precached.
