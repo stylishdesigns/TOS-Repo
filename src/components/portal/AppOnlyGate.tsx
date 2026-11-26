@@ -149,7 +149,7 @@ export const AppOnlyGate: React.FC<{ children: React.ReactNode; desktopOk?: bool
         <div className="w-16 h-16 rounded-2xl bg-orange-600 text-white font-black text-2xl grid place-items-center mx-auto shadow-lg">TO</div>
         <h1 className="mt-6 text-white text-2xl font-bold tracking-tight">Open this portal in the app</h1>
         <p className="mt-3 text-slate-300 text-sm leading-relaxed">
-          For safety, the admin, tutor and student portals open only inside the Tutorial OS app. Install it below, then sign in there.
+          For safety, the tutor and student portals open only inside the Tutorial OS app. Install it below, then sign in there. On a desktop computer, admins can also sign in from the browser.
         </p>
         <a
           href="/app"

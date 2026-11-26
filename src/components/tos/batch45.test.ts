@@ -50,6 +50,14 @@ check('tutor wrap has no desktopOk', !tutorSlice.includes('desktopOk'));
 // 4. Docblock says the exemption is admin-only.
 check('docblock documents the admin exemption', gate.includes('The admin portal is the one exception'));
 
+// 5. The centre access-code gate no longer sends desktop browsers to the
+// /app install page after the code resolves: desktop continues into the
+// facility app flow (welcome, then sign-in), where the admin portal opens.
+const codeGate = read('src/components/auth/CentreCodeGate.tsx');
+check('code gate imports isDesktopBrowser', codeGate.includes("import { isAppOnlyOn, isStandaloneDisplay, isDesktopBrowser }"));
+check('code gate skips /app redirect on desktop', codeGate.includes('!isStandaloneDisplay() && !isDesktopBrowser()'));
+check('blocked-screen copy names the admin exception', gate.includes('On a desktop computer, admins can also sign in from the browser'));
+
 if (failures.length > 0) {
   console.error(`batch 45: ${failures.length} failing`);
   process.exit(1);

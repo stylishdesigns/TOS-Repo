@@ -1,7 +1,7 @@
 import { brandVars } from '../../lib/brand';
 import React, { useState, useRef, useEffect } from 'react';
 import { Building2, ArrowRight, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
-import { isAppOnlyOn, isStandaloneDisplay } from '../portal/AppOnlyGate';
+import { isAppOnlyOn, isStandaloneDisplay, isDesktopBrowser } from '../portal/AppOnlyGate';
 
 /**
  * Centre code gate: the FIRST screen before any sign-in. The access code is a
@@ -29,15 +29,17 @@ export const CentreCodeGate: React.FC<CentreCodeGateProps> = ({ onProceed, onBac
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   // The app-only check runs HERE, after the centre is confirmed and before the
-  // login page: in any browser it sends the user straight to the app install
-  // page instead. Inside the installed app the check passes and sign-in
-  // continues as usual.
+  // login page: in a browser that cannot open the portals (phones, tablets and
+  // every browser on the app-only rule) it sends the user straight to the app
+  // install page instead. Desktop browsers are exempt: the admin portal opens
+  // on the desktop web, so sign-in continues as usual there. Inside the
+  // installed app the check passes and sign-in continues as usual.
   const handleContinue = async () => {
     if (!centre || centre.suspended || continuing) return;
     setContinuing(true);
     try {
       const appOnly = await isAppOnlyOn();
-      if (appOnly && !isStandaloneDisplay()) {
+      if (appOnly && !isStandaloneDisplay() && !isDesktopBrowser()) {
         window.location.href = '/app';
         return;
       }
