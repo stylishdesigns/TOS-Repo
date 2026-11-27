@@ -1,12 +1,10 @@
 /**
  * Batch 65: an unpaid facility's app still opens.
- * The lead-tier lock (batch 26) was written for the public landing page: an
- * unpaid facility shows no public facility page. The facility app's binding
- * reuses that same lookup, so the lock leaked into the app and an unpaid
- * facility could not even reach its own access-code gate. Now the binding
- * lookup carries app=1, and the server serves the facility's details for an
- * app lookup at any tier; only a non-app lookup, the public landing page,
- * stays locked.
+ * The lead-tier lock (batch 26) was written for the public landing page and
+ * leaked into the facility app's binding lookup. Batch 65 first carved the
+ * app lookup out of the lock with an app=1 flag; batch 66 then removed the
+ * lock entirely at the user's direction (every tier's page opens), so the
+ * flag went with it. These checks now guard the state batch 66 left behind.
  */
 import { readFileSync } from 'fs';
 
@@ -16,14 +14,14 @@ const server = readFileSync('src/server/extendedRoutes.ts', 'utf8');
 const app = readFileSync('src/App.tsx', 'utf8');
 const install = readFileSync('src/components/public/AppInstallPage.tsx', 'utf8');
 
-check('server reads the app flag on the binding lookup',
-  server.includes("const isAppLookup = String(req.query.app || '') === '1';"));
-check('lead-tier lock applies only to a non-app lookup',
-  server.includes("if (facilityTier(billing) === 'lead' && !isAppLookup) {"));
-check('the landing lock is intact: the public page still answers locked',
-  server.includes("'This facility page is not available right now. Please contact the facility admin directly.'"));
-check('the app binding lookup carries app=1',
-  app.includes('centre-by-slug?centre=${encodeURIComponent(slug)}&app=1'));
+check('no app flag remains on the binding lookup',
+  !app.includes('&app=1'));
+check('no tier gate or locked reply remains on the public lookup',
+  !server.includes('locked: true') && !server.includes('isAppLookup'));
+check('the public lookup still answers the real payload',
+  server.includes('centreId: doc.id') && server.includes('accessCodeRequired: data.accessCodeRequired !== false,'));
+check('the app binding lookup is a plain centre fetch',
+  app.includes('centre-by-slug?centre=${encodeURIComponent(slug)}`'));
 check('the locked screen stays in the app as a fallback',
   app.includes('This facility page is not available</h1>'));
 check('the /app install page lookup is untouched (no app flag)',

@@ -298,23 +298,9 @@ export function registerExtendedRoutes(app: express.Express): void {
       const doc = snap.docs.find((d) => slugifyName(String((d.data() as any)?.name || '')) === slug);
       if (!doc) return res.status(404).json({ error: 'Facility not found.' });
       const data = doc.data() as any;
-      // Batch 26: the landing-page gate is the tier, nothing else. A lead
-      // (signed up, never upgraded) has no public landing page; upgrading
-      // by paying for the minimum seats switches it on the same moment.
-      const billingSnap = await adminDb.collection('centreBilling').doc(doc.id).get();
-      const billing = billingSnap.data() || {};
-      // Batch 65: app=1 marks the facility app's own binding lookup (the
-      // installed app resolves its facility with it). The lead-tier lock is
-      // a landing-page rule: an unpaid facility shows no public facility
-      // page, but its app must still open so its owner, tutors and students
-      // can sign in and sign up there. Only a non-app lookup stays locked.
-      const isAppLookup = String(req.query.app || '') === '1';
-      if (facilityTier(billing) === 'lead' && !isAppLookup) {
-        return res.json({
-          locked: true,
-          message: 'This facility page is not available right now. Please contact the facility admin directly.',
-        });
-      }
+      // Batch 66: every tier gets the payload. The batch-26 lead-tier lock
+      // on this lookup is gone at the user's direction: a facility's own
+      // page and app open for every facility, paid or not.
       const rawAccent = String(data.accentColor || '').trim();
       res.json({
         centreId: doc.id,

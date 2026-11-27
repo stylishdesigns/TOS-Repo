@@ -42,7 +42,7 @@ function readableOn(hex: string): boolean {
   return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.62;
 }
 
-export function LaunchSplash({ tos }: { tos?: boolean } = {}) {
+export function LaunchSplash({ tos, plain }: { tos?: boolean; plain?: boolean } = {}) {
   const { centreName, activeCentre, brandAccent } = useApp() as any;
 
   const branding = React.useMemo<LaunchBranding>(() => {
@@ -83,6 +83,27 @@ export function LaunchSplash({ tos }: { tos?: boolean } = {}) {
   }, [branding, tos]);
 
   const dark = readableOn(branding.accent);
+
+  // The facility app's pre-resolution loader (batch 66): on a device that
+  // has not met this facility yet nothing is remembered, and the loader
+  // that shows while the lookup runs must carry no branding at all. A
+  // facility app never loads on the Tutorial OS wordmark.
+  if (plain && !branding.accent) {
+    return (
+      <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-white" role="status" aria-label="Loading">
+        <div className="flex items-center gap-2">
+          {[0, 1, 2].map((i) => (
+            <span
+              key={i}
+              className="w-2.5 h-2.5 rounded-full bg-slate-300"
+              style={{ animation: `tosLaunchDot 1.05s cubic-bezier(.45,0,.55,1) ${i * 0.16}s infinite` }}
+            />
+          ))}
+        </div>
+        <style>{`@keyframes tosLaunchDot{0%,100%{transform:translateY(0) scale(.85);opacity:.35}40%{transform:translateY(-7px) scale(1.15);opacity:1}}`}</style>
+      </div>
+    );
+  }
 
   // TOS mode: Tutorial OS's own surfaces (the TOS console, the landing door)
   // load on TOS's own white style, never on whatever facility this device

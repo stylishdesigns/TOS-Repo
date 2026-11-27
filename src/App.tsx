@@ -155,10 +155,7 @@ const MainLayout: React.FC = () => {
     let alive = true;
     let slug = '';
     try { slug = new URLSearchParams(window.location.search).get('centre') || ''; } catch { slug = ''; }
-    // app=1 marks this as the facility app's own binding lookup, so the
-    // lead-tier landing lock does not apply: the app opens for an unpaid
-    // facility, and only its public landing page stays locked (batch 65).
-    fetch(`/api/public/centre-by-slug?centre=${encodeURIComponent(slug)}&app=1`)
+    fetch(`/api/public/centre-by-slug?centre=${encodeURIComponent(slug)}`)
       .then((r) => r.json())
       .then((d: any) => {
         if (!alive) return;
@@ -793,7 +790,7 @@ const MainLayout: React.FC = () => {
   }
   if (isAppContext && appFacility === undefined) {
     return (
-      <LaunchSplash />
+      <LaunchSplash plain />
     );
   }
 
@@ -826,7 +823,7 @@ const MainLayout: React.FC = () => {
   // yet, hold on the plain loading screen instead.
   if (isAppContext && appFacility && (!currentUser || facilityAppStaffSession) && !appWelcomeCentre) {
     return (
-      <LaunchSplash />
+      <LaunchSplash plain />
     );
   }
 
