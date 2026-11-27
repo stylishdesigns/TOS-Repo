@@ -1038,8 +1038,8 @@ export function registerExtendedRoutes(app: express.Express): void {
       }
       const exams = snap.docs
         .map((d) => ({ id: d.id, ...(d.data() as Record<string, any>) } as Record<string, any>))
-        .map((e) => ({ ...e, questionType: ['mcq', 'theory', 'both'].includes(String(e.questionType || '')) ? String(e.questionType) : (String(e.id) === 'exam-jamb' ? 'mcq' : 'both') }))
-        .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+        .map((e: Record<string, any>) => ({ ...e, questionType: ['mcq', 'theory', 'both'].includes(String(e.questionType || '')) ? String(e.questionType) : (String(e.id) === 'exam-jamb' ? 'mcq' : 'both') }))
+        .sort((a: Record<string, any>, b: Record<string, any>) => String(a.name || '').localeCompare(String(b.name || '')));
       res.json({ ok: true, exams });
     } catch (error: any) {
       const status = Number(error?.status || 500);
