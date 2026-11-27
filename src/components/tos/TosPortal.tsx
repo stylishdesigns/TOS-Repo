@@ -5,7 +5,7 @@ import {
   RefreshCw, Send, Ban, CheckCircle2, PlayCircle, Check, Plus, ShieldCheck,
   ArrowUpRight, UserRound, BookOpen, CalendarDays, Copy, HelpCircle, Sparkles,
   AlertTriangle, X, ChevronRight, MessageSquare, Globe, Trash2, Settings, FileText,
-  PanelLeftClose, PanelLeftOpen, Share2, MonitorPlay,
+  PanelLeftClose, PanelLeftOpen, Share2, MonitorPlay, Shapes,
 } from 'lucide-react';
 import {
   api, fmtDate, fmtDateTime, LEAD_STATUS_LABELS, STATUS_STYLES, Json,
@@ -20,6 +20,7 @@ import { QuestionBankHub, MockPapersTab } from './TosQuestionHub';
 import { MocksTab } from './TosMocks';
 import { TosChat } from './TosChat';
 import { TosVideos } from './TosVideos';
+import { TosFacilityTypes } from './TosFacilityTypes';
 import { WebsiteTab } from './TosWebsite';
 import ProposalsTab from './TosProposals';
 
@@ -1125,6 +1126,7 @@ const TABS = [
   { id: 'videos', label: 'Learning Resources', mlabel: 'Learning', icon: MonitorPlay, group: 'Content' },
   { id: 'chat', label: 'Chat', mlabel: 'Chat', icon: MessageSquare, group: 'Content' },
   { id: 'website', label: 'Website', mlabel: 'Website', icon: Globe, group: 'Content' },
+  { id: 'ftypes', label: 'Facility types', mlabel: 'Types', icon: Shapes, group: 'System' },
   { id: 'audit', label: 'Audit log', mlabel: 'Audit', icon: ScrollText, group: 'System' },
   { id: 'team', label: 'Team', mlabel: 'Team', icon: Users, group: 'System' },
   { id: 'account', label: 'Account', mlabel: 'Account', icon: UserRound, group: 'System' },
@@ -1523,6 +1525,7 @@ export const TosPortal: React.FC = () => {
             {tab === 'videos' && 'YouTube lesson videos for students. Add a link, preview and watch it here, and every facility\'s Learning Resources shows it.'}
             {tab === 'chat' && 'The platform channel, chat settings and escalated reports.'}
             {tab === 'website' && 'Each facility\'s public landing page: template, content and publish.'}
+            {tab === 'ftypes' && 'The kinds of facilities that sign up and the exams each prepares students for. The signup form reads this list live.'}
             {tab === 'audit' && 'Every privileged action, recorded.'}
             {tab === 'team' && 'The people who run the platform.'}
             {tab === 'account' && 'Your platform profile, password and sign-out.'}
@@ -1536,6 +1539,7 @@ export const TosPortal: React.FC = () => {
         {tab === 'library' && <QuestionLibraryTab refreshKey={refreshKey} />}
         {tab === 'mocks' && <MocksTab refreshKey={refreshKey} openCreateSignal={mocksCreateKey} />}
         {tab === 'videos' && <TosVideos refreshKey={refreshKey} />}
+        {tab === 'ftypes' && <TosFacilityTypes refreshKey={refreshKey} />}
         {tab === 'chat' && <TosChat refreshKey={refreshKey} />}
         {tab === 'website' && <WebsiteTab refreshKey={refreshKey} />}
         {tab === 'plans' && <PlansTab />}

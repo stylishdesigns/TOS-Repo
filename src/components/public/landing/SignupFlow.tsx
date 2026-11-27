@@ -59,6 +59,10 @@ const FACILITY_TYPES = [
   'Professional exam centre',
 ];
 
+// The fixed exams every signup offers, so a registry exam that names one of
+// these pre-selects the matching chip instead of landing as a custom chip.
+const FIXED_EXAMS = ['JAMB', 'WAEC', 'NECO', 'POST-UTME'];
+
 // The exams each facility type prepares students for by default (Nov 27).
 // Types without an entry here leave the current exam selection untouched.
 const FACILITY_TYPE_EXAMS: Record<string, { jamb?: boolean; waec?: boolean; neco?: boolean; post?: boolean; custom?: string[] }> = {
@@ -273,6 +277,33 @@ export const SignupStartPage: React.FC = () => {
   const [customDraft, setCustomDraft] = useState('');
   const [accent, setAccent] = useState(draft?.accent || '');
   const [facilityType, setFacilityType] = useState(draft?.facilityType || '');
+  // The Type-of-facility dropdown reads the TOS admin's facility type
+  // registry live (batch 54). It starts on the built-in launch list and swaps
+  // to the registry when the read succeeds; if the registry is unreachable
+  // the built-in list stays, so the form never blocks on it.
+  const [typeOptions, setTypeOptions] = useState<string[]>(FACILITY_TYPES);
+  const typeExamMap = useRef<Record<string, string[]>>({});
+  useEffect(() => {
+    let dead = false;
+    fetch('/api/public/facility-types')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (dead || !d || !Array.isArray(d.types) || !d.types.length) return;
+        const names: string[] = [];
+        const map: Record<string, string[]> = {};
+        for (const t of d.types) {
+          const nm = String(t?.name || '').trim();
+          if (!nm) continue;
+          names.push(nm);
+          map[nm] = Array.isArray(t?.exams)
+            ? t.exams.map((x: any) => String(x).trim()).filter(Boolean)
+            : [];
+        }
+        if (names.length) { setTypeOptions(names); typeExamMap.current = map; }
+      })
+      .catch(() => { /* registry unreachable: the built-in list stays. */ });
+    return () => { dead = true; };
+  }, []);
   const [locked] = useState(() => isLocked());
   const [building, setBuilding] = useState(false);
   const [postState, setPostState] = useState<'running' | 'ok' | 'failed'>('running');
@@ -327,6 +358,20 @@ export const SignupStartPage: React.FC = () => {
   // Picking a facility type pre-selects the exams that type prepares students
   // for (Nov 27). The owner can still change the selection afterwards.
   const applyTypeExams = (type: string) => {
+    // Registry kinds come first (batch 54): the exams the TOS admin attached
+    // to this kind pre-select the matching chips, and anything outside the
+    // fixed set lands as a custom chip. Kinds with no exams attached fall
+    // through to the built-in mapping below, and if neither has an entry the
+    // current selection is left alone.
+    const registryExams = typeExamMap.current[type];
+    if (registryExams && registryExams.length) {
+      const has = (n: string) => registryExams.includes(n);
+      const customList = registryExams.filter((x) => !FIXED_EXAMS.includes(x));
+      setEx((prev) => ({ ...prev, jamb: has('JAMB'), waec: has('WAEC'), neco: has('NECO'), post: has('POST-UTME'), custom: customList.length > 0 }));
+      setCustomExams(customList);
+      setErrors((e2) => ({ ...e2, exams: '', customExam: '' }));
+      return;
+    }
     const m = FACILITY_TYPE_EXAMS[type];
     if (!m) return; // no default mapping: leave the current selection alone
     const customList = m.custom || [];
@@ -513,7 +558,7 @@ export const SignupStartPage: React.FC = () => {
                 disabled={locked}
                 invalid={!!errors.facilityType}
                 ariaLabel="Type of facility"
-                options={[{ value: '', label: 'Choose one' }, ...FACILITY_TYPES.map((ft) => ({ value: ft, label: ft }))]}
+                options={[{ value: '', label: 'Choose one' }, ...typeOptions.map((ft) => ({ value: ft, label: ft }))]}
               />
               <p style={{ margin: '6px 0 0', font: '400 12px Inter, sans-serif', color: '#64748B' }}>
                 This sets the exams your facility prepares students for below; you can still change them.

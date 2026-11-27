@@ -1066,6 +1066,141 @@ export function registerExtendedRoutes(app: express.Express): void {
     }
   });
 
+  // FACILITY TYPE REGISTRY (batch 54): the kinds of education facility TOS
+  // serves and the exam programmes each one prepares students for. Platform
+  // staff manage the list from the console's System tab; the signup flow's
+  // Type-of-facility dropdown and its exam pre-selection read it live through
+  // the public route below, so an edit here changes what new owners see the
+  // next time the form opens. The first read seeds the six launch kinds so
+  // the dropdown is never empty. Server-only collection (facilityTypes); the
+  // public side only reads, so no Firestore rules release is needed.
+  const FACILITY_TYPE_SEEDS: Array<{ name: string; exams: string[] }> = [
+    { name: 'Tutorial centre', exams: ['JAMB', 'WAEC', 'NECO'] },
+    { name: 'School', exams: ['WAEC', 'NECO'] },
+    { name: 'A-level centre', exams: ['IJMB', 'JUPEB'] },
+    { name: 'Adult education centre', exams: ['WAEC', 'NECO'] },
+    { name: 'Bridge programmes', exams: ['JAMB', 'IJMB', 'JUPEB'] },
+    { name: 'Professional exam centre', exams: [] },
+  ];
+
+  const listFacilityTypes = async () => {
+    const ref = adminDb.collection('facilityTypes');
+    let snap = await ref.get();
+    if (snap.empty) {
+      const now = new Date().toISOString();
+      const batch = adminDb.batch();
+      for (const seed of FACILITY_TYPE_SEEDS) {
+        const slug = seed.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+        const id = 'ftype-' + slug;
+        batch.set(ref.doc(id), { id, name: seed.name, exams: seed.exams, addedAt: now });
+      }
+      await batch.commit();
+      snap = await ref.get();
+    }
+    return snap.docs
+      .map((d) => ({ id: d.id, ...(d.data() as Record<string, any>) } as Record<string, any>))
+      .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+  };
+
+  // Exams arrive as an array or a comma-separated string; they are stored
+  // uppercase and deduplicated, capped at 8, because that is what the exam
+  // chips and question-bank tags compare against.
+  const sanitizeFacilityExams = (raw: any): string[] => {
+    const list = Array.isArray(raw) ? raw : String(raw || '').split(',');
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const item of list) {
+      const name = String(item || '').trim().toUpperCase().slice(0, 24);
+      if (name && !seen.has(name)) { seen.add(name); out.push(name); }
+      if (out.length >= 8) break;
+    }
+    return out;
+  };
+
+  // Public read for the signup form: the dropdown lists these kinds and
+  // picking one pre-selects its exams. Rate limited like the other public
+  // routes; it writes nothing except the one-time seed above.
+  app.get('/api/public/facility-types', async (req, res) => {
+    try {
+      const ip = clientIp(req);
+      if (!(await countRateLimit(`ftypes-${ip.replace(/\W/g, '')}`, 60, 60 * 60 * 1000))) {
+        return res.status(429).json({ error: 'Too many requests. Please try again later.' });
+      }
+      const types = await listFacilityTypes();
+      res.set('Cache-Control', 'no-store');
+      res.json({ ok: true, types: types.map((t) => ({ id: t.id, name: t.name, exams: Array.isArray(t.exams) ? t.exams : [] })) });
+    } catch (error: any) {
+      res.status(Number(error?.status || 500)).json({ error: error?.message || 'Facility type list failed.' });
+    }
+  });
+
+  app.get('/api/tos/facility-types', async (req, res) => {
+    try {
+      requireTos(req);
+      const types = await listFacilityTypes();
+      res.json({ ok: true, types });
+    } catch (error: any) {
+      const status = Number(error?.status || 500);
+      res.status(status).json({ error: error?.message || 'Facility type list failed.' });
+    }
+  });
+
+  app.post('/api/tos/facility-types', async (req, res) => {
+    try {
+      const caller = requireTos(req);
+      const name = String(req.body?.name || '').trim().slice(0, 60);
+      if (!name) throw httpError(400, 'Type the facility kind to add.');
+      const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+      const id = slug ? 'ftype-' + slug.slice(0, 48) : 'ftype-' + crypto.randomBytes(4).toString('hex');
+      const dup = await adminDb.collection('facilityTypes').doc(id).get();
+      if (dup.exists) throw httpError(409, 'That facility kind is already registered.');
+      const now = new Date().toISOString();
+      const payload = { id, name, exams: sanitizeFacilityExams(req.body?.exams), addedAt: now, addedBy: String(caller.email || caller.uid || '') };
+      await adminDb.collection('facilityTypes').doc(id).set(payload);
+      res.json({ ok: true, type: payload });
+    } catch (error: any) {
+      const status = Number(error?.status || 500);
+      res.status(status).json({ error: error?.message || 'Adding the facility kind failed.' });
+    }
+  });
+
+  app.patch('/api/tos/facility-types/:id', async (req, res) => {
+    try {
+      requireTos(req);
+      const id = String(req.params?.id || '').trim();
+      if (!/^[a-zA-Z0-9_-]{1,64}$/.test(id)) throw httpError(400, 'A valid facility kind id is required.');
+      const ref = adminDb.collection('facilityTypes').doc(id);
+      const doc = await ref.get();
+      if (!doc.exists) throw httpError(404, 'That facility kind no longer exists.');
+      const patch: Record<string, any> = {};
+      if (req.body?.name !== undefined) {
+        const name = String(req.body.name || '').trim().slice(0, 60);
+        if (!name) throw httpError(400, 'Type the facility kind name.');
+        patch.name = name;
+      }
+      if (req.body?.exams !== undefined) patch.exams = sanitizeFacilityExams(req.body.exams);
+      if (Object.keys(patch).length) await ref.set(patch, { merge: true });
+      const after = await ref.get();
+      res.json({ ok: true, type: { id, ...(after.data() as Record<string, any>) } });
+    } catch (error: any) {
+      const status = Number(error?.status || 500);
+      res.status(status).json({ error: error?.message || 'Saving the facility kind failed.' });
+    }
+  });
+
+  app.delete('/api/tos/facility-types/:id', async (req, res) => {
+    try {
+      requireTos(req);
+      const id = String(req.params?.id || '').trim();
+      if (!/^[a-zA-Z0-9_-]{1,64}$/.test(id)) throw httpError(400, 'A valid facility kind id is required.');
+      await adminDb.collection('facilityTypes').doc(id).delete();
+      res.json({ ok: true });
+    } catch (error: any) {
+      const status = Number(error?.status || 500);
+      res.status(status).json({ error: error?.message || 'Removing the facility kind failed.' });
+    }
+  });
+
   app.post('/api/centre/profile-image', async (req, res) => {
     try {
       const caller = getCaller(req);
