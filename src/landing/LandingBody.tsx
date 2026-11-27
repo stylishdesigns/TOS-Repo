@@ -570,7 +570,7 @@ export const LandingBody: React.FC<{
           >
             <div>
               <h2 className="lpb-h2" style={{ fontSize: 38, lineHeight: 1.1 }}>{c.contact.title || 'Ready to enrol?'}</h2>
-              <p style={{ margin: '14px 0 0', fontSize: 16, lineHeight: 1.65, opacity: 0.92 }}>{c.contact.text}</p>
+              <p style={{ margin: '14px 0 0', fontSize: 16, lineHeight: 1.65, opacity: 0.92, color: '#FFFFFF' }}>{c.contact.text}</p>
               {c.contact.address || c.contact.phone || c.contact.hours ? (
                 <div style={{ marginTop: 18, display: 'grid', gap: 6, fontSize: 14, opacity: 0.9 }}>
                   {c.contact.address ? <span>{c.contact.address}</span> : null}

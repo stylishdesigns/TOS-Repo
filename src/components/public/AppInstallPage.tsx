@@ -62,6 +62,7 @@ export function AppInstallPage() {
   const [noPrompt, setNoPrompt] = useState(false);
   const [waiting, setWaiting] = useState(false);
   const [cancelled, setCancelled] = useState(false);
+  const [installing, setInstalling] = useState(false);
   const [retryHint] = useState(() => consumeInstallRetryFlag());
   const [appOnly, setAppOnly] = useState<boolean | null>(null);
 
@@ -104,7 +105,7 @@ export function AppInstallPage() {
     document.body.style.background = '#0F172A';
     const media = window.matchMedia('(display-mode: standalone)');
     const onMode = () => { if (media.matches) setInstalled(true); };
-    const onAppInstalled = () => { setJustInstalled(true); setInstalled(true); };
+    const onAppInstalled = () => { setInstalling(false); setJustInstalled(true); setInstalled(true); };
     media.addEventListener?.('change', onMode);
     window.addEventListener('appinstalled', onAppInstalled);
     if (!media.matches) {
@@ -180,8 +181,11 @@ export function AppInstallPage() {
     }
     const choice = await evt.userChoice;
     if (choice.outcome === 'accepted') {
-      setJustInstalled(true);
+      // The browser says yes; the app lands in the next few seconds and the
+      // appinstalled event flips the card to "App installed".
+      setInstalling(true);
       setDeferred(null);
+      window.setTimeout(() => setInstalling(false), 20000);
     } else {
       setDeferred(null);
       resetPendingInstallPrompt();
@@ -293,9 +297,14 @@ export function AppInstallPage() {
         </div>
       ) : mobile ? (
         <div style={{ display: 'grid', gap: 12, justifyItems: 'center' }}>
-          <button type="button" onClick={install} disabled={waiting} style={{ ...primaryBtn, minWidth: 240, minHeight: 56, fontSize: 16, opacity: waiting ? 0.75 : 1 }}>
-            {waiting ? 'Getting the install pop-up ready…' : 'Install the app'}
+          <button type="button" onClick={install} disabled={waiting || installing} style={{ ...primaryBtn, minWidth: 240, minHeight: 56, fontSize: 16, opacity: waiting ? 0.75 : 1 }}>
+            {installing ? 'Installing…' : waiting ? 'Getting the install pop-up ready…' : 'Install the app'}
           </button>
+          {installing && !justInstalled && !installed && (
+            <p style={{ fontSize: 13.5, color: '#86EFAC', margin: 0, lineHeight: 1.6, maxWidth: 400 }}>
+              Installing the {centre.name} app now. Give it a few seconds: the app appears on your home screen as soon as it is done, and this page will confirm it.
+            </p>
+          )}
           {noPrompt && !cancelled && (
             <p style={{ fontSize: 13.5, color: '#FDBA74', margin: 0, lineHeight: 1.6, maxWidth: 400 }}>
               Chrome didn&apos;t offer the install pop-up this time. Wait a few seconds and tap Install again. If the app is
