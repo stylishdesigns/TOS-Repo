@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, CheckCircle2 } from 'lucide-react';
 
 /**
@@ -106,9 +107,8 @@ export const PRIVACY_SECTIONS: LegalSection[] = [
     ],
   },
   {
-    title: 'Where your data lives and how it is protected',
+    title: 'How your data is protected',
     paras: [
-      'Data is stored on Google Cloud infrastructure through Firebase, protected by server-side security rules, so a client cannot read another facility’s data by editing its own app.',
       'Passwords are stored only as secure hashes. Temporary passwords are never written to logs or databases, and they expire. Sign-in sessions stay on the device that signed in.',
     ],
   },
@@ -149,7 +149,7 @@ export const LegalModal: React.FC<{ kind: LegalKind; onClose: () => void }> = ({
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
   const sections = kind === 'terms' ? TERMS_SECTIONS : PRIVACY_SECTIONS;
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4"
       role="dialog"
@@ -198,7 +198,8 @@ export const LegalModal: React.FC<{ kind: LegalKind; onClose: () => void }> = ({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+      document.body,
   );
 };
 
@@ -289,7 +290,7 @@ export const VideoTermsModal: React.FC<{ onClose: () => void }> = ({ onClose }) 
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4"
       role="dialog"
@@ -340,6 +341,7 @@ export const VideoTermsModal: React.FC<{ onClose: () => void }> = ({ onClose }) 
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+      document.body,
   );
 };
