@@ -323,14 +323,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica N
 .clist li{list-style:none;color:#475569;font-size:13.5px;padding:4px 0 4px 18px;position:relative;break-inside:avoid}
 .clist li b{color:var(--ink)}
 .clist li:before{content:'\\2713';position:absolute;left:0;top:5px;color:var(--orange-d);font-weight:800}
-.ctbl{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:4px}
-.ctbl th,.ctbl td{text-align:left;padding:7px 12px;border-bottom:1px solid var(--line);vertical-align:top}
-.ctbl thead th{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border-bottom:2px solid var(--line)}
-.ctbl tbody th{font-weight:700;color:var(--ink);white-space:nowrap}
-.ctbl .price{font-weight:800;color:var(--orange-d);white-space:nowrap}
-.ctbl small{color:#64748B}
-.cplan{margin-top:10px;color:#475569;font-size:13px}
-.cplan b{color:var(--ink)}
+
+
+
+
+
+
+
+
 .ccta{margin-top:20px;background:linear-gradient(135deg,#0F172A,#1E293B);border-radius:14px;padding:22px 26px;color:#F8FAFC;font-size:13.5px}
 .ccta b{display:block;font-size:16.5px;font-weight:800;margin-bottom:5px;letter-spacing:-.01em}
 .ccta a{color:#FDBA74;font-weight:700;text-decoration:none}
@@ -396,18 +396,6 @@ export function buildCompactProposalPage(displayName: string, origin: string, sl
     <h2>Built to produce results</h2>
     <p class="cbig">A student who scores 300 and above in JAMB, or brings home A1 to B3 across nine subjects, becomes the story parents tell one another.</p>
     <p class="cbody">Daily CBT practice and the leaderboard keep students competing even when a tutor is away, mock exams surface gaps long before the real day, and the AI study coach fills the rest, so those results repeat.</p>
-  </section>
-  <section class="cs">
-    <h2>Pricing</h2>
-    <table class="ctbl">
-      <thead><tr><th>Plan</th><th>Price</th></tr></thead>
-      <tbody>
-        <tr><th>Free Facility</th><td><span class="price">NGN 0</span> <small>free forever</small></td></tr>
-        <tr><th>Standard Facility</th><td><span class="price">NGN 1,000</span> <small>/ seat / month</small></td></tr>
-        <tr><th>Premium Facility</th><td><span class="price">NGN 2,500</span> <small>/ seat / month</small></td></tr>
-      </tbody>
-    </table>
-    <p class="cplan">A seat is one student's place on the platform, and a seat only starts costing the day a student takes it: an empty seat never costs anything. Start on Free and move up any time; no setup fee, no contract.</p>
   </section>
   <div class="ccta"><b>Ready to see it live?</b>Sign up free on the landing page, check your email for the access code and login details, add students and tutors with your facility code, and you are running. No card, no payment, setup in minutes. <a href="/">tutorialos.com</a></div>
 </div>

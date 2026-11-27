@@ -26,7 +26,7 @@ check('results section is one short supporting line', block.includes('Daily CBT 
 check('old results paragraph gone', !block.includes('When a tutor is away, the CBT engine keeps every class practising'));
 
 // Pricing and CTA each carry one clean line.
-check('pricing line trimmed but keeps seat wording', block.includes("A seat is one student's place on the platform") && block.includes('an empty seat never costs anything'));
+check('pricing line removed from the brief (batch 51)', !block.includes("A seat is one student's place on the platform"));
 check('pricing line drops the no-card clause', !block.includes('no card to begin'));
 check('CTA keeps the ready line', block.includes('Ready to see it live?'));
 check('CTA keeps access-code step', block.includes('check your email for the access code and login details'));
@@ -41,7 +41,7 @@ check('CTA padding grew', block.includes('padding:22px 26px;color:#F8FAFC') || b
 check('what-you-get section kept', block.includes('What Tutorial OS gives your facility'));
 check('all 7 bullets kept', block.includes('Admissions and records:') && block.includes('<b>Fee management:</b>') && block.includes('Over 100,000 practice questions') && block.includes('<b>AI built in:</b>') && block.includes('Your brand everywhere:'));
 check('Android/iPhone/web kept', block.includes('Works on Android, iPhone and the web'));
-check('prices kept', block.includes('NGN 0') && block.includes('NGN 1,000') && block.includes('NGN 2,500') && block.includes('/ seat / month'));
+check('prices removed from the brief, kept in the full proposal (batch 51)', !block.includes('NGN 0') && !block.includes('NGN 1,000') && !block.includes('NGN 2,500') && page.includes('NGN 1,000'));
 check('no paybox or checklist cards still true', !block.includes('class="cpay"') && !block.includes('class="covers"'));
 
 // One-page mechanics unchanged.

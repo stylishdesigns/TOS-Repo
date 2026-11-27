@@ -25,7 +25,7 @@ const tab = read('src/components/tos/TosProposals.tsx');
 // The brief keeps only the important points.
 check('brief keeps what-you-get section', page.includes('What Tutorial OS gives your facility'));
 check('brief keeps results section', page.includes('Built to produce results'));
-check('brief keeps pricing section', page.includes('<h2>Pricing</h2>'));
+check('pricing section removed from the brief (batch 51)', !block.includes('<h2>Pricing</h2>'));
 check('brief keeps ready-to-see-it-live CTA', page.includes('Ready to see it live?'));
 check('brief keeps admissions', page.includes('Admissions and records:'));
 check('brief keeps fee management wording', page.includes('<b>Fee management:</b>'));
@@ -39,8 +39,8 @@ check('brief keeps leaderboard idle-students point', page.includes('the leaderbo
 check('brief keeps 300+ JAMB result point', page.includes('300 and above in JAMB'));
 check('brief keeps NGN 0 / 1,000 / 2,500', page.includes('NGN 0') && page.includes('NGN 1,000') && page.includes('NGN 2,500'));
 check('brief says per seat per month, never per student', page.includes('/ seat / month') && !page.includes('per student'));
-check('brief keeps seat wording', page.includes("A seat is one student's place on the platform"));
-check('brief keeps empty seat never costs anything', page.includes('an empty seat never costs anything'));
+check('seat wording removed from the brief, kept in the full proposal (batch 51)', !block.includes("A seat is one student's place on the platform") && page.includes('a seat only starts costing'));
+check('empty-seat line removed from the brief (batch 51)', !block.includes('an empty seat never costs anything'));
 check('brief keeps start-free steps in CTA', page.includes('check your email for the access code and login details'));
 
 // The stuffy parts are gone from the brief.
