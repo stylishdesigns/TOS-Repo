@@ -1,0 +1,40 @@
+name: CI
+
+# Machine-checked builds: every push to the preview branches and main runs the
+# type check, the unit/batch test chain and the Playwright smoke suite against
+# the live preview deploy. A red run means the push must not ship.
+on:
+  push:
+    branches: [netlify-preview-5, netlify-preview-4, main]
+  workflow_dispatch:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Unit and batch tests
+        run: npm test
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Wait for the Netlify deploy to settle
+        run: sleep 90
+
+      - name: E2E smoke tests (live preview deploy)
+        run: npx playwright test
+        env:
+          E2E_BASE_URL: https://deploy-preview-5--tutorialos.netlify.app
