@@ -166,7 +166,8 @@
 .punder .li svg{width:20px;height:20px}
 .punder .li svg{color:#FDBA74}
 @media(max-width:899px){
-  .lk{display:none}
+  .lk{display:flex}
+  .lk a{display:none}
   .pfilm{height:min(734px,calc(100vh - 196px))}
   .pcaps{height:92px}
   .pcap{top:44px}

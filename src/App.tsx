@@ -654,8 +654,10 @@ const MainLayout: React.FC = () => {
       return <TosNotFound />;
     }
     return <TosAdminLogin onBack={() => {
-      history.replaceState(null, '', window.location.pathname + window.location.search);
-      setTosLoginRequested(false);
+      // Back from the staff door returns to the Tutorial OS landing page
+      // itself, never into the facility flow: a hard navigation with #landing
+      // forces the landing regardless of what this device last had open.
+      window.location.href = '/#landing';
     }} />;
   }
 

@@ -173,6 +173,7 @@ export const PublicLandingPage: React.FC<{ centreId: string }> = ({ centreId }) 
       formApi={formApi}
       waFab={wa || undefined}
       fabMode="fixed"
+      staffSigninHref={(data.appSlug || centreId) ? `/?centre=${encodeURIComponent(data.appSlug || centreId)}` : undefined}
     />
   );
 };
