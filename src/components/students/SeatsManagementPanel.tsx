@@ -323,7 +323,7 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
               <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 <span>Seat Control Room</span>
               </h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400 max-w-xl">
+              <p className="text-[13px] text-slate-700 dark:text-slate-400 max-w-xl">
                 You pay for seats. A seat only counts while a student is on it:
                 adding a student switches the seat on and starts its count, and switching them off
                 pauses it with its remaining days. When a seat's days run out it locks until a new
@@ -421,7 +421,7 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
         <div className="mt-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-slate-200 dark:border-slate-700/60 bg-slate-50 dark:bg-slate-800/40 p-4">
           <div>
             <p className="text-xs font-bold text-slate-900 dark:text-white">Plan</p>
-            <p className="text-[11px] text-slate-400 mt-0.5">The chosen plan bills every seat you create, per seat per month.</p>
+            <p className="text-[13px] text-slate-700 mt-0.5">The chosen plan bills every seat you create, per seat per month.</p>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs font-black text-slate-900 dark:text-white">
@@ -447,7 +447,7 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
       <div className="mt-6">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-bold text-slate-900 dark:text-white">The pool</h3>
-          <span className="text-[11px] text-slate-400">
+          <span className="text-[13px] text-slate-700">
             {enrolled} enrolled · {used} holding a running seat{seats.some((s) => (s as any).kind === 'free') ? ` · ${seats.filter((s) => (s as any).kind === 'free').length} free` : ''}
           </span>
         </div>
@@ -656,7 +656,7 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
                 <h3 className="text-base font-black text-slate-900 dark:text-white">
                   Add a student to Seat {assignSeat.seatNo}
                 </h3>
-                <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                <p className="text-[13px] text-slate-700 mt-1 leading-relaxed">
                   The seat starts counting the day it takes the student. Only students without a
                   seat are listed here.
                 </p>
@@ -803,7 +803,7 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
                   <h3 className="text-lg font-black text-slate-900 dark:text-white">Upgrade to {chosenPlan.name}</h3>
                   <button onClick={() => setFlowStep('plan')} className="text-xs font-semibold text-slate-400 hover:text-slate-600 dark:hover:text-white">Back</button>
                 </div>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">How many students are you enrolling?</p>
+                <p className="text-[13px] text-slate-700 dark:text-slate-400 mb-4">How many students are you enrolling?</p>
                 <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Number of students</label>
                 <div className="flex items-center justify-between rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-2 py-2">
                   <button
@@ -872,7 +872,7 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
                     <h3 className="text-lg font-black text-slate-900 dark:text-white">Payment details</h3>
                     <button onClick={() => setFlowStep('students')} className="text-xs font-semibold text-slate-400 hover:text-slate-600 dark:hover:text-white">Back</button>
                   </div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
+                  <p className="text-[13px] text-slate-700 dark:text-slate-400 mb-4">
                     Pay {nairaFmt(seatTotal)} by bank transfer for {pickedSeats} student{pickedSeats === 1 ? '' : 's'} on the {chosenPlan.name} plan.
                   </p>
                   <div className="rounded-2xl border border-slate-200 dark:border-slate-700 divide-y divide-slate-100 dark:divide-slate-800">
@@ -908,7 +908,7 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
             {flowStep === 'receipt' && chosenPlan && (
               <>
                 <h3 className="text-lg font-black text-slate-900 dark:text-white mb-1">Confirm your payment</h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">Upload the receipt of your bank transfer.</p>
+                <p className="text-[13px] text-slate-700 dark:text-slate-400 mb-4">Upload the receipt of your bank transfer.</p>
                 <label className="block cursor-pointer">
                   <input
                     type="file"

@@ -132,7 +132,7 @@ export const PdfDocumentView: React.FC<{ url: string; name: string; zoom?: numbe
         <div className="flex flex-col items-center justify-center gap-2 py-16 px-6 text-center">
           <FileText className="w-10 h-10 text-slate-300" />
           <p className="text-sm font-bold text-slate-600">This document could not be opened.</p>
-          <p className="text-xs text-slate-400">Try uploading it again from the tutor portal.</p>
+          <p className="text-[13px] text-slate-700">Try uploading it again from the tutor portal.</p>
         </div>
       )}
     </div>

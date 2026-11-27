@@ -476,7 +476,7 @@ const GroupsSection: React.FC<SectionProps & { staffFilter: 'personal' | 'groups
         <div className="bg-white rounded-2xl p-8 border border-slate-200 text-center space-y-1.5">
           <User className="w-7 h-7 text-slate-300 mx-auto" />
           <p className="text-sm font-black text-slate-800">No personal chats yet</p>
-          <p className="text-xs text-slate-500 font-medium">Tap New chat to message someone in your facility.</p>
+          <p className="text-[13px] text-slate-700 font-medium">Tap New chat to message someone in your facility.</p>
         </div>
       )}
 
@@ -484,7 +484,7 @@ const GroupsSection: React.FC<SectionProps & { staffFilter: 'personal' | 'groups
         <div className="bg-white rounded-2xl p-8 border border-slate-200 text-center space-y-1.5">
           <Megaphone className="w-7 h-7 text-slate-300 mx-auto" />
           <p className="text-sm font-black text-slate-800">No channels for you yet</p>
-          <p className="text-xs text-slate-500 font-medium">Channels are posted by TOS. Yours will appear here.</p>
+          <p className="text-[13px] text-slate-700 font-medium">Channels are posted by TOS. Yours will appear here.</p>
         </div>
       )}
 
@@ -492,7 +492,7 @@ const GroupsSection: React.FC<SectionProps & { staffFilter: 'personal' | 'groups
         <div className="bg-white rounded-2xl p-8 border border-slate-200 text-center space-y-1.5">
           <Users className="w-7 h-7 text-slate-300 mx-auto" />
           <p className="text-sm font-black text-slate-800">No groups yet</p>
-          <p className="text-xs text-slate-500 font-medium">
+          <p className="text-[13px] text-slate-700 font-medium">
             {isAdmin ? 'Create your first group above.' : 'Your facility admins have not created any groups yet.'}
           </p>
         </div>
@@ -814,7 +814,7 @@ const ReportsSection: React.FC<SectionProps> = ({ data, isAdmin, reload, addToas
         <div className="bg-white rounded-2xl p-8 border border-slate-200 text-center space-y-1.5">
           <Flag className="w-7 h-7 text-slate-300 mx-auto" />
           <p className="text-sm font-black text-slate-800">{filter === 'pending' ? 'Nothing to review' : 'No reports yet'}</p>
-          <p className="text-xs text-slate-500 font-medium">
+          <p className="text-[13px] text-slate-700 font-medium">
             {filter === 'pending' ? 'All reported messages have been handled.' : 'Reports from your students will appear here.'}
           </p>
         </div>

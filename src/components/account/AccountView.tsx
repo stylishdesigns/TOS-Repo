@@ -39,7 +39,7 @@ export const AccountView: React.FC = () => {
       {/* Header matching video 01:06 */}
       <div>
         <h2 className="text-2xl md:text-3xl font-bold text-slate-900 tracking-tight">My Account</h2>
-        <p className="text-xs md:text-sm text-slate-500 mt-1">
+        <p className="text-[13px] md:text-sm text-slate-700 mt-1">
           Manage your account settings and preferences
         </p>
       </div>
@@ -181,7 +181,7 @@ export const AccountView: React.FC = () => {
             <p className="text-xs text-slate-700 leading-relaxed">
               <span className="font-bold text-purple-700">• Super Administrator</span> — full control. You can add and remove other administrators, approve schools, configure the campaign, rubric and security, and change every setting. This is the highest access level.
             </p>
-            <p className="text-[11px] text-slate-400">
+            <p className="text-[13px] text-slate-700">
               Only a Super Administrator can change your role.
             </p>
           </div>
@@ -193,7 +193,7 @@ export const AccountView: React.FC = () => {
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-6 space-y-6 max-w-2xl">
           <div>
             <h3 className="font-bold text-slate-900 text-base">Change Password</h3>
-            <p className="text-xs text-slate-400 mt-1">
+            <p className="text-[13px] text-slate-700 mt-1">
               You'll need your current password. Changing it signs you out everywhere, including here, so you'll sign in again with the new one.
             </p>
           </div>

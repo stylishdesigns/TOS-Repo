@@ -341,7 +341,7 @@ export const ProgrammesManager: React.FC = () => {
             <BookOpen className="w-6 h-6" />
           </div>
           <h3 className="font-bold text-slate-800 text-base">No Academic Programmes Found</h3>
-          <p className="text-xs text-slate-500 max-w-md mx-auto">
+          <p className="text-[13px] text-slate-700 max-w-md mx-auto">
             No programmes match your current filters. Try changing your search query or add a new exam track.
           </p>
           <button
@@ -470,7 +470,7 @@ export const ProgrammesManager: React.FC = () => {
                   </span>
                 </div>
                 <h3 className="text-xl font-bold text-slate-900 mt-1">{inspectingProg.name}</h3>
-                <p className="text-xs text-slate-500 mt-0.5">{inspectingProg.description}</p>
+                <p className="text-[13px] text-slate-700 mt-0.5">{inspectingProg.description}</p>
               </div>
               <button
                 onClick={() => setInspectingProg(null)}
@@ -582,7 +582,7 @@ export const ProgrammesManager: React.FC = () => {
                 <h3 className="font-bold text-base text-slate-900">
                   {editingProg ? 'Edit Exam Program' : 'Add New Exam Program'}
                 </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
+                <p className="text-[13px] text-slate-700 mt-0.5">
                   Set up exam board, tuition, subjects and duration.
                 </p>
               </div>

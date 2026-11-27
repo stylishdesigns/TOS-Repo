@@ -252,7 +252,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                   </div>
                 </div>
                 {addError && <p className="text-xs font-bold text-rose-600">{addError}</p>}
-                {isPastForm && <p className="text-xs font-bold text-slate-500">You can't set a reminder in the past. Pick today or a later time.</p>}
+                {isPastForm && <p className="text-[13px] font-bold text-slate-700">You can't set a reminder in the past. Pick today or a later time.</p>}
                 <div className="flex gap-2">
                   <button
                     type="button"
@@ -293,7 +293,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                   <Trash2 className="w-5 h-5" />
                 </div>
                 <p className="text-sm font-black text-slate-900">Delete this reminder?</p>
-                <p className="text-xs text-slate-500 font-medium mt-1 break-words">&quot;{confirmDelete.title}&quot; will stop coming up on {dayTitle(String(confirmDelete.date))}.</p>
+                <p className="text-[13px] text-slate-700 font-medium mt-1 break-words">&quot;{confirmDelete.title}&quot; will stop coming up on {dayTitle(String(confirmDelete.date))}.</p>
                 <div className="flex gap-2 mt-4">
                   <button
                     type="button"

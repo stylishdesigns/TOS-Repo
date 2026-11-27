@@ -23,7 +23,7 @@ export const DebateManager: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Debate Completion</h2>
-          <p className="text-xs text-slate-500 mt-1">
+          <p className="text-[13px] text-slate-700 mt-1">
             Team video submissions scored by the jury panel. Top teams advance each phase.
           </p>
         </div>

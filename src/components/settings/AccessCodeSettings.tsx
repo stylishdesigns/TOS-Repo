@@ -102,7 +102,7 @@ export const AccessCodeSettings: React.FC = () => {
         </div>
         <div>
           <h3 className="text-sm font-black text-slate-800">Access code</h3>
-          <p className="text-[11px] text-slate-500">Staff and students join your facility with this 6-digit code.</p>
+          <p className="text-[13px] text-slate-700">Staff and students join your facility with this 6-digit code.</p>
         </div>
       </div>
 
@@ -110,7 +110,7 @@ export const AccessCodeSettings: React.FC = () => {
       <div className="flex items-start justify-between gap-3 mb-3 pb-3 border-b border-slate-200/70">
         <div>
           <p className="text-xs font-black text-slate-800">Access code required</p>
-          <p className="text-[11px] text-slate-500 leading-snug mt-0.5">
+          <p className="text-[13px] text-slate-700 leading-snug mt-0.5">
             {required === false
               ? 'Off: students and staff skip the code and sign in straight away.'
               : 'On: students and staff enter this code before they can sign in.'}

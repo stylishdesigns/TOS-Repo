@@ -309,7 +309,7 @@ export const TopNav: React.FC<TopNavProps> = ({ onToggleMobileMenu }) => {
                   <div className="p-6 text-center">
                     <CheckCircle2 className="w-8 h-8 text-slate-200 mx-auto mb-2" />
                     <p className="text-xs font-bold text-slate-700">You're all caught up</p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">New requests, payments, salary dates and channel messages will land here.</p>
+                    <p className="text-[13px] text-slate-700 mt-0.5">New requests, payments, salary dates and channel messages will land here.</p>
                   </div>
                 )}
                 {notifications.map((n) => {

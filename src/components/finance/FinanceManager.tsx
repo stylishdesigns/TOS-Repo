@@ -690,7 +690,7 @@ export const FinanceManager: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="font-extrabold text-slate-900 text-base">{selectedDetailStudent.name}</h3>
-                  <p className="text-[11px] text-slate-500">{selectedDetailStudent.programmeName || 'No programme set'}</p>
+                  <p className="text-[13px] text-slate-700">{selectedDetailStudent.programmeName || 'No programme set'}</p>
                 </div>
               </div>
               <button
@@ -720,7 +720,7 @@ export const FinanceManager: React.FC = () => {
               <div className="space-y-2">
                 <h5 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Payment history ({history.length})</h5>
                 {history.length === 0 ? (
-                  <p className="py-4 text-center text-xs text-slate-400 font-medium">No payments recorded yet.</p>
+                  <p className="py-4 text-center text-[13px] text-slate-700 font-medium">No payments recorded yet.</p>
                 ) : (
                   <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
                     {history.map((h) => (
@@ -937,7 +937,7 @@ export const FinanceManager: React.FC = () => {
                 >
                   <span className="flex-1 min-w-0">
                     <span className="block text-[13px] font-bold text-slate-900">Automatic reminders</span>
-                    <span className="block text-[11px] text-slate-500 mt-0.5">Remind every student who owes, on the schedule below.</span>
+                    <span className="block text-[13px] text-slate-700 mt-0.5">Remind every student who owes, on the schedule below.</span>
                   </span>
                   <span className={`relative w-12 h-7 rounded-full transition-colors shrink-0 ${remEnabled ? 'bg-[var(--brand,#EA580C)]' : 'bg-slate-300'}`}>
                     <span className={`absolute top-[3px] w-5 h-5 rounded-full bg-white shadow-sm transition-all ${remEnabled ? 'left-[26px]' : 'left-[3px]'}`} />
@@ -1138,7 +1138,7 @@ export const FinanceManager: React.FC = () => {
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 shrink-0">
               <div>
                 <h3 className="font-extrabold text-slate-900 text-base">Review Student Payment</h3>
-                <p className="text-xs text-slate-500">Check the proof and details before confirming or declining</p>
+                <p className="text-[13px] text-slate-700">Check the proof and details before confirming or declining</p>
               </div>
               <button
                 type="button"

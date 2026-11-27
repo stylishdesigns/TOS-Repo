@@ -350,9 +350,9 @@ export const DashboardOverview: React.FC = () => {
               <div>
                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Payment History</p>
                 {myPayLoading ? (
-                  <p className="text-xs text-slate-400 font-bold py-4 text-center">Loading...</p>
+                  <p className="text-[13px] text-slate-700 font-bold py-4 text-center">Loading...</p>
                 ) : !myPayHistory || myPayHistory.length === 0 ? (
-                  <p className="text-xs text-slate-400 font-bold py-4 text-center">No payments recorded yet.</p>
+                  <p className="text-[13px] text-slate-700 font-bold py-4 text-center">No payments recorded yet.</p>
                 ) : (
                   <div className="space-y-2">
                     {myPayHistory.map((p) => (
@@ -510,7 +510,7 @@ export const DashboardOverview: React.FC = () => {
                 <div className="p-5 rounded-xl border border-dashed border-slate-200 text-center">
                   <CalendarDays className="w-6 h-6 text-slate-300 mx-auto" />
                   <p className="text-sm font-bold text-slate-700 mt-2">No classes scheduled for today</p>
-                  <p className="text-xs font-semibold text-slate-600 mt-0.5">Slots added to the timetable will appear here.</p>
+                  <p className="text-[13px] font-semibold text-slate-700 mt-0.5">Slots added to the timetable will appear here.</p>
                 </div>
               ) : (
                 todaySlots.slice(0, 5).map((slot) => (
@@ -526,7 +526,7 @@ export const DashboardOverview: React.FC = () => {
                         <p className="text-xs md:text-sm font-bold text-slate-900 truncate">
                           {slot.subject}
                         </p>
-                        <p className="text-xs font-semibold text-slate-600 truncate">
+                        <p className="text-[13px] font-semibold text-slate-700 truncate">
                           {slot.tutorName}{slot.room ? ` • ${slot.room}` : ''}
                         </p>
                       </div>
@@ -565,7 +565,7 @@ export const DashboardOverview: React.FC = () => {
                 <div className="p-5 rounded-xl border border-dashed border-slate-200 text-center">
                   <Inbox className="w-6 h-6 text-slate-300 mx-auto" />
                   <p className="text-sm font-bold text-slate-700 mt-2">No activity recorded yet</p>
-                  <p className="text-xs font-semibold text-slate-600 mt-0.5">Approvals, payments and updates will show here.</p>
+                  <p className="text-[13px] font-semibold text-slate-700 mt-0.5">Approvals, payments and updates will show here.</p>
                 </div>
               ) : (
                 activities.slice(0, 5).map((act) => {
@@ -630,7 +630,7 @@ export const DashboardOverview: React.FC = () => {
               <div className="p-5 rounded-xl border border-dashed border-slate-200 text-center">
                 <Trophy className="w-6 h-6 text-slate-300 mx-auto" />
                 <p className="text-sm font-bold text-slate-700 mt-2">No results recorded yet</p>
-                <p className="text-xs font-semibold text-slate-600 mt-0.5">Top scorers appear once results are uploaded.</p>
+                <p className="text-[13px] font-semibold text-slate-700 mt-0.5">Top scorers appear once results are uploaded.</p>
               </div>
             ) : (
               topPerformers.map((r, idx) => {
@@ -648,7 +648,7 @@ export const DashboardOverview: React.FC = () => {
                         <p className="text-xs font-bold text-slate-900 truncate">
                           {r.studentName}
                         </p>
-                        <p className="text-xs font-semibold text-slate-500 truncate">
+                        <p className="text-[13px] font-semibold text-slate-700 truncate">
                           {r.examTitle || r.programmeName}
                         </p>
                       </div>
@@ -689,7 +689,7 @@ export const DashboardOverview: React.FC = () => {
               <div className="p-5 rounded-xl border border-dashed border-slate-200 text-center">
                 <BookOpen className="w-6 h-6 text-slate-300 mx-auto" />
                 <p className="text-sm font-bold text-slate-700 mt-2">No exam programmes yet</p>
-                <p className="text-xs font-semibold text-slate-600 mt-0.5">Add an exam programme and registrations will count here live.</p>
+                <p className="text-[13px] font-semibold text-slate-700 mt-0.5">Add an exam programme and registrations will count here live.</p>
               </div>
             ) : (
               programmeCapacity.map(({ prog: p, enrolled }) => (

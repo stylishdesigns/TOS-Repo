@@ -83,7 +83,7 @@ export const ResourcesManager: React.FC = () => {
     <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-6">
       <div>
         <h1 className="text-xl font-black text-slate-900 dark:text-white">Resources</h1>
-        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+        <p className="text-[13px] text-slate-700 dark:text-slate-400 mt-1">
           Video classes and study materials for your students.
         </p>
       </div>
@@ -96,7 +96,7 @@ export const ResourcesManager: React.FC = () => {
             </div>
             <div>
               <h3 className="text-sm font-black text-slate-800 dark:text-slate-100">Tutorial OS video classes</h3>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug mt-0.5">
+              <p className="text-[13px] text-slate-700 dark:text-slate-400 leading-snug mt-0.5">
                 The ready-made video lesson library from Tutorial OS.
               </p>
             </div>
@@ -124,7 +124,7 @@ export const ResourcesManager: React.FC = () => {
         <button
           type="button"
           onClick={() => setVcTermsOpen(true)}
-          className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-bold text-[var(--brand, #0F172A)] dark:text-slate-200 hover:underline"
+          className="mt-3 inline-flex items-center gap-1.5 text-[13px] font-bold text-slate-800 hover:underline"
         >
           <ScrollText className="w-3.5 h-3.5" />
           View terms &amp; conditions
@@ -135,7 +135,7 @@ export const ResourcesManager: React.FC = () => {
 
       <div>
         <h2 className="text-sm font-black text-slate-800 dark:text-slate-100 mb-1">Facility uploads</h2>
-        <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-3">
+        <p className="text-[13px] text-slate-700 dark:text-slate-400 mb-3">
           Upload PDFs, images and video links for your students, the same way tutors do. Students see everything uploaded here in their app.
         </p>
         <TutorMaterialsSection tutor={adminTutor} />

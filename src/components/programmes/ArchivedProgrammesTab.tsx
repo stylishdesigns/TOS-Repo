@@ -11,7 +11,7 @@ export const ArchivedProgrammesTab: React.FC = () => (
       <Archive className="w-6 h-6" />
     </div>
     <h3 className="font-bold text-slate-800 text-base">No Archived Exam Programs Yet</h3>
-    <p className="text-xs text-slate-500 max-w-md mx-auto">
+    <p className="text-[13px] text-slate-700 max-w-md mx-auto">
       When an exam program closes, it is archived here with its real numbers: candidates enrolled, session and archive date.
     </p>
   </div>

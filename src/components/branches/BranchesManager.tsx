@@ -94,7 +94,7 @@ export const BranchesManager: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Branches & Campuses</h2>
-          <p className="text-xs text-slate-500 mt-1">
+          <p className="text-[13px] text-slate-700 mt-1">
             Multi-branch management: monitor cohort capacity, campus coordinators, and localized student populations.
           </p>
         </div>
@@ -452,7 +452,7 @@ export const BranchesManager: React.FC = () => {
                 </div>
                 <div>
                   <h4 className="font-bold text-slate-900 text-sm">{selectedBranch.name}</h4>
-                  <p className="text-slate-400 text-xs">{selectedBranch.code} • {selectedBranch.city}, {selectedBranch.state}</p>
+                  <p className="text-slate-700 text-[13px]">{selectedBranch.code} • {selectedBranch.city}, {selectedBranch.state}</p>
                 </div>
               </div>
 

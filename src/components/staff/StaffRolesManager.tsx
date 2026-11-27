@@ -651,7 +651,7 @@ export const StaffRolesManager: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="font-bold text-lg text-slate-900">Roles & Access Privileges</h3>
-                  <p className="text-xs text-slate-500">Overview of what each administrative level can see and do</p>
+                  <p className="text-[13px] text-slate-700">Overview of what each administrative level can see and do</p>
                 </div>
               </div>
               <button

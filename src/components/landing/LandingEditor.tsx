@@ -188,7 +188,7 @@ export const LandingEditor: React.FC<{ apiPath: string; refreshKey?: number; sho
                         <p className="text-sm font-bold text-white">{p.name}</p>
                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-none ${on ? 'bg-orange-500 text-white' : 'bg-slate-700 text-slate-300'}`}>{on ? 'In use' : 'Use'}</span>
                       </div>
-                      <p className="text-[11px] text-slate-400 mt-1 leading-snug">{p.desc}</p>
+                      <p className="text-[13px] text-slate-300 mt-1 leading-snug">{p.desc}</p>
                     </button>
                   );
                 })}
