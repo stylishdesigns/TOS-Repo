@@ -38,3 +38,10 @@ jobs:
         run: npx playwright test
         env:
           E2E_BASE_URL: https://deploy-preview-5--tutorialos.netlify.app
+          E2E_QA_ACCESS_CODE: ${{ secrets.E2E_QA_ACCESS_CODE }}
+          E2E_QA_OWNER_EMAIL: ${{ secrets.E2E_QA_OWNER_EMAIL }}
+          E2E_QA_OWNER_PASSWORD: ${{ secrets.E2E_QA_OWNER_PASSWORD }}
+          E2E_QA_TUTOR_EMAIL: ${{ secrets.E2E_QA_TUTOR_EMAIL }}
+          E2E_QA_TUTOR_PASSWORD: ${{ secrets.E2E_QA_TUTOR_PASSWORD }}
+          E2E_QA_STUDENT_EMAIL: ${{ secrets.E2E_QA_STUDENT_EMAIL }}
+          E2E_QA_STUDENT_PASSWORD: ${{ secrets.E2E_QA_STUDENT_PASSWORD }}
