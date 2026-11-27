@@ -21,7 +21,7 @@ export function readLaunchBranding(): LaunchBranding | null {
     const raw = localStorage.getItem('tos:launch-brand');
     if (!raw) return null;
     const r = JSON.parse(raw);
-    if (r && r.accent && (r.name || r.logo)) return r as LaunchBranding;
+    if (r && r.accent && (r.name || r.logo) && !/^#ea580c$/i.test(String(r.accent))) return r as LaunchBranding;
   } catch { /* private mode */ }
   return null;
 }
@@ -68,13 +68,18 @@ export function LaunchSplash({ tos }: { tos?: boolean } = {}) {
         }
       } catch { /* private mode */ }
     }
-    if (!next.accent) next.accent = '#EA580C';
+    // TOS orange is the Tutorial OS brand, never a facility's splash colour:
+    // a facility that has not saved its own colour loads on the white
+    // Tutorial OS wordmark splash instead.
+    if (/^#ea580c$/i.test(String(next.accent))) next.accent = '';
     return next;
   }, [centreName, activeCentre, brandAccent]);
 
   React.useEffect(() => {
     if (tos) return;
-    if (branding.name || branding.logo) persist(branding);
+    // Persist only a real facility colour: the TOS orange must never be
+    // remembered as a facility brand on this device.
+    if ((branding.name || branding.logo) && /^#[0-9a-fA-F]{6}$/.test(branding.accent) && !/^#ea580c$/i.test(branding.accent)) persist(branding);
   }, [branding, tos]);
 
   const dark = readableOn(branding.accent);
@@ -83,7 +88,7 @@ export function LaunchSplash({ tos }: { tos?: boolean } = {}) {
   // load on TOS's own white style, never on whatever facility this device
   // last visited. The hooks above stay mounted so the component keeps one
   // stable hook order whichever mode it renders.
-  if (tos) {
+  if (tos || !branding.accent) {
     return (
       <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-white" role="status" aria-label="Loading">
         <div className="flex items-center gap-2.5">

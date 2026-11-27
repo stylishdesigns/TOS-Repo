@@ -195,13 +195,15 @@ export const LandingBody: React.FC<{
   waHrefFor: (href: string) => string;
   installCentre?: string;
   installUrl?: string;
+  /** Public page only: a discreet staff sign-in link in the footer. */
+  staffSigninHref?: string;
   formApi: LandingFormApi;
   /** Shows the floating WhatsApp button when set; pass the wa.me link. */
   waFab?: string;
   /** 'fixed' floats over the whole page (public page); 'sticky' floats
    *  inside the scrolling preview frame. */
   fabMode?: 'fixed' | 'sticky';
-}> = ({ content: c, centreName, waHrefFor, formApi, waFab, fabMode = 'fixed', installCentre, installUrl }) => {
+}> = ({ content: c, centreName, waHrefFor, formApi, waFab, fabMode = 'fixed', installCentre, installUrl, staffSigninHref }) => {
   const tpl = normalizeTemplateId(c.templateId);
   const preset = templatePreset(tpl);
   const accent = /^#[0-9a-fA-F]{6}$/.test(c.accent) ? c.accent : preset.accent;
@@ -568,7 +570,7 @@ export const LandingBody: React.FC<{
           >
             <div>
               <h2 className="lpb-h2" style={{ fontSize: 38, lineHeight: 1.1 }}>{c.contact.title || 'Ready to enrol?'}</h2>
-              <p style={{ margin: '14px 0 0', fontSize: 16, lineHeight: 1.65, opacity: 0.92 }}>{c.contact.text}</p>
+              <p style={{ margin: '14px 0 0', fontSize: 16, lineHeight: 1.65, opacity: 0.92, color: '#FFFFFF' }}>{c.contact.text}</p>
               {c.contact.address || c.contact.phone || c.contact.hours ? (
                 <div style={{ marginTop: 18, display: 'grid', gap: 6, fontSize: 14, opacity: 0.9 }}>
                   {c.contact.address ? <span>{c.contact.address}</span> : null}
@@ -626,6 +628,9 @@ export const LandingBody: React.FC<{
               </a>
             ))}
           </div>
+        ) : null}
+        {staffSigninHref ? (
+          <a href={staffSigninHref} style={{ fontSize: 13, color: mut, textDecoration: 'underline', textUnderlineOffset: 3 }}>Staff sign-in</a>
         ) : null}
         <span>Powered by TutorialOS</span>
       </footer>

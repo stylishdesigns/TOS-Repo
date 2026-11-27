@@ -157,7 +157,7 @@ const RecordPaymentModal: React.FC<{
           {(row.doc.bankName || row.doc.bankAccountName || row.doc.bankAccountNumber) && (
             <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
               <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">Pay Into Account</p>
-              <p className="text-[11px] font-bold text-slate-600">
+              <p className="text-[13px] font-bold text-slate-700">
                 {row.doc.bankName || 'Bank not set'} · {row.doc.bankAccountName || 'Account name not set'}
               </p>
               <p className="text-xs font-black text-slate-900">{row.doc.bankAccountNumber || 'Account number not set'}</p>
@@ -457,7 +457,7 @@ export const StaffPayManager: React.FC = () => {
         <div className="p-8 bg-white rounded-2xl border border-slate-200 text-center">
           <Wallet className="w-8 h-8 text-slate-300 mx-auto" />
           <p className="text-sm font-black text-slate-700 mt-3">No staff yet</p>
-          <p className="text-xs text-slate-400 mt-1">Add tutors and staff members first; they will show up here.</p>
+          <p className="text-[13px] text-slate-700 mt-1">Add tutors and staff members first; they will show up here.</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -479,7 +479,7 @@ export const StaffPayManager: React.FC = () => {
                     <div className="min-w-0">
                       <p className="text-sm font-black text-slate-900 truncate">{row.name}</p>
                       <p className="text-[10px] font-bold text-slate-400">{row.role}</p>
-                      <p className="text-[11px] font-bold text-slate-600 mt-0.5">{formatPayInfo(row.doc, row.collection === 'tutors')}</p>
+                      <p className="text-[13px] font-bold text-slate-700 mt-0.5">{formatPayInfo(row.doc, row.collection === 'tutors')}</p>
                     </div>
                   </div>
                   <div className="text-right shrink-0">

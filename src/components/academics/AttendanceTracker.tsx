@@ -323,7 +323,7 @@ export const AttendanceTracker: React.FC = () => {
                   <td colSpan={8} className="py-10 text-center">
                     <Users className="w-7 h-7 text-slate-300 mx-auto" />
                     <p className="text-sm font-bold text-slate-700 mt-2">No candidates match this filter</p>
-                    <p className="text-xs text-slate-400 mt-0.5">Try another programme or clear the search.</p>
+                    <p className="text-[13px] text-slate-700 mt-0.5">Try another programme or clear the search.</p>
                   </td>
                 </tr>
               ) : filteredAttendance.map((rec, index) => (

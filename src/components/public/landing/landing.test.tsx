@@ -29,8 +29,8 @@ has(
   'Unlimited students',
   'Start for free',
   'Ready to run your facility on one system?',
-  '\u20A62,000',
-  '\u20A63,500',
+  '\u20A61,000',
+  '\u20A62,500',
 );
 assert.ok(html.includes('Check your email'), 'automated flow step 2');
 assert.ok(html.includes('Set up and invite'), 'automated flow step 3');
@@ -52,7 +52,10 @@ console.log('✓ no sign-in or sign-up buttons');
 // The trial form fields: the landing form keeps the owner's details only
 // (facility details moved to the /start page) and a Login button opens the
 // centre access-code gate. No discount request and no city anywhere.
-has('Full name', 'Email', 'Phone', 'State', 'Start free. No card needed.', 'Login');
+has('Facility owner or admin name', 'First name', 'Last name', 'Email', 'Phone', 'State', 'Start free. No card needed.', 'Login');
+assert.ok(!html.includes('Full name'), 'full name split into first and last');
+assert.ok(!html.includes('Upgrade to paid seats any time'), 'pricing lead must not quote the old per-seat price');
+assert.ok(!html.includes('₦3,500'), 'old premium price gone');
 assert.ok(!html.includes('Request a 20% discount'), 'discount request checkbox must stay removed');
 assert.ok(!html.includes('City'), 'city must stay off the forms');
 console.log('✓ trial form fields');

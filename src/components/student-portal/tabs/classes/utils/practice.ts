@@ -18,15 +18,38 @@ export interface BankQuestion {
   correctIndex: number;
   explanation: string; // may contain LaTeX
   difficulty?: 'easy' | 'medium' | 'hard';
+  examType?: string; // normalised exam key; untagged rows predate exams
+}
+
+// Batch 60: students only see their own exam's questions. Matching mirrors
+// the video-resources rule (batch 42): the student's exam keyword matches the
+// question's exam tags, either way, case-insensitive; the legacy combined
+// WAEC/NECO tag answers for WAEC and NECO; untagged questions and students
+// without an exam on their profile see everything.
+const examKeyOf = (raw: unknown): string =>
+  String(raw ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+
+const examCandidateKeysOf = (key: string): string[] => {
+  if (key === 'waec_neco') return ['waec', 'neco', 'waec_neco'];
+  if (key === 'waec' || key === 'neco') return [key, 'waec_neco'];
+  return [key];
+};
+
+export function examMatchesStudent(questionExam: unknown, studentExam: string): boolean {
+  if (!studentExam) return true;
+  const qKeys = examCandidateKeysOf(examKeyOf(questionExam));
+  const sKeys = examCandidateKeysOf(examKeyOf(studentExam));
+  return qKeys.some((k) => sKeys.includes(k));
 }
 
 export interface QuestionBankProvider {
-  getTopics(subject: string): Promise<{ topic: string; total: number }[]>;
+  getTopics(subject: string, examType?: string): Promise<{ topic: string; total: number }[]>;
   getQuestions(
     subject: string,
     topic: string | null,
     count: number,
-    excludeIds: string[]
+    excludeIds: string[],
+    examType?: string
   ): Promise<BankQuestion[]>;
 }
 
@@ -58,7 +81,7 @@ function shuffle<T>(array: T[]): T[] {
  * Never falls back to mock questions.
  */
 export class FirestoreQuestionBank implements QuestionBankProvider {
-  async getTopics(subject: string): Promise<{ topic: string; total: number }[]> {
+  async getTopics(subject: string, examType: string = ''): Promise<{ topic: string; total: number }[]> {
     try {
       const q = query(
         collection(db, 'questionBank'),
@@ -70,6 +93,7 @@ export class FirestoreQuestionBank implements QuestionBankProvider {
 
       snapshot.forEach((docSnap) => {
         const data = docSnap.data();
+        if (!examMatchesStudent(data.examType, examType)) return;
         const topic = data.topic ? String(data.topic).trim() : 'General';
         topicCounts.set(topic, (topicCounts.get(topic) || 0) + 1);
       });
@@ -87,7 +111,8 @@ export class FirestoreQuestionBank implements QuestionBankProvider {
     subject: string,
     topic: string | null,
     count: number = 10,
-    excludeIds: string[] = []
+    excludeIds: string[] = [],
+    examType: string = ''
   ): Promise<BankQuestion[]> {
     try {
       let q = topic
@@ -106,6 +131,7 @@ export class FirestoreQuestionBank implements QuestionBankProvider {
 
       snapshot.forEach((docSnap) => {
         const data = docSnap.data();
+        if (!examMatchesStudent(data.examType, examType)) return;
         allQuestions.push({
           id: docSnap.id,
           subject: data.subject || subject,
@@ -120,6 +146,7 @@ export class FirestoreQuestionBank implements QuestionBankProvider {
               : 0,
           explanation: data.explanation || '',
           difficulty: data.difficulty,
+          examType: data.examType ? String(data.examType) : undefined,
         });
       });
 

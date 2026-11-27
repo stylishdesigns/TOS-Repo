@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Loader2, X, AlertTriangle,
-  CheckCircle2, Send, Image as ImageIcon, ClipboardPaste, FileText, Copy, Eye,
+  CheckCircle2, Send, Image as ImageIcon, ClipboardPaste, FileText, Copy, Eye, SlidersHorizontal,
 } from 'lucide-react';
 import { api, Json, Card, Field, inputCls, btnPrimary, btnGhost } from './tosShared';
 import { parseBankPaste, BANK_FORMAT_GUIDE, ParsedBankQuestion } from '../../utils/questionParsing';
@@ -12,8 +12,10 @@ import { SENIOR_SUBJECTS, SUBJECT_NAMES, BANK_YEARS } from '../../data/seniorSub
  *
  * The bank is split into two independent streams with their own version
  * history and published file: PRACTICE (global, browser-cached until the next
- * publish) and MOCK (built after practice ships). Each carries one of two
- * exam pipelines: JAMB or WAEC/NECO. Questions arrive either one at a time
+ * publish) and MOCK (built after practice ships). Every question belongs to
+ * one registered exam (batch 60): the exam picker at the top scopes the whole
+ * tab, and each exam's Question types setting governs what its pipeline
+ * takes. Questions arrive either one at a time
  * through the editor or in bulk through the paste box, which runs the same
  * parsing engine the centres' publisher uses and shows the parsed questions
  * for preview before anything is saved. Publishing writes ONE versioned file
@@ -23,9 +25,19 @@ import { SENIOR_SUBJECTS, SUBJECT_NAMES, BANK_YEARS } from '../../data/seniorSub
  */
 
 type Kind = 'practice' | 'mock';
-type ExamType = 'jamb' | 'waec_neco';
+// Exam keys are the registry's normalised exam names (the legacy jamb and
+// waec_neco pipeline keys still exist on old questions).
+type ExamType = string;
 
 const PIPELINE_LABELS: Record<string, string> = { jamb: 'JAMB', waec_neco: 'WAEC/NECO' };
+
+const examKeyOf = (raw: unknown): string =>
+  String(raw ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+
+const qTypeLabel = (t: string): string =>
+  t === 'mcq' ? 'MCQ only' : t === 'theory' ? 'Theory only' : 'MCQ + theory';
+
+interface RegistryExam { id: string; name: string; questionType: string; }
 
 interface ImportDefaults {
   examType: ExamType; subject: string; year: string; topic: string; difficulty: string;
@@ -55,6 +67,20 @@ export const QuestionBankTab: React.FC<{ refreshKey: number; view?: 'edit' | 'pu
   const [data, setData] = useState<Json | null>(null);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+
+  // Batch 60: the exam picker. The registry drives the chips; an empty pick
+  // means All exams. Question types are edited from the button on this row.
+  const [exams, setExams] = useState<RegistryExam[]>([]);
+  const [examPick, setExamPick] = useState('');
+  const [showQTypes, setShowQTypes] = useState(false);
+  const examLabel = useCallback((key: string) => {
+    const hit = exams.find((e) => examKeyOf(e.name) === key);
+    return hit ? hit.name : PIPELINE_LABELS[key] || key;
+  }, [exams]);
+  const examQType = useCallback((key: string): string => {
+    const hit = exams.find((e) => examKeyOf(e.name) === key);
+    return hit ? hit.questionType : 'both';
+  }, [exams]);
 
   // Paste import
   const [pasteText, setPasteText] = useState('');
@@ -99,19 +125,41 @@ export const QuestionBankTab: React.FC<{ refreshKey: number; view?: 'edit' | 'pu
   const load = useCallback(async () => {
     setError('');
     try {
-      const r = await api(`/api/tos/questionbank/list?kind=${kind}&status=all&sort=updated&limit=100`);
+      const examQ = examPick ? `&exam=${encodeURIComponent(examPick)}` : '';
+      const r = await api(`/api/tos/questionbank/list?kind=${kind}&status=all&sort=updated&limit=100${examQ}`);
       applyList(r, 'replace');
     } catch (e: any) {
       setError(e.message);
     }
-  }, [kind]);
+  }, [kind, examPick]);
 
   useEffect(() => { load(); }, [load, refreshKey]);
 
   const loadTree = useCallback(async () => {
-    try { setSetupTree(await api(`/api/tos/questionbank/tree?kind=${kind}`)); } catch { setSetupTree(null); }
-  }, [kind]);
+    try {
+      const examQ = examPick ? `&exam=${encodeURIComponent(examPick)}` : '';
+      setSetupTree(await api(`/api/tos/questionbank/tree?kind=${kind}${examQ}`));
+    } catch { setSetupTree(null); }
+  }, [kind, examPick]);
   useEffect(() => { loadTree(); }, [loadTree, refreshKey]);
+
+  // The exam registry powers the picker, the import chips and Question types.
+  useEffect(() => {
+    let alive = true;
+    api('/api/tos/exam-types').then((r: any) => { if (alive) setExams(((r.exams || []) as any[]).map((e) => ({ id: String(e.id), name: String(e.name), questionType: String(e.questionType || 'both') }))); }).catch(() => { /* the fallback labels still work */ });
+    return () => { alive = false; };
+  }, [refreshKey, showQTypes]);
+
+  // Picking an exam up top aims the import at the same exam.
+  useEffect(() => {
+    if (examPick) setImportDefaults((d) => (d.examType === examPick ? d : { ...d, examType: examPick }));
+  }, [examPick]);
+
+  const saveQType = async (id: string, questionType: string) => {
+    setExams((list) => list.map((e) => (e.id === id ? { ...e, questionType } : e)));
+    try { await api(`/api/tos/exam-types/${encodeURIComponent(id)}`, { method: 'PATCH', body: { questionType } }); }
+    catch (e: any) { setNotice(e.message); }
+  };
 
   const setupNeeded = Boolean(setupTree && setupTree.setupNeeded);
 
@@ -274,8 +322,31 @@ export const QuestionBankTab: React.FC<{ refreshKey: number; view?: 'edit' | 'pu
     return SUBJECT_NAMES;
   };
 
+  const chipIdle = 'px-4 py-2.5 rounded-xl text-sm font-bold border transition-colors text-slate-300 border-white/10 hover:border-white/25 bg-slate-950/40';
+  const chipActive = 'px-4 py-2.5 rounded-xl text-sm font-bold border transition-colors bg-orange-500/15 text-orange-300 border-orange-500/40';
+
   return (
     <div className="space-y-5">
+      {/* Batch 60: the exam picker is the first screen here. Pick an exam and
+          the whole tab scopes to it; Question types sets what each exam's
+          pipeline takes. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-[11px] font-black uppercase tracking-wider text-slate-500 mr-1">Exam</span>
+        <button type="button" onClick={() => setExamPick('')} className={examPick === '' ? chipActive : chipIdle}>
+          All exams
+        </button>
+        {exams.map((e) => (
+          <button key={e.id} type="button" onClick={() => setExamPick(examKeyOf(e.name))}
+            title={`${e.name}: ${qTypeLabel(e.questionType)}`}
+            className={examPick === examKeyOf(e.name) ? chipActive : chipIdle}>
+            {e.name}
+          </button>
+        ))}
+        {exams.length === 0 && <span className="text-xs text-slate-500">Loading exams…</span>}
+        <button type="button" onClick={() => setShowQTypes(true)} className="ml-auto inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-white/10 bg-slate-950/40 text-slate-300 hover:border-orange-500/40 hover:text-orange-300 text-xs font-bold transition-colors">
+          <SlidersHorizontal className="w-3.5 h-3.5" /> Question types
+        </button>
+      </div>
       {view === 'publish' && (
         <>
           {/* U5: the Publish tab tidied into one status card: what is live now,
@@ -346,10 +417,30 @@ export const QuestionBankTab: React.FC<{ refreshKey: number; view?: 'edit' | 'pu
               difficulty, and class stayed optional data. */}
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             <Field label="Exam pipeline">
-              <select value={importDefaults.examType} onChange={(e) => setImportDefaults({ ...importDefaults, examType: e.target.value as ExamType })} className={inputCls}>
-                <option value="jamb">JAMB</option>
-                <option value="waec_neco">WAEC/NECO</option>
-              </select>
+              {exams.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {exams.map((e) => {
+                    const key = examKeyOf(e.name);
+                    const on = importDefaults.examType === key;
+                    return (
+                      <button key={e.id} type="button" onClick={() => setImportDefaults({ ...importDefaults, examType: key })}
+                        title={`${e.name}: ${qTypeLabel(e.questionType)}`}
+                        className={on ? chipActive : chipIdle}>
+                        {e.name}
+                        <span className="block text-[10px] font-semibold opacity-75">{qTypeLabel(e.questionType)}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <select value={importDefaults.examType} onChange={(e) => setImportDefaults({ ...importDefaults, examType: e.target.value as ExamType })} className={inputCls}>
+                  <option value="jamb">JAMB</option>
+                  <option value="waec_neco">WAEC/NECO</option>
+                </select>
+              )}
+              {importDefaults.examType && examQType(importDefaults.examType) === 'theory' && (
+                <p className="text-[11px] text-amber-300 mt-1.5">{examLabel(importDefaults.examType)} takes theory questions only. The theory pipeline is still being built, so nothing can import here yet; switch it to MCQ or Both in Question types.</p>
+              )}
             </Field>
             <Field label="Subject">
               <select value={importDefaults.subject} onChange={(e) => setImportDefaults({ ...importDefaults, subject: e.target.value, topic: '' })} className={inputCls}>
@@ -548,6 +639,43 @@ export const QuestionBankTab: React.FC<{ refreshKey: number; view?: 'edit' | 'pu
         </div>
       )}
         </>
+      )}
+
+      {/* Batch 60: Question types editor. One row per registered exam; the
+          setting decides what that exam's pipeline accepts. Name changes are
+          deliberately not possible here: questions key their exam tag on the
+          normalised name. */}
+      {showQTypes && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm overflow-y-auto" onClick={() => setShowQTypes(false)}>
+          <div className="min-h-full flex items-center justify-center p-4">
+            <div className="bg-slate-900 border border-white/10 rounded-3xl p-5 sm:p-7 max-w-xl w-full shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <h3 className="text-white font-bold text-lg">Question types</h3>
+                  <p className="text-slate-400 text-xs mt-0.5">What each exam's question bank takes. JAMB style bodies run MCQ only; essay bodies take both once the theory pipeline ships.</p>
+                </div>
+                <button onClick={() => setShowQTypes(false)} className="text-slate-500 hover:text-slate-300"><X className="w-5 h-5" /></button>
+              </div>
+              <div className="space-y-3">
+                {exams.map((e) => (
+                  <div key={e.id} className="rounded-2xl border border-white/10 bg-white/[0.02] p-3.5">
+                    <p className="text-sm font-bold text-white mb-2">{e.name}</p>
+                    <div className="flex flex-wrap gap-2">
+                      {(['mcq', 'theory', 'both'] as const).map((t) => (
+                        <button key={t} type="button" onClick={() => saveQType(e.id, t)}
+                          className={e.questionType === t ? chipActive : chipIdle}>
+                          {qTypeLabel(t)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                {exams.length === 0 && <p className="text-sm text-slate-500">No exams registered yet. Register exams under Learning resources → Exams.</p>}
+              </div>
+              <button onClick={() => setShowQTypes(false)} className={`${btnPrimary} w-full mt-5`}>Done</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Publish review modal */}

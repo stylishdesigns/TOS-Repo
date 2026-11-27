@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { LegalModal } from '../legal/TermsPrivacy';
 import { InstallGuide } from './InstallGuide';
 import { waitForInstallPrompt, detectInstalledApp, resetPendingInstallPrompt, reloadForFreshInstallPrompt } from '../../../hooks/usePWAInstall';
 import { FlowSelect } from './FlowSelect';
@@ -46,6 +47,33 @@ const ACCENT_PRESETS: Array<{ hex: string; name: string }> = [
   { hex: '#111827', name: 'Black' },
 ];
 
+// Facility types (Nov 27): what kind of facility is signing up. Picking one
+// pre-selects the exams that type prepares students for; the owner can still
+// change the exams afterwards. The TOS admin will manage this list from the
+// console in a later batch, so it lives in one place here for now.
+const FACILITY_TYPES = [
+  'Tutorial centre',
+  'School',
+  'A-level centre',
+  'Adult education centre',
+  'Bridge programmes',
+  'Professional exam centre',
+];
+
+// The fixed exams every signup offers, so a registry exam that names one of
+// these pre-selects the matching chip instead of landing as a custom chip.
+const FIXED_EXAMS = ['JAMB', 'WAEC', 'NECO', 'POST-UTME'];
+
+// The exams each facility type prepares students for by default (Nov 27).
+// Types without an entry here leave the current exam selection untouched.
+const FACILITY_TYPE_EXAMS: Record<string, { jamb?: boolean; waec?: boolean; neco?: boolean; post?: boolean; custom?: string[] }> = {
+  'Tutorial centre': { jamb: true, waec: true, neco: true },
+  'School': { waec: true, neco: true },
+  'A-level centre': { custom: ['IJMB', 'JUPEB'] },
+  'Adult education centre': { waec: true, neco: true },
+  'Bridge programmes': { jamb: true, custom: ['IJMB', 'JUPEB'] },
+};
+
 // Branded primary button for the flow pages (Nov 16): the old inline styling
 // over .btn pr read oversized and off-brand.
 const CTA = {
@@ -57,7 +85,7 @@ const CTA = {
 } as const;
 
 export interface FlowOwner { fullName: string; email: string; phone: string; state: string; }
-export interface FlowFacility { name: string; logoUrl: string; logoName: string; teachers: string; address: string; exams: string[]; students: string; consent: boolean; accent: string; }
+export interface FlowFacility { name: string; logoUrl: string; logoName: string; teachers: string; address: string; facilityType: string; exams: string[]; students: string; consent: boolean; accent: string; }
 export interface FlowResult { startedAt: number; domain: string; }
 
 // Same rule the server applies when it mints the subdomain (extendedRoutes
@@ -249,6 +277,34 @@ export const SignupStartPage: React.FC = () => {
   });
   const [customDraft, setCustomDraft] = useState('');
   const [accent, setAccent] = useState(draft?.accent || '');
+  const [facilityType, setFacilityType] = useState(draft?.facilityType || '');
+  // The Type-of-facility dropdown reads the TOS admin's facility type
+  // registry live (batch 54). It starts on the built-in launch list and swaps
+  // to the registry when the read succeeds; if the registry is unreachable
+  // the built-in list stays, so the form never blocks on it.
+  const [typeOptions, setTypeOptions] = useState<string[]>(FACILITY_TYPES);
+  const typeExamMap = useRef<Record<string, string[]>>({});
+  useEffect(() => {
+    let dead = false;
+    fetch('/api/public/facility-types')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (dead || !d || !Array.isArray(d.types) || !d.types.length) return;
+        const names: string[] = [];
+        const map: Record<string, string[]> = {};
+        for (const t of d.types) {
+          const nm = String(t?.name || '').trim();
+          if (!nm) continue;
+          names.push(nm);
+          map[nm] = Array.isArray(t?.exams)
+            ? t.exams.map((x: any) => String(x).trim()).filter(Boolean)
+            : [];
+        }
+        if (names.length) { setTypeOptions(names); typeExamMap.current = map; }
+      })
+      .catch(() => { /* registry unreachable: the built-in list stays. */ });
+    return () => { dead = true; };
+  }, []);
   const [locked] = useState(() => isLocked());
   const [building, setBuilding] = useState(false);
   const [postState, setPostState] = useState<'running' | 'ok' | 'failed'>('running');
@@ -259,6 +315,10 @@ export const SignupStartPage: React.FC = () => {
   const [sending, setSending] = useState(false);
 
   const [nameState, setNameState] = useState<NameState>({ status: 'idle', domain: '' });
+
+  // Batch 57: the agree line now opens the real documents as a popup here on
+  // the page, instead of naming documents that did not exist anywhere.
+  const [legalKind, setLegalKind] = useState<null | 'terms' | 'privacy'>(null);
   const debounceRef = useRef<number | null>(null);
   useEffect(() => {
     if (debounceRef.current) window.clearTimeout(debounceRef.current);
@@ -300,13 +360,38 @@ export const SignupStartPage: React.FC = () => {
     setErrors((e2) => ({ ...e2, customExam: '' }));
   };
 
+  // Picking a facility type pre-selects the exams that type prepares students
+  // for (Nov 27). The owner can still change the selection afterwards.
+  const applyTypeExams = (type: string) => {
+    // Registry kinds come first (batch 54): the exams the TOS admin attached
+    // to this kind pre-select the matching chips, and anything outside the
+    // fixed set lands as a custom chip. Kinds with no exams attached fall
+    // through to the built-in mapping below, and if neither has an entry the
+    // current selection is left alone.
+    const registryExams = typeExamMap.current[type];
+    if (registryExams && registryExams.length) {
+      const has = (n: string) => registryExams.includes(n);
+      const customList = registryExams.filter((x) => !FIXED_EXAMS.includes(x));
+      setEx((prev) => ({ ...prev, jamb: has('JAMB'), waec: has('WAEC'), neco: has('NECO'), post: has('POST-UTME'), custom: customList.length > 0 }));
+      setCustomExams(customList);
+      setErrors((e2) => ({ ...e2, exams: '', customExam: '' }));
+      return;
+    }
+    const m = FACILITY_TYPE_EXAMS[type];
+    if (!m) return; // no default mapping: leave the current selection alone
+    const customList = m.custom || [];
+    setEx((prev) => ({ ...prev, jamb: !!m.jamb, waec: !!m.waec, neco: !!m.neco, post: !!m.post, custom: customList.length > 0 }));
+    setCustomExams(customList);
+    setErrors((e2) => ({ ...e2, exams: '', customExam: '' }));
+  };
+
   // Keep the draft on the device so a refresh on this page loses nothing.
   useEffect(() => {
     try {
-      sessionStorage.setItem(FACILITY_KEY, JSON.stringify({ name, logoUrl, logoName, teachers, address, exams: examTypes(), students, consent, accent }));
+      sessionStorage.setItem(FACILITY_KEY, JSON.stringify({ name, logoUrl, logoName, teachers, address, facilityType, exams: examTypes(), students, consent, accent }));
     } catch { /* storage unavailable: the form still works, it just will not survive a refresh. */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [name, logoUrl, logoName, teachers, address, ex, customExams, students, consent, accent]);
+  }, [name, logoUrl, logoName, teachers, address, facilityType, ex, customExams, students, consent, accent]);
 
   const pickLogo = async (file: File | null) => {
     setFormError('');
@@ -343,6 +428,7 @@ export const SignupStartPage: React.FC = () => {
   const validate = (): Record<string, string> => {
     const e: Record<string, string> = {};
     if (t(name).length < 2 || t(name).length > 120) e.name = 'Please give your facility name.';
+    if (!facilityType) e.facilityType = 'Please choose your facility type.';
     if (!logoUrl) e.logo = 'Please upload your facility logo.';
     if (!teachers) e.teachers = 'Please choose how many teachers you have.';
     if (!t(owner?.state)) e.state = 'Please choose a state on the first step.';
@@ -388,6 +474,7 @@ export const SignupStartPage: React.FC = () => {
           logoUrl,
           teacherCount: teachers,
           examTypes: examTypes(),
+          facilityType,
           accentColor: accent,
           consent: true,
           website: '', // honeypot: real visitors leave it empty
@@ -465,6 +552,23 @@ export const SignupStartPage: React.FC = () => {
                 </p>
               )}
               {ERR(errors.name)}
+            </div>
+
+            <div>
+              <label htmlFor="w1-ftype" style={L}>Type of facility</label>
+              <FlowSelect
+                id="w1-ftype"
+                value={facilityType}
+                onChange={(v) => { setFacilityType(v); applyTypeExams(v); setErrors((e2) => ({ ...e2, facilityType: '' })); }}
+                disabled={locked}
+                invalid={!!errors.facilityType}
+                ariaLabel="Type of facility"
+                options={[{ value: '', label: 'Choose one' }, ...typeOptions.map((ft) => ({ value: ft, label: ft }))]}
+              />
+              <p style={{ margin: '6px 0 0', font: '400 12px Inter, sans-serif', color: '#64748B' }}>
+                This sets the exams your facility prepares students for below; you can still change them.
+              </p>
+              {ERR(errors.facilityType)}
             </div>
 
             <div>
@@ -600,7 +704,7 @@ export const SignupStartPage: React.FC = () => {
             </div>
 
             <div>
-              <span style={L}>Pick your app's accent colour</span>
+              <span style={L}>Pick your app's brand colour</span>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
                 {ACCENT_PRESETS.map((p) => {
                   const on = accent === p.hex;
@@ -608,7 +712,7 @@ export const SignupStartPage: React.FC = () => {
                     <button
                       key={p.hex}
                       type="button"
-                      aria-label={`${p.name} accent`}
+                      aria-label={`${p.name} brand colour`}
                       aria-pressed={on}
                       disabled={locked}
                       onClick={() => setAccent(p.hex)}
@@ -617,16 +721,46 @@ export const SignupStartPage: React.FC = () => {
                   );
                 })}
               </div>
-              <p style={{ margin: '6px 0 0', font: '400 12px Inter, sans-serif', color: '#64748B' }}>Used on your app, portals and landing page.</p>
+              <p style={ { margin: '6px 0 0', font: '400 12px Inter, sans-serif', color: '#64748B' } }>Used on your app, portals and landing page.</p>
+              <div style={{ marginTop: '14px', display: 'flex', justifyContent: 'center' }}>
+                <div style={{ width: '252px', borderRadius: '20px', border: '1px solid #E2E8F0', boxShadow: '0 12px 32px -18px rgba(15,23,42,.35)', overflow: 'hidden', background: '#F8FAFC' }}>
+                  <div style={{ background: accent || '#EA580C', padding: '12px 14px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ width: '30px', height: '30px', borderRadius: '10px', background: 'rgba(255,255,255,.24)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#fff', font: '800 13px Inter, sans-serif', flex: 'none' }}>{(name || 'TOS').slice(0, 2).toUpperCase()}</span>
+                    <span style={{ color: '#fff', font: '800 14px Inter, sans-serif' }}>{name || 'Your facility'}</span>
+                  </div>
+                  <div style={{ padding: '12px' }}>
+                    <p style={{ margin: '0', font: '500 11px Inter, sans-serif', color: '#64748B' }}>Good morning</p>
+                    <p style={{ margin: '2px 0 10px', font: '800 15px Inter, sans-serif', color: '#0F172A' }}>Welcome back</p>
+                    <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '10px 12px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: accent || '#EA580C', flex: 'none' }} />
+                      <span style={{ font: '600 12.5px Inter, sans-serif', color: '#334155' }}>Chemistry, 10:00 AM</span>
+                      <span style={{ marginLeft: 'auto', font: '500 11px Inter, sans-serif', color: '#94A3B8' }}>Next class</span>
+                    </div>
+                    <div style={{ marginTop: '10px', borderRadius: '12px', background: accent || '#EA580C', color: '#fff', font: '700 13px Inter, sans-serif', padding: '11px 0', textAlign: 'center' }}>Continue practice</div>
+                    <div style={{ marginTop: '8px', borderRadius: '12px', border: `1.5px solid ${accent || '#EA580C'}`, color: accent || '#EA580C', font: '700 13px Inter, sans-serif', padding: '11px 0', textAlign: 'center', background: '#fff' }}>Take a mock exam</div>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-around', padding: '8px 12px 10px', borderTop: '1px solid #E2E8F0', background: '#fff' }}>
+                    {[true, false, false].map((onDot, i) => (
+                      <span key={i} style={{ width: '7px', height: '7px', borderRadius: '50%', background: onDot ? (accent || '#EA580C') : '#CBD5E1' }} />
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <p style={{ margin: '8px 0 0', font: '400 12px Inter, sans-serif', color: '#64748B', textAlign: 'center' }}>
+                A quick look at your student app in your colour. It changes as you pick.
+              </p>
             </div>
 
             <div>
               <label style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', font: '500 14px/1.45 Inter, sans-serif', color: '#334155', cursor: locked ? 'default' : 'pointer' }}>
                 <input type="checkbox" checked={consent} onChange={() => { if (locked) return; setConsent((p) => !p); setErrors((e2) => ({ ...e2, consent: '' })); }} aria-invalid={errors.consent ? true : false} style={{ width: '20px', height: '20px', marginTop: '2px', flex: 'none', pointerEvents: locked ? 'none' : 'auto' }} />
-                I agree to be contacted about my request and to the Privacy policy and Terms.
+                I agree to be contacted about my request and to the{' '}
+                <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setLegalKind('privacy'); }} style={{ font: 'inherit', color: '#C2410C', textDecoration: 'underline', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>Privacy policy</button>{' '}and{' '}
+                <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setLegalKind('terms'); }} style={{ font: 'inherit', color: '#C2410C', textDecoration: 'underline', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>Terms</button>.
               </label>
               {ERR(errors.consent)}
             </div>
+          {legalKind && <LegalModal kind={legalKind} onClose={() => setLegalKind(null)} />}
           </div>
 
           {formError && <p role="alert" style={{ margin: '14px 0 0', font: '600 14px Inter, sans-serif', color: '#DC2626' }}>{formError}</p>}
@@ -695,12 +829,13 @@ export const SignupConfirmPage: React.FC = () => {
             {row('Email', owner.email)}
             {row('Phone', owner.phone)}
             {row('Facility', <span style={{ display: 'inline-flex', alignItems: 'center', gap: '10px' }}>{facility.logoUrl && <img src={facility.logoUrl} alt="Facility logo" style={{ width: '34px', height: '34px', objectFit: 'contain', borderRadius: '8px', border: '1px solid #E2E8F0', background: '#F8FAFC', padding: '2px' }} />}{facility.name}</span>)}
+            {facility.facilityType && row('Facility type', facility.facilityType)}
             {row('State', owner.state)}
             {row('Address', facility.address)}
             {row('Teachers', facility.teachers)}
             {row('Students', facility.students)}
             {row('Exams', facility.exams.join(', '))}
-            {row('Accent', <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}><span style={{ width: 14, height: 14, borderRadius: '50%', background: facility.accent || '#EA580C', display: 'inline-block', flex: 'none' }} />{(facility.accent || '#EA580C').toUpperCase()}</span>)}
+            {row('Brand colour', <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}><span style={{ width: 14, height: 14, borderRadius: '50%', background: facility.accent || '#EA580C', display: 'inline-block', flex: 'none' }} />{(facility.accent || '#EA580C').toUpperCase()}</span>)}
           </div>
         </div>
 
@@ -719,7 +854,7 @@ export const SignupConfirmPage: React.FC = () => {
           <h2 style={h2Style}>Your plan</h2>
           <span className="pill" style={{ marginBottom: '12px' }}>Free seats included · upgrade any time</span>
           <p style={{ font: '500 15px/1.6 Inter, sans-serif', color: '#334155', margin: '10px 0 0' }}>
-            Your facility starts on the <b>Free Facility</b> plan: up to 5 students, free forever. Upgrade any time: pay for seats (from <b>₦2,000 per seat per month</b>) to add more students and unlock your facility's own public landing page.
+            Your facility starts on the <b>Free Facility</b> plan: up to 5 students, free forever. Upgrade any time: pay for seats (from <b>₦1,000 per seat per month</b>) to add more students and unlock your facility's own public landing page.
           </p>
         </div>
 

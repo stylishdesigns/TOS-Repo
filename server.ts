@@ -38,6 +38,7 @@ import { runFeeReminderSweep } from "./src/server/feeReminders";
 import { runPushSweep } from "./src/server/pushSender";
 import { registerStudentMockRoutes } from "./src/server/studentMockRoutes";
 import { registerNotificationRoutes } from "./src/server/notificationRoutes";
+import { registerWelcomeRoutes } from "./src/server/welcomeTrio";
 import { registerTutorAiRoutes } from "./src/server/tutorAiRoutes";
 import { registerAnnouncementRoutes } from "./src/server/announcementRoutes";
 
@@ -1523,6 +1524,7 @@ RULES:
   registerLandingAdminRoutes(app);
   registerMockRoutes(app);
   registerNotificationRoutes(app);
+  registerWelcomeRoutes(app);
   registerAnnouncementRoutes(app);
   registerStudentMockRoutes(app);
 

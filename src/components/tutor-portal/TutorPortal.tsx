@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
+import { fireFirstLook } from '../../lib/welcome';
 import { useFirebase } from '../../context/FirebaseContext';
 import { HomeTab } from './tabs/HomeTab';
 import { ScheduleTab } from './tabs/ScheduleTab';
@@ -39,6 +40,11 @@ export const TutorPortal: React.FC = () => {
   const { tutors, settings, setViewMode, isAdmin, activeTutor: contextTutor, updateTutor, logout, bgTheme, activeCentre } = useApp();
   const centreName = activeCentre?.name || (settings as any)?.centreName || 'Tutor Portal';
   const { updatePassword } = useFirebase();
+  // Batch 58: the welcome trio fires once, on the tutor's first look.
+  useEffect(() => {
+    fireFirstLook(contextTutor?.uid);
+  }, [contextTutor?.uid]);
+
 
   const parseInitialTutorTab = (): TabType => {
     try {

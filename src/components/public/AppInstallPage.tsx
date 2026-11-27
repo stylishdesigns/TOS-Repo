@@ -11,7 +11,7 @@ type InstallPromptEvent = Event & {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 };
 
-type AppCentre = { slug: string; name: string; logo: string };
+type AppCentre = { slug: string; name: string; logo: string; accent?: string };
 
 const CENTRE_KEY = 'tos:app-centre';
 
@@ -56,14 +56,34 @@ export function AppInstallPage() {
   const [justInstalled, setJustInstalled] = useState(false);
   const [code, setCode] = useState('');
   const [looking, setLooking] = useState(false);
-  const [accent, setAccent] = useState<string>('');
+  const [accent, setAccent] = useState<string>(() => appCentre?.accent || '');
   const [codeError, setCodeError] = useState('');
   const [deferred, setDeferred] = useState<InstallPromptEvent | null>(() => getPendingInstallPrompt() as InstallPromptEvent | null);
   const [noPrompt, setNoPrompt] = useState(false);
   const [waiting, setWaiting] = useState(false);
   const [cancelled, setCancelled] = useState(false);
+  const [installing, setInstalling] = useState(false);
   const [retryHint] = useState(() => consumeInstallRetryFlag());
   const [appOnly, setAppOnly] = useState<boolean | null>(null);
+
+  const [urlCentre, setUrlCentre] = useState<AppCentre | null>(null);
+
+  // When the link carries ?centre= (the welcome email and the app-only gate
+  // both do), show that facility's own name and logo on this page straight
+  // away, before the access code is even entered.
+  useEffect(() => {
+    const slug = new URLSearchParams(window.location.search).get('centre');
+    if (!slug || appCentre) return;
+    let alive = true;
+    fetch(`/api/public/centre-by-slug?centre=${encodeURIComponent(slug)}`)
+      .then((r) => r.json())
+      .then((d: any) => {
+        if (!alive || !d || d.locked || !d.centreName) return;
+        setUrlCentre({ slug: slugifyName(d.centreName), name: String(d.centreName), logo: String(d.logoUrl || ''), accent: String(d.accent || '') });
+      })
+      .catch(() => undefined);
+    return () => { alive = false; };
+  }, []);
 
   useEffect(() => {
     isAppOnlyOn().then(setAppOnly).catch(() => undefined);
@@ -85,7 +105,7 @@ export function AppInstallPage() {
     document.body.style.background = '#0F172A';
     const media = window.matchMedia('(display-mode: standalone)');
     const onMode = () => { if (media.matches) setInstalled(true); };
-    const onAppInstalled = () => { setJustInstalled(true); setInstalled(true); };
+    const onAppInstalled = () => { setInstalling(false); setJustInstalled(true); setInstalled(true); };
     media.addEventListener?.('change', onMode);
     window.addEventListener('appinstalled', onAppInstalled);
     if (!media.matches) {
@@ -161,8 +181,11 @@ export function AppInstallPage() {
     }
     const choice = await evt.userChoice;
     if (choice.outcome === 'accepted') {
-      setJustInstalled(true);
+      // The browser says yes; the app lands in the next few seconds and the
+      // appinstalled event flips the card to "App installed".
+      setInstalling(true);
       setDeferred(null);
+      window.setTimeout(() => setInstalling(false), 20000);
     } else {
       setDeferred(null);
       resetPendingInstallPrompt();
@@ -172,6 +195,8 @@ export function AppInstallPage() {
 
   const card: CSSProperties = { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 16, padding: 22, textAlign: 'center' };
   const primaryBtn: CSSProperties = { width: '100%', minHeight: 52, borderRadius: 12, border: 'none', background: accent || '#EA580C', color: '#fff', fontWeight: 800, fontSize: 16, cursor: 'pointer' };
+
+  const showCentre = centre || urlCentre;
 
   const loginCard = (
     <div style={{ ...card, background: 'rgba(22,163,74,0.14)', borderColor: 'rgba(34,197,94,0.35)' }}>
@@ -197,6 +222,16 @@ export function AppInstallPage() {
       <p style={{ color: '#94A3B8', fontSize: 15, lineHeight: 1.6, margin: '0 auto 26px', maxWidth: 420 }}>
         Enter your facility&apos;s access code so the app installs with your facility&apos;s own name, logo and colours. The code is in your welcome email.
       </p>
+      {(showCentre) && (
+        <div style={{ margin: '0 auto 18px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+          {showCentre.logo ? (
+            <img src={showCentre.logo} alt={showCentre.name} style={{ width: 64, height: 64, borderRadius: 16, objectFit: 'cover', border: '1px solid rgba(255,255,255,0.18)' }} />
+          ) : (
+            <div style={{ width: 64, height: 64, borderRadius: 16, background: accent || '#EA580C', color: '#fff', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: 22 }}>{initialsOf(showCentre.name)}</div>
+          )}
+          <span style={{ fontWeight: 800, fontSize: 15, color: '#F8FAFC' }}>{showCentre.name}</span>
+        </div>
+      )}
       <div style={card}>
         <input
           value={code}
@@ -262,9 +297,14 @@ export function AppInstallPage() {
         </div>
       ) : mobile ? (
         <div style={{ display: 'grid', gap: 12, justifyItems: 'center' }}>
-          <button type="button" onClick={install} disabled={waiting} style={{ ...primaryBtn, minWidth: 240, minHeight: 56, fontSize: 16, opacity: waiting ? 0.75 : 1 }}>
-            {waiting ? 'Getting the install pop-up ready…' : 'Install the app'}
+          <button type="button" onClick={install} disabled={waiting || installing} style={{ ...primaryBtn, minWidth: 240, minHeight: 56, fontSize: 16, opacity: waiting ? 0.75 : 1 }}>
+            {installing ? 'Installing…' : waiting ? 'Getting the install pop-up ready…' : 'Install the app'}
           </button>
+          {installing && !justInstalled && !installed && (
+            <p style={{ fontSize: 13.5, color: '#86EFAC', margin: 0, lineHeight: 1.6, maxWidth: 400 }}>
+              Installing the {centre.name} app now. Give it a few seconds: the app appears on your home screen as soon as it is done, and this page will confirm it.
+            </p>
+          )}
           {noPrompt && !cancelled && (
             <p style={{ fontSize: 13.5, color: '#FDBA74', margin: 0, lineHeight: 1.6, maxWidth: 400 }}>
               Chrome didn&apos;t offer the install pop-up this time. Wait a few seconds and tap Install again. If the app is
@@ -305,12 +345,7 @@ export function AppInstallPage() {
   return (
     <div style={{ minHeight: '100dvh', background: '#0F172A', color: '#F8FAFC', display: 'flex', flexDirection: 'column', fontFamily: 'Inter, sans-serif' }}>
       <header style={{ padding: '18px 24px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', gap: 10 }}>
-        <span style={{ width: 38, height: 38, borderRadius: 10, background: accent || '#EA580C', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-          <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z" fill="none" stroke="#fff" strokeWidth="2" strokeLinejoin="round" />
-            <path d="M9 12l2 2 4-4" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </span>
+        <img src="/tos-brand-icon.png" alt="Tutorial OS" style={{ width: 38, height: 38, borderRadius: 10, objectFit: 'contain', flexShrink: 0 }} />
         <span style={{ fontWeight: 800, fontSize: 17 }}>Tutorial OS</span>
       </header>
 
@@ -325,14 +360,14 @@ export function AppInstallPage() {
           <a
             href="/#landing"
             style={{
-              color: '#CBD5E1',
+              color: '#F1F5F9',
               textDecoration: 'none',
               fontWeight: 700,
               fontSize: 14,
               padding: '12px 22px',
               borderRadius: 12,
-              border: '1px solid rgba(255,255,255,0.16)',
-              background: 'rgba(255,255,255,0.04)',
+              border: '1px solid rgba(255,255,255,0.35)',
+              background: 'rgba(255,255,255,0.12)',
             }}
           >
             Back to landing page

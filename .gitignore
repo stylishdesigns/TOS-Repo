@@ -10,3 +10,7 @@ firebase-applet-config.json
 .aistudio/
 firestore-debug.log
 node_modules
+
+# Playwright
+/test-results/
+/playwright-report/

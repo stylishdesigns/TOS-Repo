@@ -156,7 +156,7 @@ export const CmsManager: React.FC = () => {
           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-5">
             <div>
               <h3 className="text-base font-extrabold text-slate-900">Institute Identity & Contacts</h3>
-              <p className="text-xs text-slate-500">
+              <p className="text-[13px] text-slate-700">
                 Setup for selling this software to any education facility: changes here rebrand the entire website and receipt headers.
               </p>
             </div>
@@ -252,7 +252,7 @@ export const CmsManager: React.FC = () => {
           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-5">
             <div>
               <h3 className="text-base font-extrabold text-slate-900">Hero Section & Headline Copy</h3>
-              <p className="text-xs text-slate-500">
+              <p className="text-[13px] text-slate-700">
                 The first thing prospective parents and students see when visiting the website.
               </p>
             </div>
@@ -310,7 +310,7 @@ export const CmsManager: React.FC = () => {
                 />
                 <div className="text-xs text-slate-500">
                   <p className="font-bold text-slate-700">Image Live Preview</p>
-                  <p className="text-[11px] text-slate-400 mt-0.5">
+                  <p className="text-[13px] text-slate-700 mt-0.5">
                     High resolution academic imagery representing classroom excellence.
                   </p>
                 </div>
@@ -324,7 +324,7 @@ export const CmsManager: React.FC = () => {
           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-5">
             <div>
               <h3 className="text-base font-extrabold text-slate-900">Urgent Announcements & Verified Stats</h3>
-              <p className="text-xs text-slate-500">
+              <p className="text-[13px] text-slate-700">
                 Flash bar at the very top of the website and trust proof metrics.
               </p>
             </div>
@@ -384,7 +384,7 @@ export const CmsManager: React.FC = () => {
           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-5">
             <div>
               <h3 className="text-base font-extrabold text-slate-900">Tuition Payment Bank Account</h3>
-              <p className="text-xs text-slate-500">
+              <p className="text-[13px] text-slate-700">
                 Shown to candidates at the end of the online registration form to pay via direct bank transfer or USSD.
               </p>
             </div>
@@ -436,7 +436,7 @@ export const CmsManager: React.FC = () => {
             <div className="flex justify-between items-center">
               <div>
                 <h3 className="text-base font-extrabold text-slate-900">Hall of Fame & Alumni Testimonials</h3>
-                <p className="text-xs text-slate-500">
+                <p className="text-[13px] text-slate-700">
                   Highlight success stories on the public landing page to drive conversion.
                 </p>
               </div>
@@ -462,7 +462,7 @@ export const CmsManager: React.FC = () => {
                         <p className="text-[10px] font-bold text-amber-600">{t.score}</p>
                       </div>
                     </div>
-                    <p className="text-xs text-slate-600 italic">"{t.quote}"</p>
+                    <p className="text-[13px] text-slate-700 italic">"{t.quote}"</p>
                   </div>
 
                   <div className="mt-3 pt-2 border-t border-slate-200 flex justify-between items-center text-[10px] text-slate-400">

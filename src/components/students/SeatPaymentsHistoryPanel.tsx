@@ -51,7 +51,7 @@ export const SeatPaymentsHistoryPanel: React.FC = () => {
       <div className="flex items-center justify-between gap-3">
         <div>
           <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-white">Seat Payment History</h3>
-          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+          <p className="text-[13px] sm:text-sm text-slate-700 mt-0.5">
             Every payment made for seats: the receipt, when it was paid, and when Tutorial OS confirmed it.
           </p>
         </div>

@@ -4,6 +4,7 @@ import App from './App.tsx';
 import { PublicLandingPage } from './components/landing/PublicLandingPage';
 import { AppInstallPage } from './components/public/AppInstallPage';
 import { SignupStartPage, SignupConfirmPage, SignupAppPage } from './components/public/landing/SignupFlow';
+import { LegalPage } from './components/public/legal/TermsPrivacy';
 import { PreviewOnboarding } from './components/public/PreviewOnboarding';
 import './index.css';
 import {registerSW} from 'virtual:pwa-register';
@@ -105,11 +106,13 @@ const startMatch = window.location.pathname.match(/^\/start\/?$/);
 const confirmMatch = window.location.pathname.match(/^\/start\/confirm\/?$/);
 const appFlowMatch = window.location.pathname.match(/^\/start\/app\/?$/);
 const previewOnboardingMatch = /^\/preview\/?$/.test(window.location.pathname);
+const termsMatch = /^\/terms\/?$/.test(window.location.pathname);
+const privacyMatch = /^\/privacy\/?$/.test(window.location.pathname);
 
 // A facility's plain address: tutorialos.com/<facility-name>, the whole name
 // with every space and symbol removed and never shortened. Reserved
 // single-segment paths (the app install page, the signup flow) never match.
-const RESERVED_ROOT = ['app', 'start', 'api', 'tos', 'login', 'admin', 'support', 'preview'];
+const RESERVED_ROOT = ['app', 'start', 'api', 'tos', 'login', 'admin', 'support', 'preview', 'terms', 'privacy'];
 
 const rootLandingMatch = (() => {
   const m = window.location.pathname.match(/^\/([A-Za-z0-9][A-Za-z0-9_-]{2,159})\/?$/);
@@ -129,6 +132,10 @@ createRoot(document.getElementById('root')!).render(
     <SignupConfirmPage />
   ) : appFlowMatch ? (
     <SignupAppPage />
+  ) : termsMatch ? (
+    <LegalPage kind="terms" />
+  ) : privacyMatch ? (
+    <LegalPage kind="privacy" />
   ) : previewOnboardingMatch ? (
     <PreviewOnboarding />
   ) : rootLandingMatch ? (

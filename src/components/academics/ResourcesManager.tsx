@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Loader2, PlaySquare } from 'lucide-react';
+import { Loader2, PlaySquare, ScrollText } from 'lucide-react';
+import { VideoTermsModal } from '../public/legal/TermsPrivacy';
 import { getAuth } from 'firebase/auth';
 import { useApp } from '../../context/AppContext';
 import { Tutor } from '../../types';
@@ -38,6 +39,9 @@ export const ResourcesManager: React.FC = () => {
   const [vcEnabled, setVcEnabled] = useState<boolean | null>(null);
   const [vcBusy, setVcBusy] = useState(false);
   const [vcError, setVcError] = useState('');
+  // Batch 57: the video-classes terms. The switch's card carries a
+  // View-terms button so the admin reads the legal side before flipping it.
+  const [vcTermsOpen, setVcTermsOpen] = useState(false);
 
   const loadVc = useCallback(async () => {
     if (!activeCentreId) return;
@@ -79,7 +83,7 @@ export const ResourcesManager: React.FC = () => {
     <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-6">
       <div>
         <h1 className="text-xl font-black text-slate-900 dark:text-white">Resources</h1>
-        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+        <p className="text-[13px] text-slate-700 dark:text-slate-400 mt-1">
           Video classes and study materials for your students.
         </p>
       </div>
@@ -92,7 +96,7 @@ export const ResourcesManager: React.FC = () => {
             </div>
             <div>
               <h3 className="text-sm font-black text-slate-800 dark:text-slate-100">Tutorial OS video classes</h3>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug mt-0.5">
+              <p className="text-[13px] text-slate-700 dark:text-slate-400 leading-snug mt-0.5">
                 The ready-made video lesson library from Tutorial OS.
               </p>
             </div>
@@ -117,12 +121,21 @@ export const ResourcesManager: React.FC = () => {
             : 'On: your students see the Tutorial OS video classes in their app, arranged by subject and topic.'}
           {' '}Your own uploaded resources are always visible either way. The switch works instantly.
         </p>
+        <button
+          type="button"
+          onClick={() => setVcTermsOpen(true)}
+          className="mt-3 inline-flex items-center gap-1.5 text-[13px] font-bold text-slate-800 hover:underline"
+        >
+          <ScrollText className="w-3.5 h-3.5" />
+          View terms &amp; conditions
+        </button>
         {vcError && <p className="text-[11px] text-rose-600 dark:text-rose-400 mt-2">{vcError}</p>}
       </div>
+      {vcTermsOpen && <VideoTermsModal onClose={() => setVcTermsOpen(false)} />}
 
       <div>
         <h2 className="text-sm font-black text-slate-800 dark:text-slate-100 mb-1">Facility uploads</h2>
-        <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-3">
+        <p className="text-[13px] text-slate-700 dark:text-slate-400 mb-3">
           Upload PDFs, images and video links for your students, the same way tutors do. Students see everything uploaded here in their app.
         </p>
         <TutorMaterialsSection tutor={adminTutor} />

@@ -91,6 +91,23 @@ export function mapKey(raw: unknown): string {
   return normKey(raw).replace(/[.\\/]/g, '_');
 }
 
+// Batch 60: the exam pick comes from the registry. Most keys match the
+// stored examType exactly. The old combined WAEC/NECO pipeline still answers
+// for WAEC and NECO picks, so those keys expand to their candidate set and
+// ride the post-filter instead of a single Firestore equality.
+export function examCandidateKeys(raw: unknown): string[] {
+  const key = mapKey(raw);
+  if (!key) return [];
+  if (key === 'waec_neco') return ['waec', 'neco', 'waec_neco'];
+  if (key === 'waec' || key === 'neco') return [key, 'waec_neco'];
+  return [key];
+}
+
+export function examMatches(docExam: unknown, wantedKeys: string[]): boolean {
+  const k = mapKey(docExam);
+  return Boolean(k) && wantedKeys.includes(k);
+}
+
 export function tokensOf(text: unknown): string[] {
   const seen = new Set<string>();
   String(text ?? '')
@@ -407,9 +424,15 @@ export function registerQuestionBankLibraryRoutes(
       }
       const klass = String(req.query.klass || '').trim();
 
-      // Exactly one tree scope at a time, taken from the normalised key fields.
+      // Exactly one tree scope at a time among subject, topic, year and batch.
+      // The exam pick (batch 60) is the persistent filter above them: it uses
+      // the indexed examType equality when it safely can, and post-filters
+      // otherwise (search, the legacy WAEC/NECO trio, any combined tree
+      // scope, or the changed tab whose updatedAt inequality has no exam
+      // composite).
       const scope: Array<[string, string | number]> = [];
-      if (String(req.query.examType || '').trim()) scope.push(['examType', normKey(req.query.examType)]);
+      const examPick = String(req.query.exam || req.query.examType || '').trim();
+      const examKeys = examPick ? examCandidateKeys(examPick) : null;
       if (String(req.query.subject || '').trim()) scope.push(['subjectKey', mapKey(req.query.subject)]);
       if (String(req.query.topic || '').trim()) scope.push(['topicKey', mapKey(req.query.topic)]);
       if (String(req.query.year || '').trim()) {
@@ -427,8 +450,13 @@ export function registerQuestionBankLibraryRoutes(
       const search = q.length > 0;
       if (search && scope.length) {
         throw httpError(400, 'Search runs across the whole stream, so it cannot be combined with a tree scope. Clear the tree selection to search.');
-
       }
+      const examExact = Boolean(
+        examKeys && !search && scope.length === 0 && status !== 'changed'
+        && examKeys.length === 1 && examKeys[0] === normKey(examPick),
+      );
+      const examPostFilter = Boolean(examKeys && !examExact);
+      if (examExact) scope.push(['examType', examKeys![0]]);
 
       let query = adminDb.collection(QB_QUESTIONS) as Query;
       query = query.where('kind', '==', kind);
@@ -468,6 +496,7 @@ export function registerQuestionBankLibraryRoutes(
       }
 
       const matches = (d: any) => {
+        if (examKeys && !examMatches(d.examType, examKeys)) return false;
         if (words.length) {
           const hay = `${String(d.text || '')} ${String(d.explanation || '')} ${String(d.subject || '')} ${String(d.topic || '')}`.toLowerCase();
           if (!words.every((w) => hay.includes(w))) return false;
@@ -481,7 +510,7 @@ export function registerQuestionBankLibraryRoutes(
       let lastDoc: QueryDocumentSnapshot | null = null;
       let lastReturned: QueryDocumentSnapshot | null = null;
 
-      for (let round = 0; round < (search ? QB_PAGE_BUDGET : 1); round += 1) {
+      for (let round = 0; round < (search || examPostFilter ? QB_PAGE_BUDGET : 1); round += 1) {
         let page = query.limit(limit + 1) as Query;
         if (start) page = page.startAfter(...(start.v as any[]), adminDb.collection(QB_QUESTIONS).doc(start.i));
         const snap = await page.get();
@@ -580,6 +609,8 @@ export function registerQuestionBankLibraryRoutes(
     try {
       requireTos(req);
       const kind = parseKind(req.query.kind);
+      const examPick = String(req.query.exam || '').trim();
+      const examKeys = examPick ? examCandidateKeys(examPick) : null;
       const summary = await readSummary(kind);
       const setupNeeded = !summary?.setup?.backfilled || !summary?.setup?.recounted;
       // Counter repair check, free on the reads already in hand: a field name
@@ -595,7 +626,14 @@ export function registerQuestionBankLibraryRoutes(
       const sKeys = Object.keys(summary.subjects || {}).slice(0, SUBJECT_DOC_CAP);
       const subjectDocs = await readSubjectDocs(kind, sKeys);
       const repairNeeded = hasDottedKeys(summary) || subjectDocs.some(({ data }) => hasDottedKeys(data));
-      const subjects = subjectDocs.map(({ sKey, data }) => ({
+      const examCountFor = (byExamType: unknown): number => {
+        if (!examKeys) return -1;
+        const m = (byExamType || {}) as Record<string, any>;
+        return examKeys.reduce((n, k) => n + (Number(m[k]?.total) || 0), 0);
+      };
+      const subjects = subjectDocs
+        .filter(({ data }) => examCountFor(data?.byExamType) !== 0)
+        .map(({ sKey, data }) => ({
         key: sKey,
         label: String(data?.label || summary.subjects?.[sKey]?.label || sKey),
         total: Number(data?.total ?? summary.subjects?.[sKey]?.total) || 0,
@@ -607,8 +645,10 @@ export function registerQuestionBankLibraryRoutes(
           label: String(t.label || tKey),
           total: Number(t.total) || 0,
           byYear: t.byYear || {},
-        })).sort((a, b) => a.label.localeCompare(b.label)),
-      }));
+        })),
+        }))
+        .map((x) => ({ ...x, topics: (x.topics as any[]).sort((a: any, b: any) => a.label.localeCompare(b.label)) }))
+        .sort((a, b) => a.label.localeCompare(b.label));
       const meta = await readKindMeta(kind);
       res.json({
         ok: true,

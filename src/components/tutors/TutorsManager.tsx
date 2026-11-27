@@ -393,7 +393,7 @@ export const TutorsManager: React.FC = () => {
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div>
                 <h3 className="font-bold text-base text-slate-900">Invite Tutor</h3>
-                <p className="text-xs text-slate-500 mt-0.5">
+                <p className="text-[13px] text-slate-700 mt-0.5">
                   Assign academic departments and subjects taught.
                 </p>
               </div>
@@ -593,7 +593,7 @@ export const TutorsManager: React.FC = () => {
                   </div>
                   <div>
                     <h4 className="font-bold text-slate-900 text-sm">{selectedTutor.name}</h4>
-                    <p className="text-slate-500 text-xs">{(selectedTutor.departments || []).join(', ') || 'General'}</p>
+                    <p className="text-slate-700 text-[13px]">{(selectedTutor.departments || []).join(', ') || 'General'}</p>
                   </div>
                 </div>
 

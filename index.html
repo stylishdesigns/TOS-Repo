@@ -65,7 +65,7 @@
               try { hint = localStorage.getItem('tos:last-surface'); } catch (e2) { hint = null; }
               var b = null;
               try { b = JSON.parse(localStorage.getItem('tos:launch-brand') || 'null'); } catch (e) { b = null; }
-              var brandOk = !!(b && /^#[0-9a-fA-F]{6}$/.test(String(b.accent || '')));
+              var brandOk = !!(b && /^#[0-9a-fA-F]{6}$/.test(String(b.accent || '')) && !/^#ea580c$/i.test(String(b.accent || '')));
               // Door first, then what this device was last on, then a facility
               // device that has never been classified: facility portals open on
               // the facility's brand, the TOS console and the landing on TOS's

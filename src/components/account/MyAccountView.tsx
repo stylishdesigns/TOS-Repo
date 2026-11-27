@@ -237,11 +237,11 @@ export const MyAccountView: React.FC = () => {
           {/* Access Level Card (video 02:07 - 02:08) */}
           <div className="bg-white p-6 rounded-xl border border-slate-200/90 shadow-xs space-y-3">
             <h3 className="font-bold text-base text-slate-900">Access Level</h3>
-            <p className="text-xs text-slate-600 leading-relaxed">
+            <p className="text-[13px] text-slate-700 leading-relaxed">
               <span className="font-bold text-slate-900">• Super Administrator — full control.</span>{' '}
               You can add and remove other administrators, approve schools, configure the campaign, rubric and security, and change every setting. This is the highest access level.
             </p>
-            <div className="p-3 bg-slate-50 rounded-lg text-[11px] text-slate-500">
+            <div className="p-3 bg-slate-50 rounded-lg text-[13px] text-slate-700">
               Areas you can open: Dashboard • Schools • Students • Other Learners • Juries • Training • Assessments • Debate • Leaderboard • Reports • Account • Settings
             </div>
           </div>
@@ -252,7 +252,7 @@ export const MyAccountView: React.FC = () => {
       {activeTab === 'Password' && (
         <div className="bg-white p-6 rounded-xl border border-slate-200/90 shadow-xs max-w-2xl">
           <h3 className="font-bold text-base text-slate-900 pb-2 border-b border-slate-100">Change Password</h3>
-          <p className="text-xs text-slate-500 mt-2">
+          <p className="text-[13px] text-slate-700 mt-2">
             You'll need your current password. Changing it signs you out everywhere, including here, so you'll sign in again with the new one.
           </p>
 
@@ -333,7 +333,7 @@ export const MyAccountView: React.FC = () => {
             <div>
               <h3 className="font-bold text-sm text-slate-900">Two-factor authentication</h3>
               <p className="text-xs font-medium text-slate-800 mt-1">Require a code at login</p>
-              <p className="text-[11px] text-slate-400 mt-0.5">We'll email you a six-digit code each time you sign in.</p>
+              <p className="text-[13px] text-slate-700 mt-0.5">We'll email you a six-digit code each time you sign in.</p>
             </div>
 
             <button

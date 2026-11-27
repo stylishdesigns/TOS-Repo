@@ -16,11 +16,10 @@ export interface OutgoingEmail {
   subject: string;
   html: string;
   text: string;
-  /** ZeptoMail template merge values (full_name, centre_name, ...). When set
-   *  and ZEPTOMAIL_TEMPLATE_KEY is configured, the mail goes out through the
-   *  registered ZeptoMail template instead of the raw-message endpoint. */
+  /** Kept for the OTP template route only; ordinary mail always sends the
+   *  internal template's own HTML and text. */
   mergeFields?: Record<string, string>;
-  /** Overrides ZEPTOMAIL_TEMPLATE_KEY for this one send (the OTP template). */
+  /** The OTP template key, set only by sendOtpEmail. */
   templateKey?: string;
 }
 
@@ -69,10 +68,12 @@ async function sendViaZepto(email: OutgoingEmail): Promise<SendEmailResult> {
   const bounce =
     (process.env.ZEPTOMAIL_BOUNCE || '').trim() ||
     (host.includes('@') ? host : '');
-  const templateKey = email.templateKey || (process.env.ZEPTOMAIL_TEMPLATE_KEY || '').trim();
-  // A registered ZeptoMail template (the welcome template) carries its own
-  // subject and layout; Zoho fills the placeholders from merge_info. The
-  // template key is an identifier, never logged.
+  // Batch 57: the registered ZeptoMail templates are retired. Every mail goes
+  // out as a raw message carrying Tutorial OS's own template (email.ts
+  // builders and welcomeTemplate.ts), so what owners receive always matches
+  // what the code renders. Only the OTP template key may still route through
+  // a registered template, and only when set on the send itself.
+  const templateKey = (email.templateKey || '').trim();
   if (templateKey && email.mergeFields) {
     try {
       const res = await fetch(`${base}/v1.1/email/template`, {
@@ -192,6 +193,22 @@ const BOX = (label: string, value: string) => `
   <p style="font-size:18px;font-weight:800;margin:0;letter-spacing:.04em;">${value}</p>
 </div>`;
 
+// Batch 57: credentials are listed as check rows, one tick each, never as a
+// run-together statement. Order everywhere: login email, temporary password,
+// access code.
+const CHECK = (label: string, value: string) => `
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;margin:0 0 10px;">
+  <tr>
+    <td style="width:26px;vertical-align:top;">
+      <div style="width:22px;height:22px;border-radius:11px;background:#DCFCE7;color:#15803D;font-size:13px;font-weight:700;line-height:22px;text-align:center;">&#10003;</div>
+    </td>
+    <td style="vertical-align:top;padding-left:10px;">
+      <p style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#64748b;margin:0;">${label}</p>
+      <p style="font-size:16px;font-weight:800;color:#0f172a;margin:2px 0 0;word-break:break-all;">${value}</p>
+    </td>
+  </tr>
+</table>`;
+
 export function buildVerificationEmail(params: { to: string; fullName: string; businessName: string; verifyUrl: string }): OutgoingEmail {
   const body = `
   <p style="margin:0 0 16px;">Hi ${escapeHtml(params.fullName)},</p>
@@ -219,7 +236,7 @@ export function buildWelcomeEmail(params: {
   resend?: boolean;
 }): OutgoingEmail {
   const credentials = params.tempPassword
-    ? `${BOX('Login email', escapeHtml(params.loginEmail))}${BOX('Temporary password', escapeHtml(params.tempPassword))}`
+    ? `${CHECK('Login email', escapeHtml(params.loginEmail))}${CHECK('Temporary password', escapeHtml(params.tempPassword))}`
     : `<p style="margin:0 0 12px;">Sign in with the password you already use for <strong>${escapeHtml(params.loginEmail)}</strong>.</p>`;
   const steps = params.tempPassword
     ? `<li style="margin:0 0 8px;">Sign in and set your own password (the temporary one only works for 7 days).</li>
@@ -229,7 +246,7 @@ export function buildWelcomeEmail(params: {
   <p style="margin:0 0 16px;">Hi ${escapeHtml(params.fullName || 'there')},</p>
   <p style="margin:0 0 16px;">${params.resend ? 'Here are fresh login details for' : 'Welcome to'} <strong>${escapeHtml(params.centreName)}</strong> on Tutorial OS.</p>
   ${credentials}
-  ${params.accessCode ? BOX('Access code', escapeHtml(params.accessCode)) : ''}
+  ${params.accessCode ? CHECK('Access code', escapeHtml(params.accessCode)) : ''}
   <p style="font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#64748b;margin:18px 0 8px;">What happens next</p>
   <ol style="margin:0;padding-left:20px;font-size:14px;line-height:1.6;">
     ${steps}
@@ -246,8 +263,8 @@ export function buildWelcomeEmail(params: {
     html: WRAP(params.resend ? 'Fresh login details' : 'Welcome to Tutorial OS', body),
     text:
       `Hi ${params.fullName || 'there'},\n\n${params.resend ? 'Fresh login details for' : 'Welcome to'} ${params.centreName} on Tutorial OS.\n` +
-      (params.tempPassword ? `Login email: ${params.loginEmail}\nTemporary password: ${params.tempPassword}\n` : `Sign in with your existing password for ${params.loginEmail}.\n`) +
-      (params.accessCode ? `Access code: ${params.accessCode}\n` : '') +
+      (params.tempPassword ? `✓ Login email: ${params.loginEmail}\n✓ Temporary password: ${params.tempPassword}\n` : `Sign in with your existing password for ${params.loginEmail}.\n`) +
+      (params.accessCode ? `✓ Access code: ${params.accessCode}\n` : '') +
       `\nSign in at ${params.appUrl}/\n` +
       (params.tempPassword ? '\nThe temporary password expires in 7 days and is never stored anywhere.\n' : ''),
   };
@@ -266,9 +283,9 @@ export function buildStaffInviteEmail(params: {
   const body = `
   <p style="margin:0 0 16px;">Hi ${escapeHtml(params.fullName || 'there')},</p>
   <p style="margin:0 0 16px;">You have been added as <strong>${escapeHtml(params.role)}</strong> at <strong>${escapeHtml(params.centreName)}</strong> on Tutorial OS. Here is everything you need to sign in:</p>
-  ${BOX('Login email', escapeHtml(params.loginEmail))}
-  ${BOX('Temporary password', escapeHtml(params.tempPassword))}
-  ${params.accessCode ? BOX('Facility access code', escapeHtml(params.accessCode)) : ''}
+  ${CHECK('Login email', escapeHtml(params.loginEmail))}
+  ${CHECK('Temporary password', escapeHtml(params.tempPassword))}
+  ${params.accessCode ? CHECK('Facility access code', escapeHtml(params.accessCode)) : ''}
   <p style="font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#64748b;margin:18px 0 8px;">What happens next</p>
   <ol style="margin:0;padding-left:20px;font-size:14px;line-height:1.6;">
     <li style="margin:0 0 8px;">Sign in and set your own password. The temporary password only works for 7 days.</li>
@@ -283,8 +300,8 @@ export function buildStaffInviteEmail(params: {
     html: WRAP('Welcome to the team', body),
     text:
       `Hi ${params.fullName || 'there'},\n\nYou have been added as ${params.role} at ${params.centreName} on Tutorial OS.\n` +
-      `Login email: ${params.loginEmail}\nTemporary password: ${params.tempPassword}\n` +
-      (params.accessCode ? `Facility access code: ${params.accessCode}\n` : '') +
+      `✓ Login email: ${params.loginEmail}\n✓ Temporary password: ${params.tempPassword}\n` +
+      (params.accessCode ? `✓ Facility access code: ${params.accessCode}\n` : '') +
       `\nSign in at ${params.appUrl}/app and set your own password. The temporary password works for 7 days.\n`,
   };
 }
@@ -292,7 +309,7 @@ export function buildStaffInviteEmail(params: {
 export function buildAccessCodeChangedEmail(params: { to: string; centreName: string; accessCode: string; appUrl: string }): OutgoingEmail {
   const body = `
   <p style="margin:0 0 16px;">The access code for <strong>${escapeHtml(params.centreName)}</strong> was changed. The old code stopped working immediately; existing members are unaffected.</p>
-  ${BOX('New access code', escapeHtml(params.accessCode))}
+  ${CHECK('New access code', escapeHtml(params.accessCode))}
   <p style="margin:24px 0;">
     <a href="${params.appUrl}/" style="background:#ea580c;color:#ffffff;font-weight:700;text-decoration:none;padding:12px 22px;border-radius:10px;display:inline-block;">Open Tutorial OS</a>
   </p>`;
@@ -300,8 +317,50 @@ export function buildAccessCodeChangedEmail(params: { to: string; centreName: st
     to: params.to,
     subject: `Your new access code for ${params.centreName}`,
     html: WRAP('Access code changed', body),
-    text: `The access code for ${params.centreName} was changed. The old code stopped working immediately; existing members are unaffected.\n\nNew access code: ${params.accessCode}\n\nOpen Tutorial OS: ${params.appUrl}/`,
+    text: `The access code for ${params.centreName} was changed. The old code stopped working immediately; existing members are unaffected.\n\n✓ New access code: ${params.accessCode}\n\nOpen Tutorial OS: ${params.appUrl}/`,
   };
+}
+
+export type WelcomeRole = 'admin' | 'tutor' | 'student';
+
+/** Batch 58: the role welcome, sent once when an account takes its first
+ *  look inside its portal. Same facility, three different first stops. */
+export function buildRoleWelcomeEmail(params: {
+  to: string;
+  fullName: string;
+  centreName: string;
+  programmes: string;
+  role: WelcomeRole;
+  appUrl: string;
+}): OutgoingEmail {
+  const first = (params.fullName || '').split(/\s+/)[0] || 'there';
+  const name = escapeHtml(first);
+  const centre = escapeHtml(params.centreName);
+  const programmeLine = params.programmes
+    ? `<p style="margin:0 0 16px;">Your programmes: <strong>${escapeHtml(params.programmes)}</strong>.</p>`
+    : '';
+  const body = `<p style="margin:0 0 16px;">${name}, welcome to <strong>${centre}</strong> on Tutorial OS.</p>
+${programmeLine}
+<p style="margin:0 0 16px;">${escapeHtml(roleLine(params.role, centre))}</p>
+<p style="margin:24px 0;">
+  <a href="${params.appUrl}/" style="background:#ea580c;color:#ffffff;font-weight:700;text-decoration:none;padding:12px 22px;border-radius:10px;display:inline-block;">Open Tutorial OS</a>
+</p>`;
+  return {
+    to: params.to,
+    subject: `Welcome to ${params.centreName} on Tutorial OS`,
+    html: WRAP('Welcome', body),
+    text: `${first}, welcome to ${params.centreName} on Tutorial OS.\n\n${roleLine(params.role, params.centreName)}\n\nOpen Tutorial OS: ${params.appUrl}/`,
+  };
+}
+
+function roleLine(role: WelcomeRole, centre: string): string {
+  if (role === 'admin') {
+    return `Everything about ${centre} lives in your dashboard: students, tutors, fees, study materials, CBT mocks, attendance and the leaderboard. Add your students and take attendance from one place.`;
+  }
+  if (role === 'tutor') {
+    return `Your classes, study materials, attendance and CBT mocks for ${centre} are all in one place. Check your timetable and reach your students any time.`;
+  }
+  return `Your classes, study materials, video lessons, practice questions and CBT mocks are ready. Practise daily, take your mocks and climb the leaderboard.`;
 }
 
 function escapeHtml(value: string): string {

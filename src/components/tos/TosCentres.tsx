@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { loadLastGood, saveLastGood } from '../../lib/lastGood';
 import {
   Loader2, ChevronLeft, AlertTriangle, Send, Ban, RefreshCw,
-  Copy, Wallet, CheckCircle2, Plus, Trash2, Globe,
+  Copy, Wallet, CheckCircle2, Plus, Trash2, Globe, Mail, X, Upload, Paperclip,
 } from 'lucide-react';
 import {
   api, money, fmtDate, fmtDateTime, STATUS_LABELS, Json,
@@ -32,6 +32,9 @@ export const CentreDetail: React.FC<{ centreId: string; onBack: () => void; onDa
   const [confirmStatus, setConfirmStatus] = useState<'' | 'suspend' | 'reactivate'>('');
   const [reason, setReason] = useState('');
   const [payment, setPayment] = useState({ amount: '', periodEnd: '', seats: '', method: '', reference: '', note: '' });
+  // Batch 60: the receipt for a payment the console records, so the facility
+  // sees the proof in its own payment history like any direct payment.
+  const [paymentReceipt, setPaymentReceipt] = useState<{ name: string; data: string } | null>(null);
   const [seatEdits, setSeatEdits] = useState({ seatCap: '', billedSeatsMinimum: '', planId: '', freeSeatsCustom: '' });
 
   const load = useCallback(async () => {
@@ -153,6 +156,24 @@ export const CentreDetail: React.FC<{ centreId: string; onBack: () => void; onDa
           >
             {busy === 'resend-credentials' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} Reset owner password
           </button>
+          {/* Batch 58: hand the login details over again without resetting
+              the password while the owner has not signed in yet. */}
+          <button
+            onClick={() => doAction('resend-login-details', {}, (r) => {
+              if (r.alreadyActive) {
+                setOwnerNote('The owner has already signed in, so the temporary password is gone. Use Reset owner password to send a new one.');
+              } else if (r.delivered) {
+                setOwnerNote('The login details were sent to the owner by email again.');
+              } else if (r.tempPassword) {
+                setCredentials({ centreName: centre.name, email: centre.ownerEmail, password: r.tempPassword, accessCode: centre.accessCode });
+                setOwnerNote('Email could not be delivered; the details are on screen.');
+              }
+            })}
+            disabled={busy === 'resend-login-details'}
+            className={btnGhost}
+          >
+            {busy === 'resend-login-details' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />} Resend login details
+          </button>
           {ownerNote && <p className="text-xs text-emerald-300">{ownerNote}</p>}
         </div>
         {centre.suspendedReason && (
@@ -261,9 +282,32 @@ export const CentreDetail: React.FC<{ centreId: string; onBack: () => void; onDa
             <Field label="Note">
               <input value={payment.note} onChange={(e) => setPayment((p) => ({ ...p, note: e.target.value }))} className={inputCls} />
             </Field>
+            <Field label="Payment receipt (optional)">
+              {paymentReceipt ? (
+                <div className="flex items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
+                  <span className="text-xs text-white truncate flex items-center gap-2"><Paperclip className="w-3.5 h-3.5 text-orange-300 shrink-0" />{paymentReceipt.name}</span>
+                  <button onClick={() => setPaymentReceipt(null)} disabled={busy !== ''} className="text-slate-400 hover:text-white shrink-0" title="Remove the receipt"><X className="w-4 h-4" /></button>
+                </div>
+              ) : (
+                <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer hover:text-white transition-colors">
+                  <Upload className="w-4 h-4 shrink-0" /> Attach a receipt (PNG, JPG, WebP or PDF, up to 4 MB)
+                  <input type="file" accept="image/png,image/jpeg,image/webp,application/pdf" className="hidden" onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = '';
+                    if (!file) return;
+                    if (file.size > 4 * 1024 * 1024) { setActionError('The receipt can be up to 4 MB.'); return; }
+                    const reader = new FileReader();
+                    reader.onload = () => setPaymentReceipt({ name: file.name, data: String(reader.result || '') });
+                    reader.readAsDataURL(file);
+                  }} />
+                </label>
+              )}
+            </Field>
+            <p className="text-xs text-slate-400">Recording a payment notifies the facility immediately: its dashboard updates and its admins get an in-app, push and email notice. A receipt you attach shows in their seat payment history, the same as payments they make themselves.</p>
             <button
-              onClick={() => doAction('record-payment', { amount: Number(payment.amount), periodEnd: payment.periodEnd, seats: Number(payment.seats) || 0, method: payment.method, reference: payment.reference, note: payment.note }, (r: any) => {
+              onClick={() => doAction('record-payment', { amount: Number(payment.amount), periodEnd: payment.periodEnd, seats: Number(payment.seats) || 0, method: payment.method, reference: payment.reference, note: payment.note, ...(paymentReceipt ? { receiptData: paymentReceipt.data } : {}) }, (r: any) => {
                 setPayment({ amount: '', periodEnd: '', seats: '', method: '', reference: '', note: '' });
+                setPaymentReceipt(null);
                 if (r?.seats?.capped) setOwnerNote(r.seats.message || 'Only some seats could be added: the facility is at its seat cap.');
               })}
               disabled={busy !== '' || !payment.amount || !payment.periodEnd}
@@ -274,9 +318,9 @@ export const CentreDetail: React.FC<{ centreId: string; onBack: () => void; onDa
             {(payments || []).length > 0 && (
               <div className="pt-3 border-t border-white/5 space-y-1.5">
                 {payments.map((p: any) => (
-                  <div key={p.id} className="flex items-center justify-between text-xs">
+                  <div key={p.id} className="flex items-center justify-between gap-2 text-xs">
                     <span className="text-white font-bold">{money(p.amount)}</span>
-                    <span className="text-slate-400">covers to {fmtDate(p.periodCoveredUntil)} · {p.method || '—'} · {fmtDateTime(p.at)}</span>
+                    <span className="text-slate-400 truncate">covers to {fmtDate(p.periodCoveredUntil)} · {p.method || '—'} · {fmtDateTime(p.at)}{p.receiptUrl ? <> · <a href={p.receiptUrl} target="_blank" rel="noreferrer" className="text-orange-300 underline">receipt</a></> : null}</span>
                   </div>
                 ))}
               </div>

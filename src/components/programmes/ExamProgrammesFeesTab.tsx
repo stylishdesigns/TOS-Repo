@@ -90,7 +90,7 @@ export const ExamProgrammesFeesTab: React.FC = () => {
         <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50">
           <div>
             <h3 className="font-bold text-slate-900 text-sm">Exam Programmes Fee Schedule</h3>
-            <p className="text-xs text-slate-500">
+            <p className="text-[13px] text-slate-700">
               Tuition, mock examinations, registration, and instalment payment breakdown
             </p>
           </div>

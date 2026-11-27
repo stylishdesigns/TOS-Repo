@@ -5,6 +5,18 @@ import {
 } from 'lucide-react';
 import { api, fmtDate, inputCls } from './tosShared';
 import type { VideoResource, TosExamType } from '../../types';
+import { enablePush, pushPermission, type PushState } from '../student-portal/push';
+
+/** Batch 64: a custom exam a facility typed on the signup form, waiting for
+ *  the TOS admin to approve it into the registry or discard it. */
+interface ExamRequest {
+  id: string;
+  examName: string;
+  centreName?: string;
+  requestedBy?: string;
+  requestedAt?: string;
+  status?: string;
+}
 
 /**
  * Learning Resources (batch 42): the TOS console where platform staff build
@@ -85,6 +97,11 @@ export const TosVideos: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
   const [examBusy, setExamBusy] = useState(false);
   const [examErr, setExamErr] = useState('');
   const [examConfirmId, setExamConfirmId] = useState('');
+  // Batch 64: custom exams facilities typed on signup, waiting for review.
+  const [pendingReqs, setPendingReqs] = useState<ExamRequest[]>([]);
+  const [reqBusy, setReqBusy] = useState('');
+  const [reqMsg, setReqMsg] = useState('');
+  const [pushOn, setPushOn] = useState<PushState>(() => pushPermission());
 
   const load = useCallback(() => {
     setLoading(true);
@@ -92,10 +109,13 @@ export const TosVideos: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
     Promise.all([
       api('/api/tos/video-resources'),
       api('/api/tos/exam-types').catch(() => null),
+      api('/api/tos/exam-requests').catch(() => null),
     ])
-      .then(([v, e]: any[]) => {
+      .then(([v, e, r]: any[]) => {
         setVideos(Array.isArray(v?.videos) ? v.videos : []);
         if (e && Array.isArray(e?.exams)) setExams(e.exams);
+        const rs = Array.isArray(r?.requests) ? r.requests : [];
+        setPendingReqs(rs.filter((x: any) => x?.status === 'pending'));
       })
       .catch((e: any) => setErr(e?.message || 'Loading the video list failed.'))
       .finally(() => setLoading(false));
@@ -219,6 +239,41 @@ export const TosVideos: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
     }
   };
 
+  // Batch 64: review a custom exam request. Approve registers the exam in
+  // the shared registry (server adds it with the both question forms);
+  // discard closes the request without touching the registry.
+  const decide = async (rq: ExamRequest, decision: 'approve' | 'discard') => {
+    setReqBusy(rq.id);
+    setExamErr('');
+    try {
+      const d: any = await api(`/api/tos/exam-requests/${encodeURIComponent(rq.id)}/decide`, { method: 'POST', body: { decision } });
+      setPendingReqs((list) => list.filter((x) => x.id !== rq.id));
+      if (decision === 'approve') {
+        if (d?.exam) setExams((list) => [...list, d.exam as TosExamType].sort((a, b) => String(a.name).localeCompare(String(b.name))));
+        setReqMsg(`Approved: ${d?.exam?.name || rq.examName} is now in the registry.`);
+      } else {
+        setReqMsg(`Discarded the ${rq.examName} request.`);
+      }
+    } catch (e: any) {
+      setExamErr(e?.message || 'Could not record that decision.');
+    } finally {
+      setReqBusy('');
+    }
+  };
+
+  // Batch 64: turn on push notifications for the console, so new custom exam
+  // requests (and anything else TOS sends) reach the admin's device.
+  const enableConsolePush = async () => {
+    const st = await enablePush();
+    setPushOn(st);
+    setReqMsg(
+      st === 'granted' ? 'Push notifications are on for this device.'
+      : st === 'denied' ? 'Notifications are blocked for this site in this browser.'
+      : st === 'unsupported' ? 'This browser does not support push notifications.'
+      : 'Could not turn push on. Try again.',
+    );
+  };
+
   return (
     <div className="space-y-5">
       {/* Toolbar: refresh + add on the left, the Exams registry button in the
@@ -239,6 +294,11 @@ export const TosVideos: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
           title="Register the examinations learning resources are added for"
         >
           <ListPlus className="w-4 h-4 text-orange-400" /> Exams
+          {pendingReqs.length > 0 && (
+            <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-orange-500 text-[10px] font-extrabold text-white">
+              {pendingReqs.length}
+            </span>
+          )}
         </button>
       </div>
 
@@ -656,6 +716,56 @@ export const TosVideos: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
               <p className="text-[11px] text-slate-400 leading-relaxed">
                 These are the examinations learning resources can be tagged with. Students only see videos tagged with the exam on their own programme.
               </p>
+              {pendingReqs.length > 0 && (
+                <div className="rounded-xl border border-orange-500/30 bg-orange-500/10 p-3 space-y-2">
+                  <p className="text-[11px] font-bold text-orange-300 flex items-center gap-1.5">
+                    <GraduationCap className="w-3.5 h-3.5" /> Custom exam requests
+                  </p>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    Exams facilities added on signup that are not in the registry. Approving adds the exam to the registry so it can get its own questions; discarding closes the request.
+                  </p>
+                  <div className="space-y-1.5">
+                    {pendingReqs.map((rq) => (
+                      <div key={rq.id} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-white flex-1 truncate">{rq.examName}</span>
+                          {reqBusy === rq.id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
+                          ) : (
+                            <span className="flex items-center gap-1.5">
+                              <button
+                                onClick={() => decide(rq, 'approve')}
+                                className="h-7 px-2.5 rounded-lg bg-emerald-600 text-[11px] font-bold text-white hover:bg-emerald-500"
+                              >
+                                Approve
+                              </button>
+                              <button
+                                onClick={() => decide(rq, 'discard')}
+                                className="h-7 px-2.5 rounded-lg bg-rose-600 text-[11px] font-bold text-white hover:bg-rose-500"
+                              >
+                                Discard
+                              </button>
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-slate-400 mt-0.5">
+                          {rq.centreName || 'A facility'}{rq.requestedBy ? ` · ${rq.requestedBy}` : ''}{rq.requestedAt ? ` · ${new Date(rq.requestedAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'short' })}` : ''}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      onClick={enableConsolePush}
+                      disabled={pushOn === 'granted' || pushOn === 'unsupported'}
+                      className="h-7 px-2.5 rounded-lg border border-white/15 bg-white/5 text-[11px] font-bold text-slate-300 hover:text-white hover:bg-white/10 disabled:opacity-60 disabled:cursor-default"
+                    >
+                      {pushOn === 'granted' ? 'Push is on for this device' : 'Turn on push notifications'}
+                    </button>
+                  </div>
+                </div>
+              )}
+              {reqMsg && <p className="text-[11px] text-emerald-300">{reqMsg}</p>}
               <div className="space-y-1.5 max-h-64 overflow-y-auto">
                 {exams.map((ex) => (
                   <div key={ex.id} className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2">

@@ -29,11 +29,16 @@ check('app-context gate found', gateIdx > 0);
 const gateBlock = app.slice(gateIdx, gateIdx + 1600);
 check('gate back navigates to /#landing', gateBlock.includes("window.location.href = '/#landing'"));
 const backCount = (app.match(/window\.location\.href = '\/#landing'/g) || []).length;
-check('exactly one /#landing navigation in App.tsx', backCount === 1);
+// Two intentional hard navigations to /#landing: the app-context gate's back
+// (this batch) and the staff door's back (batch 52h), both fresh-load fixes.
+const staffIdx = app.indexOf('TosAdminLogin onBack=');
+const staffBlock = app.slice(staffIdx, staffIdx + 600);
+check('two /#landing navigations in App.tsx (gate + staff door)', backCount === 2);
+check('staff door back navigates to /#landing', staffBlock.includes("window.location.href = '/#landing'"));
 check('no stale state-only back on the app-context gate', !gateBlock.includes('setCentreGateRequested(false)'));
 
 // 2. The app context belt still holds the loading screen (unchanged).
-check('bound-facility belt still holds the loading screen', app.includes('isAppContext && appFacility && !currentUser && !appWelcomeCentre'));
+check('bound-facility belt still holds the loading screen', app.includes('isAppContext && appFacility && (!currentUser || facilityAppStaffSession) && !appWelcomeCentre'));
 
 // 3. The /app page's back link is unchanged and hidden in the installed app.
 check('install page back link targets /#landing', install.includes('href="/#landing"'));

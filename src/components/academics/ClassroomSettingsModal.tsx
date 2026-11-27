@@ -126,7 +126,7 @@ export const ClassroomSettingsModal: React.FC<Props> = ({ isOpen, onClose }) => 
             </div>
             <div>
               <h3 className="font-bold text-base text-slate-900">Classroom & Room Management Settings</h3>
-              <p className="text-xs text-slate-500">
+              <p className="text-[13px] text-slate-700">
                 Configure lecture halls, science laboratories, CBT test rooms, and student capacity
               </p>
             </div>

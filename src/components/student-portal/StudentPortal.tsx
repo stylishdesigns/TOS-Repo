@@ -1,4 +1,5 @@
 import { initialsAvatar } from '../../lib/avatar';
+import { fireFirstLook } from '../../lib/welcome';
 import { loadLastGood, loadLastGoodFlag, saveLastGoodFlag } from '../../lib/lastGood';
 import { LaunchSplash } from './LaunchSplash';
 import React, { useState, useEffect } from 'react';
@@ -72,6 +73,11 @@ export const StudentPortal: React.FC = () => {
   const orbShadowClosed = `0 0 0 5px color-mix(in srgb, ${orbAccent} 22%, transparent), 0 10px 24px color-mix(in srgb, ${orbAccent} 50%, transparent), inset 0 2px 0 rgba(255,255,255,.35)`;
 
   const { user, loading: authLoading } = useFirebase();
+
+  // Batch 58: the welcome trio fires once, on the student's first look.
+  useEffect(() => {
+    if (user && !authLoading) fireFirstLook(user.uid);
+  }, [user?.uid, authLoading]);
   const [profileLoading, setProfileLoading] = useState(true);
   const [hasProfile, setHasProfile] = useState(false);
   const [accessOff, setAccessOff] = useState(false);

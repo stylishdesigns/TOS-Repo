@@ -48,6 +48,7 @@ export interface ProvisionLead {
   city: string;
   examTypes: string[];
   accentColor?: string;
+  facilityType?: string;
   skipTrial: boolean;
   /** Optional popup extras (2026-11-13 signup wizard): stored on the centre
    *  document so the whitelabel branding and reports can use them. */
@@ -160,6 +161,7 @@ export async function provisionCentre(
 
   const centreRef = adminDb.collection('centres').doc(centreId);
   await centreRef.set({
+    ...(params.facilityType ? { facilityType: String(params.facilityType).trim().slice(0, 60) } : {}),
     name: businessName,
     // Batch 26: no trial. A new signup is a LEAD until it upgrades by
     // paying for at least the platform minimum of seats.
@@ -236,7 +238,7 @@ export async function provisionCentre(
   const accessCode = await createAccessCode(centreId);
   await centreRef.update({ accessCode });
 
-  // The welcome email is the user's ZeptoMail template (welcomeTemplate.ts):
+  // The welcome email is Tutorial OS's internal template (welcomeTemplate.ts):
   // access code, temporary password, the centre's own sign-in link, the app
   // install link and the WhatsApp community group.
   const appBase = (params.appBaseUrl || process.env.APP_URL || 'https://tutorialos.com').replace(/\/+$/, '');
@@ -253,9 +255,9 @@ export async function provisionCentre(
     subject: welcome.subject,
     html: welcome.html,
     text: welcome.text,
-    // Same values the embedded template renders locally; when
-    // ZEPTOMAIL_TEMPLATE_KEY is set the send goes through the registered
-    // ZeptoMail template and these fill its placeholders instead.
+    // Same values the embedded template renders locally; batch 57 retired the
+    // registered ZeptoMail template, so the send always carries the internal
+    // template's own HTML.
     mergeFields: {
       full_name: fullName || 'there',
       centre_name: businessName,
@@ -346,6 +348,32 @@ export async function resendCredentials(centreId: string, actorUid: string): Pro
   });
 
   return emailRes.delivered ? { delivered: true } : { delivered: false, tempPassword };
+}
+
+/** Batch 58: hand the login details over again WITHOUT resetting the owner's
+ *  password. Works while the owner has not signed in yet (the temporary
+ *  password still stands). Once they have set their own password the original
+ *  temporary password is gone, so the caller is told to use the reset flow. */
+export async function resendLoginDetails(
+  centreId: string,
+  actorUid: string
+): Promise<{ delivered: boolean; alreadyActive: boolean; tempPassword?: string }> {
+  const cDoc = await adminDb.collection('centres').doc(centreId).get();
+  if (!cDoc.exists) throw httpError(404, 'Facility not found.');
+  const email = normalizeEmail((cDoc.data() as any)?.ownerEmail || '');
+  if (!email) throw httpError(400, 'This facility has no owner email on file.');
+
+  let user;
+  try {
+    user = await adminAuth.getUserByEmail(email);
+  } catch {
+    throw httpError(404, 'The owner account does not exist yet. Ask them to sign up first.');
+  }
+
+  const claims = (user.customClaims || {}) as Record<string, any>;
+  if (!claims.mustChangePassword) return { delivered: false, alreadyActive: true };
+
+  return { ...(await resendCredentials(centreId, actorUid)), alreadyActive: false };
 }
 
 /** Regenerate the access code: the old one stops working immediately. */

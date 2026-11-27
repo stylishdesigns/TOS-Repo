@@ -36,7 +36,7 @@ export const ToastContainer: React.FC = () => {
             <div className="flex-1 min-w-0 pt-0.5">
               <p className="text-sm font-bold text-slate-900 leading-tight">{toast.title}</p>
               {toast.description && (
-                <p className="text-xs text-slate-500 mt-1 leading-normal">{toast.description}</p>
+                <p className="text-[13px] text-slate-700 mt-1 leading-normal">{toast.description}</p>
               )}
             </div>
 

@@ -42,6 +42,38 @@ export const STATUS_LABELS: Record<string, string> = {
 
 export const EXAM_LABELS: Record<string, string> = { jamb: 'JAMB', waec_neco: 'WAEC/NECO' };
 
+// Batch 60: exams come from the registry. The tab merges the registry names
+// into the label map on load, so older labels keep working and new exams
+// label themselves.
+export const examKeyOf = (raw: unknown): string =>
+  String(raw ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+
+// The legacy combined WAEC/NECO pipeline still answers for WAEC and NECO.
+export const examCandidateKeysOf = (key: string): string[] => {
+  if (key === 'waec_neco') return ['waec', 'neco', 'waec_neco'];
+  if (key === 'waec' || key === 'neco') return [key, 'waec_neco'];
+  return [key];
+};
+
+export const qTypeLabelOf = (t: string): string =>
+  t === 'mcq' ? 'MCQ only' : t === 'theory' ? 'Theory only' : 'MCQ + theory';
+
+interface RegistryExam { id: string; name: string; questionType: string; }
+export const useExamRegistry = (): RegistryExam[] => {
+  const [exams, setExams] = useState<RegistryExam[]>([]);
+  useEffect(() => {
+    let alive = true;
+    api('/api/tos/exam-types').then((r: any) => {
+      if (!alive) return;
+      const list = ((r.exams || []) as any[]).map((e) => ({ id: String(e.id), name: String(e.name), questionType: String(e.questionType || 'both') }));
+      setExams(list);
+      for (const e of list) EXAM_LABELS[examKeyOf(e.name)] = e.name;
+    }).catch(() => { /* the legacy labels still work */ });
+    return () => { alive = false; };
+  }, []);
+  return exams;
+};
+
 const pad = (n: number) => String(n).padStart(2, '0');
 const monthRange = (ym: string) => {
   const [y, m] = ym.split('-').map(Number);
@@ -85,8 +117,9 @@ const MockForm: React.FC<{
   initial: { title: string; examType: string; rows: SubjectRow[]; source: 'random' | 'picked'; date?: string };
   busy: boolean;
   showDate?: boolean;
+  exams?: RegistryExam[];
   onSubmit: (payload: Json) => void;
-}> = ({ initial, busy, showDate, onSubmit }) => {
+}> = ({ initial, busy, showDate, exams = [], onSubmit }) => {
   const [title, setTitle] = useState(initial.title);
   const [examType, setExamType] = useState(initial.examType);
   const [rows, setRows] = useState<SubjectRow[]>(initial.rows);
@@ -142,6 +175,7 @@ const MockForm: React.FC<{
   };
 
   const isJamb = examType === 'jamb';
+  const examQType = exams.find((e) => examKeyOf(e.name) === examType)?.questionType || '';
   const setRow = (i: number, patch: Partial<SubjectRow>) =>
     setRows(rows.map((r, j) => (j === i ? { ...r, ...patch } : r)));
 
@@ -183,14 +217,21 @@ const MockForm: React.FC<{
           placeholder="e.g. November full-length practice" maxLength={120} />
       </Field>
       <Field label="Exam type">
-        <div className="flex gap-2">
-          {['jamb', 'waec_neco'].map((t) => (
-            <button key={t} type="button" onClick={() => { setExamType(t); if (t === 'waec_neco') setRows(rows.slice(0, 1)); }}
+        <div className="flex flex-wrap gap-2">
+          {(exams.length > 0
+            ? exams.map((e) => ({ t: examKeyOf(e.name), label: e.name, qt: e.questionType }))
+            : ['jamb', 'waec_neco'].map((t) => ({ t, label: EXAM_LABELS[t], qt: 'both' }))
+          ).map(({ t, label, qt }) => (
+            <button key={t} type="button" onClick={() => { setExamType(t); if (['waec', 'neco', 'waec_neco'].includes(t)) setRows(rows.slice(0, 1)); }}
               className={`px-4 py-2.5 rounded-xl text-sm font-bold border transition-colors ${examType === t ? 'bg-orange-500/15 text-orange-300 border-orange-500/40' : 'text-slate-300 border-white/10 hover:border-white/25 bg-slate-950/40'}`}>
-              {EXAM_LABELS[t]}
+              {label}
+              <span className="block text-[10px] font-semibold opacity-75">{qTypeLabelOf(qt)}</span>
             </button>
           ))}
         </div>
+        {examQType === 'theory' && (
+          <p className="text-[11px] text-amber-300 mt-1.5">This exam takes theory questions only. The theory pipeline is still being built, so its mock bank is empty until then.</p>
+        )}
       </Field>
       <Field label="Question source">
         <div className="flex gap-2">
@@ -1386,6 +1427,14 @@ export const MocksTab: React.FC<{ refreshKey: number; openCreateSignal?: number 
   const [createError, setCreateError] = useState('');
   const [guideOpen, setGuideOpen] = useState(false);
 
+  // Batch 60: the exam picker is the first screen on this tab, and a mock
+  // cannot be set up until a specific exam is picked. The registry also
+  // feeds the create form's exam chips and the labels.
+  const exams = useExamRegistry();
+  const [examPick, setExamPick] = useState('');
+  const [examNotice, setExamNotice] = useState('');
+  const examQTypeOf = (key: string) => exams.find((e) => examKeyOf(e.name) === key)?.questionType || '';
+
   // UI piece 1, revised Oct 28 (user's call): the panel is now a slide-in
   // drawer instead of a card below the calendar, so a tap always brings the
   // form to the front. The date field takes focus when the create drawer
@@ -1437,6 +1486,12 @@ export const MocksTab: React.FC<{ refreshKey: number; openCreateSignal?: number 
   const today = todayStr();
 
   const createOn = async (date: string) => {
+    if (!examPick) {
+      setExamNotice('Choose an exam first: every mock is built for one exam.');
+      setSubTab('calendar');
+      return;
+    }
+    setExamNotice('');
     setPanel({ mode: 'create', date });
     setCreateError('');
   };
@@ -1461,10 +1516,36 @@ export const MocksTab: React.FC<{ refreshKey: number; openCreateSignal?: number 
     { id: 'settings', label: 'Settings' },
   ] as const;
 
+  const chipIdle = 'px-4 py-2.5 rounded-xl text-sm font-bold border transition-colors text-slate-300 border-white/10 hover:border-white/25 bg-slate-950/40';
+  const chipActive = 'px-4 py-2.5 rounded-xl text-sm font-bold border transition-colors bg-orange-500/15 text-orange-300 border-orange-500/40';
+
   return (
     <div className="space-y-5">
+      {/* Batch 60: exam picker first. A mock is always built for one exam,
+          and the form stays closed until that exam is chosen here. */}
       <div className="flex flex-wrap items-center gap-2">
-        <button onClick={() => createOn(todayStr())} className={btnPrimary}>
+        <span className="text-[11px] font-black uppercase tracking-wider text-slate-500 mr-1">Exam</span>
+        <button type="button" onClick={() => { setExamPick(''); setExamNotice(''); }} className={examPick === '' ? chipActive : chipIdle}>
+          All exams
+        </button>
+        {exams.map((e) => (
+          <button key={e.id} type="button" onClick={() => { setExamPick(examKeyOf(e.name)); setExamNotice(''); }}
+            title={`${e.name}: ${qTypeLabelOf(e.questionType)}`}
+            className={examPick === examKeyOf(e.name) ? chipActive : chipIdle}>
+            {e.name}
+          </button>
+        ))}
+        {exams.length === 0 && <span className="text-xs text-slate-500">Loading exams…</span>}
+      </div>
+      <p className={`text-xs ${examNotice ? 'text-amber-300' : 'text-slate-500'}`}>
+        {examNotice
+          ? examNotice
+          : examPick
+            ? `${EXAM_LABELS[examPick] || examPick}: ${qTypeLabelOf(examQTypeOf(examPick))}. Pick the exam before setting a mock up; its subjects and question types follow it.`
+            : 'Pick an exam above to set a mock up. The calendar shows every exam’s mocks either way.'}
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <button onClick={() => createOn(todayStr())} className={btnPrimary} disabled={!examPick} title={examPick ? 'New mock' : 'Choose an exam first'}>
           <Plus className="w-4 h-4" /> New mock
         </button>
         <button onClick={() => setGuideOpen(true)} aria-label="How this works" title="How this works"
@@ -1515,6 +1596,7 @@ export const MocksTab: React.FC<{ refreshKey: number; openCreateSignal?: number 
                   >
                     <span className={`text-[11px] font-bold ${mk ? 'text-white' : 'text-slate-500'}`}>{day}</span>
                     {mk && <span className="block text-[9px] font-bold uppercase tracking-wider mt-0.5 truncate">{STATUS_LABELS[mk.status] || mk.status}</span>}
+                    {mk && <span className="block text-[9px] font-bold text-slate-400 mt-0.5 truncate">{EXAM_LABELS[mk.examType] || mk.examType}</span>}
                   </button>
                 );
               })()}
@@ -1538,7 +1620,8 @@ export const MocksTab: React.FC<{ refreshKey: number; openCreateSignal?: number 
               <>
                 <MockForm
                   showDate
-                  initial={{ ...emptyForm('jamb'), date: panel.date }}
+                  exams={exams}
+                  initial={{ ...emptyForm(examPick || 'jamb'), date: panel.date }}
                   busy={creating}
                   onSubmit={async (payload) => {
                     setCreating(true); setCreateError('');

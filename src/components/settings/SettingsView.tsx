@@ -504,7 +504,7 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
         <div className="bg-white p-5 sm:p-6 rounded-xl border border-slate-200/90 shadow-xs space-y-5">
           <div className="border-b border-slate-100 pb-3">
             <h3 className="text-base font-bold text-slate-900">Administrator Profile Details</h3>
-            <p className="text-xs text-slate-500">
+            <p className="text-[13px] text-slate-700">
               Personal contact information and designation displayed across administrative records.
             </p>
           </div>
@@ -606,7 +606,7 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
           <div className="bg-white p-5 sm:p-6 rounded-xl border border-slate-200/90 shadow-xs space-y-4">
             <div className="border-b border-slate-100 pb-3">
               <h3 className="text-base font-bold text-slate-900">Change Administrative Password</h3>
-              <p className="text-xs text-slate-500">
+              <p className="text-[13px] text-slate-700">
                 Choose a strong passphrase with numbers, uppercase letters, and symbols.
               </p>
             </div>
@@ -674,7 +674,7 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
           <div className="bg-white p-5 sm:p-6 rounded-xl border border-slate-200/90 shadow-xs flex items-center justify-between">
             <div>
               <h4 className="text-sm font-bold text-slate-900">Two-Factor Authentication (2FA)</h4>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <p className="text-[13px] text-slate-700 mt-0.5">
                 Require an SMS OTP code or Authenticator app token on login.
               </p>
             </div>
@@ -705,7 +705,7 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
           <div className="bg-white p-5 sm:p-6 rounded-xl border border-slate-200/90 shadow-xs space-y-3">
             <div className="border-b border-slate-100 pb-3">
               <h3 className="text-base font-bold text-slate-900">Session Expiry</h3>
-              <p className="text-xs text-slate-500">
+              <p className="text-[13px] text-slate-700">
                 How long a login on any of your devices stays signed in. "None" keeps every device signed in until you sign out or revoke it.
               </p>
             </div>
@@ -727,7 +727,7 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
             <div className="border-b border-slate-100 pb-3 flex items-center justify-between gap-3">
               <div>
                 <h3 className="text-base font-bold text-slate-900">Active Login Sessions</h3>
-                <p className="text-xs text-slate-500">
+                <p className="text-[13px] text-slate-700">
                   Every device signed into this account, tracked live. Revoke one to sign it out.
                 </p>
               </div>
@@ -816,7 +816,7 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
           <div className="bg-white p-5 sm:p-6 rounded-xl border border-slate-200/90 shadow-xs space-y-4">
             <div className="border-b border-slate-100 pb-3">
               <h3 className="text-base font-bold text-slate-900">Accent colour</h3>
-              <p className="text-xs text-slate-500">
+              <p className="text-[13px] text-slate-700">
                 One colour for your facility: the website landing page, portals, login page and the app families install. Saving here updates them all together, no deploy needed.
               </p>
             </div>
@@ -847,7 +847,7 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
           <div className="bg-white p-5 sm:p-6 rounded-xl border border-slate-200/90 shadow-xs space-y-4">
             <div className="border-b border-slate-100 pb-3">
               <h3 className="text-base font-bold text-slate-900">Facility Logo</h3>
-              <p className="text-xs text-slate-500">
+              <p className="text-[13px] text-slate-700">
                 Your logo appears on your facility's landing page and becomes the app icon when families install your app. A square image works best.
               </p>
             </div>
@@ -888,7 +888,7 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
           <div className="bg-white p-5 sm:p-6 rounded-xl border border-slate-200/90 shadow-xs space-y-4">
             <div className="border-b border-slate-100 pb-3">
               <h3 className="text-base font-bold text-slate-900">Welcome Image</h3>
-              <p className="text-xs text-slate-500">
+              <p className="text-[13px] text-slate-700">
                 The picture families see when your app opens, above Get Started and Log In. A photo of your centre or a graphic both work. A tall portrait image (three by four) fills the card best; every facility starts with a default students image until you change it.
               </p>
             </div>
@@ -927,7 +927,7 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
             <div className="border-b border-slate-100 pb-3 flex items-start justify-between gap-3">
               <div>
                 <h3 className="text-base font-bold text-slate-900">Facility Photos</h3>
-                <p className="text-xs text-slate-500">
+                <p className="text-[13px] text-slate-700">
                   Show families what your facility looks like. Add up to 5 photos, one at a time or several at once. Tap a photo to preview it large.
                 </p>
               </div>
@@ -982,7 +982,7 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
           <div className="bg-white p-5 sm:p-6 rounded-xl border border-slate-200/90 shadow-xs space-y-5">
           <div className="border-b border-slate-100 pb-3">
             <h3 className="text-base font-bold text-slate-900">Facility Identity & Academic Parameters</h3>
-            <p className="text-xs text-slate-500">
+            <p className="text-[13px] text-slate-700">
               Global Facility name, active academic session, and official contact lines.
             </p>
           </div>
@@ -1106,7 +1106,7 @@ export const SettingsView: React.FC<{ mode?: 'profile' | 'facility' }> = ({ mode
         <div className="space-y-3">
           <div>
             <h3 className="text-base font-bold text-slate-900">Website Landing Page</h3>
-            <p className="text-xs text-slate-500">The public page families see at your facility's address. Edit what it says below.</p>
+            <p className="text-[13px] text-slate-700">The public page families see at your facility's address. Edit what it says below.</p>
           </div>
           <WebsiteLanding />
         </div>
