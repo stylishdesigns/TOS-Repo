@@ -65,6 +65,25 @@ export function AppInstallPage() {
   const [retryHint] = useState(() => consumeInstallRetryFlag());
   const [appOnly, setAppOnly] = useState<boolean | null>(null);
 
+  const [urlCentre, setUrlCentre] = useState<AppCentre | null>(null);
+
+  // When the link carries ?centre= (the welcome email and the app-only gate
+  // both do), show that facility's own name and logo on this page straight
+  // away, before the access code is even entered.
+  useEffect(() => {
+    const slug = new URLSearchParams(window.location.search).get('centre');
+    if (!slug || appCentre) return;
+    let alive = true;
+    fetch(`/api/public/centre-by-slug?centre=${encodeURIComponent(slug)}`)
+      .then((r) => r.json())
+      .then((d: any) => {
+        if (!alive || !d || d.locked || !d.centreName) return;
+        setUrlCentre({ slug: slugifyName(d.centreName), name: String(d.centreName), logo: String(d.logoUrl || ''), accent: String(d.accent || '') });
+      })
+      .catch(() => undefined);
+    return () => { alive = false; };
+  }, []);
+
   useEffect(() => {
     isAppOnlyOn().then(setAppOnly).catch(() => undefined);
   }, []);
@@ -173,6 +192,8 @@ export function AppInstallPage() {
   const card: CSSProperties = { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 16, padding: 22, textAlign: 'center' };
   const primaryBtn: CSSProperties = { width: '100%', minHeight: 52, borderRadius: 12, border: 'none', background: accent || '#EA580C', color: '#fff', fontWeight: 800, fontSize: 16, cursor: 'pointer' };
 
+  const showCentre = centre || urlCentre;
+
   const loginCard = (
     <div style={{ ...card, background: 'rgba(22,163,74,0.14)', borderColor: 'rgba(34,197,94,0.35)' }}>
       <h2 style={{ fontSize: 20, fontWeight: 800, margin: '0 0 6px', color: '#DCFCE7' }}>
@@ -197,6 +218,16 @@ export function AppInstallPage() {
       <p style={{ color: '#94A3B8', fontSize: 15, lineHeight: 1.6, margin: '0 auto 26px', maxWidth: 420 }}>
         Enter your facility&apos;s access code so the app installs with your facility&apos;s own name, logo and colours. The code is in your welcome email.
       </p>
+      {(showCentre) && (
+        <div style={{ margin: '0 auto 18px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+          {showCentre.logo ? (
+            <img src={showCentre.logo} alt={showCentre.name} style={{ width: 64, height: 64, borderRadius: 16, objectFit: 'cover', border: '1px solid rgba(255,255,255,0.18)' }} />
+          ) : (
+            <div style={{ width: 64, height: 64, borderRadius: 16, background: accent || '#EA580C', color: '#fff', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: 22 }}>{initialsOf(showCentre.name)}</div>
+          )}
+          <span style={{ fontWeight: 800, fontSize: 15, color: '#F8FAFC' }}>{showCentre.name}</span>
+        </div>
+      )}
       <div style={card}>
         <input
           value={code}
