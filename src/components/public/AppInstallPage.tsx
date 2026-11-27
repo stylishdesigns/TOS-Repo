@@ -11,7 +11,7 @@ type InstallPromptEvent = Event & {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 };
 
-type AppCentre = { slug: string; name: string; logo: string };
+type AppCentre = { slug: string; name: string; logo: string; accent?: string };
 
 const CENTRE_KEY = 'tos:app-centre';
 
@@ -56,7 +56,7 @@ export function AppInstallPage() {
   const [justInstalled, setJustInstalled] = useState(false);
   const [code, setCode] = useState('');
   const [looking, setLooking] = useState(false);
-  const [accent, setAccent] = useState<string>('');
+  const [accent, setAccent] = useState<string>(() => appCentre?.accent || '');
   const [codeError, setCodeError] = useState('');
   const [deferred, setDeferred] = useState<InstallPromptEvent | null>(() => getPendingInstallPrompt() as InstallPromptEvent | null);
   const [noPrompt, setNoPrompt] = useState(false);
@@ -305,12 +305,7 @@ export function AppInstallPage() {
   return (
     <div style={{ minHeight: '100dvh', background: '#0F172A', color: '#F8FAFC', display: 'flex', flexDirection: 'column', fontFamily: 'Inter, sans-serif' }}>
       <header style={{ padding: '18px 24px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', gap: 10 }}>
-        <span style={{ width: 38, height: 38, borderRadius: 10, background: accent || '#EA580C', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-          <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z" fill="none" stroke="#fff" strokeWidth="2" strokeLinejoin="round" />
-            <path d="M9 12l2 2 4-4" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </span>
+        <img src="/tos-brand-icon.png" alt="Tutorial OS" style={{ width: 38, height: 38, borderRadius: 10, objectFit: 'contain', flexShrink: 0 }} />
         <span style={{ fontWeight: 800, fontSize: 17 }}>Tutorial OS</span>
       </header>
 

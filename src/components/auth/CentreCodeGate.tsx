@@ -40,6 +40,24 @@ export const CentreCodeGate: React.FC<CentreCodeGateProps> = ({ onProceed, onBac
     try {
       const appOnly = await isAppOnlyOn();
       if (appOnly && !isStandaloneDisplay() && !isDesktopBrowser()) {
+        // The facility is already confirmed here: this code was just looked up
+        // and matched. Hand it to the install page so the user never types the
+        // access code twice; /app opens straight on the install step for this
+        // facility, already branded.
+        try {
+          const slug = String(centre.centreName || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+          if (slug) {
+            sessionStorage.setItem('tos:app-centre', JSON.stringify({
+              slug,
+              name: centre.centreName,
+              logo: String(centre.logoUrl || ''),
+              accent: String(centre.accentColor || ''),
+            }));
+            // This code is now the device's facility: drop any earlier signup's
+            // branding so it can never win over the code just used.
+            sessionStorage.removeItem('tos:signup-result');
+          }
+        } catch { /* storage unavailable: the install page asks for the code */ }
         window.location.href = '/app';
         return;
       }
@@ -134,22 +152,24 @@ export const CentreCodeGate: React.FC<CentreCodeGateProps> = ({ onProceed, onBac
 
       <div className="w-full max-w-md bg-slate-900/90 border border-slate-800/80 rounded-3xl p-8 backdrop-blur-xl shadow-2xl relative z-10">
         <div className="flex flex-col items-center text-center mb-8">
-          <div className="w-16 h-16 rounded-2xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-500 shadow-inner shadow-orange-500/20 mb-4">
-            <Building2 className="w-8 h-8" />
-          </div>
+          <img src="/tos-brand-icon.png" alt="Tutorial OS" className="w-16 h-16 rounded-2xl mb-4 shadow-lg" />
           {lockedCentre ? (
             <>
               <h1 className="text-2xl font-black tracking-tight text-white mb-2">Facility access code</h1>
-              <p className="text-sm text-slate-400 font-medium max-w-xs">
-                Enter the 6-digit access code provided by your education facility.
-              </p>
+              {!centre && (
+                <p className="text-sm text-slate-400 font-medium max-w-xs">
+                  Enter the 6-digit access code provided by your education facility.
+                </p>
+              )}
             </>
           ) : (
             <>
               <h1 className="text-2xl font-black tracking-tight text-white mb-2">Which facility?</h1>
-              <p className="text-sm text-slate-400 font-medium max-w-xs">
-                Enter the 6-digit access code provided by your education facility.
-              </p>
+              {!centre && (
+                <p className="text-sm text-slate-400 font-medium max-w-xs">
+                  Enter the 6-digit access code provided by your education facility.
+                </p>
+              )}
             </>
           )}
         </div>
@@ -214,14 +234,14 @@ export const CentreCodeGate: React.FC<CentreCodeGateProps> = ({ onProceed, onBac
           <div className="space-y-6">
             <div className="p-5 rounded-2xl bg-slate-800/60 border border-slate-700/60 text-center">
               {centre.logoUrl ? (
-                <img src={centre.logoUrl} alt="Facility logo" className="w-12 h-12 mx-auto rounded-xl object-contain bg-white p-1.5 mb-3 shadow-lg" />
+                <img src={centre.logoUrl} alt="Facility logo" className="w-20 h-20 mx-auto rounded-2xl object-contain bg-white p-2 mb-3 shadow-lg" />
               ) : (
-                <div className="w-12 h-12 mx-auto rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-400 mb-3">
-                  <Building2 className="w-6 h-6" />
+                <div className="w-20 h-20 mx-auto rounded-2xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-400 mb-3">
+                  <Building2 className="w-10 h-10" />
                 </div>
               )}
               <p className="text-[11px] uppercase tracking-widest text-slate-500 font-bold mb-1">You are entering</p>
-              <p className="text-xl font-black text-white">{centre.centreName}</p>
+              <p className="text-3xl font-black text-white tracking-tight">{centre.centreName}</p>
               {centre.suspended && (
                 <p className="text-xs text-amber-400 font-medium mt-2">
                   This facility is currently inactive. Contact the facility administration.
