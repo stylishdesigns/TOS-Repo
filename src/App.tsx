@@ -509,6 +509,7 @@ const MainLayout: React.FC = () => {
         title={authCentre?.centreName || ''}
         accent={authCentre?.accent}
         logoUrl={authCentre?.logoUrl}
+        logoUrl={authCentre?.logoUrl}
         subtitle=""
         onSuccess={() => {}}
         onBack={handleLogout}
@@ -1005,6 +1006,7 @@ const MainLayout: React.FC = () => {
         portalType="student"
         title={authCentre?.centreName || ''}
         accent={authCentre?.accent}
+        logoUrl={authCentre?.logoUrl}
         subtitle=""
         onSuccess={() => {}}
         onBack={() => { if (appWelcomeCentre) { setAppWelcomeMode('welcome'); } else { setShowPortals(false); setShowWelcome(true); setCentreGateRequested(false); } }}
@@ -1027,6 +1029,7 @@ const MainLayout: React.FC = () => {
         portalType="student"
         title={authCentre?.centreName || ''}
         accent={authCentre?.accent}
+        logoUrl={authCentre?.logoUrl}
         subtitle=""
         onSuccess={() => {}}
         onBack={() => { if (appWelcomeCentre) { setAppWelcomeMode('welcome'); } else { setShowPortals(false); setShowWelcome(true); setCentreGateRequested(false); } }}

@@ -24,6 +24,7 @@ check(app.includes('accent?: string; logoUrl?: string } | null'), 'pendingCentre
 check((app.match(/setPendingCentre\(\{ code: '', centreName: facility\.centreName, centreId: facility\.centreId, accent: facility\.accent, logoUrl: facility\.logoUrl \}\);/) || []).length === 1, 'facility-resolution pendingCentre carries logoUrl');
 check((app.match(/setPendingCentre\(\{ code, centreName, centreId, accent, logoUrl: logoUrl \|\| '' \}\);/g) || []).length === 2, 'both gate onProceeds hand the logo through');
 check(app.includes('logoUrl: pendingCentre.logoUrl'), 'authCentre passes pendingCentre logoUrl to AuthPortal');
+check((app.match(/logoUrl=\{authCentre\?\.logoUrl\}/g) || []).length >= 3, 'every authCentre AuthPortal hands the logo through');
 check(app.includes('logoUrl: appWelcomeCentre.logoUrl }'), 'welcome-restore pendingCentre carries logoUrl');
 
 const gate = repo('src/components/auth/CentreCodeGate.tsx');
