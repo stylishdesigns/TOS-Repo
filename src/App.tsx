@@ -509,7 +509,6 @@ const MainLayout: React.FC = () => {
         title={authCentre?.centreName || ''}
         accent={authCentre?.accent}
         logoUrl={authCentre?.logoUrl}
-        logoUrl={authCentre?.logoUrl}
         subtitle=""
         onSuccess={() => {}}
         onBack={handleLogout}
