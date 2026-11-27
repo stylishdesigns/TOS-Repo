@@ -6,21 +6,25 @@ import { expect, type Page } from '@playwright/test';
 export const QA_ACCESS_CODE = process.env.E2E_QA_ACCESS_CODE || '';
 export const QA_OWNER_EMAIL = process.env.E2E_QA_OWNER_EMAIL || '';
 export const QA_OWNER_PASSWORD = process.env.E2E_QA_OWNER_PASSWORD || '';
+export const QA_TUTOR_EMAIL = process.env.E2E_QA_TUTOR_EMAIL || '';
+export const QA_TUTOR_PASSWORD = process.env.E2E_QA_TUTOR_PASSWORD || '';
+export const QA_STUDENT_EMAIL = process.env.E2E_QA_STUDENT_EMAIL || '';
+export const QA_STUDENT_PASSWORD = process.env.E2E_QA_STUDENT_PASSWORD || '';
 export const QA_FACILITY_NAME = process.env.E2E_QA_FACILITY_NAME || 'Fo QA Facility';
 
 export const qaCredentialsConfigured = Boolean(
-  QA_ACCESS_CODE && QA_OWNER_EMAIL && QA_OWNER_PASSWORD,
+  QA_ACCESS_CODE && QA_OWNER_EMAIL && QA_OWNER_PASSWORD && QA_TUTOR_EMAIL && QA_TUTOR_PASSWORD && QA_STUDENT_EMAIL && QA_STUDENT_PASSWORD,
 );
 
 export const qaSkipReason = qaCredentialsConfigured
   ? undefined
-  : 'QA facility credentials are not configured (set E2E_QA_ACCESS_CODE, E2E_QA_OWNER_EMAIL and E2E_QA_OWNER_PASSWORD)';
+  : 'QA facility credentials are not configured (set E2E_QA_ACCESS_CODE plus the owner, tutor and student email/password pairs)';
 
-// Sign the QA facility's owner in through the same flow a real facility owner
-// walks: the landing Login button, the 6-digit access-code gate, then the
-// facility's own email + password sign-in form. Nothing is written to any
-// facility's data; this only establishes the signed-in session.
-export async function qaOwnerSignin(page: Page): Promise<void> {
+// Sign a QA facility account in through the same flow every real user walks:
+// the landing Login button, the 6-digit access-code gate, then the facility's
+// own email + password sign-in form. Nothing is written to any facility's
+// data; this only establishes the signed-in session for one account.
+export async function qaPortalSignin(page: Page, email: string, password: string): Promise<void> {
   await page.goto('/');
   await page.getByRole('button', { name: 'Login', exact: true }).click();
 
@@ -38,7 +42,11 @@ export async function qaOwnerSignin(page: Page): Promise<void> {
 
   const emailBox = page.getByPlaceholder('e.g. name@yourfacility.com');
   await emailBox.waitFor({ state: 'visible', timeout: 30_000 });
-  await emailBox.fill(QA_OWNER_EMAIL);
-  await page.getByPlaceholder('\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022').fill(QA_OWNER_PASSWORD);
+  await emailBox.fill(email);
+  await page.getByPlaceholder('\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022').fill(password);
   await page.getByRole('button', { name: 'Sign In' }).click();
+}
+
+export function qaOwnerSignin(page: Page): Promise<void> {
+  return qaPortalSignin(page, QA_OWNER_EMAIL, QA_OWNER_PASSWORD);
 }
