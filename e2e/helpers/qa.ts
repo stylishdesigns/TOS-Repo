@@ -44,7 +44,7 @@ export async function qaPortalSignin(page: Page, email: string, password: string
   await emailBox.waitFor({ state: 'visible', timeout: 30_000 });
   await emailBox.fill(email);
   await page.getByPlaceholder('\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022').fill(password);
-  await page.getByRole('button', { name: 'Sign In' }).click();
+  await page.getByRole('button', { name: 'Sign In', exact: true }).click();
 }
 
 export function qaOwnerSignin(page: Page): Promise<void> {
