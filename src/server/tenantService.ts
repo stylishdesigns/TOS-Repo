@@ -1,5 +1,5 @@
 import { adminDb, adminAuth } from './firebaseAdmin';
-import { reconcileSeatOrder, renumberSeatsForCentre, migrateToLeadTier } from './seatDays';
+import { reconcileSeatOrder, renumberSeatsForCentre, migrateToLeadTier, SEAT_FLOOR } from './seatDays';
 import { ensurePlansV2, ensurePlansV3, ensurePlansV4Prices } from './seatUpgrades';
 import {
   Centre,
@@ -552,11 +552,14 @@ export function seatCapFor(
   // A seat cap the TOS console set directly (it differs from the plan's own
   // cap) is an explicit override and wins even during a trial, so the cap the
   // console shows is the cap the facility enforces.
+  // Batch 58: every facility starts with at least FIVE seats (the free
+  // grant). Older facilities whose billing cap still reads 0 or 2 from the
+  // old setup show and enforce at least five; a cap above five never shrinks.
   if (billing && Number(billing.seatCap) > 0 && (!plan || Number(billing.seatCap) !== Number(plan.seatCap))) {
-    return Number(billing.seatCap);
+    return Math.max(Number(billing.seatCap), SEAT_FLOOR);
   }
   if (status === 'trial' && plan?.trialSeatCap) return plan.trialSeatCap;
-  return billing?.seatCap ?? plan?.seatCap ?? 0;
+  return Math.max(Number(billing?.seatCap ?? plan?.seatCap ?? 0), SEAT_FLOOR);
 }
 
 /**

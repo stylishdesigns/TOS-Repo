@@ -321,6 +321,48 @@ export function buildAccessCodeChangedEmail(params: { to: string; centreName: st
   };
 }
 
+export type WelcomeRole = 'admin' | 'tutor' | 'student';
+
+/** Batch 58: the role welcome, sent once when an account takes its first
+ *  look inside its portal. Same facility, three different first stops. */
+export function buildRoleWelcomeEmail(params: {
+  to: string;
+  fullName: string;
+  centreName: string;
+  programmes: string;
+  role: WelcomeRole;
+  appUrl: string;
+}): OutgoingEmail {
+  const first = (params.fullName || '').split(/\s+/)[0] || 'there';
+  const name = escapeHtml(first);
+  const centre = escapeHtml(params.centreName);
+  const programmeLine = params.programmes
+    ? `<p style="margin:0 0 16px;">Your programmes: <strong>${escapeHtml(params.programmes)}</strong>.</p>`
+    : '';
+  const body = `<p style="margin:0 0 16px;">${name}, welcome to <strong>${centre}</strong> on Tutorial OS.</p>
+${programmeLine}
+<p style="margin:0 0 16px;">${escapeHtml(roleLine(params.role, centre))}</p>
+<p style="margin:24px 0;">
+  <a href="${params.appUrl}/" style="background:#ea580c;color:#ffffff;font-weight:700;text-decoration:none;padding:12px 22px;border-radius:10px;display:inline-block;">Open Tutorial OS</a>
+</p>`;
+  return {
+    to: params.to,
+    subject: `Welcome to ${params.centreName} on Tutorial OS`,
+    html: WRAP('Welcome', body),
+    text: `${first}, welcome to ${params.centreName} on Tutorial OS.\n\n${roleLine(params.role, params.centreName)}\n\nOpen Tutorial OS: ${params.appUrl}/`,
+  };
+}
+
+function roleLine(role: WelcomeRole, centre: string): string {
+  if (role === 'admin') {
+    return `Everything about ${centre} lives in your dashboard: students, tutors, fees, study materials, CBT mocks, attendance and the leaderboard. Add your students and take attendance from one place.`;
+  }
+  if (role === 'tutor') {
+    return `Your classes, study materials, attendance and CBT mocks for ${centre} are all in one place. Check your timetable and reach your students any time.`;
+  }
+  return `Your classes, study materials, video lessons, practice questions and CBT mocks are ready. Practise daily, take your mocks and climb the leaderboard.`;
+}
+
 function escapeHtml(value: string): string {
   return (value || '')
     .replace(/&/g, '&amp;')

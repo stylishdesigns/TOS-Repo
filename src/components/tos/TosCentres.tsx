@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { loadLastGood, saveLastGood } from '../../lib/lastGood';
 import {
   Loader2, ChevronLeft, AlertTriangle, Send, Ban, RefreshCw,
-  Copy, Wallet, CheckCircle2, Plus, Trash2, Globe,
+  Copy, Wallet, CheckCircle2, Plus, Trash2, Globe, Mail,
 } from 'lucide-react';
 import {
   api, money, fmtDate, fmtDateTime, STATUS_LABELS, Json,
@@ -152,6 +152,24 @@ export const CentreDetail: React.FC<{ centreId: string; onBack: () => void; onDa
             className={btnGhost}
           >
             {busy === 'resend-credentials' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} Reset owner password
+          </button>
+          {/* Batch 58: hand the login details over again without resetting
+              the password while the owner has not signed in yet. */}
+          <button
+            onClick={() => doAction('resend-login-details', {}, (r) => {
+              if (r.alreadyActive) {
+                setOwnerNote('The owner has already signed in, so the temporary password is gone. Use Reset owner password to send a new one.');
+              } else if (r.delivered) {
+                setOwnerNote('The login details were sent to the owner by email again.');
+              } else if (r.tempPassword) {
+                setCredentials({ centreName: centre.name, email: centre.ownerEmail, password: r.tempPassword, accessCode: centre.accessCode });
+                setOwnerNote('Email could not be delivered; the details are on screen.');
+              }
+            })}
+            disabled={busy === 'resend-login-details'}
+            className={btnGhost}
+          >
+            {busy === 'resend-login-details' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />} Resend login details
           </button>
           {ownerNote && <p className="text-xs text-emerald-300">{ownerNote}</p>}
         </div>

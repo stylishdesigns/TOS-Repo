@@ -1,5 +1,5 @@
 import React, { useRef,  useState, useEffect, Component, ErrorInfo, ReactNode, lazy, Suspense } from 'react';
-import { AppProvider, useApp } from './context/AppContext';
+import { AppProvider, useApp, BG_THEME_STORAGE_KEY } from './context/AppContext';
 import { Sidebar } from './components/layout/Sidebar';
 import { AppOnlyGate } from './components/portal/AppOnlyGate';
 import { LaunchSplash } from './components/student-portal/LaunchSplash';
@@ -22,6 +22,7 @@ import { JoinCentreScreen } from './components/auth/JoinCentreScreen';
 
 import { PasswordChangeOverlay } from './components/auth/PasswordChangeOverlay';
 import { getAuth } from 'firebase/auth';
+import { fireFirstLook } from './lib/welcome';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import { AlertCircle, MessageCircle, ShieldCheck } from 'lucide-react';
@@ -41,6 +42,7 @@ const MainLayout: React.FC = () => {
     adminSection, 
     selectedStudent, 
     bgTheme, 
+    setBgTheme, 
     isAdmin, 
     currentUser, 
     isAuthLoading, 
@@ -59,6 +61,22 @@ const MainLayout: React.FC = () => {
     brandAccent,
     passwordChangePending
   } = useApp();
+
+  // Batch 58: the welcome trio fires once, on the admin's first look.
+  useEffect(() => {
+    if (isAdmin && !isAuthLoading) fireFirstLook(currentUser?.uid);
+  }, [isAdmin, isAuthLoading, currentUser?.uid]);
+  // Batch 58: the admin portal opens on dark mode by default. An explicit
+  // choice saved on this device always wins; a tutor or student keeps the
+  // light default and switches manually.
+  const adminThemeDefaulted = React.useRef(false);
+  useEffect(() => {
+    if (!isAdmin || adminThemeDefaulted.current) return;
+    adminThemeDefaulted.current = true;
+    try {
+      if (!localStorage.getItem(BG_THEME_STORAGE_KEY)) setBgTheme('dark');
+    } catch { /* storage unavailable: keep the current theme */ }
+  }, [isAdmin, setBgTheme]);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [showWelcome, setShowWelcome] = useState(true);
   // '#landing' forces the public Tutorial OS landing page for this visit,

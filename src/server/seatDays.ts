@@ -147,8 +147,136 @@ interface SeedContext {
  *  exist only when the facility creates one itself (Add seat) or a payment
  *  buys seats; nothing else is seeded by default. */
 export async function ensureSeatsForCentre(centreId: string, ctx: SeedContext): Promise<void> {
-  if (await hasSeats(centreId)) return;
+  if (await hasSeats(centreId)) {
+    await applySeatFloor(centreId, ctx);
+    return;
+  }
   await reconcileFreeSeats(centreId, ctx.freeSeats);
+  await applySeatFloor(centreId, ctx);
+}
+
+/** Batch 58: the floor every facility's seat pool stands on: the free grant
+ *  of five seats. No facility starts on zero or two any more. */
+export const SEAT_FLOOR = 5;
+
+/** Batch 58, runs once per facility on its first seats read after this
+ *  ships (guarded by billing.seatFloorAppliedAt):
+ *  1. The free pool is topped up so the whole pool reaches at least five
+ *     seats. Nothing is ever removed and no paid seat is touched.
+ *  2. billing.seatCap below five rises to the pool size, so the console
+ *     shows e.g. 2/5 instead of 2/2 or 0.
+ *  3. The facility's existing students take the vacant free seats, oldest
+ *     first: active memberships first, then Active student records, so the
+ *     seats panel reflects the students the facility already teaches.
+ *  Never reduces anything, and paid pools stay untouched. */
+async function applySeatFloor(centreId: string, ctx: SeedContext): Promise<void> {
+  const billing = (ctx.billing || {}) as any;
+  if (billing.seatFloorAppliedAt) return;
+  const billingRef = adminDb.collection('centreBilling').doc(centreId);
+  const nowIso = new Date().toISOString();
+
+  const seats = await listSeats(centreId);
+  const paidCount = seats.filter((d) => seatKind(d.data() as SeatRead) === 'paid').length;
+  const freeCount = seats.length - paidCount;
+  const wantFree = Math.max(freeCount, Math.max(0, SEAT_FLOOR - paidCount));
+  if (wantFree > freeCount) await reconcileFreeSeats(centreId, wantFree);
+
+  const capUpdates: Record<string, unknown> = { seatFloorAppliedAt: nowIso };
+  if (Number(billing.seatCap ?? 0) < SEAT_FLOOR) {
+    capUpdates.seatCap = Math.max(wantFree + paidCount, SEAT_FLOOR);
+  }
+  await billingRef.set(capUpdates, { merge: true });
+
+  const fresh = await listSeats(centreId);
+  const vacant = fresh
+    .filter((d) => seatKind(d.data() as SeatRead) === 'free' && !String((d.data() as SeatRead).studentUid || ''))
+    .slice(0, Math.max(0, SEAT_FLOOR - paidCount));
+  if (!vacant.length) return;
+
+  const taken = new Set(
+    fresh
+      .map((d) => String((d.data() as SeatRead).studentUid || ''))
+      .filter(Boolean)
+  );
+  const candidates: { uid: string; name: string }[] = [];
+  const memSnap = await adminDb
+    .collection('memberships')
+    .where('centreId', '==', centreId)
+    .where('role', '==', 'student')
+    .where('status', '==', 'active')
+    .limit(SEAT_FLOOR * 2)
+    .get();
+  for (const m of memSnap.docs) {
+    const uid = String(m.data().uid || '');
+    if (uid && !taken.has(uid) && !candidates.some((c) => c.uid === uid)) {
+      candidates.push({ uid, name: String((m.data() as any).studentName || '') });
+    }
+  }
+  if (candidates.length < vacant.length) {
+    const stuSnap = await adminDb
+      .collection('students')
+      .where('centreId', '==', centreId)
+      .limit(SEAT_FLOOR * 4)
+      .get();
+    const sorted = stuSnap.docs
+      .map((d) => ({ d, createdAt: String((d.data() as any).createdAt || '') }))
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    for (const { d } of sorted) {
+      if (candidates.length >= vacant.length) break;
+      const stu = d.data() as any;
+      const uid = String(stu.uid || d.id);
+      if (!uid || taken.has(uid) || candidates.some((c) => c.uid === uid)) continue;
+      const status = String(stu.status || '').toLowerCase();
+      if (status && status !== 'active') continue;
+      candidates.push({ uid, name: String(stu.name || '') });
+    }
+  }
+
+  let assigned = 0;
+  for (const c of candidates) {
+    if (assigned >= vacant.length) break;
+    const seatDoc = vacant[assigned];
+    const seat = seatDoc.data() as SeatRead;
+    const stuSnap = await adminDb.collection('students').doc(c.uid).get();
+    const studentName = String((stuSnap.data() as any)?.name || c.name || '');
+    const history = [
+      ...((seat.history || []) as SeatHistoryEntry[]),
+      { uid: c.uid, name: studentName, from: null, to: nowIso, reason: "Moved onto the facility's free seats" },
+    ];
+    await seatDoc.ref.set(
+      {
+        status: 'active' as SeatStatus,
+        studentUid: c.uid,
+        studentName,
+        assignedAt: nowIso,
+        startedAt: nowIso,
+        history,
+      },
+      { merge: true }
+    );
+    await adminDb.collection('students').doc(c.uid).set({ accessStatus: 'active' }, { merge: true });
+    await adminDb
+      .collection('memberships')
+      .doc(`${c.uid}__${centreId}`)
+      .set(
+        {
+          uid: c.uid,
+          centreId,
+          role: 'student',
+          status: 'active',
+          seatId: seatDoc.id,
+          seatNo: Number(seat.seatNo || 0),
+          updatedAt: nowIso,
+        },
+        { merge: true }
+      );
+    assigned += 1;
+  }
+
+  if (assigned > 0) {
+    const occupied = (await listSeats(centreId)).filter((d) => String((d.data() as SeatRead).studentUid || '')).length;
+    await billingRef.set({ activeStudentCount: occupied }, { merge: true });
+  }
 }
 
 /** Batch 23, runs once per facility on its first seats read after this ships:

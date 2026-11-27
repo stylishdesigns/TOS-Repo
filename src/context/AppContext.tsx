@@ -351,6 +351,10 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 const STORAGE_KEY = 'EXCELLENCE_TUTORIAL_DATA_V1';
 
+/** Batch 58: the admin portal's dark-by-default rule keys off this exact
+ *  key: no saved preference means the role default applies. */
+export const BG_THEME_STORAGE_KEY = `${STORAGE_KEY}_bgTheme`;
+
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Tenant-scoped cache keys: each centre's cached records live under their
   // own key, so one centre's dashboard never hydrates another centre's data.
@@ -1755,7 +1759,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Background Theme for the application canvas alone
   const [bgTheme, setBgThemeState] = useState<'light' | 'dark'>(() => {
     try {
-      const saved = localStorage.getItem(`${STORAGE_KEY}_bgTheme`);
+      const saved = localStorage.getItem(BG_THEME_STORAGE_KEY);
       return saved === 'dark' ? 'dark' : 'light';
     } catch {
       return 'light';
@@ -1765,7 +1769,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const setBgTheme = (theme: 'light' | 'dark') => {
     setBgThemeState(theme);
     try {
-      localStorage.setItem(`${STORAGE_KEY}_bgTheme`, theme);
+      localStorage.setItem(BG_THEME_STORAGE_KEY, theme);
     } catch (e) {
       console.error(e);
     }

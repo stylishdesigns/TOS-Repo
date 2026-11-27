@@ -350,6 +350,32 @@ export async function resendCredentials(centreId: string, actorUid: string): Pro
   return emailRes.delivered ? { delivered: true } : { delivered: false, tempPassword };
 }
 
+/** Batch 58: hand the login details over again WITHOUT resetting the owner's
+ *  password. Works while the owner has not signed in yet (the temporary
+ *  password still stands). Once they have set their own password the original
+ *  temporary password is gone, so the caller is told to use the reset flow. */
+export async function resendLoginDetails(
+  centreId: string,
+  actorUid: string
+): Promise<{ delivered: boolean; alreadyActive: boolean; tempPassword?: string }> {
+  const cDoc = await adminDb.collection('centres').doc(centreId).get();
+  if (!cDoc.exists) throw httpError(404, 'Facility not found.');
+  const email = normalizeEmail((cDoc.data() as any)?.ownerEmail || '');
+  if (!email) throw httpError(400, 'This facility has no owner email on file.');
+
+  let user;
+  try {
+    user = await adminAuth.getUserByEmail(email);
+  } catch {
+    throw httpError(404, 'The owner account does not exist yet. Ask them to sign up first.');
+  }
+
+  const claims = (user.customClaims || {}) as Record<string, any>;
+  if (!claims.mustChangePassword) return { delivered: false, alreadyActive: true };
+
+  return { ...(await resendCredentials(centreId, actorUid)), alreadyActive: false };
+}
+
 /** Regenerate the access code: the old one stops working immediately. */
 export async function regenerateAccessCode(
   centreId: string,

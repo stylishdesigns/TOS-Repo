@@ -386,12 +386,16 @@ export const TopNav: React.FC<TopNavProps> = ({ onToggleMobileMenu }) => {
                 </div>
               </div>
 
-              {/* Appearance: App Background (Light / Dark) */}
+              {/* Appearance: App Background (Light / Dark). Batch 58: the
+                  control sits on the left of the row under its own caption,
+                  lining up with the rest of the menu instead of hugging the
+                  right edge. */}
               <div
                 id="bg-theme-toggle-container"
-                className="px-4 py-3.5 border-b border-slate-100 bg-slate-50/70"
+                className="px-4 py-3 border-b border-slate-100 bg-slate-50/70"
               >
-                <div className="flex items-center justify-end gap-3">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">Appearance</p>
+                <div className="flex items-center gap-3">
 
                   <div className="flex items-center rounded-xl bg-white border border-slate-200 p-0.5 shadow-sm shrink-0">
                     {([

@@ -29,8 +29,7 @@ import {
   provisionCentre,
   regenerateAccessCode,
   resendCredentials,
-  runBillingSweep,
-} from './provisioning';
+  runBillingSweep, resendLoginDetails } from './provisioning';
 import { deleteCentreCascade, loadBillingMap, registerTosRoutes2 } from './tosRoutes2';
 import { registerChatRoutes } from './chatRoutes';
 import { registerQuestionBankRoutes } from './questionBankRoutes';
@@ -2708,6 +2707,19 @@ export function registerExtendedRoutes(app: express.Express): void {
       if (type === 'resend-credentials') {
         const result = await resendCredentials(req.params.id, caller.uid);
         return res.json({ success: true, delivered: result.delivered, ...(result.tempPassword ? { tempPassword: result.tempPassword } : {}) });
+      }
+      // Batch 58: resend the login details WITHOUT resetting the password
+      // while the owner has not signed in yet. Once they have set their own
+      // password the temporary one is gone, so the console is told to use
+      // the reset flow instead.
+      if (type === 'resend-login-details') {
+        const result = await resendLoginDetails(req.params.id, caller.uid);
+        return res.json({
+          success: true,
+          delivered: result.delivered,
+          alreadyActive: result.alreadyActive === true,
+          ...(result.tempPassword ? { tempPassword: result.tempPassword } : {}),
+        });
       }
       if (type === 'record-payment') {
         const amount = Number(req.body?.amount);
