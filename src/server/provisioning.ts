@@ -48,6 +48,7 @@ export interface ProvisionLead {
   city: string;
   examTypes: string[];
   accentColor?: string;
+  facilityType?: string;
   skipTrial: boolean;
   /** Optional popup extras (2026-11-13 signup wizard): stored on the centre
    *  document so the whitelabel branding and reports can use them. */
@@ -160,6 +161,7 @@ export async function provisionCentre(
 
   const centreRef = adminDb.collection('centres').doc(centreId);
   await centreRef.set({
+    ...(params.facilityType ? { facilityType: String(params.facilityType).trim().slice(0, 60) } : {}),
     name: businessName,
     // Batch 26: no trial. A new signup is a LEAD until it upgrades by
     // paying for at least the platform minimum of seats.

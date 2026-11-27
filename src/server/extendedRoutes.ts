@@ -1293,6 +1293,7 @@ export function registerExtendedRoutes(app: express.Express): void {
         logoUrl: typeof req.body.logoUrl === 'string' && /^https:\/\//.test(String(req.body.logoUrl)) ? String(req.body.logoUrl).trim() : '',
         teacherCount: typeof req.body.teacherCount === 'string' ? String(req.body.teacherCount).trim().slice(0, 20) : '',
         examTypes: Array.isArray(checked.examTypes) ? checked.examTypes.filter(Boolean) : [],
+        facilityType: typeof req.body.facilityType === 'string' ? String(req.body.facilityType).trim().slice(0, 60) : '',
         accentColor: checked.accentColor,
         skipTrial: checked.skipTrial === true,
         source: 'lead',

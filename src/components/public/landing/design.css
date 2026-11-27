@@ -227,3 +227,6 @@ html{scroll-behavior:smooth}
 .confetti{position:fixed;top:-24px;border-radius:2px;opacity:0;animation-name:confetti-fall;animation-timing-function:linear;animation-fill-mode:forwards}
 @keyframes confetti-fall{0%{transform:translateY(-10px) rotate(0deg);opacity:1}85%{opacity:1}100%{transform:translateY(94vh) rotate(340deg);opacity:0}}
 #how .cd h3{text-align:center}
+
+/* Start-free button spinner (Nov 27) */
+@keyframes tosSpin { to { transform: rotate(360deg); } }

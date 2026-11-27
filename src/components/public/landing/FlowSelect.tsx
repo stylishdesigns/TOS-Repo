@@ -19,8 +19,13 @@ export const FlowSelect: React.FC<{
   disabled?: boolean;
   invalid?: boolean;
   ariaLabel?: string;
-}> = ({ id, value, options, onChange, disabled, invalid, ariaLabel }) => {
+  /** Renders a search box at the top of the open list, filtering as the user types (Nov 27). */
+  searchable?: boolean;
+}> = ({ id, value, options, onChange, disabled, invalid, ariaLabel, searchable }) => {
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const searchRef = useRef<HTMLInputElement | null>(null);
+  const visible = searchable && query.trim() ? options.filter((o) => o.label.toLowerCase().includes(query.trim().toLowerCase())) : options;
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const current = options.find((o) => o.value === value);
 
@@ -44,6 +49,14 @@ export const FlowSelect: React.FC<{
     onChange(v);
     setOpen(false);
   };
+
+  // The search box starts empty and focused every time the list opens.
+  useEffect(() => {
+    if (!open || !searchable) return;
+    setQuery('');
+    const t = window.setTimeout(() => { if (searchRef.current) searchRef.current.focus(); }, 0);
+    return () => window.clearTimeout(t);
+  }, [open, searchable]);
 
   return (
     <div ref={wrapRef} style={{ position: 'relative' }}>
@@ -119,7 +132,23 @@ export const FlowSelect: React.FC<{
             overflowY: 'auto',
           }}
         >
-          {options.map((o) => {
+          {searchable && (
+            <div style={{ position: 'sticky', top: 0, background: '#fff', padding: '2px 2px 6px', zIndex: 2 }}>
+              <input
+                ref={searchRef}
+                type="text"
+                value={query}
+                onChange={(ev) => setQuery(ev.target.value)}
+                placeholder="Search..."
+                aria-label="Search the list"
+                style={{ width: '100%', minHeight: '40px', borderRadius: '10px', border: '1px solid #CBD5E1', padding: '8px 12px', font: '500 14px Inter, sans-serif', color: '#0F172A', outline: 'none', boxSizing: 'border-box' }}
+              />
+            </div>
+          )}
+          {visible.length === 0 && (
+            <p style={{ margin: '8px 6px', font: '500 14px Inter, sans-serif', color: '#94A3B8' }}>No match. Try another spelling.</p>
+          )}
+          {visible.map((o) => {
             const on = o.value === value;
             return (
               <button
