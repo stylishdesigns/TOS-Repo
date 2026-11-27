@@ -2,6 +2,7 @@ import express from 'express';
 import * as crypto from 'crypto';
 import { FieldValue } from 'firebase-admin/firestore';
 import { adminDb } from './firebaseAdmin';
+import { centreMockGate } from './examProgrammeGate';
 import { postMockOpenOnce } from './chatAutoPosts';
 import { Caller, effectiveStatus, getBillingDoc, getPlatformConfig, httpError, listActiveMembershipsForUser } from './tenantService';
 import {
@@ -139,6 +140,9 @@ interface StudentContext {
   caller: Caller;
   centreId: string;
   studentId: string;
+  /** Batch 56: the centre's exam-programme gate for platform mocks, or null
+   *  when the centre records no programmes (older facilities see all). */
+  mockGate: ((examType: string) => boolean) | null;
 }
 
 async function requireStudent(req: express.Request): Promise<StudentContext> {
@@ -161,7 +165,7 @@ async function requireStudent(req: express.Request): Promise<StudentContext> {
   const stuSnap = await adminDb.collection('students').where('uid', '==', caller.uid).limit(1).get();
   const stuDoc = stuSnap.docs[0];
   if (!stuDoc) throw httpError(403, 'No student record found for your sign-in.');
-  return { caller, centreId: student.centreId, studentId: stuDoc.id };
+  return { caller, centreId: student.centreId, studentId: stuDoc.id, mockGate: centreMockGate(centre.audienceTypes) };
 }
 
 /** One read: the student's current username claim, by uid. */
@@ -300,7 +304,11 @@ async function dayStatus(res: express.Response, ctx: StudentContext, date: strin
     const aSnap = await adminDb.collection(MOCK_ATTEMPTS).doc(`mock-${date}__${ctx.caller.uid}`).get();
     const a = aSnap.exists ? (aSnap.data() as any) : null;
 
-    const mock = usable ? {
+    // Batch 56: a day's mock only shows as upcoming when the facility's exam
+    // programmes include this mock's exam. Past days keep attempt-based state,
+    // so results a student already sat stay visible.
+    const allowed = usable && (!ctx.mockGate || ctx.mockGate(String(m.examType || '')));
+    const mock = usable && allowed ? {
       id: `mock-${date}`,
       title: String(m.title || ''),
       examType: String(m.examType || ''),
@@ -311,7 +319,7 @@ async function dayStatus(res: express.Response, ctx: StudentContext, date: strin
     } : null;
 
     let state = 'no_mock';
-    if (diff > 0 && usable) state = 'upcoming';
+    if (diff > 0 && allowed) state = 'upcoming';
     else if (diff < 0 && usable) state = a && String(a.status) === 'submitted' ? 'submitted' : 'missed';
 
     const released = state === 'submitted' && Boolean(
@@ -381,7 +389,7 @@ export function registerStudentMockRoutes(app: express.Express): void {
         .where('date', '>=', today)
         .where('date', '<=', weekEnd)
         .get();
-      const week = weekSnap.docs
+      const weekAll = weekSnap.docs
         .map((d) => d.data() as any)
         .filter((m) => !['cancelled', 'void', 'draft', 'archived'].includes(String(m.status)))
         .sort((a, b) => String(a.date).localeCompare(String(b.date)))
@@ -389,6 +397,9 @@ export function registerStudentMockRoutes(app: express.Express): void {
           id: m.id, date: m.date, title: m.title, examType: m.examType, status: m.status,
           durationMinutes: m.durationMinutes, subjects: m.subjects, questionCount: m.questionCount,
         }));
+      // Batch 56: the facility's exam programmes decide which mocks its
+      // students see. A centre with none recorded sees everything.
+      const week = ctx.mockGate ? weekAll.filter((m) => ctx.mockGate!(String(m.examType || ''))) : weekAll;
       const todayMock = week.find((m) => m.date === today) || null;
       const nextMock = week.find((m) => m.date !== today && ['scheduled', 'live'].includes(String(m.status))) || null;
 
@@ -669,6 +680,12 @@ export function registerStudentMockRoutes(app: express.Express): void {
       const mock = mockSnap.data() as any;
       if (!['scheduled', 'live'].includes(String(mock.status))) {
         throw httpError(409, `Today's mock is not open (${mock.status}).`);
+      }
+      // Batch 56: the server, not the phone, owns the exam-programme gate. A
+      // facility that does not prepare students for this mock's exam cannot
+      // start it, however the request arrives.
+      if (ctx.mockGate && !ctx.mockGate(String(mock.examType || ''))) {
+        throw httpError(404, 'There is no mock today for your facility.');
       }
       // A mockId in the body is ignored on purpose: the route can only ever
       // open today's mock, so no future or past paper is reachable at all.
