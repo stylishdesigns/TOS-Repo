@@ -155,7 +155,10 @@ const MainLayout: React.FC = () => {
     let alive = true;
     let slug = '';
     try { slug = new URLSearchParams(window.location.search).get('centre') || ''; } catch { slug = ''; }
-    fetch(`/api/public/centre-by-slug?centre=${encodeURIComponent(slug)}`)
+    // app=1 marks this as the facility app's own binding lookup, so the
+    // lead-tier landing lock does not apply: the app opens for an unpaid
+    // facility, and only its public landing page stays locked (batch 65).
+    fetch(`/api/public/centre-by-slug?centre=${encodeURIComponent(slug)}&app=1`)
       .then((r) => r.json())
       .then((d: any) => {
         if (!alive) return;

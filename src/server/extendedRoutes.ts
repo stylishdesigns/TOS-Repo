@@ -303,7 +303,13 @@ export function registerExtendedRoutes(app: express.Express): void {
       // by paying for the minimum seats switches it on the same moment.
       const billingSnap = await adminDb.collection('centreBilling').doc(doc.id).get();
       const billing = billingSnap.data() || {};
-      if (facilityTier(billing) === 'lead') {
+      // Batch 65: app=1 marks the facility app's own binding lookup (the
+      // installed app resolves its facility with it). The lead-tier lock is
+      // a landing-page rule: an unpaid facility shows no public facility
+      // page, but its app must still open so its owner, tutors and students
+      // can sign in and sign up there. Only a non-app lookup stays locked.
+      const isAppLookup = String(req.query.app || '') === '1';
+      if (facilityTier(billing) === 'lead' && !isAppLookup) {
         return res.json({
           locked: true,
           message: 'This facility page is not available right now. Please contact the facility admin directly.',
