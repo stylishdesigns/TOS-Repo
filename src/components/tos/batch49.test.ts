@@ -35,7 +35,7 @@ check('brief keeps chat', page.includes('Chat for the whole facility:'));
 check('brief keeps AI', page.includes('<b>AI built in:</b>'));
 check('brief keeps brand everywhere', page.includes('Your brand everywhere:'));
 check('brief keeps Android/iPhone/web', page.includes('Works on Android, iPhone and the web'));
-check('brief keeps leaderboard idle-students point', page.includes('the leaderboard keeps students competing'));
+check('brief keeps leaderboard idle-students point', page.includes('the leaderboard keep students competing')); // batch 50 rewrote the results line
 check('brief keeps 300+ JAMB result point', page.includes('300 and above in JAMB'));
 check('brief keeps NGN 0 / 1,000 / 2,500', page.includes('NGN 0') && page.includes('NGN 1,000') && page.includes('NGN 2,500'));
 check('brief says per seat per month, never per student', page.includes('/ seat / month') && !page.includes('per student'));

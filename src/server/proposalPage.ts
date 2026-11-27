@@ -304,7 +304,7 @@ const COMPACT_CSS = `
 *{box-sizing:border-box;margin:0;padding:0}
 html{-webkit-text-size-adjust:100%}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;color:var(--ink);background:#fff;line-height:1.5}
-.cwrap{max-width:1080px;margin:0 auto;padding:0 30px}
+.cwrap{max-width:1040px;margin:0 auto;padding:0 30px}
 .c-hero{background:linear-gradient(160deg,#0F172A 0%,#1E293B 70%,#273449 100%);color:#F8FAFC;padding:30px 0 28px;position:relative;overflow:hidden;border-radius:0 0 16px 16px}
 .c-hero:before{content:'';position:absolute;right:-120px;top:-160px;width:420px;height:420px;border-radius:50%;background:radial-gradient(circle,rgba(249,115,22,.4),rgba(249,115,22,0) 70%)}
 .c-hero .cwrap{position:relative;z-index:1}
@@ -315,9 +315,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica N
 .c-hero h1{font-size:29px;line-height:1.15;font-weight:800;letter-spacing:-.02em;max-width:24em}
 .c-hero .forline{margin-top:11px;display:inline-flex;flex-wrap:wrap;gap:7px 13px;align-items:center;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);border-radius:999px;padding:8px 16px;font-size:13px;color:#CBD5E1}
 .c-hero .forline b{color:#fff}
-.cs{margin-top:16px;border:1px solid var(--line);border-radius:14px;padding:18px 22px;background:#fff}
-.cs h2{font-size:17px;font-weight:800;letter-spacing:-.01em;margin-bottom:8px}
+.cs{margin-top:20px;border:1px solid var(--line);border-radius:14px;padding:22px 26px;background:#fff}
+.cs h2{font-size:18px;font-weight:800;letter-spacing:-.01em;margin-bottom:10px}
 .cbody{color:#475569;font-size:13.5px}
+.cbig{color:var(--ink);font-size:19px;font-weight:800;line-height:1.45;letter-spacing:-.01em;margin-bottom:8px;max-width:36em}
 .clist{margin-top:4px;columns:2;column-gap:34px}
 .clist li{list-style:none;color:#475569;font-size:13.5px;padding:4px 0 4px 18px;position:relative;break-inside:avoid}
 .clist li b{color:var(--ink)}
@@ -330,8 +331,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica N
 .ctbl small{color:#64748B}
 .cplan{margin-top:10px;color:#475569;font-size:13px}
 .cplan b{color:var(--ink)}
-.ccta{margin-top:16px;background:linear-gradient(135deg,#0F172A,#1E293B);border-radius:14px;padding:18px 22px;color:#F8FAFC;font-size:13.5px}
-.ccta b{display:block;font-size:15.5px;font-weight:800;margin-bottom:4px;letter-spacing:-.01em}
+.ccta{margin-top:20px;background:linear-gradient(135deg,#0F172A,#1E293B);border-radius:14px;padding:22px 26px;color:#F8FAFC;font-size:13.5px}
+.ccta b{display:block;font-size:16.5px;font-weight:800;margin-bottom:5px;letter-spacing:-.01em}
 .ccta a{color:#FDBA74;font-weight:700;text-decoration:none}
 .cfoot{color:var(--muted);font-size:11.5px;text-align:center;padding:14px 0 20px}
 .cfoot b{color:var(--ink)}
@@ -393,7 +394,8 @@ export function buildCompactProposalPage(displayName: string, origin: string, sl
   </section>
   <section class="cs">
     <h2>Built to produce results</h2>
-    <p class="cbody">When a tutor is away, the CBT engine keeps every class practising, the leaderboard keeps students competing and the AI study coach fills the gap. And results are what fill your classes: a student who scores 300 and above in JAMB, or brings home A1 to B3 across nine subjects, becomes the story parents tell one another. Daily practice and mock exams that surface gaps long before the real day make those results repeatable.</p>
+    <p class="cbig">A student who scores 300 and above in JAMB, or brings home A1 to B3 across nine subjects, becomes the story parents tell one another.</p>
+    <p class="cbody">Daily CBT practice and the leaderboard keep students competing even when a tutor is away, mock exams surface gaps long before the real day, and the AI study coach fills the rest, so those results repeat.</p>
   </section>
   <section class="cs">
     <h2>Pricing</h2>
@@ -405,9 +407,9 @@ export function buildCompactProposalPage(displayName: string, origin: string, sl
         <tr><th>Premium Facility</th><td><span class="price">NGN 2,500</span> <small>/ seat / month</small></td></tr>
       </tbody>
     </table>
-    <p class="cplan">A seat is one student's place on the platform, and a seat only starts costing the day a student takes it: an empty seat never costs anything. Every facility starts on Free and moves up any time; no setup fee, no contract, no card to begin.</p>
+    <p class="cplan">A seat is one student's place on the platform, and a seat only starts costing the day a student takes it: an empty seat never costs anything. Start on Free and move up any time; no setup fee, no contract.</p>
   </section>
-  <div class="ccta"><b>Ready to see it live?</b>Start free today: sign up on the landing page, check your email for the access code and login details, brand the facility, add students and tutors, and you are running. No card, no payment, setup in minutes. <a href="/">tutorialos.com</a></div>
+  <div class="ccta"><b>Ready to see it live?</b>Sign up free on the landing page, check your email for the access code and login details, add students and tutors with your facility code, and you are running. No card, no payment, setup in minutes. <a href="/">tutorialos.com</a></div>
 </div>
 <div class="cfoot"><b>Tutorial OS</b> &middot; One software system for learning facilities of every kind &middot; Prepared for ${name}</div>
 </div>
