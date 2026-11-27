@@ -108,6 +108,40 @@ export async function ensurePlansV3(): Promise<void> {
   console.warn('[plansV3] plan names renamed to the Facility suffix and feature fields stamped');
 }
 
+/**
+ * Batch 57: the platform's confirmed seat prices stamped onto the plan
+ * catalogue, so the facility admin's upgrade panel shows the same amounts the
+ * landing and the proposal quote: Standard ₦1,000 and Premium ₦2,500 per seat
+ * per month (Free stays ₦0). One write per deploy, skipped once done.
+ */
+export async function ensurePlansV4Prices(): Promise<void> {
+  const cfgRef = adminDb.collection('platformConfig').doc('global');
+  const cfgSnap = await cfgRef.get();
+  const cfg = (cfgSnap.data() || {}) as any;
+  if (cfg.plansV4PricesDoneAt) return;
+
+  const PRICES: Record<string, number> = {
+    centre_free: 0,
+    centre_standard: 1000,
+    centre_plus: 2500,
+  };
+  const changed: string[] = [];
+  for (const [id, price] of Object.entries(PRICES)) {
+    const ref = adminDb.collection('platformPlans').doc(id);
+    const snap = await ref.get();
+    if (!snap.exists) continue;
+    if (Number((snap.data() as any)?.price || 0) !== price) {
+      await ref.set({ price, priceType: 'per_seat' }, { merge: true });
+      changed.push(`${id}:₦${price}`);
+    }
+  }
+  await cfgRef.set(
+    { plansV4PricesDoneAt: new Date().toISOString(), plansV4PricesChanged: changed },
+    { merge: true }
+  );
+  console.warn(`[plans-v4] seat prices stamped: ${changed.join(', ') || 'none needed'}`);
+}
+
 export async function ensurePlansV2(): Promise<void> {
   const cfgRef = adminDb.collection('platformConfig').doc('global');
   const cfgSnap = await cfgRef.get();

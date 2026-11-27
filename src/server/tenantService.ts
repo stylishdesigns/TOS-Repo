@@ -1,6 +1,6 @@
 import { adminDb, adminAuth } from './firebaseAdmin';
 import { reconcileSeatOrder, renumberSeatsForCentre, migrateToLeadTier } from './seatDays';
-import { ensurePlansV2, ensurePlansV3 } from './seatUpgrades';
+import { ensurePlansV2, ensurePlansV3, ensurePlansV4Prices } from './seatUpgrades';
 import {
   Centre,
   CentreBilling,
@@ -1691,6 +1691,7 @@ export async function getSeatsSummaryService(centreId: string): Promise<CentreSe
   // renames Plus to Premium and puts every lead on Free. One-time, guarded.
   try { await ensurePlansV2(); } catch { /* retried on the next seats read */ }
   try { await ensurePlansV3(); } catch { /* retried on the next seats read */ }
+  try { await ensurePlansV4Prices(); } catch { /* retried on the next seats read */ }
   const billing = await getBillingDoc(centreId);
   const centre = await getCentreDoc(centreId);
   const config = await getPlatformConfig();

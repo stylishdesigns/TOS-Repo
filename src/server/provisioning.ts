@@ -238,7 +238,7 @@ export async function provisionCentre(
   const accessCode = await createAccessCode(centreId);
   await centreRef.update({ accessCode });
 
-  // The welcome email is the user's ZeptoMail template (welcomeTemplate.ts):
+  // The welcome email is Tutorial OS's internal template (welcomeTemplate.ts):
   // access code, temporary password, the centre's own sign-in link, the app
   // install link and the WhatsApp community group.
   const appBase = (params.appBaseUrl || process.env.APP_URL || 'https://tutorialos.com').replace(/\/+$/, '');
@@ -255,9 +255,9 @@ export async function provisionCentre(
     subject: welcome.subject,
     html: welcome.html,
     text: welcome.text,
-    // Same values the embedded template renders locally; when
-    // ZEPTOMAIL_TEMPLATE_KEY is set the send goes through the registered
-    // ZeptoMail template and these fill its placeholders instead.
+    // Same values the embedded template renders locally; batch 57 retired the
+    // registered ZeptoMail template, so the send always carries the internal
+    // template's own HTML.
     mergeFields: {
       full_name: fullName || 'there',
       centre_name: businessName,

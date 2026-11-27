@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Loader2, PlaySquare } from 'lucide-react';
+import { Loader2, PlaySquare, ScrollText } from 'lucide-react';
+import { VideoTermsModal } from '../public/legal/TermsPrivacy';
 import { getAuth } from 'firebase/auth';
 import { useApp } from '../../context/AppContext';
 import { Tutor } from '../../types';
@@ -38,6 +39,9 @@ export const ResourcesManager: React.FC = () => {
   const [vcEnabled, setVcEnabled] = useState<boolean | null>(null);
   const [vcBusy, setVcBusy] = useState(false);
   const [vcError, setVcError] = useState('');
+  // Batch 57: the video-classes terms. The switch's card carries a
+  // View-terms button so the admin reads the legal side before flipping it.
+  const [vcTermsOpen, setVcTermsOpen] = useState(false);
 
   const loadVc = useCallback(async () => {
     if (!activeCentreId) return;
@@ -117,8 +121,17 @@ export const ResourcesManager: React.FC = () => {
             : 'On: your students see the Tutorial OS video classes in their app, arranged by subject and topic.'}
           {' '}Your own uploaded resources are always visible either way. The switch works instantly.
         </p>
+        <button
+          type="button"
+          onClick={() => setVcTermsOpen(true)}
+          className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-bold text-[var(--brand, #0F172A)] dark:text-slate-200 hover:underline"
+        >
+          <ScrollText className="w-3.5 h-3.5" />
+          View terms &amp; conditions
+        </button>
         {vcError && <p className="text-[11px] text-rose-600 dark:text-rose-400 mt-2">{vcError}</p>}
       </div>
+      {vcTermsOpen && <VideoTermsModal onClose={() => setVcTermsOpen(false)} />}
 
       <div>
         <h2 className="text-sm font-black text-slate-800 dark:text-slate-100 mb-1">Facility uploads</h2>

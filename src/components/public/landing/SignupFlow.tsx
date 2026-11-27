@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { LegalModal } from '../legal/TermsPrivacy';
 import { InstallGuide } from './InstallGuide';
 import { waitForInstallPrompt, detectInstalledApp, resetPendingInstallPrompt, reloadForFreshInstallPrompt } from '../../../hooks/usePWAInstall';
 import { FlowSelect } from './FlowSelect';
@@ -314,6 +315,10 @@ export const SignupStartPage: React.FC = () => {
   const [sending, setSending] = useState(false);
 
   const [nameState, setNameState] = useState<NameState>({ status: 'idle', domain: '' });
+
+  // Batch 57: the agree line now opens the real documents as a popup here on
+  // the page, instead of naming documents that did not exist anywhere.
+  const [legalKind, setLegalKind] = useState<null | 'terms' | 'privacy'>(null);
   const debounceRef = useRef<number | null>(null);
   useEffect(() => {
     if (debounceRef.current) window.clearTimeout(debounceRef.current);
@@ -749,10 +754,13 @@ export const SignupStartPage: React.FC = () => {
             <div>
               <label style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', font: '500 14px/1.45 Inter, sans-serif', color: '#334155', cursor: locked ? 'default' : 'pointer' }}>
                 <input type="checkbox" checked={consent} onChange={() => { if (locked) return; setConsent((p) => !p); setErrors((e2) => ({ ...e2, consent: '' })); }} aria-invalid={errors.consent ? true : false} style={{ width: '20px', height: '20px', marginTop: '2px', flex: 'none', pointerEvents: locked ? 'none' : 'auto' }} />
-                I agree to be contacted about my request and to the Privacy policy and Terms.
+                I agree to be contacted about my request and to the{' '}
+                <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setLegalKind('privacy'); }} style={{ font: 'inherit', color: '#C2410C', textDecoration: 'underline', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>Privacy policy</button>{' '}and{' '}
+                <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setLegalKind('terms'); }} style={{ font: 'inherit', color: '#C2410C', textDecoration: 'underline', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>Terms</button>.
               </label>
               {ERR(errors.consent)}
             </div>
+          {legalKind && <LegalModal kind={legalKind} onClose={() => setLegalKind(null)} />}
           </div>
 
           {formError && <p role="alert" style={{ margin: '14px 0 0', font: '600 14px Inter, sans-serif', color: '#DC2626' }}>{formError}</p>}
