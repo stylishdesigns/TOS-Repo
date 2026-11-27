@@ -6,6 +6,7 @@ import { runStaffPayReminderSweep } from './staffPayReminders';
 import { provisionSeats, getSeatPool, facilityTier, countPaidSeatsForCentre, addSeatsForCentre, enforceSeatConfigAcrossFacilities } from './seatDays';
 import { runSeatPolicySweep } from './seatSweep';
 import { payAccount, paidSeatStats, createUpgradeRequest, attachReceiptToUpgradeRequest, listUpgradeRequests, decideUpgradeRequest, listSeatPayments, notifySeatPaymentRegistered } from './seatUpgrades';
+import { fileCustomExamRequests } from './examRequests';
 import {
   Caller,
   countActiveStudents,
@@ -1102,6 +1103,68 @@ export function registerExtendedRoutes(app: express.Express): void {
     }
   });
 
+  // ==========================================================================
+  // Custom exam requests (batch 64): exams facilities typed on the signup
+  // form that are not in the registry. The TOS admin reviews each one:
+  // approving registers it in the examTypes library so it can get its own
+  // questions; discarding closes it as not relevant. The examRequests
+  // collection is server-only (requireTos routes + the public trial route),
+  // so no Firestore rules changes are involved.
+  // ==========================================================================
+  app.get('/api/tos/exam-requests', async (req, res) => {
+    try {
+      requireTos(req);
+      const snap = await adminDb.collection('examRequests').orderBy('requestedAt', 'desc').limit(50).get();
+      const requests = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Record<string, any>) }));
+      res.json({ ok: true, requests });
+    } catch (error: any) {
+      const status = Number(error?.status || 500);
+      res.status(status).json({ error: error?.message || 'Loading exam requests failed.' });
+    }
+  });
+
+  app.post('/api/tos/exam-requests/:id/decide', async (req, res) => {
+    try {
+      const caller = requireTos(req);
+      const id = String(req.params?.id || '').trim();
+      if (!/^[a-zA-Z0-9_-]{1,64}$/.test(id)) throw httpError(400, 'A valid request id is required.');
+      const decision = String(req.body?.decision || '').trim().toLowerCase();
+      if (!['approve', 'discard'].includes(decision)) throw httpError(400, 'Decision must be approve or discard.');
+      const ref = adminDb.collection('examRequests').doc(id);
+      const snap = await ref.get();
+      if (!snap.exists) throw httpError(404, 'That request is not on file.');
+      const data = snap.data() as Record<string, any>;
+      if (data.status !== 'pending') throw httpError(409, 'That request has already been reviewed.');
+      const now = new Date().toISOString();
+      let addedExam: Record<string, any> | null = null;
+      if (decision === 'approve') {
+        const name = String(data.examName || '').trim().slice(0, 24);
+        const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+        const examId = slug ? 'exam-' + slug : 'exam-' + crypto.randomBytes(4).toString('hex');
+        const dup = await adminDb.collection('examTypes').doc(examId).get();
+        if (!dup.exists) {
+          // Custom exams run both question forms until an admin narrows them,
+          // mirroring the registry's default for non-JAMB exams.
+          const payload = { id: examId, name, addedAt: now, addedBy: String(caller.email || caller.uid || ''), questionType: 'both' };
+          await adminDb.collection('examTypes').doc(examId).set(payload);
+        }
+        addedExam = { id: examId, name, questionType: 'both' };
+      }
+      await ref.set(
+        {
+          status: decision === 'approve' ? 'approved' : 'rejected',
+          decidedAt: now,
+          decidedBy: String(caller.email || caller.uid || ''),
+        },
+        { merge: true },
+      );
+      res.json({ ok: true, status: decision === 'approve' ? 'approved' : 'rejected', exam: addedExam });
+    } catch (error: any) {
+      const status = Number(error?.status || 500);
+      res.status(status).json({ error: error?.message || 'Reviewing the exam request failed.' });
+    }
+  });
+
   // FACILITY TYPE REGISTRY (batch 54): the kinds of education facility TOS
   // serves and the exam programmes each one prepares students for. Platform
   // staff manage the list from the console's System tab; the signup flow's
@@ -1487,6 +1550,15 @@ export function registerExtendedRoutes(app: express.Express): void {
           businessName: checked.businessName,
           welcomeDelivered: result.welcomeDelivered,
         },
+      });
+      // Batch 64: exams a facility typed that are not in the registry become
+      // pending requests for the TOS admin to review (approve adds them to
+      // the library; discard closes them). Never blocks the trial.
+      await fileCustomExamRequests({
+        exams: Array.isArray(checked.examTypes) ? checked.examTypes.map(String) : [],
+        centreId: result.centreId,
+        centreName: checked.businessName,
+        requestedBy: checked.email,
       });
       res.json({ success: true, emailDelivered: result.welcomeDelivered });
     } catch (error: any) {

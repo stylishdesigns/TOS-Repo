@@ -167,6 +167,13 @@ const MainLayout: React.FC = () => {
         setLandingLocked(null);
         if (d && d.centreId) {
           const facility = { centreId: String(d.centreId), centreName: String(d.centreName || ''), accent: String(d.accent || ''), logoUrl: String(d.logoUrl || ''), accessCodeRequired: d.accessCodeRequired !== false };
+          // The facility app must never carry a TOS door in its address: if a
+          // stale hash (#tos-admin or #landing) survived on the device, put the
+          // app's own door (#access) back before anything renders.
+          try {
+            const h = (window.location.hash || '').toLowerCase();
+            if (h === '#tos-admin' || h === '#landing') window.location.hash = '#access';
+          } catch { /* hash unavailable */ }
           // The gate state is prepared in the same update as the facility
           // itself, so the access-code gate is the very first screen that
           // paints: the TOS landing never flashes through the gap in between.
@@ -231,6 +238,9 @@ const MainLayout: React.FC = () => {
     }
   }, [activeCentreId]);
 
+  // Read before the centre-entry effect below: in the facility app the entry
+  // effect itself checks the platform-staff claim.
+  const [hasTosClaim, setHasTosClaim] = useState(false);
   const centreEntryKeyRef = useRef<string | null>(null);
   // The facility whose saved tenant this load already tried to restore, so a
   // failed restore falls through to normal entry instead of looping.
@@ -254,6 +264,16 @@ const MainLayout: React.FC = () => {
     // is resolved from its start address (?centre=): the binding decides
     // which centre this app belongs to, so nothing may enter before it lands.
     if (isAppContext && appFacility === undefined) return;
+    // In the installed facility app a platform-staff session stays invisible:
+    // the app belongs to its facility, so a staff account sees the access-code
+    // gate like a signed-out visit. Automatic entry never runs for it and the
+    // staff session itself is left alone (the console keeps it in the browser).
+    if (isAppContext && appFacility && hasTosClaim) {
+      centreEntryKeyRef.current = null;
+      setCentreEntryBusy(false);
+      setCentreEntryFailed(false);
+      return;
+    }
     // While the email-verification gate is up it owns the screen.
     if (verifyPending) return;
     if (activeCentreId) {
@@ -359,7 +379,7 @@ const MainLayout: React.FC = () => {
         });
       })
       .finally(() => setCentreEntryBusy(false));
-  }, [currentUser, hasCheckedActiveCentre, activeCentreId, pendingCentre, centreEntryRetry, appWelcomeCentre, appWelcomeMode, appFacility, verifyPending, passwordChangePending, enterCentreByCode, enterSoleCentre, resumeCentreSession]);
+  }, [currentUser, hasCheckedActiveCentre, activeCentreId, pendingCentre, centreEntryRetry, appWelcomeCentre, appWelcomeMode, appFacility, verifyPending, passwordChangePending, enterCentreByCode, enterSoleCentre, resumeCentreSession, hasTosClaim]);
 
   // The centre code gate appears only after a login button on the landing
   // page is clicked; the platform-staff door (#tos-admin) never shows it.
@@ -372,7 +392,6 @@ const MainLayout: React.FC = () => {
   // token. There is no client-side email shortcut (Prompt D): /api/session/sync
   // is the only thing that can mint the claim, and the server enforces it on
   // every route.
-  const [hasTosClaim, setHasTosClaim] = useState(false);
   // Resolves after the token's claims are read (and, when the `tos` claim is
   // not in the token yet, after one server round-trip that may mint it), so a
   // claim-only staff account never flashes the tenant dashboard first.
@@ -442,6 +461,12 @@ const MainLayout: React.FC = () => {
   }, [currentUser?.uid, centreAppRequested, tosDoorAttempt]);
   // The verified `tos` claim is the whole client-side test (Prompt D).
   const isTosAdmin = hasTosClaim;
+  // The TOS staff door (#tos) and the console itself are web surfaces. The
+  // installed facility app never paints anything TOS: inside it the door is
+  // ignored, and a signed-in platform-staff session stays invisible, so the
+  // app shows its own access-code gate exactly like a signed-out visit.
+  const tosDoorActive = tosLoginRequested && !isAppContext;
+  const facilityAppStaffSession = isAppContext && isTosAdmin;
 
   // The device remembers which surface it was last on ('tos:last-surface'),
   // so the pre-app boot splash and the auth splash paint the right world:
@@ -451,7 +476,7 @@ const MainLayout: React.FC = () => {
   // back into the landing page or a facility's access-code gate.
   useEffect(() => {
     try {
-      const onTos = tosLoginRequested || (!!currentUser && isTosAdmin && !centreAppRequested);
+      const onTos = !isAppContext && (tosLoginRequested || (!!currentUser && isTosAdmin && !centreAppRequested));
       if (onTos) {
         localStorage.setItem('tos:last-surface', 'tos');
         const h = (window.location.hash || '').toLowerCase();
@@ -573,7 +598,7 @@ const MainLayout: React.FC = () => {
   // sidebar's Landing page button uses it, and the logo's three quick taps
   // on the landing bring them straight back into the console while the
   // session lives (a signed-out visitor still gets the staff sign-in).
-  if (currentUser && isTosAdmin && !centreAppRequested && !forceLanding) return <Suspense fallback={<ScreenFallback />}><TosPortal /></Suspense>;
+  if (currentUser && isTosAdmin && !centreAppRequested && !forceLanding && !isAppContext) return <Suspense fallback={<ScreenFallback />}><TosPortal /></Suspense>;
 
   // A signed-in account whose platform check could not finish (a weak
   // connection) is still signed in: say that plainly here instead of showing
@@ -609,7 +634,7 @@ const MainLayout: React.FC = () => {
   // Platform staff never see the centre access-code screen (Prompt E). When a
   // staff member opens a centre door without an active centre membership,
   // explain the way to test a centre instead of showing code entry.
-  if (currentUser && isTosAdmin && !activeCentreId && !forceLanding) {
+  if (currentUser && isTosAdmin && !activeCentreId && !forceLanding && !isAppContext) {
     return (
       <div className="min-h-screen w-full bg-slate-950 flex flex-col items-center justify-center text-center p-6">
         <div className="w-14 h-14 rounded-2xl bg-orange-500/10 border border-orange-500/30 flex items-center justify-center mb-5">
@@ -640,7 +665,7 @@ const MainLayout: React.FC = () => {
 
   // Landing page flow: the Tutorial OS product landing is the first screen,
   // and the existing role picker stays one click away from it.
-  if (tosLoginRequested) {
+  if (tosDoorActive) {
     // Signed-out visitors get the staff sign-in; a signed-in non-staff sees a
     // plain not-found, and one whose platform verification failed sees why.
     if (currentUser && !isTosAdmin) {
@@ -705,7 +730,7 @@ const MainLayout: React.FC = () => {
   // A signed-out visitor enters this facility's access code first; the code
   // confirms the centre, then the facility's welcome screen opens, and
   // sign-in follows from there. A signed-in account skips the gate entirely.
-  if (!currentUser && !tosLoginRequested && !pendingCentre && isAppContext && appFacility && appWelcomeCentre && appWelcomeMode === null) {
+  if ((!currentUser || facilityAppStaffSession) && !tosDoorActive && !pendingCentre && isAppContext && appFacility && appWelcomeCentre && appWelcomeMode === null) {
     return (
       <CentreCodeGate
         lockedCentre={{ centreId: appFacility.centreId, centreName: appFacility.centreName, accent: appFacility.accent, logoUrl: appFacility.logoUrl }}
@@ -731,7 +756,7 @@ const MainLayout: React.FC = () => {
   }
 
   // The facility app's home screen: welcome first, then login or sign-up.
-  if (!currentUser && !tosLoginRequested && centreGateRequested && appWelcomeCentre && appWelcomeMode === 'welcome') {
+  if ((!currentUser || facilityAppStaffSession) && !tosDoorActive && centreGateRequested && appWelcomeCentre && appWelcomeMode === 'welcome') {
     const enterFromWelcome = (mode: 'login' | 'signup') => {
       setPendingCentre({ code: '', centreName: appWelcomeCentre.centreName, centreId: appWelcomeCentre.centreId, accent: appWelcomeCentre.accent, logoUrl: appWelcomeCentre.logoUrl });
       setAppWelcomeMode(mode);
@@ -772,7 +797,7 @@ const MainLayout: React.FC = () => {
   // The centre code gate shows after a login button on the landing page is
   // clicked (the platform-staff door above is exempt). It only selects and
   // names the centre; the centre's login page follows it.
-  if (!currentUser && !tosLoginRequested && !pendingCentre && centreGateRequested && appFacility === null) {
+  if ((!currentUser || facilityAppStaffSession) && !tosDoorActive && !pendingCentre && centreGateRequested && appFacility === null) {
     return (
       <CentreCodeGate
         onProceed={(code, centreName, centreId, accent, logoUrl) => {
@@ -796,13 +821,13 @@ const MainLayout: React.FC = () => {
   // Belt over braces: a bound facility app never paints the public TOS
   // landing, not for a single frame. If the gate state is somehow not ready
   // yet, hold on the plain loading screen instead.
-  if (isAppContext && appFacility && !currentUser && !appWelcomeCentre) {
+  if (isAppContext && appFacility && (!currentUser || facilityAppStaffSession) && !appWelcomeCentre) {
     return (
       <LaunchSplash />
     );
   }
 
-  if (forceLanding || (showWelcome && !currentUser)) {
+  if ((!isAppContext && forceLanding) || (showWelcome && !currentUser)) {
     if (!showPortals) {
       return (
         <TutorialOsLanding
@@ -996,7 +1021,7 @@ const MainLayout: React.FC = () => {
 
   // The facility app's login and student sign-up, reached from the app's own
   // welcome screen. Back returns to the welcome screen, never the TOS landing.
-  if (!currentUser && appWelcomeCentre && appWelcomeMode === 'login') {
+  if ((!currentUser || facilityAppStaffSession) && appWelcomeCentre && appWelcomeMode === 'login') {
     return (
       <AuthPortal
         portalType="student"
