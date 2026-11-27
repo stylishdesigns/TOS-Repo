@@ -840,7 +840,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({
                       <div className="w-full border-t border-slate-100"></div>
                     </div>
                     <div className="relative flex justify-center text-[10px] uppercase font-black tracking-widest">
-                      <span className="px-4 bg-white text-slate-400">Or continue with</span>
+                      <span className="px-4 bg-white text-slate-600">Or continue with</span>
                     </div>
                   </div>
                 )}

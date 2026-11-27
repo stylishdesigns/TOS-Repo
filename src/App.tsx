@@ -87,7 +87,7 @@ const MainLayout: React.FC = () => {
   // secret. The first screen asks for the code, shows the centre's name, and
   // the selected centre's login page follows; after sign-in the app enters
   // that centre automatically.
-  const [pendingCentre, setPendingCentre] = useState<{ code: string; centreName: string; centreId?: string; accent?: string } | null>(null);
+  const [pendingCentre, setPendingCentre] = useState<{ code: string; centreName: string; centreId?: string; accent?: string; logoUrl?: string } | null>(null);
   const [loginCentreError, setLoginCentreError] = useState<string | null>(null);
   // Post-login centre resolution is silent: no code screen sits between the
   // login page and the dashboard. The centre chosen before login is entered
@@ -159,7 +159,7 @@ const MainLayout: React.FC = () => {
           // code gate and the welcome screen entirely: splash, then straight
           // to signing in. The centre is already known, so no code is needed.
           if (facility.accessCodeRequired === false) {
-            setPendingCentre({ code: '', centreName: facility.centreName, centreId: facility.centreId, accent: facility.accent });
+            setPendingCentre({ code: '', centreName: facility.centreName, centreId: facility.centreId, accent: facility.accent, logoUrl: facility.logoUrl });
             setAppWelcomeMode('login');
           }
           setAppFacility(facility);
@@ -489,7 +489,7 @@ const MainLayout: React.FC = () => {
   // (the last one used on this device) can never repaint them as another
   // facility's page.
   const authCentre: { centreName: string; accent?: string; logoUrl?: string } | null = pendingCentre
-    ? { centreName: pendingCentre.centreName, accent: pendingCentre.accent }
+    ? { centreName: pendingCentre.centreName, accent: pendingCentre.accent, logoUrl: pendingCentre.logoUrl }
     : appFacility
       ? { centreName: appFacility.centreName, accent: appFacility.accent, logoUrl: appFacility.logoUrl }
       : appWelcomeCentre
@@ -693,7 +693,7 @@ const MainLayout: React.FC = () => {
         lockedCentre={{ centreId: appFacility.centreId, centreName: appFacility.centreName, accent: appFacility.accent, logoUrl: appFacility.logoUrl }}
         onProceed={(code, centreName, centreId, accent, logoUrl) => {
           setShowWelcome(false);
-          setPendingCentre({ code, centreName, centreId, accent });
+          setPendingCentre({ code, centreName, centreId, accent, logoUrl: logoUrl || '' });
           setAppWelcomeCentre({ centreId: centreId || appFacility.centreId, centreName, accent: accent || '', logoUrl: logoUrl || appFacility.logoUrl, welcomeImageUrl: '' });
           setAppWelcomeMode('welcome');
         }}
@@ -715,7 +715,7 @@ const MainLayout: React.FC = () => {
   // The facility app's home screen: welcome first, then login or sign-up.
   if (!currentUser && !tosLoginRequested && centreGateRequested && appWelcomeCentre && appWelcomeMode === 'welcome') {
     const enterFromWelcome = (mode: 'login' | 'signup') => {
-      setPendingCentre({ code: '', centreName: appWelcomeCentre.centreName, centreId: appWelcomeCentre.centreId, accent: appWelcomeCentre.accent });
+      setPendingCentre({ code: '', centreName: appWelcomeCentre.centreName, centreId: appWelcomeCentre.centreId, accent: appWelcomeCentre.accent, logoUrl: appWelcomeCentre.logoUrl });
       setAppWelcomeMode(mode);
     };
     return (
@@ -762,7 +762,7 @@ const MainLayout: React.FC = () => {
           // app boots on #access) must still land on the login page, not the
           // landing: clear the welcome flag the gate ran past.
           setShowWelcome(false);
-          setPendingCentre({ code, centreName, centreId, accent });
+          setPendingCentre({ code, centreName, centreId, accent, logoUrl: logoUrl || '' });
           // In the facility app the gate's Continue opens the app's own
           // welcome screen; login happens from there, never straight away.
           if (isAppContext) {

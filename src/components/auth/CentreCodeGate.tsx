@@ -240,7 +240,7 @@ export const CentreCodeGate: React.FC<CentreCodeGateProps> = ({ onProceed, onBac
                   <Building2 className="w-10 h-10" />
                 </div>
               )}
-              <p className="text-[11px] uppercase tracking-widest text-slate-500 font-bold mb-1">You are entering</p>
+              <p className="text-xs uppercase tracking-widest text-white font-bold mb-1">You are entering</p>
               <p className="text-3xl font-black text-white tracking-tight">{centre.centreName}</p>
               {centre.suspended && (
                 <p className="text-xs text-amber-400 font-medium mt-2">
@@ -288,7 +288,7 @@ export const CentreCodeGate: React.FC<CentreCodeGateProps> = ({ onProceed, onBac
           <button
             type="button"
             onClick={onBack} data-gate-back
-            className="text-[11px] text-slate-600 hover:text-slate-400 font-medium transition-colors flex items-center gap-1.5 cursor-pointer"
+            className="px-4 py-2 rounded-full border border-slate-600 text-slate-200 hover:text-white hover:border-slate-400 font-semibold text-xs transition-colors flex items-center gap-1.5 cursor-pointer"
           >
             <ArrowRight className="w-3.5 h-3.5 rotate-180" />
             <span>Back to landing page</span>

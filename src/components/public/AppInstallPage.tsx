@@ -320,14 +320,14 @@ export function AppInstallPage() {
           <a
             href="/#landing"
             style={{
-              color: '#CBD5E1',
+              color: '#F1F5F9',
               textDecoration: 'none',
               fontWeight: 700,
               fontSize: 14,
               padding: '12px 22px',
               borderRadius: 12,
-              border: '1px solid rgba(255,255,255,0.16)',
-              background: 'rgba(255,255,255,0.04)',
+              border: '1px solid rgba(255,255,255,0.35)',
+              background: 'rgba(255,255,255,0.12)',
             }}
           >
             Back to landing page
