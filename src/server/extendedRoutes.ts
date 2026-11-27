@@ -5,7 +5,7 @@ import { adminAuth, adminDb } from './firebaseAdmin';
 import { runStaffPayReminderSweep } from './staffPayReminders';
 import { provisionSeats, getSeatPool, facilityTier, countPaidSeatsForCentre, addSeatsForCentre, enforceSeatConfigAcrossFacilities } from './seatDays';
 import { runSeatPolicySweep } from './seatSweep';
-import { payAccount, paidSeatStats, createUpgradeRequest, attachReceiptToUpgradeRequest, listUpgradeRequests, decideUpgradeRequest, listSeatPayments } from './seatUpgrades';
+import { payAccount, paidSeatStats, createUpgradeRequest, attachReceiptToUpgradeRequest, listUpgradeRequests, decideUpgradeRequest, listSeatPayments, notifySeatPaymentRegistered } from './seatUpgrades';
 import {
   Caller,
   countActiveStudents,
@@ -1018,13 +1018,27 @@ export function registerExtendedRoutes(app: express.Express): void {
         const batch = adminDb.batch();
         for (const name of ['JAMB', 'WAEC', 'NECO', 'IJMB', 'JUPEB']) {
           const id = 'exam-' + name.toLowerCase();
-          batch.set(ref.doc(id), { id, name, addedAt: now });
+          // JAMB is objectives only; the essay bodies run both question forms
+          // until an admin narrows them (batch 60).
+          batch.set(ref.doc(id), { id, name, addedAt: now, questionType: id === 'exam-jamb' ? 'mcq' : 'both' });
         }
         await batch.commit();
         snap = await ref.get();
       }
+      // Batch 60: every exam carries a question-type setting (mcq, theory or
+      // both). Older docs predate the field, so backfill it on read: JAMB is
+      // objectives only, every other exam runs both forms until narrowed.
+      const missingType = snap.docs.filter((d) => !['mcq', 'theory', 'both'].includes(String((d.data() as any)?.questionType || '')));
+      if (missingType.length) {
+        const fix = adminDb.batch();
+        for (const d of missingType) {
+          fix.set(d.ref, { questionType: d.id === 'exam-jamb' ? 'mcq' : 'both' }, { merge: true });
+        }
+        await fix.commit();
+      }
       const exams = snap.docs
         .map((d) => ({ id: d.id, ...(d.data() as Record<string, any>) } as Record<string, any>))
+        .map((e) => ({ ...e, questionType: ['mcq', 'theory', 'both'].includes(String(e.questionType || '')) ? String(e.questionType) : (String(e.id) === 'exam-jamb' ? 'mcq' : 'both') }))
         .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
       res.json({ ok: true, exams });
     } catch (error: any) {
@@ -1042,13 +1056,36 @@ export function registerExtendedRoutes(app: express.Express): void {
       const id = slug ? 'exam-' + slug : 'exam-' + crypto.randomBytes(4).toString('hex');
       const dup = await adminDb.collection('examTypes').doc(id).get();
       if (dup.exists) throw httpError(409, 'That exam is already registered.');
+      const qType = String(req.body?.questionType || 'mcq').trim().toLowerCase();
+      if (!['mcq', 'theory', 'both'].includes(qType)) throw httpError(400, 'Question type must be mcq, theory or both.');
       const now = new Date().toISOString();
-      const payload = { id, name, addedAt: now, addedBy: String(caller.email || caller.uid || '') };
+      const payload = { id, name, addedAt: now, addedBy: String(caller.email || caller.uid || ''), questionType: qType };
       await adminDb.collection('examTypes').doc(id).set(payload);
       res.json({ ok: true, exam: payload });
     } catch (error: any) {
       const status = Number(error?.status || 500);
       res.status(status).json({ error: error?.message || 'Registering the exam failed.' });
+    }
+  });
+
+  // Batch 60: change an exam's question form. The name is immutable because
+  // question bank and mock documents key their exam tags on the normalised
+  // name; renaming would orphan every tagged question.
+  app.patch('/api/tos/exam-types/:id', async (req, res) => {
+    try {
+      requireTos(req);
+      const id = String(req.params?.id || '').trim();
+      if (!/^[a-zA-Z0-9_-]{1,64}$/.test(id)) throw httpError(400, 'A valid exam id is required.');
+      const qType = String(req.body?.questionType || '').trim().toLowerCase();
+      if (!['mcq', 'theory', 'both'].includes(qType)) throw httpError(400, 'Question type must be mcq, theory or both.');
+      const ref = adminDb.collection('examTypes').doc(id);
+      const snap = await ref.get();
+      if (!snap.exists) throw httpError(404, 'That exam is not registered.');
+      await ref.set({ questionType: qType, updatedAt: new Date().toISOString() }, { merge: true });
+      res.json({ ok: true, exam: { id, ...(snap.data() as Record<string, any>), questionType: qType } });
+    } catch (error: any) {
+      const status = Number(error?.status || 500);
+      res.status(status).json({ error: error?.message || 'Updating the exam failed.' });
     }
   });
 
@@ -2731,6 +2768,32 @@ export function registerExtendedRoutes(app: express.Express): void {
         if (!Number.isFinite(amount) || amount <= 0) return res.status(400).json({ error: 'Enter a payment amount.' });
         if (!periodEnd || isNaN(new Date(periodEnd).getTime())) return res.status(400).json({ error: 'Enter the period the payment covers.' });
         if (!bDoc.exists) return res.status(400).json({ error: 'This facility has no billing document yet.' });
+        // Batch 60: the console can attach the receipt (same rules as the
+        // facility's own upload: PNG/JPG/WebP image or PDF, up to 4 MB), so
+        // the facility sees the proof in its seat payment history, exactly
+        // like the payments it makes itself.
+        let receiptUrl = '';
+        const receiptData = String(req.body?.receiptData || '');
+        if (receiptData) {
+          const rm = /^data:(image\/(?:png|jpe?g|webp)|application\/pdf);base64,([A-Za-z0-9+/=]+)$/.exec(receiptData);
+          if (!rm) return res.status(400).json({ error: 'The receipt must be a PNG, JPG or WebP image, or a PDF.' });
+          const rBytes = Math.floor((rm[2].length * 3) / 4);
+          if (rBytes > 4 * 1024 * 1024) return res.status(413).json({ error: 'The receipt can be up to 4 MB.' });
+          const cloud = String(process.env.CLOUDINARY_CLOUD_NAME || '');
+          const preset = String(process.env.CLOUDINARY_UPLOAD_PRESET || '');
+          if (!cloud || !preset) return res.status(500).json({ error: 'Receipt hosting is not configured on this deployment.' });
+          const endpoint = rm[1] === 'application/pdf' ? 'raw' : 'image';
+          try {
+            const form = new FormData();
+            form.append('upload_preset', preset);
+            form.append('folder', 'tos/receipts');
+            form.append('file', receiptData);
+            const resp = await fetch(`https://api.cloudinary.com/v1_1/${cloud}/${endpoint}/upload`, { method: 'POST', body: form });
+            const cd: any = await resp.json().catch(() => null);
+            receiptUrl = cd && typeof cd.secure_url === 'string' ? cd.secure_url : '';
+            if (!resp.ok || !receiptUrl) return res.status(502).json({ error: 'The receipt could not be uploaded. Please try again.' });
+          } catch { return res.status(502).json({ error: 'The receipt could not be uploaded. Please try again.' }); }
+        }
         await adminDb.collection('billingPayments').add({
           centreId: req.params.id,
           amount,
@@ -2738,6 +2801,7 @@ export function registerExtendedRoutes(app: express.Express): void {
           method,
           reference,
           note,
+          ...(receiptUrl ? { receiptUrl } : {}),
           actorUid: caller.uid,
           at: new Date().toISOString(),
         });
@@ -2770,6 +2834,11 @@ export function registerExtendedRoutes(app: express.Express): void {
           }
         } catch (e) { console.error('[tos/facilities] tier flip failed:', (e as Error).message); }
         await auditChange('PAYMENT_RECORDED', { amount, periodCoveredUntil: new Date(periodEnd).toISOString(), method, reference, seats, seatResult });
+        // Batch 60: the facility hears immediately: in-app + push to the
+        // owner and admins, and one email each.
+        try {
+          await notifySeatPaymentRegistered({ centreId: req.params.id, amount, periodEnd, seats, method, reference, ...(receiptUrl ? { receiptUrl } : {}) });
+        } catch (e) { console.error('[tos/facilities] payment notify failed:', (e as Error).message); }
         return res.json({ success: true, ...(upgraded ? { upgraded: true } : {}), ...(seatResult ? { seats: seatResult } : {}) });
       }
       if (type === 'suspend') {

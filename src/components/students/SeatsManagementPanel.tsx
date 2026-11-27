@@ -21,6 +21,12 @@ import { Student, SeatSummary } from '../../types';
 // Batch 44: the plan cards in the payment flow show what each plan actually
 // covers, word for word like the pricing cards on the landing page and the
 // proposal, so an admin choosing a plan can see the difference at a glance.
+const PLAN_FEATURES_PREMIUM = [
+  'Everything in Standard',
+  'WhatsApp notifications for parents',
+  '500 AI credits per seat',
+];
+
 const PLAN_FEATURES: Record<string, string[]> = {
   centre_free: [
     'Up to 5 students',
@@ -36,11 +42,10 @@ const PLAN_FEATURES: Record<string, string[]> = {
     '200 AI credits per seat',
     'AI question generation and performance analysis',
   ],
-  centre_premium: [
-    'Everything in Standard',
-    'WhatsApp notifications for parents',
-    '500 AI credits per seat',
-  ],
+  // Batch 60: the Premium plan's Firestore id is centre_plus (the
+  // centre_premium alias stays for any older plan doc).
+  centre_plus: PLAN_FEATURES_PREMIUM,
+  centre_premium: PLAN_FEATURES_PREMIUM,
 };
 
 interface SeatsManagementPanelProps {
@@ -105,7 +110,13 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
     if (!activeCentreId) return;
     let alive = true;
     api(`/api/centre/seats/plan?centreId=${encodeURIComponent(activeCentreId)}`)
-      .then((d: any) => { if (alive) setPlanState(d); })
+      .then((d: any) => {
+        if (alive) setPlanState(d);
+        try {
+          const current = (d?.plans || []).find((p: any) => p.id === d?.planId);
+          if (current?.name) localStorage.setItem(`tos:plan-tag-${activeCentreId}`, JSON.stringify({ name: current.name, planId: d.planId }));
+        } catch { /* cache is best effort */ }
+      })
       .catch(() => { /* the card hides when the plan lookup fails */ });
     return () => { alive = false; };
   }, [activeCentreId]);
@@ -134,9 +145,20 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
   // Batch 26: a lead (signed up, never upgraded) gets a lead chip in place
   // of the old trial countdown.
   // Batch 29: the plan the facility is on, as a big tag beside the title.
+  // Batch 60: the plan tag never guesses. The last known plan is cached on
+  // this device per facility, so a return visit renders it instantly; a first
+  // visit holds a quiet placeholder until the plan read lands, instead of
+  // printing "Free plan" before the facility's real plan is known.
   const planTagLabel = (() => {
-    const current = (planState?.plans || []).find((p: any) => p.id === planState?.planId);
-    return `${current?.name || 'Free'} plan`;
+    if (planState?.planId) {
+      const current = (planState?.plans || []).find((p: any) => p.id === planState?.planId);
+      if (current?.name) return `${current.name} plan`;
+    }
+    try {
+      const cached = JSON.parse(localStorage.getItem(`tos:plan-tag-${activeCentreId}`) || 'null');
+      if (cached?.name) return `${cached.name} plan`;
+    } catch { /* cache is best effort */ }
+    return null;
   })();
   const occupiedSeatsCount = seats.filter((x) => String((x as any).studentUid || '')).length;
   const withoutSeatCount = Math.max(0, enrolled - occupiedSeatsCount);
@@ -285,7 +307,7 @@ export const SeatsManagementPanel: React.FC<SeatsManagementPanelProps> = ({ stud
       <div className="flex flex-col items-center gap-1.5 pb-5">
         <span className="relative inline-flex items-center px-6 py-2.5 rounded-2xl text-base sm:text-xl font-black tracking-wide bg-[var(--brand,#0F172A)] text-white shadow-lg">
           <span aria-hidden="true" className="absolute inset-0 rounded-2xl bg-[var(--brand,#0F172A)] blur-md opacity-40 animate-pulse" />
-          <span className="relative">{planTagLabel}</span>
+          <span className="relative">{planTagLabel ?? <span aria-label="Loading plan" className="inline-block w-28 h-5 rounded bg-white/25 animate-pulse align-middle" />}</span>
         </span>
         <span className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Current plan</span>
       </div>

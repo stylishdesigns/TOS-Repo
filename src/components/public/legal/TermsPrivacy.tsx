@@ -158,10 +158,10 @@ export const LegalModal: React.FC<{ kind: LegalKind; onClose: () => void }> = ({
       onClick={onClose}
     >
       <div
-        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-3xl w-full max-w-xl max-h-[85vh] flex flex-col shadow-xl"
+        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-3xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-start justify-between gap-3 px-6 pt-5 pb-3 border-b border-slate-100 dark:border-slate-800">
+        <div className="flex items-start justify-between gap-3 px-6 sm:px-8 pt-6 pb-4 border-b border-slate-100 dark:border-slate-800">
           <div>
             <p className="text-[10px] font-black uppercase tracking-wider text-[#C2410C]">Tutorial OS</p>
             <h2 className="text-lg font-black text-slate-900 dark:text-white mt-0.5">
@@ -187,12 +187,12 @@ export const LegalModal: React.FC<{ kind: LegalKind; onClose: () => void }> = ({
             </section>
           ))}
         </div>
-        <div className="px-6 py-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3">
+        <div className="px-6 sm:px-8 py-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3">
           <p className="text-[11px] text-slate-400">Last updated November 2026.</p>
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-[#C2410C] hover:brightness-110"
+            className="px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-[#C2410C] hover:brightness-110"
           >
             Done reading
           </button>
@@ -298,14 +298,14 @@ export const VideoTermsModal: React.FC<{ onClose: () => void }> = ({ onClose }) 
       onClick={onClose}
     >
       <div
-        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-3xl w-full max-w-xl max-h-[85vh] flex flex-col shadow-xl"
+        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-3xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-start justify-between gap-3 px-6 pt-5 pb-3 border-b border-slate-100 dark:border-slate-800">
+        <div className="flex items-start justify-between gap-3 px-6 sm:px-8 pt-6 pb-4 border-b border-slate-100 dark:border-slate-800">
           <div>
             <p className="text-[10px] font-black uppercase tracking-wider text-[#C2410C]">Tutorial OS</p>
-            <h2 className="text-lg font-black text-slate-900 dark:text-white mt-0.5">Video classes: terms &amp; conditions</h2>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">For facility admins switching on the Tutorial OS video classes.</p>
+            <h2 className="text-xl font-black text-slate-900 dark:text-white mt-1">Video classes: terms &amp; conditions</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">For facility admins switching on the Tutorial OS video classes.</p>
           </div>
           <button
             type="button"
@@ -316,22 +316,25 @@ export const VideoTermsModal: React.FC<{ onClose: () => void }> = ({ onClose }) 
             <X className="w-4 h-4" />
           </button>
         </div>
-        <div className="overflow-y-auto px-6 py-4">
-          {VIDEO_TERMS_SECTIONS.map((s) => (
-            <section key={s.title} className="mb-4">
-              <h3 className="text-[13px] font-black text-slate-800 dark:text-slate-100 mb-1">{s.title}</h3>
+        <div className="overflow-y-auto px-6 sm:px-8 py-5">
+          {VIDEO_TERMS_SECTIONS.map((s, idx) => (
+            <section key={s.title} className="mb-6 last:mb-1">
+              <div className="flex items-center gap-2.5 mb-2.5">
+                <span className="inline-flex items-center justify-center w-6 h-6 rounded-lg bg-[#C2410C]/10 text-[#C2410C] text-[11px] font-black shrink-0">{String(idx + 1).padStart(2, '0')}</span>
+                <h3 className="text-[15px] font-black tracking-tight text-slate-900 dark:text-white">{s.title}</h3>
+              </div>
               {s.paras.map((p, i) => (
-                <p key={i} className="text-[13px] leading-relaxed text-slate-600 dark:text-slate-300 mb-1.5">{p}</p>
+                <p key={i} className="text-[14px] leading-[1.75] text-slate-600 dark:text-slate-300 mb-2">{p}</p>
               ))}
             </section>
           ))}
         </div>
-        <div className="px-6 py-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3">
+        <div className="px-6 sm:px-8 py-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3">
           <p className="text-[11px] text-slate-400">Last updated November 2026.</p>
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-[#C2410C] hover:brightness-110"
+            className="px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-[#C2410C] hover:brightness-110"
           >
             Done reading
           </button>

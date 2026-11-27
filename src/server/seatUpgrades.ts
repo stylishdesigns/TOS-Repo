@@ -400,7 +400,7 @@ export async function listUpgradeRequests(): Promise<any[]> {
 
 /** Emails + in-app/push audience for one facility: owner and active
  *  owner/admin members, the same source the seat sweeps use. */
-async function centreAudience(centreId: string): Promise<{ emails: string[]; uids: string[] }> {
+export async function centreAudience(centreId: string): Promise<{ emails: string[]; uids: string[] }> {
   const emails = new Set<string>();
   const uids = new Set<string>();
   try {
@@ -429,7 +429,7 @@ async function centreAudience(centreId: string): Promise<{ emails: string[]; uid
 
 /** In-app + push notice to the facility's admins, same write shape the seat
  *  sweeps use. */
-async function notifyCentreAdmins(
+export async function notifyCentreAdmins(
   centreId: string,
   uids: string[],
   key: string,
@@ -632,4 +632,52 @@ export async function decideUpgradeRequest(input: {
   }
 
   return { ok: true, action: 'approved', seatsCreated: result.created, emailsSent };
+}
+
+/** Batch 60: the facility hears immediately when Tutorial OS records a payment
+ *  for it from the console: in-app + push to the owner and admins, and one
+ *  email each. Receipt, when attached, is visible in their payment history. */
+export async function notifySeatPaymentRegistered(input: {
+  centreId: string;
+  amount: number;
+  periodEnd: string;
+  seats: number;
+  method: string;
+  reference: string;
+  receiptUrl?: string;
+}): Promise<void> {
+  let centreName = 'your facility';
+  try {
+    const centreDoc = await adminDb.collection('centres').doc(input.centreId).get();
+    centreName = String((centreDoc.data() as any)?.name || '') || centreName;
+  } catch { /* best effort */ }
+  let covers = String(input.periodEnd || '');
+  try { covers = new Date(input.periodEnd).toLocaleDateString([], { day: 'numeric', month: 'long', year: 'numeric' }); } catch { /* keep raw */ }
+  const seatsLine = input.seats > 0 ? ` It adds ${input.seats} seat${input.seats === 1 ? '' : 's'} to your pool.` : '';
+  const audience = await centreAudience(input.centreId);
+  if (audience.uids.length) {
+    await notifyCentreAdmins(
+      input.centreId,
+      audience.uids,
+      `payreg-${Date.now().toString(36)}`,
+      'payment_registered',
+      'Payment registered',
+      `Tutorial OS recorded your ${naira(input.amount)} payment for ${centreName}.${seatsLine} You are covered until ${covers}.`
+    );
+  }
+  const shell = emailShell(
+    'Payment registered',
+    `<p style="font-size:14px;color:#334155;line-height:1.6;margin:0 0 12px;">We have recorded a payment of <strong style="color:#0F172A;">${naira(input.amount)}</strong> for <strong style="color:#0F172A;">${centreName}</strong>.${seatsLine}</p>
+     <p style="font-size:14px;color:#334155;line-height:1.6;margin:0 0 12px;">Your account is covered until <strong style="color:#0F172A;">${covers}</strong>.${input.method ? ` Payment method: ${input.method}.` : ''} The receipt${input.receiptUrl ? '' : ' and full details'} appear in your seat payment history inside your dashboard.</p>`
+  );
+  for (const email of audience.emails) {
+    try {
+      await sendEmail({
+        to: email,
+        subject: `Payment registered for ${centreName}`,
+        html: shell,
+        text: `We have recorded your ${naira(input.amount)} payment for ${centreName}.${seatsLine} Your account is covered until ${covers}. The receipt appears in your seat payment history inside your dashboard.`,
+      });
+    } catch { /* one recipient failing never blocks the rest */ }
+  }
 }
