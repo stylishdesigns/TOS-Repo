@@ -80,6 +80,12 @@ export function AppInstallPage() {
       .then((d: any) => {
         if (!alive || !d || d.locked || !d.centreName) return;
         setUrlCentre({ slug: slugifyName(d.centreName), name: String(d.centreName), logo: String(d.logoUrl || ''), accent: String(d.accent || '') });
+        // Batch 67: this device is installing this facility's app; remember
+        // the facility's launch branding so the boot splash is theirs from
+        // the very first launch.
+        if (/^#[0-9a-fA-F]{6}$/.test(String(d.accent || '')) && !/^#ea580c$/i.test(String(d.accent || ''))) {
+          try { localStorage.setItem('tos:launch-brand', JSON.stringify({ logo: String(d.logoUrl || ''), name: String(d.centreName), accent: String(d.accent) })); } catch { /* private mode */ }
+        }
       })
       .catch(() => undefined);
     return () => { alive = false; };

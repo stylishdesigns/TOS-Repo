@@ -152,7 +152,15 @@ export const CentreCodeGate: React.FC<CentreCodeGateProps> = ({ onProceed, onBac
 
       <div className="w-full max-w-md bg-slate-900/90 border border-slate-800/80 rounded-3xl p-8 backdrop-blur-xl shadow-2xl relative z-10">
         <div className="flex flex-col items-center text-center mb-8">
-          <img src="/tos-brand-icon.png" alt="Tutorial OS" className="w-16 h-16 rounded-2xl mb-4 shadow-lg" />
+          {/* Batch 67: the Tutorial OS mark belongs to the TOS-landing gate
+              only. The facility app's own gate (lockedCentre) carries the
+              facility's logo instead, or nothing. */}
+          {!lockedCentre && (
+            <img src="/tos-brand-icon.png" alt="Tutorial OS" className="w-16 h-16 rounded-2xl mb-4 shadow-lg" />
+          )}
+          {lockedCentre && lockedCentre.logoUrl ? (
+            <img src={lockedCentre.logoUrl} alt="Facility logo" className="w-16 h-16 rounded-2xl mb-4 shadow-lg object-contain bg-white p-1.5" />
+          ) : null}
           {lockedCentre ? (
             <>
               <h1 className="text-2xl font-black tracking-tight text-white mb-2">Facility access code</h1>

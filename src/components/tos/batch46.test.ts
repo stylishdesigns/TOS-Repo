@@ -38,7 +38,7 @@ check('staff door back navigates to /#landing', staffBlock.includes("window.loca
 check('no stale state-only back on the app-context gate', !gateBlock.includes('setCentreGateRequested(false)'));
 
 // 2. The app context belt still holds the loading screen (unchanged).
-check('bound-facility belt still holds the loading screen', app.includes('isAppContext && appFacility && (!currentUser || facilityAppStaffSession) && !appWelcomeCentre'));
+check('bound-facility belt still holds the loading screen', app.includes('isAppContext && appFacility && (!currentUser || facilityAppStaffSession) && (!appWelcomeCentre || appSplashHold)'));
 
 // 3. The /app page's back link is unchanged and hidden in the installed app.
 check('install page back link targets /#landing', install.includes('href="/#landing"'));

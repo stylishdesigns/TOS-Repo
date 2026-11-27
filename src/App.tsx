@@ -147,6 +147,9 @@ const MainLayout: React.FC = () => {
   // belong to it. undefined while the lookup runs, null when the visit
   // carries no ?centre= (a plain browser visit keeps today's behaviour).
   const [appFacility, setAppFacility] = useState<{ centreId: string; centreName: string; accent: string; logoUrl: string; accessCodeRequired?: boolean } | null | undefined>(undefined);
+  // Batch 67: the facility's own splash holds briefly after the lookup lands,
+  // before the gate or dashboard takes over.
+  const [appSplashHold, setAppSplashHold] = useState(false);
   // Batch 22: a facility under the paid-seat minimum has no public landing
   // page; the lookup returns locked and the visitor sees this screen only.
   const [landingLocked, setLandingLocked] = useState<{ message: string } | null>(null);
@@ -207,6 +210,17 @@ const MainLayout: React.FC = () => {
     // The phone's top strip (browser chrome and the installed app's bar)
     // follows the facility's colour, never platform orange.
     setThemeColor(appFacility.accent);
+    // Batch 67: the facility's own splash (logo, name, dots on its colour)
+    // holds briefly before the gate or dashboard, and the device remembers
+    // the facility's branding so the next cold start boots on it too.
+    setAppSplashHold(true);
+    const holdTimer = setTimeout(() => setAppSplashHold(false), 1100);
+    if (/^#[0-9a-fA-F]{6}$/.test(appFacility.accent) && !/^#ea580c$/i.test(appFacility.accent)) {
+      try {
+        localStorage.setItem('tos:launch-brand', JSON.stringify({ centreId: appFacility.centreId, logo: appFacility.logoUrl || '', name: appFacility.centreName || '', accent: appFacility.accent }));
+      } catch { /* private mode */ }
+    }
+    return () => clearTimeout(holdTimer);
   }, [appFacility]);
 
   // Email verification gate: a student account created with email + password
@@ -730,7 +744,7 @@ const MainLayout: React.FC = () => {
   // A signed-out visitor enters this facility's access code first; the code
   // confirms the centre, then the facility's welcome screen opens, and
   // sign-in follows from there. A signed-in account skips the gate entirely.
-  if ((!currentUser || facilityAppStaffSession) && !tosDoorActive && !pendingCentre && isAppContext && appFacility && appWelcomeCentre && appWelcomeMode === null) {
+  if ((!currentUser || facilityAppStaffSession) && !tosDoorActive && !pendingCentre && isAppContext && appFacility && appWelcomeCentre && appWelcomeMode === null && !appSplashHold) {
     return (
       <CentreCodeGate
         lockedCentre={{ centreId: appFacility.centreId, centreName: appFacility.centreName, accent: appFacility.accent, logoUrl: appFacility.logoUrl }}
@@ -819,11 +833,11 @@ const MainLayout: React.FC = () => {
   }
 
   // Belt over braces: a bound facility app never paints the public TOS
-  // landing, not for a single frame. If the gate state is somehow not ready
-  // yet, hold on the plain loading screen instead.
-  if (isAppContext && appFacility && (!currentUser || facilityAppStaffSession) && !appWelcomeCentre) {
+  // landing, not for a single frame. While the gate state is not ready yet,
+  // or during the splash hold, hold on the facility's own branded splash.
+  if (isAppContext && appFacility && (!currentUser || facilityAppStaffSession) && (!appWelcomeCentre || appSplashHold)) {
     return (
-      <LaunchSplash plain />
+      <LaunchSplash facility={appFacility} />
     );
   }
 

@@ -28,7 +28,7 @@ export function readLaunchBranding(): LaunchBranding | null {
 
 const readPersisted = readLaunchBranding;
 
-function persist(b: LaunchBranding) {
+export function persist(b: LaunchBranding) {
   memBranding = b;
   try { localStorage.setItem('tos:launch-brand', JSON.stringify(b)); } catch { /* private mode */ }
 }
@@ -42,13 +42,17 @@ function readableOn(hex: string): boolean {
   return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.62;
 }
 
-export function LaunchSplash({ tos, plain }: { tos?: boolean; plain?: boolean } = {}) {
+export function LaunchSplash({ tos, plain, facility }: { tos?: boolean; plain?: boolean; facility?: { centreName?: string; accent?: string; logoUrl?: string } | null } = {}) {
   const { centreName, activeCentre, brandAccent } = useApp() as any;
 
   const branding = React.useMemo<LaunchBranding>(() => {
     // Start from what the device already knows (survives app cold starts), so
-    // the splash is one steady screen from the first paint.
-    const base: LaunchBranding = readPersisted() || { logo: '', name: '', accent: '' };
+    // the splash is one steady screen from the first paint. The facility prop
+    // (batch 67) wins when the caller already knows the facility: the bound
+    // app paints its own splash from the lookup, first launch included.
+    const base: LaunchBranding = (facility && /^#[0-9a-fA-F]{6}$/.test(String(facility.accent || '')))
+      ? { centreId: '', logo: String(facility.logoUrl || ''), name: String(facility.centreName || ''), accent: String(facility.accent) }
+      : readPersisted() || { logo: '', name: '', accent: '' };
     const next: LaunchBranding = {
       centreId: String(activeCentre?.id || '') || base.centreId,
       logo: String(activeCentre?.logoUrl || activeCentre?.branding?.logo || activeCentre?.branding?.logoUrl || '') || base.logo,
@@ -73,7 +77,7 @@ export function LaunchSplash({ tos, plain }: { tos?: boolean; plain?: boolean } 
     // Tutorial OS wordmark splash instead.
     if (/^#ea580c$/i.test(String(next.accent))) next.accent = '';
     return next;
-  }, [centreName, activeCentre, brandAccent]);
+  }, [centreName, activeCentre, brandAccent, facility]);
 
   React.useEffect(() => {
     if (tos) return;

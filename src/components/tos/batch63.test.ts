@@ -33,13 +33,13 @@ check('last-surface never marks a facility app as TOS',
 check('TOS landing never paints in the app context',
   app.includes('if ((!isAppContext && forceLanding) || (showWelcome && !currentUser)) {'));
 check('app gate treats a staff session as signed out',
-  app.includes('if ((!currentUser || facilityAppStaffSession) && !tosDoorActive && !pendingCentre && isAppContext && appFacility && appWelcomeCentre && appWelcomeMode === null) {'));
+  app.includes('if ((!currentUser || facilityAppStaffSession) && !tosDoorActive && !pendingCentre && isAppContext && appFacility && appWelcomeCentre && appWelcomeMode === null && !appSplashHold) {'));
 check('app welcome screen reachable for a staff session',
   app.includes("if ((!currentUser || facilityAppStaffSession) && !tosDoorActive && centreGateRequested && appWelcomeCentre && appWelcomeMode === 'welcome') {"));
 check('app login page reachable for a staff session',
   app.includes("if ((!currentUser || facilityAppStaffSession) && appWelcomeCentre && appWelcomeMode === 'login') {"));
 check('belt branch covers a staff session',
-  app.includes('if (isAppContext && appFacility && (!currentUser || facilityAppStaffSession) && !appWelcomeCentre) {'));
+  app.includes('if (isAppContext && appFacility && (!currentUser || facilityAppStaffSession) && (!appWelcomeCentre || appSplashHold)) {'));
 check('automatic entry never runs for a staff session in the app',
   app.includes('if (isAppContext && appFacility && hasTosClaim) {'));
 check('entry effect watches the staff claim',
