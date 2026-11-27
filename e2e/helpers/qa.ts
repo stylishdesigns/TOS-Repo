@@ -20,11 +20,32 @@ export const qaSkipReason = qaCredentialsConfigured
   ? undefined
   : 'QA facility credentials are not configured (set E2E_QA_ACCESS_CODE plus the owner, tutor and student email/password pairs)';
 
+// QA poses as the installed facility app. The platform runs app-only portals
+// (the student and tutor portals open only inside the installed app, in
+// standalone display mode), so a plain browser meets the install call-to-action
+// instead of the portal. The sign-in suites test the portals, so they stand in
+// for the installed app here rather than flipping the platform's own setting.
+async function qaPoseAsInstalledApp(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const original = window.matchMedia.bind(window);
+    window.matchMedia = ((query: string) => {
+      const real = original(query);
+      if (query === '(display-mode: standalone)') {
+        const fake = Object.create(real);
+        Object.defineProperty(fake, 'matches', { get: () => true });
+        return fake as MediaQueryList;
+      }
+      return real;
+    }) as typeof window.matchMedia;
+  });
+}
+
 // Sign a QA facility account in through the same flow every real user walks:
 // the landing Login button, the 6-digit access-code gate, then the facility's
 // own email + password sign-in form. Nothing is written to any facility's
 // data; this only establishes the signed-in session for one account.
 export async function qaPortalSignin(page: Page, email: string, password: string): Promise<void> {
+  await qaPoseAsInstalledApp(page);
   await page.goto('/');
   await page.getByRole('button', { name: 'Login', exact: true }).click();
 

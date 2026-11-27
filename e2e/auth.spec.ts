@@ -27,20 +27,20 @@ test.describe('qa facility sign-in', () => {
     // Signed in: the facility's own sign-in form is gone and the facility's
     // name is on screen somewhere (portal header or welcome).
     await expect(page.getByPlaceholder('e.g. name@yourfacility.com')).toBeHidden({ timeout: 30_000 });
-    await expect(page.locator('body')).toContainText(QA_FACILITY_NAME);
+    await expect(page.locator('body')).toContainText(QA_FACILITY_NAME, { timeout: 30_000 });
   });
 
   test('tutor signs in through the access-code gate and reaches the portal', async ({ page }) => {
     await qaPortalSignin(page, QA_TUTOR_EMAIL, QA_TUTOR_PASSWORD);
 
     await expect(page.getByPlaceholder('e.g. name@yourfacility.com')).toBeHidden({ timeout: 30_000 });
-    await expect(page.locator('body')).toContainText(QA_FACILITY_NAME);
+    await expect(page.locator('body')).toContainText(QA_FACILITY_NAME, { timeout: 30_000 });
   });
 
   test('student signs in through the access-code gate and reaches the portal', async ({ page }) => {
     await qaPortalSignin(page, QA_STUDENT_EMAIL, QA_STUDENT_PASSWORD);
 
     await expect(page.getByPlaceholder('e.g. name@yourfacility.com')).toBeHidden({ timeout: 30_000 });
-    await expect(page.locator('body')).toContainText(QA_FACILITY_NAME);
+    await expect(page.locator('body')).toContainText(QA_FACILITY_NAME, { timeout: 30_000 });
   });
 });
