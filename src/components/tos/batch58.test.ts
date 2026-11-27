@@ -9,10 +9,11 @@ import path from 'path';
  *  2. The gate's "You are entering" label is white and bold.
  *  3. "Back to landing page" is a visible bordered pill on the gate and a
  *     bright bordered button on the app install page.
- *  4. "Or continue with" on the facility login card reads in slate-600.
+ *  4. "Or continue with" on the facility login card reads in slate-600 and
+ *     (batch 59) stays readable on the dark card via the or-divider hook.
  *  5. The TOS monogram tile: the TOS text and the cap are enlarged to fill
- *     the orange component (font-size 175, cap scaled 1.45), every icon
- *     file regenerated from the new SVG, og-proposal.jpg re-tiled.
+ *     the orange component (batch 59: font-size 205, cap scaled 1.70,
+ *     baseline 406), every icon file regenerated, og-proposal.jpg re-tiled.
  */
 
 const repo = (p: string) => fs.readFileSync(path.join(process.cwd(), p), 'utf8');
@@ -36,13 +37,13 @@ const install = repo('src/components/public/AppInstallPage.tsx');
 check(install.includes("color: '#F1F5F9'") && install.includes("border: '1px solid rgba(255,255,255,0.35)'") && install.includes("background: 'rgba(255,255,255,0.12)'"), 'install-page back button is bright');
 
 const auth = repo('src/components/auth/AuthPortal.tsx');
-check(auth.includes('px-4 bg-white text-slate-600">Or continue with</span>'), 'Or continue with reads in slate-600');
+check(auth.includes('px-4 bg-white text-slate-600 or-divider">Or continue with</span>'), 'Or continue with reads in slate-600 (batch 59: + or-divider)');
 check(!auth.includes('text-slate-400">Or continue with'), 'old faded divider gone');
 
 const svg = repo('public/icon.svg');
-check(svg.includes('font-size="175"'), 'TOS text enlarged to 175');
-check(svg.includes('scale(1.45)'), 'cap scaled up to match');
-check(svg.includes('y="378"'), 'monogram re-centred in the tile');
+check(svg.includes('font-size="205"'), 'TOS text enlarged to 205 (batch 59)');
+check(svg.includes('scale(1.7)'), 'cap scaled up to match (batch 59: 1.70)');
+check(svg.includes('y="406"'), 'monogram re-centred in the tile (batch 59)');
 for (const f of ['tos-brand-icon.png', 'pwa-512x512.png', 'pwa-192x192.png', 'apple-touch-icon.png', 'favicon-32.png', 'favicon.ico', 'icon.svg', 'og-proposal.jpg']) {
   check(fs.existsSync(path.join(process.cwd(), 'public', f)), 'icon file present: ' + f);
 }

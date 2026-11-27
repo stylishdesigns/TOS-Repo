@@ -7,12 +7,12 @@
   </defs>
   <rect width="512" height="512" rx="115" fill="url(#g)"/>
   <!-- mortarboard perched on the O -->
-  <g fill="#ffffff" transform="translate(0,-74) translate(252,262) scale(1.45) translate(-252,-262)">
+  <g fill="#ffffff" transform="translate(0,-81) translate(252,262) scale(1.7) translate(-252,-262)">
     <rect x="228" y="256" width="62" height="28" rx="12"/>
     <polygon points="142,262 252,218 362,262 252,306"/>
     <line x1="252" y1="260" x2="155" y2="260" stroke="#ffffff" stroke-width="6"/>
     <line x1="155" y1="260" x2="155" y2="292" stroke="#ffffff" stroke-width="6"/>
     <circle cx="155" cy="297" r="9"/>
   </g>
-  <text x="256" y="378" font-family="Arial, Helvetica, sans-serif" font-size="175" font-weight="800" fill="#ffffff" text-anchor="middle" letter-spacing="2">TOS</text>
+  <text x="256" y="406" font-family="Arial, Helvetica, sans-serif" font-size="205" font-weight="800" fill="#ffffff" text-anchor="middle" letter-spacing="2">TOS</text>
 </svg>

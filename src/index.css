@@ -252,6 +252,7 @@ span.text-slate-600:not(.dark-bg-mode *) {
 .tos-student-dark .active\:bg-slate-100\/80:active { background-color: #1a2438cc; }
 .tos-student-dark .active\:bg-slate-50\/80:active { background-color: #0d1526cc; }
 .tos-student-dark .border-slate-100 { border-color: #22304a; }
+.tos-student-dark .or-divider { background-color: #101a2c; color: #cbd5e1; }
 .tos-student-dark .border-slate-200 { border-color: #22304a; }
 .tos-student-dark .border-slate-200\/90 { border-color: #22304a; }
 .tos-student-dark .border-slate-200\/80 { border-color: #22304a; }
