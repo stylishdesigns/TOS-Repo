@@ -12,6 +12,7 @@ import {
 } from './utils/practice';
 import { PracticeSession } from './PracticeSession';
 import { PracticeSummary } from './PracticeSummary';
+import { examMatchesStudent } from './utils/practice';
 
 interface PracticeSectionProps {
   student: Student;
@@ -24,6 +25,12 @@ export const PracticeSection: React.FC<PracticeSectionProps> = ({
   initialSubject,
   onSwitchToTimetable,
 }) => {
+  // Batch 60: practice is scoped to the student's exam. The question bank
+  // tags every question with its exam; the student's own exam keyword filters
+  // it, the same way video resources do. A student without an exam on their
+  // profile sees everything.
+  const studentExam = student.examToRegister || student.programmeName || '';
+
   // Available subjects for student
   const availableSubjects = useMemo(() => {
     if (student.subjects && student.subjects.length > 0) {
@@ -76,7 +83,7 @@ export const PracticeSection: React.FC<PracticeSectionProps> = ({
     const loadData = async () => {
       const bank = getQuestionBank();
       const [fetchedTopics, studentProgress] = await Promise.all([
-        bank.getTopics(selectedSubject),
+        bank.getTopics(selectedSubject, examMatchesStudent('', studentExam) ? studentExam : ''),
         getStudentPracticeProgress(student.id || student.uid || '', selectedSubject),
       ]);
 
@@ -136,7 +143,7 @@ export const PracticeSection: React.FC<PracticeSectionProps> = ({
     const currentProgress = progressMap[topicName];
     const excludeIds = currentProgress?.recentIds || [];
 
-    const questions = await bank.getQuestions(selectedSubject, topicName, 10, excludeIds);
+    const questions = await bank.getQuestions(selectedSubject, topicName, 10, excludeIds, studentExam);
     if (questions.length === 0) {
       return;
     }

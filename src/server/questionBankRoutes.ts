@@ -52,6 +52,23 @@ type Kind = (typeof KINDS)[number];
 // rides with the mock piece.
 const EXAM_TYPES = ['jamb', 'waec_neco'] as const;
 type ExamType = (typeof EXAM_TYPES)[number];
+
+// Batch 60: every question belongs to one registered exam, keyed on the
+// normalised exam name. The legacy jamb and waec_neco pipeline keys keep
+// working when the registry has no match yet, so nothing old breaks.
+interface RegistryExam { key: string; questionType: string; }
+async function registryExam(raw: unknown): Promise<RegistryExam> {
+  const pick = mapKey(raw);
+  if (!pick) throw httpError(400, 'Exam pipeline is required.');
+  const snap = await adminDb.collection('examTypes').get();
+  const hit = snap.docs.find((d) => mapKey((d.data() as any)?.name || d.id) === pick);
+  if (hit) {
+    const qt = String((hit.data() as any)?.questionType || 'mcq').trim().toLowerCase();
+    return { key: mapKey((hit.data() as any)?.name || hit.id), questionType: ['mcq', 'theory', 'both'].includes(qt) ? qt : 'mcq' };
+  }
+  if ((EXAM_TYPES as readonly string[]).includes(pick)) return { key: pick, questionType: 'both' };
+  throw httpError(400, 'That exam is not registered. Register it under Exams first.');
+}
 const EARLIEST_YEAR = 1978;
 const IMPORT_MAX = 400;
 
@@ -107,15 +124,17 @@ function parseYear(raw: any, required: boolean): number | null {
   return y;
 }
 
-function validateQuestion(body: any): ValidatedQuestion {
+async function validateQuestion(body: any): Promise<ValidatedQuestion> {
   if (!body || typeof body !== 'object') throw httpError(400, 'Invalid request body.');
 
   const kindRaw = String(body.kind ?? 'practice').trim().toLowerCase();
   if (!(KINDS as readonly string[]).includes(kindRaw)) throw httpError(400, 'Kind must be practice or mock.');
   const kind = kindRaw as Kind;
-  const examTypeRaw = String(body.examType ?? 'jamb').trim().toLowerCase();
-  if (!(EXAM_TYPES as readonly string[]).includes(examTypeRaw)) throw httpError(400, 'Exam pipeline must be jamb or waec_neco.');
-  const examType = examTypeRaw as ExamType;
+  const reg = await registryExam(body.examType ?? 'jamb');
+  if (reg.questionType === 'theory') {
+    throw httpError(400, `${reg.key.toUpperCase()} is set to theory questions only. Switch it to MCQ or Both in Question types before saving objective questions.`);
+  }
+  const examType = reg.key as ExamType;
 
   const subject = String(body.subject ?? '').trim();
   const klass = String(body.klass ?? '').trim();
@@ -401,7 +420,7 @@ export function registerQuestionBankRoutes(app: express.Express): void {
   app.post('/api/tos/questionbank/questions', async (req, res) => {
     try {
       const caller = requireTos(req);
-      const q = validateQuestion(req.body);
+      const q = await validateQuestion(req.body);
       const now = new Date().toISOString();
       const docData = {
         ...q,
@@ -437,7 +456,7 @@ export function registerQuestionBankRoutes(app: express.Express): void {
   app.post('/api/tos/questionbank/questions/:id', async (req, res) => {
     try {
       const caller = requireTos(req);
-      const q = validateQuestion(req.body);
+      const q = await validateQuestion(req.body);
       const ref = adminDb.collection(QB_QUESTIONS).doc(req.params.id);
       const doc = await ref.get();
       if (!doc.exists) throw httpError(404, 'Question not found.');
@@ -475,9 +494,11 @@ export function registerQuestionBankRoutes(app: express.Express): void {
       const kindRaw = String(body.kind ?? 'practice').trim().toLowerCase();
       if (!(KINDS as readonly string[]).includes(kindRaw)) throw httpError(400, 'Kind must be practice or mock.');
       const kind = kindRaw as Kind;
-      const examTypeRaw = String(body.examType ?? 'jamb').trim().toLowerCase();
-      if (!(EXAM_TYPES as readonly string[]).includes(examTypeRaw)) throw httpError(400, 'Exam pipeline must be jamb or waec_neco.');
-      const examType = examTypeRaw as ExamType;
+      const reg = await registryExam(body.examType ?? 'jamb');
+      if (reg.questionType === 'theory') {
+        throw httpError(400, `${reg.key.toUpperCase()} is set to theory questions only. Switch it to MCQ or Both in Question types before importing objective questions.`);
+      }
+      const examType = reg.key as ExamType;
       const subject = String(body.subject ?? '').trim();
       const klass = String(body.klass ?? '').trim();
       const topic = String(body.topic ?? '').trim();

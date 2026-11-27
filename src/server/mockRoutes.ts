@@ -69,7 +69,8 @@ const QB_SCAN_CAP = 2000; // same windowed-read ceiling the bank uses
 const STATUSES = ['draft', 'scheduled', 'live', 'closed', 'released', 'archived', 'cancelled', 'void'] as const;
 type MockStatus = (typeof STATUSES)[number];
 const EXAM_TYPES = ['jamb', 'waec_neco'] as const;
-type ExamType = (typeof EXAM_TYPES)[number];
+// Batch 60: a mock carries any registered exam key (normalised exam name).
+type ExamType = string;
 
 const TITLE_MAX = 120;
 const SUBJECT_MAX = 80;
@@ -120,10 +121,54 @@ export function lagosToday(): string {
 // ---------------------------------------------------------------------------
 // Validation. Fields outside the whitelist are dropped, never stored.
 // ---------------------------------------------------------------------------
-function parseExamType(v: unknown): ExamType {
-  const s = String(v ?? '').trim().toLowerCase();
-  if (!(EXAM_TYPES as readonly string[]).includes(s)) throw httpError(400, 'Exam type must be jamb or waec_neco.');
-  return s as ExamType;
+// Batch 60: exams come from the registry. The legacy jamb and waec_neco
+// pipeline keys keep working when the registry has no match yet, so mocks
+// made before this change stay readable and editable.
+let examRegistryCache: { at: number; exams: Array<{ key: string; name: string; questionType: string }> } | null = null;
+async function loadExamRegistry(): Promise<Array<{ key: string; name: string; questionType: string }>> {
+  if (examRegistryCache && Date.now() - examRegistryCache.at < 60_000) return examRegistryCache.exams;
+  const snap = await adminDb.collection('examTypes').get();
+  const exams = snap.docs
+    .map((d) => {
+      const x = d.data() as any;
+      const name = String(x?.name || d.id.replace(/^exam-/, ''));
+      const qt = String(x?.questionType || 'mcq').trim().toLowerCase();
+      return { key: examKeyOf(name), name, questionType: ['mcq', 'theory', 'both'].includes(qt) ? qt : 'mcq' };
+    })
+    .filter((e) => e.key);
+  examRegistryCache = { at: Date.now(), exams };
+  return exams;
+}
+
+function examKeyOf(raw: unknown): string {
+  return String(raw ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+}
+
+// Candidate bank keys for one exam: the old combined WAEC/NECO pipeline still
+// answers for WAEC and NECO mocks, exactly as the question bank reads do.
+function examCandidateKeysOf(key: string): string[] {
+  if (key === 'waec_neco') return ['waec', 'neco', 'waec_neco'];
+  if (key === 'waec' || key === 'neco') return [key, 'waec_neco'];
+  return [key];
+}
+
+// Exams that are one paper on one date take exactly one subject, as WAEC and
+// NECO always have. Everything else follows the JAMB shape (subjectCount cap).
+function isSinglePaperExam(key: string): boolean {
+  return ['waec', 'neco', 'waec_neco'].includes(key);
+}
+
+async function parseExamType(v: unknown): Promise<{ key: string; name: string; questionType: string }> {
+  const pick = examKeyOf(v);
+  if (!pick) throw httpError(400, 'Exam type is required.');
+  const exams = await loadExamRegistry();
+  const hit = exams.find((e) => e.key === pick);
+  if (hit) return { key: hit.key, name: hit.name, questionType: hit.questionType };
+  if ((EXAM_TYPES as readonly string[]).includes(pick)) {
+    const jamb = exams.find((e) => e.key === 'jamb');
+    return { key: pick, name: pick === 'jamb' ? 'JAMB' : 'WAEC/NECO', questionType: pick === 'jamb' && jamb ? jamb.questionType : 'both' };
+  }
+  throw httpError(400, 'That exam is not registered. Register it under Exams first.');
 }
 
 function parseDate(v: unknown): string {
@@ -149,8 +194,8 @@ interface SubjectSpec {
 function parseSubjects(raw: unknown, settings: MockSettings, examType: ExamType, questionSource: 'random' | 'picked'): SubjectSpec[] {
   if (!Array.isArray(raw) || raw.length < 1) throw httpError(400, 'At least one subject is required.');
   if (raw.length > SUBJECTS_MAX) throw httpError(400, `At most ${SUBJECTS_MAX} subjects.`);
-  if (examType === 'waec_neco' && raw.length !== 1) {
-    throw httpError(400, 'A WAEC/NECO mock is one paper: exactly one subject per date.');
+  if (isSinglePaperExam(examType) && raw.length !== 1) {
+    throw httpError(400, 'This exam runs one paper on one date: exactly one subject per mock.');
   }
   if (examType === 'jamb' && raw.length > settings.jamb.subjectCount) {
     throw httpError(400, `A JAMB mock takes at most ${settings.jamb.subjectCount} subjects (the setting can be changed).`);
@@ -324,12 +369,13 @@ function shuffle<T>(arr: T[]): T[] {
   return out;
 }
 
-async function pickRandom(subject: string, count: number): Promise<{ paper: PaperQuestion[]; key: KeyItem[] }> {
+async function pickRandom(subject: string, count: number, examKeys: string[]): Promise<{ paper: PaperQuestion[]; key: KeyItem[] }> {
   const snap = await adminDb
     .collection(QB_QUESTIONS)
     .where('kind', '==', 'mock')
     .where('status', '==', 'published')
     .where('subject', '==', subject)
+    .where('examType', 'in', examKeys.slice(0, 10))
     .get();
   if (snap.size > QB_SCAN_CAP) throw httpError(413, `Too many mock questions for "${subject}" to pick from; trim the bank.`);
   if (snap.size < count) {
@@ -360,7 +406,7 @@ async function pickRandom(subject: string, count: number): Promise<{ paper: Pape
   return { paper: shuffle(paper), key };
 }
 
-async function pickPicked(subject: string, ids: string[]): Promise<{ paper: PaperQuestion[]; key: KeyItem[] }> {
+async function pickPicked(subject: string, ids: string[], examKeys: string[]): Promise<{ paper: PaperQuestion[]; key: KeyItem[] }> {
   const paper: PaperQuestion[] = [];
   const key: KeyItem[] = [];
   for (const id of ids) {
@@ -372,6 +418,9 @@ async function pickPicked(subject: string, ids: string[]): Promise<{ paper: Pape
     }
     if (String(d.subject || '') !== subject) {
       throw httpError(409, `Question ${id} belongs to "${String(d.subject || '')}", not "${subject}".`);
+    }
+    if (!examCandidateKeysOf(String(d.examType || 'jamb')).some((k) => examKeys.includes(k))) {
+      throw httpError(409, `Question ${id} belongs to a different exam's bank (${String(d.examType || 'jamb')}).`);
     }
     paper.push({
       id: doc.id,
@@ -687,11 +736,15 @@ export function registerMockRoutes(app: express.Express): void {
       const caller = requireTos(req);
       const body = req.body || {};
       const { settings } = await readSettings();
-      const examType = parseExamType(body.examType);
+      const exam = await parseExamType(body.examType);
+      const examType = exam.key;
       const date = parseDate(body.date);
       const title = parseTitle(body.title);
       const questionSource = parseQuestionSource(body.questionSource);
       const subjects = parseSubjects(body.subjects, settings, examType, questionSource);
+      if (exam.questionType === 'theory') {
+        throw httpError(400, `${exam.name} takes theory questions only. The theory pipeline is still being built, so its mock paper cannot be built yet; switch the exam to MCQ or Both in Question types first.`);
+      }
       if (questionSource === 'picked') rejectDuplicateIds(subjects);
       const id = `mock-${date}`;
       const now = new Date().toISOString();
@@ -705,6 +758,7 @@ export function registerMockRoutes(app: express.Express): void {
         tx.set(ref, {
           id,
           examType,
+          examQuestionType: exam.questionType,
           title,
           date,
           status: 'draft' as MockStatus,
@@ -744,7 +798,8 @@ export function registerMockRoutes(app: express.Express): void {
         if (body.date && String(body.date) !== mock.date) {
           throw httpError(400, 'A mock keeps its date. To move it, cancel this one and create a new mock on the other date.');
         }
-        const examType = parseExamType(mock.examType);
+        // Tolerant read: the stored exam key was validated at creation.
+        const examType = examKeyOf(mock.examType) || 'jamb';
         const questionSource = body.questionSource ? parseQuestionSource(body.questionSource) : mock.questionSource;
         const subjects = parseSubjects(body.subjects ?? mock.subjects, settings, examType, questionSource);
         if (questionSource === 'picked') rejectDuplicateIds(subjects);
@@ -890,12 +945,14 @@ export function registerMockRoutes(app: express.Express): void {
           dupes.add(q);
         }
       }
+      const examKeys = examCandidateKeysOf(String(mock.examType || 'jamb'));
       for (const s of subjects) {
         const agg = await adminDb
           .collection(QB_QUESTIONS)
           .where('kind', '==', 'mock')
           .where('status', '==', 'published')
           .where('subject', '==', s.subject)
+          .where('examType', 'in', examKeys.slice(0, 10))
           .count()
           .get();
         const available = agg.data().count;
@@ -906,7 +963,10 @@ export function registerMockRoutes(app: express.Express): void {
           warnings.push({ level: 'warn', code: 'low-margin', message: `"${s.subject}" has only ${available - s.count} spare questions beyond the ${s.count} needed.` });
         }
       }
-      res.json({ ok: true, ready: !warnings.some((w) => w.level === 'error'), warnings, counts });
+      if (examCandidateKeysOf(String(mock.examType || 'jamb')) && mock.examQuestionType === 'theory') {
+        warnings.push({ level: 'error', code: 'exam-theory-only', message: `${String(mock.examType)} is set to theory questions only. The theory pipeline is still being built, so its mock bank has no auto-markable questions yet; switch the exam to MCQ or Both in Question types.` });
+      }
+      res.json({ ok: true, ready: !warnings.some((w) => w.level === 'error'), warnings, counts, examQuestionType: mock.examQuestionType || 'mcq' });
     } catch (error: any) {
       if (error?.status) return res.status(error.status).json({ error: error.message });
       console.error('[mocks] readiness failed:', error?.message || error);
@@ -1014,11 +1074,12 @@ async function destroyPrivatePaper(mockId: string): Promise<boolean> {
       }
       const paper: PaperQuestion[] = [];
       const key: KeyItem[] = [];
+      const examKeys = examCandidateKeysOf(String(mock.examType || 'jamb'));
       for (const s of subjects) {
         const picked =
           mock.questionSource === 'picked'
-            ? await pickPicked(s.subject, (s.questionIds || []).slice(0, QUESTION_IDS_MAX))
-            : await pickRandom(s.subject, s.count);
+            ? await pickPicked(s.subject, (s.questionIds || []).slice(0, QUESTION_IDS_MAX), examKeys)
+            : await pickRandom(s.subject, s.count, examKeys);
         paper.push(...picked.paper);
         key.push(...picked.key);
       }
@@ -1026,8 +1087,12 @@ async function destroyPrivatePaper(mockId: string): Promise<boolean> {
       if (paper.length !== expected) {
         throw httpError(409, `Freeze built ${paper.length} questions but the mock declares ${expected}. Nothing was written.`);
       }
-      const durationMinutes = mock.examType === 'jamb' ? settings.jamb.durationMinutes : settings.waecNeco.durationMinutes;
-      const scoreScale = mock.examType === 'jamb' ? settings.jamb.scoreScale : settings.waecNeco.scoreScale;
+      // JAMB keeps its own settings shape; single-paper exams run the
+      // WAEC/NECO shape; every other registered exam follows the JAMB shape
+      // until per-exam settings arrive.
+      const singlePaper = isSinglePaperExam(String(mock.examType || ''));
+      const durationMinutes = singlePaper ? settings.waecNeco.durationMinutes : settings.jamb.durationMinutes;
+      const scoreScale = singlePaper ? settings.waecNeco.scoreScale : settings.jamb.scoreScale;
       // MB1 Step 2: the paper itself is stored privately (authenticated
       // Cloudinary asset, questions and options only) before anything is
       // written to Firestore, so a failed upload never leaves a half-scheduled
